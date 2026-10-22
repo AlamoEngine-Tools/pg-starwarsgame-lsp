@@ -76,7 +76,13 @@ function request(method, params, timeoutMs = 120000) {
         processId: process.pid,
         rootUri,
         capabilities: {},
-        initializationOptions: {workspaceRoot: workspace, projectPath: `${workspace}/${project}`},
+        // AET_BASELINE reads a baseline built here rather than the newest release, for a change
+        // that needs one rebuilt.
+        initializationOptions: {
+            workspaceRoot: workspace,
+            projectPath: `${workspace}/${project}`,
+            baselineLocalPath: process.env.AET_BASELINE,
+        },
         workspaceFolders: [{uri: rootUri, name: "rig"}],
     });
     send({jsonrpc: "2.0", method: "initialized", params: {}});

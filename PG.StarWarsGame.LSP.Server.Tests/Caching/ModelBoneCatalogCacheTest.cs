@@ -72,6 +72,22 @@ public sealed class ModelBoneCatalogCacheTest
         Assert.False(loaded["ev_speeder.alo"].ParticleSystem);
     }
 
+    // A reused snapshot keeps a model's proxies (#270), or the particle systems would lose the models
+    // that carry them after a restart.
+    [Fact]
+    public void Save_ThenTryLoad_KeepsAModelsProxies()
+    {
+        var cache = Build(new MockFileSystem());
+        cache.Save(PgprojPath, "fp-1", new Dictionary<string, ModelCatalogEntry>
+        {
+            ["ev_speeder.alo"] = new(["root"], []) { Proxies = ["P_Engine_ALT2", "P_Smoke"] }
+        });
+
+        var loaded = cache.TryLoad(PgprojPath, "fp-1")!;
+
+        Assert.Equal(["P_Engine_ALT2", "P_Smoke"], loaded["ev_speeder.alo"].Proxies);
+    }
+
     [Fact]
     public void TryLoad_KeysAreCaseInsensitive_LikeTheModelBoneKey()
     {

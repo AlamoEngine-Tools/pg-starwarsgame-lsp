@@ -535,14 +535,14 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
         return ModelTextureNames.Scan(buffer.ToArray());
     };
 
-    var (assetFiles, modelBones, modelTextures, particleSystems) = MegAssetCatalogBuilder.Build(
+    var (assetFiles, modelBones, modelTextures, particleSystems, modelProxies) = MegAssetCatalogBuilder.Build(
         megEntries, looseFileSystem, engine.GameRepository.Path,
         openMegEntry, getBones, getMtdIcons, assetLogger, getTextures);
 
     baseline = baseline with
     {
         AssetFiles = assetFiles, ModelBones = modelBones, ModelTextures = modelTextures,
-        ParticleSystems = particleSystems
+        ParticleSystems = particleSystems, ModelProxies = modelProxies
     };
     Console.WriteLine($"Asset files: {baseline.AssetFiles.Count} asset file(s) (MEG + loose)");
     Console.WriteLine($"Model bones: {baseline.ModelBones.Count} model(s) with bone data");

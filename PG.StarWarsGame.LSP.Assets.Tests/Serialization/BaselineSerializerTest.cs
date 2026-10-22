@@ -53,6 +53,23 @@ public sealed class BaselineSerializerTest
         Assert.Contains("P_SMOKE.ALO", result.ParticleSystems);
     }
 
+    // The particle systems each shipped model's proxies name, as written (#270). A baseline written
+    // before the field has none, and its particle systems list no models - so it needs no version.
+    [Fact]
+    public void RoundTrip_ModelProxies()
+    {
+        var baseline = BaselineIndex.Empty with
+        {
+            ModelProxies = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("ev_stardestroyer.alo", ["P_HP_Imperial_Damage", "pe_stardestroyerengines"])
+        };
+
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(["P_HP_Imperial_Damage", "pe_stardestroyerengines"],
+            result.ModelProxies["EV_STARDESTROYER.ALO"].ToArray());
+    }
+
     [Fact]
     public void RoundTrip_Behaviors()
     {

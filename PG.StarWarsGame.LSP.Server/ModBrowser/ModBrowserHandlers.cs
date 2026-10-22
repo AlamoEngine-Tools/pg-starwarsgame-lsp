@@ -124,8 +124,8 @@ internal static class EntryFiles
 }
 
 /// <summary>
-///     The proxy names inside a model file, read once per model and index: the catalog scan does not
-///     read proxies, so a model's particle systems cost one file read when it is first opened.
+///     The proxy names inside a model file: from the catalog scan where it saw the model, otherwise
+///     read once per model and index, when it is first opened.
 /// </summary>
 internal static class ModelProxies
 {
@@ -135,7 +135,9 @@ internal static class ModelProxies
     public static Func<string, IReadOnlyList<string>> For(GameIndex index, IGameAssetResolver assets)
     {
         var read = Reads(index, assets);
-        return path => read(path).Proxies;
+        return path => index.ModelProxies.TryGetValue(ModelBoneKey.From(path), out var scanned)
+            ? scanned
+            : read(path).Proxies;
     }
 
     /// <summary>

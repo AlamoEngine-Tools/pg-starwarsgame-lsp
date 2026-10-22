@@ -36,9 +36,10 @@ public sealed class ModelBoneCatalogSnapshot
     ///     (2026-09-30) - a v1 snapshot has none, and an absent texture list means "never scanned",
     ///     which would send the validator back to parsing every model on demand; 3 = entries say
     ///     whether the file is a particle system (#270) - a v2 snapshot would list every one as a
-    ///     model.
+    ///     model; 4 = entries carry the model's proxy names (#270) - a v3 snapshot would name no
+    ///     model as a particle system's user.
     /// </remarks>
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     [Key(0)] public int SchemaVersion { get; set; }
 
@@ -72,4 +73,8 @@ public sealed class SerializedModelBones
     /// <summary>The file is a particle system rather than a model (#270).</summary>
     [Key(3)]
     public bool ParticleSystem { get; set; }
+
+    /// <summary>The particle names the model's proxies carry, as the file spells them (#270).</summary>
+    [Key(4)]
+    public string[] Proxies { get; set; } = [];
 }

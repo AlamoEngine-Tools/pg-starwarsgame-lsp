@@ -928,6 +928,43 @@ public sealed class WorkspaceIndexerTest
         Assert.True(svc.AppliedModelBones!.ContainsKey("shipped.alo"));
     }
 
+    // A model's proxies name the particle systems it carries (#270): the scan that reads every .alo
+    // records them, merged over the baseline's like the rest of the model catalog, so a particle
+    // system can list the models that carry it.
+    [Fact]
+    public void ApplyModelBoneCatalog_PublishesTheModelsProxies_TheModsOverTheBaselines()
+    {
+        var fs = new MockFileSystem();
+        fs.AddDirectory(Root("mod/art"));
+        var baseline = BaselineIndex.Empty with
+        {
+            ModelProxies = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .WithComparers(StringComparer.OrdinalIgnoreCase)
+                .Add("shipped.alo", ["P_Shipped"]).Add("my_frigate.alo", ["P_Old_Engine"])
+        };
+        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
+        var cache = new StubBoneCache
+        {
+            Stored =
+            {
+                [Root("mod/mod.pgproj")] = new Dictionary<string, ModelCatalogEntry>
+                {
+                    ["my_frigate.alo"] = new(["root"], []) { Proxies = ["P_Engine_ALT2"] }
+                }
+            }
+        };
+        var indexer = BuildWithBoneCache(fs, svc, cache);
+
+        indexer.ApplyModelBoneCatalog(WorkspaceConfiguration.Empty with
+        {
+            AssetRoots = [Root("mod/art")],
+            Layers = [new ProjectLayer(0, "mod", [], [], [], [Root("mod/art")], null, Root("mod/mod.pgproj"))]
+        });
+
+        Assert.Equal(["P_Engine_ALT2"], svc.AppliedModelProxies!["my_frigate.alo"].ToArray());
+        Assert.Equal(["P_Shipped"], svc.AppliedModelProxies["shipped.alo"].ToArray());
+    }
+
     /// <summary>
     ///     The reason the snapshot is per LAYER: a layer whose models are unchanged must be served
     ///     from its own snapshot, and must NOT be re-extracted because a sibling layer changed.
@@ -2357,6 +2394,13 @@ public sealed class WorkspaceIndexerTest
         public void ApplyParticleSystems(ImmutableHashSet<string> particleSystems)
         {
             AppliedParticleSystems = particleSystems;
+        }
+
+        public ImmutableDictionary<string, ImmutableArray<string>>? AppliedModelProxies { get; private set; }
+
+        public void ApplyModelProxies(ImmutableDictionary<string, ImmutableArray<string>> proxies)
+        {
+            AppliedModelProxies = proxies;
         }
 
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)

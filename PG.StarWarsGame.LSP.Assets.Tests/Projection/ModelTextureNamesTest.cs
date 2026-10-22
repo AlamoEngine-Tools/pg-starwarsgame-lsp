@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
+using PG.StarWarsGame.LSP.Assets.Tests.Models;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
@@ -54,5 +55,22 @@ public sealed class ModelTextureNamesTest
 
         Assert.Equal(kind, scan.Kind);
         Assert.Empty(scan.Textures);
+    }
+
+    // The particle systems a model's proxies name come from the same read as its textures, so a
+    // system can list the models that carry it without a second pass over every model (#270).
+    [Fact]
+    public void Scan_AModel_AlsoNamesItsProxies()
+    {
+        var alo = AloChunkFixture.Concat(
+            AloChunkFixture.Skeleton(
+                AloChunkFixture.Bone("ROOT", -1, true, AloChunkFixture.Translation(0, 0, 0)),
+                AloChunkFixture.Bone("Engine_00", 0, true, AloChunkFixture.Translation(0, 0, 0))),
+            AloChunkFixture.Connections(proxies: [AloChunkFixture.Proxy("P_Engine_Glow_ALT2", 1)]));
+
+        var scan = ModelTextureNames.Scan(alo);
+
+        Assert.Equal(AloFileKind.Model, scan.Kind);
+        Assert.Equal(["P_Engine_Glow_ALT2"], scan.Proxies);
     }
 }

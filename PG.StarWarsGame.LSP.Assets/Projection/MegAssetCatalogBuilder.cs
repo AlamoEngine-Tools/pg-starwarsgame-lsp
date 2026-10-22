@@ -54,7 +54,7 @@ public static class MegAssetCatalogBuilder
     /// <param name="logger">Logger for collision warnings.</param>
     /// <param name="extractTextures">
     ///     Reads what an open <c>.alo</c> is and the texture names it carries inside itself. When
-    ///     <see langword="null" />, no texture catalog and no particle-system set is built, and the
+    ///     <see langword="null" />, no texture catalog, particle-system set or proxy catalog is built, and the
     ///     validator falls back to parsing each model on demand - which is what it did before, and
     ///     what MEASURED as the entire cost of a workspace diagnostics sweep.
     ///     <para>
@@ -70,7 +70,8 @@ public static class MegAssetCatalogBuilder
         ImmutableHashSet<string> assetFiles,
         ImmutableDictionary<string, ImmutableArray<string>> modelBones,
         ImmutableDictionary<string, ImmutableArray<string>> modelTextures,
-        ImmutableHashSet<string> particleSystems
+        ImmutableHashSet<string> particleSystems,
+        ImmutableDictionary<string, ImmutableArray<string>> modelProxies
         ) Build(
             IEnumerable<(string megName, IEnumerable<string> entryPaths)> megEntries,
             IFileSystem looseFileSystem,
@@ -87,6 +88,8 @@ public static class MegAssetCatalogBuilder
         var bonesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
         var texturesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
         var particleBuilder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
+        var proxiesBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
+            StringComparer.OrdinalIgnoreCase);
 
         foreach (var (megName, entryPaths) in megEntries)
         foreach (var rawPath in entryPaths)
@@ -115,7 +118,8 @@ public static class MegAssetCatalogBuilder
 
             TryExtractBones(normalized, openEntry, extractBones, bonesBuilder);
             if (extractTextures is not null)
-                TryExtractTextures(normalized, openEntry, extractTextures, texturesBuilder, particleBuilder);
+                TryExtractTextures(normalized, openEntry, extractTextures, texturesBuilder, particleBuilder,
+                    proxiesBuilder);
         }
 
         // Merge loose files on top (workspace loose files may extend the MEG catalog).
@@ -131,7 +135,8 @@ public static class MegAssetCatalogBuilder
                 kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase),
             texturesBuilder.ToImmutableDictionary(
                 kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase),
-            particleBuilder.ToImmutable());
+            particleBuilder.ToImmutable(),
+            proxiesBuilder.ToImmutable());
     }
 
     /// <summary>
@@ -239,7 +244,8 @@ public static class MegAssetCatalogBuilder
         Func<string, Stream?> openEntry,
         Func<Stream, AloScan> extractTextures,
         Dictionary<string, ImmutableArray<string>> texturesBuilder,
-        ImmutableHashSet<string>.Builder particleBuilder)
+        ImmutableHashSet<string>.Builder particleBuilder,
+        ImmutableDictionary<string, ImmutableArray<string>>.Builder proxiesBuilder)
     {
         try
         {
@@ -251,6 +257,7 @@ public static class MegAssetCatalogBuilder
             var scan = extractTextures(stream);
             texturesBuilder[key] = [.. scan.Textures];
             if (scan.Kind == AloFileKind.Particle) particleBuilder.Add(key);
+            else proxiesBuilder[key] = [.. scan.Proxies];
         }
         catch
         {

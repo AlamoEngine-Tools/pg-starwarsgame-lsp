@@ -25,6 +25,7 @@ public static class BaselineSerializer
             ModelBones = ToSerializedArray(baseline.ModelBones),
             ModelTextures = ToSerializedArray(baseline.ModelTextures),
             ParticleSystems = baseline.ParticleSystems.ToArray(),
+            ModelProxies = ToSerializedArray(baseline.ModelProxies),
             ObjectTags = ToSerializedObjectTags(baseline.ObjectTags),
             SchemaVersion = SerializedBaseline.CurrentSchemaVersion
         };
@@ -76,6 +77,8 @@ public static class BaselineSerializer
             ModelBones = modelBones,
             ModelTextures = modelTextures,
             ParticleSystems = (dto.ParticleSystems ?? []).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
+            ModelProxies = (dto.ModelProxies ?? []).ToImmutableDictionary(
+                e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase),
             ObjectTags = objectTags
         };
     }

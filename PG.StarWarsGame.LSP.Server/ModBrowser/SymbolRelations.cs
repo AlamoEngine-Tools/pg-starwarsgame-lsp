@@ -225,6 +225,7 @@ public sealed class SymbolRelations(
             ("luaScripts", "requires") => (index.Documents.GetValueOrDefault(entry.Id)?.RequireArgs ?? [])
                 .Select(a => catalog.Find("luaScripts", WithExtension(a, ".lua")) ?? Missing(a, ".lua")),
             ("textures", UsedBy) => ModelsNaming(entry.Name).Concat(Users(entry.Name)),
+            ("particleSystems", UsedBy) => ModelsCarrying(entry.Name).Concat(Users(entry.Name)),
             (_, UsedBy) => Users(entry.Name),
             _ => []
         };
@@ -248,6 +249,18 @@ public sealed class SymbolRelations(
         return index.ModelTextures
             .Where(m => m.Value.Any(named => TextureKey(named) == key))
             .Select(m => catalog.Find("models", m.Key) ?? catalog.Find("particleSystems", m.Key))
+            .OfType<SymbolRow>()
+            .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    // The models whose proxies name a particle system, matched as the engine loads it: level tags stripped.
+    private IEnumerable<SymbolRow> ModelsCarrying(string particleSystem)
+    {
+        var stem = Path.GetFileNameWithoutExtension(particleSystem);
+        return index.ModelProxies
+            .Where(m => m.Value.Any(p => string.Equals(ModelLevelTag.Strip(p), stem,
+                StringComparison.OrdinalIgnoreCase)))
+            .Select(m => catalog.Find("models", m.Key))
             .OfType<SymbolRow>()
             .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase);
     }

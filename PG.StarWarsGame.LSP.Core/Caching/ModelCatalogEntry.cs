@@ -20,4 +20,7 @@ namespace PG.StarWarsGame.LSP.Core.Caching;
 public sealed record ModelCatalogEntry(string[] Bones, string[] Textures, bool ParticleSystem = false)
 {
     public static readonly ModelCatalogEntry Empty = new([], []);
+
+    /// <summary>The particle names the model's proxies carry, as the file spells them (#270).</summary>
+    public string[] Proxies { get; init; } = [];
 }

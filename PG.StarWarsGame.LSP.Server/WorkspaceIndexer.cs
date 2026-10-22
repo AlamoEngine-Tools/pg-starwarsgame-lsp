@@ -249,6 +249,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         // Which .alo files are particle systems (#270), the workspace's entry deciding for its name.
         var particleSystems = _indexService.Current.Baseline.ParticleSystems.ToBuilder();
+        // Each model's proxy names (#270), the workspace's model replacing the shipped one's.
+        var proxies = _indexService.Current.Baseline.ModelProxies.ToBuilder();
 
         var workspaceCount = 0;
         var reusedLayers = 0;
@@ -272,6 +274,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 mergedTextures[path] = [.. entry.Textures];
                 if (entry.ParticleSystem) particleSystems.Add(path);
                 else particleSystems.Remove(path);
+                proxies[path] = [.. entry.Proxies];
                 workspaceCount++;
             }
         }
@@ -286,6 +289,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _indexService.ApplyModelBones(mergedBones.ToImmutable());
         _indexService.ApplyModelTextures(mergedTextures.ToImmutable());
         _indexService.ApplyParticleSystems(particleSystems.ToImmutable());
+        _indexService.ApplyModelProxies(proxies.ToImmutable());
     }
 
 
@@ -486,7 +490,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with
                 {
                     Textures = [.. scan.Textures],
-                    ParticleSystem = scan.Kind == AloFileKind.Particle
+                    ParticleSystem = scan.Kind == AloFileKind.Particle,
+                    Proxies = [.. scan.Proxies]
                 };
         }
 

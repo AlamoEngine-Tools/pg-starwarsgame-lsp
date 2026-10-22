@@ -91,6 +91,14 @@ public sealed record BaselineIndex(
         ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    ///     The particle names each shipped model's proxies carry, keyed like <see cref="ModelBones" />,
+    ///     from the same scan (#270). Empty in a baseline built before it, which names no shipped model
+    ///     as a particle system's user.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<string>> ModelProxies { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     ///     Full child-tag tree of each shipped GameObject, keyed case-insensitively by object id. Built
     ///     offline by the BaselineBuilder; consumed by the effective-object merge engine so that variants
     ///     (<c>Variant_Of_Existing_Type</c>) whose base is a shipped object can be resolved. Empty for

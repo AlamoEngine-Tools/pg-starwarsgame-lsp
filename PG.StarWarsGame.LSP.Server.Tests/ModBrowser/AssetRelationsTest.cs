@@ -90,7 +90,10 @@ public sealed class AssetRelationsTest
             ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .WithComparers(StringComparer.OrdinalIgnoreCase)
                 // The effect names its glow as a .tga that only ships as a .dds.
-                .Add("ev_tie.alo", ["Tie.tga"]).Add("p_smoke.alo", ["Smoke.tga", "Glow.tga"])
+                .Add("ev_tie.alo", ["Tie.tga"]).Add("p_smoke.alo", ["Smoke.tga", "Glow.tga"]),
+            ModelProxies = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .WithComparers(StringComparer.OrdinalIgnoreCase)
+                .Add("ev_tie.alo", ["P_Smoke_ALT2", "P_Missing_LOD0"])
         };
         // The model carries two effects; one names a particle system no layer ships.
         // The mod's model and its script are files on disk; its idle clip is listed but not found, and
@@ -213,6 +216,13 @@ public sealed class AssetRelationsTest
     public void AParticleSystem_OpensIntoItsTextures_ATgaNameMeaningTheDdsShipped()
     {
         Assert.Equal(["smoke.tga", "glow.dds"], Names(Relations().Rows("particleSystems", "p_smoke.alo", "textures")));
+    }
+
+    // The models carrying a particle system are the ones whose proxies name it, level tags stripped.
+    [Fact]
+    public void AParticleSystem_IsUsedByTheModelsWhoseProxiesNameIt()
+    {
+        Assert.Equal(["ev_tie.alo"], Names(Relations().Rows("particleSystems", "p_smoke.alo", "usedBy")));
     }
 
     [Fact]

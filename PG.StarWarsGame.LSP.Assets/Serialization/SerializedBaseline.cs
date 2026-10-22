@@ -48,4 +48,12 @@ public sealed class SerializedBaseline
     /// </summary>
     [Key(12)]
     public string[] ParticleSystems { get; set; } = [];
+
+    /// <summary>
+    ///     The proxy names inside each shipped model, keyed like <see cref="ModelBones" /> (#270). Needs
+    ///     no new <see cref="CurrentSchemaVersion" />: a baseline written before it reads as none, which
+    ///     names no shipped model as a particle system's user - the behaviour before the field.
+    /// </summary>
+    [Key(13)]
+    public SerializedEnumValues[] ModelProxies { get; set; } = [];
 }

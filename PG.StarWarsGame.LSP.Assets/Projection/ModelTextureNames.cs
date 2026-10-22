@@ -49,12 +49,17 @@ public static class ModelTextureNames
         {
             // A particle system and a model are both .alo and are told apart by their first chunk,
             // exactly as the preview does it. Reading one as the other throws rather than lying.
-            return new AloScan(kind, kind switch
+            if (kind == AloFileKind.Model)
             {
-                AloFileKind.Particle => ParticleTextures(bytes),
-                AloFileKind.Model => ModelTextures(bytes),
-                _ => []
-            });
+                // One read for both: the model's textures and the particle systems its proxies name.
+                var model = AloModelReader.Read(bytes);
+                return new AloScan(kind, ModelTextures(model))
+                {
+                    Proxies = [.. model.Proxies.Select(p => p.Name)]
+                };
+            }
+
+            return new AloScan(kind, kind == AloFileKind.Particle ? ParticleTextures(bytes) : []);
         }
         catch
         {
@@ -64,11 +69,11 @@ public static class ModelTextureNames
         }
     }
 
-    private static IReadOnlyList<string> ModelTextures(byte[] bytes)
+    private static IReadOnlyList<string> ModelTextures(AlamoModelContent model)
     {
         var names = new List<string>();
 
-        foreach (var mesh in AloModelReader.Read(bytes).Meshes)
+        foreach (var mesh in model.Meshes)
         foreach (var sub in mesh.SubMeshes)
         foreach (var parameter in sub.Parameters)
             if (parameter.Type == AlamoShaderParameterType.Texture

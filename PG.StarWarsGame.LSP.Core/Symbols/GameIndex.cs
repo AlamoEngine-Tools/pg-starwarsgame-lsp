@@ -57,6 +57,7 @@ public sealed record GameIndex(
         ModelBones = original.ModelBones;
         ModelTextures = original.ModelTextures;
         ParticleSystems = original.ParticleSystems;
+        ModelProxies = original.ModelProxies;
         WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
         WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
     }
@@ -142,6 +143,14 @@ public sealed record GameIndex(
     /// </summary>
     public ImmutableHashSet<string> ParticleSystems { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     Merged (baseline ∪ workspace) catalog of the particle names each model's proxies carry, as
+    ///     the file spells them, keyed like <see cref="ModelBones" /> (#270). What lets a particle
+    ///     system name the models that carry it without opening every model.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<string>> ModelProxies { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     ///     Dynamic enum values discovered by scanning the workspace XML enum files - values the mod has
