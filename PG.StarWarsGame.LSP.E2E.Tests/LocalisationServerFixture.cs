@@ -87,8 +87,7 @@ public sealed class LocalisationServerFixture : LspServerFixture
             schemaLocalPath = LspTestEnvironment.SchemaLocalPath,
             gamePath = LspTestEnvironment.GamePath,
             baselineLocalPath = LspTestEnvironment.BaselineLocalPath,
-            locale = LspTestEnvironment.Locale,
-            features = new { tools = new { localisation = true } }
+            locale = LspTestEnvironment.Locale
         };
     }
 

@@ -12,18 +12,21 @@ namespace PG.StarWarsGame.LSP.Server;
 ///     Resolves <see cref="LspConfiguration" /> by merging two sources:
 ///     1. <c>.pg-lsp.json</c> in the workspace root (static defaults).
 ///     2. <c>initializationOptions</c> from the editor's LSP initialize request (dynamic overrides).
-///     Editor values win over file values.
+///     Editor values win over file values. A game path neither sets is the detected install's.
 /// </summary>
 public sealed class LspConfigurationProvider : ILspConfigurationProvider
 {
     private static readonly JsonSerializerOptions FeatureJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly IFileSystem _fileSystem;
+    private readonly IGameInstallLocator? _installs;
     private readonly ILogger<LspConfigurationProvider> _logger;
 
-    public LspConfigurationProvider(IFileSystem fileSystem, ILogger<LspConfigurationProvider> logger)
+    public LspConfigurationProvider(IFileSystem fileSystem, ILogger<LspConfigurationProvider> logger,
+        IGameInstallLocator? installs = null)
     {
         _fileSystem = fileSystem;
         _logger = logger;
+        _installs = installs;
     }
 
     public LspConfiguration Current { get; private set; } = new();
@@ -39,11 +42,26 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var workspaceRoot = ResolveWorkspaceRoot(initializationOptions);
         var fromFile = LoadConfigFile(workspaceRoot);
         var overlay = ParseInitOptions(initializationOptions, out var overlayFeatures,
-            out var overlayDiagnostics, out var overlayEncyclopedia);
-        Current = Merge(fromFile, overlay, overlayFeatures, overlayDiagnostics, overlayEncyclopedia);
+            out var overlayDiagnostics);
+        Current = Merge(fromFile, overlay, overlayFeatures, overlayDiagnostics);
+        Current = WithDetectedInstalls(Current);
 
         _logger.LogInformation("LSP configuration loaded (locale={Locale}, gamePath={GamePath})",
             Current.Locale, Current.GamePath ?? "<none>");
+    }
+
+    // Only a path left unset is looked for; one the editor or the file sets is taken as given.
+    private LspConfiguration WithDetectedInstalls(LspConfiguration config)
+    {
+        if (_installs is null) return config;
+        var gamePath = string.IsNullOrWhiteSpace(config.GamePath) ? _installs.FindBaseGame() : config.GamePath;
+        var expansionPath = string.IsNullOrWhiteSpace(config.ExpansionPath)
+            ? _installs.FindExpansion()
+            : config.ExpansionPath;
+        if (gamePath != config.GamePath || expansionPath != config.ExpansionPath)
+            _logger.LogInformation("Game installs detected (base game={GamePath}, expansion={ExpansionPath})",
+                gamePath ?? "<none>", expansionPath ?? "<none>");
+        return config with { GamePath = gamePath, ExpansionPath = expansionPath };
     }
 
     private static string? ResolveWorkspaceRoot(object? initOptions)
@@ -76,11 +94,10 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
     }
 
     private LspConfiguration ParseInitOptions(object? initOptions, out FeatureFlags? features,
-        out DiagnosticsConfig? diagnostics, out EncyclopediaConfig? encyclopedia)
+        out DiagnosticsConfig? diagnostics)
     {
         features = null;
         diagnostics = null;
-        encyclopedia = null;
         if (initOptions is null) return new LspConfiguration();
 
         JsonElement elem;
@@ -109,7 +126,6 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
 
         features = ParseFeatures(elem);
         diagnostics = ParseDiagnostics(elem);
-        encyclopedia = ParseEncyclopedia(elem);
 
         var workspaceRoot = TryGetString(elem, "workspaceRoot");
         var projectPath = TryGetString(elem, "projectPath");
@@ -123,6 +139,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var baselineLocalPath = TryGetString(elem, "baselineLocalPath");
         var baselineType = TryGetString(elem, "baselineType");
         var baselineUrl = TryGetString(elem, "baselineUrl");
+        var projectFileOffered = elem.TryGetProperty("projectFileOffered", out var offered)
+                                 && offered.ValueKind == JsonValueKind.True;
 
         _logger.LogInformation(
             "ParseInitOptions: schemaLocalPath={LocalPath}, schemaUrl={Url}, baselineType={BaselineType}",
@@ -132,6 +150,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         {
             WorkspaceRoot = workspaceRoot,
             ProjectPath = projectPath,
+            ProjectFileOffered = projectFileOffered,
             GamePath = baseGamePath,
             ExpansionPath = expansionGamePath,
             ShaderPath = shaderPath,
@@ -198,27 +217,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         }
     }
 
-    /// <summary>
-    ///     Extracts the optional <c>encyclopedia</c> node. Absent or malformed returns <c>null</c>,
-    ///     so the .pg-lsp.json value (or the default screen) applies.
-    /// </summary>
-    private EncyclopediaConfig? ParseEncyclopedia(JsonElement elem)
-    {
-        if (!elem.TryGetProperty("encyclopedia", out var node)) return null;
-        try
-        {
-            return node.Deserialize<EncyclopediaConfig>(FeatureJsonOptions);
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogWarning(ex, "Malformed 'encyclopedia' node in InitializationOptions; ignoring it");
-            return null;
-        }
-    }
-
     private static LspConfiguration Merge(LspConfiguration file, LspConfiguration overlay,
-        FeatureFlags? overlayFeatures, DiagnosticsConfig? overlayDiagnostics,
-        EncyclopediaConfig? overlayEncyclopedia)
+        FeatureFlags? overlayFeatures, DiagnosticsConfig? overlayDiagnostics)
     {
         return new LspConfiguration
         {
@@ -226,9 +226,9 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             // the client always sends the complete resolved object, so no per-leaf merge.
             Features = overlayFeatures ?? file.Features,
             Diagnostics = overlayDiagnostics ?? file.Diagnostics,
-            Encyclopedia = overlayEncyclopedia ?? file.Encyclopedia,
             WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
             ProjectPath = overlay.ProjectPath ?? file.ProjectPath,
+            ProjectFileOffered = overlay.ProjectFileOffered,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
             ShaderPath = overlay.ShaderPath ?? file.ShaderPath,

@@ -41,11 +41,6 @@ public sealed class GetProjectileHandler(
     public Task<GetProjectileResult> Handle(
         GetProjectileParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(
-                new GetProjectileResult(null,
-                    new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
-
         var id = request.Name?.Trim() ?? string.Empty;
         if (id.Length == 0)
             return Task.FromResult(new GetProjectileResult(null,
@@ -73,16 +68,13 @@ public sealed class GetProjectileHandler(
 ///     catalog scan that already reads every file records which they are, and those are left out
 ///     (#270). One no scan has seen is offered.
 /// </remarks>
-public sealed class ListModelsHandler(IGameIndexService indexService, ILspConfigurationProvider config)
+public sealed class ListModelsHandler(IGameIndexService indexService)
     : IJsonRpcRequestHandler<ListModelsParams, ListModelsResult>
 {
     private const string ModelFolder = "data/art/models/";
 
     public Task<ListModelsResult> Handle(ListModelsParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new ListModelsResult([]));
-
         var assets = indexService.Current.AssetFiles;
         var particleSystems = indexService.Current.ParticleSystems;
         var models = assets.GetByExtension(".alo")
@@ -102,11 +94,6 @@ public sealed class ListModelsHandler(IGameIndexService indexService, ILspConfig
 }
 
 /// <summary>Serves the assembled scene description.</summary>
-/// <remarks>
-///     Gated on <c>features.tools.modelPreview</c>: when off, every request answers with a scene
-///     carrying one explanatory problem rather than an error, so a client that asks anyway gets a
-///     panel that explains itself instead of a failed request.
-/// </remarks>
 public sealed class GetPreviewSceneHandler(
     PreviewSceneBuilder builder,
     IGameAssetResolver assets,
@@ -117,12 +104,6 @@ public sealed class GetPreviewSceneHandler(
     public async Task<GetPreviewSceneResult> Handle(
         GetPreviewSceneParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return new GetPreviewSceneResult(PreviewScene.NotFound(
-                request.ObjectId ?? request.ModelReference ?? string.Empty,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOffAet"),
-                assets.Tiers));
-
         if (!string.IsNullOrWhiteSpace(request.ObjectId))
         {
             // Only an object has ability rows to put icons on, so only this path pays for the
@@ -181,10 +162,6 @@ public sealed class GetModelGlbHandler(
 {
     public Task<GetModelGlbResult> Handle(GetModelGlbParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetModelGlbResult(null, [],
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
-
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
             return Task.FromResult(new GetModelGlbResult(null, [],
@@ -310,10 +287,6 @@ public sealed class GetModelDetailHandler(
     public Task<GetModelDetailResult> Handle(
         GetModelDetailParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetModelDetailResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
-
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
             return Task.FromResult(new GetModelDetailResult(null,
@@ -363,10 +336,6 @@ public sealed class GetSubMeshGeometryHandler(
     public Task<GetSubMeshGeometryResult> Handle(
         GetSubMeshGeometryParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetSubMeshGeometryResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
-
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
             return Task.FromResult(new GetSubMeshGeometryResult(null,
@@ -419,10 +388,6 @@ public sealed class GetModelTextureHandler(
     public Task<GetModelTextureResult> Handle(
         GetModelTextureParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetModelTextureResult(null, null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
-
         var name = request.Name?.Trim();
         if (string.IsNullOrEmpty(name))
             return Task.FromResult(new GetModelTextureResult(null, null,
@@ -454,19 +419,12 @@ public sealed class GetModelTextureHandler(
 ///     The sources are never shipped with the extension - see <see cref="ShaderSourceResolver" />.
 ///     This only reads whatever copy the user has, and answering null is normal.
 /// </remarks>
-public sealed class GetShaderSourceHandler(
-    ShaderSourceResolver shaders,
-    ILspConfigurationProvider config)
+public sealed class GetShaderSourceHandler(ShaderSourceResolver shaders)
     : IJsonRpcRequestHandler<GetShaderSourceParams, GetShaderSourceResult>
 {
     public Task<GetShaderSourceResult> Handle(
         GetShaderSourceParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(
-                new GetShaderSourceResult(null, false,
-                    new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
-
         return Task.FromResult(
             new GetShaderSourceResult(shaders.Read(request.Name), shaders.HasManagedShaders));
     }
@@ -494,11 +452,6 @@ public sealed class GetParticleSystemHandler(
     public Task<GetParticleSystemResult> Handle(
         GetParticleSystemParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(
-                new GetParticleSystemResult(null,
-                    Error: new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
-
         // Resolved ONCE: the object carries both the asset name and the render scale, and looking it
         // up twice would resolve the whole variant chain twice for one request.
         var owner = ObjectBehind(request.Name);

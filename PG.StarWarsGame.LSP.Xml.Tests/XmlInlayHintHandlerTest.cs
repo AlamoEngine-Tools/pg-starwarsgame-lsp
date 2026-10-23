@@ -48,24 +48,6 @@ public sealed class XmlInlayHintHandlerTest
             registry, config ?? new FakeLspConfigurationProvider()), index);
     }
 
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_InlayHintsFlagOff_ReturnsNull()
-    {
-        // Same arrange as LocKeyTag_WithKnownTranslation - only the flag differs.
-        const string xml = "<GameObjectType>\n  <Text_ID>TEXT_UNIT_NAME</Text_ID>\n</GameObjectType>";
-        var schema = new LocKeySchemaProvider("Text_ID");
-        var loc = new ValueLocalisationIndex("TEXT_UNIT_NAME", "X-Wing Fighter");
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { InlayHints = false } });
-
-        var (handler, _) = Build(xml, schema, loc, config);
-        var result = await handler.Handle(Params(), CancellationToken.None);
-
-        Assert.Null(result);
-    }
-
     private static LspRange FullRange()
     {
         return new LspRange(new Position(0, 0), new Position(int.MaxValue, 0));

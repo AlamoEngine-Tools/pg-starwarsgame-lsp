@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 
@@ -31,38 +30,25 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
         await _project.DisposeAsync();
     }
 
-    private LuaAnalyzerStarter Starter(bool flag, bool executableFound = true)
+    private LuaAnalyzerStarter Starter(bool executableFound = true)
     {
-        var config = new FixedConfiguration(new LspConfiguration
-        {
-            Features = new FeatureFlags { Lua = new LuaFeatureFlags { Analyzer = flag } }
-        });
-        return new LuaAnalyzerStarter(_instances, _project, config, new LuaStubLocation { Directory = "D:/schema/lua" },
+        return new LuaAnalyzerStarter(_instances, _project, new LuaStubLocation { Directory = "D:/schema/lua" },
             executableFound, NullLogger<LuaAnalyzerStarter>.Instance);
     }
 
     [Fact]
-    public async Task FlagOn_BothStart()
+    public async Task WithTheExecutable_BothStart()
     {
-        await Starter(true).ConfigureAsync(Layers);
+        await Starter().ConfigureAsync(Layers);
 
         Assert.Same(Layers, Assert.Single(_instances.Configured));
         Assert.True(_project.IsRunning);
     }
 
     [Fact]
-    public async Task FlagOff_NeitherStarts()
-    {
-        await Starter(false).ConfigureAsync(Layers);
-
-        Assert.Empty(_instances.Configured);
-        Assert.Equal(0, _project.Starts);
-    }
-
-    [Fact]
     public async Task NoExecutable_NeitherStarts()
     {
-        await Starter(true, false).ConfigureAsync(Layers);
+        await Starter(false).ConfigureAsync(Layers);
 
         Assert.Empty(_instances.Configured);
         Assert.Equal(0, _project.Starts);
@@ -131,15 +117,6 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
         public void Configure(IReadOnlyList<ProjectLayer> layers)
         {
             Configured.Add(layers);
-        }
-    }
-
-    private sealed class FixedConfiguration(LspConfiguration current) : ILspConfigurationProvider
-    {
-        public LspConfiguration Current { get; } = current;
-
-        public void LoadFrom(object? initializationOptions)
-        {
         }
     }
 }

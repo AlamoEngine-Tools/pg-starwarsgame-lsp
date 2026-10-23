@@ -12,7 +12,6 @@ namespace PG.StarWarsGame.LSP.Server.Variants;
 /// <summary>
 ///     Resolves a variant GameObject against its <c>Variant_Of_Existing_Type</c> base chain and returns the
 ///     effective object rendered as annotated XML. The editor client opens the result in a read-only tab.
-///     Gated on <c>features.tools.variants</c>: when off, every request answers with the not-found shape.
 /// </summary>
 public sealed class GetEffectiveObjectHandler
     : IJsonRpcRequestHandler<GetEffectiveObjectParams, GetEffectiveObjectResult>
@@ -34,9 +33,6 @@ public sealed class GetEffectiveObjectHandler
     public Task<GetEffectiveObjectResult> Handle(GetEffectiveObjectParams request,
         CancellationToken cancellationToken)
     {
-        if (!_config.Current.Features.Tools.Variants)
-            return Task.FromResult(new GetEffectiveObjectResult(false, false, null, [], string.Empty, null));
-
         var resolver = new EffectiveObjectResolver(_indexService.Current, _schema, _tagSource);
         var effective = resolver.Resolve(request.ObjectId);
 

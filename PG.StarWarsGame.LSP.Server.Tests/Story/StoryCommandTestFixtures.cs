@@ -93,13 +93,9 @@ internal static class StoryCommandTestFixtures
         return new DocumentTextSource(new FakeHost(), fileHelper, NullLogger<DocumentTextSource>.Instance);
     }
 
-    public static ILspConfigurationProvider Config(bool storyEditor = true, bool storyEditing = true)
+    public static ILspConfigurationProvider Config(bool storyEditing = true)
     {
-        return FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-        {
-            Tools = new ToolsFeatureFlags { StoryEditor = storyEditor, StoryEditing = storyEditing },
-            Story = new StoryFeatureFlags { Discovery = true }
-        });
+        return FakeLspConfigurationProvider.WithFeatures(new FeatureFlags { StoryEditing = storyEditing });
     }
 
     public static StubReloadService Reload()

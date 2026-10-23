@@ -6,7 +6,6 @@ using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -16,7 +15,6 @@ public sealed class GetBaselineEntriesHandler
     : IJsonRpcRequestHandler<GetBaselineEntriesParams, GetBaselineEntriesResult>
 {
     private readonly IBaselineTranslationProvider _baselineProvider;
-    private readonly ILspConfigurationProvider _config;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
@@ -29,8 +27,7 @@ public sealed class GetBaselineEntriesHandler
         ITranslationDatabaseFactory factory,
         IFileHelper fileHelper,
         ILocalisationProjectRegistry projectRegistry,
-        ILocalisationLayerRegistry layerRegistry,
-        ILspConfigurationProvider config)
+        ILocalisationLayerRegistry layerRegistry)
     {
         _baselineProvider = baselineProvider;
         _langService = langService;
@@ -38,15 +35,11 @@ public sealed class GetBaselineEntriesHandler
         _fileHelper = fileHelper;
         _projectRegistry = projectRegistry;
         _layerRegistry = layerRegistry;
-        _config = config;
     }
 
     public Task<GetBaselineEntriesResult> Handle(
         GetBaselineEntriesParams request, CancellationToken ct)
     {
-        if (!LocalisationFeatureDisabled.IsEnabled(_config))
-            return Task.FromResult(GetBaselineEntriesResult.Empty);
-
         var languages = _langService.OfficiallySupported();
 
         // A credits file gets the game's own credits, not its MasterText. The two share nothing: a

@@ -307,10 +307,7 @@ public sealed class StorySimulationServiceTest
     public async Task Handlers_SimulatorFlagOff_ReturnDisabledMessage()
     {
         var (service, _) = BuildService();
-        var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-        {
-            Tools = new ToolsFeatureFlags { StorySimulator = false }
-        });
+        var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags { StorySimulator = false });
 
         var result = await new StorySimStartHandler(service, config)
             .Handle(new StorySimStartParams("GC", "Rebel"), CancellationToken.None);

@@ -8,7 +8,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
@@ -22,7 +21,6 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
     private readonly ILuaAnalyzer? _analyzer;
-    private readonly ILspConfigurationProvider _config;
 
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -35,7 +33,6 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILogger<LuaDefinitionHandler> logger,
-        ILspConfigurationProvider config,
         // Optional: with the analyzer running, it answers where we have nothing.
         ILuaAnalyzer? analyzer = null,
         ILuaSandboxProvider? sandbox = null)
@@ -44,7 +41,6 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         _parseCache = parseCache;
         _fileHelper = fileHelper;
         _logger = logger;
-        _config = config;
         _analyzer = analyzer;
         _sandbox = sandbox;
     }
@@ -53,7 +49,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     {
         var ours = await HandleOurs(request);
         if (ours is not null && ours.Any()) return ours;
-        if (_analyzer is null || !_config.Current.Features.Lua.GoToDefinition ||
+        if (_analyzer is null ||
             !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
         var theirs = await _analyzer.RequestAsync<LocationOrLocationLinks>("textDocument/definition", request, ct);
@@ -69,9 +65,6 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 
     private Task<LocationOrLocationLinks?> HandleOurs(DefinitionParams request)
     {
-        if (!_config.Current.Features.Lua.GoToDefinition)
-            return Task.FromResult<LocationOrLocationLinks?>(null);
-
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<LocationOrLocationLinks?>(null);

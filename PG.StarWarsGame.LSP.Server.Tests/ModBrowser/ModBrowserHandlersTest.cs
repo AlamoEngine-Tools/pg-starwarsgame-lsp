@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -13,7 +12,7 @@ using System.IO.Abstractions.TestingHelpers;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.ModBrowser;
 
-/// <summary>The Mod Browser's requests, and their setting (#270).</summary>
+/// <summary>The Mod Browser's requests (#270).</summary>
 public sealed class ModBrowserHandlersTest
 {
     private static readonly GameIndex s_index = GameIndex.Empty with
@@ -26,14 +25,6 @@ public sealed class ModBrowserHandlersTest
         }
     };
 
-    private static FakeLspConfigurationProvider Config(bool modBrowser)
-    {
-        return FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-        {
-            Tools = new ToolsFeatureFlags { ModBrowser = modBrowser }
-        });
-    }
-
     private sealed class NoTags : IVariantTagSource
     {
         public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
@@ -42,27 +33,24 @@ public sealed class ModBrowserHandlersTest
         }
     }
 
-    [Theory]
-    [InlineData(true, 1)]
-    [InlineData(false, 0)]
-    public async Task TheSetting_GatesEveryRequest(bool modBrowser, int expected)
+    [Fact]
+    public async Task EveryRequest_AnswersFromTheIndex()
     {
         var index = new FakeGameIndexService(s_index);
         var schema = new NullSchemaProvider();
         var layers = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
-        var config = Config(modBrowser);
         var assets = new FakeAssets();
 
-        var outline = await new GetSymbolOutlineHandler(index, schema, layers, config)
+        var outline = await new GetSymbolOutlineHandler(index, schema, layers)
             .Handle(new GetSymbolOutlineParams(SymbolOutlines.GameData), CancellationToken.None);
-        var page = await new GetSymbolPageHandler(index, schema, new NoTags(), assets, config)
+        var page = await new GetSymbolPageHandler(index, schema, new NoTags(), assets)
             .Handle(new GetSymbolPageParams("xml:GameObjectType"), CancellationToken.None);
         var node = await new GetSymbolNodeHandler(index, schema, new NoTags(), assets,
-                new FileHelper(new MockFileSystem()), config)
+                new FileHelper(new MockFileSystem()))
             .Handle(new GetSymbolNodeParams("xml:GameObjectType", "Star_Destroyer"), CancellationToken.None);
 
-        Assert.Equal(expected, outline.Pages.Count);
-        Assert.Equal(expected, page.Total);
-        Assert.Equal(expected == 1, node.Entry is not null);
+        Assert.Single(outline.Pages);
+        Assert.Equal(1, page.Total);
+        Assert.NotNull(node.Entry);
     }
 }

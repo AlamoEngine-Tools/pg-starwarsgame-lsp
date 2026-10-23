@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -56,52 +55,33 @@ public sealed class ServerLogLevelTest
     }
 
     /// <summary>
-    ///     Every level the VS Code setting offers is one this server understands.
+    ///     Every level the <c>aet-eaw-edit.lsp.debug.logLevel</c> setting documents is one this server
+    ///     understands.
     /// </summary>
     /// <remarks>
     ///     The setting hands its value straight to <c>--log-level=</c>, and an unparseable one falls
-    ///     back to Information SILENTLY - so a typo in the manifest's enum would present a level
-    ///     that quietly does nothing. The two lists have to be checked against each other.
+    ///     back to Information SILENTLY - so a level the extension README names and this server does
+    ///     not parse would quietly do nothing. The setting is no longer contributed, so the README's
+    ///     list is the one checked here.
     /// </remarks>
-    [Fact]
-    public void EveryLevelTheVsCodeSettingOffersIsUnderstood()
+    [Theory]
+    [InlineData("Trace")]
+    [InlineData("Debug")]
+    [InlineData("Information")]
+    [InlineData("Warning")]
+    [InlineData("Error")]
+    public void EveryLevelTheSettingDocumentsIsUnderstood(string level)
     {
-        var manifest = Path.Combine(FindRepoRoot(),
-            "PG.StarWarsGame.LSP.Client.VSCode", "aet-eaw-edit", "package.json");
-        using var doc = JsonDocument.Parse(File.ReadAllText(manifest));
-
-        var setting = doc.RootElement
-            .GetProperty("contributes").GetProperty("configuration").EnumerateArray()
-            .Select(block => block.TryGetProperty("properties", out var props)
-                             && props.TryGetProperty("aet-eaw-edit.lsp.debug.logLevel", out var s)
-                ? s
-                : (JsonElement?)null)
-            .FirstOrDefault(s => s is not null);
-        Assert.NotNull(setting);
-
-        var offered = setting!.Value.GetProperty("enum").EnumerateArray()
-            .Select(v => v.GetString()!).ToArray();
-        Assert.NotEmpty(offered);
-
-        foreach (var level in offered)
-            Assert.True(
-                ServerLogLevel.Resolve([$"--log-level={level}"]) != ServerLogLevel.Default
-                || level == nameof(LogLevel.Information),
-                $"The setting offers '{level}', which this server does not understand - it would " +
-                "silently fall back to Information.");
-
-        // And the declared default is the one the server would have used anyway - the client only
-        // passes the option when it DIFFERS from this, so the two have to name the same level.
-        Assert.Equal<string?>(ServerLogLevel.Default.ToString(),
-            setting.Value.GetProperty("default").GetString());
+        Assert.Equal(Enum.Parse<LogLevel>(level), ServerLogLevel.Resolve([$"--log-level={level}"]));
     }
 
-    private static string FindRepoRoot()
+    /// <summary>
+    ///     The client passes the option only when the setting DIFFERS from Information, so the
+    ///     server's own default has to be that level.
+    /// </summary>
+    [Fact]
+    public void TheDefault_IsTheLevelTheClientLeavesUnsaid()
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "PG.StarWarsGame.LSP.slnx")))
-            dir = dir.Parent;
-        return dir?.FullName
-               ?? throw new InvalidOperationException("Could not locate the repo root.");
+        Assert.Equal(LogLevel.Information, ServerLogLevel.Default);
     }
 }

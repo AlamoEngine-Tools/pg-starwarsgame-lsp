@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 
@@ -16,7 +15,7 @@ public interface ILuaAnalyzerStarter
 }
 
 /// <summary>
-///     When <c>features.lua.analyzer</c> is on and its executable was found: hands the layers to the
+///     When the analyzer executable was found: hands the layers to the
 ///     per-script analyzers - from then on every open script gets one of its own, resolved over them -
 ///     and starts the whole-project analyzer, the leaf's scripts with the lower layers and every stub as
 ///     its library, which answers renames and where a library is used (<see cref="LuaAnalyzerRoutes" />).
@@ -24,19 +23,12 @@ public interface ILuaAnalyzerStarter
 public sealed class LuaAnalyzerStarter(
     ILuaAnalyzerLayers instances,
     LuaAnalyzerHost project,
-    ILspConfigurationProvider config,
     LuaStubLocation stubs,
     bool executableFound,
     ILogger<LuaAnalyzerStarter> logger) : ILuaAnalyzerStarter
 {
     public async Task ConfigureAsync(IReadOnlyList<ProjectLayer> layers)
     {
-        if (!config.Current.Features.Lua.Analyzer)
-        {
-            logger.LogDebug("Lua analyzer off (features.lua.analyzer)");
-            return;
-        }
-
         if (!executableFound)
         {
             logger.LogInformation(

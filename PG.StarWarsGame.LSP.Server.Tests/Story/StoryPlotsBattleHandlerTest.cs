@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Server.Story;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
@@ -13,19 +12,10 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 /// </summary>
 public sealed class StoryPlotsBattleHandlerTest
 {
-    private static ILspConfigurationProvider Config()
-    {
-        return FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-        {
-            Tools = new ToolsFeatureFlags { StoryEditor = true },
-            Story = new StoryFeatureFlags { Discovery = true }
-        });
-    }
-
     private static async Task<StoryFactionDto> Faction()
     {
         var result = await new GetStoryPlotsHandler(
-                new StoryBattleFixture.ModelService(), new StoryBattleFixture.IndexService(), Config())
+                new StoryBattleFixture.ModelService(), new StoryBattleFixture.IndexService())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
         Assert.Null(result.Error);
         return Assert.Single(Assert.Single(result.Campaigns).Factions);

@@ -17,9 +17,9 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     diagnostics for open documents of a given file extension, and clears stale URIs.
 ///     When debounceMs &gt; 0, rapid consecutive index changes (e.g. from a workspace-wide
 ///     rename) are batched: only the last change triggers a diagnostic run.
-///     Subclasses can gate publishing entirely via <see cref="DiagnosticsEnabled" /> (used for
-///     the per-language diagnostics feature flags): while it returns false, index changes
-///     publish nothing.
+///     Subclasses can gate publishing entirely via <see cref="DiagnosticsEnabled" /> (the dialog
+///     publisher, while no storyDialog directory is declared): while it returns false, index
+///     changes publish nothing.
 /// </summary>
 public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 {

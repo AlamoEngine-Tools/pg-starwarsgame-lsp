@@ -217,6 +217,7 @@ function simRequest(method: string, args?: Record<string, unknown>): void {
 // state document; a missing or broken store falls back to the defaults.
 const SIM_PACE_KEY = "storyGraph.simPace";
 const SIM_LENS_KEY = "storyGraph.simLenses";
+const SIM_AUTO_RESUME_KEY = "storyGraph.simAutoResume";
 // The path taken is what a simulation view is FOR, so the active-path lens is on until the reader
 // takes it off; the flow tints and the script states are on for the same reason.
 const DEFAULT_LENSES: SimLenses = {
@@ -238,6 +239,23 @@ function writePace(pace: SimPace): void {
         localStorage.setItem(SIM_PACE_KEY, JSON.stringify(pace));
     } catch {
         // Storage is a convenience; nothing to do without it.
+    }
+}
+
+/** On unless the reader turned it off: an answer is usually given to get the story moving. */
+function readAutoResume(): boolean {
+    try {
+        return localStorage.getItem(SIM_AUTO_RESUME_KEY) !== "false";
+    } catch {
+        return true;
+    }
+}
+
+function writeAutoResume(on: boolean): void {
+    try {
+        localStorage.setItem(SIM_AUTO_RESUME_KEY, String(on));
+    } catch {
+        // Same.
     }
 }
 
@@ -6483,11 +6501,18 @@ function App(): React.JSX.Element {
     const paceRef = useRef(pace);
     const [playing, setPlaying] = useState(false);
     const playingRef = useRef(false);
-    // Auto-resume: whether the setting is on, whether the last pause was the clock waiting on the
-    // author rather than the reader pressing pause, and whether the state now arriving answers
-    // something - the three things that decide if play picks itself up again.
-    const autoResumeRef = useRef(true);
+    // Auto-resume: whether the last pause was the clock waiting on the author rather than the
+    // reader pressing pause, and whether the state now arriving answers something - what decides
+    // if play picks itself up again.
     const pausedForWaitRef = useRef(false);
+    const [autoResume, setAutoResumeState] = useState(readAutoResume);
+    const setAutoResume = useCallback((on: boolean) => {
+        setAutoResumeState(on);
+        writeAutoResume(on);
+    }, []);
+    // Mirror for the state routine, which outlives the render that set it.
+    const autoResumeRef = useRef(autoResume);
+    autoResumeRef.current = autoResume;
     // What the server last refused, shown beside the chip until the next state arrives.
     const [simNotice, setSimNotice] = useState<string | null>(null);
     // Whether this battle panel already handed the reader back to the galaxy for its outcome.
@@ -7099,6 +7124,8 @@ function App(): React.JSX.Element {
             },
             setBreakpoints: (nodeIds, onConditionalGates) =>
                 sendSim("breakpoints", { nodeIds, onConditionalGates }),
+            setMediaCompletes: (on) =>
+                sendSim("options", { assumeMediaCompletes: on }),
             centerNode: (nodeId) => editorRef.current?.centerNode(nodeId),
             copy: (text) => vscode.postMessage({ type: "copy", text }),
         }),
@@ -7479,9 +7506,6 @@ function App(): React.JSX.Element {
                         edit: msg.edit === true,
                         simulate: msg.simulate === true,
                     });
-                    break;
-                case "simSettings":
-                    autoResumeRef.current = msg.autoResume !== false;
                     break;
                 case "confirmStageResult":
                     if (msg.proceed) {
@@ -7916,6 +7940,8 @@ function App(): React.JSX.Element {
                                         actions={simActions}
                                         labelOf={labelOf}
                                         notice={simNotice}
+                                        autoResume={autoResume}
+                                        setAutoResume={setAutoResume}
                                         onSelect={(selection) => {
                                             setSimSelection(selection);
                                             // The readout names an event; show it too, as a row press does.

@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
@@ -16,10 +15,9 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.CodeLens;
 /// </summary>
 public sealed class EncyclopediaCodeLensProviderTest
 {
-    private static EncyclopediaCodeLensProvider Provider(
-        IVariantTagSource source, ILspConfigurationProvider? config = null)
+    private static EncyclopediaCodeLensProvider Provider(IVariantTagSource source)
     {
-        return new EncyclopediaCodeLensProvider(source, config ?? new FakeLspConfigurationProvider(),
+        return new EncyclopediaCodeLensProvider(source,
             new PlanetSchema());
     }
 
@@ -101,17 +99,6 @@ public sealed class EncyclopediaCodeLensProviderTest
         var source = new TagSource().With("A", Tag("Mass", "5")).With("B", Tag("Mass", "6"));
 
         Assert.Null(Provider(source).Handle(Ctx(a, index)));
-    }
-
-    [Fact]
-    public void Handle_EncyclopediaFlagOff_EmitsNothing()
-    {
-        var symbol = Sym("Etahn");
-        var source = new TagSource().With("Etahn", Tag("Encyclopedia_Text", "TEXT_BIO"));
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Encyclopedia = false } });
-
-        Assert.Null(Provider(source, config).Handle(Ctx(symbol, IndexWith(symbol))));
     }
 
     // A planet's popup is a preview of its own, not the unit card (maintainer, 2026-10-22).

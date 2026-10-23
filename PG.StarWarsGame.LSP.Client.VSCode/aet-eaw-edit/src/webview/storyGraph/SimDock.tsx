@@ -67,6 +67,8 @@ export interface SimActions {
     luaNotify: (id: string) => void;
     setFlag: (name: string, value: number) => void;
     setBreakpoints: (nodeIds: string[], onGates: boolean) => void;
+    /** Whether media is owed its completion; the session's, from the next tick on. */
+    setMediaCompletes: (on: boolean) => void;
     centerNode: (nodeId: string) => void;
     copy: (text: string) => void;
     /** The battle's own panel; `simulate` opens it straight into its session. */
@@ -1713,8 +1715,9 @@ function ScriptDialog(
 /**
  * The tick transport, in the dock foot, laid out as the preview's animation player: the transport
  * row - |<< back to the start, |< one tick back, play or pause, >| one tick, >>| run to the next
- * decision, and Break on gates at the far end where a player keeps its record button - then the
- * status readout in the scrubber's slot, then the speed, one slider over an ordered axis.
+ * decision, and the run's behaviour switches at the far end where a player keeps its record
+ * button: Break on gates, Resume after an answer, media finishing on its own - then the status
+ * readout in the scrubber's slot, then the speed, one slider over an ordered axis.
  */
 export function SimTransport(props: {
     state: StorySimStateDto;
@@ -1726,6 +1729,9 @@ export function SimTransport(props: {
     onSelect: (selection: SimSelection) => void;
     /** What the server last refused, shown under the readout until the next state. */
     notice: string | null;
+    /** The viewer's preference: an answer resumes play that a wait for it paused. */
+    autoResume: boolean;
+    setAutoResume: (on: boolean) => void;
 }): React.JSX.Element {
     const { state, pace, playing, actions } = props;
     const halted = !!state.haltedAt;
@@ -1740,6 +1746,8 @@ export function SimTransport(props: {
             ? {}
             : { disabled: true as const, disabledReason: frozen };
     const stop = speedStopOf(pace);
+    // Absent from an older server's state, where the session always assumed it.
+    const mediaCompletes = state.assumeMediaCompletes !== false;
     return (
         <div className="player sim-transport">
             <div className="player-row">
@@ -1803,6 +1811,20 @@ export function SimTransport(props: {
                             !state.breakOnGates,
                         )
                     }
+                />
+                <IconButton
+                    icon="autoResume"
+                    className={props.autoResume ? "active" : undefined}
+                    pressed={props.autoResume}
+                    title={l10n.t("Resume after an answer")}
+                    onClick={() => props.setAutoResume(!props.autoResume)}
+                />
+                <IconButton
+                    icon="mediaCompletes"
+                    className={mediaCompletes ? "active" : undefined}
+                    pressed={mediaCompletes}
+                    title={l10n.t("Speech and movies finish on their own")}
+                    onClick={() => actions.setMediaCompletes(!mediaCompletes)}
                 />
             </div>
             <SimStatus

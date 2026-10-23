@@ -237,21 +237,6 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Equal(1, Assert.Single(kept).Range.Start.Line);
     }
 
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public void OnIndexChanged_LuaDiagnosticsFlagOff_PublishesNothing()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Lua = new LuaFeatureFlags { Diagnostics = false } });
-        var (_, published, indexService, workspaceHost) = Build(config: config);
-        workspaceHost.Set(LuaUri, "function Foo() end");
-
-        indexService.Fire(GameIndex.Empty);
-
-        Assert.Empty(published);
-    }
-
     private static GameIndex IndexWithLuaRef(string documentUri, string targetId,
         string? expectedTypeName = null, GameSymbol? resolvedSymbol = null,
         GameSymbolKind kind = GameSymbolKind.XmlObject, ILocalisationIndex? localisation = null)

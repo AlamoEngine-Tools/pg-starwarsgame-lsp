@@ -34,11 +34,11 @@ From the Marketplace, or `aet-eaw-edit-x.x.x.vsix` from
 code --install-extension aet-eaw-edit-x.x.x.vsix
 ```
 
-### 2. Enable the language server
+### 2. Open the mod
 
-`aet-eaw-edit.lsp.enabled` = `true`. The bundled server runs unless `aet-eaw-edit.lsp.executable` names another one.
-
-Activation: an open XML or Lua file, or a `.pgproj` in the workspace.
+The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod without one: a `Data` folder
+holding `XML`, `Scripts`, `Art`, `Audio`, `Text` or a MEG archive, or a `modinfo.json`. The game's own folder and any
+other folder get no server. A mod without a `.pgproj` is offered one, written from what its folder holds.
 
 ---
 
@@ -108,7 +108,7 @@ Scripts under the declared `scripts` directories are indexed.
 
 - Completion, navigation, rename
 - Quick fixes
-- Hover and diagnostics _(work in progress)_
+- Hover and diagnostics
 - Lua analyzer (bundled EmmyLua): identifier completion, references, symbols, code lenses, inlay hints
 - Engine surface from measured stub files: registered functions, wrapper classes, the standard library the game
   opens, per-host globals; string arguments naming game objects, text keys and enum values complete and resolve
@@ -117,7 +117,7 @@ Scripts under the declared `scripts` directories are indexed.
 
 ## Lua debugger
 
-> **Work in progress, off by default.** Flag: `aet-eaw-edit.features.lua.debugger`. Requires a debug build of the game with its Lua debug server running; retail builds have none.
+> Requires a debug build of the game with its Lua debug server running; retail builds have none.
 
 > **With thanks to EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, whose [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) documented the game's Lua debug server protocol. This debugger was built against that description; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
@@ -143,7 +143,7 @@ Debug type **Empire at War Lua**:
       "type": "eaw-lua",
       "request": "launch",
       "name": "Launch Empire at War (Lua)",
-      "program": "${config:aet-eaw-edit.game.executable}"
+      "program": "<the debug StarWarsI.exe>"
     }
   ]
 }
@@ -156,7 +156,7 @@ Game limits, reported rather than hidden:
 - No breakpoint conditions
 - Whole game frozen while a script is stopped
 - Pause at the next Lua line
-- Table expansion only with `aet-eaw-edit.game.unsafeTableExpansion`
+- Table expansion only with `unsafeTableExpansion`
 
 The extension's README documents every attribute.
 
@@ -188,7 +188,7 @@ Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `S
   - Gameplay: attacker weapons and abilities, hardpoint destroy and repair, damage log with armour types
 - Particle systems, saved shots, handoff to AloViewer and the Particle Editor
 - **Set Up Base Shader Sources** fetches Petroglyph's published shader sources; never redistributed
-- Game models need `aet-eaw-edit.lsp.source.baseGameDirectory` and `expansionDirectory`
+- Game models come from the game install, found in the Steam library or the Windows registry; `aet-eaw-edit.lsp.source.baseGameDirectory` and `expansionDirectory` override it
 - No sounds
 
 ---
@@ -311,12 +311,12 @@ One format per project. `"type": "DAT"` projects edit compiled `.dat` files dire
 
 ## Commands and settings
 
-The extension contributes 29 commands and 70 settings. Both are documented, with defaults and the
-feature flag each belongs to, in the extension's own README:
+The extension contributes 32 commands and 24 settings - 10 on the settings page, 14 for development. All are
+documented, with defaults, in the extension's own
+README:
 
 - [Commands](PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#commands)
 - [Settings reference](PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#settings-reference)
-- [Feature flags](PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#feature-flags)
 
 That file ships with the extension, so it is the copy that stays in step with what is installed.
 
@@ -329,22 +329,20 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 | What | Where | When | How to disable |
 |---|---|---|---|
 | XML schema | GitHub - newest compatible schema release | On server start; nothing when the release is already cached; default branch when no release exists | `aet-eaw-edit.lsp.schema.source` = `local` |
-| Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\` | `aet-eaw-edit.lsp.source.baseline.type` = `local` or `none` |
-| Shader sources | Petroglyph's published download, or `aet-eaw-edit.shaders.sourceUrl` | Only on **Set Up Base Shader Sources** | Do not run the command |
+| Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\` | `aet-eaw-edit.lsp.source.baseline.type` = `local` |
+| Shader sources | Petroglyph's published download | Only on **Set Up Base Shader Sources** | Do not run the command |
 
 ---
 
 ## Troubleshooting
 
-**No diagnostics.** `aet-eaw-edit.lsp.enabled` = `true`; then **EaWEdit: Restart LSP Server**.
+**No diagnostics.** The workspace needs a `.pgproj`, or a mod's `Data` folder; then **EaWEdit: Restart LSP Server**.
 
 **Version mismatch on startup.** Only for a server set in `aet-eaw-edit.lsp.executable`; clear it to use the bundled one.
 
 **Features work in some files only.** Only directories declared in the `.pgproj` are indexed.
 
-**Localisation views missing.** `aet-eaw-edit.features.tools.localisation` = `true`; the server restarts on the change.
-
-**"The game did not answer on 127.0.0.1:1234 within 60 s".** Debug build with `luadebug` run in its console required; match `aet-eaw-edit.game.luaDebugPort` to the instance (first free port from 1234 upward).
+**"The game did not answer on 127.0.0.1:1234 within 60 s".** Debug build with `luadebug` run in its console required; match `port` in `launch.json` to the instance (first free port from 1234 upward).
 
 **Server output.** `aet-eaw-edit.lsp.debug.traceServer` = `messages`; **EaWEdit** output channel.
 

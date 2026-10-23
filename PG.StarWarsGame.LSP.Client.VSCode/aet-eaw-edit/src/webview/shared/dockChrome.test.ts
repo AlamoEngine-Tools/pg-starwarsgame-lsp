@@ -208,6 +208,37 @@ describe("stageFlyoutCss", () => {
 
 describe("rotarySwitchCss", () => {
     /**
+     * A position that cannot be entered must look it.
+     *
+     * Without its own rule a disabled position kept the enabled look - the same opacity, the
+     * pointer and the brightening on hover - so Edit on a read-only story graph looked pressable
+     * and only its tooltip said otherwise.
+     */
+    it("shows a disabled position as disabled", () => {
+        const opacity = (selector: string): number => {
+            const rule = new RegExp(
+                `${selector}\\s*\\{[^}]*opacity:\\s*([\\d.]+)`,
+            ).exec(rotarySwitchCss);
+            assert.ok(rule !== null, `no opacity for ${selector}`);
+            return Number(rule[1]);
+        };
+
+        assert.ok(
+            opacity("\\.rotary-pos:disabled") < opacity("\\.rotary-pos"),
+            "a disabled position is as bright as an enabled one",
+        );
+        assert.match(
+            rotarySwitchCss,
+            /\.rotary-pos:disabled\s*\{[^}]*cursor:\s*default/,
+        );
+        assert.match(
+            rotarySwitchCss,
+            /\.rotary-pos:hover:not\(:disabled\)\s*\{[^}]*opacity:\s*1/,
+        );
+        assert.doesNotMatch(rotarySwitchCss, /\.rotary-pos:hover\s*\{/);
+    });
+
+    /**
      * A position must not touch the readout.
      *
      * `RADIUS` in `RotaryModeSwitch` is the distance between their centres, so the clearance is

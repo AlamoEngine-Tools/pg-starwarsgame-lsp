@@ -147,6 +147,8 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         // and simply knew nothing.
         _logger.LogWarning("No .pgproj found under [{Roots}]; nothing to index.", string.Join(", ", roots));
         _status?.RecordProject(false, ProjectProblem.Missing);
+        // The client is offering to write one: that offer is the message, and this would only repeat it.
+        if (_config?.Current.ProjectFileOffered == true) return null;
         _notifier.ShowError(
             Messages.Format("ProjectConfig_NoPgprojFileWasFound", string.Join(", ", roots)));
         return null;

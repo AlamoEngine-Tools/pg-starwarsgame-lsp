@@ -2,7 +2,22 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // Workspace-wide requests that belong to no single editor. Mirrors
-// PG.StarWarsGame.LSP.Server/WorkspaceSettingsHandlers.cs and Variants/GetEffectiveObjectParams.cs.
+// PG.StarWarsGame.LSP.Server/WorkspaceSettingsHandlers.cs, Variants/GetEffectiveObjectParams.cs and
+// Project/AdoptModProjectHandler.cs.
+
+// ── aet/adoptModProject ──────────────────────────────────────────────────────
+
+/** A project file for a mod that has none, written from what its folder holds. */
+export interface AdoptModProjectParams {
+    directory: string;
+}
+
+export interface AdoptModProjectResult {
+    /** The written file, or null when nothing was written. */
+    projectFile: string | null;
+    /** Why nothing was written. */
+    error: string | null;
+}
 
 // ── aet/getWorkspaceSettings / aet/setWorkspaceSettings ──────────────────────
 

@@ -79,9 +79,22 @@
   ([#202](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/202))
   - Well-formed files only; a refused file names its line and column
   - Vanilla: 993 well-formed files format with unchanged diagnostics and line endings
-- **Feature flags** - `aet-eaw-edit.features.xml.strictness`, `aet-eaw-edit.features.xml.formatting`
-  ([#203](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/203))
-  - Formatting off: no formatter offered, so another XML formatter takes the files
+- **Ten settings** - everything is on except two experimental modes; the settings page holds what a modder
+  decides ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+  - `aet-eaw-edit.experimental.storyEditing` and `aet-eaw-edit.experimental.storySimulator`, off by default
+  - Now on: Lua hover and diagnostics, story discovery, graph diagnostics, symbols and rename, story-dialog
+    diagnostics, hints, definition and quick fixes, the story graph in View mode, the localisation editor, the Lua
+    debugger
+  - The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod: a `Data` folder
+    holding `XML`, `Scripts`, `Art`, `Audio`, `Text` or a MEG archive, or a `modinfo.json`; the game's own folder and
+    any other folder get none
+  - The game installs are found in the Steam library or the Windows registry; `aet-eaw-edit.lsp.source.baseGameDirectory`
+    and `aet-eaw-edit.lsp.source.expansionDirectory` override them
+  - A mod opened without a `.pgproj` is offered one, once, written from what the folder holds: the directories that
+    exist, the text format, the name from `modinfo.json`; nothing created, `modinfo.json` unchanged
+  - The settings page groups them under Game, Localisation, Tools, Diagnostics and Experimental
+  - Development and troubleshooting settings are hidden from the settings page, under Development; `@tag:advanced`
+    in its search shows them, and `settings.json` still completes and describes them
 - **Server and Lua analyzer in the extension** - nothing to download or configure; the language server and
   [EmmyLua Analyzer](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) 0.25.1 ship inside a Windows x64 VSIX
   ([#156](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/156))
@@ -270,6 +283,8 @@
 
 ### Fixes
 
+- **New Mod Project in an existing mod** - leaves the mod's `modinfo.json`, dependencies included, as it was; only a
+  folder without one gets a new one ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
@@ -428,6 +443,27 @@
   lenses, no inlay hints, no hover for the workspace's own functions and types
 - **Settings removed** - `aet-eaw-edit.features.lua.codeLens`, `aet-eaw-edit.features.lua.inlayHints`; both come
   from the analyzer
+- **Feature flags removed** - every `aet-eaw-edit.features.*` setting but `aet-eaw-edit.features.preview.energyPool`;
+  a feature cannot be switched off, and a set key shows as unknown
+  ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+  - Renamed: `aet-eaw-edit.features.tools.storyEditing` is `aet-eaw-edit.experimental.storyEditing`,
+    `aet-eaw-edit.features.tools.storySimulator` is `aet-eaw-edit.experimental.storySimulator`
+- **`aet-eaw-edit.lsp.enabled` removed** - a `.pgproj` or a mod's folder starts the server; *Disable (Workspace)* on
+  the extension keeps it off in a workspace
+- **More settings removed** - `aet-eaw-edit.lsp.locale` (no translation existed), `aet-eaw-edit.modVerify.enabled` and
+  `aet-eaw-edit.modVerify.executable` (read by nothing), `aet-eaw-edit.shaders.sourceUrl`
+- **Story simulator options moved into the simulator** - `aet-eaw-edit.storySimulator.autoResume` is *Resume after
+  an answer* and `aet-eaw-edit.storySimulator.assumeMediaCompletes` is *Speech and movies finish on their own*, two
+  toggles beside *Break on gates* in the transport. Resume is kept per viewer; the media option belongs to the run,
+  changes it from the next tick on and holds through Back and Restart
+- **Encyclopedia screen moved into the preview** - `aet-eaw-edit.encyclopedia.screenWidth` and
+  `aet-eaw-edit.encyclopedia.screenHeight` are the *Screen* dropdown in the encyclopedia preview: the common
+  resolutions and the game's own detail presets, 1920x1080 by default, kept per user. A change redraws every
+  open card, with no server restart; the Mod Browser's card is drawn for the same screen
+- **Lua debugger settings moved to `launch.json`** - `aet-eaw-edit.game.executable` is `program`,
+  `aet-eaw-edit.game.luaDebugHost` is `host`, `aet-eaw-edit.game.luaDebugPort` is `port`,
+  `aet-eaw-edit.game.unsafeTableExpansion` is `unsafeTableExpansion`; `aet-eaw-edit.game.arguments` is `args`, which
+  comes after the mod chain
 - **`---@xmlref`** - no longer read; the tag is `---@aetref`
 - **Archives no list names** - no longer count as present; an archive under an art or audio folder that no
   `MegaFiles.xml` names is never loaded by the game

@@ -24,6 +24,7 @@ import {
     reasonLabel,
     relationIcon,
     relationLabel,
+    rowInertReason,
     rowTypeLabel,
 } from "./modBrowserModel";
 
@@ -146,7 +147,7 @@ describe("relationIcon", () => {
         assert.equal(relationIcon("requires"), "script");
         assert.equal(relationIcon("usedBy"), "references");
         assert.equal(relationIcon("referencedBy"), "references");
-        assert.equal(relationIcon("definitions"), "definition");
+        assert.equal(relationIcon("overrides"), "definition");
     });
 
     // An object's own tags name the rest: a relation named after its tag.
@@ -183,6 +184,10 @@ describe("relationLabel", () => {
         assert.equal(relationLabel("referencedBy"), "References");
         assert.equal(relationLabel("usedBy"), "References");
     });
+
+    it("calls the definitions the winning one replaces its overrides", () => {
+        assert.equal(relationLabel("overrides"), "Overrides");
+    });
 });
 
 describe("originLabel", () => {
@@ -208,7 +213,41 @@ describe("reasonLabel", () => {
     it("says why a relation lists nothing", () => {
         assert.equal(reasonLabel("none"), "None");
         assert.equal(reasonLabel("notInModFiles"), "Not in the mod's files");
+        assert.equal(reasonLabel("definedOnce"), "Defined once");
         assert.equal(reasonLabel(null), "");
+    });
+});
+
+describe("rowInertReason", () => {
+    const row = {
+        id: "x",
+        name: "x",
+        kinds: [],
+        origin: "layer:0",
+        overrides: [],
+    };
+
+    it("leaves a row with a page or a place to go to active", () => {
+        assert.equal(rowInertReason({ ...row, page: "models" }), undefined);
+        assert.equal(
+            rowInertReason({
+                ...row,
+                location: { uri: "file:///a.xml", line: 3 },
+            }),
+            undefined,
+        );
+    });
+
+    it("says why any other row does nothing", () => {
+        assert.equal(
+            rowInertReason({ ...row, origin: "missing" }),
+            "Nothing defines this name",
+        );
+        assert.equal(
+            rowInertReason({ ...row, origin: "game", packed: true }),
+            "Packed - no file to open",
+        );
+        assert.equal(rowInertReason(row), "Not an entry of its own");
     });
 });
 
@@ -364,7 +403,6 @@ describe("actionChoices", () => {
         assert.equal(reasonOf("shipped"), "Only the game defines it");
         assert.equal(reasonOf("binary"), "Not a text file");
         assert.equal(reasonOf("schema"), "Defined by the schema");
-        assert.equal(reasonOf("off"), "Turned off in the settings");
     });
 });
 

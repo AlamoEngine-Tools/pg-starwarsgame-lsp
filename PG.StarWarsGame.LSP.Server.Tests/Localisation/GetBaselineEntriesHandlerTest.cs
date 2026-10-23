@@ -15,20 +15,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
 public sealed class GetBaselineEntriesHandlerTest
 {
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_LocalisationFlagOff_ReturnsEmptyEntries()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var handler = BuildHandler(config);
-
-        var result = await handler.Handle(new GetBaselineEntriesParams(), CancellationToken.None);
-
-        Assert.Empty(result.Entries);
-    }
-
     [Fact]
     public async Task Handle_Always_ReturnsNonEmptyEntries()
     {
@@ -200,8 +186,7 @@ public sealed class GetBaselineEntriesHandlerTest
             factory,
             new FileHelper(sp.GetRequiredService<IFileSystem>()),
             projectRegistry,
-            layerRegistry,
-            config ?? new FakeLspConfigurationProvider());
+            layerRegistry);
 
         return (handler, projectRegistry, layerRegistry, factory, langService);
     }

@@ -83,12 +83,6 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-        {
-            Fail(rejection);
-            return Unit.Value;
-        }
-
         if (request.Arguments?.FirstOrDefault() is not JObject args)
         {
             Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesCommand"));

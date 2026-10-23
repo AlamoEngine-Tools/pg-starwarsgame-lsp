@@ -4,17 +4,17 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Server.Story;
 using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 /// <summary>
 ///     E2E pin for the feature-flag wire contract: a client-supplied <c>features</c> node in
-///     <c>initializationOptions</c> must selectively disable only the flags it names - everything
-///     else keeps the server's all-true default. <see cref="FeatureFlagsServerFixture" /> turns off
-///     <c>xml.completion</c>, <c>xml.diagnostics</c>, and <c>tools.localisation</c>; go-to-definition
-///     (left untouched) must still work, proving this isn't an all-or-nothing kill switch.
+///     <c>initializationOptions</c> must disable only the flag it names - the other keeps the
+///     server's all-true default. <see cref="FeatureFlagsServerFixture" /> turns off
+///     <c>storySimulator</c>; go-to-definition must still work, proving the flag is not an
+///     all-or-nothing kill switch.
 /// </summary>
 [Trait("Category", "E2E")]
 public sealed class FeatureFlagSmokeTest : IClassFixture<FeatureFlagsServerFixture>
@@ -29,50 +29,21 @@ public sealed class FeatureFlagSmokeTest : IClassFixture<FeatureFlagsServerFixtu
     }
 
     [Fact]
-    public async Task Formatting_XmlFormattingFlagOff_NotAdvertised()
-    {
-        // Dynamic registrations follow the initialize answer; by scan completion they have landed.
-        RequireEawWorkspace();
-        await WaitForFullScanAsync();
-
-        Assert.False(AdvertisedMethods.Advertises(_fixture.Client, AdvertisedMethods.Formatting));
-        Assert.False(AdvertisedMethods.Advertises(_fixture.Client, AdvertisedMethods.RangeFormatting));
-    }
-
-    [Fact]
-    public async Task Completion_XmlCompletionFlagOff_ReturnsEmpty()
+    public async Task StorySimStart_StorySimulatorFlagOff_NamesTheSetting()
     {
         RequireEawWorkspace();
         await WaitForFullScanAsync();
 
-        var (uri, lines) = await OpenCorvettesAsync();
-        try
-        {
-            var (line, col) = FindFirstGrandchildElementPosition(lines);
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var result = await _fixture.Client.RequestCompletion(
-                new CompletionParams
-                {
-                    TextDocument = new TextDocumentIdentifier { Uri = uri },
-                    Position = new Position(line, col),
-                    Context = new CompletionContext
-                    {
-                        TriggerKind = CompletionTriggerKind.TriggerCharacter,
-                        TriggerCharacter = "<"
-                    }
-                }, cts.Token);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var result = await _fixture.Client.SendRequest(new StorySimStartParams("Any", "Any"), cts.Token);
 
-            Assert.NotNull(result);
-            Assert.Empty(result.Items);
-        }
-        finally
-        {
-            CloseDocument(uri);
-        }
+        Assert.Null(result.State);
+        Assert.NotNull(result.Error);
+        Assert.Contains("aet-eaw-edit.experimental.storySimulator", result.Error);
     }
 
     [Fact]
-    public async Task GoToDefinition_XmlGoToDefinitionFlagLeftOn_StillResolvesWorkspaceDefinition()
+    public async Task GoToDefinition_WithAFlagOff_StillResolvesWorkspaceDefinition()
     {
         RequireEawWorkspace();
         await WaitForFullScanAsync();
@@ -104,55 +75,14 @@ public sealed class FeatureFlagSmokeTest : IClassFixture<FeatureFlagsServerFixtu
         }
     }
 
-    [Fact]
-    public async Task Diagnostics_XmlDiagnosticsFlagOff_NonePublishedAfterOpen()
-    {
-        RequireEawWorkspace();
-        await WaitForFullScanAsync();
-
-        var (uri, lines) = await OpenCorvettesAsync(false);
-        var diagnosticsReceived = _fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(3));
-        try
-        {
-            _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
-            {
-                TextDocument = new TextDocumentItem
-                {
-                    Uri = uri, LanguageId = "xml", Version = 1,
-                    Text = string.Join(Environment.NewLine, lines)
-                }
-            });
-
-            await Assert.ThrowsAsync<TaskCanceledException>(() => diagnosticsReceived);
-        }
-        finally
-        {
-            CloseDocument(uri);
-        }
-    }
-
-    [Fact]
-    public async Task GetLocalisationProjects_ToolsLocalisationFlagOff_ReturnsEmptyProjects()
-    {
-        RequireEawWorkspace();
-        await WaitForFullScanAsync();
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var result = await _fixture.Client.SendRequest(new GetLocalisationProjectsParams(), cts.Token);
-
-        Assert.Empty(result.Projects);
-    }
-
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private async Task<(DocumentUri uri, string[] lines)> OpenCorvettesAsync(bool alreadyOpened = true)
+    private async Task<(DocumentUri uri, string[] lines)> OpenCorvettesAsync()
     {
         var workspace = LspTestEnvironment.EawWorkspacePath!;
         var path = Path.Combine(workspace, CorvettesXmlRel);
         var uri = DocumentUri.FromFileSystemPath(path);
         var lines = await File.ReadAllLinesAsync(path);
-
-        if (!alreadyOpened) return (uri, lines);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {

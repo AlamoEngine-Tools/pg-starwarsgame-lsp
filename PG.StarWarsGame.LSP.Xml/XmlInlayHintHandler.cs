@@ -50,9 +50,6 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
 
     public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Xml.InlayHints)
-            return Task.FromResult<InlayHintContainer?>(null);
-
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<InlayHintContainer?>(null);

@@ -38,12 +38,10 @@ public sealed class ValidateStoryCommandBatchHandler(
     public Task<GetStoryDiagnosticsResult> Handle(
         ValidateStoryCommandBatchParams request, CancellationToken ct)
     {
-        // Gated on the READ surface, not on editing: validation writes nothing, and the panel's
-        // Validate button is available in every mode (it is the only source of story diagnostics
+        // Not gated on editing: validation writes nothing, and the panel's Validate button is
+        // available in every mode (it is the only source of story diagnostics
         // there). In View mode the batch is empty, so this is simply "diagnose the committed
         // campaign" - gating it behind Edit mode would leave read-only users with no diagnostics.
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new GetStoryDiagnosticsResult([], rejection));
 
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)

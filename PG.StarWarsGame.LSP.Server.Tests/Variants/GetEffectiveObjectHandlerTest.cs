@@ -30,26 +30,6 @@ public sealed class GetEffectiveObjectHandlerTest
             config ?? new FakeLspConfigurationProvider());
     }
 
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_VariantsFlagOff_NotFoundDespiteResolvableObject()
-    {
-        // Same arrange as Handle_Variant_RendersMergedEffectiveXml - only the flag differs.
-        var index = IndexWith(Sym("V", "B"), Sym("B"));
-        var source = new FakeVariantTagSource()
-            .With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0))
-            .With("V", new VariantTag("Mass", "5", "<Mass>5</Mass>", 0));
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Variants = false } });
-
-        var result = await Handler(index, source, config)
-            .Handle(new GetEffectiveObjectParams { ObjectId = "V" }, CancellationToken.None);
-
-        Assert.False(result.Found);
-        Assert.Equal(string.Empty, result.Xml);
-    }
-
     [Fact]
     public async Task Handle_Variant_RendersMergedEffectiveXml()
     {

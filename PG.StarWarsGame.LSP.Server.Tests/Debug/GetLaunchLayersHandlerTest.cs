@@ -34,19 +34,6 @@ public sealed class GetLaunchLayersHandlerTest
     }
 
     [Fact]
-    public async Task Handle_DebuggerFlagOff_DisabledWithNoLayers()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Lua = new LuaFeatureFlags { Debugger = false } });
-        var layers = Layers(Layer("Mod", 1, "D:/Mods/Mod", "D:/Mods/Mod/Data/Scripts"));
-
-        var result = await Handler(layers, config).Handle(new GetLaunchLayersParams(), CancellationToken.None);
-
-        Assert.False(result.Enabled);
-        Assert.Empty(result.Layers);
-    }
-
-    [Fact]
     public async Task Handle_LayersHighestRankFirst_WithScriptRootsAndProjectDirectory()
     {
         var layers = Layers(

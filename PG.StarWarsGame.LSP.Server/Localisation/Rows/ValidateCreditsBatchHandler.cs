@@ -38,9 +38,6 @@ public sealed class ValidateCreditsBatchHandler
     public Task<ValidateCreditsBatchResult> Handle(
         ValidateCreditsBatchParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-            return Task.FromResult(new ValidateCreditsBatchResult([], rejection));
-
         var fs = _fileHelper.FileSystem;
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath)
             || !fs.File.Exists(request.ProjectFilePath))

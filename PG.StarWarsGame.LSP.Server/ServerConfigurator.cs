@@ -159,6 +159,7 @@ public static class ServerConfigurator
             .WithHandler<RevalidateDocumentCommandHandler>()
             .WithHandler<ReloadProjectCommandHandler>()
             .WithHandler<NewModProjectCommandHandler>()
+            .WithHandler<AdoptModProjectHandler>()
             .WithHandler<InitLocalisationProjectCommandHandler>()
             .WithHandler<ImportLocalisationProjectCommandHandler>()
             .WithHandler<CreateLocalisationKeyCommandHandler>()
@@ -225,12 +226,15 @@ public static class ServerConfigurator
             .WithHandler<StorySimRunToDecisionHandler>()
             .WithHandler<StorySimSeekHandler>()
             .WithHandler<StorySimBreakpointsHandler>()
+            .WithHandler<StorySimOptionsHandler>()
             .WithHandler<StorySimWorldHandler>()
             .WithHandler<StorySimResolveBattleHandler>()
             .WithHandler<StorySimRetryBattleHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
+                // Game paths the editor leaves unset are the detected installs'.
+                services.AddSingleton<IGameInstallLocator, GameInstallLocator>();
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();
                 // The server's own texts outside a diagnostics run, in the configured locale.
                 services.AddSingleton<IMessageCatalog, ConfiguredMessageCatalog>();
@@ -263,8 +267,7 @@ public static class ServerConfigurator
                 // startup snapshot it also accepts only answers until the first real scan.
                 services.AddSingleton<IStoryChainProblemStore>(sp =>
                     new LiveStoryChainProblemStore(
-                        sp.GetRequiredService<IStoryModelService>,
-                        sp.GetRequiredService<ILspConfigurationProvider>()));
+                        sp.GetRequiredService<IStoryModelService>));
 
                 // Story campaign models (per-campaign threads + graph) and their diagnostics.
                 services.AddSingleton<IStoryModelService, StoryModelService>();
@@ -276,7 +279,6 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IGameIndexService>(),
                         sp.GetRequiredService<IStartupGate>(),
                         sp.GetRequiredService<IStoryModelService>(),
-                        sp.GetRequiredService<ILspConfigurationProvider>(),
                         p => sp.GetRequiredService<ILanguageServerFacade>()
                             .SendNotification("aet/storyGraphChanged", p),
                         sp.GetRequiredService<ILogger<StoryGraphChangeNotifier>>()));
@@ -353,8 +355,8 @@ public static class ServerConfigurator
                 // script's instance - itself and its require tree, as the game gives every script a
                 // Lua state of its own - and one whole-project process that answers renames and where
                 // a library is used, nothing else. Started once the project load knows the layers,
-                // each with its configuration in a directory of its own. Absent executable or flag
-                // off: never started, every call a no-op.
+                // each with its configuration in a directory of its own. Absent executable: never
+                // started, every call a no-op.
                 services.AddSingleton<LuaStubLocation>();
                 // The annotations this server knows, inserted above the functions in the text the
                 // analyzer reads - an open script's and every file of a script's require tree.
@@ -394,7 +396,6 @@ public static class ServerConfigurator
                 services.AddSingleton<ILuaAnalyzerStarter>(sp => new LuaAnalyzerStarter(
                     sp.GetRequiredService<LuaAnalyzerInstances>(),
                     sp.GetRequiredService<LuaAnalyzerHost>(),
-                    sp.GetRequiredService<ILspConfigurationProvider>(),
                     sp.GetRequiredService<LuaStubLocation>(),
                     ResolveLuaAnalyzer(sp) is not null,
                     sp.GetRequiredService<ILogger<LuaAnalyzerStarter>>()));
@@ -589,23 +590,16 @@ public static class ServerConfigurator
                 configProvider.LoadFrom(request.InitializationOptions);
                 logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
 
-                // Formatting is registered only when its flag is on, so an off flag advertises no
-                // capability and another XML formatter can take the documents. A request-time check
-                // would still claim them and answer with nothing.
-                //
-                // When is the client's choice. Registered here, a handler is in the initialize
-                // result - right for a client taking it statically, but one asking for dynamic
+                // When formatting is registered is the client's choice. Registered here, a handler is
+                // in the initialize result - right for a client taking it statically, but one asking for dynamic
                 // registration is then sent the registration TWICE under one id (measured), and
                 // VS Code offers two formatters. So a dynamic client gets it once the server has
                 // started, after the library's own registration batch.
-                if (configProvider.Current.Features.Xml.Formatting)
-                {
-                    var textDocument = request.Capabilities?.TextDocument;
-                    var documentLate = textDocument?.Formatting.Value?.DynamicRegistration == true;
-                    var rangeLate = textDocument?.RangeFormatting.Value?.DynamicRegistration == true;
-                    RegisterFormatting(server, !documentLate, !rangeLate);
-                    formattingAfterStart = (documentLate, rangeLate);
-                }
+                var textDocument = request.Capabilities?.TextDocument;
+                var documentLate = textDocument?.Formatting.Value?.DynamicRegistration == true;
+                var rangeLate = textDocument?.RangeFormatting.Value?.DynamicRegistration == true;
+                RegisterFormatting(server, !documentLate, !rangeLate);
+                formattingAfterStart = (documentLate, rangeLate);
 
                 await Task.CompletedTask;
             })

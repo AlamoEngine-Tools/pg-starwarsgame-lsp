@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -20,7 +19,6 @@ public sealed class StoryDialogScopeService : IStoryDialogScope
     private readonly Dictionary<string, (DateTime WriteTimeUtc, IReadOnlyCollection<int> Chapters)> _chapterCache =
         new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly ILspConfigurationProvider _configProvider;
     private readonly IFileHelper _fileHelper;
 
     private readonly object _gate = new();
@@ -28,18 +26,15 @@ public sealed class StoryDialogScopeService : IStoryDialogScope
 
     public StoryDialogScopeService(
         IModProjectReloadService reloadService,
-        ILspConfigurationProvider configProvider,
         IFileHelper fileHelper)
     {
         _reloadService = reloadService;
-        _configProvider = configProvider;
         _fileHelper = fileHelper;
     }
 
     private IReadOnlyList<string> Roots => _reloadService.LastWorkspaceConfig?.StoryDialogRoots ?? [];
 
-    public bool Enabled =>
-        _configProvider.Current.Features.Dialog.Diagnostics && Roots.Count > 0;
+    public bool Enabled => Roots.Count > 0;
 
     public bool IsInScope(string canonicalUri)
     {

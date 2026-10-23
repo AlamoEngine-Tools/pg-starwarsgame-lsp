@@ -21,4 +21,14 @@ public sealed record GetEncyclopediaEntryParams : IRequest<GetEncyclopediaEntryR
     ///     take over the body, and even then only when it is non-empty.
     /// </summary>
     public bool Multiplayer { get; init; }
+
+    /// <summary>
+    ///     The screen the card is drawn for; absent, 1920x1080. The game sizes these glyphs from the
+    ///     display it runs on: the height sets the glyph size, the width converts it into the card's
+    ///     units, and only the exact pair 800x600 also narrows the line budget.
+    /// </summary>
+    public int? ScreenWidth { get; init; }
+
+    /// <inheritdoc cref="ScreenWidth" />
+    public int? ScreenHeight { get; init; }
 }

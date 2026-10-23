@@ -26,11 +26,8 @@ internal sealed class XmlFormattingRequest(
     IUserNotifier notifier,
     ILspConfigurationProvider config)
 {
-    public bool Enabled => config.Current.Features.Xml.Formatting;
-
     public TextEditContainer? Format(TextDocumentIdentifier document, FormattingOptions options, LspRange? range)
     {
-        if (!Enabled) return null;
         var uri = fileHelper.NormalizeUri(document.Uri.ToString());
         if (!context.IsEaWXmlFile(uri) || parseCache.GetOrParse(uri) is not { } doc) return null;
 

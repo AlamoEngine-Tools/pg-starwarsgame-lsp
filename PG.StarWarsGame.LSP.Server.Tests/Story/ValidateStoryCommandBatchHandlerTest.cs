@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 public sealed class ValidateStoryCommandBatchHandlerTest
 {
     private static ValidateStoryCommandBatchHandler Handler(
-        string marker, bool storyEditor = true, bool storyEditing = true)
+        string marker, bool storyEditing = true)
     {
         var fs = NewFileSystem();
         var fileHelper = FileHelperFor(fs);
@@ -23,21 +23,12 @@ public sealed class ValidateStoryCommandBatchHandlerTest
             fileHelper,
             Reload(),
             new MarkerCollector(marker),
-            Config(storyEditor, storyEditing));
+            Config(storyEditing));
     }
 
     private static ValidateStoryCommandBatchParams Batch(params StoryCommandDto[] commands)
     {
         return new ValidateStoryCommandBatchParams("GC", "Rebel", commands);
-    }
-
-    [Fact]
-    public async Task StoryEditorOff_ReturnsDisabledMessage()
-    {
-        var result = await Handler("anything", false)
-            .Handle(Batch(), CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
     }
 
     /// <summary>

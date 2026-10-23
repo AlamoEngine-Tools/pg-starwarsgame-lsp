@@ -74,9 +74,6 @@ public sealed class ExportLocalisationToDatHandler
     public Task<ExportLocalisationToDatResult> Handle(
         ExportLocalisationToDatParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-            return Task.FromResult(new ExportLocalisationToDatResult([], rejection));
-
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
             return Task.FromResult(new ExportLocalisationToDatResult([],
                 new ConfiguredMessageCatalog(_config).Format("LocExportDat_NoProjectFilePathProvided")));

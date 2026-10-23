@@ -2,28 +2,22 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.JsonRpc;
-using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
 public sealed class GetLocalisationProjectsHandler
     : IJsonRpcRequestHandler<GetLocalisationProjectsParams, GetLocalisationProjectsResult>
 {
-    private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationProjectRegistry _registry;
 
-    public GetLocalisationProjectsHandler(ILocalisationProjectRegistry registry, ILspConfigurationProvider config)
+    public GetLocalisationProjectsHandler(ILocalisationProjectRegistry registry)
     {
         _registry = registry;
-        _config = config;
     }
 
     public Task<GetLocalisationProjectsResult> Handle(
         GetLocalisationProjectsParams request, CancellationToken cancellationToken)
     {
-        if (!LocalisationFeatureDisabled.IsEnabled(_config))
-            return Task.FromResult(new GetLocalisationProjectsResult([]));
-
         return Task.FromResult(new GetLocalisationProjectsResult(_registry.Projects));
     }
 }

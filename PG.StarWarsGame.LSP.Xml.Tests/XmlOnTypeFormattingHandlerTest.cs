@@ -4,7 +4,6 @@
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
@@ -26,26 +25,12 @@ public sealed class XmlOnTypeFormattingHandlerTest
         };
     }
 
-    private static XmlOnTypeFormattingHandler Build(string text, ILspConfigurationProvider? config = null,
+    private static XmlOnTypeFormattingHandler Build(string text,
         IEaWXmlContext? eaWContext = null)
     {
         var host = new FakeHost(TestUri, text);
         return new XmlOnTypeFormattingHandler(TestParseCache.For(host), eaWContext ?? new AllowAllEaWContext(),
-            new FileHelper(new MockFileSystem()), config ?? new FakeLspConfigurationProvider());
-    }
-
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_AutoCloseFlagOff_ReturnsNull()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { AutoCloseTag = false } });
-        var handler = Build("<Root>\n<Foo>\n</Root>", config);
-
-        var result = await handler.Handle(At(1, 5), CancellationToken.None);
-
-        Assert.Null(result);
+            new FileHelper(new MockFileSystem()));
     }
 
     // ── happy path ───────────────────────────────────────────────────────────

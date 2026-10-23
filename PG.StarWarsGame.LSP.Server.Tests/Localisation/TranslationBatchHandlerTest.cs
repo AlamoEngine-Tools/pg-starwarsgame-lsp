@@ -263,24 +263,6 @@ public sealed class TranslationBatchHandlerTest
         Assert.Equal(Csv, fs.File.ReadAllText(Path));
     }
 
-    // ── the feature gate ─────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Apply_WithTheToolDisabled_RefusesAndWritesNothing()
-    {
-        var fs = Files();
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (apply, _, _) = Build(fs, config);
-
-        var result = await apply.Handle(
-            new ApplyTranslationBatchParams(Path, HashOf(fs), [SetValue("TEXT_A", "x")]),
-            CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(LocalisationFeatureDisabled.MessageKey), result.Error);
-        Assert.Equal(Csv, fs.File.ReadAllText(Path));
-    }
-
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (ApplyTranslationBatchHandler Apply, ValidateTranslationBatchHandler Validate,

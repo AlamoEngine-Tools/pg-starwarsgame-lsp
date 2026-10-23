@@ -233,19 +233,6 @@ public sealed class ConvertLocalisationFormatHandlerTest
     // ── refusals ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Convert_FlagOff_Refuses()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (handler, fs, _, _) = Build(config: config);
-
-        var result = await handler.Handle(Request(CsvPath, "Xml"), CancellationToken.None);
-
-        Assert.NotNull(result.Error);
-        Assert.False(fs.File.Exists("/mod/data/text/MasterTextFile.xml"));
-    }
-
-    [Fact]
     public async Task Convert_MissingFile_Refuses()
     {
         var (handler, _, _, _) = Build();

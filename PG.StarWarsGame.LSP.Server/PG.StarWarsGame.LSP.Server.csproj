@@ -27,6 +27,8 @@
 
     <ItemGroup>
         <PackageReference Include="AlamoEngineTools.Modinfo"/>
+        <PackageReference Include="AlamoEngineTools.PG.StarWarsGame.Infrastructure"/>
+        <PackageReference Include="AlamoEngineTools.PG.StarWarsGame.Infrastructure.Steam"/>
         <PackageReference Include="CsvHelper"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
         <PackageReference Include="Microsoft.Extensions.Http"/>

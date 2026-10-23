@@ -26,6 +26,13 @@ import { GetEncyclopediaEntryResult } from "../protocol/encyclopedia";
 import { EncyclopediaCard } from "./encyclopediaCard";
 import { encyclopediaNotices, noticeSeverity } from "./encyclopediaNotices";
 import {
+    DEFAULT_ENCYCLOPEDIA_SCREEN,
+    ENCYCLOPEDIA_SCREENS,
+    encyclopediaScreenFrom,
+    encyclopediaScreenId,
+} from "./encyclopediaScreens";
+import {
+    comboboxCss,
     dockBodyCss,
     dockChromeCss,
     dockHeaderCss,
@@ -38,6 +45,7 @@ import { Field } from "./shared/Field";
 import { ProblemsPanel } from "./shared/ProblemsPanel";
 import { problemLook } from "./shared/problemLook";
 import { RightDock } from "./shared/RightDock";
+import { SelectField } from "./shared/SelectField";
 
 import { initPanelLayout } from "./shared/panelLayoutBridge";
 import { SeverityTag } from "./shared/SeverityTag";
@@ -84,6 +92,8 @@ const Shell = styled.div`
     ${dockBodyCss}
     ${dockOverviewCss}
     ${problemsPanelCss}
+    /* The Screen field is the shared Combobox; without its rules the list falls into the dock's flow. */
+    ${comboboxCss}
 
     height: 100%;
     display: flex;
@@ -248,6 +258,9 @@ function App(): React.JSX.Element {
      * request stays here; whether it was honoured is read off the entry.
      */
     const [multiplayer, setMultiplayer] = useState(false);
+    // The screen the card is drawn for: the person's choice, kept by the host and sent with every
+    // entry, so a reloaded webview shows the screen the card on it was drawn for.
+    const [screen, setScreen] = useState(DEFAULT_ENCYCLOPEDIA_SCREEN);
     /**
      * Which faction's frame to draw. The engine takes this from the viewing player's faction; a
      * preview has no player, so the user picks. Held here and never driven from the response - the
@@ -298,6 +311,7 @@ function App(): React.JSX.Element {
                 type: string;
                 entry?: GetEncyclopediaEntryResult;
                 multiplayer?: boolean;
+                screen?: unknown;
                 shipName?: string | null;
             };
             if (msg.type !== "entry" || msg.entry === undefined) {
@@ -310,6 +324,7 @@ function App(): React.JSX.Element {
             if (typeof msg.multiplayer === "boolean") {
                 setMultiplayer(msg.multiplayer);
             }
+            setScreen(encyclopediaScreenFrom(msg.screen));
         };
 
         window.addEventListener("message", handle);
@@ -320,6 +335,12 @@ function App(): React.JSX.Element {
     const onToggleMultiplayer = (next: boolean): void => {
         setMultiplayer(next);
         vscode.postMessage({ type: "setMultiplayer", multiplayer: next });
+    };
+
+    const onPickScreen = (id: string): void => {
+        const next = encyclopediaScreenFrom(id);
+        setScreen(next);
+        vscode.postMessage({ type: "setScreen", screen: next });
     };
 
     const stage =
@@ -523,6 +544,23 @@ function App(): React.JSX.Element {
                                 onSelect={(id) =>
                                     onToggleMultiplayer(id === "mp")
                                 }
+                            />
+                        </Field>
+
+                        {/* What the card IS drawn for, beside the other choices of which card - not
+                        beside Zoom, which only changes how large it is shown. The game sizes these
+                        glyphs from the display it runs on; the list is the common ones. */}
+                        <Field label={l10n.t("Screen")}>
+                            <SelectField
+                                value={encyclopediaScreenId(screen)}
+                                options={ENCYCLOPEDIA_SCREENS.map((s) => ({
+                                    value: encyclopediaScreenId(s),
+                                }))}
+                                onChange={onPickScreen}
+                                ariaLabel={l10n.t("Screen")}
+                                title={l10n.t(
+                                    "The screen resolution the card is drawn for",
+                                )}
                             />
                         </Field>
                     </>

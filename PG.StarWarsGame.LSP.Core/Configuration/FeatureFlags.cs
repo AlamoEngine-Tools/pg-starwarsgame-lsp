@@ -4,174 +4,24 @@
 namespace PG.StarWarsGame.LSP.Core.Configuration;
 
 /// <summary>
-///     Per-language, per-capability feature flags. Every flag defaults to <c>true</c>: a bare
-///     server (no client-supplied <c>features</c> node) behaves exactly as before flags existed.
-///     The user-facing defaults - which flags are off out of the box - live in the VS Code
-///     client's package.json, the one list of them; the client always sends the complete resolved
-///     object via initializationOptions, so these defaults only reach a bare server.
+///     The experimental features, one switch each. Everything else is always on. Every flag defaults
+///     to <c>true</c>, so a bare server (no client-supplied <c>features</c> node) runs everything;
+///     the user-facing defaults - off - live in the VS Code client's package.json, and the client
+///     always sends the resolved object via initializationOptions.
 ///     In <c>.pg-lsp.json</c> the node is spelled PascalCase (<c>"Features"</c>, case-sensitive);
 ///     in initializationOptions it is camelCase (<c>"features"</c>, parsed case-insensitively).
 /// </summary>
 public record FeatureFlags
 {
-    public XmlFeatureFlags Xml { get; init; } = new();
-    public LuaFeatureFlags Lua { get; init; } = new();
-    public ToolsFeatureFlags Tools { get; init; } = new();
-    public StoryFeatureFlags Story { get; init; } = new();
-    public DialogFeatureFlags Dialog { get; init; } = new();
-}
-
-/// <summary>Flags for XML language capabilities.</summary>
-public record XmlFeatureFlags
-{
-    public bool Completion { get; init; } = true;
-    public bool Hover { get; init; } = true;
-    public bool Diagnostics { get; init; } = true;
-    public bool GoToDefinition { get; init; } = true;
-    public bool FindReferences { get; init; } = true;
-    public bool Rename { get; init; } = true;
-    public bool CodeLens { get; init; } = true;
-    public bool InlayHints { get; init; } = true;
-    public bool CodeActions { get; init; } = true;
-    public bool LinkedEditing { get; init; } = true;
-    public bool AutoCloseTag { get; init; } = true;
-
     /// <summary>
-    ///     Document and range formatting. Off, the server does not advertise either capability, so
-    ///     another XML formatter can take the documents.
-    /// </summary>
-    public bool Formatting { get; init; } = true;
-
-    /// <summary>
-    ///     XML the game reads that standard XML tools reject, or that the game reads differently
-    ///     from what the document shows (the XML strictness group). A file the game drops is
-    ///     reported regardless.
-    /// </summary>
-    public bool Strictness { get; init; } = true;
-}
-
-/// <summary>Flags for Lua language capabilities.</summary>
-public record LuaFeatureFlags
-{
-    public bool Completion { get; init; } = true;
-    public bool Hover { get; init; } = true;
-    public bool Diagnostics { get; init; } = true;
-    public bool GoToDefinition { get; init; } = true;
-    public bool Rename { get; init; } = true;
-    public bool CodeActions { get; init; } = true;
-
-    /// <summary>
-    ///     Gates the Lua debugger: <c>aet/getScriptRoots</c> on the language server, and on the
-    ///     client the debug adapter itself. Off by default in the client while the feature is new.
-    /// </summary>
-    public bool Debugger { get; init; } = true;
-
-    /// <summary>
-    ///     Runs the Lua analyzer (emmylua_ls) behind this server, with the open Lua documents
-    ///     mirrored to it. Off by default in the client while the feature is new; it needs the
-    ///     analyzer executable either way.
-    /// </summary>
-    public bool Analyzer { get; init; } = true;
-}
-
-/// <summary>Flags for story-mode capabilities.</summary>
-public record StoryFeatureFlags
-{
-    /// <summary>
-    ///     Gates the campaign story-chain scan: file typing for plot manifests
-    ///     (<c>StoryPlotManifest</c>) and story threads (<c>StoryParser</c>), the chain
-    ///     diagnostics, and thereby the story event/reward param validation and completion
-    ///     that activate on those file types.
-    /// </summary>
-    public bool Discovery { get; init; } = true;
-
-    /// <summary>
-    ///     Gates the campaign-model graph diagnostics (dangling prereqs, prereq cycles,
-    ///     duplicate/ambiguous event names, unreachable events, tag order, flag length).
-    /// </summary>
-    public bool GraphDiagnostics { get; init; } = true;
-
-    /// <summary>
-    ///     Gates story symbol/reference indexing across XML and Lua (event names, flags,
-    ///     AI-notification ids) and thereby hover/definition/references on them.
-    /// </summary>
-    public bool Symbols { get; init; } = true;
-
-    /// <summary>Gates cross-language rename of story symbols (builds on <see cref="Symbols" />).</summary>
-    public bool Rename { get; init; } = true;
-}
-
-/// <summary>
-///     Flags for the story-dialog (.txt) language capabilities - its own family like
-///     <see cref="LuaFeatureFlags" />, so completion/hover flags can join later.
-/// </summary>
-public record DialogFeatureFlags
-{
-    /// <summary>
-    ///     Gates the story-dialog language service: diagnostics for .txt files under the
-    ///     pgproj storyDialog directories and the XML-side Story_Dialog/Story_Chapter
-    ///     cross-checks.
-    /// </summary>
-    public bool Diagnostics { get; init; } = true;
-
-    /// <summary>Gates end-of-line translated-text hints for localisation-key arguments (TEXT/TITLE).</summary>
-    public bool InlayHints { get; init; } = true;
-
-    /// <summary>Gates go-to-definition on object-reference arguments (speech events, movies, SFX events).</summary>
-    public bool GoToDefinition { get; init; } = true;
-
-    /// <summary>Gates the suppression quick fixes on dialog diagnostics.</summary>
-    public bool CodeActions { get; init; } = true;
-}
-
-/// <summary>Flags for cross-language tooling endpoints.</summary>
-public record ToolsFeatureFlags
-{
-    /// <summary>Gates the aet/* localisation endpoints, localisation commands and the create-key code action.</summary>
-    public bool Localisation { get; init; } = true;
-
-    /// <summary>Gates aet/getEffectiveObject and the "show effective object" code lens.</summary>
-    public bool Variants { get; init; } = true;
-
-    /// <summary>
-    ///     Gates <c>aet/getEncyclopediaEntry</c> and the encyclopedia popup preview built on it.
-    ///     Independent of <see cref="Localisation" />: the endpoint reads translations but writes
-    ///     none, so a workspace can preview popups with the localisation editor turned off.
-    /// </summary>
-    public bool Encyclopedia { get; init; } = true;
-
-    /// <summary>
-    ///     Gates <c>aet/getSymbolOutline</c>, <c>aet/getSymbolPage</c>, <c>aet/getSymbolNode</c> and the
-    ///     Mod Browser built on them (#270). Reads the index only.
-    /// </summary>
-    public bool ModBrowser { get; init; } = true;
-
-    /// <summary>
-    ///     Gates <c>aet/getPreviewScene</c>, <c>aet/getModelGlb</c>, <c>aet/getModelTexture</c> and the
-    ///     3D model preview built on them. Independent of everything else: the preview reads model and
-    ///     texture files and writes nothing.
-    /// </summary>
-    public bool ModelPreview { get; init; } = true;
-
-    /// <summary>
-    ///     Gates the story editor protocol: every <c>aet/getStory*</c> endpoint and the
-    ///     <c>aet/storyGraphChanged</c> notification (builds on <c>features.story.discovery</c>).
-    ///     This is the read surface - the panel and its View mode.
-    /// </summary>
-    public bool StoryEditor { get; init; } = true;
-
-    /// <summary>
-    ///     Gates Edit mode: the authoring endpoints that stage, preview, validate and write story
-    ///     changes (builds on <see cref="StoryEditor" />, which hosts them). Separate so the graph
-    ///     can be browsed read-only without exposing mutation.
+    ///     Edit mode in the story graph: the authoring endpoints that stage, preview, validate and
+    ///     write story changes.
     /// </summary>
     public bool StoryEditing { get; init; } = true;
 
     /// <summary>
-    ///     Gates the story simulator: every <c>aet/storySim*</c> endpoint and the
-    ///     <c>aet/storySimChanged</c> notification. The endpoints also require
-    ///     <c>features.story.discovery</c>, which supplies the campaigns; the client runs the
-    ///     simulation in the panel <see cref="StoryEditor" /> hosts.
+    ///     The story simulator: every <c>aet/storySim*</c> endpoint and the
+    ///     <c>aet/storySimChanged</c> notification.
     /// </summary>
     public bool StorySimulator { get; init; } = true;
 }

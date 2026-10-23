@@ -21,9 +21,6 @@ public sealed class GetLaunchLayersHandler : IJsonRpcRequestHandler<GetLaunchLay
 
     public Task<GetLaunchLayersResult> Handle(GetLaunchLayersParams request, CancellationToken cancellationToken)
     {
-        if (!_config.Current.Features.Lua.Debugger)
-            return Task.FromResult(new GetLaunchLayersResult(false, []));
-
         var layers = _layers.Layers
             .OrderByDescending(layer => layer.Rank)
             .Select(layer =>

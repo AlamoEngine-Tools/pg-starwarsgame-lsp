@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Notifications;
@@ -17,7 +16,6 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 /// </summary>
 public sealed class StoryGraphChangeNotifier : DebouncedIndexNotifier
 {
-    private readonly ILspConfigurationProvider _config;
     private readonly ILogger<StoryGraphChangeNotifier> _logger;
     private readonly IStoryModelService _modelService;
     private readonly Action<StoryGraphChangedParams> _send;
@@ -26,14 +24,12 @@ public sealed class StoryGraphChangeNotifier : DebouncedIndexNotifier
         IGameIndexService indexService,
         IStartupGate gate,
         IStoryModelService modelService,
-        ILspConfigurationProvider config,
         Action<StoryGraphChangedParams> send,
         ILogger<StoryGraphChangeNotifier> logger,
         int debounceMs = 100)
         : base(indexService, gate, debounceMs)
     {
         _modelService = modelService;
-        _config = config;
         _send = send;
         _logger = logger;
     }
@@ -42,8 +38,6 @@ public sealed class StoryGraphChangeNotifier : DebouncedIndexNotifier
     {
         try
         {
-            if (StoryEditorFeature.Rejection(_config) is not null) return;
-
             var campaigns = _modelService.GetInvalidatedCampaigns();
             if (campaigns.Count == 0) return;
 

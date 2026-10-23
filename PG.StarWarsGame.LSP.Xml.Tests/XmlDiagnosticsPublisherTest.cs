@@ -204,48 +204,6 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
     }
 
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    private static FakeLspConfigurationProvider XmlDiagnosticsOff()
-    {
-        return FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { Diagnostics = false } });
-    }
-
-    [Fact]
-    public void IndexChanged_XmlDiagnosticsFlagOff_PublishesNothing()
-    {
-        var (_, published, indexService, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
-        workspaceHost.Set("file:///a.xml", "<Root/>");
-
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
-
-        Assert.Empty(published);
-    }
-
-    [Fact]
-    public async Task RevalidateDocument_XmlDiagnosticsFlagOff_PublishesNothing()
-    {
-        var (publisher, published, _, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
-        workspaceHost.Set("file:///a.xml", "<Root/>");
-
-        await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
-
-        Assert.Empty(published);
-    }
-
-    [Fact]
-    public async Task RevalidateWorkspace_XmlDiagnosticsFlagOff_PublishesNothing()
-    {
-        var (publisher, published, indexService, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
-        workspaceHost.Set("file:///a.xml", "<Root/>");
-        indexService.Current = IndexWithDoc("file:///a.xml");
-
-        await publisher.RevalidateWorkspaceAsync(CancellationToken.None);
-
-        Assert.Empty(published);
-    }
-
     [Fact]
     public void IndexChanged_TwoOpenDocuments_PublishesTwice()
     {
@@ -492,14 +450,8 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Contains(pub.Diagnostics!, d => d.Message.Contains("UNIT_A"));
     }
 
-    private static FakeLspConfigurationProvider StrictnessOff()
-    {
-        return FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { Strictness = false } });
-    }
-
     [Fact]
-    public void Strictness_On_ReportsAStrictOnlyFindingAsAWarning()
+    public void Strictness_ReportsAStrictOnlyFindingAsAWarning()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed(withStructure: true);
         workspaceHost.Set("file:///a.xml", StrayAmpersandDoc);
@@ -513,23 +465,9 @@ public sealed class XmlDiagnosticsPublisherTest
     }
 
     [Fact]
-    public void Strictness_Off_DropsTheStrictnessGroup()
+    public void Strictness_AFileTheGameDrops_IsAnError()
     {
-        var (_, published, indexService, workspaceHost) =
-            BuildSubscribed(config: StrictnessOff(), withStructure: true);
-        workspaceHost.Set("file:///a.xml", StrayAmpersandDoc);
-
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
-
-        Assert.DoesNotContain(published.Last().Diagnostics!,
-            x => x.Code?.String?.StartsWith("aetswg-015-", StringComparison.Ordinal) == true);
-    }
-
-    [Fact]
-    public void Strictness_Off_StillReportsAFileTheGameDrops()
-    {
-        var (_, published, indexService, workspaceHost) =
-            BuildSubscribed(config: StrictnessOff(), withStructure: true);
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(withStructure: true);
         workspaceHost.Set("file:///a.xml", DroppedFileDoc);
 
         indexService.Fire(IndexWithDoc("file:///a.xml"));

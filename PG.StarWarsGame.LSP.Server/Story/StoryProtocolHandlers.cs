@@ -20,15 +20,11 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 
 public sealed class GetStoryPlotsHandler(
     IStoryModelService modelService,
-    IGameIndexService indexService,
-    ILspConfigurationProvider config)
+    IGameIndexService indexService)
     : IJsonRpcRequestHandler<GetStoryPlotsParams, GetStoryPlotsResult>
 {
     public Task<GetStoryPlotsResult> Handle(GetStoryPlotsParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new GetStoryPlotsResult([], rejection));
-
         var chain = modelService.GetChainResult();
         var manifestsByFile = new Dictionary<string, StoryManifestContents>(StringComparer.OrdinalIgnoreCase);
         foreach (var manifest in chain.Manifests)
@@ -170,9 +166,6 @@ public sealed class GetStoryGraphHandler(
 {
     public Task<GetStoryGraphResult> Handle(GetStoryGraphParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new GetStoryGraphResult([], [], rejection));
-
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
@@ -190,9 +183,6 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
 {
     public Task<GetStoryNodeDetailResult> Handle(GetStoryNodeDetailParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new GetStoryNodeDetailResult(null, rejection));
-
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         var node = model?.Graph.Nodes.FirstOrDefault(n =>
             n.Kind == StoryNodeKind.Event && n.Id == request.NodeId);
@@ -224,15 +214,11 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
 
 public sealed class GetStoryLayoutHandler(
     IStoryLayoutStore store,
-    IStoryModelService models,
-    ILspConfigurationProvider config)
+    IStoryModelService models)
     : IJsonRpcRequestHandler<GetStoryLayoutParams, GetStoryLayoutResult>
 {
     public Task<GetStoryLayoutResult> Handle(GetStoryLayoutParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new GetStoryLayoutResult([], rejection));
-
         // The sidecar names an event by its thread and event hashed together and anything else by
         // its node id, so the graph's own nodes - the scope's, since a battle's portals exist only
         // there - are what turn those keys back into nodes. A node the campaign no longer has
@@ -255,14 +241,11 @@ public sealed class GetStoryLayoutHandler(
     }
 }
 
-public sealed class SetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigurationProvider config)
+public sealed class SetStoryLayoutHandler(IStoryLayoutStore store)
     : IJsonRpcRequestHandler<SetStoryLayoutParams, SetStoryLayoutResult>
 {
     public Task<SetStoryLayoutResult> Handle(SetStoryLayoutParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new SetStoryLayoutResult(false, rejection));
-
         store.Set(new StoryModelKey(request.Campaign, request.Faction), request.Entries
             .Select(e => new StoryLayoutEntry(e.ThreadUri, e.EventName, e.X, e.Y, e.NodeId))
             .ToList());
@@ -270,14 +253,11 @@ public sealed class SetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigura
     }
 }
 
-public sealed class GetStorySchemaHandler(ISchemaProvider schema, ILspConfigurationProvider config)
+public sealed class GetStorySchemaHandler(ISchemaProvider schema)
     : IJsonRpcRequestHandler<GetStorySchemaParams, GetStorySchemaResult>
 {
     public Task<GetStorySchemaResult> Handle(GetStorySchemaParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new GetStorySchemaResult([], [], rejection));
-
         return Task.FromResult(new GetStorySchemaResult(
             Project(schema.GetEnum("StoryEventType")),
             Project(schema.GetEnum("StoryRewardType"))));
@@ -315,8 +295,7 @@ public sealed class GetStoryParamOptionsHandler(
     IStoryModelService modelService,
     IGameIndexService indexService,
     ISchemaProvider schema,
-    StoryParamValueProposalProvider proposals,
-    ILspConfigurationProvider config)
+    StoryParamValueProposalProvider proposals)
     : IJsonRpcRequestHandler<GetStoryParamOptionsParams, GetStoryParamOptionsResult>
 {
     // Measured on eaw with the foc baseline: every slot but the object types (8870) holds at most
@@ -325,9 +304,6 @@ public sealed class GetStoryParamOptionsHandler(
 
     public Task<GetStoryParamOptionsResult> Handle(GetStoryParamOptionsParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new GetStoryParamOptionsResult([], rejection));
-
         var enumName = string.Equals(request.Side, "reward", StringComparison.OrdinalIgnoreCase)
             ? "StoryRewardType"
             : "StoryEventType";
@@ -417,9 +393,6 @@ public sealed class GetStoryDiagnosticsHandler(
 {
     public Task<GetStoryDiagnosticsResult> Handle(GetStoryDiagnosticsParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new GetStoryDiagnosticsResult([], rejection));
-
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
@@ -460,15 +433,11 @@ public sealed class GetStoryDiagnosticsHandler(
 ///     it was never story-specific to begin with.
 /// </remarks>
 public sealed class ResolveStoryReferenceHandler(
-    IDefinitionLocator locator,
-    ILspConfigurationProvider config)
+    IDefinitionLocator locator)
     : IJsonRpcRequestHandler<ResolveStoryReferenceParams, ResolveStoryReferenceResult>
 {
     public Task<ResolveStoryReferenceResult> Handle(ResolveStoryReferenceParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Task.FromResult(new ResolveStoryReferenceResult(Error: rejection));
-
         var located = locator.Locate(request.Value, request.ReferenceType);
         return Task.FromResult(new ResolveStoryReferenceResult(
             located.Uri, located.Line, located.Column, located.Error));

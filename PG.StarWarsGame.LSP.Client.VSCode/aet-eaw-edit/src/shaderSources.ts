@@ -118,16 +118,7 @@ export async function offerShaderSources(
     }
 
     if (choice === OPEN_DOWNLOAD_PAGE()) {
-        const url = vscode.workspace
-            .getConfiguration()
-            .get<string>("aet-eaw-edit.shaders.sourceUrl")
-            ?.trim();
-
-        await vscode.env.openExternal(
-            vscode.Uri.parse(
-                url !== undefined && url !== "" ? url : SHADER_ARCHIVE_URL,
-            ),
-        );
+        await vscode.env.openExternal(vscode.Uri.parse(SHADER_ARCHIVE_URL));
         return;
     }
 
@@ -193,14 +184,7 @@ export function managedShaderDirectory(
 export async function downloadShaderSources(
     context: vscode.ExtensionContext,
 ): Promise<boolean> {
-    const configured = vscode.workspace
-        .getConfiguration()
-        .get<string>("aet-eaw-edit.shaders.sourceUrl")
-        ?.trim();
-    const url =
-        configured !== undefined && configured !== ""
-            ? configured
-            : SHADER_ARCHIVE_URL;
+    const url = SHADER_ARCHIVE_URL;
 
     return vscode.window.withProgress(
         {

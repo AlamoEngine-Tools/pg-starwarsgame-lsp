@@ -401,6 +401,43 @@ public sealed class StorySimulationBattleTest
     }
 
     [Fact]
+    public void SetOptions_ChangesTheRunningSession_AndHoldsThroughASeek()
+    {
+        var (service, _) = BuildService();
+        service.Start(GalaxyKey);
+        service.Tick(GalaxyKey, 3);
+
+        var (state, error) = service.SetOptions(GalaxyKey, new StorySimOptions(false));
+
+        Assert.Null(error);
+        Assert.False(state!.AssumeMediaCompletes);
+        Assert.Equal(3, state.Tick);
+        // The option is the session's, not a step in its history: going back keeps it.
+        Assert.False(service.Seek(GalaxyKey, 0).State!.AssumeMediaCompletes);
+    }
+
+    [Fact]
+    public void SetOptions_OnTheGalaxy_IsWhatABattleStartsUnder()
+    {
+        var (service, _) = BuildService();
+        service.Start(GalaxyKey);
+        service.SetOptions(GalaxyKey, new StorySimOptions(false));
+
+        Assert.False(service.Start(M2Session).State!.AssumeMediaCompletes);
+    }
+
+    [Fact]
+    public void SetOptions_WithoutASession_IsRefused()
+    {
+        var (service, _) = BuildService();
+
+        var (state, error) = service.SetOptions(GalaxyKey, new StorySimOptions(false));
+
+        Assert.Null(state);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
     public void ApplyWorldChange_BattleOutcome_InsideABattle_ResolvesIt()
     {
         var (service, _) = BuildService();

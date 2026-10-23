@@ -9,17 +9,12 @@ import {
     collectSourceRoots,
     type LaunchLayersResult,
 } from "./launchLayers";
-import {
-    DEBUGGER_DISABLED_MESSAGE,
-    LUA_DEBUG_TYPE,
-    luaDebuggerEnabled,
-} from "./luaDebugAdapterFactory";
+import { LUA_DEBUG_TYPE } from "./luaDebugAdapterFactory";
 
 /**
- * Fills in what a launch.json leaves out. The connection settings come from the `aet-eaw-edit.game`
- * settings, the script roots and the mod chain from the language server's view of the project
- * layers. A launch that cannot be assembled is refused with the reason rather than started
- * against the wrong files.
+ * Fills in what a launch.json leaves out: the game's default debug connection, and the script roots
+ * and the mod chain from the language server's view of the project layers. A launch that cannot be
+ * assembled is refused with the reason rather than started against the wrong files.
  *
  * With several projects open the layers are the ones of the project the launch belongs to: the
  * one its workspace folder holds, or the active document's (#230).
@@ -49,7 +44,7 @@ export class LuaDebugConfigurationProvider
                 type: LUA_DEBUG_TYPE,
                 request: "launch",
                 name: "Launch Empire at War (Lua)",
-                program: "${config:aet-eaw-edit.game.executable}",
+                program: "",
             },
         ];
     }
@@ -58,11 +53,6 @@ export class LuaDebugConfigurationProvider
         folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
     ): Promise<vscode.DebugConfiguration | undefined | null> {
-        if (!luaDebuggerEnabled()) {
-            void vscode.window.showErrorMessage(DEBUGGER_DISABLED_MESSAGE);
-            return undefined;
-        }
-
         // F5 with no launch.json: attach, which needs nothing but a running game.
         if (!config.type && !config.request && !config.name) {
             config = {
@@ -72,13 +62,10 @@ export class LuaDebugConfigurationProvider
             };
         }
 
-        const game = vscode.workspace.getConfiguration("aet-eaw-edit.game");
-        config.host ??= game.get<string>("luaDebugHost", "127.0.0.1");
-        config.port ??= game.get<number>("luaDebugPort", 1234);
-        config.unsafeTableExpansion ??= game.get<boolean>(
-            "unsafeTableExpansion",
-            false,
-        );
+        // The game takes the first free UDP port from 1234 upward.
+        config.host ??= "127.0.0.1";
+        config.port ??= 1234;
+        config.unsafeTableExpansion ??= false;
 
         const layers = await this._layers(this._gatewayFor(folder));
 
@@ -94,11 +81,10 @@ export class LuaDebugConfigurationProvider
         }
 
         if (config.request === "launch") {
-            config.program ||= game.get<string>("executable", "");
             if (!config.program) {
                 void vscode.window.showErrorMessage(
                     vscode.l10n.t(
-                        'No game executable is configured. Set "aet-eaw-edit.game.executable" or "program" in the launch configuration',
+                        'No game executable is configured. Set "program" in the launch configuration to the debug build of the game',
                     ),
                 );
                 return undefined;
@@ -125,11 +111,7 @@ export class LuaDebugConfigurationProvider
             const userArgs = Array.isArray(config.args)
                 ? (config.args as string[])
                 : [];
-            config.args = [
-                ...game.get<string[]>("arguments", []),
-                ...chain.args,
-                ...userArgs,
-            ];
+            config.args = [...chain.args, ...userArgs];
         }
 
         return config;

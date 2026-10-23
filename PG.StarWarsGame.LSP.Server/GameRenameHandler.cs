@@ -54,8 +54,8 @@ public sealed class GameRenameHandler : RenameHandlerBase
         var index = _indexService.Current;
 
         if (uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-            return _config.Current.Features.Xml.Rename ? _xmlProvider.HandleRename(uri, request, index) : null;
-        if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) || !_config.Current.Features.Lua.Rename)
+            return _xmlProvider.HandleRename(uri, request, index);
+        if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return null;
 
         if (_analyzer is null || _luaProvider.Claims(uri, request.Position.Line, request.Position.Character, index))

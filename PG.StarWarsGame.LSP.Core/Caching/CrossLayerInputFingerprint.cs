@@ -43,7 +43,7 @@ namespace PG.StarWarsGame.LSP.Core.Caching;
 ///     </list>
 ///     <para>
 ///         Everything else the parsers touch is either covered elsewhere or carries no project
-///         state: the schema and the story feature flag fold into <see cref="SchemaFingerprint" />;
+///         state: the schema folds into <see cref="SchemaFingerprint" />;
 ///         the file helper, parse caches and loggers do not vary by layer.
 ///     </para>
 ///     <para>

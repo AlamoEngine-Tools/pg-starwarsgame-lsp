@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -14,17 +13,11 @@ public sealed class LuaStorySymbolCollectionTest
 {
     private const string Uri = "file:///ws/data/scripts/story/story_campaign.lua";
 
-    private static async Task<DocumentIndex> ParseAsync(string lua,
-        bool symbolsFlag = true, string? apiSchema = null)
+    private static async Task<DocumentIndex> ParseAsync(string lua, string? apiSchema = null)
     {
-        var config = new StubConfigProvider(new LspConfiguration
-        {
-            Features = new FeatureFlags { Story = new StoryFeatureFlags { Symbols = symbolsFlag } }
-        });
         var parser = new LuaGameDocumentParser(
             new LuaApiSchemaProvider(apiSchema is null ? [] : [apiSchema]),
-            new FileHelper(new MockFileSystem()),
-            configProvider: config);
+            new FileHelper(new MockFileSystem()));
         return await parser.ParseAsync(Uri, lua, 1, CancellationToken.None);
     }
 
@@ -97,24 +90,5 @@ public sealed class LuaStorySymbolCollectionTest
 
         var reference = Assert.Single(index.References, r => r.ExpectedTypeName == "StoryFlag");
         Assert.Equal("REBEL_TRAP_SET", reference.TargetId);
-    }
-
-    [Fact]
-    public async Task SymbolsFlagOff_EmitsNoStorySymbols()
-    {
-        var index = await ParseAsync(
-            "StoryModeEvents = { E = S }\nStory_Event(\"Ping\")", false);
-
-        Assert.DoesNotContain(index.Symbols, s => s.TypeName == "StoryNotification");
-        Assert.DoesNotContain(index.References, r => r.ExpectedTypeName == "StoryEvent");
-    }
-
-    private sealed class StubConfigProvider(LspConfiguration current) : ILspConfigurationProvider
-    {
-        public LspConfiguration Current => current;
-
-        public void LoadFrom(object? initializationOptions)
-        {
-        }
     }
 }

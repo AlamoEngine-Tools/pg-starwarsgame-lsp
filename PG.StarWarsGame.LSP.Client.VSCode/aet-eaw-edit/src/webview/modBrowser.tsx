@@ -61,6 +61,7 @@ import {
     reasonLabel,
     relationIcon,
     relationLabel,
+    rowInertReason,
     rowTypeLabel,
 } from "./modBrowserModel";
 import { ACTION_ICONS, PreviewPage } from "./modBrowserPreview";
@@ -589,12 +590,24 @@ function App(): React.JSX.Element {
         setCurrent(node);
     };
 
+    /** Goes to where a row's definition is, for one that names a place rather than a page. */
+    const goToRow = (row: SymbolRow): void => {
+        if (row.location) {
+            vscode.postMessage({
+                type: "openLocation",
+                uri: row.location.uri,
+                line: row.location.line,
+            });
+        }
+    };
+
     /**
      * Opens an entry in the foreground, in its own tab or the one unpinned preview tab. An entry
      * whose type has no preview is only selected: a tab with its header alone would show nothing.
      */
     const openEntry = async (node: EntryNode): Promise<void> => {
         if (!node.row.page) {
+            goToRow(node.row);
             return;
         }
         if ((await fetchNode(node))?.open?.reason) {
@@ -630,6 +643,10 @@ function App(): React.JSX.Element {
             return;
         }
         if (!node.row.page) {
+            // An overridden definition has no page; opening it, or going to it, is its place.
+            if (action === "open" || action === "definition") {
+                goToRow(node.row);
+            }
             return;
         }
         if (action === "open") {
@@ -790,7 +807,10 @@ function App(): React.JSX.Element {
     const railRows: RailRow[] = [];
     const walk = (node: RailNode, depth: number): void => {
         const open = expanded.has(node.key);
-        const inert = node.kind === "entry" ? !node.row.page : node.count === 0;
+        const inert =
+            node.kind === "entry"
+                ? rowInertReason(node.row) !== undefined
+                : node.count === 0;
         railRows.push({ key: node.key, node, depth, open, inert });
         if (!open || inert) {
             return;
@@ -1374,17 +1394,11 @@ function ListPage({
             onResize={onResize}
             onMove={onMove}
             filter={filter}
-            inert={(r) =>
-                r.page
-                    ? undefined
-                    : r.origin === "missing"
-                      ? l10n.t("Nothing defines this name")
-                      : l10n.t("Not an entry of its own")
-            }
+            inert={rowInertReason}
             onSelect={onSelect}
             onOpen={(r) => onAct("open", r)}
             onKey={(key, r) => {
-                if (key !== "F12" || !r.page) {
+                if (key !== "F12" || rowInertReason(r) !== undefined) {
                     return false;
                 }
                 onAct("definition", r);

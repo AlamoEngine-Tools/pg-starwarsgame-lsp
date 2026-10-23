@@ -225,6 +225,10 @@ export interface SymbolRow {
     page?: string | null;
     /** An enum value's value - what the engine uses for it - beside its name, the key XML writes. */
     value?: string | null;
+    /** Where an overridden definition is, for a go-to; none for one no editor can open. */
+    location?: SymbolLocation | null;
+    /** A definition inside packed data - the game's own or a MEG's - with no file to open. */
+    packed?: boolean;
 }
 
 /** A kind with how many entries of the list are of it. */

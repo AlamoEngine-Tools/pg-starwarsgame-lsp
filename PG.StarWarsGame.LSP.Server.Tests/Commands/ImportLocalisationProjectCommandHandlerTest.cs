@@ -30,25 +30,6 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
 {
     private const string PgprojPath = "/mod/mymod.pgproj";
 
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_LocalisationFlagOff_NoOp()
-    {
-        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
-        {
-            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
-        });
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (handler, reload, writer, _) = BuildHandler(mockFs, lspConfig: config);
-
-        await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
-
-        Assert.False(reload.FullyReloaded);
-        Assert.Null(writer.LastCall);
-    }
-
     // ── validation / guard clauses ───────────────────────────────────────────
 
     [Theory]
@@ -137,19 +118,6 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
 
         Assert.Empty(notifier.Errors);
         Assert.Contains("mastertextfile.xml", Assert.Single(notifier.Infos), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Handle_LocalisationFlagOff_TellsTheUserWhy()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (handler, _, _, notifier) = BuildHandler(lspConfig: config);
-
-        await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
-
-        Assert.Empty(notifier.Infos);
-        Assert.Single(notifier.Errors);
     }
 
     [Fact]

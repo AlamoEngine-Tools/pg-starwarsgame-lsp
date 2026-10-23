@@ -41,9 +41,6 @@ public sealed class ValidateTranslationBatchHandler
     public Task<ValidateTranslationBatchResult> Handle(
         ValidateTranslationBatchParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-            return Task.FromResult(new ValidateTranslationBatchResult([], rejection));
-
         var fs = _fileHelper.FileSystem;
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath)
             || !fs.File.Exists(request.ProjectFilePath))

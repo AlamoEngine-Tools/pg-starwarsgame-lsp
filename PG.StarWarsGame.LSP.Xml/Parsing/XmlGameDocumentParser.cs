@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -40,7 +39,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
     private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
 
-    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IEaWXmlContext? _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
@@ -50,12 +48,11 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
     // parseCache is optional so minimal test setups can omit it; production wires the shared
     // cache so the indexing parse seeds it - the diagnostics publish and the first hover/inlay
-    // request after an edit then reuse this parse instead of re-parsing. A null configProvider
-    // (test convenience) means every feature flag reads as enabled. eaWXmlContext is optional too;
-    // without it a doc's xml-relative path is unknown, so workspace-file symbols are skipped.
+    // request after an edit then reuse this parse instead of re-parsing. eaWXmlContext is optional
+    // too; without it a doc's xml-relative path is unknown, so workspace-file symbols are skipped.
     public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
         IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger,
-        IXmlParseCache? parseCache = null, ILspConfigurationProvider? configProvider = null,
+        IXmlParseCache? parseCache = null,
         IEaWXmlContext? eaWXmlContext = null)
     {
         _fileHelper = fileHelper;
@@ -63,7 +60,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         _fileTypeRegistry = fileTypeRegistry;
         _logger = logger;
         _parseCache = parseCache;
-        _configProvider = configProvider;
         _eaWXmlContext = eaWXmlContext;
     }
 
@@ -89,8 +85,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, lineIndex, references, ct));
         symbols.AddRange(CollectWorkspaceFileSymbols(canonicalUri, registeredTypes));
 
-        if ((_configProvider?.Current.Features.Story.Symbols ?? true) &&
-            registeredTypes.Contains(StoryReferenceTypes.ThreadFileTypeName, StringComparer.OrdinalIgnoreCase))
+        if (registeredTypes.Contains(StoryReferenceTypes.ThreadFileTypeName, StringComparer.OrdinalIgnoreCase))
             StoryDocumentSymbolCollector.Collect(parsed, canonicalUri, _schema, symbols, references);
 
         var groupMemberships = CollectGroupMemberships(doc, canonicalUri, lineIndex, ct);

@@ -170,19 +170,6 @@ public sealed class GetLocalisationRowsHandlerTest
     // ── failures ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Handle_FlagOff_ReturnsDisabledError()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var handler = BuildHandler(Files(), config);
-
-        var result = await handler.Handle(new GetLocalisationRowsParams(CsvPath), CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(LocalisationFeatureDisabled.MessageKey), result.Error);
-        Assert.Empty(result.Rows);
-    }
-
-    [Fact]
     public async Task Handle_MissingPath_ReturnsError()
     {
         var handler = BuildHandler(Files());

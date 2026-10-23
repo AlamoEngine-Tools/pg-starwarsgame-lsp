@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Discovery;
@@ -14,33 +13,25 @@ public sealed class StoryGraphDiagnosticsServiceTest
 {
     private const string ThreadUri = "file:///ws/data/xml/story_a.xml";
 
-    private static StoryGraphDiagnosticsService Build(bool flagOn)
+    private static StoryGraphDiagnosticsService Build()
     {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Story = new StoryFeatureFlags { GraphDiagnostics = flagOn } });
-        return new StoryGraphDiagnosticsService(new StubModelService(), new EmptySchema(), config,
+        return new StoryGraphDiagnosticsService(new StubModelService(), new EmptySchema(),
             ResxMessageCatalog.Server("en"));
     }
 
     [Fact]
-    public void GetForDocument_FlagOn_SurfacesModelDiagnostics()
+    public void GetForDocument_SurfacesModelDiagnostics()
     {
-        var diagnostics = Build(true).GetForDocument(ThreadUri);
+        var diagnostics = Build().GetForDocument(ThreadUri);
 
         // The stub campaign contains a dangling prereq in this document.
         Assert.Contains(diagnostics, d => d.Message.Contains("Ghost"));
     }
 
     [Fact]
-    public void GetForDocument_FlagOff_ReturnsNothing()
-    {
-        Assert.Empty(Build(false).GetForDocument(ThreadUri));
-    }
-
-    [Fact]
     public void GetForDocument_SameFindingFromTwoCampaigns_IsDeduplicated()
     {
-        var diagnostics = Build(true).GetForDocument(ThreadUri);
+        var diagnostics = Build().GetForDocument(ThreadUri);
 
         Assert.Single(diagnostics, d => d.Message.Contains("Ghost"));
     }

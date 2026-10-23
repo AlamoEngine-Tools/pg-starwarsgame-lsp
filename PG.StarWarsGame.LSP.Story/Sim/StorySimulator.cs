@@ -34,6 +34,13 @@ public sealed record StorySimSnapshot
     /// <summary>The event whose breakpoint halted the last run, until the next command.</summary>
     public string? HaltedAt { get; init; }
 
+    /// <summary>
+    ///     Whether media a reward starts is owed its completion on the next tick. Starts as the
+    ///     session's <see cref="StorySimOptions" /> and changes mid-run through
+    ///     <see cref="StorySimulator.SetAssumeMediaCompletes" />.
+    /// </summary>
+    public bool AssumeMediaCompletes { get; init; } = true;
+
     /// <summary>Human-readable step log, newest last.</summary>
     public ImmutableList<string> Log { get; init; } = ImmutableList<string>.Empty;
 }
@@ -269,7 +276,8 @@ public sealed partial class StorySimulator
     ///     before anything polls - a battle starts with the galaxy's flag table and world as they
     ///     stand when it is entered; without them the campaign's own seed applies.
     /// </summary>
-    public StorySimSnapshot Start(ImmutableDictionary<string, int>? flags = null, StoryWorld? world = null)
+    public StorySimSnapshot Start(ImmutableDictionary<string, int>? flags = null, StoryWorld? world = null,
+        bool? assumeMediaCompletes = null)
     {
         var snapshot = new StorySimSnapshot
         {
@@ -280,6 +288,7 @@ public sealed partial class StorySimulator
                 World = world ?? SeedWorld(_model.Seed),
                 Flags = flags ?? StoryRuntimeState.Initial.Flags
             },
+            AssumeMediaCompletes = assumeMediaCompletes ?? Options.AssumeMediaCompletes,
             Log = ImmutableList.Create(Scope is null
                     ? _messages.Format("StorySim_SimulationStarted")
                     : _messages.Format("StorySim_BattleStarted", Scope))
@@ -354,7 +363,7 @@ public sealed partial class StorySimulator
             && string.Equals(node.Event!.EventType, "STORY_FLAG", StringComparison.OrdinalIgnoreCase)
             && PolledTriggerSatisfied(node, snapshot));
         // Media left to the author is playing, not owed: the clock does nothing for it.
-        var completions = Options.AssumeMediaCompletes ? runtime.PendingCompletions.Count : 0;
+        var completions = snapshot.AssumeMediaCompletes ? runtime.PendingCompletions.Count : 0;
         return timers + polls + completions + runtime.PendingEmissions.Count + scripts;
     }
 
@@ -363,6 +372,15 @@ public sealed partial class StorySimulator
     {
         var ticks = (int)Math.Round(seconds / ClockStepSeconds);
         return ticks <= 0 ? snapshot : Tick(snapshot, ticks);
+    }
+
+    /// <summary>
+    ///     Changes whether media is owed its completion, from the next tick on. Media already playing
+    ///     is remembered either way, so turning it on completes that too on the next tick.
+    /// </summary>
+    public StorySimSnapshot SetAssumeMediaCompletes(StorySimSnapshot snapshot, bool assumeMediaCompletes)
+    {
+        return snapshot with { AssumeMediaCompletes = assumeMediaCompletes };
     }
 
     /// <summary>Manually fires an active event (the user says its trigger condition happened).</summary>
@@ -515,7 +533,7 @@ public sealed partial class StorySimulator
                 continue;
             // A completion the simulator owes will dispatch on the next tick; media left to the
             // author is theirs to end, so its listener stays a decision.
-            if (Options.AssumeMediaCompletes && type is SpeechDone or MovieDone &&
+            if (snapshot.AssumeMediaCompletes && type is SpeechDone or MovieDone &&
                 HasPendingCompletion(node, snapshot.Runtime)) continue;
 
             var kind = type switch
@@ -641,7 +659,7 @@ public sealed partial class StorySimulator
     {
         // Media left to the author plays until they end it (or the engine does, on a new speech
         // or a battle's end); the clock never completes it.
-        if (!Options.AssumeMediaCompletes) return snapshot;
+        if (!snapshot.AssumeMediaCompletes) return snapshot;
         var pending = snapshot.Runtime.PendingCompletions;
         if (pending.Count == 0) return snapshot;
 
@@ -987,7 +1005,7 @@ public sealed partial class StorySimulator
         {
             Runtime = snapshot.Runtime.WithCompletionPending(doneType + "|" + name.ToUpperInvariant() + "|" + node.Id)
         };
-        return Options.AssumeMediaCompletes
+        return snapshot.AssumeMediaCompletes
             ? Note(snapshot, node.Id, null, cause, "  -> " + _messages.Format("StorySim_OwedNextTick", doneType, name))
             : Note(snapshot, node.Id, null, cause, "  -> " + _messages.Format("StorySim_LeftAuthor", doneType, name));
     }

@@ -4,7 +4,6 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -20,7 +19,6 @@ namespace PG.StarWarsGame.LSP.Story.Dialog;
 /// </summary>
 public sealed class DialogInlayHintHandler : InlayHintsHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
     private readonly DialogFactProducer _factProducer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -32,22 +30,17 @@ public sealed class DialogInlayHintHandler : InlayHintsHandlerBase
         IStoryDialogScope scope,
         DialogFactProducer factProducer,
         IFileHelper fileHelper,
-        IDocumentTextSource textSource,
-        ILspConfigurationProvider config)
+        IDocumentTextSource textSource)
     {
         _indexService = indexService;
         _scope = scope;
         _factProducer = factProducer;
         _fileHelper = fileHelper;
         _textSource = textSource;
-        _config = config;
     }
 
     public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Dialog.InlayHints)
-            return Task.FromResult<InlayHintContainer?>(null);
-
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_scope.IsInScope(uri))
             return Task.FromResult<InlayHintContainer?>(null);

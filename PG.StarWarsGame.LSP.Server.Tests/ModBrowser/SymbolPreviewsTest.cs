@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -152,7 +151,7 @@ public sealed class SymbolPreviewsTest
         };
     }
 
-    private static SymbolPreviews Previews(ToolsFeatureFlags? tools = null)
+    private static SymbolPreviews Previews()
     {
         GameSymbol[] symbols =
         [
@@ -196,7 +195,7 @@ public sealed class SymbolPreviewsTest
         // The model's proxies name the engine effect and one no file holds.
         // The model and the script are files of the project on disk; the engine effect ships packed.
         var relations = new SymbolRelations(index, schema, tags, catalog,
-            id => id == Model ? ["P_Engine", "P_Missing"] : [], tools,
+            id => id == Model ? ["P_Engine", "P_Missing"] : [],
             id => id switch
             {
                 Model => ModelFile,
@@ -259,9 +258,6 @@ public sealed class SymbolPreviewsTest
         Assert.Equal(
             [("identity", 0, 0, 2, 2), ("encyclopedia", 4, 0, 2, 6), ("entries", 0, 2, 4, 4)],
             Layout(Previews().Preview(Page, "Star_Destroyer_Mk2")));
-        Assert.Equal(
-            [("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("entries", 0, 2, 4, 4)],
-            Layout(Previews(new ToolsFeatureFlags { Encyclopedia = false }).Preview(Page, "Star_Destroyer")));
     }
 
     // The definition is the file's, one click away with its highlighting; no preview repeats it
@@ -343,14 +339,6 @@ public sealed class SymbolPreviewsTest
     public void APlanet_HasNoEncyclopediaTile_ThoughItsTextDefinesABody()
     {
         Assert.DoesNotContain(Previews().Preview(Page, "Coruscant").Tiles, t => t.Kind == "encyclopedia");
-    }
-
-    [Fact]
-    public void TheEncyclopedia_IsLeftOutWhenItsFeatureIsOff()
-    {
-        var preview = Previews(new ToolsFeatureFlags { Encyclopedia = false }).Preview(Page, "Star_Destroyer");
-
-        Assert.DoesNotContain(preview.Tiles, t => t.Kind == "encyclopedia");
     }
 
     // A preview that would be its header alone is none: a texture, a sound, an animation and an enum

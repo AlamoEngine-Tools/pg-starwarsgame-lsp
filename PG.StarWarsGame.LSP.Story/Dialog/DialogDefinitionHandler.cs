@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -22,7 +21,6 @@ namespace PG.StarWarsGame.LSP.Story.Dialog;
 /// </summary>
 public sealed class DialogDefinitionHandler : DefinitionHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
     private readonly DialogFactProducer _factProducer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -36,8 +34,7 @@ public sealed class DialogDefinitionHandler : DefinitionHandlerBase
         DialogFactProducer factProducer,
         IFileHelper fileHelper,
         IDocumentTextSource textSource,
-        ILogger<DialogDefinitionHandler> logger,
-        ILspConfigurationProvider config)
+        ILogger<DialogDefinitionHandler> logger)
     {
         _indexService = indexService;
         _scope = scope;
@@ -45,14 +42,10 @@ public sealed class DialogDefinitionHandler : DefinitionHandlerBase
         _fileHelper = fileHelper;
         _textSource = textSource;
         _logger = logger;
-        _config = config;
     }
 
     public override Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Dialog.GoToDefinition)
-            return Task.FromResult<LocationOrLocationLinks?>(null);
-
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_scope.IsInScope(uri))
             return Task.FromResult<LocationOrLocationLinks?>(null);

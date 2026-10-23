@@ -73,9 +73,6 @@ public sealed class CreateLocalisationLanguageFileHandler
     public async Task<CreateLocalisationLanguageFileResult> Handle(
         CreateLocalisationLanguageFileParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-            return Fail(rejection);
-
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
             return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_NoLocalisationFileWasGiven"));
 

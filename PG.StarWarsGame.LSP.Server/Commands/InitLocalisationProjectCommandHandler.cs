@@ -61,12 +61,6 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-        {
-            Fail(rejection);
-            return Unit.Value;
-        }
-
         var fs = _fileHelper.FileSystem;
         var rootLayer = _reloadService.LastWorkspaceConfig?.Layers
             .OrderByDescending(l => l.Rank).FirstOrDefault();

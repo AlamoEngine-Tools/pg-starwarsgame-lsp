@@ -12,9 +12,4 @@ internal sealed class FakeLspConfigurationProvider : ILspConfigurationProvider
     public void LoadFrom(object? initializationOptions)
     {
     }
-
-    public static FakeLspConfigurationProvider WithFeatures(FeatureFlags features)
-    {
-        return new FakeLspConfigurationProvider { Current = new LspConfiguration { Features = features } };
-    }
 }

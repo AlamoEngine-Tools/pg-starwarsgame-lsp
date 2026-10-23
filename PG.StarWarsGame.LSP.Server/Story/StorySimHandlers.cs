@@ -175,6 +175,19 @@ public sealed class StorySimBreakpointsHandler(IStorySimulationService sim, ILsp
     }
 }
 
+public sealed class StorySimOptionsHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimOptionsParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimOptionsParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.SetOptions(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            new StorySimOptions(request.AssumeMediaCompletes));
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
 public sealed class StorySimResolveBattleHandler(IStorySimulationService sim, ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<StorySimResolveBattleParams, StorySimStateResult>
 {

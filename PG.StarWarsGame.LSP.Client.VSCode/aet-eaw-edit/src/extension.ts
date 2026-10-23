@@ -57,6 +57,10 @@ import { offerShaderSources, shaderDirectory } from "./shaderSources";
 import { initDialogGeometryStorage } from "./dialogGeometryStorage";
 import { initPanelLayoutStorage } from "./panelLayoutStorage";
 import { initViewerSettingsStorage } from "./viewerSettingsStorage";
+import {
+    encyclopediaScreenParams,
+    initEncyclopediaScreenStorage,
+} from "./encyclopediaScreenStorage";
 import { initProjectSettingsStorage } from "./projectSettingsStorage";
 import { LocalisationEditorPanel } from "./localisationEditorPanel";
 import {
@@ -69,6 +73,7 @@ import { LspGateway } from "./lsp/lspGateway";
 import { RoutedLspGateway } from "./lsp/routedLspGateway";
 import { stopClient } from "./lsp/stopClient";
 import { discoverProjects } from "./projectDiscovery";
+import { isModFolder, projectOfferDue } from "./modLayout";
 import {
     type ClientSpec,
     type ClientState,
@@ -102,6 +107,8 @@ import {
 } from "./serverCommand";
 import { serverProblem } from "./serverLaunch";
 import {
+    AdoptModProjectParams,
+    AdoptModProjectResult,
     ConvertLocalisationFormatResult,
     ExportLocalisationToDatResult,
     GET_ENCYCLOPEDIA_ENTRY,
@@ -675,94 +682,29 @@ function cfg(section: string) {
     return vscode.workspace.getConfiguration(`aet-eaw-edit.${section}`);
 }
 
-/**
- * A game install directory, from the setting that declares it or the one that used to.
- *
- * These were declared as `aet-eaw-edit.modVerify.*` and read as `aet-eaw-edit.lsp.source.*`, so
- * setting either did nothing: the server was never given a game path, and every asset that ships
- * with the game stayed unreachable. The declaration has moved to the key the reader asks for - the
- * one the model preview's own description already pointed at.
- *
- * The old key is still read so that anyone who set it gets the behaviour they were promised, rather
- * than a silent no-op turning into a silently ignored setting.
- */
+/** A game install directory, from its `aet-eaw-edit.lsp.source` setting. */
 function gameDirectory(
     name: "baseGameDirectory" | "expansionDirectory",
 ): string | undefined {
-    return (
-        cfg("lsp.source").get<string>(name) ||
-        cfg("modVerify").get<string>(name) ||
-        undefined
-    );
+    return cfg("lsp.source").get<string>(name) || undefined;
 }
 
 /**
- * Builds the complete resolved feature-flag object sent to the server via initializationOptions.
- * The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults everything to
- * true; the user-facing defaults, including every flag that is off out of the box, live in
- * package.json, so the fallbacks here must mirror package.json. Flags are restart-based: the config listener in activate() restarts the server when
- * any `aet-eaw-edit.features` value changes.
+ * The experimental features, sent to the server via initializationOptions; everything else is always
+ * on. The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults each to true, so
+ * the fallbacks here carry the user-facing default - off - and must mirror package.json. Restart-based:
+ * the config listener in activate() restarts the server when an `aet-eaw-edit.experimental` value
+ * changes.
  */
 function resolveFeatureFlags() {
-    const features = cfg("features");
-    const flag = (key: string, fallback: boolean) =>
-        features.get<boolean>(key, fallback);
+    const experimental = cfg("experimental");
     return {
-        xml: {
-            completion: flag("xml.completion", true),
-            hover: flag("xml.hover", true),
-            diagnostics: flag("xml.diagnostics", true),
-            goToDefinition: flag("xml.goToDefinition", true),
-            findReferences: flag("xml.findReferences", true),
-            rename: flag("xml.rename", true),
-            codeLens: flag("xml.codeLens", true),
-            inlayHints: flag("xml.inlayHints", true),
-            codeActions: flag("xml.codeActions", true),
-            linkedEditing: flag("xml.linkedEditing", true),
-            autoCloseTag: flag("xml.autoCloseTag", true),
-            strictness: flag("xml.strictness", true),
-            formatting: flag("xml.formatting", true),
-        },
-        lua: {
-            completion: flag("lua.completion", true),
-            hover: flag("lua.hover", false),
-            diagnostics: flag("lua.diagnostics", false),
-            goToDefinition: flag("lua.goToDefinition", true),
-            rename: flag("lua.rename", true),
-            codeActions: flag("lua.codeActions", true),
-            debugger: flag("lua.debugger", false),
-            analyzer: flag("lua.analyzer", true),
-        },
-        tools: {
-            localisation: flag("tools.localisation", false),
-            storyEditor: flag("tools.storyEditor", false),
-            storyEditing: flag("tools.storyEditing", false),
-            storySimulator: flag("tools.storySimulator", false),
-            variants: flag("tools.variants", true),
-            encyclopedia: flag("tools.encyclopedia", true),
-            modelPreview: flag("tools.modelPreview", true),
-            modBrowser: flag("tools.modBrowser", true),
-        },
-        story: {
-            discovery: flag("story.discovery", false),
-            graphDiagnostics: flag("story.graphDiagnostics", false),
-            symbols: flag("story.symbols", false),
-            rename: flag("story.rename", false),
-        },
-        dialog: {
-            diagnostics: flag("dialog.diagnostics", false),
-            inlayHints: flag("dialog.inlayHints", false),
-            goToDefinition: flag("dialog.goToDefinition", false),
-            codeActions: flag("dialog.codeActions", false),
-        },
+        storyEditing: experimental.get<boolean>("storyEditing", false),
+        storySimulator: experimental.get<boolean>("storySimulator", false),
     };
 }
 
 function validateConfiguration(extensionPath: string): boolean {
-    if (!cfg("lsp").get<boolean>("enabled")) {
-        return true;
-    }
-
     let valid = true;
 
     const serverMissing = serverProblem(
@@ -932,9 +874,7 @@ function startProjectClient(
             // The user's own copy of the base shader SOURCES; never shipped with this extension.
             shaderPath: shaderDirectory(),
             expansionGamePath: gameDirectory("expansionDirectory"),
-            locale: cfg("lsp").get<string>("locale", "en"),
-            // The game's language, not this extension's. `locale` above sets the language the server
-            // writes its own hover text and diagnostics in; this one picks the string table.
+            // The game's language, not this extension's: it picks the string table.
             localisationLanguage: cfg("lsp.localisation").get<string>(
                 "language",
                 "ENGLISH",
@@ -968,19 +908,16 @@ function startProjectClient(
                     false,
                 ),
             },
-            // Which screen the encyclopedia card is drawn for. The game sizes that popup's glyphs
-            // from the display it runs on, so a preview has to be told which display to match.
-            encyclopedia: {
-                screenWidth: cfg("encyclopedia").get<number>(
-                    "screenWidth",
-                    1920,
-                ),
-                screenHeight: cfg("encyclopedia").get<number>(
-                    "screenHeight",
-                    1080,
-                ),
-            },
             features: resolveFeatureFlags(),
+            // A mod folder about to be offered a project file: the offer says what is missing.
+            projectFileOffered:
+                spec.projectPath === undefined &&
+                projectOfferDue(
+                    spec.workspaceRoot,
+                    subdirectories,
+                    files,
+                    askedAboutProject(context),
+                ),
         },
     };
 
@@ -1327,7 +1264,9 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
             }
         },
     });
-    const specs = clientSpecs(discovery, folders, onDiskSpelling);
+    const specs = clientSpecs(discovery, folders, onDiskSpelling, (folder) =>
+        isModFolder(folder, subdirectories, files),
+    );
 
     if (specs.length > 1) {
         logLine(
@@ -1370,6 +1309,95 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
     localisationNavigatorProvider?.projectsChanged();
     modBrowserProvider?.projectsChanged();
     updateStatus();
+    if (discovery.projects.length === 0 && folders.length > 0) {
+        void offerProjectFile(context, folders[0]);
+    }
+}
+
+/** Folders whose project file offer was declined for good, kept across sessions. */
+const PROJECT_OFFER_DECLINED = "aet-eaw-edit.projectOfferDeclined";
+/** Folders offered a project file this session, so a rediscovery does not ask again. */
+const projectOffered = new Set<string>();
+
+/** The folders already asked about a project file: declined for good, or offered this session. */
+function askedAboutProject(context: vscode.ExtensionContext): string[] {
+    return [
+        ...context.globalState.get<string[]>(PROJECT_OFFER_DECLINED, []),
+        ...projectOffered,
+    ];
+}
+
+/**
+ * Offers a project file for a mod opened without one (#295), once: the server writes it from what
+ * the folder holds and it opens, so what was guessed is in front of the reader. Its creation
+ * restarts the servers like any new `.pgproj`.
+ */
+async function offerProjectFile(
+    context: vscode.ExtensionContext,
+    folder: string,
+): Promise<void> {
+    const key = folder.toLowerCase();
+    const declined = context.globalState.get<string[]>(
+        PROJECT_OFFER_DECLINED,
+        [],
+    );
+    if (
+        !projectOfferDue(
+            folder,
+            subdirectories,
+            files,
+            askedAboutProject(context),
+        )
+    ) {
+        return;
+    }
+    projectOffered.add(key);
+
+    const create = vscode.l10n.t("Create project file");
+    const notNow = vscode.l10n.t("Not now");
+    const never = vscode.l10n.t("Not for this folder");
+    const choice = await vscode.window.showInformationMessage(
+        vscode.l10n.t("EaWEdit: Mod without a project file - {0}", folder),
+        create,
+        notNow,
+        never,
+    );
+    if (choice === never) {
+        await context.globalState.update(PROJECT_OFFER_DECLINED, [
+            ...declined,
+            key,
+        ]);
+        return;
+    }
+    if (choice !== create) {
+        return;
+    }
+
+    const outcome = await lsp.request<AdoptModProjectResult>(
+        "aet/adoptModProject",
+        { directory: folder } satisfies AdoptModProjectParams,
+    );
+    if (!outcome.ok) {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t(
+                "EaWEdit: Project file not created - {0}",
+                outcome.message,
+            ),
+        );
+        return;
+    }
+    if (outcome.value.projectFile === null) {
+        void vscode.window.showWarningMessage(
+            vscode.l10n.t(
+                "EaWEdit: Project file not created - {0}",
+                outcome.value.error ?? "",
+            ),
+        );
+        return;
+    }
+    await vscode.window.showTextDocument(
+        vscode.Uri.file(outcome.value.projectFile),
+    );
 }
 
 /** A directory as the disk spells it, so a document selector matches VS Code's spelling. */
@@ -1378,6 +1406,30 @@ function onDiskSpelling(directory: string): string {
         return fs.realpathSync.native(directory).replace(/\\/g, "/");
     } catch {
         return directory;
+    }
+}
+
+/** The subdirectories of a directory, or undefined when it cannot be read. */
+function subdirectories(directory: string): string[] | undefined {
+    try {
+        return fs
+            .readdirSync(directory, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name);
+    } catch {
+        return undefined;
+    }
+}
+
+/** The files of a directory, or undefined when it cannot be read. */
+function files(directory: string): string[] | undefined {
+    try {
+        return fs
+            .readdirSync(directory, { withFileTypes: true })
+            .filter((entry) => entry.isFile())
+            .map((entry) => entry.name);
+    } catch {
+        return undefined;
     }
 }
 
@@ -1410,9 +1462,6 @@ function watchWorkspace(context: vscode.ExtensionContext): void {
 function onProjectFileTouched(context: vscode.ExtensionContext): void {
     // Not validated here: the configuration was checked when the servers started, and a project
     // file saved on every keystroke must not raise the same settings errors each time.
-    if (cfg("lsp").get<boolean>("enabled") !== true) {
-        return;
-    }
     void reconcileClients(context).then(() => {
         // A .pgproj change can add or drop a project reference, which moves the very directories the
         // dependency watchers cover - so rebuild them whenever one changes, wherever it lives.
@@ -1674,6 +1723,8 @@ export async function activate(
     // things out of the mod's own tree - so they go to workspaceState beside the dialog geometry.
     initViewerSettingsStorage(context.globalState);
     initProjectSettingsStorage(context.workspaceState);
+    // The screen the encyclopedia card is drawn for is the display the person targets.
+    initEncyclopediaScreenStorage(context.globalState);
 
     // Same reasoning: how wide you like a dock is a property of your screen and your habits,
     // not of the mod you have open.
@@ -2382,7 +2433,6 @@ export async function activate(
     context.subscriptions.push(traceChannel);
 
     logLine("Extension activated.");
-    logLine(`  lsp.enabled      = ${cfg("lsp").get<boolean>("enabled")}`);
     logLine(
         `  lsp.devMode      = ${cfg("lsp.devMode").get<boolean>("enabled", false)}`,
     );
@@ -2415,26 +2465,21 @@ export async function activate(
     // projects that came or went start or stop.
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
-            if (cfg("lsp").get<boolean>("enabled") === true) {
-                // A server kept running may now find a dependency inside a folder, or outside one:
-                // its own watchers over directories outside the folders are rebuilt too.
-                void reconcileClients(context).then(() => {
-                    for (const project of clients.values()) {
-                        if (project.state === "ready") {
-                            void refreshDependencyWatchers(project);
-                        }
+            // A server kept running may now find a dependency inside a folder, or outside one:
+            // its own watchers over directories outside the folders are rebuilt too.
+            void reconcileClients(context).then(() => {
+                for (const project of clients.values()) {
+                    if (project.state === "ready") {
+                        void refreshDependencyWatchers(project);
                     }
-                });
-            }
+                }
+            });
         }),
     );
 
     const restartServer = async () => {
         await stopAllClients();
-        if (
-            cfg("lsp").get<boolean>("enabled") === true &&
-            validateConfiguration(context.extensionPath)
-        ) {
+        if (validateConfiguration(context.extensionPath)) {
             await reconcileClients(context);
         }
     };
@@ -2445,15 +2490,9 @@ export async function activate(
                 return;
             }
 
-            const enabled = cfg("lsp").get<boolean>("enabled") === true;
-            logLine(
-                `Configuration changed. lsp.enabled=${enabled}, servers running=${clients.size}`,
-            );
+            logLine(`Configuration changed. Servers running=${clients.size}`);
 
-            if (!enabled && clients.size > 0) {
-                await stopAllClients();
-            } else if (
-                enabled &&
+            if (
                 clients.size === 0 &&
                 validateConfiguration(context.extensionPath)
             ) {
@@ -2461,14 +2500,14 @@ export async function activate(
                 await reconcileClients(context);
             } else if (
                 clients.size > 0 &&
-                (e.affectsConfiguration("aet-eaw-edit.features") ||
+                (e.affectsConfiguration("aet-eaw-edit.experimental") ||
                     e.affectsConfiguration("aet-eaw-edit.lsp.executable") ||
                     e.affectsConfiguration("aet-eaw-edit.lua.analyzerPath"))
             ) {
-                // Feature flags travel once via initializationOptions, and the two executables are
-                // picked when the process starts - restart to apply any of them.
+                // The experimental flags travel once via initializationOptions, and the two
+                // executables are picked when the process starts - restart to apply any of them.
                 logLine(
-                    "Feature flags or executables changed - restarting LSP server.",
+                    "Experimental features or executables changed - restarting LSP server.",
                 );
                 await restartServer();
             } else {
@@ -3233,7 +3272,11 @@ export async function activate(
                     const entry =
                         await lsp.requestOrReport<GetEncyclopediaEntryResult>(
                             GET_ENCYCLOPEDIA_ENTRY,
-                            { objectId: id, multiplayer },
+                            {
+                                objectId: id,
+                                multiplayer,
+                                ...encyclopediaScreenParams(),
+                            },
                             "load the encyclopedia entry",
                         );
                     if (entry === undefined) {
@@ -3326,16 +3369,8 @@ export async function activate(
         ),
     );
 
-    if (
-        cfg("lsp").get<boolean>("enabled") === true &&
-        validateConfiguration(context.extensionPath)
-    ) {
-        logLine("LSP enabled - starting server.");
+    if (validateConfiguration(context.extensionPath)) {
         void reconcileClients(context);
-    } else if (cfg("lsp").get<boolean>("enabled") !== true) {
-        logLine(
-            "LSP disabled (aet-eaw-edit.lsp.enabled is false). Use the restart command or enable it in settings.",
-        );
     }
 }
 

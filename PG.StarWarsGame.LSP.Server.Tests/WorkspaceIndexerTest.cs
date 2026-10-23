@@ -378,33 +378,6 @@ public sealed class WorkspaceIndexerTest
     }
 
     [Fact]
-    public void PreScanMetafiles_SpecialDef_StoryDiscoveryFlagOff_RegistersOnlyTheRegistryFileAndClearsProblems()
-    {
-        var root = Root("ws");
-        var xmlDir = Path.Combine(root, "data", "xml");
-        var fs = new MockFileSystem(StoryChainFixture(xmlDir));
-        var registry = new FileTypeRegistry();
-        var store = new StoryChainProblemStore();
-        store.Replace([
-            new StoryChainProblem("Campaigns_Old.xml", "file:///stale", 0, 0, 0, 1,
-                StoryChainProblemKind.UnresolvedStoryName, "X", new CatalogueText("stale"), XmlDiagnosticSeverity.Error)
-        ]);
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Story = new StoryFeatureFlags { Discovery = false } });
-        var (indexer, _) = BuildWithHost(fs, new FakeIndexService(), registry,
-            new FakeSchemaProvider(StorySpecialDef()), null, store, config);
-
-        indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
-
-        // The game opens the registry whether or not the chain is followed here, so it alone is
-        // registered - with no types - and nothing the chain would have reached is.
-        var ownKey = new FileHelper(fs).PathToFileUri(Path.Combine(xmlDir, "campaignfiles.xml"));
-        Assert.Equal([ownKey], registry.All.Keys.ToArray());
-        Assert.Empty(registry.GetTypesForFile(ownKey));
-        Assert.Empty(store.GetForDocument("file:///stale"));
-    }
-
-    [Fact]
     public void PreScanMetafiles_SpecialDef_UnresolvedStoryName_LandsInProblemStore()
     {
         var root = Root("ws");

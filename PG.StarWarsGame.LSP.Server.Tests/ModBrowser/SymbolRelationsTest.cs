@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.ModBrowser;
@@ -17,6 +16,11 @@ namespace PG.StarWarsGame.LSP.Server.Tests.ModBrowser;
 public sealed class SymbolRelationsTest
 {
     private const string Units = "file:///c:/work/mod/data/xml/units.xml";
+
+    private const string BaseUnits = "file:///c:/work/base/data/xml/units.xml";
+
+    // A dependency's object read out of its MEG: no file the editor can open.
+    private const string PackedUnits = "meg:///c:/work/packed/data/config.meg/data/xml/units.xml";
     private const string Page = "xml:GameObjectType";
 
     private static GameSymbol Object(string id, int line, string type = "GameObjectType")
@@ -75,7 +79,7 @@ public sealed class SymbolRelationsTest
         }
     }
 
-    private static SymbolRelations Relations(ToolsFeatureFlags? tools = null)
+    private static SymbolRelations Relations(bool withDependencies = false)
     {
         GameSymbol[] symbols =
         [
@@ -103,12 +107,32 @@ public sealed class SymbolRelationsTest
             new GameReference("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType", Units, 25, 8, 14);
         var tieUsesShipped =
             new GameReference("Shipped_Only", GameSymbolKind.XmlObject, "GameObjectType", Units, 26, 8, 12);
+        // Two dependencies under the mod that define the Star Destroyer as well: one in a loose file,
+        // one packed. The mod's definition wins; theirs are what it overrides.
+        GameSymbol[] baseDefinitions =
+        [
+            new("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin(BaseUnits, 9, 4), null),
+            new("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin(PackedUnits, 5, 4), null)
+        ];
+        var documents = ImmutableDictionary<string, DocumentIndex>.Empty.Add(Units,
+            new DocumentIndex(Units, 1, [.. symbols], [tieUsesSd, tieUsesShipped], LayerRank: 0, LayerName: "Mod"));
+        var definitions = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s));
+        if (withDependencies)
+        {
+            documents = documents
+                .Add(BaseUnits,
+                    new DocumentIndex(BaseUnits, 1, [baseDefinitions[0]], [], LayerRank: -1, LayerName: "Base"))
+                .Add(PackedUnits,
+                    new DocumentIndex(PackedUnits, 1, [baseDefinitions[1]], [], LayerRank: -2, LayerName: "Packed"));
+            definitions = definitions.SetItem("Star_Destroyer",
+                [baseDefinitions[1], definitions["Star_Destroyer"][0], baseDefinitions[0]]);
+        }
+
         var index = GameIndex.Empty with
         {
             Baseline = baseline,
-            Documents = ImmutableDictionary<string, DocumentIndex>.Empty.Add(Units,
-                new DocumentIndex(Units, 1, [.. symbols], [tieUsesSd, tieUsesShipped], LayerRank: 0, LayerName: "Mod")),
-            WorkspaceDefinitions = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s)),
+            Documents = documents,
+            WorkspaceDefinitions = definitions,
             WorkspaceReferences = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("Star_Destroyer", [tieUsesSd]).Add("Shipped_Only", [tieUsesShipped]),
             AssetFiles = MergedAssetFileIndex.Merge(
@@ -131,7 +155,7 @@ public sealed class SymbolRelationsTest
             ["Coruscant"] = [("Encyclopedia_Text", "TEXT_CORUSCANT")]
         });
         var schema = new Schema();
-        return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []), tools: tools);
+        return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []));
     }
 
     private static Dictionary<string, SymbolRelation> RelationsOf(string id)
@@ -194,16 +218,6 @@ public sealed class SymbolRelationsTest
     }
 
     [Fact]
-    public void AnActionWhoseFeatureIsOff_IsOffered_Disabled()
-    {
-        var actions = ActionsOf(Relations(new ToolsFeatureFlags { ModelPreview = false, Variants = false }),
-            "Star_Destroyer_Mk2");
-
-        Assert.Contains(("previewUnit", "off"), actions);
-        Assert.Contains(("effectiveObject", "off"), actions);
-    }
-
-    [Fact]
     public void AGameObject_OpensIntoWhatItsTagsName_ByWhatEachIs()
     {
         var relations = RelationsOf("Star_Destroyer");
@@ -211,7 +225,7 @@ public sealed class SymbolRelationsTest
         Assert.Equal(
             [
                 "models", "particleSystems", "particles", "sfxEvents", "speechEvents", "hardpoints", "otherReferences",
-                "textures", "luaScript", "referencedBy", "definitions"
+                "textures", "luaScript", "referencedBy", "overrides"
             ],
             relations.Keys);
         Assert.Equal(1, relations["models"].Count);
@@ -222,7 +236,7 @@ public sealed class SymbolRelationsTest
         Assert.Equal(1, relations["textures"].Count);
         Assert.Equal(1, relations["luaScript"].Count);
         Assert.Equal(1, relations["referencedBy"].Count);
-        Assert.Equal(2, relations["definitions"].Count);
+        Assert.Equal(1, relations["overrides"].Count);
     }
 
     [Fact]
@@ -260,11 +274,26 @@ public sealed class SymbolRelationsTest
     }
 
     [Fact]
-    public void TheDefinitions_AreEveryLayersAndTheGames_TheWinnerFirst()
+    public void TheOverrides_AreTheDefinitionsTheWinnerReplaces_HighestFirst()
     {
-        var definitions = Relations().Rows(Page, "Star_Destroyer", "definitions")!;
+        var overrides = Relations(withDependencies: true).Rows(Page, "Star_Destroyer", "overrides")!;
 
-        Assert.Equal(["layer:0", "game"], definitions.Select(r => r.Origin));
+        Assert.Equal(["layer:-1", "layer:-2", "game"], overrides.Select(r => r.Origin));
+    }
+
+    [Fact]
+    public void AnOverride_InAFile_GoesToIt_APackedOne_SaysSo()
+    {
+        var overrides = Relations(withDependencies: true).Rows(Page, "Star_Destroyer", "overrides")!;
+
+        Assert.Equal([new SymbolLocation(BaseUnits, 9), null, null], overrides.Select(r => r.Location));
+        Assert.Equal([false, true, true], overrides.Select(r => r.Packed));
+    }
+
+    [Fact]
+    public void AnObjectDefinedOnce_OverridesNothing_AndSaysSo()
+    {
+        Assert.Equal(new SymbolRelation("overrides", 0, "definedOnce"), RelationsOf("Tie_Fighter")["overrides"]);
     }
 
     [Fact]
@@ -283,14 +312,14 @@ public sealed class SymbolRelationsTest
     }
 
     [Fact]
-    public void ARelationsRow_OpensOnItsOwnPage_AMissingOrADefinitionOnNone()
+    public void ARelationsRow_OpensOnItsOwnPage_AMissingOrAnOverrideOnNone()
     {
         var relations = Relations();
 
         Assert.Equal("models", relations.Rows(Page, "Star_Destroyer", "models")!.Single().Page);
         Assert.Equal(["xml:HardPoint", null],
             relations.Rows(Page, "Star_Destroyer", "hardpoints")!.Select(r => r.Page));
-        Assert.All(relations.Rows(Page, "Star_Destroyer", "definitions")!, r => Assert.Null(r.Page));
+        Assert.All(relations.Rows(Page, "Star_Destroyer", "overrides")!, r => Assert.Null(r.Page));
     }
 
     [Fact]

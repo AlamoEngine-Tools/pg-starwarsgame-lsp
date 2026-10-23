@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
 public sealed class PreviewStoryGraphHandlerTest
 {
-    private static PreviewStoryGraphHandler Handler(bool storyEditor = true, bool storyEditing = true)
+    private static PreviewStoryGraphHandler Handler(bool storyEditing = true)
     {
         var fs = NewFileSystem();
         var fileHelper = FileHelperFor(fs);
@@ -20,20 +20,12 @@ public sealed class PreviewStoryGraphHandlerTest
             new StoryTestSchema(),
             fileHelper,
             Reload(),
-            Config(storyEditor, storyEditing));
+            Config(storyEditing));
     }
 
     private static PreviewStoryGraphParams Preview(params StoryCommandDto[] commands)
     {
         return new PreviewStoryGraphParams("GC", "Rebel", commands);
-    }
-
-    [Fact]
-    public async Task StoryEditorOff_ReturnsDisabledMessage()
-    {
-        var result = await Handler(false).Handle(Preview(), CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
     }
 
     /// <summary>

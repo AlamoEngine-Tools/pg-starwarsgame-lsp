@@ -3,7 +3,6 @@
 
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
@@ -13,7 +12,7 @@ namespace PG.StarWarsGame.LSP.Xml.CodeLens;
 
 /// <summary>
 ///     Emits a "preview unit" lens on every object that declares a tactical model, opening the model
-///     preview for that object. Gated on <c>features.tools.modelPreview</c>.
+///     preview for that object.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -35,21 +34,16 @@ internal sealed class PreviewUnitCodeLensProvider : IXmlCodeLensProvider
 {
     public const string PreviewUnitCommand = "aet-eaw-edit.lsp.previewAssembledUnit";
 
-    private readonly ILspConfigurationProvider _config;
     private readonly IVariantTagSource _tagSource;
 
-    public PreviewUnitCodeLensProvider(IVariantTagSource tagSource, ILspConfigurationProvider config)
+    public PreviewUnitCodeLensProvider(IVariantTagSource tagSource)
     {
         _tagSource = tagSource;
-        _config = config;
     }
 
     public LspCodeLens? Handle(CodeLensSymbolContext ctx)
     {
         ArgumentNullException.ThrowIfNull(ctx);
-
-        if (!_config.Current.Features.Tools.ModelPreview)
-            return null;
 
         // Assets and localisation keys reach the same registry, and only an XML object can be
         // assembled into a scene.

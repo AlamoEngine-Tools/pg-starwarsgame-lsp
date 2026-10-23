@@ -17,8 +17,7 @@ namespace PG.StarWarsGame.LSP.Xml.CodeActions;
 
 /// <summary>
 ///     Offers "Preview model X.ALO" on a value that names a model: a whole model tag from anywhere on
-///     its line, and the model item of a slotted tuple under the cursor. Gated on
-///     <c>features.tools.modelPreview</c>.
+///     its line, and the model item of a slotted tuple under the cursor.
 /// </summary>
 /// <remarks>
 ///     A model that is not found is offered DISABLED with the reason rather than left out, so the
@@ -50,9 +49,6 @@ internal sealed class PreviewModelCodeActionProvider : IXmlCursorCodeActionProvi
 
     public IEnumerable<CommandOrCodeAction> Handle(DocumentUri documentUri, Position position)
     {
-        if (!_config.Current.Features.Tools.ModelPreview)
-            return [];
-
         var parsed = _parseCache.GetOrParse(_fileHelper.NormalizeUri(documentUri.ToString()));
         if (parsed is null)
             return [];

@@ -17,6 +17,9 @@ export interface GetEncyclopediaEntryParams {
      * `usedMultiplayerBody` on the result.
      */
     multiplayer?: boolean;
+    /** The screen the card is drawn for; absent, 1920x1080. The glyph size follows the height. */
+    screenWidth?: number;
+    screenHeight?: number;
 }
 
 /**

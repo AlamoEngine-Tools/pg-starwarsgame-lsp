@@ -24,22 +24,6 @@ public sealed class LuaCodeActionHandlerTest
             config ?? new FakeLspConfigurationProvider());
     }
 
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_LuaCodeActionsFlagOff_ReturnsEmpty()
-    {
-        // Same arrange as Handle_RedundantRequireDiagnostic - only the flag differs.
-        var diag = RedundantRequireDiag(3, 0, 12);
-        var request = ParamsWithDiagnostics("file:///s.lua", diag);
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Lua = new LuaFeatureFlags { CodeActions = false } });
-
-        var result = await MakeSut(config: config).Handle(request, CancellationToken.None);
-
-        Assert.Empty(result!);
-    }
-
     private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)
     {
         return new CodeActionParams

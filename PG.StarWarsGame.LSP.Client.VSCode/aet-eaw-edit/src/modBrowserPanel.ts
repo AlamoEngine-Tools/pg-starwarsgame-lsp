@@ -4,6 +4,8 @@
 import * as vscode from "vscode";
 
 import { PanelProject } from "./panelProject";
+import { encyclopediaScreenParams } from "./encyclopediaScreenStorage";
+import { GET_ENCYCLOPEDIA_ENTRY } from "./protocol/encyclopedia";
 import { MOD_BROWSER_METHODS, SymbolOutline } from "./protocol/modBrowser";
 import {
     PanelRegistry,
@@ -144,8 +146,16 @@ export class ModBrowserPanel extends WebviewPanelHost {
     /** Passes one of the browser's requests to the server; anything else is answered with nothing. */
     private async _relay(msg: WebviewMessage): Promise<void> {
         const method = typeof msg.method === "string" ? msg.method : "";
+        // The embedded card is drawn for the same screen as the encyclopedia preview.
+        const params =
+            method === GET_ENCYCLOPEDIA_ENTRY
+                ? {
+                      ...(msg.params as object),
+                      ...encyclopediaScreenParams(),
+                  }
+                : msg.params;
         const outcome = MOD_BROWSER_METHODS.includes(method)
-            ? await this.project.gateway.request<unknown>(method, msg.params)
+            ? await this.project.gateway.request<unknown>(method, params)
             : undefined;
         this.post({
             type: "response",

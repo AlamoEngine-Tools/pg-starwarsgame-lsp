@@ -114,7 +114,7 @@ export function relationIcon(relation: string): IconName {
         case "usedBy":
         case "otherReferences":
             return "references";
-        case "definitions":
+        case "overrides":
             return "definition";
         case "tags":
             return "tag";
@@ -155,8 +155,8 @@ export function relationLabel(relation: string): string {
         case "referencedBy":
         case "usedBy":
             return l10n.t("References");
-        case "definitions":
-            return l10n.t("Definitions");
+        case "overrides":
+            return l10n.t("Overrides");
         case "animations":
             return l10n.t("Animations");
         case "model":
@@ -216,9 +216,27 @@ export function reasonLabel(reason: string | null | undefined): string {
             return l10n.t("None");
         case "notInModFiles":
             return l10n.t("Not in the mod's files");
+        case "definedOnce":
+            return l10n.t("Defined once");
         default:
             return reason ?? "";
     }
+}
+
+/**
+ * Why a row does nothing when chosen, or undefined when it opens: a row with a page opens on it, an
+ * overridden definition in a file goes to it.
+ */
+export function rowInertReason(row: SymbolRow): string | undefined {
+    if (row.page || row.location) {
+        return undefined;
+    }
+    if (row.origin === "missing") {
+        return l10n.t("Nothing defines this name");
+    }
+    return row.packed
+        ? l10n.t("Packed - no file to open")
+        : l10n.t("Not an entry of its own");
 }
 
 /** The origins the search form offers: every layer, the root project first, then the game. */
@@ -556,8 +574,6 @@ function actionReasonLabel(reason: string): string {
             return l10n.t("Not a variant");
         case "noPreview":
             return l10n.t("No preview for this type");
-        case "off":
-            return l10n.t("Turned off in the settings");
         default:
             return reason;
     }

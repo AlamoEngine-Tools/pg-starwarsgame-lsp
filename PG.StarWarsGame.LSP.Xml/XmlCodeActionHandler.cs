@@ -26,9 +26,6 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
 
     public override Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Xml.CodeActions)
-            return Task.FromResult<CommandOrCodeActionContainer?>(new CommandOrCodeActionContainer());
-
         var uri = request.TextDocument.Uri;
         var actions = request.Context.Diagnostics
             .SelectMany(d => _registry.Dispatch(new XmlCodeActionContext(uri, d)

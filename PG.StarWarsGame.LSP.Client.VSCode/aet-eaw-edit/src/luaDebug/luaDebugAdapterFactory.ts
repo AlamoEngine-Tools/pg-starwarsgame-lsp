@@ -9,16 +9,6 @@ import { serverProblem } from "../serverLaunch";
 
 export const LUA_DEBUG_TYPE = "eaw-lua";
 
-export const DEBUGGER_DISABLED_MESSAGE =
-    'The Lua debugger is disabled. Enable "aet-eaw-edit.features.lua.debugger" in the settings to use it';
-
-/** Whether the Lua debugger feature flag is on. Read live so a toggle needs no reload of this module. */
-export function luaDebuggerEnabled(): boolean {
-    return vscode.workspace
-        .getConfiguration("aet-eaw-edit.features")
-        .get<boolean>("lua.debugger", false);
-}
-
 /**
  * Starts one adapter process per debug session: the server binary with `--debug-adapter`,
  * speaking DAP on stdio. The adapter shares nothing with the running language server.
@@ -34,11 +24,6 @@ export class LuaDebugAdapterDescriptorFactory
     createDebugAdapterDescriptor(
         _session: vscode.DebugSession,
     ): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
-        if (!luaDebuggerEnabled()) {
-            void vscode.window.showErrorMessage(DEBUGGER_DISABLED_MESSAGE);
-            return undefined;
-        }
-
         const command = resolveServerCommand(this._extensionPath, [
             "--debug-adapter",
         ]);

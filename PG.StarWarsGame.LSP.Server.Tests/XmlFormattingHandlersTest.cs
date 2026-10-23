@@ -4,7 +4,6 @@
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
@@ -35,13 +34,12 @@ public sealed class XmlFormattingHandlersTest
     }
 
     private (XmlDocumentFormattingHandler Full, XmlDocumentRangeFormattingHandler Partial) Handlers(
-        string text, bool flag = true, bool eaw = true)
+        string text, bool eaw = true)
     {
         var cache = new OneDocumentCache(text);
         var context = new FixedEaWContext(eaw);
         var files = new FileHelper(new MockFileSystem());
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { Formatting = flag } });
+        var config = new FakeLspConfigurationProvider();
         return (new XmlDocumentFormattingHandler(cache, context, files, _notifier, config),
             new XmlDocumentRangeFormattingHandler(cache, context, files, _notifier, config));
     }
@@ -88,16 +86,6 @@ public sealed class XmlFormattingHandlersTest
         Assert.Empty(All(edits));
         var warning = Assert.Single(_notifier.Warnings);
         Assert.StartsWith("Formatting refused: ", warning);
-    }
-
-    [Fact]
-    public async Task FlagOff_FormatsNothing()
-    {
-        var edits = await Handlers(Text, false).Full.Handle(
-            new DocumentFormattingParams { TextDocument = Doc, Options = Tabs }, CancellationToken.None);
-
-        Assert.Empty(All(edits));
-        Assert.Empty(_notifier.Warnings);
     }
 
     [Fact]

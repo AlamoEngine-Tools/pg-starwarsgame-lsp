@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -13,30 +12,24 @@ namespace PG.StarWarsGame.LSP.Server;
 ///     Serves the story graph diagnostics for a document by running the producer over every
 ///     campaign model containing it. A thread shared by several campaigns (universal triggers)
 ///     would repeat identical findings - they are de-duplicated; campaign-specific findings
-///     (e.g. ambiguity that exists in only one campaign) survive. Gated by
-///     <c>features.story.graphDiagnostics</c>.
+///     (e.g. ambiguity that exists in only one campaign) survive.
 /// </summary>
 public sealed class StoryGraphDiagnosticsService : IStoryGraphDiagnosticsSource
 {
-    private readonly ILspConfigurationProvider _configProvider;
     private readonly IStoryModelService _modelService;
     private readonly StoryGraphDiagnosticsProducer _producer;
 
     public StoryGraphDiagnosticsService(
         IStoryModelService modelService,
         ISchemaProvider schema,
-        ILspConfigurationProvider configProvider,
         IMessageCatalog messages)
     {
         _modelService = modelService;
-        _configProvider = configProvider;
         _producer = new StoryGraphDiagnosticsProducer(schema, messages);
     }
 
     public IReadOnlyList<StoryGraphDiagnostic> GetForDocument(string canonicalUri)
     {
-        if (!_configProvider.Current.Features.Story.GraphDiagnostics) return [];
-
         var seen = new HashSet<(int, int, string)>();
         var diagnostics = new List<StoryGraphDiagnostic>();
         foreach (var model in _modelService.GetModelsContaining(canonicalUri))
