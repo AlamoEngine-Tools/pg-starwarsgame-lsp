@@ -164,7 +164,7 @@ The extension's README documents every attribute.
 
 ## Story mode
 
-Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `Story_*.xml` thread files. Opt-in and in development; see the story flags in the extension's README.
+Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `Story_*.xml` thread files. Viewing is on; editing and simulation are experimental and off by default, one setting each; see the extension's README.
 
 - **Campaign Editor** view
 - Story graph
@@ -329,7 +329,7 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 | What | Where | When | How to disable |
 |---|---|---|---|
 | XML schema | GitHub - newest compatible schema release | On server start; nothing when the release is already cached; default branch when no release exists | `aet-eaw-edit.lsp.schema.source` = `local` |
-| Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\` | `aet-eaw-edit.lsp.source.baseline.type` = `local` |
+| Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.aetswg\baselines\` | `aet-eaw-edit.lsp.source.baseline.type` = `local` |
 | Shader sources | Petroglyph's published download | Only on **Set Up Base Shader Sources** | Do not run the command |
 
 ---

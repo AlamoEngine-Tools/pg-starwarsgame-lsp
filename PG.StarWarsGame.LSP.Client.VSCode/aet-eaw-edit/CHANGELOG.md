@@ -7,21 +7,20 @@
 - **Localisable texts** - every user-facing string moves into one catalogue per runtime, the start of
   translations and the one place the text rules are checked
   ([#274](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/274))
-  - The extension manifest's 178 texts - command titles, setting descriptions, enum labels, view names,
+  - The extension manifest's texts - command titles, setting descriptions, enum labels, view names,
     debugger labels - come from `package.nls.json`; `npm run lint` fails on a text written into
     `package.json` itself or a key the catalogue does not carry
-  - The extension host's 180 texts - notifications and their buttons, prompts, quick picks, progress, tree
+  - The extension host's texts - notifications and their buttons, prompts, quick picks, progress, tree
     items and panel titles - go through `vscode.l10n.t` into `l10n/bundle.l10n.json`; the lint fails on a
     text written in place or a bundle that no longer matches the code. Six texts in second person were
     reworded on the way, and plural messages are whole sentences
-  - The webviews' 650 texts - the model preview, story graph, localisation editor, encyclopedia and credits
+  - The webviews' texts - the model preview, story graph, localisation editor, encyclopedia and credits
     - come from the same bundle, which the host hands every page; text interrupted by values is one
     message with placeholders. The page's language follows VS Code's display language. Curly quotes in one
     message became straight ones, and texts in second person were reworded
-  - The server's own texts come from one catalogue, `ServerMessages.resx`, in the language
-    `aet-eaw-edit.lsp.locale` names, English where no translation exists; values in a message keep the
-    form the XML holds - `0.5`, never `0,5`. A test ties every key the code asks for to the catalogue
-    and back
+  - The server's own texts come from one catalogue, `ServerMessages.resx`; English is the only language it holds so
+    far; values in a message keep the form the XML holds - `0.5`, never `0,5`. A test ties every key the code asks
+    for to the catalogue and back
   - The XML diagnostics read the configured locale; it was fixed to English, so neither the server's
     texts nor the schema's per-language notes ever reached a diagnostic in another language
   - The XML structure findings, the cross-tag rules, every message fragment and every engine-repair
@@ -279,12 +278,12 @@
     model, a file revealed in the file manager and the name copied; an unavailable one disabled with the reason
   - A planet offers no encyclopedia card anywhere, its popup being a preview of its own
   - The Preview Model picker lists models only, without particle systems
-  - Flag `aet-eaw-edit.features.tools.modBrowser`, on by default
 
 ### Fixes
 
 - **New Mod Project in an existing mod** - leaves the mod's `modinfo.json`, dependencies included, as it was; only a
-  folder without one gets a new one ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+  folder without one gets a new one; a folder that already has the project file is refused with its path, where
+  "created" was reported ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
