@@ -111,8 +111,8 @@ Every `.pgproj` under the open folders is a project with a language server of it
 
 A `.pgproj` in the old shape fails to load with a notification naming this fix.
 
-**One `.pgproj` per workspace.** More than one fails to start with a notification listing them all; remove the extras or
-open the subfolder holding the one you want.
+**Several `.pgproj` files.** Each one gets a language server of its own; see
+[Several projects in one window](#several-projects-in-one-window).
 
 **Clear cached indexes.** Delete `.aetswg` next to every `.pgproj` and `%USERPROFILE%\.aetswg\`, then run **EaWEdit:
 Restart LSP Server**. Both are rebuilt automatically.
@@ -170,7 +170,7 @@ Every EaW XML file is read as the game reads it and, when the game keeps it, as 
 | `aetswg-012-3001` | No `<?xml ...?>` declaration                                                     | Insert the XML declaration                                                    |
 | `aetswg-012-3002` | End tag naming another element                                                   | Close the element left open; rename a misspelled end tag; remove one too many |
 | `aetswg-012-3003` | End tag differing in case only                                                   | Rename the end tag                                                            |
-| `aetswg-012-3004` | End tag where the root element is expected                                       | Remove the end tag                                                            |
+| `aetswg-012-3004` | End tag outside any element                                                      | Remove the end tag                                                            |
 | `aetswg-012-3005` | No root element, or a root without child elements                                | -                                                                             |
 | `aetswg-012-3006` | A second root element                                                            | -                                                                             |
 | `aetswg-012-3007` | Attribute without `=` or without double quotes                                   | Use double quotes, unless the value holds `"`                                 |
@@ -615,7 +615,8 @@ Read-only.
   - Column widths and order dragged in the header, kept per list
 - **Relations** - computed for one entry, when it opens; an empty one counted zero, with the reason
   - Game objects: models, particle systems, particles, SFX and speech events, hardpoints, other references,
-    textures, Lua script, references, definitions
+    textures, Lua script, references, overrides - the definitions the one the game uses replaces, each opening
+    at its line unless it is packed
   - Objects only the game defines: no relations from their tags (`Not in the mod's files`)
   - Models: animations, particle systems, textures, references. Particle systems: textures, and as references
     the models whose proxies carry them and the objects naming them. Animations: model. Textures and audio:
@@ -773,7 +774,7 @@ once set.
 
 | Setting                            | Default      | Description                                                                             |
 |------------------------------------|--------------|-----------------------------------------------------------------------------------------|
-| `aet-eaw-edit.localisation.format` | `format-dat` | Default format for new localisation projects (`format-dat`, `format-csv`, `format-xml`) |
+| `aet-eaw-edit.localisation.format` | `format-dat` | Default format for new localisation projects (`format-dat`, `format-csv`, `format-xml`, `format-nls`) |
 
 ### Diagnostics
 
@@ -798,7 +799,7 @@ For development and troubleshooting. Hidden from the settings page; `@tag:advanc
 | `aet-eaw-edit.lsp.schema.source`                   | `http`        | `http` (GitHub, the newest compatible schema release) or `local`                                                                                                                                                                                                                                                                                                       |
 | `aet-eaw-edit.lsp.schema.localPath`                | _(empty)_     | The schema repository's `eaw` folder, holding `_index.json`; not its root (source `local`)                                                                                                                                                                                                                                                                             |
 | `aet-eaw-edit.lsp.schema.url`                      | _(empty)_     | Custom schema index URL (source `http`)                                                                                                                                                                                                                                                                                                                                |
-| `aet-eaw-edit.lsp.source.baseline.type`            | `http`        | `http` or `local`; the baseline is the snapshot of every vanilla object and localisation key, cached in `%USERPROFILE%\.pg-swg-lsp\baselines\`                                                                                                                                                                                                                          |
+| `aet-eaw-edit.lsp.source.baseline.type`            | `http`        | `http` or `local`; the baseline is the snapshot of every vanilla object and localisation key, cached in `%USERPROFILE%\.aetswg\baselines\`                                                                                                                                                                                                                              |
 | `aet-eaw-edit.lsp.source.baseline.localPath`       | _(empty)_     | Local baseline file (type `local`)                                                                                                                                                                                                                                                                                                                                     |
 | `aet-eaw-edit.lsp.source.baseline.url`             | _(empty)_     | Custom baseline URL (type `http`)                                                                                                                                                                                                                                                                                                                                      |
 | `aet-eaw-edit.features.preview.energyPool`         | `false`       | Energy pool in the preview (editor-side, no restart). Off on purpose: the shipped game disables the mechanic                                                                                                                                                                                                                                                           |
@@ -812,7 +813,7 @@ Three data sources; nothing else is sent or received. No telemetry.
 | What           | Where                                                                | When                                                                                               | How to disable                                                                |
 |----------------|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
 | XML schema     | GitHub - newest compatible schema release                            | On server start; nothing when the release is already cached; default branch when no release exists | `aet-eaw-edit.lsp.schema.source` = `local`                                    |
-| Game baseline  | Configured URL (default: GitHub releases)                            | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\`; refreshed on new versions                  | `aet-eaw-edit.lsp.source.baseline.type` = `local`                             |
+| Game baseline  | Configured URL (default: GitHub releases)                            | Once; cached in `%USERPROFILE%\.aetswg\baselines\`; refreshed on new versions                      | `aet-eaw-edit.lsp.source.baseline.type` = `local`                             |
 | Shader sources | Petroglyph's published download                                      | Only on **Set Up Base Shader Sources**                                                             | Do not run the command; set `aet-eaw-edit.shaders.directory` to a copy at hand |
 
 ---
@@ -831,9 +832,6 @@ Clear the setting to use it.
 **Features work in some files only.** Only directories listed in the `.pgproj` are indexed; add the paths to
 `directories.xml` or `directories.scripts`.
 
-**"Found multiple .pgproj files under ...".** One `.pgproj` per workspace root: remove the extras or open the subfolder,
-then restart the server.
-
 **"'directories.text'/'directories.textResourceType' were removed".** Pre-0.2.0 `.pgproj`;
 see [Upgrading from 0.1.x](#upgrading-from-01x).
 
@@ -850,8 +848,9 @@ via `modPaths`. See [Lua debugger](#lua-debugger).
 **Raw server output.** `aet-eaw-edit.lsp.debug.traceServer` = `messages`; **EaWEdit** output channel.
 
 **No diagnostics at all, for any file.** `aet-eaw-edit.lsp.debug.logLevel` = `Debug`, then restart the server and read
-`aetswg-*.log` in the workspace root: it records whether XML document sync was registered and whether each `didOpen`
-reached the handler. At the default level neither line is written.
+the **EaWEdit** output channel (a Debug build of the server also writes `aetswg-*.log` in each project's folder): it
+records whether XML document sync was registered and whether each `didOpen` reached the handler. At the default level
+neither line is written.
 
 ---
 

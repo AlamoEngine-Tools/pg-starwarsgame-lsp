@@ -232,11 +232,13 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 new Position(start.Line, start.Character),
                 new Position(end.Line, end.Character));
 
+            // An entry point first: a library stub declaring the same name (Definitions in
+            // PGInterventions) is the library's own copy, and the game calls the script's.
+            if (schema.GetEntryPoint(name) is { } entryPoint)
+                return BuildHover(BuildEntryPointHoverMarkdown(entryPoint), range);
             if (schema.AllFunctionNames.Contains(name))
                 return BuildHover(BuildFunctionHoverMarkdown(name, schema.GetFunctionDescription(name),
                     schema.GetFunctionParams(name), schema.GetReturnTypeName(name)), range);
-            if (schema.GetEntryPoint(name) is { } entryPoint)
-                return BuildHover(BuildEntryPointHoverMarkdown(entryPoint), range);
         }
 
         return null;

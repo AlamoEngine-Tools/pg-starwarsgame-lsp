@@ -80,6 +80,8 @@ const SHOWN_ATTRIBUTES = new Set([
     "hint",
     "detail",
     "description",
+    // A disabled control's tooltip: the story graph's Save said "nothing is staged" outside every catalogue.
+    "disabledReason",
     "caption",
 ]);
 

@@ -168,4 +168,60 @@ public sealed class AdoptModProjectHandlerTest
         Assert.NotNull(result.Error);
         Assert.Empty(fs.Directory.GetFiles(Root, "*.pgproj"));
     }
+
+    // The client offers a project for every folder laid out like a mod; one it offers and this
+    // refuses was an offer that could only fail.
+    [Theory]
+    [InlineData("Data/Scripts/Library/lib.lua", "scripts")]
+    [InlineData("Data/Art/Models/a.alo", "art")]
+    [InlineData("Data/Audio/Speech/a.wav", "audio")]
+    public void AModWithoutXml_IsAdopted_WithTheDirectoriesItHas(string file, string directory)
+    {
+        var fs = Mod(file);
+
+        var directories = Written(fs, Adopt(fs))["directories"]!.AsObject();
+
+        Assert.True(directories.ContainsKey(directory));
+        Assert.False(directories.ContainsKey("xml"));
+    }
+
+    [Fact]
+    public void AModOfTextOrArchivesOnly_IsAdopted()
+    {
+        var text = Mod("Data/Text/MasterTextFile_English.dat");
+        var packed = Mod("Data/Config.meg");
+
+        Assert.Equal("DAT", (string?)Written(text, Adopt(text))["localisation"]!["type"]);
+        Assert.Empty(Written(packed, Adopt(packed))["directories"]!.AsObject());
+    }
+
+    [Fact]
+    public void AFolderWithOnlyModinfo_IsAdopted_UnderTheModsName()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile($"{Root}/modinfo.json", new MockFileData("""{ "name": "Legacy Mod" }"""));
+
+        Assert.Equal("Legacy Mod", (string?)Written(fs, Adopt(fs))["name"]);
+    }
+
+    [Theory]
+    [InlineData("sweaw.exe")]
+    [InlineData("StarWarsG.exe")]
+    public void TheGamesOwnFolder_IsRefused(string executable)
+    {
+        var fs = Mod("Data/XML/a.xml", executable);
+
+        var result = Adopt(fs);
+
+        Assert.Null(result.ProjectFile);
+        Assert.NotNull(result.Error);
+    }
+
+    [Fact]
+    public void AFolderWithABareXmlFolder_IsRefused()
+    {
+        var fs = Mod("xml/a.xml");
+
+        Assert.Null(Adopt(fs).ProjectFile);
+    }
 }

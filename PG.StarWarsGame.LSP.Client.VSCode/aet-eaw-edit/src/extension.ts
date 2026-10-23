@@ -105,7 +105,7 @@ import {
     resolveServerCommand,
     resolveServerEnvironment,
 } from "./serverCommand";
-import { serverProblem } from "./serverLaunch";
+import { analyzerProblem, serverProblem } from "./serverLaunch";
 import {
     AdoptModProjectParams,
     AdoptModProjectResult,
@@ -713,6 +713,20 @@ function validateConfiguration(extensionPath: string): boolean {
     );
     if (serverMissing) {
         void vscode.window.showErrorMessage(serverMissing);
+        valid = false;
+    }
+
+    const analyzerMissing = analyzerProblem(
+        cfg("lua").get<string>("analyzerPath") ?? "",
+        fs.existsSync,
+    );
+    if (analyzerMissing) {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t(
+                'EaWEdit: Lua analyzer not found - {0}. Fix "aet-eaw-edit.lua.analyzerPath", or clear it to use the bundled one',
+                analyzerMissing,
+            ),
+        );
         valid = false;
     }
 
@@ -2570,7 +2584,7 @@ export async function activate(
                     prompt: vscode.l10n.t("Mod name"),
                     placeHolder: vscode.l10n.t("My Awesome Mod"),
                     validateInput: (v) =>
-                        v?.trim() ? null : "Name is required",
+                        v?.trim() ? null : vscode.l10n.t("Name is required"),
                 });
                 if (!name) {
                     return;
@@ -2579,26 +2593,18 @@ export async function activate(
                     canSelectFolders: true,
                     canSelectFiles: false,
                     canSelectMany: false,
-                    openLabel: "Select mod root folder",
+                    openLabel: vscode.l10n.t("Select mod root folder"),
                 });
                 if (!folders?.length) {
                     return;
                 }
-                // Announced only once it actually ran. The old code said "created" whether or not the
-                // request got through, so a server that had died reported a project that did not exist.
-                const created = await lsp.executeCommand(
+                // The server says what it did - created, or refused because a project file exists. The
+                // client announced "created" whenever the command returned, refusals included.
+                await lsp.executeCommand(
                     "aet-eaw-edit.lsp.newModProject",
                     [{ name: name.trim(), path: folders[0].fsPath }],
-                    `could not create the mod project '${name.trim()}'`,
+                    vscode.l10n.t("Mod project not created - {0}", name.trim()),
                 );
-                if (created) {
-                    vscode.window.showInformationMessage(
-                        vscode.l10n.t(
-                            "Mod project '{0}' created.",
-                            name.trim(),
-                        ),
-                    );
-                }
             },
         ),
     );

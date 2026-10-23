@@ -7853,8 +7853,12 @@ function App(): React.JSX.Element {
                                         disabled={pendingCount === 0 || saving}
                                         disabledReason={
                                             saving
-                                                ? "Save - writing the staged changes now"
-                                                : "Save - nothing is staged"
+                                                ? l10n.t(
+                                                      "Save - writing the staged changes now",
+                                                  )
+                                                : l10n.t(
+                                                      "Save - nothing is staged",
+                                                  )
                                         }
                                         onClick={saveEdits}
                                     />
@@ -8038,7 +8042,9 @@ function App(): React.JSX.Element {
                                                 "Toggle thread lanes",
                                             )}
                                             disabled={scope !== null}
-                                            disabledReason="Thread lanes - galactic graph only"
+                                            disabledReason={l10n.t(
+                                                "Thread lanes - galactic graph only",
+                                            )}
                                             onClick={() => toggleLane("thread")}
                                         />
                                         <IconButton
@@ -8596,7 +8602,9 @@ function TacticalCreateBar(props: {
             <Button
                 className="primary"
                 disabled={!thread || !file.trim()}
-                disabledReason="Pick a thread file and give the story a name"
+                disabledReason={l10n.t(
+                    "Pick a thread file and give the story a name",
+                )}
                 onClick={create}
             >
                 {l10n.t("Create")}

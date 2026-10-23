@@ -423,6 +423,24 @@ public sealed class LuaHoverHandlerTest
         Assert.Contains("PGStateMachine", text);
     }
 
+    // A library stub also declares Definitions - its own copy of the entry point. The game calls a
+    // script's Definitions as the entry point, so its card is the one a script's definition shows.
+    [Fact]
+    public async Task AnEntryPointALibraryStubAlsoDeclares_ShowsTheEntryPointsCard()
+    {
+        var schema = new LuaApiSchemaProvider(
+            ["--- Not documented on the site; see the library source.\nfunction Definitions() end"],
+            [
+                new LuaEntryPoint("Definitions", LuaEntryPointCaller.LIBRARY, ["PGStateMachine"], ["object"],
+                    "The script's own setup.")
+            ]);
+
+        var text = await HoverOn("function Definitions()\nend", 0, 12, schema);
+
+        Assert.Contains("The script's own setup.", text);
+        Assert.DoesNotContain("Not documented on the site", text);
+    }
+
     // ── the state machine (#252) ─────────────────────────────────────────────
 
     private const string MachineLibraryUri = "file:///data/scripts/library/pgstatemachine.lua";

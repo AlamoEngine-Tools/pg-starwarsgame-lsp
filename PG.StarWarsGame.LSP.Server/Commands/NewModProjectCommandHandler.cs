@@ -9,8 +9,10 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Commands;
 
@@ -22,10 +24,15 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
 
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<NewModProjectCommandHandler> _logger;
+    private readonly IMessageCatalog _messages;
+    private readonly IUserNotifier _notifier;
 
-    public NewModProjectCommandHandler(IFileHelper fileHelper, ILogger<NewModProjectCommandHandler> logger)
+    public NewModProjectCommandHandler(IFileHelper fileHelper, IUserNotifier notifier, IMessageCatalog messages,
+        ILogger<NewModProjectCommandHandler> logger)
     {
         _fileHelper = fileHelper;
+        _notifier = notifier;
+        _messages = messages;
         _logger = logger;
     }
 
@@ -60,6 +67,7 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
         {
             _logger.LogWarning(
                 "aet-eaw-edit.lsp.newModProject: project file '{Path}' already exists; nothing created.", pgprojPath);
+            _notifier.ShowError(_messages.Format("NewModProject_ProjectExists", pgprojPath));
             return Unit.Task;
         }
 
@@ -72,6 +80,7 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
             WriteModinfo(modinfoPath, name);
 
         _logger.LogInformation("aet-eaw-edit.lsp.newModProject: created mod project '{Name}' at '{Path}'.", name, path);
+        _notifier.ShowInfo(_messages.Format("NewModProject_Created", name, pgprojPath));
         return Unit.Task;
     }
 

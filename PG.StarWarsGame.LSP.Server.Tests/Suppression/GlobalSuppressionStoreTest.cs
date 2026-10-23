@@ -102,6 +102,19 @@ public sealed class GlobalSuppressionStoreTest
         Assert.Equal([CommentInsideValue], store.GetAll());
     }
 
+    // The bare array is older than version 1, so it gains the default-off entry too: the migration
+    // wrapping it jumped straight to version 2 and skipped the one that adds it, turning the
+    // finding on for the project.
+    [Fact]
+    public void BareArrayFile_GainsTheDefaultEntryOnce()
+    {
+        var (store, fs) = Build(existingJson: """[ { "id": "aetswg-010-0001" } ]""");
+
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), CommentInsideValue], store.GetAll());
+        var written = JsonNode.Parse(fs.File.ReadAllText(SidecarPath))!.AsObject();
+        Assert.Equal(SuppressionsDocument.Version.ToString(), (string?)written["_typeVersion"]);
+    }
+
     [Fact]
     public void CurrentFileWithoutTheEntry_HasOptedIn_AndIsNotChanged()
     {
@@ -184,7 +197,8 @@ public sealed class GlobalSuppressionStoreTest
         var (store, _) = Build(existingJson:
             """[{"id":"garbage"},{"id":"aetswg-010-0001"}]""");
 
-        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], store.GetAll());
+        // A bare array migrates like any file older than version 2: it gains the default-off entry.
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), CommentInsideValue], store.GetAll());
     }
 
     // The failure this prevents: suppressions.json is hand-editable and committed, so a typo in it

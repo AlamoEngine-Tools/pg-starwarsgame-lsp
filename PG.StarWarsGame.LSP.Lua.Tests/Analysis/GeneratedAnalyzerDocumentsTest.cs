@@ -123,6 +123,23 @@ public sealed class GeneratedAnalyzerDocumentsTest
                      "local OnUpdate = 2\nfunction F()\n  OnUpdate = 2\nend\n", inner.Texts[Other]);
     }
 
+    // A script's entry point is its own, not the library copy a stub declares under the same name:
+    // the library's documentation was injected above every script's Definitions.
+    [Fact]
+    public void AnEntryPoint_GetsNoLibraryStubsAnnotations()
+    {
+        var inner = new ScriptedLuaAnalyzer();
+        var stubs = LuaApiSchemaProvider.FromFiles(
+            [new LuaStubFile("pginterventions.d.lua", "--- Not documented on the site.\nfunction Definitions() end")],
+            [new LuaEntryPoint("Definitions", LuaEntryPointCaller.LIBRARY, ["PGStateMachine"], ["object"], "Setup.")]);
+        var documents = new GeneratedAnalyzerDocuments(inner, [new StubOverrideAnnotations(stubs)],
+            new FileHelper(new MockFileSystem()));
+
+        documents.DidOpen(Uri, "function Definitions()\nend\n", 1);
+
+        Assert.Equal("function Definitions()\nend\n", inner.Texts[Uri]);
+    }
+
     // A state handler's message is one of the library's three values (#252).
     [Fact]
     public void AStateHandler_GetsItsMessageTyped()

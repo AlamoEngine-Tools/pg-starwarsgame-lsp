@@ -693,7 +693,7 @@ function DecisionRow(props: {
                 icon="check"
                 title={quick?.title ?? "No one-press answer"}
                 disabled={quick === null}
-                disabledReason="No one-press answer - open the row"
+                disabledReason={l10n.t("No one-press answer - open the row")}
                 onClick={() => quick?.run()}
             />
         </div>
@@ -1213,7 +1213,7 @@ function EventDialog(
                         <Button
                             title={l10n.t("Fire now")}
                             disabled={!armed}
-                            disabledReason="Not armed"
+                            disabledReason={l10n.t("Not armed")}
                             onClick={() => actions.satisfy(props.nodeId)}
                         >
                             <Icon name="fire" size={13} />
@@ -1351,7 +1351,9 @@ function PlanetDialog(props: {
             title={props.name}
             confirmLabel="OK"
             canConfirm={changed}
-            disabledReason={draft ? "Owner unchanged" : "Owner required"}
+            disabledReason={
+                draft ? l10n.t("Owner unchanged") : l10n.t("Owner required")
+            }
             onConfirm={() => {
                 if (changed) {
                     actions.world({
@@ -1445,7 +1447,9 @@ function FlagDialog(props: {
             confirmLabel="OK"
             canConfirm={valid}
             disabledReason={
-                name.trim() ? "Whole number required" : "Flag name required"
+                name.trim()
+                    ? l10n.t("Whole number required")
+                    : l10n.t("Flag name required")
             }
             onConfirm={() => {
                 if (valid) {
@@ -1506,7 +1510,7 @@ function DecisionDialog(props: {
             title={picker.title}
             confirmLabel="OK"
             canConfirm={value.length > 0}
-            disabledReason={`${picker.noun} required`}
+            disabledReason={l10n.t("{0} required", picker.noun)}
             onConfirm={() => {
                 const change = value ? picker.change(value) : null;
                 if (change) {
@@ -1968,7 +1972,7 @@ export function TracePanel(props: {
                     icon="copy"
                     title={l10n.t("Copy")}
                     disabled={shown.length === 0}
-                    disabledReason="Nothing to copy"
+                    disabledReason={l10n.t("Nothing to copy")}
                     onClick={() => props.actions.copy(copyText())}
                 />
             </div>

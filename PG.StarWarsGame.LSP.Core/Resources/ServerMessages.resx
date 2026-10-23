@@ -28,10 +28,19 @@
     <value>cannot absorb fire from any source</value>
   </data>
   <data name="AdoptModProject_NotAMod" xml:space="preserve">
-    <value>No Data/XML folder, so not a mod - {0}</value>
+    <value>Not laid out like a mod: No game folder or MEG archive under Data, no modinfo.json - {0}</value>
+  </data>
+  <data name="AdoptModProject_GameFolder" xml:space="preserve">
+    <value>The game's own folder, not a mod - {0}</value>
   </data>
   <data name="AdoptModProject_ProjectExists" xml:space="preserve">
     <value>A project file already exists - {0}</value>
+  </data>
+  <data name="NewModProject_ProjectExists" xml:space="preserve">
+    <value>Mod project not created: A project file already exists - {0}</value>
+  </data>
+  <data name="NewModProject_Created" xml:space="preserve">
+    <value>Mod project '{0}' created - {1}</value>
   </data>
   <data name="AllowedValues_HereOnlySupportsTheEngine" xml:space="preserve">
     <value>&lt;{0}&gt; here only supports {1} - the engine overwrites anything else.</value>
@@ -584,6 +593,9 @@
   </data>
   <data name="HardpointModeRowWithoutAbility_NotInSlots" xml:space="preserve">
     <value>'{0}' has {1}; the game reads the row only while an active {2} ability sits in its first or second slot.</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_NotOnUnit" xml:space="preserve">
+    <value>'{0}' has {1}; the game reads the row only while it has an active {2} ability.</value>
   </data>
   <data name="HardpointModeRowWithoutAbility_SlotTooLate" xml:space="preserve">
     <value>'{0}' has {1} in slot {2} of {3}; the game reads the row for the first two slots only.</value>
@@ -1223,7 +1235,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>This script's state is reused for its next instance, and nothing in it defines Flush_G: Every global, tables included, carries over.</value>
   </data>
   <data name="LuaPooledState_RunsAtDefinitionTime" xml:space="preserve">
-    <value>'{0}', which runs at definition time,</value>
+    <value>'{0}', which runs at definition time</value>
   </data>
   <data name="LuaScriptReference_LuaScriptCarriesItsExtension" xml:space="preserve">
     <value>Lua script '{0}' carries its extension. The game appends '.lua' itself and looks for '{1}.lua'.</value>
@@ -2865,6 +2877,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="XmlGameReader_InsertXMLDeclaration" xml:space="preserve">
     <value>Insert the XML declaration</value>
+  </data>
+  <data name="XmlGameReader_MoveXMLDeclaration" xml:space="preserve">
+    <value>Move the XML declaration to the top</value>
   </data>
   <data name="XmlGameReader_InsideCommentGameDropsWhole" xml:space="preserve">
     <value>'--' inside a comment: The game drops the whole file</value>

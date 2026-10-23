@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import * as l10n from "@vscode/l10n";
 import type { StoryGraphNodeDto } from "../../protocol/story";
 import {
     editModeBlockedBy,
@@ -10,6 +11,34 @@ import {
     readOnlyOwnerOf,
     readOnlyThreadIndex,
 } from "./dependencyEdit";
+
+// Both reasons are read in the editor's language: they come from the catalogue, so a bundle that
+// translates them is what they read.
+describe("the read-only reasons", () => {
+    it("come from the catalogue", () => {
+        l10n.config({
+            contents: {
+                "Read-only: '{0}' is a referenced project. Edit this thread in '{0}' itself":
+                    "TRANSLATED {0}",
+                "Every thread here belongs to {0}, which this workspace only references. Open the graph in that project to edit it":
+                    "TRANSLATED ALL {0}",
+            },
+        });
+        try {
+            assert.equal(readOnlyMessage("Core"), "TRANSLATED Core");
+            const blocked = editModeBlockedBy([
+                {
+                    id: "e",
+                    threadUri: "file:///core/a.xml",
+                    readOnlyOwner: "Core",
+                } as StoryGraphNodeDto,
+            ]);
+            assert.equal(blocked, "TRANSLATED ALL 'Core'");
+        } finally {
+            l10n.config({ contents: {} });
+        }
+    });
+});
 
 function node(
     id: string,
