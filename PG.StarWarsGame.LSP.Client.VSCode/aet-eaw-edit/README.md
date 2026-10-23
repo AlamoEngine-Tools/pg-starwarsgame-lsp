@@ -476,7 +476,7 @@ as one graph. Edit and Simulation modes are experimental, each behind its own se
   - Drop event and reward types from the palette
   - Edit names, params, branch, perpetual and dialog in place
   - Staged and applied on save as one `workspace/applyEdit`; minimal edits; inserted tags in the engine's order
-- **Simulation** (Simulation mode, flag `tools.storySimulator`)
+- **Simulation** (Simulation mode, setting `aet-eaw-edit.experimental.storySimulator`)
   - The campaign runs forward in 1 s ticks by the engine's own event rules: push-based arming, campaign-wide trigger
     rewards, resets, disables, timers from arming, flag comparisons with the engine's defaults, speech and movie
     completions owed to the next tick
@@ -510,6 +510,9 @@ as one graph. Edit and Simulation modes are experimental, each behind its own se
     the dock; foot: the transport - restart, one tick back, play, one tick, run until the story reaches a new decision,
     a breakpoint or nothing more can happen - with a pace of pulse, step or a custom rate. The clock is never held back
     by open decisions: a real campaign has hundreds of armed listeners from tick 0
+  - The run's switches, at the end of the transport: Break on gates; Resume after an answer, play picking itself up
+    once the decision it stopped for is answered, kept per user; Speech and movies finish on their own, the session's
+    option, changed from the next tick on and kept through a rewind. All on except Break on gates
   - Canvas: the flow along the edges, fire counts, gate meters on armed timers and flag checks, breakpoint marks; lenses
     for the path taken, the flow tints and the script states
   - Trace panel: every transition with its tick, node, cause and source; filter by text or `t12` for one tick; copy
@@ -568,7 +571,7 @@ persist per campaign faction in `.aetswg/story-layout.json`.
   `aet-eaw-edit.shaders.directory`; never redistributed
 - **Game models** - from the game install: found in the Steam library or the Windows registry, or set in
   `aet-eaw-edit.lsp.source.baseGameDirectory` and, for Forces of Corruption, `expansionDirectory`
-- **Energy pool** - behind `aet-eaw-edit.features.preview.energyPool`, set in `settings.json` and off on purpose: the
+- **Energy pool** - behind `aet-eaw-edit.features.preview.energyPool`, a development setting and off on purpose: the
   engine implements it, the shipped game disables it
 - **Not covered** - sounds and animation SFX maps; AloViewer remains the tool for those
 
@@ -705,6 +708,7 @@ Command Palette (`Ctrl+Shift+P`).
 | EaWEdit: Select Project                                | The project commands act on, with several open                   |
 | EaWEdit: Re-validate Workspace                         | Re-runs diagnostics in every language                            |
 | EaWEdit: Restart LSP Server                            | Restarts the language server                                     |
+| EaWEdit: Copy Bug Report Info                          | Client and server status for a public issue; no paths            |
 | EaWEdit: Force LSP Startup                             | Runs the startup scan again when a session came up without one   |
 | EaWEdit: Show Effective Object (Variant Inheritance)   | Merged XML of a variant object                                   |
 | EaWEdit: Preview Model                                 | Opens a model by file name, without XML                          |

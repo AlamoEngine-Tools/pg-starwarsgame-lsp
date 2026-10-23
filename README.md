@@ -310,7 +310,8 @@ One format per project. `"type": "DAT"` projects edit compiled `.dat` files dire
 
 ## Commands and settings
 
-The extension contributes 29 commands and 12 settings. Both are documented, with defaults, in the extension's own
+The extension contributes 32 commands and 24 settings - 10 on the settings page, 14 for development. All are
+documented, with defaults, in the extension's own
 README:
 
 - [Commands](PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#commands)

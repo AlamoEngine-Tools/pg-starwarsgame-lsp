@@ -608,15 +608,6 @@
             "format": "uri-reference",
             "scope": "machine-overridable",
             "markdownDescription": "%config.shaders.directory.markdownDescription%"
-          },
-          "aet-eaw-edit.features.preview.energyPool": {
-            "order": 4,
-            "type": "boolean",
-            "default": false,
-            "tags": [
-              "advanced"
-            ],
-            "markdownDescription": "%config.features.preview.energyPool.markdownDescription%"
           }
         }
       },
@@ -828,6 +819,15 @@
               "advanced"
             ],
             "markdownDescription": "%config.lsp.debug.waitForDebugger.markdownDescription%"
+          },
+          "aet-eaw-edit.features.preview.energyPool": {
+            "order": 14,
+            "type": "boolean",
+            "default": false,
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.features.preview.energyPool.markdownDescription%"
           }
         }
       }
