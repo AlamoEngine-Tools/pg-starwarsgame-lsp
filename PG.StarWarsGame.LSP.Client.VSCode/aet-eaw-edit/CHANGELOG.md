@@ -130,11 +130,11 @@
     per game, `SpawnList` handed a callback or a flag it never takes
   - The analyzer's other type rules stay off. Counted over vanilla with every script in a state of its own (FoC
     2692 findings, EaW 1062), they describe the stubs or the analyzer's inference, not the scripts
-  - Stubs: `GlobalValue` and `ThreadValue` are called and carry `Get`, `Set` and `Reset`; `Script` and
-    `FreeStore` carry their members (`Script.Debug_Should_Issue_Event_Alert` was an unknown field); `Find_All_Objects_Of_Type`
-    takes a player as any filter; `Reinforce_Unit` takes three arguments; animation names match without regard
-    to case; `collectgarbage` takes its limit; the libraries' optional parameters and returns as their source
-    has them
+  - Stubs: `GlobalValue` and `ThreadValue` are called and carry `Get` and `Set`, `ThreadValue` `Reset` as well;
+    `Script` and `FreeStore` carry their members (`Script.Debug_Should_Issue_Event_Alert` was an unknown field);
+    `Find_All_Objects_Of_Type` takes a player as any filter; `Reinforce_Unit` takes three arguments; animation names
+    match without regard to case; `collectgarbage` takes its limit; the libraries' optional parameters and returns
+    as their source has them
 - **Engine types in a script's own definition of an engine function** - its parameters and return value typed
   from the engine's documentation, in the definition and at its calls
   ([#251](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/251))
