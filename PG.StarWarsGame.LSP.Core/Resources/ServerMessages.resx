@@ -594,6 +594,9 @@
   <data name="HardpointModeRowWithoutAbility_NotInSlots" xml:space="preserve">
     <value>'{0}' has {1}; the game reads the row only while an active {2} ability sits in its first or second slot.</value>
   </data>
+  <data name="HardpointModeRowWithoutAbility_NotOnUnit" xml:space="preserve">
+    <value>'{0}' has {1}; the game reads the row only while it has an active {2} ability.</value>
+  </data>
   <data name="HardpointModeRowWithoutAbility_SlotTooLate" xml:space="preserve">
     <value>'{0}' has {1} in slot {2} of {3}; the game reads the row for the first two slots only.</value>
   </data>
