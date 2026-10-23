@@ -6,6 +6,7 @@ import * as assert from "node:assert/strict";
 import * as path from "path";
 import {
     ANALYZER_VARIABLE,
+    analyzerProblem,
     bundledServerPath,
     chooseServerCommand,
     serverEnvironment,
@@ -156,4 +157,24 @@ test("a configured analyzer reaches the server as its variable", () => {
 test("no analyzer configured: the environment as it is, so the bundled one is found", () => {
     const base = { PATH: "p", [ANALYZER_VARIABLE]: "from-shell" };
     assert.deepEqual(serverEnvironment(base, ""), base);
+});
+
+// A configured analyzer that is not there was skipped without a word, and the bundled one ran
+// instead: the setting looked honoured and was not.
+test("a configured analyzer that does not exist is the problem, named by its path", () => {
+    assert.equal(
+        analyzerProblem("d:/tools/emmylua_ls.exe", () => false),
+        "d:/tools/emmylua_ls.exe",
+    );
+});
+
+test("an analyzer that exists, or none configured, is no problem", () => {
+    assert.equal(
+        analyzerProblem("d:/tools/emmylua_ls.exe", () => true),
+        undefined,
+    );
+    assert.equal(
+        analyzerProblem("", () => false),
+        undefined,
+    );
 });

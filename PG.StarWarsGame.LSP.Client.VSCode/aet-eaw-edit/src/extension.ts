@@ -105,7 +105,7 @@ import {
     resolveServerCommand,
     resolveServerEnvironment,
 } from "./serverCommand";
-import { serverProblem } from "./serverLaunch";
+import { analyzerProblem, serverProblem } from "./serverLaunch";
 import {
     AdoptModProjectParams,
     AdoptModProjectResult,
@@ -713,6 +713,20 @@ function validateConfiguration(extensionPath: string): boolean {
     );
     if (serverMissing) {
         void vscode.window.showErrorMessage(serverMissing);
+        valid = false;
+    }
+
+    const analyzerMissing = analyzerProblem(
+        cfg("lua").get<string>("analyzerPath") ?? "",
+        fs.existsSync,
+    );
+    if (analyzerMissing) {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t(
+                'EaWEdit: Lua analyzer not found - {0}. Fix "aet-eaw-edit.lua.analyzerPath", or clear it to use the bundled one',
+                analyzerMissing,
+            ),
+        );
         valid = false;
     }
 

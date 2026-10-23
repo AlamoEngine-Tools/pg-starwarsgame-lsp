@@ -89,6 +89,7 @@
   "go-to-definition is not available here.": "go-to-definition is not available here.",
   "EaWEdit project": "EaWEdit project",
   "Select a project": "Select a project",
+  "EaWEdit: Lua analyzer not found - {0}. Fix \"aet-eaw-edit.lua.analyzerPath\", or clear it to use the bundled one": "EaWEdit: Lua analyzer not found - {0}. Fix \"aet-eaw-edit.lua.analyzerPath\", or clear it to use the bundled one",
   "EaWEdit: Baseline type is \"local\" but no path is configured. Set \"aet-eaw-edit.lsp.source.baseline.localPath\".": "EaWEdit: Baseline type is \"local\" but no path is configured. Set \"aet-eaw-edit.lsp.source.baseline.localPath\".",
   "EaWEdit: Schema source is \"local\" but no directory is configured. Set \"aet-eaw-edit.lsp.schema.localPath\".": "EaWEdit: Schema source is \"local\" but no directory is configured. Set \"aet-eaw-edit.lsp.schema.localPath\".",
   "EaWEdit: Server version {0} does not match the expected version {1}. Clear \"aet-eaw-edit.lsp.executable\" to use the bundled server": "EaWEdit: Server version {0} does not match the expected version {1}. Clear \"aet-eaw-edit.lsp.executable\" to use the bundled server",

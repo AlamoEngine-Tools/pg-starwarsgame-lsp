@@ -123,3 +123,14 @@ export function serverEnvironment(
 ): NodeJS.ProcessEnv {
     return analyzerPath ? { ...base, [ANALYZER_VARIABLE]: analyzerPath } : base;
 }
+
+/**
+ * The configured Lua analyzer's path when it names nothing that exists, else undefined. The server
+ * skips a missing analyzer and runs the bundled one, so a wrong setting has to be caught here.
+ */
+export function analyzerProblem(
+    analyzerPath: string,
+    exists: (file: string) => boolean,
+): string | undefined {
+    return analyzerPath && !exists(analyzerPath) ? analyzerPath : undefined;
+}
