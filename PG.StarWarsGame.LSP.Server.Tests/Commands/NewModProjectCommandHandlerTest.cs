@@ -101,6 +101,24 @@ public sealed class NewModProjectCommandHandlerTest
         Assert.Empty(fs.AllFiles);
     }
 
+    /// <summary>
+    ///     Run inside an existing mod, the command adds a project file and leaves the mod's own
+    ///     modinfo.json - its dependencies included - as it was.
+    /// </summary>
+    [Fact]
+    public async Task ExistingModinfo_IsLeftAsItWas()
+    {
+        const string modinfo = """{ "name": "Old Name", "version": "2.3", "dependencies": [ "123456" ] }""";
+        var fs = new MockFileSystem();
+        fs.AddFile("/mods/mymod/modinfo.json", new MockFileData(modinfo));
+        var handler = Build(fs);
+
+        await handler.Handle(Params("My Mod", "/mods/mymod"), CancellationToken.None);
+
+        Assert.True(fs.File.Exists("/mods/mymod/My_Mod.pgproj"));
+        Assert.Equal(modinfo, fs.File.ReadAllText("/mods/mymod/modinfo.json"));
+    }
+
     [Fact]
     public async Task MissingPath_NoFilesCreated()
     {

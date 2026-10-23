@@ -65,7 +65,11 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
 
         CreateDirectories(path);
         WritePgproj(pgprojPath, name);
-        WriteModinfo(fs.Path.Combine(path, "modinfo.json"), name);
+        // An existing mod's modinfo.json - its dependencies included - is the mod's, not ours to
+        // replace; only a folder without one gets a new one.
+        var modinfoPath = fs.Path.Combine(path, "modinfo.json");
+        if (!fs.File.Exists(modinfoPath))
+            WriteModinfo(modinfoPath, name);
 
         _logger.LogInformation("aet-eaw-edit.lsp.newModProject: created mod project '{Name}' at '{Path}'.", name, path);
         return Unit.Task;

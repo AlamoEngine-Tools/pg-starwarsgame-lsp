@@ -277,6 +277,8 @@
 
 ### Fixes
 
+- **New Mod Project in an existing mod** - leaves the mod's `modinfo.json`, dependencies included, as it was; only a
+  folder without one gets a new one ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
