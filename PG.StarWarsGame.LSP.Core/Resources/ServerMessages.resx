@@ -27,6 +27,12 @@
   <data name="AbsorbBlasterApplicableUnitsRule_Consequence" xml:space="preserve">
     <value>cannot absorb fire from any source</value>
   </data>
+  <data name="AdoptModProject_NotAMod" xml:space="preserve">
+    <value>No Data/XML folder, so not a mod - {0}</value>
+  </data>
+  <data name="AdoptModProject_ProjectExists" xml:space="preserve">
+    <value>A project file already exists - {0}</value>
+  </data>
   <data name="AllowedValues_HereOnlySupportsTheEngine" xml:space="preserve">
     <value>&lt;{0}&gt; here only supports {1} - the engine overwrites anything else.</value>
   </data>

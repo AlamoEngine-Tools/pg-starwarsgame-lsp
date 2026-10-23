@@ -144,7 +144,8 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
             modinfoPath, JsonSerializer.Serialize(content, JsonOptions));
     }
 
-    private static string SanitizeModName(string name)
+    /// <summary>A mod name as a file name: whitespace to underscores, anything else unsafe dropped.</summary>
+    internal static string SanitizeModName(string name)
     {
         var builder = new StringBuilder(name.Length);
         foreach (var ch in name.Trim())

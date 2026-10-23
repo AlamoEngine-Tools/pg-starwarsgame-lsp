@@ -69,7 +69,7 @@ import { LspGateway } from "./lsp/lspGateway";
 import { RoutedLspGateway } from "./lsp/routedLspGateway";
 import { stopClient } from "./lsp/stopClient";
 import { discoverProjects } from "./projectDiscovery";
-import { isModFolder } from "./modLayout";
+import { isModFolder, offersProject } from "./modLayout";
 import {
     type ClientSpec,
     type ClientState,
@@ -103,6 +103,8 @@ import {
 } from "./serverCommand";
 import { serverProblem } from "./serverLaunch";
 import {
+    AdoptModProjectParams,
+    AdoptModProjectResult,
     ConvertLocalisationFormatResult,
     ExportLocalisationToDatResult,
     GET_ENCYCLOPEDIA_ENTRY,
@@ -1306,6 +1308,84 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
     localisationNavigatorProvider?.projectsChanged();
     modBrowserProvider?.projectsChanged();
     updateStatus();
+    if (discovery.projects.length === 0 && folders.length > 0) {
+        void offerProjectFile(context, folders[0]);
+    }
+}
+
+/** Folders whose project file offer was declined for good, kept across sessions. */
+const PROJECT_OFFER_DECLINED = "aet-eaw-edit.projectOfferDeclined";
+/** Folders offered a project file this session, so a rediscovery does not ask again. */
+const projectOffered = new Set<string>();
+
+/**
+ * Offers a project file for a mod opened without one (#295), once: the server writes it from what
+ * the folder holds and it opens, so what was guessed is in front of the reader. Its creation
+ * restarts the servers like any new `.pgproj`.
+ */
+async function offerProjectFile(
+    context: vscode.ExtensionContext,
+    folder: string,
+): Promise<void> {
+    const key = folder.toLowerCase();
+    const declined = context.globalState.get<string[]>(
+        PROJECT_OFFER_DECLINED,
+        [],
+    );
+    if (
+        projectOffered.has(key) ||
+        declined.includes(key) ||
+        !offersProject(folder, subdirectories, files)
+    ) {
+        return;
+    }
+    projectOffered.add(key);
+
+    const create = vscode.l10n.t("Create project file");
+    const notNow = vscode.l10n.t("Not now");
+    const never = vscode.l10n.t("Not for this folder");
+    const choice = await vscode.window.showInformationMessage(
+        vscode.l10n.t("EaWEdit: Mod without a project file - {0}", folder),
+        create,
+        notNow,
+        never,
+    );
+    if (choice === never) {
+        await context.globalState.update(PROJECT_OFFER_DECLINED, [
+            ...declined,
+            key,
+        ]);
+        return;
+    }
+    if (choice !== create) {
+        return;
+    }
+
+    const outcome = await lsp.request<AdoptModProjectResult>(
+        "aet/adoptModProject",
+        { directory: folder } satisfies AdoptModProjectParams,
+    );
+    if (!outcome.ok) {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t(
+                "EaWEdit: Project file not created - {0}",
+                outcome.message,
+            ),
+        );
+        return;
+    }
+    if (outcome.value.projectFile === null) {
+        void vscode.window.showWarningMessage(
+            vscode.l10n.t(
+                "EaWEdit: Project file not created - {0}",
+                outcome.value.error ?? "",
+            ),
+        );
+        return;
+    }
+    await vscode.window.showTextDocument(
+        vscode.Uri.file(outcome.value.projectFile),
+    );
 }
 
 /** A directory as the disk spells it, so a document selector matches VS Code's spelling. */
@@ -1323,6 +1403,18 @@ function subdirectories(directory: string): string[] | undefined {
         return fs
             .readdirSync(directory, { withFileTypes: true })
             .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name);
+    } catch {
+        return undefined;
+    }
+}
+
+/** The files of a directory, or undefined when it cannot be read. */
+function files(directory: string): string[] | undefined {
+    try {
+        return fs
+            .readdirSync(directory, { withFileTypes: true })
+            .filter((entry) => entry.isFile())
             .map((entry) => entry.name);
     } catch {
         return undefined;

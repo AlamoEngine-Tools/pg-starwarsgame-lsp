@@ -38,7 +38,11 @@ one. Any other folder gets no server.
 
 ### 3. Create a mod project file
 
-`.pgproj` at the root of the mod workspace:
+A mod opened without one is offered a project file, once: **Create project file** writes it from what the folder
+holds - the directories that exist, the text format found in `Data/Text`, the name from `modinfo.json` - and opens it.
+Nothing is created and `modinfo.json` is not changed. **Not for this folder** stops the offer for good.
+
+By hand, the `.pgproj` goes at the root of the mod workspace:
 
 ```json
 {

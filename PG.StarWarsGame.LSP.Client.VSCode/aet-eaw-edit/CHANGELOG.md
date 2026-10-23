@@ -89,6 +89,8 @@
     any other folder gets none
   - The game installs are found in the Steam library or the Windows registry; `aet-eaw-edit.lsp.source.baseGameDirectory`
     and `aet-eaw-edit.lsp.source.expansionDirectory` override them
+  - A mod opened without a `.pgproj` is offered one, once, written from what the folder holds: the directories that
+    exist, the text format, the name from `modinfo.json`; nothing created, `modinfo.json` unchanged
   - Development and troubleshooting settings are read but no longer on the settings page; the extension README
     lists them
 - **Server and Lua analyzer in the extension** - nothing to download or configure; the language server and

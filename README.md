@@ -37,7 +37,7 @@ code --install-extension aet-eaw-edit-x.x.x.vsix
 ### 2. Open the mod
 
 The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod (`Data/XML`) without one.
-Any other folder gets no server.
+Any other folder gets no server. A mod without a `.pgproj` is offered one, written from what its folder holds.
 
 ---
 

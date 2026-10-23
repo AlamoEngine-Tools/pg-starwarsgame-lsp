@@ -159,6 +159,7 @@ public static class ServerConfigurator
             .WithHandler<RevalidateDocumentCommandHandler>()
             .WithHandler<ReloadProjectCommandHandler>()
             .WithHandler<NewModProjectCommandHandler>()
+            .WithHandler<AdoptModProjectHandler>()
             .WithHandler<InitLocalisationProjectCommandHandler>()
             .WithHandler<ImportLocalisationProjectCommandHandler>()
             .WithHandler<CreateLocalisationKeyCommandHandler>()
