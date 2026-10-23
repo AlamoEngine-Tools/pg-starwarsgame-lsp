@@ -81,7 +81,8 @@ public sealed class ParticleFileDiagnosticsPublisherTest
 
     // ── fixture ───────────────────────────────────────────────────────────────
 
-    private static ParticleFileDiagnosticsPublisher Publisher(List<PublishDiagnosticsParams> published, FakeAssets assets)
+    private static ParticleFileDiagnosticsPublisher Publisher(List<PublishDiagnosticsParams> published,
+        FakeAssets assets)
     {
         var index = GameIndex.Empty with { AssetFiles = assets };
         return new ParticleFileDiagnosticsPublisher(published.Add, new FakeGameIndexService(index),

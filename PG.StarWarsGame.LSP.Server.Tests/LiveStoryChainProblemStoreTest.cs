@@ -94,12 +94,11 @@ public sealed class LiveStoryChainProblemStoreTest
         // IStoryModelService -> IModProjectReloadService -> IWorkspaceIndexer -> this store, so
         // resolving it in the constructor would close a DI cycle.
         var resolved = false;
-        _ = new LiveStoryChainProblemStore(
-            () =>
-            {
-                resolved = true;
-                return new FakeStoryModelService(StoryChainScanResult.Empty);
-            });
+        _ = new LiveStoryChainProblemStore(() =>
+        {
+            resolved = true;
+            return new FakeStoryModelService(StoryChainScanResult.Empty);
+        });
 
         Assert.False(resolved);
     }
