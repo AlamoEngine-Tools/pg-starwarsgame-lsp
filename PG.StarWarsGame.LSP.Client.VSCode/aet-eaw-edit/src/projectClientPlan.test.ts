@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import * as l10n from "@vscode/l10n";
 
 import { discoverProjects } from "./projectDiscovery";
 import {
@@ -363,6 +364,31 @@ describe("ownerKey", () => {
 });
 
 describe("statusText", () => {
+    // The status bar reads in the editor's language: its texts come from the catalogue.
+    it("reads its texts from the catalogue", () => {
+        l10n.config({
+            contents: {
+                "EaWEdit LSP: Stopped": "TRANSLATED STOPPED",
+                "EaWEdit LSP: {0} projects indexed": "TRANSLATED {0}",
+            },
+        });
+        try {
+            assert.equal(
+                statusText([{ name: "A", state: "stopped" }]),
+                "$(circle-slash) TRANSLATED STOPPED",
+            );
+            assert.equal(
+                statusText([
+                    { name: "A", state: "ready" },
+                    { name: "B", state: "ready" },
+                ]),
+                "$(check) TRANSLATED 2",
+            );
+        } finally {
+            l10n.config({ contents: {} });
+        }
+    });
+
     it("reads exactly as before for one server", () => {
         assert.equal(
             statusText([{ name: "M", state: "starting" }]),

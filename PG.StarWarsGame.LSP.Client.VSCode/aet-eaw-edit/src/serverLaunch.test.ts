@@ -3,6 +3,7 @@
 
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
+import * as l10n from "@vscode/l10n";
 import * as path from "path";
 import {
     ANALYZER_VARIABLE,
@@ -166,6 +167,28 @@ test("a configured analyzer that does not exist is the problem, named by its pat
         analyzerProblem("d:/tools/emmylua_ls.exe", () => false),
         "d:/tools/emmylua_ls.exe",
     );
+});
+
+// What is shown when the server cannot start reads in the editor's language.
+test("the reason the server cannot start comes from the catalogue", () => {
+    l10n.config({
+        contents: { "EaWEdit: LSP server not found - {0}": "TRANSLATED {0}" },
+    });
+    try {
+        const command = chooseServerCommand({
+            extensionPath,
+            devMode: false,
+            projectPath: "",
+            executable: "d:/s/Server.dll",
+            extraArgs: [],
+        });
+        assert.equal(
+            serverProblem(command, () => false),
+            "TRANSLATED d:/s/Server.dll",
+        );
+    } finally {
+        l10n.config({ contents: {} });
+    }
 });
 
 test("an analyzer that exists, or none configured, is no problem", () => {

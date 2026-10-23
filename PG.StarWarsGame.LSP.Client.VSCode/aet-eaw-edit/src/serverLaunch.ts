@@ -105,11 +105,17 @@ export function serverProblem(
     }
     if (choice.devMode) {
         // The default project path is right only when the extension runs from its source folder.
-        return `EaWEdit: Dev mode project not found - ${choice.requires}. Set "aet-eaw-edit.lsp.devMode.projectPath", or turn dev mode off`;
+        return l10n.t(
+            'EaWEdit: Dev mode project not found - {0}. Set "aet-eaw-edit.lsp.devMode.projectPath", or turn dev mode off',
+            choice.requires,
+        );
     }
     return choice.bundled
-        ? `EaWEdit: The bundled server is missing - ${choice.requires}. Reinstall the extension, or set "aet-eaw-edit.lsp.executable"`
-        : `EaWEdit: LSP server not found - ${choice.requires}`;
+        ? l10n.t(
+              'EaWEdit: The bundled server is missing - {0}. Reinstall the extension, or set "aet-eaw-edit.lsp.executable"',
+              choice.requires,
+          )
+        : l10n.t("EaWEdit: LSP server not found - {0}", choice.requires);
 }
 
 /**

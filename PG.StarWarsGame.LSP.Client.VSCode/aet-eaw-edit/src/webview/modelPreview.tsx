@@ -6349,7 +6349,9 @@ function ModelPreview(): React.JSX.Element {
                         "Return this turret to the pose the model authored",
                     )}
                     disabled={!moved}
-                    disabledReason="This turret is already at its authored pose"
+                    disabledReason={l10n.t(
+                        "This turret is already at its authored pose",
+                    )}
                     onClick={(event) => {
                         event.stopPropagation();
                         viewportRef.current?.resetTurretAim(row.id);
@@ -8855,7 +8857,9 @@ function ModelPreview(): React.JSX.Element {
                                                         cameraPresets.length ===
                                                         0
                                                     }
-                                                    disabledReason="No camera preset to bind"
+                                                    disabledReason={l10n.t(
+                                                        "No camera preset to bind",
+                                                    )}
                                                     onClick={() => {
                                                         const preset =
                                                             cameraPresets[
@@ -9030,7 +9034,9 @@ function ModelPreview(): React.JSX.Element {
                                                         captureSizeId !==
                                                         "custom"
                                                     }
-                                                    disabledReason="Custom size only"
+                                                    disabledReason={l10n.t(
+                                                        "Custom size only",
+                                                    )}
                                                     onChange={(width) =>
                                                         setCustomCapture(
                                                             (c) => ({
@@ -9048,7 +9054,9 @@ function ModelPreview(): React.JSX.Element {
                                                         captureSizeId !==
                                                         "custom"
                                                     }
-                                                    disabledReason="Custom size only"
+                                                    disabledReason={l10n.t(
+                                                        "Custom size only",
+                                                    )}
                                                     onChange={(height) =>
                                                         setCustomCapture(
                                                             (c) => ({
@@ -9092,7 +9100,10 @@ function ModelPreview(): React.JSX.Element {
 
                                             <Button
                                                 disabled={captureDims === null}
-                                                disabledReason={`Width and height must be whole numbers from 1 to ${MAX_SIDE}`}
+                                                disabledReason={l10n.t(
+                                                    "Width and height must be whole numbers from 1 to {0}",
+                                                    MAX_SIDE,
+                                                )}
                                                 onClick={() => {
                                                     const viewport =
                                                         viewportRef.current;
@@ -9485,7 +9496,9 @@ function ModelPreview(): React.JSX.Element {
                                                     fireTarget === "hull" &&
                                                     !shipTargetable
                                                 }
-                                                disabledReason="Fire - pick a hardpoint to fire at"
+                                                disabledReason={l10n.t(
+                                                    "Fire - pick a hardpoint to fire at",
+                                                )}
                                                 onClick={fire}
                                             />
                                             <IconButton
@@ -9547,7 +9560,9 @@ function ModelPreview(): React.JSX.Element {
                                                 // Names the control even when it is disabled: a tooltip that
                                                 // gives only the reason leaves a reader who has never opened it
                                                 // no idea what it is.
-                                                disabledReason="Damage log - nothing fired yet"
+                                                disabledReason={l10n.t(
+                                                    "Damage log - nothing fired yet",
+                                                )}
                                                 onClick={() =>
                                                     setLogOpen((open) => !open)
                                                 }
@@ -9671,7 +9686,9 @@ function ModelPreview(): React.JSX.Element {
                                                                 ability,
                                                             ).length === 0
                                                         }
-                                                        disabledReason="This ability declares nothing else"
+                                                        disabledReason={l10n.t(
+                                                            "This ability declares nothing else",
+                                                        )}
                                                         onClick={() =>
                                                             setInfoAbility(
                                                                 (open) =>
@@ -10331,7 +10348,9 @@ function ModelPreview(): React.JSX.Element {
                                                             presetName.trim() ===
                                                             ""
                                                         }
-                                                        disabledReason="Give the weapon a name to save it"
+                                                        disabledReason={l10n.t(
+                                                            "Give the weapon a name to save it",
+                                                        )}
                                                         onClick={() => {
                                                             const name =
                                                                 presetName.trim();
@@ -10368,7 +10387,9 @@ function ModelPreview(): React.JSX.Element {
                                                             attackerPresets.length ===
                                                             0
                                                         }
-                                                        disabledReason="No saved weapons to remove"
+                                                        disabledReason={l10n.t(
+                                                            "No saved weapons to remove",
+                                                        )}
                                                         onClick={() =>
                                                             setAttackerPresets(
                                                                 [],
@@ -10606,7 +10627,9 @@ function ModelPreview(): React.JSX.Element {
                                     count={notices.length}
                                     expanded={problemsOpen}
                                     disabled={notices.length === 0}
-                                    disabledReason="Nothing to report about this model"
+                                    disabledReason={l10n.t(
+                                        "Nothing to report about this model",
+                                    )}
                                     title={
                                         `${problemsOpen ? "Hide" : "Read"} ` +
                                         `${notices.length} ${problemWord}`
@@ -10685,7 +10708,9 @@ function ModelPreview(): React.JSX.Element {
                                                     "Put the model back the way it opened",
                                                 )}
                                                 disabled={!touched}
-                                                disabledReason="The model is as it opened"
+                                                disabledReason={l10n.t(
+                                                    "The model is as it opened",
+                                                )}
                                                 onClick={resetModel}
                                             />
                                         </>
@@ -11403,7 +11428,9 @@ ${becauseText(node.because)}`
                                                                     row.id,
                                                             )
                                                         }
-                                                        disabledReason="No traverse declared"
+                                                        disabledReason={l10n.t(
+                                                            "No traverse declared",
+                                                        )}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             setSweeping(
@@ -11464,7 +11491,9 @@ ${becauseText(node.because)}`
                                                         (c) => c.isDestroyable,
                                                     )
                                                 }
-                                                disabledReason="No hardpoint on this model can be destroyed"
+                                                disabledReason={l10n.t(
+                                                    "No hardpoint on this model can be destroyed",
+                                                )}
                                                 onClick={() => destroyAll(true)}
                                             />
                                             <IconButton
@@ -11475,7 +11504,9 @@ ${becauseText(node.because)}`
                                                     "Repair all hardpoints",
                                                 )}
                                                 disabled={destroyed.size === 0}
-                                                disabledReason="Nothing is destroyed"
+                                                disabledReason={l10n.t(
+                                                    "Nothing is destroyed",
+                                                )}
                                                 onClick={() =>
                                                     destroyAll(false)
                                                 }
@@ -11849,7 +11880,9 @@ ${becauseText(node.because)}`
                                                                     disabled={
                                                                         !card.isDestroyable
                                                                     }
-                                                                    disabledReason="Is_Destroyable is off"
+                                                                    disabledReason={l10n.t(
+                                                                        "Is_Destroyable is off",
+                                                                    )}
                                                                     onClick={(
                                                                         event,
                                                                     ) => {
@@ -11889,7 +11922,9 @@ ${becauseText(node.because)}`
                                                                     disabled={
                                                                         !card.sweepable
                                                                     }
-                                                                    disabledReason="No traverse declared"
+                                                                    disabledReason={l10n.t(
+                                                                        "No traverse declared",
+                                                                    )}
                                                                     onClick={(
                                                                         event,
                                                                     ) => {
@@ -12220,14 +12255,18 @@ ${becauseText(node.because)}`
                                                 disabled={
                                                     orderedClips.length < 2
                                                 }
-                                                disabledReason="Only one clip"
+                                                disabledReason={l10n.t(
+                                                    "Only one clip",
+                                                )}
                                                 onClick={() => step(-1)}
                                             />
                                             <IconButton
                                                 icon="firstFrame"
                                                 title={l10n.t("First frame")}
                                                 disabled={animation === null}
-                                                disabledReason="Pick a clip below to play it"
+                                                disabledReason={l10n.t(
+                                                    "Pick a clip below to play it",
+                                                )}
                                                 onClick={() => seek(0)}
                                             />
                                             <IconButton
@@ -12245,14 +12284,18 @@ ${becauseText(node.because)}`
                                                           : l10n.t("Play")
                                                 }
                                                 disabled={animation === null}
-                                                disabledReason="Pick a clip below to play it"
+                                                disabledReason={l10n.t(
+                                                    "Pick a clip below to play it",
+                                                )}
                                                 onClick={togglePlay}
                                             />
                                             <IconButton
                                                 icon="lastFrame"
                                                 title={l10n.t("Last frame")}
                                                 disabled={animation === null}
-                                                disabledReason="Pick a clip below to play it"
+                                                disabledReason={l10n.t(
+                                                    "Pick a clip below to play it",
+                                                )}
                                                 onClick={() =>
                                                     seek(playhead.duration)
                                                 }
@@ -12263,7 +12306,9 @@ ${becauseText(node.because)}`
                                                 disabled={
                                                     orderedClips.length < 2
                                                 }
-                                                disabledReason="Only one clip"
+                                                disabledReason={l10n.t(
+                                                    "Only one clip",
+                                                )}
                                                 onClick={() => step(1)}
                                             />
                                             <IconButton
@@ -12284,7 +12329,9 @@ ${becauseText(node.because)}`
                                                           )
                                                 }
                                                 disabled={animation === null}
-                                                disabledReason="Pick a clip below to play it"
+                                                disabledReason={l10n.t(
+                                                    "Pick a clip below to play it",
+                                                )}
                                                 onClick={() =>
                                                     setAnimationLoop(
                                                         (current) => !current,
