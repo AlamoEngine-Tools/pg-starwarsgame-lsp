@@ -36,7 +36,7 @@ public sealed class SymbolRelations(
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
-    private const string Definitions = "definitions";
+    private const string Overrides = "overrides";
     private const string UsedBy = "usedBy";
     private static readonly char[] s_separators = [',', ' ', '\t', '\n', '\r'];
     private static readonly string[] s_textureInterchange = [".tga", ".dds"];
@@ -101,7 +101,7 @@ public sealed class SymbolRelations(
         var relations = keys
             .Select(k => Counted(k, named.GetValueOrDefault(k)?.Count ?? 0, known ? "none" : "notInModFiles"))
             .Append(Counted(ReferencedBy, ReferencingObjects(entry.Id).Count(), "none"))
-            .Append(Counted(Definitions, DefinitionRows(entry.Id).Count, "none"))
+            .Append(Counted(Overrides, OverrideRows(entry.Id).Count, "definedOnce"))
             .ToList();
         var defined = WorkspaceDefinition(entry.Id);
         var winner = defined ?? index.Baseline.Symbols.GetValueOrDefault(entry.Id);
@@ -193,8 +193,8 @@ public sealed class SymbolRelations(
         {
             case ReferencedBy:
                 return ReferencingObjects(entry.Id).Select(o => catalog.FindObject(o) ?? Missing(o, null)).ToList();
-            case Definitions:
-                return DefinitionRows(entry.Id);
+            case Overrides:
+                return OverrideRows(entry.Id);
         }
 
         var (named, _) = TagRelations(entry);
@@ -461,7 +461,10 @@ public sealed class SymbolRelations(
     }
 
     // Every layer's definition of the object, the one the game uses first, then the game's own.
-    private List<SymbolRow> DefinitionRows(string id)
+    // The definitions the one the game uses replaces, highest layer first: every layer's below the
+    // winner, then the game's. One in a file the editor can open carries its location for a go-to;
+    // one inside packed data - a MEG's, the game's - is marked so.
+    private List<SymbolRow> OverrideRows(string id)
     {
         var rows = new List<SymbolRow>();
         if (index.WorkspaceDefinitions.TryGetValue(id, out var definitions))
@@ -473,11 +476,15 @@ public sealed class SymbolRelations(
                 var layer = index.Documents.GetValueOrDefault(origin.Uri)?.LayerName;
                 rows.Add(new SymbolRow(origin.Uri + "#" + origin.Line,
                     $"{origin.Uri[(origin.Uri.LastIndexOf('/') + 1)..]}:{origin.Line + 1}", definition.TypeName, [],
-                    "layer:" + index.LayerRankOf(definition), layer, []));
+                    "layer:" + index.LayerRankOf(definition), layer, [])
+                {
+                    Location = origin.IsNavigable ? new SymbolLocation(origin.Uri, origin.Line) : null,
+                    Packed = !origin.IsNavigable
+                });
             }
 
         if (index.Baseline.Symbols.TryGetValue(id, out var shipped) && shipped.Kind == GameSymbolKind.XmlObject)
-            rows.Add(new SymbolRow(id, id, shipped.TypeName, [], "game", null, []));
-        return rows;
+            rows.Add(new SymbolRow(id, id, shipped.TypeName, [], "game", null, []) { Packed = true });
+        return rows.Skip(1).ToList();
     }
 }

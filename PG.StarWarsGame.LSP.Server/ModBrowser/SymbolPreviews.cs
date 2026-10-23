@@ -107,7 +107,7 @@ public sealed class SymbolPreviews(
         layout.Put(Header(entry, node), 0, 0, 2, 2);
         layout.Put(XmlProblems(node.Location), 2, 0, 2, 2);
         var named = node.Relations
-            .Where(r => r.Relation is not (ReferencedBy or "definitions") && r.Count > 0)
+            .Where(r => r.Relation is not (ReferencedBy or "overrides") && r.Count > 0)
             .Select(r => r.Relation)
             .Take(4)
             .ToList();

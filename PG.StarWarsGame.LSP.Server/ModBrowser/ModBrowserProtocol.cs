@@ -60,7 +60,7 @@ public sealed record GetSymbolPageParams(string Page) : IRequest<GetSymbolPageRe
 
 /// <param name="Page">The page the entry is listed on.</param>
 /// <param name="Id">The entry's id.</param>
-/// <param name="Relation">The relation to list: <c>models</c>, <c>referencedBy</c>, <c>definitions</c> and the rest.</param>
+/// <param name="Relation">The relation to list: <c>models</c>, <c>referencedBy</c>, <c>overrides</c> and the rest.</param>
 public sealed record SymbolParent(string Page, string Id, string Relation);
 
 /// <summary>One entry, opened: its row and what it relates to, each relation counted.</summary>
@@ -258,4 +258,10 @@ public sealed record SymbolRow(
 {
     /// <summary>An enum value's value - what the engine uses for it - beside its name, the key XML writes.</summary>
     public string? Value { get; init; }
+
+    /// <summary>Where an overridden definition is, for a go-to; null for one no editor can open.</summary>
+    public SymbolLocation? Location { get; init; }
+
+    /// <summary>Whether the row is a definition inside packed data - the game's own or a MEG's - with no file to open.</summary>
+    public bool Packed { get; init; }
 }
