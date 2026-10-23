@@ -28,7 +28,10 @@
     <value>cannot absorb fire from any source</value>
   </data>
   <data name="AdoptModProject_NotAMod" xml:space="preserve">
-    <value>No Data/XML folder, so not a mod - {0}</value>
+    <value>Not laid out like a mod: No game folder or MEG archive under Data, no modinfo.json - {0}</value>
+  </data>
+  <data name="AdoptModProject_GameFolder" xml:space="preserve">
+    <value>The game's own folder, not a mod - {0}</value>
   </data>
   <data name="AdoptModProject_ProjectExists" xml:space="preserve">
     <value>A project file already exists - {0}</value>
