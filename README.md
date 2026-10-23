@@ -327,7 +327,7 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 | What | Where | When | How to disable |
 |---|---|---|---|
 | XML schema | GitHub - newest compatible schema release | On server start; nothing when the release is already cached; default branch when no release exists | `aet-eaw-edit.lsp.schema.source` = `local` |
-| Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\` | `aet-eaw-edit.lsp.source.baseline.type` = `local` or `none` |
+| Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\` | `aet-eaw-edit.lsp.source.baseline.type` = `local` |
 | Shader sources | Petroglyph's published download | Only on **Set Up Base Shader Sources** | Do not run the command |
 
 ---

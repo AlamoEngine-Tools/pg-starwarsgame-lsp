@@ -622,6 +622,15 @@
             "default": 1080,
             "minimum": 240,
             "markdownDescription": "%config.encyclopedia.screenHeight.markdownDescription%"
+          },
+          "aet-eaw-edit.features.preview.energyPool": {
+            "order": 6,
+            "type": "boolean",
+            "default": false,
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.features.preview.energyPool.markdownDescription%"
           }
         }
       },
@@ -656,6 +665,183 @@
             "type": "boolean",
             "default": false,
             "markdownDescription": "%config.experimental.storySimulator.markdownDescription%"
+          }
+        }
+      },
+      {
+        "id": "aet-eaw-edit.development",
+        "title": "%config.section.development.title%",
+        "order": 6,
+        "type": "object",
+        "properties": {
+          "aet-eaw-edit.lsp.executable": {
+            "order": 1,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "scope": "machine-overridable",
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.executable.markdownDescription%"
+          },
+          "aet-eaw-edit.lua.analyzerPath": {
+            "order": 2,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "scope": "machine-overridable",
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lua.analyzerPath.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.devMode.enabled": {
+            "order": 3,
+            "type": "boolean",
+            "default": false,
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.devMode.enabled.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.devMode.projectPath": {
+            "order": 4,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "scope": "machine-overridable",
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.devMode.projectPath.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.schema.source": {
+            "order": 5,
+            "type": "string",
+            "default": "http",
+            "enum": [
+              "http",
+              "local"
+            ],
+            "enumItemLabels": [
+              "%config.lsp.schema.source.enumItemLabels.0%",
+              "%config.lsp.schema.source.enumItemLabels.1%"
+            ],
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.schema.source.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.schema.url": {
+            "order": 6,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.schema.url.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.schema.localPath": {
+            "order": 7,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "scope": "machine-overridable",
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.schema.localPath.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.source.baseline.type": {
+            "order": 8,
+            "type": "string",
+            "default": "http",
+            "enum": [
+              "http",
+              "local"
+            ],
+            "enumItemLabels": [
+              "%config.lsp.source.baseline.type.enumItemLabels.0%",
+              "%config.lsp.source.baseline.type.enumItemLabels.1%"
+            ],
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.source.baseline.type.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.source.baseline.url": {
+            "order": 9,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.source.baseline.url.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.source.baseline.localPath": {
+            "order": 10,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "scope": "machine-overridable",
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.source.baseline.localPath.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.debug.traceServer": {
+            "order": 11,
+            "type": "string",
+            "default": "off",
+            "enum": [
+              "off",
+              "messages",
+              "verbose"
+            ],
+            "enumItemLabels": [
+              "%config.lsp.debug.traceServer.enumItemLabels.0%",
+              "%config.lsp.debug.traceServer.enumItemLabels.1%",
+              "%config.lsp.debug.traceServer.enumItemLabels.2%"
+            ],
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.debug.traceServer.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.debug.logLevel": {
+            "order": 12,
+            "type": "string",
+            "default": "Information",
+            "enum": [
+              "Trace",
+              "Debug",
+              "Information",
+              "Warning",
+              "Error"
+            ],
+            "enumItemLabels": [
+              "%config.lsp.debug.logLevel.enumItemLabels.0%",
+              "%config.lsp.debug.logLevel.enumItemLabels.1%",
+              "%config.lsp.debug.logLevel.enumItemLabels.2%",
+              "%config.lsp.debug.logLevel.enumItemLabels.3%",
+              "%config.lsp.debug.logLevel.enumItemLabels.4%"
+            ],
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.debug.logLevel.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.debug.waitForDebugger": {
+            "order": 13,
+            "type": "boolean",
+            "default": false,
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.debug.waitForDebugger.markdownDescription%"
           }
         }
       }

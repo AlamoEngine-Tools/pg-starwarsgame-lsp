@@ -91,8 +91,9 @@
     and `aet-eaw-edit.lsp.source.expansionDirectory` override them
   - A mod opened without a `.pgproj` is offered one, once, written from what the folder holds: the directories that
     exist, the text format, the name from `modinfo.json`; nothing created, `modinfo.json` unchanged
-  - Development and troubleshooting settings are read but no longer on the settings page; the extension README
-    lists them
+  - The settings page groups them under Game, Localisation, Tools, Diagnostics and Experimental
+  - Development and troubleshooting settings are hidden from the settings page, under Development; `@tag:advanced`
+    in its search shows them, and `settings.json` still completes and describes them
 - **Server and Lua analyzer in the extension** - nothing to download or configure; the language server and
   [EmmyLua Analyzer](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) 0.25.1 ship inside a Windows x64 VSIX
   ([#156](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/156))
