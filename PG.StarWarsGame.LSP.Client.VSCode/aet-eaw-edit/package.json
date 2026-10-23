@@ -34,7 +34,10 @@
     "onLanguage:xml",
     "onLanguage:lua",
     "onDebugResolve:eaw-lua",
-    "workspaceContains:**/*.pgproj"
+    "workspaceContains:**/*.pgproj",
+    "workspaceContains:modinfo.json",
+    "workspaceContains:{Data,data,DATA}/**",
+    "workspaceContains:{XML,Xml,xml,Scripts,scripts,Art,art,Audio,audio,Text,text}/**"
   ],
   "main": "./out/extension.js",
   "l10n": "./l10n",
