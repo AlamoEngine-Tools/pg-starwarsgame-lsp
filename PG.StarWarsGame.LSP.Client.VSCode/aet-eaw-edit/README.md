@@ -33,8 +33,9 @@ From the Marketplace, or `aet-eaw-edit-x.x.x.vsix` from the
 
 ### 2. Open the mod
 
-The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod (`Data/XML`) without
-one. Any other folder gets no server.
+The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod without one: a `Data`
+folder holding `XML`, `Scripts`, `Art`, `Audio`, `Text` or a MEG archive, or a `modinfo.json`. The game's own folder
+and any other folder get no server.
 
 ### 3. Create a mod project file
 
@@ -818,7 +819,7 @@ Three data sources; nothing else is sent or received. No telemetry.
 
 ## Troubleshooting
 
-**No diagnostics.** The workspace needs a `.pgproj`, or a `Data/XML` folder; `aet-eaw-edit.lsp.executable` empty (the
+**No diagnostics.** The workspace needs a `.pgproj`, or a mod's `Data` folder; `aet-eaw-edit.lsp.executable` empty (the
 bundled server) or pointing to a `PG.StarWarsGame.LSP.Server.exe`; then **EaWEdit: Restart LSP Server**.
 
 **"LSP server failed to start".** Windows may have blocked the downloaded executable: Properties > **Unblock** on

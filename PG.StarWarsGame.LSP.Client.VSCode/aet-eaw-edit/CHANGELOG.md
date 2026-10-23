@@ -85,8 +85,9 @@
   - Now on: Lua hover and diagnostics, story discovery, graph diagnostics, symbols and rename, story-dialog
     diagnostics, hints, definition and quick fixes, the story graph in View mode, the localisation editor, the Lua
     debugger
-  - The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod (`Data/XML`);
-    any other folder gets none
+  - The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod: a `Data` folder
+    holding `XML`, `Scripts`, `Art`, `Audio`, `Text` or a MEG archive, or a `modinfo.json`; the game's own folder and
+    any other folder get none
   - The game installs are found in the Steam library or the Windows registry; `aet-eaw-edit.lsp.source.baseGameDirectory`
     and `aet-eaw-edit.lsp.source.expansionDirectory` override them
   - A mod opened without a `.pgproj` is offered one, once, written from what the folder holds: the directories that

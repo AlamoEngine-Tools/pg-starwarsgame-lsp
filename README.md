@@ -36,8 +36,9 @@ code --install-extension aet-eaw-edit-x.x.x.vsix
 
 ### 2. Open the mod
 
-The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod (`Data/XML`) without one.
-Any other folder gets no server. A mod without a `.pgproj` is offered one, written from what its folder holds.
+The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod without one: a `Data` folder
+holding `XML`, `Scripts`, `Art`, `Audio`, `Text` or a MEG archive, or a `modinfo.json`. The game's own folder and any
+other folder get no server. A mod without a `.pgproj` is offered one, written from what its folder holds.
 
 ---
 
@@ -335,7 +336,7 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 
 ## Troubleshooting
 
-**No diagnostics.** The workspace needs a `.pgproj`, or a `Data/XML` folder; then **EaWEdit: Restart LSP Server**.
+**No diagnostics.** The workspace needs a `.pgproj`, or a mod's `Data` folder; then **EaWEdit: Restart LSP Server**.
 
 **Version mismatch on startup.** Only for a server set in `aet-eaw-edit.lsp.executable`; clear it to use the bundled one.
 
