@@ -496,31 +496,37 @@
     ],
     "configuration": [
       {
-        "title": "%config.section.general.title%",
+        "id": "aet-eaw-edit.game",
+        "title": "%config.section.game.title%",
+        "order": 1,
         "type": "object",
         "properties": {
-          "aet-eaw-edit.diagnostics.workspaceOnStartup": {
-            "order": 390,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.diagnostics.workspaceOnStartup.markdownDescription%"
+          "aet-eaw-edit.lsp.source.baseGameDirectory": {
+            "order": 1,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "%config.lsp.source.baseGameDirectory.markdownDescription%",
+            "scope": "machine-overridable"
           },
-          "aet-eaw-edit.encyclopedia.screenWidth": {
-            "order": 392,
-            "type": "number",
-            "default": 1920,
-            "minimum": 320,
-            "markdownDescription": "%config.encyclopedia.screenWidth.markdownDescription%"
-          },
-          "aet-eaw-edit.encyclopedia.screenHeight": {
-            "order": 393,
-            "type": "number",
-            "default": 1080,
-            "minimum": 240,
-            "markdownDescription": "%config.encyclopedia.screenHeight.markdownDescription%"
-          },
+          "aet-eaw-edit.lsp.source.expansionDirectory": {
+            "order": 2,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "%config.lsp.source.expansionDirectory.markdownDescription%",
+            "scope": "machine-overridable"
+          }
+        }
+      },
+      {
+        "id": "aet-eaw-edit.localisation",
+        "title": "%config.section.localisation.title%",
+        "order": 2,
+        "type": "object",
+        "properties": {
           "aet-eaw-edit.lsp.localisation.language": {
-            "order": 450,
+            "order": 1,
             "type": "string",
             "default": "ENGLISH",
             "markdownDescription": "%config.lsp.localisation.language.markdownDescription%",
@@ -552,7 +558,7 @@
             ]
           },
           "aet-eaw-edit.localisation.format": {
-            "order": 1200,
+            "order": 2,
             "type": "string",
             "default": "format-dat",
             "markdownDescription": "%config.localisation.format.markdownDescription%",
@@ -574,54 +580,82 @@
               "%config.localisation.format.markdownEnumDescriptions.2%",
               "%config.localisation.format.markdownEnumDescriptions.3%"
             ]
-          },
-          "aet-eaw-edit.lsp.source.baseGameDirectory": {
-            "order": 1500,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lsp.source.baseGameDirectory.markdownDescription%",
-            "scope": "machine-overridable"
-          },
-          "aet-eaw-edit.lsp.source.expansionDirectory": {
-            "order": 1600,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lsp.source.expansionDirectory.markdownDescription%",
-            "scope": "machine-overridable"
-          },
+          }
+        }
+      },
+      {
+        "id": "aet-eaw-edit.tools",
+        "title": "%config.section.tools.title%",
+        "order": 3,
+        "type": "object",
+        "properties": {
           "aet-eaw-edit.tools.aloViewerExecutable": {
-            "order": 1400,
+            "order": 1,
             "type": "string",
             "default": "",
             "markdownDescription": "%config.tools.aloViewerExecutable.markdownDescription%"
           },
           "aet-eaw-edit.tools.particleEditorExecutable": {
-            "order": 1401,
+            "order": 2,
             "type": "string",
             "default": "",
             "markdownDescription": "%config.tools.particleEditorExecutable.markdownDescription%"
           },
-          "aet-eaw-edit.experimental.storyEditing": {
-            "order": 2500,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.experimental.storyEditing.markdownDescription%"
-          },
-          "aet-eaw-edit.experimental.storySimulator": {
-            "order": 2510,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.experimental.storySimulator.markdownDescription%"
-          },
           "aet-eaw-edit.shaders.directory": {
-            "order": 2160,
+            "order": 3,
             "type": "string",
             "default": "",
             "format": "uri-reference",
             "scope": "machine-overridable",
             "markdownDescription": "%config.shaders.directory.markdownDescription%"
+          },
+          "aet-eaw-edit.encyclopedia.screenWidth": {
+            "order": 4,
+            "type": "number",
+            "default": 1920,
+            "minimum": 320,
+            "markdownDescription": "%config.encyclopedia.screenWidth.markdownDescription%"
+          },
+          "aet-eaw-edit.encyclopedia.screenHeight": {
+            "order": 5,
+            "type": "number",
+            "default": 1080,
+            "minimum": 240,
+            "markdownDescription": "%config.encyclopedia.screenHeight.markdownDescription%"
+          }
+        }
+      },
+      {
+        "id": "aet-eaw-edit.diagnostics",
+        "title": "%config.section.diagnostics.title%",
+        "order": 4,
+        "type": "object",
+        "properties": {
+          "aet-eaw-edit.diagnostics.workspaceOnStartup": {
+            "order": 1,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.diagnostics.workspaceOnStartup.markdownDescription%"
+          }
+        }
+      },
+      {
+        "id": "aet-eaw-edit.experimental",
+        "title": "%config.section.experimental.title%",
+        "order": 5,
+        "type": "object",
+        "properties": {
+          "aet-eaw-edit.experimental.storyEditing": {
+            "order": 1,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.experimental.storyEditing.markdownDescription%"
+          },
+          "aet-eaw-edit.experimental.storySimulator": {
+            "order": 2,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.experimental.storySimulator.markdownDescription%"
           }
         }
       }
