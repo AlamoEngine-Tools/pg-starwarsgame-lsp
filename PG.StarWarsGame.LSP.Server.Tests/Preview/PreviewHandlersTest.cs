@@ -19,12 +19,9 @@ public sealed class PreviewHandlersTest
 {
     private static readonly string[] NoAnimations = [];
 
-    private static ILspConfigurationProvider Config(bool modelPreview = true)
+    private static ILspConfigurationProvider Config()
     {
-        return new StubConfig(new LspConfiguration
-        {
-            Features = new FeatureFlags { Tools = new ToolsFeatureFlags { ModelPreview = modelPreview } }
-        });
+        return new StubConfig(new LspConfiguration());
     }
 
     private static PreviewSceneBuilder Builder(StubAssets assets, params GameSymbol[] symbols)
@@ -53,19 +50,6 @@ public sealed class PreviewHandlersTest
     }
 
     [Fact]
-    public async Task GetPreviewScene_WhenTheFeatureIsOff_ExplainsItselfInsteadOfErroring()
-    {
-        // A panel that says why it is empty beats a failed request the user cannot interpret.
-        var assets = new StubAssets();
-        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config(false));
-
-        var result = await handler.Handle(
-            new GetPreviewSceneParams { ModelReference = "x.alo" }, CancellationToken.None);
-
-        Assert.Contains(result.Scene.Problems, p => p.Message.Contains("modelPreview"));
-    }
-
-    [Fact]
     public async Task GetPreviewScene_AcceptsAFileUriFromTheCustomEditor()
     {
         // The custom editor sends a file:/// URI; the XML sends a bare name. Both mean one model.
@@ -86,7 +70,7 @@ public sealed class PreviewHandlersTest
 
     // ── the model list ────────────────────────────────────────────────────────
 
-    private static ListModelsHandler ListModels(bool modelPreview = true, params string[] particleSystems)
+    private static ListModelsHandler ListModels(params string[] particleSystems)
     {
         var index = GameIndex.Empty with
         {
@@ -98,7 +82,7 @@ public sealed class PreviewHandlersTest
                 ["data/art/models/my_frigate.alo"]),
             ParticleSystems = particleSystems.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase)
         };
-        return new ListModelsHandler(new FakeGameIndexService(index), Config(modelPreview));
+        return new ListModelsHandler(new FakeGameIndexService(index));
     }
 
     /// <summary>
@@ -121,7 +105,7 @@ public sealed class PreviewHandlersTest
     [Fact]
     public async Task ListModels_LeavesOutTheParticleSystemsTheCatalogKnows()
     {
-        var result = await ListModels(true, "P_SMOKE.ALO").Handle(new ListModelsParams(), CancellationToken.None);
+        var result = await ListModels("P_SMOKE.ALO").Handle(new ListModelsParams(), CancellationToken.None);
 
         Assert.Equal(["ev_stardestroyer.alo", "my_frigate.alo"], result.Models.Select(m => m.Name));
     }
@@ -133,14 +117,6 @@ public sealed class PreviewHandlersTest
 
         Assert.True(result.Models.Single(m => m.Name == "ev_stardestroyer.alo").BaseGame);
         Assert.False(result.Models.Single(m => m.Name == "my_frigate.alo").BaseGame);
-    }
-
-    [Fact]
-    public async Task ListModels_WhenTheFeatureIsOff_OffersNothing()
-    {
-        var result = await ListModels(false).Handle(new ListModelsParams(), CancellationToken.None);
-
-        Assert.Empty(result.Models);
     }
 
     // ── the GLB endpoint ──────────────────────────────────────────────────────

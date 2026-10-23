@@ -19,7 +19,7 @@ public sealed class XmlCodeActionHandlerTest
         var resolvedConfig = config ?? new FakeLspConfigurationProvider();
         var registry = new XmlCodeActionRegistry([
             new FixSuggestionCodeActionProvider(cache ?? new EmptyFixCache()),
-            new CreateLocKeyCodeActionProvider(resolvedConfig)
+            new CreateLocKeyCodeActionProvider()
         ]);
         return new XmlCodeActionHandler(registry, resolvedConfig, cursor is null ? [] : [cursor]);
     }
@@ -39,35 +39,6 @@ public sealed class XmlCodeActionHandlerTest
 
         Assert.Equal("cursor", Assert.Single(result!).CodeAction!.Title);
         Assert.Equal(new Position(4, 7), cursor.Asked);
-    }
-
-    [Fact]
-    public async Task CursorProviders_AreSilent_WhenCodeActionsAreOff()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { CodeActions = false } });
-
-        var result = await MakeSut(config: config, cursor: new RecordingCursorProvider())
-            .Handle(ParamsWithDiagnostics("file:///test.xml"), CancellationToken.None);
-
-        Assert.Empty(result!);
-    }
-
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_CodeActionsFlagOff_ReturnsEmpty()
-    {
-        // Same arrange as DiagnosticWithFix_ReturnsSingleCodeActionWithEdit - only the flag differs.
-        const string uri = "file:///test.xml";
-        var range = new LspRange(new Position(0, 10), new Position(0, 13));
-        var request = ParamsWithDiagnostics(uri, DiagWithFix(range, "42"));
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { CodeActions = false } });
-
-        var result = await MakeSut(config: config).Handle(request, CancellationToken.None);
-
-        Assert.Empty(result!);
     }
 
     private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)

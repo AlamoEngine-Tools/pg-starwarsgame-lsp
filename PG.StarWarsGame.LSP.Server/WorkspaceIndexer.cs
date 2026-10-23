@@ -141,7 +141,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             }
         }
 
-        // Replace-all also clears stale problems when a rescan (or a disabled flag) yields none.
+        // Replace-all also clears stale problems when a rescan yields none.
         _storyChainProblems.Replace(storyProblems);
     }
 
@@ -502,7 +502,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     ///     Follows a <see cref="MetafileType.Special" /> definition (campaignfiles.xml) through the
     ///     campaign → plot manifest → story thread chain and types every discovered file
     ///     (<c>StoryPlotManifest</c> / <c>StoryParser</c>) under every xml root. Chain problems are
-    ///     collected for the diagnostics pipeline. Gated by <c>features.story.discovery</c>.
+    ///     collected for the diagnostics pipeline.
     /// </summary>
     private void ScanStoryChain(MetafileDefinition def, IReadOnlyList<string> roots,
         IReadOnlyList<string> xmlRoots, BaselineIndex baseline, List<StoryChainProblem> problems)
@@ -514,14 +514,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         // chain types the files it reaches, not this one.
         if (copies.Count > 0)
             _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(copies[0]), []);
-
-        if (!_configProvider.Current.Features.Story.Discovery)
-        {
-            if (_logger.IsEnabled(LogLevel.Information))
-                _logger.LogInformation(
-                    "Story discovery is disabled (features.story.discovery); skipping '{Path}'", def.Path);
-            return;
-        }
 
         if (copies.Count == 0)
         {
@@ -660,12 +652,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         // The schema drives what the parser emits (which tags produce references, which files
         // carry types), so snapshots built under a different schema are stale even when every
-        // file's content hash matches. Computed once per scan. Flags that change INDEX CONTENT
-        // (story symbol emission) fold into the same fingerprint - flags are restart-based, so
-        // this is the only place a flip can invalidate cached parses.
+        // file's content hash matches. Computed once per scan.
         var schemaFingerprint = SchemaFingerprint.Compute(_schema);
-        if (!_configProvider.Current.Features.Story.Symbols)
-            schemaFingerprint += ";story-symbols-off";
         // The Lua stubs decide which string arguments a script's index records as references.
         // Measured: an index cached under the released stubs (---@xmlref, no longer read) held no
         // Lua reference at all, and a server on the current stubs replayed it.

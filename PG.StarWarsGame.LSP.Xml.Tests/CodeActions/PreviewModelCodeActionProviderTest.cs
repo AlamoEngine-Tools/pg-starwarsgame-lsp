@@ -6,7 +6,6 @@ using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -49,24 +48,22 @@ public sealed class PreviewModelCodeActionProviderTest
 
     private static readonly string MappingLine = Xml.Split('\n')[3].TrimEnd('\r');
 
-    private static PreviewModelCodeActionProvider BuildProvider(bool modelPreview = true, string xml = Xml)
+    private static PreviewModelCodeActionProvider BuildProvider(string xml = Xml)
     {
         var host = new OneDocumentHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { ModelPreview = modelPreview } });
         var index = GameIndex.Empty with
         {
             AssetFiles = MergedAssetFileIndex.Merge([],
                 ["data/art/models/ei_trooper.alo", "data/art/models/ei_snow.alo", "data/art/models/ei_sand.alo"])
         };
         return new PreviewModelCodeActionProvider(TestParseCache.For(host, fileHelper), new ModelTagSchema(),
-            new FixedIndex(index), fileHelper, config);
+            new FixedIndex(index), fileHelper, new FakeLspConfigurationProvider());
     }
 
-    private static List<CodeAction> At(int line, int character, bool modelPreview = true)
+    private static List<CodeAction> At(int line, int character)
     {
-        return BuildProvider(modelPreview).Handle(DocumentUri.From(Uri), new Position(line, character))
+        return BuildProvider().Handle(DocumentUri.From(Uri), new Position(line, character))
             .Select(a => a.CodeAction!)
             .ToList();
     }
@@ -152,12 +149,6 @@ public sealed class PreviewModelCodeActionProviderTest
     {
         // The format diagnostic already says what is wrong, and there is nothing to open.
         Assert.Empty(At(6, 3));
-    }
-
-    [Fact]
-    public void WithModelPreviewOff_OffersNothing()
-    {
-        Assert.Empty(At(2, 3, false));
     }
 }
 

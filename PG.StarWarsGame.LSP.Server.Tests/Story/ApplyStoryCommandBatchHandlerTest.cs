@@ -15,8 +15,7 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 public sealed class ApplyStoryCommandBatchHandlerTest
 {
     private static ApplyStoryCommandBatchHandler Handler(
-        CapturingApplier applier, bool storyEditor = true, GameIndex? index = null,
-        bool storyEditing = true)
+        CapturingApplier applier, GameIndex? index = null, bool storyEditing = true)
     {
         var fs = NewFileSystem();
         var fileHelper = FileHelperFor(fs);
@@ -28,7 +27,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
             fileHelper,
             Reload(),
             applier,
-            Config(storyEditor, storyEditing),
+            Config(storyEditing),
             NullLogger<ApplyStoryCommandBatchHandler>.Instance);
     }
 
@@ -49,16 +48,6 @@ public sealed class ApplyStoryCommandBatchHandlerTest
                 c => c.TextDocumentEdit!.TextDocument.Uri.ToString(),
                 c => c.TextDocumentEdit!.Edits.Single().NewText,
                 DocumentUris.Comparer);
-    }
-
-    [Fact]
-    public async Task StoryEditorOff_ReturnsDisabledMessage()
-    {
-        var result = await Handler(new CapturingApplier(), false)
-            .Handle(Batch(Cmd("setPerpetual", eventName: "Start", flag: true)), CancellationToken.None);
-
-        Assert.False(result.Success);
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
     }
 
     /// <summary>

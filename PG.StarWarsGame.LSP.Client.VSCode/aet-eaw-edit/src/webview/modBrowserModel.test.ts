@@ -364,7 +364,6 @@ describe("actionChoices", () => {
         assert.equal(reasonOf("shipped"), "Only the game defines it");
         assert.equal(reasonOf("binary"), "Not a text file");
         assert.equal(reasonOf("schema"), "Defined by the schema");
-        assert.equal(reasonOf("off"), "Turned off in the settings");
     });
 });
 

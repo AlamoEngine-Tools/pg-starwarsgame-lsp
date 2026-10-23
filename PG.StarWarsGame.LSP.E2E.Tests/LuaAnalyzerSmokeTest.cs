@@ -32,8 +32,7 @@ public sealed class LuaAnalyzerSmokeTest
             new
             {
                 workspaceRoot = workspace,
-                schemaLocalPath = LspTestEnvironment.SchemaLocalPath,
-                features = new { lua = new { analyzer = true } }
+                schemaLocalPath = LspTestEnvironment.SchemaLocalPath
             },
             workspace,
             new Dictionary<string, string?> { ["AET_EMMYLUA_LS"] = analyzer });

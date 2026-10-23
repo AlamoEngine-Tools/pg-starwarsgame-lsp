@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.ModBrowser;
@@ -75,7 +74,7 @@ public sealed class SymbolRelationsTest
         }
     }
 
-    private static SymbolRelations Relations(ToolsFeatureFlags? tools = null)
+    private static SymbolRelations Relations()
     {
         GameSymbol[] symbols =
         [
@@ -131,7 +130,7 @@ public sealed class SymbolRelationsTest
             ["Coruscant"] = [("Encyclopedia_Text", "TEXT_CORUSCANT")]
         });
         var schema = new Schema();
-        return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []), tools: tools);
+        return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []));
     }
 
     private static Dictionary<string, SymbolRelation> RelationsOf(string id)
@@ -191,16 +190,6 @@ public sealed class SymbolRelationsTest
 
         Assert.Null(relations.Node(Page, "Shipped_Only").Location);
         Assert.Contains(("definition", "shipped"), ActionsOf(relations, "Shipped_Only"));
-    }
-
-    [Fact]
-    public void AnActionWhoseFeatureIsOff_IsOffered_Disabled()
-    {
-        var actions = ActionsOf(Relations(new ToolsFeatureFlags { ModelPreview = false, Variants = false }),
-            "Star_Destroyer_Mk2");
-
-        Assert.Contains(("previewUnit", "off"), actions);
-        Assert.Contains(("effectiveObject", "off"), actions);
     }
 
     [Fact]

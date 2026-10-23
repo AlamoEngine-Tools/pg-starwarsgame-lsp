@@ -4,27 +4,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Services;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
 public sealed class GetLanguagesHandlerTest
 {
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_LocalisationFlagOff_ReturnsEmptyLanguages()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var handler = BuildHandler(config);
-
-        var result = await handler.Handle(new GetLanguagesParams(), CancellationToken.None);
-
-        Assert.Empty(result.Languages);
-    }
-
     [Fact]
     public async Task Handle_Always_ReturnsNonEmptyLanguageList()
     {
@@ -67,13 +52,13 @@ public sealed class GetLanguagesHandlerTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static GetLanguagesHandler BuildHandler(ILspConfigurationProvider? config = null)
+    private static GetLanguagesHandler BuildHandler()
     {
         var services = new ServiceCollection();
         services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
         return new GetLanguagesHandler(
-            sp.GetRequiredService<ILanguageService>(), config ?? new FakeLspConfigurationProvider());
+            sp.GetRequiredService<ILanguageService>());
     }
 }

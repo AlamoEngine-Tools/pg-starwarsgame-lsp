@@ -78,9 +78,6 @@ public abstract class ApplyLocalisationBatchHandlerBase<TCommand, TResult>
         IReadOnlyList<TCommand> commands,
         CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-            return Failed(null, rejection);
-
         if (string.IsNullOrWhiteSpace(projectFilePath))
             return Failed(null,
                 new ConfiguredMessageCatalog(_config).Format("LocApplyBatch_NoProjectFilePathProvided"));

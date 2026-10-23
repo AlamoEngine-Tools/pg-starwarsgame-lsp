@@ -43,9 +43,6 @@ public sealed class GetLocalisationRowsHandler
     public async Task<GetLocalisationRowsResult> Handle(
         GetLocalisationRowsParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-            return Failure(rejection);
-
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
             return Failure(new ConfiguredMessageCatalog(_config).Format("LocGetRows_NoProjectFilePathProvided"));
 

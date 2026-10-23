@@ -556,8 +556,6 @@ function actionReasonLabel(reason: string): string {
             return l10n.t("Not a variant");
         case "noPreview":
             return l10n.t("No preview for this type");
-        case "off":
-            return l10n.t("Turned off in the settings");
         default:
             return reason;
     }

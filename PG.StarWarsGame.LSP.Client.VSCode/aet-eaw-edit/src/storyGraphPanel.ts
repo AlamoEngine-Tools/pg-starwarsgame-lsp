@@ -283,16 +283,6 @@ export class StoryGraphPanel extends WebviewPanelHost {
     ): Promise<void> {
         const requestName =
             "aet/storySim" + method.charAt(0).toUpperCase() + method.slice(1);
-        // The session's options travel with its start and hold until it stops; only the
-        // extension host can read configuration.
-        const options =
-            method === "start"
-                ? {
-                      assumeMediaCompletes: this._simulatorSetting(
-                          "assumeMediaCompletes",
-                      ),
-                  }
-                : {};
         const result =
             await this.project.gateway.requestOrReport<StorySimStateResult>(
                 requestName,
@@ -300,7 +290,6 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     campaign: this._target.campaign,
                     faction: this._target.faction,
                     scope: this._target.scope,
-                    ...options,
                     ...(args ?? {}),
                 },
                 "simulation request failed",
@@ -534,39 +523,21 @@ export class StoryGraphPanel extends WebviewPanelHost {
     }
 
     /**
-     * Tells the webview which editor modes it may offer. Edit and Simulation are separately flagged
-     * and both default off, so the rotary switch must not advertise a mode whose every request the
-     * server would reject - the panel itself is already gated on `tools.storyEditor`, so View is
-     * always available by the time this runs. Read here rather than in the webview because only the
-     * extension host can see configuration.
+     * Tells the webview which editor modes it may offer. Edit and Simulation are experimental, each
+     * behind its own setting and off by default, so the rotary switch must not advertise a mode whose
+     * every request the server would reject. View is always available. Read here rather than in the
+     * webview because only the extension host can see configuration.
      */
     private _sendAvailableModes(): void {
-        const features = vscode.workspace.getConfiguration(
-            "aet-eaw-edit.features",
+        const experimental = vscode.workspace.getConfiguration(
+            "aet-eaw-edit.experimental",
         );
         this.post({
             type: "availableModes",
-            edit: features.get<boolean>("tools.storyEditing", false) === true,
-            // Not contributed in package.json (WIP): only ever true if hand-written into settings.
+            edit: experimental.get<boolean>("storyEditing", false) === true,
             simulate:
-                features.get<boolean>("tools.storySimulator", false) === true,
+                experimental.get<boolean>("storySimulator", false) === true,
         });
-        // The webview's own simulation preferences; the session's go with its start instead.
-        this.post({
-            type: "simSettings",
-            autoResume: this._simulatorSetting("autoResume"),
-        });
-    }
-
-    /** A `aet-eaw-edit.storySimulator.*` setting; both default on, as the contribution says. */
-    private _simulatorSetting(
-        name: "assumeMediaCompletes" | "autoResume",
-    ): boolean {
-        return (
-            vscode.workspace
-                .getConfiguration("aet-eaw-edit.storySimulator")
-                .get<boolean>(name, true) !== false
-        );
     }
 
     /** Fetches the workspace preferences and pushes the swimlane-lane toggles to the webview. */

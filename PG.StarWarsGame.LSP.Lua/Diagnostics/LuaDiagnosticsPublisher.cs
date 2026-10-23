@@ -96,10 +96,6 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 
     protected override string FileExtension => ".lua";
 
-    // Feature-flag gate: a null provider (test convenience ctor) means always enabled.
-    protected override bool DiagnosticsEnabled =>
-        _configProvider?.Current.Features.Lua.Diagnostics ?? true;
-
     // The analyzer reports on its own schedule, per document: keep the kept findings and publish
     // that document again, so the editor sees one set from one server.
     private void OnAnalyzerPublished(LspPublishParams p)

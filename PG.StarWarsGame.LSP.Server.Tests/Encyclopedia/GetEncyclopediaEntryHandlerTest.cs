@@ -375,22 +375,6 @@ public sealed class GetEncyclopediaEntryHandlerTest
         Assert.Empty(result.Body);
     }
 
-    [Fact]
-    public async Task Handle_EncyclopediaFlagOff_NotFoundDespiteResolvableObject()
-    {
-        var loca = new FakeLocalisation().With("SP", "single");
-        var index = IndexWith(loca, Sym("U"));
-        var source = new FakeVariantTagSource().With("U", Tag("Encyclopedia_Text", "SP"));
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Encyclopedia = false } });
-
-        var result = await Handler(index, source, config)
-            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
-
-        Assert.False(result.Found);
-        Assert.Empty(result.Body);
-    }
-
     private sealed class FakeLocalisation : ILocalisationIndex
     {
         private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);

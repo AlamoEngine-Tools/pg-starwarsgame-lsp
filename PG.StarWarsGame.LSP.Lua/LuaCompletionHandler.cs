@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -19,7 +18,6 @@ namespace PG.StarWarsGame.LSP.Lua;
 public sealed class LuaCompletionHandler : CompletionHandlerBase
 {
     private readonly ILuaAnalyzer? _analyzer;
-    private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaCompletionHandler> _logger;
@@ -32,7 +30,6 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaCompletionHandler> logger,
-        ILspConfigurationProvider config,
         // Optional: with the analyzer running, its items join ours.
         ILuaAnalyzer? analyzer = null)
     {
@@ -41,14 +38,13 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
         _logger = logger;
-        _config = config;
         _analyzer = analyzer;
     }
 
     public override async Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
         var ours = await HandleOurs(request);
-        if (_analyzer is null || !_config.Current.Features.Lua.Completion ||
+        if (_analyzer is null ||
             !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
 
@@ -58,9 +54,6 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
     private Task<CompletionList> HandleOurs(CompletionParams request)
     {
-        if (!_config.Current.Features.Lua.Completion)
-            return Task.FromResult(new CompletionList());
-
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult(new CompletionList());

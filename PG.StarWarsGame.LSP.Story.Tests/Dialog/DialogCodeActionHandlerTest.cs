@@ -4,7 +4,6 @@
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -25,16 +24,13 @@ public sealed class DialogCodeActionHandlerTest
 
     private static readonly DiagnosticId Unknown = DiagnosticIds.DialogUnknownCommand;
 
-    private static DialogCodeActionHandler Handler(string text, bool inScope = true, bool flag = true)
+    private static DialogCodeActionHandler Handler(string text, bool inScope = true)
     {
         return new DialogCodeActionHandler(
             new StubScope(inScope),
             new FileHelper(new MockFileSystem()),
             new StubTextSource(Uri, text),
-            FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-            {
-                Dialog = new DialogFeatureFlags { CodeActions = flag }
-            }));
+            new FakeLspConfigurationProvider());
     }
 
     private static CodeActionParams Request(int line, string? code)
@@ -170,14 +166,6 @@ public sealed class DialogCodeActionHandlerTest
     public async Task OutOfScopeDocument_OffersNothing()
     {
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n", false);
-
-        Assert.Empty(await Actions(handler, Request(1, Unknown.ToString())));
-    }
-
-    [Fact]
-    public async Task FlagOff_OffersNothing()
-    {
-        var handler = Handler("[CHAPTER 0]\nBOGUS 1\n", flag: false);
 
         Assert.Empty(await Actions(handler, Request(1, Unknown.ToString())));
     }

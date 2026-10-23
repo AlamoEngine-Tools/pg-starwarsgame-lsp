@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using Newtonsoft.Json.Linq;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
@@ -12,15 +11,9 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.CodeLens;
 
 public sealed class VariantCodeLensProviderTest
 {
-    private static VariantCodeLensProvider Provider(ILspConfigurationProvider? config = null)
+    private static VariantCodeLensProvider Provider()
     {
-        return new VariantCodeLensProvider(config ?? new FakeLspConfigurationProvider());
-    }
-
-    private static FakeLspConfigurationProvider VariantsOff()
-    {
-        return FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Variants = false } });
+        return new VariantCodeLensProvider();
     }
 
     private static GameSymbol Sym(string id, string? baseId = null)
@@ -39,32 +32,6 @@ public sealed class VariantCodeLensProviderTest
     private static CodeLensSymbolContext Ctx(GameSymbol symbol, GameIndex index)
     {
         return new CodeLensSymbolContext(symbol, (FileOrigin)symbol.Origin, index);
-    }
-
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public void Handle_VariantsFlagOff_SuppressesShowEffectiveLens()
-    {
-        var v = Sym("V", "B");
-
-        var lens = Provider(VariantsOff()).Handle(Ctx(v, IndexWith(v, Sym("B"))));
-
-        Assert.Null(lens);
-    }
-
-    [Fact]
-    public void Handle_VariantsFlagOff_KeepsVariantsPeekLensOnBaseSymbol()
-    {
-        // Only the showEffectiveObject lens is variant tooling - the "N variants" references peek
-        // stays available with the flag off.
-        var b = Sym("B");
-        var index = IndexWith(b, Sym("V1", "B"), Sym("V2", "B"));
-
-        var lens = Provider(VariantsOff()).Handle(Ctx(b, index));
-
-        Assert.NotNull(lens);
-        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens!.Command!.Name);
     }
 
     [Fact]

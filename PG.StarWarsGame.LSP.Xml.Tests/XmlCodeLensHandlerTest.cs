@@ -75,24 +75,6 @@ public sealed class XmlCodeLensHandlerTest
             registry, config ?? new FakeLspConfigurationProvider());
     }
 
-    // ── feature flag ──────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_CodeLensFlagOff_ReturnsNull()
-    {
-        // Same arrange as Handle_DocumentWithSymbolAndZeroRefs - only the flag differs.
-        var sym = SymbolAt("UNIT_A", TestUri, 3);
-        var doc = new DocumentIndex(TestUri, 1,
-            ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { CodeLens = false } });
-        var handler = BuildHandler(BuildIndex(doc), config: config);
-
-        var result = await handler.Handle(ForDoc(), CancellationToken.None);
-
-        Assert.Null(result);
-    }
-
     // ── null / miss cases ─────────────────────────────────────────────────────
 
     [Fact]

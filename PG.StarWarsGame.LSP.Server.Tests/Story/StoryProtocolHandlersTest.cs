@@ -35,13 +35,9 @@ public sealed class StoryProtocolHandlersTest
         return new FiringIndexService { Current = GameIndex.Empty with { Documents = documents } };
     }
 
-    private static ILspConfigurationProvider Config(bool storyEditor = true, bool discovery = true)
+    private static ILspConfigurationProvider Config()
     {
-        return FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-        {
-            Tools = new ToolsFeatureFlags { StoryEditor = storyEditor },
-            Story = new StoryFeatureFlags { Discovery = discovery }
-        });
+        return new FakeLspConfigurationProvider();
     }
 
     private static StubModelService Models()
@@ -54,7 +50,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryPlots_ReturnsCampaignFactionManifestTree()
     {
-        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+        var result = await new GetStoryPlotsHandler(Models(), Index())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -72,7 +68,7 @@ public sealed class StoryProtocolHandlersTest
     {
         // Manifest Lua_Script entries are extensionless engine-cased names ("Story_Lua"); the
         // indexed document is lowercase with extension. Unindexed scripts resolve to null.
-        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+        var result = await new GetStoryPlotsHandler(Models(), Index())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         var faction = Assert.Single(Assert.Single(result.Campaigns).Factions);
@@ -84,7 +80,7 @@ public sealed class StoryProtocolHandlersTest
     {
         // Manifest entries carry engine casing ("Story_Act_I.xml"); canonical thread URIs are
         // lowercase. The client must receive the resolved URI - it cannot search case-insensitively.
-        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+        var result = await new GetStoryPlotsHandler(Models(), Index())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         var faction = Assert.Single(Assert.Single(result.Campaigns).Factions);
@@ -109,7 +105,7 @@ public sealed class StoryProtocolHandlersTest
                 .Add("Story_Set", [member])
         };
 
-        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index }, Config())
+        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index })
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Equal("Story_Set", Assert.Single(result.Campaigns).Set);
@@ -134,7 +130,7 @@ public sealed class StoryProtocolHandlersTest
             }
         };
 
-        var result = await new GetStoryPlotsHandler(models, Index(), Config())
+        var result = await new GetStoryPlotsHandler(models, Index())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         var campaign = Assert.Single(result.Campaigns);
@@ -154,7 +150,7 @@ public sealed class StoryProtocolHandlersTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("GC", [campaignSym])
         };
 
-        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index }, Config())
+        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index })
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         var campaign = Assert.Single(result.Campaigns);
@@ -165,29 +161,10 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryPlots_CampaignWithoutSet_HasNullSet()
     {
-        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+        var result = await new GetStoryPlotsHandler(Models(), Index())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Null(Assert.Single(result.Campaigns).Set);
-    }
-
-    [Fact]
-    public async Task GetStoryPlots_StoryEditorOff_ReturnsDisabledMessage()
-    {
-        var result = await new GetStoryPlotsHandler(Models(), Index(), Config(false))
-            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
-        Assert.Empty(result.Campaigns);
-    }
-
-    [Fact]
-    public async Task GetStoryPlots_DiscoveryOff_NamesTheMissingPrerequisite()
-    {
-        var result = await new GetStoryPlotsHandler(Models(), Index(), Config(discovery: false))
-            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DiscoveryMissingKey), result.Error);
     }
 
     // ── aet/getStoryGraph ────────────────────────────────────────────────────
@@ -228,7 +205,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryPlots_ListsTheFactionsBattles_NoneWhenNothingLinksATacticalPlot()
     {
-        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+        var result = await new GetStoryPlotsHandler(Models(), Index())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         var faction = Assert.Single(Assert.Single(result.Campaigns).Factions);
@@ -501,7 +478,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_ProjectsEventAndRewardEnums()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider(), Config())
+        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -524,7 +501,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_ShipsEveryNoteKind_WithItsTextAndValue()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider(), Config())
+        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         var bugged = Assert.Single(result.EventTypes, t => t.Name == "STORY_BUGGED");
@@ -545,7 +522,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_EnumParams_ShipEnumValuesInline()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider(), Config())
+        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         var battle = Assert.Single(result.RewardTypes, t => t.Name == "LINK_BATTLE");
@@ -558,11 +535,10 @@ public sealed class StoryProtocolHandlersTest
 
     // ── aet/getStoryParamOptions ─────────────────────────────────────────────
 
-    private static GetStoryParamOptionsHandler OptionsHandler(
-        FiringIndexService? index = null, bool storyEditor = true)
+    private static GetStoryParamOptionsHandler OptionsHandler(FiringIndexService? index = null)
     {
         return new GetStoryParamOptionsHandler(Models(), index ?? Index(), new ProtocolSchemaProvider(),
-            new StoryParamValueProposalProvider(), Config(storyEditor));
+            new StoryParamValueProposalProvider());
     }
 
     private static FiringIndexService IndexWith(params (string Id, string TypeName)[] symbols)
@@ -667,16 +643,6 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal(2000, result.Options.Count);
     }
 
-    [Fact]
-    public async Task GetStoryParamOptions_StoryEditorOff_ReturnsDisabledMessage()
-    {
-        var result = await OptionsHandler(storyEditor: false)
-            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "reward", "TRIGGER_EVENT", 0),
-                CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
-    }
-
     private static Diagnostic Diag(int line, int character, DiagnosticSeverity severity, string message)
     {
         return new Diagnostic
@@ -734,25 +700,12 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal("warning", diagnostic.Severity);
     }
 
-    [Fact]
-    public async Task GetStoryDiagnostics_StoryEditorOff_ReturnsDisabledMessage()
-    {
-        var collector = new FakeCollector();
-        var handler = new GetStoryDiagnosticsHandler(
-            Models(), Index(), collector, new FakeTextSource(), Config(false));
-
-        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC", "Rebel"), CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
-    }
-
     // ── aet/resolveStoryReference ────────────────────────────────────────────
 
-    private static ResolveStoryReferenceHandler ResolveHandler(
-        FiringIndexService index, bool storyEditor = true)
+    private static ResolveStoryReferenceHandler ResolveHandler(FiringIndexService index)
     {
         return new ResolveStoryReferenceHandler(
-            new DefinitionLocator(index, new ProtocolSchemaProvider()), Config(storyEditor));
+            new DefinitionLocator(index, new ProtocolSchemaProvider()));
     }
 
     [Fact]
@@ -839,7 +792,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var index = new FiringIndexService();
         var sent = new List<StoryGraphChangedParams>();
-        _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(["GC"]), Config(),
+        _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(["GC"]),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
         index.Fire();
@@ -852,20 +805,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var index = new FiringIndexService();
         var sent = new List<StoryGraphChangedParams>();
-        _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(), Config(),
-            sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
-
-        index.Fire();
-
-        Assert.Empty(sent);
-    }
-
-    [Fact]
-    public void Notifier_StoryEditorOff_StaysQuiet()
-    {
-        var index = new FiringIndexService();
-        var sent = new List<StoryGraphChangedParams>();
-        _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(["GC"]), Config(false),
+        _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
         index.Fire();

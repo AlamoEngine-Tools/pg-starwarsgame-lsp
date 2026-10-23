@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -21,22 +20,19 @@ public sealed class StoryDialogScopeServiceTest
 
     private static (StoryDialogScopeService Scope, FileHelper FileHelper) Build(
         MockFileSystem? fs = null,
-        IReadOnlyList<string>? roots = null,
-        bool flagOn = true)
+        IReadOnlyList<string>? roots = null)
     {
         var fileSystem = fs ?? new MockFileSystem();
         var fileHelper = new FileHelper(fileSystem);
         var config = WorkspaceConfiguration.Empty with { StoryDialogRoots = roots ?? [DialogRoot] };
-        var provider = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Dialog = new DialogFeatureFlags { Diagnostics = flagOn } });
-        var scope = new StoryDialogScopeService(new StubReloadService(config), provider, fileHelper);
+        var scope = new StoryDialogScopeService(new StubReloadService(config), fileHelper);
         return (scope, fileHelper);
     }
 
     // ── Enabled ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Enabled_FlagOnAndRootsConfigured_IsTrue()
+    public void Enabled_RootsConfigured_IsTrue()
     {
         var (scope, _) = Build();
 
@@ -47,14 +43,6 @@ public sealed class StoryDialogScopeServiceTest
     public void Enabled_NoRootsConfigured_IsFalse()
     {
         var (scope, _) = Build(roots: []);
-
-        Assert.False(scope.Enabled);
-    }
-
-    [Fact]
-    public void Enabled_FlagOff_IsFalse()
-    {
-        var (scope, _) = Build(flagOn: false);
 
         Assert.False(scope.Enabled);
     }

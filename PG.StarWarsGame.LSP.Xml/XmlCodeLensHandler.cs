@@ -44,9 +44,6 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
 
     public override Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Xml.CodeLens)
-            return Task.FromResult<CodeLensContainer?>(null);
-
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<CodeLensContainer?>(null);

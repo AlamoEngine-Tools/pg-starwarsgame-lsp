@@ -79,9 +79,16 @@
   ([#202](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/202))
   - Well-formed files only; a refused file names its line and column
   - Vanilla: 993 well-formed files format with unchanged diagnostics and line endings
-- **Feature flags** - `aet-eaw-edit.features.xml.strictness`, `aet-eaw-edit.features.xml.formatting`
-  ([#203](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/203))
-  - Formatting off: no formatter offered, so another XML formatter takes the files
+- **Twelve settings** - everything is on except two experimental modes; the settings page holds what a modder
+  decides ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+  - `aet-eaw-edit.experimental.storyEditing` and `aet-eaw-edit.experimental.storySimulator`, off by default
+  - Now on: Lua hover and diagnostics, story discovery, graph diagnostics, symbols and rename, story-dialog
+    diagnostics, hints, definition and quick fixes, the story graph in View mode, the localisation editor, the Lua
+    debugger
+  - The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod (`Data/XML`);
+    any other folder gets none
+  - Development and troubleshooting settings are read but no longer on the settings page; the extension README
+    lists them
 - **Server and Lua analyzer in the extension** - nothing to download or configure; the language server and
   [EmmyLua Analyzer](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) 0.25.1 ship inside a Windows x64 VSIX
   ([#156](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/156))
@@ -428,6 +435,21 @@
   lenses, no inlay hints, no hover for the workspace's own functions and types
 - **Settings removed** - `aet-eaw-edit.features.lua.codeLens`, `aet-eaw-edit.features.lua.inlayHints`; both come
   from the analyzer
+- **Feature flags removed** - every `aet-eaw-edit.features.*` setting but `aet-eaw-edit.features.preview.energyPool`;
+  a feature cannot be switched off, and a set key shows as unknown
+  ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+  - Renamed: `aet-eaw-edit.features.tools.storyEditing` is `aet-eaw-edit.experimental.storyEditing`,
+    `aet-eaw-edit.features.tools.storySimulator` is `aet-eaw-edit.experimental.storySimulator`
+- **`aet-eaw-edit.lsp.enabled` removed** - a `.pgproj` or a mod's folder starts the server; *Disable (Workspace)* on
+  the extension keeps it off in a workspace
+- **More settings removed** - `aet-eaw-edit.lsp.locale` (no translation existed), `aet-eaw-edit.modVerify.enabled` and
+  `aet-eaw-edit.modVerify.executable` (read by nothing), `aet-eaw-edit.shaders.sourceUrl`,
+  `aet-eaw-edit.storySimulator.assumeMediaCompletes` and `aet-eaw-edit.storySimulator.autoResume` (the simulator
+  always does both)
+- **Lua debugger settings moved to `launch.json`** - `aet-eaw-edit.game.executable` is `program`,
+  `aet-eaw-edit.game.luaDebugHost` is `host`, `aet-eaw-edit.game.luaDebugPort` is `port`,
+  `aet-eaw-edit.game.unsafeTableExpansion` is `unsafeTableExpansion`; `aet-eaw-edit.game.arguments` is `args`, which
+  comes after the mod chain
 - **`---@xmlref`** - no longer read; the tag is `---@aetref`
 - **Archives no list names** - no longer count as present; an archive under an art or audio folder that no
   `MegaFiles.xml` names is never loaded by the game

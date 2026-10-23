@@ -13,8 +13,8 @@ namespace PG.StarWarsGame.LSP.Core.Workspace;
 public interface IStoryDialogScope
 {
     /// <summary>
-    ///     <c>true</c> when the dialog language is active: the <c>features.dialog.diagnostics</c>
-    ///     flag is on AND the workspace declares at least one storyDialog directory.
+    ///     <c>true</c> when the dialog language is active: the workspace declares at least one
+    ///     storyDialog directory.
     /// </summary>
     bool Enabled { get; }
 

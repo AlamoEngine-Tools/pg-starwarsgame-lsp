@@ -67,7 +67,7 @@ public sealed class ExecuteStoryCommandHandlerTest
     }
 
     private static ExecuteStoryCommandHandler Handler(
-        CapturingApplier applier, bool storyEditor = true, GameIndex? index = null,
+        CapturingApplier applier, GameIndex? index = null,
         IStoryModelService? modelService = null, bool storyEditing = true)
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
@@ -78,11 +78,7 @@ public sealed class ExecuteStoryCommandHandlerTest
             [Path.Combine(XmlDir, "campaigns_test.xml")] = new(CampaignSetText)
         });
         var fileHelper = new FileHelper(fs);
-        var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-        {
-            Tools = new ToolsFeatureFlags { StoryEditor = storyEditor, StoryEditing = storyEditing },
-            Story = new StoryFeatureFlags { Discovery = true }
-        });
+        var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags { StoryEditing = storyEditing });
         return new ExecuteStoryCommandHandler(
             modelService ?? new StubModelService(),
             new StubIndexService(index ?? DefaultIndex()),
@@ -123,15 +119,6 @@ public sealed class ExecuteStoryCommandHandlerTest
     }
 
     // ── Gating & validation ──────────────────────────────────────────────────
-
-    [Fact]
-    public async Task StoryEditorOff_ReturnsDisabledMessage()
-    {
-        var result = await Handler(new CapturingApplier(), false)
-            .Handle(Command("deleteEvent", eventName: "Start"), CancellationToken.None);
-
-        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
-    }
 
     /// <summary>
     ///     The legacy single-command mutation path is authoring too - Edit mode off must refuse it

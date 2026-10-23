@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Story.Discovery;
 
@@ -18,12 +17,9 @@ namespace PG.StarWarsGame.LSP.Server;
 ///         refreshed on startup and <c>.pgproj</c> reload ONLY, so serving it afterwards means
 ///         reporting problems the user has already fixed and staying silent about new ones.
 ///     </para>
-///     Gated by <c>features.story.discovery</c>, the same flag that gates the startup scan.
 /// </summary>
 public sealed class LiveStoryChainProblemStore : IStoryChainProblemStore
 {
-    private readonly ILspConfigurationProvider _configProvider;
-
     private readonly object _gate = new();
 
     // Lazily resolved: IStoryModelService -> IModProjectReloadService -> IWorkspaceIndexer ->
@@ -36,11 +32,9 @@ public sealed class LiveStoryChainProblemStore : IStoryChainProblemStore
 
     private StoryChainScanResult? _cachedFor;
 
-    public LiveStoryChainProblemStore(
-        Func<IStoryModelService> modelService, ILspConfigurationProvider configProvider)
+    public LiveStoryChainProblemStore(Func<IStoryModelService> modelService)
     {
         _modelService = modelService;
-        _configProvider = configProvider;
     }
 
     public void Replace(IReadOnlyList<StoryChainProblem> problems)
@@ -50,8 +44,6 @@ public sealed class LiveStoryChainProblemStore : IStoryChainProblemStore
 
     public IReadOnlyList<StoryChainProblem> GetForDocument(string canonicalUri)
     {
-        if (!_configProvider.Current.Features.Story.Discovery) return [];
-
         var result = _modelService().GetChainResult();
 
         // A scan that reached nothing at all has not run yet (inside the startup window the

@@ -4,11 +4,12 @@
 /**
  * Which language clients the window runs, and what each one covers (#229).
  *
- * One server runs per open project. With one project - or none, a folder without a project file -
- * the window keeps today's single client exactly: every xml, lua and dialog file goes to it, it is
- * rooted at the first folder and logs there. Only with several projects does each client narrow to
- * its own directories, because two clients selecting one document would both publish for it and
- * every finding would show twice.
+ * One server runs per open project. With one project - or none, a folder laid out like a mod without
+ * a project file - the window runs a single client: every xml, lua and dialog file goes to it, it is
+ * rooted at the first folder and logs there. A folder that is neither gets no client: any xml or lua
+ * file activates the extension. Only with several projects does each client narrow to its own
+ * directories, because two clients selecting one document would both publish for it and every
+ * finding would show twice.
  *
  * Pure, so the decisions are tested here and the extension only carries them out.
  */
@@ -44,18 +45,23 @@ export const WINDOW_CLIENT = "window";
  * @param canonical Spells a directory as it is on disk. A referenced project's directory is spelled
  *     as the project file wrote it, and a document selector is matched against VS Code's own
  *     spelling of the path.
+ * @param isModFolder Whether a folder without a project file is laid out like a mod.
  */
 export function clientSpecs(
     discovery: Discovery,
     folders: readonly string[],
     canonical: (directory: string) => string = (d) => d,
+    isModFolder: (directory: string) => boolean = () => false,
 ): ClientSpec[] {
     if (discovery.projects.length <= 1) {
         const first = folders[0];
-        if (first === undefined) {
+        const project = discovery.projects[0];
+        if (
+            first === undefined ||
+            (project === undefined && !isModFolder(first))
+        ) {
             return [];
         }
-        const project = discovery.projects[0];
         return [
             withSignature({
                 key: WINDOW_CLIENT,

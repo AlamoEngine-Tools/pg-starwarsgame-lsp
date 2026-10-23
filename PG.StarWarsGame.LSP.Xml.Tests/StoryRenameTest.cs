@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -45,11 +44,10 @@ public sealed class StoryRenameTest
         };
     }
 
-    private static XmlRenameHandler Handler(FeatureFlags? features = null)
+    private static XmlRenameHandler Handler()
     {
         return new XmlRenameHandler(new AllowAllEaWContext(),
-            new NullTextSource(), new EmptySchema(), NullLogger<XmlRenameHandler>.Instance,
-            features is null ? null : FakeLspConfigurationProvider.WithFeatures(features));
+            new NullTextSource(), new EmptySchema(), NullLogger<XmlRenameHandler>.Instance);
     }
 
     private static RenameParams Rename(string newName)
@@ -115,15 +113,6 @@ public sealed class StoryRenameTest
         var edit = Handler().HandleRename(ThreadA, Rename("NEW_FLAG"), StoryIndex("StoryFlag"));
 
         Assert.NotNull(edit);
-    }
-
-    [Fact]
-    public void StoryRenameFlagOff_ReturnsNullForBothRenameAndPrepare()
-    {
-        var features = new FeatureFlags { Story = new StoryFeatureFlags { Rename = false } };
-
-        Assert.Null(Handler(features).HandleRename(ThreadA, Rename("X"), StoryIndex()));
-        Assert.Null(Handler(features).HandlePrepare(ThreadA, DefLine, DefColumn + 2, StoryIndex()));
     }
 
     private sealed class NullTextSource : IDocumentTextSource

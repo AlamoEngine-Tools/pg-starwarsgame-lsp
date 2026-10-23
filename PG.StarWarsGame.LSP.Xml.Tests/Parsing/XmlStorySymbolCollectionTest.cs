@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -17,15 +16,11 @@ public sealed class XmlStorySymbolCollectionTest
 {
     private const string Uri = "file:///ws/data/xml/story_test.xml";
 
-    private static async Task<DocumentIndex> ParseAsync(string xml,
-        bool typedAsStoryParser = true, bool symbolsFlag = true)
+    private static async Task<DocumentIndex> ParseAsync(string xml, bool typedAsStoryParser = true)
     {
         var registry = new StubRegistry(typedAsStoryParser ? ["StoryParser"] : []);
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Story = new StoryFeatureFlags { Symbols = symbolsFlag } });
         var parser = new XmlGameDocumentParser(new FileHelper(new MockFileSystem()),
-            new StoryEnumSchemaProvider(), registry, NullLogger<XmlGameDocumentParser>.Instance,
-            configProvider: config);
+            new StoryEnumSchemaProvider(), registry, NullLogger<XmlGameDocumentParser>.Instance);
         return await parser.ParseAsync(Uri, xml, 1, CancellationToken.None);
     }
 
@@ -157,17 +152,6 @@ public sealed class XmlStorySymbolCollectionTest
         var index = await ParseAsync(
             "<Story><Event Name=\"E\"><Prereq>A</Prereq></Event></Story>",
             false);
-
-        Assert.DoesNotContain(index.Symbols, s => s.TypeName == "StoryEvent");
-        Assert.DoesNotContain(index.References, r => r.ExpectedTypeName == "StoryEvent");
-    }
-
-    [Fact]
-    public async Task SymbolsFlagOff_EmitsNoStorySymbols()
-    {
-        var index = await ParseAsync(
-            "<Story><Event Name=\"E\"><Prereq>A</Prereq></Event></Story>",
-            symbolsFlag: false);
 
         Assert.DoesNotContain(index.Symbols, s => s.TypeName == "StoryEvent");
         Assert.DoesNotContain(index.References, r => r.ExpectedTypeName == "StoryEvent");

@@ -309,188 +309,45 @@ public sealed class LspConfigurationProviderTest : IDisposable
     // ── feature flags ────────────────────────────────────────────────────────
 
     [Fact]
-    public void LoadFrom_NoFeaturesNode_AllFeatureFlagsDefaultTrue()
+    public void LoadFrom_NoFeaturesNode_BothFlagsDefaultTrue()
     {
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
         provider.LoadFrom(Json(new { locale = "en" }));
 
-        var features = provider.Current.Features;
-        Assert.True(features.Xml.Completion);
-        Assert.True(features.Xml.Hover);
-        Assert.True(features.Xml.Diagnostics);
-        Assert.True(features.Xml.GoToDefinition);
-        Assert.True(features.Xml.FindReferences);
-        Assert.True(features.Xml.Rename);
-        Assert.True(features.Xml.CodeLens);
-        Assert.True(features.Xml.InlayHints);
-        Assert.True(features.Xml.CodeActions);
-        Assert.True(features.Xml.LinkedEditing);
-        Assert.True(features.Lua.Completion);
-        Assert.True(features.Lua.Hover);
-        Assert.True(features.Lua.Diagnostics);
-        Assert.True(features.Lua.GoToDefinition);
-        Assert.True(features.Lua.Rename);
-        Assert.True(features.Lua.CodeActions);
-        Assert.True(features.Tools.Localisation);
-        Assert.True(features.Tools.Variants);
-        Assert.True(features.Story.Discovery);
-        Assert.True(features.Dialog.Diagnostics);
+        Assert.True(provider.Current.Features.StoryEditing);
+        Assert.True(provider.Current.Features.StorySimulator);
     }
 
     [Fact]
-    public void LoadFrom_PartialFeaturesNode_DisablesLeafKeepsSiblings()
+    public void LoadFrom_StoryEditingDisabled_ParsesFromCamelCaseNode()
     {
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { xml = new { completion = false } } }));
+        provider.LoadFrom(Json(new { features = new { storyEditing = false } }));
 
-        Assert.False(provider.Current.Features.Xml.Completion);
-        Assert.True(provider.Current.Features.Xml.Hover);
-        Assert.True(provider.Current.Features.Lua.Completion);
-        Assert.True(provider.Current.Features.Tools.Localisation);
-        Assert.True(provider.Current.Features.Story.Discovery);
-    }
-
-    [Fact]
-    public void LoadFrom_StoryDiscoveryDisabled_ParsesFromCamelCaseNode()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { story = new { discovery = false } } }));
-
-        Assert.False(provider.Current.Features.Story.Discovery);
-        // Untouched leaves keep their defaults.
-        Assert.True(provider.Current.Features.Xml.Completion);
-    }
-
-    [Fact]
-    public void LoadFrom_DialogDiagnosticsDisabled_ParsesFromCamelCaseNode()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { dialog = new { diagnostics = false } } }));
-
-        Assert.False(provider.Current.Features.Dialog.Diagnostics);
-        Assert.True(provider.Current.Features.Story.Discovery);
-    }
-
-    [Fact]
-    public void LoadFrom_StoryGraphDiagnosticsDisabled_ParsesFromCamelCaseNode()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { story = new { graphDiagnostics = false } } }));
-
-        Assert.False(provider.Current.Features.Story.GraphDiagnostics);
-        Assert.True(provider.Current.Features.Story.Discovery);
-    }
-
-    [Fact]
-    public void LoadFrom_StorySymbolsDisabled_ParsesFromCamelCaseNode()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { story = new { symbols = false } } }));
-
-        Assert.False(provider.Current.Features.Story.Symbols);
-        Assert.True(provider.Current.Features.Story.GraphDiagnostics);
-    }
-
-    [Fact]
-    public void LoadFrom_DialogInlayHintsDisabled_ParsesFromCamelCaseNode()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { dialog = new { inlayHints = false } } }));
-
-        Assert.False(provider.Current.Features.Dialog.InlayHints);
-        Assert.True(provider.Current.Features.Dialog.Diagnostics);
-    }
-
-    [Fact]
-    public void LoadFrom_DialogGoToDefinitionDisabled_ParsesFromCamelCaseNode()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { dialog = new { goToDefinition = false } } }));
-
-        Assert.False(provider.Current.Features.Dialog.GoToDefinition);
-        Assert.True(provider.Current.Features.Dialog.InlayHints);
-    }
-
-    [Fact]
-    public void LoadFrom_StoryRenameDisabled_ParsesFromCamelCaseNode()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { story = new { rename = false } } }));
-
-        Assert.False(provider.Current.Features.Story.Rename);
-        Assert.True(provider.Current.Features.Story.Discovery);
-    }
-
-    [Fact]
-    public void LoadFrom_StoryEditorDisabled_ParsesFromCamelCaseNode()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { tools = new { storyEditor = false } } }));
-
-        Assert.False(provider.Current.Features.Tools.StoryEditor);
-        Assert.True(provider.Current.Features.Tools.Localisation);
+        Assert.False(provider.Current.Features.StoryEditing);
+        // The untouched flag keeps its default.
+        Assert.True(provider.Current.Features.StorySimulator);
     }
 
     [Fact]
     public void LoadFrom_StorySimulatorDisabled_ParsesFromCamelCaseNode()
     {
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { tools = new { storySimulator = false } } }));
+        provider.LoadFrom(Json(new { features = new { storySimulator = false } }));
 
-        Assert.False(provider.Current.Features.Tools.StorySimulator);
-        Assert.True(provider.Current.Features.Tools.StoryEditor);
-    }
-
-    /// <summary>
-    ///     Edit mode is gated independently of the panel: turning authoring off must leave the
-    ///     read-only story editor (View mode) enabled.
-    /// </summary>
-    [Fact]
-    public void LoadFrom_StoryEditingDisabled_LeavesStoryEditorEnabled()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { features = new { tools = new { storyEditing = false } } }));
-
-        Assert.False(provider.Current.Features.Tools.StoryEditing);
-        Assert.True(provider.Current.Features.Tools.StoryEditor);
-    }
-
-    [Fact]
-    public void LoadFrom_FeaturesCamelCaseKeys_MapToPascalCaseProperties()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new
-        {
-            features = new
-            {
-                xml = new { goToDefinition = false, inlayHints = false, linkedEditing = false },
-                lua = new { codeActions = false, hover = false },
-                tools = new { localisation = false }
-            }
-        }));
-
-        var features = provider.Current.Features;
-        Assert.False(features.Xml.GoToDefinition);
-        Assert.False(features.Xml.InlayHints);
-        Assert.False(features.Xml.LinkedEditing);
-        Assert.False(features.Lua.CodeActions);
-        Assert.False(features.Lua.Hover);
-        Assert.False(features.Tools.Localisation);
-        // Untouched leaves keep their defaults.
-        Assert.True(features.Xml.Completion);
-        Assert.True(features.Lua.Rename);
-        Assert.True(features.Tools.Variants);
+        Assert.False(provider.Current.Features.StorySimulator);
+        Assert.True(provider.Current.Features.StoryEditing);
     }
 
     [Fact]
     public void LoadFrom_FeaturesViaNonJsonElementToken_Parse()
     {
-        var fakeToken = new FakeJsonToken("""{"features":{"lua":{"diagnostics":false}}}""");
+        var fakeToken = new FakeJsonToken("""{"features":{"storySimulator":false}}""");
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
         provider.LoadFrom(fakeToken);
 
-        Assert.False(provider.Current.Features.Lua.Diagnostics);
-        Assert.True(provider.Current.Features.Lua.Completion);
+        Assert.False(provider.Current.Features.StorySimulator);
+        Assert.True(provider.Current.Features.StoryEditing);
     }
 
     [Fact]
@@ -498,32 +355,32 @@ public sealed class LspConfigurationProviderTest : IDisposable
     {
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
         var ex = Record.Exception(() =>
-            provider.LoadFrom(Json(new { features = new { xml = new { completion = "not-a-bool" } } })));
+            provider.LoadFrom(Json(new { features = new { storyEditing = "not-a-bool" } })));
 
         Assert.Null(ex);
-        Assert.True(provider.Current.Features.Xml.Completion);
+        Assert.True(provider.Current.Features.StoryEditing);
+        Assert.True(provider.Current.Features.StorySimulator);
     }
 
     [Fact]
     public void Merge_InitOptionsFeaturesWinWholesaleOverFileFeatures()
     {
-        // File disables Xml.Hover and Lua.CodeActions; init options send a features node that
-        // only disables Xml.Completion. The init options node replaces the file node wholesale
-        // (the client always sends the complete resolved object), so the file's flags are gone.
+        // The file turns the simulator off; init options send a features node that only turns
+        // editing off. The init options node replaces the file node wholesale (the client always
+        // sends the complete resolved object), so the file's flag is gone.
         File.WriteAllText(
             Path.Combine(_tempDir, ".pg-lsp.json"),
-            """{"Features":{"Xml":{"Hover":false},"Lua":{"CodeActions":false}}}""");
+            """{"Features":{"StorySimulator":false}}""");
 
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
         provider.LoadFrom(Json(new
         {
             workspaceRoot = _tempDir,
-            features = new { xml = new { completion = false } }
+            features = new { storyEditing = false }
         }));
 
-        Assert.False(provider.Current.Features.Xml.Completion);
-        Assert.True(provider.Current.Features.Xml.Hover);
-        Assert.True(provider.Current.Features.Lua.CodeActions);
+        Assert.False(provider.Current.Features.StoryEditing);
+        Assert.True(provider.Current.Features.StorySimulator);
     }
 
     [Fact]
@@ -531,13 +388,13 @@ public sealed class LspConfigurationProviderTest : IDisposable
     {
         File.WriteAllText(
             Path.Combine(_tempDir, ".pg-lsp.json"),
-            """{"Features":{"Xml":{"Hover":false}}}""");
+            """{"Features":{"StoryEditing":false}}""");
 
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
         provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
 
-        Assert.False(provider.Current.Features.Xml.Hover);
-        Assert.True(provider.Current.Features.Xml.Completion);
+        Assert.False(provider.Current.Features.StoryEditing);
+        Assert.True(provider.Current.Features.StorySimulator);
     }
 
     // ── MockFileSystem tests ─────────────────────────────────────────────────

@@ -29,10 +29,6 @@ namespace PG.StarWarsGame.LSP.Server.Encyclopedia;
 ///         Resolution runs against the effective object so that variants inherit their encyclopedia
 ///         tags; reading the raw node would preview every <c>Variant_Of_Existing_Type</c> as blank.
 ///     </para>
-///     <para>
-///         Gated on <c>features.tools.encyclopedia</c>: when off, every request answers with the
-///         not-found shape.
-///     </para>
 /// </remarks>
 public sealed class GetEncyclopediaEntryHandler
     : IJsonRpcRequestHandler<GetEncyclopediaEntryParams, GetEncyclopediaEntryResult>
@@ -84,10 +80,6 @@ public sealed class GetEncyclopediaEntryHandler
     public async Task<GetEncyclopediaEntryResult> Handle(GetEncyclopediaEntryParams request,
         CancellationToken cancellationToken)
     {
-        if (!_config.Current.Features.Tools.Encyclopedia)
-            return GetEncyclopediaEntryResult.NotFound(
-                request.ObjectId, EncyclopediaLayoutResolver.Defaults);
-
         var index = _indexService.Current;
         var resolver = new EffectiveObjectResolver(index, _schema, _tagSource);
         // The card is drawn for a particular screen, because the game sizes these glyphs from the

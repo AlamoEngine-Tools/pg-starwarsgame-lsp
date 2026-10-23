@@ -972,9 +972,6 @@
   <data name="LocValidateTranslation_FileNotFound" xml:space="preserve">
     <value>File not found: {0}</value>
   </data>
-  <data name="LocalisationFeature_Disabled" xml:space="preserve">
-    <value>Localisation features are disabled. Enable 'aet-eaw-edit.features.tools.localisation' in the editor settings.</value>
-  </data>
   <data name="LocalisationKeyHandlerBase_LocalisationKeyWasNotFound" xml:space="preserve">
     <value>Localisation key '{0}' was not found in the loaded translation databases.</value>
   </data>
@@ -1503,12 +1500,6 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="PreviewHandlers_CouldNotBeRead" xml:space="preserve">
     <value>'{0}' could not be read: {1}</value>
-  </data>
-  <data name="PreviewHandlers_ModelPreviewTurnedOff" xml:space="preserve">
-    <value>The model preview is turned off.</value>
-  </data>
-  <data name="PreviewHandlers_ModelPreviewTurnedOffAet" xml:space="preserve">
-    <value>The model preview is turned off (aet-eaw-edit.features.tools.modelPreview).</value>
   </data>
   <data name="PreviewHandlers_ModelWasNotFound" xml:space="preserve">
     <value>Model '{0}' was not found. {1}</value>
@@ -2063,13 +2054,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>Malformed chapter header '{0}': Expected '[CHAPTER &lt;number&gt;]'.</value>
   </data>
   <data name="StoryEditingFeature_Disabled" xml:space="preserve">
-    <value>Story editing is disabled. Enable 'aet-eaw-edit.features.tools.storyEditing' in the editor settings.</value>
-  </data>
-  <data name="StoryEditorFeature_Disabled" xml:space="preserve">
-    <value>The story editor is disabled. Enable 'aet-eaw-edit.features.tools.storyEditor' in the editor settings.</value>
-  </data>
-  <data name="StoryEditorFeature_DiscoveryMissing" xml:space="preserve">
-    <value>The story editor requires story discovery. Enable 'aet-eaw-edit.features.story.discovery' in the editor settings.</value>
+    <value>Story editing is disabled. Enable 'aet-eaw-edit.experimental.storyEditing' in the editor settings.</value>
   </data>
   <data name="StoryGraph_AmbiguousTarget" xml:space="preserve">
     <value>'{0}' names more than one event in the same plot file - the engine's pick is undefined.</value>
@@ -2165,7 +2150,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>'{0}' is not a valid number in vector '{1}'.</value>
   </data>
   <data name="StorySimFeature_Disabled" xml:space="preserve">
-    <value>The story simulator is disabled. Enable 'aet-eaw-edit.features.tools.storySimulator' in the editor settings.</value>
+    <value>The story simulator is disabled. Enable 'aet-eaw-edit.experimental.storySimulator' in the editor settings.</value>
   </data>
   <data name="StorySimLua_EmissionIn" xml:space="preserve">
     <value>{0} in {1:0.#}s</value>

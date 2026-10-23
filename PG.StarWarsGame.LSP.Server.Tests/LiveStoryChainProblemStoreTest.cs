@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Story.Discovery;
@@ -37,7 +36,7 @@ public sealed class LiveStoryChainProblemStoreTest
     public void Live_problems_are_served_for_the_document_that_owns_them()
     {
         var model = new FakeStoryModelService(ResultWith(Problem(CampaignUri, "live")));
-        var store = new LiveStoryChainProblemStore(() => model, new FakeLspConfigurationProvider());
+        var store = new LiveStoryChainProblemStore(() => model);
 
         var problem = Assert.Single(store.GetForDocument(CampaignUri));
         Assert.Equal("live", problem.Message.Key);
@@ -47,7 +46,7 @@ public sealed class LiveStoryChainProblemStoreTest
     public void Live_problems_for_other_documents_are_not_served()
     {
         var model = new FakeStoryModelService(ResultWith(Problem("file:///w/other.xml", "live")));
-        var store = new LiveStoryChainProblemStore(() => model, new FakeLspConfigurationProvider());
+        var store = new LiveStoryChainProblemStore(() => model);
 
         Assert.Empty(store.GetForDocument(CampaignUri));
     }
@@ -57,7 +56,7 @@ public sealed class LiveStoryChainProblemStoreTest
     {
         // The whole point: the snapshot still holds the problem the user has since fixed.
         var model = new FakeStoryModelService(ResultWith());
-        var store = new LiveStoryChainProblemStore(() => model, new FakeLspConfigurationProvider());
+        var store = new LiveStoryChainProblemStore(() => model);
         store.Replace([Problem(CampaignUri, "stale startup problem")]);
 
         Assert.Empty(store.GetForDocument(CampaignUri));
@@ -67,7 +66,7 @@ public sealed class LiveStoryChainProblemStoreTest
     public void A_new_problem_appears_without_any_reload()
     {
         var model = new FakeStoryModelService(ResultWith());
-        var store = new LiveStoryChainProblemStore(() => model, new FakeLspConfigurationProvider());
+        var store = new LiveStoryChainProblemStore(() => model);
         Assert.Empty(store.GetForDocument(CampaignUri));
 
         model.Result = ResultWith(Problem(CampaignUri, "typed just now"));
@@ -82,22 +81,11 @@ public sealed class LiveStoryChainProblemStoreTest
         // Inside the startup window the chain scan reads nothing (config/schema not published yet)
         // and returns Empty. Falling through to the snapshot keeps startup behaviour unchanged.
         var model = new FakeStoryModelService(StoryChainScanResult.Empty);
-        var store = new LiveStoryChainProblemStore(() => model, new FakeLspConfigurationProvider());
+        var store = new LiveStoryChainProblemStore(() => model);
         store.Replace([Problem(CampaignUri, "from startup scan")]);
 
         var problem = Assert.Single(store.GetForDocument(CampaignUri));
         Assert.Equal("from startup scan", problem.Message.Key);
-    }
-
-    [Fact]
-    public void Story_discovery_disabled_serves_nothing()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Story = new StoryFeatureFlags { Discovery = false } });
-        var model = new FakeStoryModelService(ResultWith(Problem(CampaignUri, "live")));
-        var store = new LiveStoryChainProblemStore(() => model, config);
-
-        Assert.Empty(store.GetForDocument(CampaignUri));
     }
 
     [Fact]
@@ -111,8 +99,7 @@ public sealed class LiveStoryChainProblemStoreTest
             {
                 resolved = true;
                 return new FakeStoryModelService(StoryChainScanResult.Empty);
-            },
-            new FakeLspConfigurationProvider());
+            });
 
         Assert.False(resolved);
     }

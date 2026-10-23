@@ -5,7 +5,6 @@ using System.IO.Abstractions.TestingHelpers;
 using System.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -80,32 +79,13 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         Assert.Equal(published[0].Uri, published[1].Uri);
     }
 
-    [Fact]
-    public async Task RepublishAll_DoesNothingWhileThePreviewIsOff()
-    {
-        var published = new List<PublishDiagnosticsParams>();
-        var publisher = Publisher(published,
-            new FakeAssets().With(FlaggedPath, ParticleSystem(Emitter(extra: Chunk(0x007F, false, I32(1))))),
-            modelPreview: false);
-
-        await publisher.RepublishAllAsync(CancellationToken.None);
-
-        Assert.Empty(published);
-    }
-
     // ── fixture ───────────────────────────────────────────────────────────────
 
-    private static ParticleFileDiagnosticsPublisher Publisher(
-        List<PublishDiagnosticsParams> published, FakeAssets assets, bool modelPreview = true)
+    private static ParticleFileDiagnosticsPublisher Publisher(List<PublishDiagnosticsParams> published, FakeAssets assets)
     {
         var index = GameIndex.Empty with { AssetFiles = assets };
-        var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-        {
-            Tools = new ToolsFeatureFlags { ModelPreview = modelPreview }
-        });
-
         return new ParticleFileDiagnosticsPublisher(published.Add, new FakeGameIndexService(index),
-            new NoDocuments(), assets, new FileHelper(new MockFileSystem()), config);
+            new NoDocuments(), assets, new FileHelper(new MockFileSystem()), new FakeLspConfigurationProvider());
     }
 
     private sealed class FakeAssets : IGameAssetResolver, IAssetFileIndex

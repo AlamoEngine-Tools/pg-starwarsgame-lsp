@@ -5,7 +5,6 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
@@ -27,25 +26,20 @@ public sealed class XmlOnTypeFormattingHandler : DocumentOnTypeFormattingHandler
 {
     private const string TriggerCharacter = ">";
 
-    private readonly ILspConfigurationProvider _config;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IXmlParseCache _parseCache;
 
     public XmlOnTypeFormattingHandler(IXmlParseCache parseCache, IEaWXmlContext eaWXmlContext,
-        IFileHelper fileHelper, ILspConfigurationProvider config)
+        IFileHelper fileHelper)
     {
         _parseCache = parseCache;
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
-        _config = config;
     }
 
     public override Task<TextEditContainer?> Handle(DocumentOnTypeFormattingParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Xml.AutoCloseTag)
-            return Empty();
-
         // Defensive: we only ever react to the '>' that closes an opening tag.
         if (request.Character != TriggerCharacter)
             return Empty();

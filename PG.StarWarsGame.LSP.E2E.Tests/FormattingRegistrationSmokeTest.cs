@@ -6,9 +6,8 @@ using Newtonsoft.Json.Linq;
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 /// <summary>
-///     Formatting is offered exactly once, the way the client asked for it, and not at all with
-///     <c>features.xml.formatting</c> off. Counted on the wire: a registration sent twice under one
-///     id gave VS Code two formatters from this extension.
+///     Formatting is offered exactly once, the way the client asked for it. Counted on the wire: a
+///     registration sent twice under one id gave VS Code two formatters from this extension.
 /// </summary>
 [Trait("Category", "E2E")]
 public sealed class FormattingRegistrationSmokeTest
@@ -16,29 +15,23 @@ public sealed class FormattingRegistrationSmokeTest
     private static readonly string[] Methods = ["textDocument/formatting", "textDocument/rangeFormatting"];
 
     [Theory]
-    [InlineData(true, true)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(false, false)]
-    public async Task Formatting_IsOfferedOnce_TheWayTheClientAsked(bool dynamicRegistration, bool flag)
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Formatting_IsOfferedOnce_TheWayTheClientAsked(bool dynamicRegistration)
     {
         var capability = new { dynamicRegistration };
         await using var session = await RawLspSession.StartAsync(
             new { textDocument = new { formatting = capability, rangeFormatting = capability } },
-            new
-            {
-                schemaLocalPath = LspTestEnvironment.SchemaLocalPath,
-                features = new { xml = new { formatting = flag } }
-            });
+            new { schemaLocalPath = LspTestEnvironment.SchemaLocalPath });
 
         var registered = session.RegisteredMethods;
         foreach (var method in Methods)
         {
-            var expectedDynamic = flag && dynamicRegistration ? 1 : 0;
+            var expectedDynamic = dynamicRegistration ? 1 : 0;
             Assert.Equal(expectedDynamic, registered.Count(m => m == method));
         }
 
-        var expectedStatic = flag && !dynamicRegistration;
+        var expectedStatic = !dynamicRegistration;
         Assert.Equal(expectedStatic, Offered(session.Capabilities["documentFormattingProvider"]));
         Assert.Equal(expectedStatic, Offered(session.Capabilities["documentRangeFormattingProvider"]));
     }

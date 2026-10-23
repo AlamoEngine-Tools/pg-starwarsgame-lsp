@@ -56,9 +56,6 @@ public sealed class SetLocalisationProjectFormatHandler
     public async Task<SetLocalisationProjectFormatResult> Handle(
         SetLocalisationProjectFormatParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-            return Fail(rejection);
-
         var extension = LocalisationFormatUtility.ToExtension(request.Format);
         if (extension is null)
             return Fail(new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NotLocalisationFormatUseCSV",

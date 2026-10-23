@@ -199,62 +199,6 @@ public sealed class GameRenameHandlerTest
         public LuaSandbox Current => sandbox;
     }
 
-    // ── feature flags ──────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_XmlRenameFlagOff_ReturnsNullWithoutInvokingXmlProvider()
-    {
-        var stub = new StubProvider(new WorkspaceEdit());
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { Rename = false } });
-
-        var result = await BuildHandler(stub, config: config)
-            .Handle(RenameAt(XmlUri), CancellationToken.None);
-
-        Assert.Null(result);
-        Assert.False(stub.RenameCalled);
-    }
-
-    [Fact]
-    public async Task Handle_XmlRenameFlagOff_LuaStillRouted()
-    {
-        var luaEdit = new WorkspaceEdit();
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { Rename = false } });
-
-        var result = await BuildHandler(luaProvider: new StubProvider(luaEdit), config: config)
-            .Handle(RenameAt(LuaUri), CancellationToken.None);
-
-        Assert.Same(luaEdit, result);
-    }
-
-    [Fact]
-    public async Task Handle_LuaRenameFlagOff_ReturnsNullWithoutInvokingLuaProvider()
-    {
-        var stub = new StubProvider(new WorkspaceEdit());
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Lua = new LuaFeatureFlags { Rename = false } });
-
-        var result = await BuildHandler(luaProvider: stub, config: config)
-            .Handle(RenameAt(LuaUri), CancellationToken.None);
-
-        Assert.Null(result);
-        Assert.False(stub.RenameCalled);
-    }
-
-    [Fact]
-    public async Task Handle_LuaRenameFlagOff_XmlStillRouted()
-    {
-        var xmlEdit = new WorkspaceEdit();
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Lua = new LuaFeatureFlags { Rename = false } });
-
-        var result = await BuildHandler(new StubProvider(xmlEdit), config: config)
-            .Handle(RenameAt(XmlUri), CancellationToken.None);
-
-        Assert.Same(xmlEdit, result);
-    }
-
     // ── routing ────────────────────────────────────────────────────────────────
 
     [Fact]

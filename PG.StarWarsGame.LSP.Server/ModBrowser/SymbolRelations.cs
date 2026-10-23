@@ -3,7 +3,6 @@
 
 using System.Runtime.CompilerServices;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Validation;
@@ -23,7 +22,6 @@ namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 ///     The proxy names a model file carries, by its game-relative path; a model's particle systems
 ///     are read from it, one file, when the model is opened.
 /// </param>
-/// <param name="tools">The tool features on; an action whose feature is off is offered disabled.</param>
 /// <param name="fileOf">
 ///     The file on disk an asset or a script is, by its entry id - a game-relative path or a document
 ///     URI; null where none is, as for one that only ships inside the game's archives.
@@ -34,18 +32,14 @@ public sealed class SymbolRelations(
     IVariantTagSource tags,
     SymbolCatalog catalog,
     Func<string, IReadOnlyList<string>>? proxiesOf = null,
-    ToolsFeatureFlags? tools = null,
     Func<string, string?>? fileOf = null)
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
     private const string Definitions = "definitions";
     private const string UsedBy = "usedBy";
-    private const string Off = "off";
     private static readonly char[] s_separators = [',', ' ', '\t', '\n', '\r'];
     private static readonly string[] s_textureInterchange = [".tga", ".dds"];
-
-    private readonly ToolsFeatureFlags _tools = tools ?? new ToolsFeatureFlags();
 
     // Which objects name each asset: every object's tags, read once per index on the first request
     // that needs it, never on open (about 830 ms on the EaW tree - measured in code comments).
@@ -137,16 +131,12 @@ public sealed class SymbolRelations(
         List<SymbolAction> actions = page switch
         {
             "models" or "particleSystems" =>
-                [definition, new SymbolAction("previewModel", _tools.ModelPreview ? null : Off)],
+                [definition, new SymbolAction("previewModel", null)],
             // A clip is worth seeing only on its model, which the preview pairs with it by name and
             // checks against the skeleton; one no model's name prefixes has nothing to play on.
             "animations" =>
             [
-                definition, new SymbolAction("previewClip", !_tools.ModelPreview
-                    ? Off
-                    : ModelOf(entry.Name).Any()
-                        ? null
-                        : "unpaired")
+                definition, new SymbolAction("previewClip", ModelOf(entry.Name).Any() ? null : "unpaired")
             ],
             _ => [definition]
         };
@@ -165,23 +155,15 @@ public sealed class SymbolRelations(
         List<SymbolAction> actions =
         [
             new SymbolAction("definition", location is null ? "shipped" : null),
-            new SymbolAction("previewUnit", !_tools.ModelPreview
-                ? Off
-                : winner is not null && TacticalModels.Declared(index, tags, winner)
+            new SymbolAction("previewUnit", winner is not null && TacticalModels.Declared(index, tags, winner)
+                ? null
+                : "noModel"),
+            new SymbolAction("encyclopedia", winner is null || !EncyclopediaTags.DefinesBody(index, tags, winner)
+                ? "noEncyclopedia"
+                : EncyclopediaTags.HasCard(index, tags, winner, schema.GetKind(ObjectKindNames.Planet))
                     ? null
-                    : "noModel"),
-            new SymbolAction("encyclopedia", !_tools.Encyclopedia
-                ? Off
-                : winner is null || !EncyclopediaTags.DefinesBody(index, tags, winner)
-                    ? "noEncyclopedia"
-                    : EncyclopediaTags.HasCard(index, tags, winner, schema.GetKind(ObjectKindNames.Planet))
-                        ? null
-                        : "planet"),
-            new SymbolAction("effectiveObject", !_tools.Variants
-                ? Off
-                : string.IsNullOrEmpty(winner?.VariantBaseId)
-                    ? "notAVariant"
-                    : null)
+                    : "planet"),
+            new SymbolAction("effectiveObject", string.IsNullOrEmpty(winner?.VariantBaseId) ? "notAVariant" : null)
         ];
         return gameObject
             ? actions

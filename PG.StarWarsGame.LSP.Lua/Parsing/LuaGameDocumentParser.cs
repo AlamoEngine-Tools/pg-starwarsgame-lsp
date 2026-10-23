@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
@@ -16,25 +15,21 @@ namespace PG.StarWarsGame.LSP.Lua.Parsing;
 
 public sealed class LuaGameDocumentParser : IGameDocumentParser
 {
-    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IFileHelper _fileHelper;
     private readonly ILuaParseCache? _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
     // parseCache is optional so minimal test setups can omit it; production wires the shared
     // cache so the indexing parse seeds it - the diagnostics publish and the first request after
-    // an edit then reuse this parse instead of re-parsing. A null configProvider (test
-    // convenience) means every feature flag reads as enabled.
+    // an edit then reuse this parse instead of re-parsing.
     public LuaGameDocumentParser(
         ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper,
-        ILuaParseCache? parseCache = null,
-        ILspConfigurationProvider? configProvider = null)
+        ILuaParseCache? parseCache = null)
     {
         _schemaProvider = schemaProvider;
         _fileHelper = fileHelper;
         _parseCache = parseCache;
-        _configProvider = configProvider;
     }
 
     public bool CanParse(string fileExtension)
@@ -63,8 +58,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
             new FileOrigin(canonicalUri, 0, 0),
             null));
 
-        if (_configProvider?.Current.Features.Story.Symbols ?? true)
-            LuaStorySymbolCollector.Collect(root, canonicalUri, symbols, references);
+        LuaStorySymbolCollector.Collect(root, canonicalUri, symbols, references);
 
         return ValueTask.FromResult(new DocumentIndex(
             canonicalUri, version,

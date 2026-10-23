@@ -73,8 +73,6 @@ public sealed class DialogCodeActionHandler : CodeActionHandlerBase
 
     private IEnumerable<CommandOrCodeAction> Build(CodeActionParams request)
     {
-        if (!_config.Current.Features.Dialog.CodeActions) return [];
-
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_scope.IsInScope(uri)) return [];
 

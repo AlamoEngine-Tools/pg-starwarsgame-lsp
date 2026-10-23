@@ -63,13 +63,29 @@ describe("clientSpecs", () => {
         assert.equal(specs[0].roots, undefined);
     });
 
-    it("still runs one client for a folder with no project file, as today", () => {
-        const folders = ["c:/notes"];
-        const specs = clientSpecs(discover(folders, {}), folders);
+    it("runs one client for a folder laid out like a mod with no project file", () => {
+        const folders = ["c:/mods/Legacy"];
+        const specs = clientSpecs(
+            discover(folders, {}),
+            folders,
+            undefined,
+            (directory) => directory === "c:/mods/Legacy",
+        );
 
         assert.equal(specs.length, 1);
         assert.equal(specs[0].projectPath, undefined);
-        assert.equal(specs[0].workspaceRoot, "c:/notes");
+        assert.equal(specs[0].workspaceRoot, "c:/mods/Legacy");
+    });
+
+    /** Without lsp.enabled, any folder with an xml or lua file activates the extension. */
+    it("runs no client for a folder that is neither a project nor a mod", () => {
+        const folders = ["c:/notes"];
+
+        assert.deepEqual(
+            clientSpecs(discover(folders, {}), folders, undefined, () => false),
+            [],
+        );
+        assert.deepEqual(clientSpecs(discover(folders, {}), folders), []);
     });
 
     it("runs no client for an empty window", () => {

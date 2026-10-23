@@ -174,7 +174,7 @@
             "type": "eaw-lua",
             "request": "launch",
             "name": "%debugger.eaw-lua.initial.launch.name%",
-            "program": "${config:aet-eaw-edit.game.executable}"
+            "program": ""
           }
         ],
         "configurationSnippets": [
@@ -194,7 +194,7 @@
               "type": "eaw-lua",
               "request": "launch",
               "name": "%debugger.eaw-lua.snippet.launch.name%",
-              "program": "^\"\\${config:aet-eaw-edit.game.executable}\""
+              "program": "^\"${1:StarWarsI.exe}\""
             }
           }
         ]
@@ -214,20 +214,17 @@
         {
           "id": "aet-eaw-edit.lsp.localisationNavigator",
           "name": "%view.lsp.localisationNavigator.name%",
-          "icon": "resources/icons/language-solid-full.svg",
-          "when": "config.aet-eaw-edit.features.tools.localisation"
+          "icon": "resources/icons/language-solid-full.svg"
         },
         {
           "id": "aet-eaw-edit.lsp.storyNavigator",
           "name": "%view.lsp.storyNavigator.name%",
-          "icon": "resources/icons/book-journal-whills-solid-full.svg",
-          "when": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+          "icon": "resources/icons/book-journal-whills-solid-full.svg"
         },
         {
           "id": "aet-eaw-edit.lsp.modBrowser",
           "name": "%view.lsp.modBrowser.name%",
-          "icon": "$(list-tree)",
-          "when": "config.aet-eaw-edit.features.tools.modBrowser"
+          "icon": "$(list-tree)"
         }
       ],
       "debug": [
@@ -235,8 +232,7 @@
           "id": "aet-eaw-edit.luaDebug.scripts",
           "name": "%view.luaDebug.scripts.name%",
           "icon": "$(file-code)",
-          "contextualTitle": "%view.luaDebug.scripts.contextualTitle%",
-          "when": "config.aet-eaw-edit.features.lua.debugger"
+          "contextualTitle": "%view.luaDebug.scripts.contextualTitle%"
         }
       ]
     },
@@ -353,7 +349,7 @@
         "command": "aet-eaw-edit.luaDebug.refreshScripts",
         "title": "%command.luaDebug.refreshScripts.title%",
         "icon": "$(refresh)",
-        "enablement": "config.aet-eaw-edit.features.lua.debugger && aet-eaw-edit.luaDebug.sessionActive"
+        "enablement": "aet-eaw-edit.luaDebug.sessionActive"
       },
       {
         "command": "aet-eaw-edit.luaDebug.refreshThreads",
@@ -400,40 +396,33 @@
       },
       {
         "command": "aet-eaw-edit.lsp.initLocalisationProject",
-        "title": "%command.lsp.initLocalisationProject.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "title": "%command.lsp.initLocalisationProject.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.importLocalisationProject",
-        "title": "%command.lsp.importLocalisationProject.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "title": "%command.lsp.importLocalisationProject.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.showEffectiveObject",
-        "title": "%command.lsp.showEffectiveObject.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.variants"
+        "title": "%command.lsp.showEffectiveObject.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.showEncyclopedia",
-        "title": "%command.lsp.showEncyclopedia.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.encyclopedia"
+        "title": "%command.lsp.showEncyclopedia.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.openModBrowser",
-        "title": "%command.lsp.openModBrowser.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.modBrowser"
+        "title": "%command.lsp.openModBrowser.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.openStoryGraph",
         "title": "%command.lsp.openStoryGraph.title%",
-        "icon": "$(type-hierarchy)",
-        "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+        "icon": "$(type-hierarchy)"
       },
       {
         "command": "aet-eaw-edit.lsp.openStoryFile",
         "title": "%command.lsp.openStoryFile.title%",
-        "icon": "$(go-to-file)",
-        "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+        "icon": "$(go-to-file)"
       },
       {
         "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
@@ -444,59 +433,49 @@
       {
         "command": "aet-eaw-edit.lsp.refreshStoryNavigator",
         "title": "%command.lsp.refreshStoryNavigator.title%",
-        "icon": "$(refresh)",
-        "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+        "icon": "$(refresh)"
       },
       {
         "command": "aet-eaw-edit.lsp.openLocalisationEditor",
         "title": "%command.lsp.openLocalisationEditor.title%",
-        "icon": "$(table)",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "icon": "$(table)"
       },
       {
         "command": "aet-eaw-edit.lsp.refreshLocalisationNavigator",
         "title": "%command.lsp.refreshLocalisationNavigator.title%",
-        "icon": "$(refresh)",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "icon": "$(refresh)"
       },
       {
         "command": "aet-eaw-edit.lsp.newLocalisationProject",
         "title": "%command.lsp.newLocalisationProject.title%",
-        "icon": "$(new-file)",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "icon": "$(new-file)"
       },
       {
         "command": "aet-eaw-edit.lsp.exportLocalisationToDat",
-        "title": "%command.lsp.exportLocalisationToDat.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "title": "%command.lsp.exportLocalisationToDat.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.convertLocalisationFormat",
-        "title": "%command.lsp.convertLocalisationFormat.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "title": "%command.lsp.convertLocalisationFormat.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.setLocalisationProjectFormat",
         "title": "%command.lsp.setLocalisationProjectFormat.title%",
-        "icon": "$(symbol-file)",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "icon": "$(symbol-file)"
       },
       {
         "command": "aet-eaw-edit.lsp.openLocalisationAsText",
-        "title": "%command.lsp.openLocalisationAsText.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "title": "%command.lsp.openLocalisationAsText.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.previewCreditsCrawl",
         "title": "%command.lsp.previewCreditsCrawl.title%",
-        "icon": "$(open-preview)",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "icon": "$(open-preview)"
       },
       {
         "command": "aet-eaw-edit.lsp.previewCreditsCrawlFullScreen",
         "title": "%command.lsp.previewCreditsCrawlFullScreen.title%",
-        "icon": "$(screen-full)",
-        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+        "icon": "$(screen-full)"
       },
       {
         "command": "aet-eaw-edit.copyBugReportInfo",
@@ -504,18 +483,15 @@
       },
       {
         "command": "aet-eaw-edit.lsp.previewModel",
-        "title": "%command.lsp.previewModel.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.modelPreview"
+        "title": "%command.lsp.previewModel.title%"
       },
       {
         "command": "aet-eaw-edit.lsp.previewAssembledUnit",
-        "title": "%command.lsp.previewAssembledUnit.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.modelPreview"
+        "title": "%command.lsp.previewAssembledUnit.title%"
       },
       {
         "command": "aet-eaw-edit.shaders.obtain",
-        "title": "%command.shaders.obtain.title%",
-        "enablement": "config.aet-eaw-edit.features.tools.modelPreview"
+        "title": "%command.shaders.obtain.title%"
       }
     ],
     "configuration": [
@@ -523,28 +499,6 @@
         "title": "%config.section.general.title%",
         "type": "object",
         "properties": {
-          "aet-eaw-edit.lsp.enabled": {
-            "order": 100,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.lsp.enabled.markdownDescription%"
-          },
-          "aet-eaw-edit.lsp.executable": {
-            "order": 200,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lsp.executable.markdownDescription%",
-            "scope": "machine-overridable"
-          },
-          "aet-eaw-edit.lua.analyzerPath": {
-            "order": 210,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lua.analyzerPath.markdownDescription%",
-            "scope": "machine-overridable"
-          },
           "aet-eaw-edit.diagnostics.workspaceOnStartup": {
             "order": 390,
             "type": "boolean",
@@ -564,30 +518,6 @@
             "default": 1080,
             "minimum": 240,
             "markdownDescription": "%config.encyclopedia.screenHeight.markdownDescription%"
-          },
-          "aet-eaw-edit.lsp.locale": {
-            "order": 400,
-            "type": "string",
-            "default": "en",
-            "markdownDescription": "%config.lsp.locale.markdownDescription%",
-            "enum": [
-              "en",
-              "de",
-              "fr",
-              "es",
-              "it",
-              "pl",
-              "ru"
-            ],
-            "enumItemLabels": [
-              "%config.lsp.locale.enumItemLabels.0%",
-              "%config.lsp.locale.enumItemLabels.1%",
-              "%config.lsp.locale.enumItemLabels.2%",
-              "%config.lsp.locale.enumItemLabels.3%",
-              "%config.lsp.locale.enumItemLabels.4%",
-              "%config.lsp.locale.enumItemLabels.5%",
-              "%config.lsp.locale.enumItemLabels.6%"
-            ]
           },
           "aet-eaw-edit.lsp.localisation.language": {
             "order": 450,
@@ -621,64 +551,6 @@
               "%config.lsp.localisation.language.enumItemLabels.10%"
             ]
           },
-          "aet-eaw-edit.lsp.source.baseline.type": {
-            "order": 600,
-            "type": "string",
-            "default": "http",
-            "markdownDescription": "%config.lsp.source.baseline.type.markdownDescription%",
-            "enum": [
-              "http",
-              "local"
-            ],
-            "enumItemLabels": [
-              "%config.lsp.source.baseline.type.enumItemLabels.0%",
-              "%config.lsp.source.baseline.type.enumItemLabels.1%"
-            ]
-          },
-          "aet-eaw-edit.lsp.source.baseline.localPath": {
-            "order": 700,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lsp.source.baseline.localPath.markdownDescription%",
-            "scope": "machine-overridable"
-          },
-          "aet-eaw-edit.lsp.source.baseline.url": {
-            "order": 750,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lsp.source.baseline.url.markdownDescription%"
-          },
-          "aet-eaw-edit.lsp.schema.source": {
-            "order": 800,
-            "type": "string",
-            "default": "http",
-            "markdownDescription": "%config.lsp.schema.source.markdownDescription%",
-            "enum": [
-              "http",
-              "local"
-            ],
-            "enumItemLabels": [
-              "%config.lsp.schema.source.enumItemLabels.0%",
-              "%config.lsp.schema.source.enumItemLabels.1%"
-            ]
-          },
-          "aet-eaw-edit.lsp.schema.url": {
-            "order": 900,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lsp.schema.url.markdownDescription%"
-          },
-          "aet-eaw-edit.lsp.schema.localPath": {
-            "order": 1000,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lsp.schema.localPath.markdownDescription%",
-            "scope": "machine-overridable"
-          },
           "aet-eaw-edit.localisation.format": {
             "order": 1200,
             "type": "string",
@@ -703,21 +575,6 @@
               "%config.localisation.format.markdownEnumDescriptions.3%"
             ]
           },
-          "aet-eaw-edit.modVerify.enabled": {
-            "order": 1300,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.modVerify.enabled.markdownDescription%"
-          },
-          "aet-eaw-edit.modVerify.executable": {
-            "order": 1400,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.modVerify.executable.markdownDescription%",
-            "scope": "machine-overridable",
-            "when": "aet-eaw-edit.modVerify.enabled"
-          },
           "aet-eaw-edit.lsp.source.baseGameDirectory": {
             "order": 1500,
             "type": "string",
@@ -734,62 +591,6 @@
             "markdownDescription": "%config.lsp.source.expansionDirectory.markdownDescription%",
             "scope": "machine-overridable"
           },
-          "aet-eaw-edit.lsp.devMode.enabled": {
-            "order": 1700,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.lsp.devMode.enabled.markdownDescription%"
-          },
-          "aet-eaw-edit.lsp.devMode.projectPath": {
-            "order": 1800,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "markdownDescription": "%config.lsp.devMode.projectPath.markdownDescription%",
-            "scope": "machine-overridable"
-          },
-          "aet-eaw-edit.lsp.debug.traceServer": {
-            "order": 1900,
-            "type": "string",
-            "default": "off",
-            "markdownDescription": "%config.lsp.debug.traceServer.markdownDescription%",
-            "enum": [
-              "off",
-              "messages",
-              "verbose"
-            ],
-            "enumItemLabels": [
-              "%config.lsp.debug.traceServer.enumItemLabels.0%",
-              "%config.lsp.debug.traceServer.enumItemLabels.1%",
-              "%config.lsp.debug.traceServer.enumItemLabels.2%"
-            ]
-          },
-          "aet-eaw-edit.lsp.debug.logLevel": {
-            "order": 1950,
-            "type": "string",
-            "default": "Information",
-            "markdownDescription": "%config.lsp.debug.logLevel.markdownDescription%",
-            "enum": [
-              "Trace",
-              "Debug",
-              "Information",
-              "Warning",
-              "Error"
-            ],
-            "enumItemLabels": [
-              "%config.lsp.debug.logLevel.enumItemLabels.0%",
-              "%config.lsp.debug.logLevel.enumItemLabels.1%",
-              "%config.lsp.debug.logLevel.enumItemLabels.2%",
-              "%config.lsp.debug.logLevel.enumItemLabels.3%",
-              "%config.lsp.debug.logLevel.enumItemLabels.4%"
-            ]
-          },
-          "aet-eaw-edit.lsp.debug.waitForDebugger": {
-            "order": 2000,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.lsp.debug.waitForDebugger.markdownDescription%"
-          },
           "aet-eaw-edit.tools.aloViewerExecutable": {
             "order": 1400,
             "type": "string",
@@ -801,252 +602,18 @@
             "type": "string",
             "default": "",
             "markdownDescription": "%config.tools.particleEditorExecutable.markdownDescription%"
-          }
-        }
-      },
-      {
-        "title": "%config.section.features.title%",
-        "type": "object",
-        "properties": {
-          "aet-eaw-edit.features.xml.completion": {
-            "order": 100,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.completion.markdownDescription%"
           },
-          "aet-eaw-edit.features.xml.hover": {
-            "order": 200,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.hover.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.diagnostics": {
-            "order": 300,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.diagnostics.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.goToDefinition": {
-            "order": 400,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.goToDefinition.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.findReferences": {
-            "order": 500,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.findReferences.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.rename": {
-            "order": 600,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.rename.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.codeLens": {
-            "order": 700,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.codeLens.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.inlayHints": {
-            "order": 800,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.inlayHints.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.codeActions": {
-            "order": 900,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.codeActions.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.linkedEditing": {
-            "order": 1000,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.linkedEditing.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.autoCloseTag": {
-            "order": 1050,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.autoCloseTag.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.strictness": {
-            "order": 1060,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.strictness.markdownDescription%"
-          },
-          "aet-eaw-edit.features.xml.formatting": {
-            "order": 1070,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.xml.formatting.markdownDescription%"
-          },
-          "aet-eaw-edit.features.lua.completion": {
-            "order": 1100,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.lua.completion.markdownDescription%"
-          },
-          "aet-eaw-edit.features.lua.hover": {
-            "order": 1200,
+          "aet-eaw-edit.experimental.storyEditing": {
+            "order": 2500,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "%config.features.lua.hover.markdownDescription%"
+            "markdownDescription": "%config.experimental.storyEditing.markdownDescription%"
           },
-          "aet-eaw-edit.features.lua.diagnostics": {
-            "order": 1300,
+          "aet-eaw-edit.experimental.storySimulator": {
+            "order": 2510,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "%config.features.lua.diagnostics.markdownDescription%"
-          },
-          "aet-eaw-edit.features.lua.goToDefinition": {
-            "order": 1400,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.lua.goToDefinition.markdownDescription%"
-          },
-          "aet-eaw-edit.features.lua.rename": {
-            "order": 1500,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.lua.rename.markdownDescription%"
-          },
-          "aet-eaw-edit.features.lua.codeActions": {
-            "order": 1800,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.lua.codeActions.markdownDescription%"
-          },
-          "aet-eaw-edit.features.lua.debugger": {
-            "order": 1820,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.lua.debugger.markdownDescription%"
-          },
-          "aet-eaw-edit.features.lua.analyzer": {
-            "order": 1830,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.lua.analyzer.markdownDescription%"
-          },
-          "aet-eaw-edit.features.story.discovery": {
-            "order": 1850,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.story.discovery.markdownDescription%"
-          },
-          "aet-eaw-edit.features.story.graphDiagnostics": {
-            "order": 1855,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.story.graphDiagnostics.markdownDescription%"
-          },
-          "aet-eaw-edit.features.story.symbols": {
-            "order": 1857,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.story.symbols.markdownDescription%"
-          },
-          "aet-eaw-edit.features.story.rename": {
-            "order": 1858,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.story.rename.markdownDescription%"
-          },
-          "aet-eaw-edit.features.dialog.diagnostics": {
-            "order": 1860,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.dialog.diagnostics.markdownDescription%"
-          },
-          "aet-eaw-edit.features.dialog.inlayHints": {
-            "order": 1862,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.dialog.inlayHints.markdownDescription%"
-          },
-          "aet-eaw-edit.features.dialog.goToDefinition": {
-            "order": 1864,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.dialog.goToDefinition.markdownDescription%"
-          },
-          "aet-eaw-edit.features.dialog.codeActions": {
-            "order": 1866,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.dialog.codeActions.markdownDescription%"
-          },
-          "aet-eaw-edit.features.tools.localisation": {
-            "order": 1900,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.tools.localisation.markdownDescription%"
-          },
-          "aet-eaw-edit.features.tools.storyEditor": {
-            "order": 1950,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.tools.storyEditor.markdownDescription%"
-          },
-          "aet-eaw-edit.features.tools.storyEditing": {
-            "order": 1955,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.tools.storyEditing.markdownDescription%"
-          },
-          "aet-eaw-edit.features.tools.storySimulator": {
-            "order": 1957,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.tools.storySimulator.markdownDescription%"
-          },
-          "aet-eaw-edit.storySimulator.assumeMediaCompletes": {
-            "order": 1958,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.storySimulator.assumeMediaCompletes.markdownDescription%"
-          },
-          "aet-eaw-edit.storySimulator.autoResume": {
-            "order": 1959,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.storySimulator.autoResume.markdownDescription%"
-          },
-          "aet-eaw-edit.features.tools.variants": {
-            "order": 2000,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.tools.variants.markdownDescription%"
-          },
-          "aet-eaw-edit.features.tools.encyclopedia": {
-            "order": 2100,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.tools.encyclopedia.markdownDescription%"
-          },
-          "aet-eaw-edit.features.tools.modBrowser": {
-            "order": 2120,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.tools.modBrowser.markdownDescription%"
-          },
-          "aet-eaw-edit.features.tools.modelPreview": {
-            "order": 2150,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "%config.features.tools.modelPreview.markdownDescription%"
-          },
-          "aet-eaw-edit.features.preview.energyPool": {
-            "order": 2155,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.features.preview.energyPool.markdownDescription%"
+            "markdownDescription": "%config.experimental.storySimulator.markdownDescription%"
           },
           "aet-eaw-edit.shaders.directory": {
             "order": 2160,
@@ -1055,56 +622,6 @@
             "format": "uri-reference",
             "scope": "machine-overridable",
             "markdownDescription": "%config.shaders.directory.markdownDescription%"
-          },
-          "aet-eaw-edit.shaders.sourceUrl": {
-            "order": 2170,
-            "type": "string",
-            "default": "",
-            "format": "uri",
-            "scope": "machine-overridable",
-            "markdownDescription": "%config.shaders.sourceUrl.markdownDescription%"
-          }
-        }
-      },
-      {
-        "title": "%config.section.lua-debugger.title%",
-        "properties": {
-          "aet-eaw-edit.game.executable": {
-            "order": 3100,
-            "type": "string",
-            "default": "",
-            "format": "uri-reference",
-            "scope": "machine-overridable",
-            "markdownDescription": "%config.game.executable.markdownDescription%"
-          },
-          "aet-eaw-edit.game.arguments": {
-            "order": 3200,
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "default": [],
-            "markdownDescription": "%config.game.arguments.markdownDescription%"
-          },
-          "aet-eaw-edit.game.luaDebugHost": {
-            "order": 3300,
-            "type": "string",
-            "default": "127.0.0.1",
-            "markdownDescription": "%config.game.luaDebugHost.markdownDescription%"
-          },
-          "aet-eaw-edit.game.luaDebugPort": {
-            "order": 3400,
-            "type": "integer",
-            "default": 1234,
-            "minimum": 1,
-            "maximum": 65535,
-            "markdownDescription": "%config.game.luaDebugPort.markdownDescription%"
-          },
-          "aet-eaw-edit.game.unsafeTableExpansion": {
-            "order": 3500,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.game.unsafeTableExpansion.markdownDescription%"
           }
         }
       }

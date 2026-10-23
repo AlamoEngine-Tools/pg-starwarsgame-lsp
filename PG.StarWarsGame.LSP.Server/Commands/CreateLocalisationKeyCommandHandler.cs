@@ -7,7 +7,6 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -17,7 +16,6 @@ namespace PG.StarWarsGame.LSP.Server.Commands;
 public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerBase
 {
     public const string CommandName = "aet-eaw-edit.lsp.createLocalisationKey";
-    private readonly ILspConfigurationProvider _config;
 
     private readonly ILocalisationEntryWriter _entryWriter;
     private readonly IFileHelper _fileHelper;
@@ -28,24 +26,16 @@ public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerB
         ILocalisationEntryWriter entryWriter,
         IFileHelper fileHelper,
         IModProjectReloadService reloadService,
-        ILogger<CreateLocalisationKeyCommandHandler> logger,
-        ILspConfigurationProvider config)
+        ILogger<CreateLocalisationKeyCommandHandler> logger)
     {
         _entryWriter = entryWriter;
         _fileHelper = fileHelper;
         _reloadService = reloadService;
         _logger = logger;
-        _config = config;
     }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
-        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
-        {
-            _logger.LogWarning("{Cmd}: {Reason}", CommandName, rejection);
-            return Unit.Value;
-        }
-
         if (request.Arguments is null || request.Arguments.Count < 2)
         {
             _logger.LogWarning("{Cmd}: missing arguments.", CommandName);

@@ -16,19 +16,16 @@ using PG.StarWarsGame.LSP.Xml;
 namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 
 /// <summary>
-///     Serves an outline's pages with their counts, and the project's layers (#270). Gated on
-///     <c>features.tools.modBrowser</c>, like the two requests below: off, each answers empty.
+///     Serves an outline's pages with their counts, and the project's layers (#270).
 /// </summary>
 public sealed class GetSymbolOutlineHandler(
     IGameIndexService index,
     ISchemaProvider schema,
-    IProjectLayerMap layers,
-    ILspConfigurationProvider config)
+    IProjectLayerMap layers)
     : IJsonRpcRequestHandler<GetSymbolOutlineParams, GetSymbolOutlineResult>
 {
     public Task<GetSymbolOutlineResult> Handle(GetSymbolOutlineParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolOutlineResult([], []));
         var catalog = SymbolCatalog.For(index.Current, schema);
         return Task.FromResult(new GetSymbolOutlineResult(catalog.Outline(request.Outline),
             layers.Layers.Select(l => new SymbolLayer(l.Rank, l.Name)).ToList()));
@@ -40,13 +37,11 @@ public sealed class GetSymbolPageHandler(
     IGameIndexService index,
     ISchemaProvider schema,
     IVariantTagSource tags,
-    IGameAssetResolver assets,
-    ILspConfigurationProvider config)
+    IGameAssetResolver assets)
     : IJsonRpcRequestHandler<GetSymbolPageParams, GetSymbolPageResult>
 {
     public Task<GetSymbolPageResult> Handle(GetSymbolPageParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolPageResult([], 0));
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema);
         if (request.Parent is not { } parent) return Task.FromResult(catalog.Page(request));
@@ -63,17 +58,15 @@ public sealed class GetSymbolNodeHandler(
     ISchemaProvider schema,
     IVariantTagSource tags,
     IGameAssetResolver assets,
-    IFileHelper fileHelper,
-    ILspConfigurationProvider config)
+    IFileHelper fileHelper)
     : IJsonRpcRequestHandler<GetSymbolNodeParams, GetSymbolNodeResult>
 {
     public Task<GetSymbolNodeResult> Handle(GetSymbolNodeParams request, CancellationToken cancellationToken)
     {
-        if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolNodeResult(null, []));
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema);
         return Task.FromResult(new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
-                config.Current.Features.Tools, EntryFiles.For(assets, fileHelper))
+                EntryFiles.For(assets, fileHelper))
             .Node(request.Page, request.Id));
     }
 }
@@ -92,12 +85,10 @@ public sealed class GetSymbolPreviewHandler(
 {
     public Task<GetSymbolPreviewResult> Handle(GetSymbolPreviewParams request, CancellationToken cancellationToken)
     {
-        var features = config.Current.Features.Tools;
-        if (!features.ModBrowser) return Task.FromResult(new GetSymbolPreviewResult(null, []));
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema);
         var relations = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
-            features, EntryFiles.For(assets, fileHelper));
+            EntryFiles.For(assets, fileHelper));
         return Task.FromResult(new SymbolPreviews(current, relations, texts, diagnostics, fileHelper.FileSystem,
                 ModelProxies.BonesFor(current, assets), schema, config.Current.Locale)
             .Preview(request.Page, request.Id));

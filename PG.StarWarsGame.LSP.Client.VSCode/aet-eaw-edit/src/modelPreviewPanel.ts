@@ -662,9 +662,8 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     /**
      * Hands the current subject to a standalone editor.
      *
-     * The preview is read-only by design; these tools are where the editing happens. Following the
-     * existing `modVerify.executable` convention, the path is a setting and nothing is guessed - the
-     * extension does not search for an install.
+     * The preview is read-only by design; these tools are where the editing happens. The path is a
+     * setting and nothing is guessed - the extension does not search for an install.
      */
     private async openExternal(tool: ExternalTool): Promise<void> {
         const executable = vscode.workspace

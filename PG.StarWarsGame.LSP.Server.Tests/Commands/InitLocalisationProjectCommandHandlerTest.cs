@@ -27,23 +27,6 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 {
     private const string PgprojPath = "/mod/mymod.pgproj";
 
-    // ── feature flag ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_LocalisationFlagOff_NoSeedFileNoReload()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (handler, fs, reload, writer, _) = BuildHandler(
-            ConfiguredLayer("Csv", "/mod/data/text"), lspConfig: config);
-
-        await handler.Handle(NoArgsRequest(), CancellationToken.None);
-
-        Assert.False(fs.File.Exists("/mod/data/text/mastertextfile.csv"));
-        Assert.False(reload.LocalisationOnlyReloaded);
-        Assert.Null(writer.LastCall);
-    }
-
     // ── already-configured root layer: format/directory come from the project, not the client ──
 
     [Fact]
@@ -289,20 +272,6 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
         Assert.Empty(notifier.Errors);
         Assert.Contains("mastertextfile.csv", Assert.Single(notifier.Infos), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Handle_LocalisationFlagOff_TellsTheUserWhy()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (handler, _, _, _, notifier) = BuildHandler(
-            ConfiguredLayer("Csv", "/mod/data/text"), lspConfig: config);
-
-        await handler.Handle(NoArgsRequest(), CancellationToken.None);
-
-        Assert.Empty(notifier.Infos);
-        Assert.Single(notifier.Errors);
     }
 
     // The likeliest one to hit in practice: run Initialise twice. It refused, said nothing, and the

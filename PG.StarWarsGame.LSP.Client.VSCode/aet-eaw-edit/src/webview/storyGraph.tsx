@@ -6483,10 +6483,9 @@ function App(): React.JSX.Element {
     const paceRef = useRef(pace);
     const [playing, setPlaying] = useState(false);
     const playingRef = useRef(false);
-    // Auto-resume: whether the setting is on, whether the last pause was the clock waiting on the
-    // author rather than the reader pressing pause, and whether the state now arriving answers
-    // something - the three things that decide if play picks itself up again.
-    const autoResumeRef = useRef(true);
+    // Auto-resume: whether the last pause was the clock waiting on the author rather than the
+    // reader pressing pause, and whether the state now arriving answers something - what decides
+    // if play picks itself up again.
     const pausedForWaitRef = useRef(false);
     // What the server last refused, shown beside the chip until the next state arrives.
     const [simNotice, setSimNotice] = useState<string | null>(null);
@@ -6935,7 +6934,7 @@ function App(): React.JSX.Element {
             } else if (
                 answeredRef.current &&
                 shouldResumeAfterAnswer({
-                    autoResume: autoResumeRef.current,
+                    autoResume: true,
                     pausedForWait: pausedForWaitRef.current,
                     stillWaiting: waiting,
                     halted: !!state.haltedAt,
@@ -7479,9 +7478,6 @@ function App(): React.JSX.Element {
                         edit: msg.edit === true,
                         simulate: msg.simulate === true,
                     });
-                    break;
-                case "simSettings":
-                    autoResumeRef.current = msg.autoResume !== false;
                     break;
                 case "confirmStageResult":
                     if (msg.proceed) {

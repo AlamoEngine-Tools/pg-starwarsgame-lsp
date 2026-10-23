@@ -107,19 +107,6 @@ public sealed class SetLocalisationProjectFormatHandlerTest
         Assert.Null(writer.LastCall);
     }
 
-    [Fact]
-    public async Task The_feature_flag_off_is_refused()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (handler, _, writer) = Build(config: config);
-
-        var result = await handler.Handle(new SetLocalisationProjectFormatParams("Dat"), CancellationToken.None);
-
-        Assert.NotNull(result.Error);
-        Assert.Null(writer.LastCall);
-    }
-
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (SetLocalisationProjectFormatHandler Handler, SpyReloadService Reload, SpyFileWriter Writer) Build(

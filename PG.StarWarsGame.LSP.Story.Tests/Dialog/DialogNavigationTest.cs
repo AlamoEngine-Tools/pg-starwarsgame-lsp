@@ -6,7 +6,6 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -74,31 +73,20 @@ public sealed class DialogNavigationTest
         };
     }
 
-    private static ILspConfigurationProvider Config(bool inlayHints = true, bool goToDefinition = true)
-    {
-        return FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
-        {
-            Dialog = new DialogFeatureFlags { InlayHints = inlayHints, GoToDefinition = goToDefinition }
-        });
-    }
-
-    private static DialogInlayHintHandler HintHandler(
-        string text, bool inScope = true, bool flag = true)
+    private static DialogInlayHintHandler HintHandler(string text, bool inScope = true)
     {
         return new DialogInlayHintHandler(
             new StubIndexService(Index()), new StubScope(inScope), new DialogFactProducer(Schema),
             new FileHelper(new MockFileSystem()),
-            new StubTextSource(Uri, text), Config(flag));
+            new StubTextSource(Uri, text));
     }
 
-    private static DialogDefinitionHandler DefinitionHandler(
-        string text, bool inScope = true, bool flag = true)
+    private static DialogDefinitionHandler DefinitionHandler(string text, bool inScope = true)
     {
         return new DialogDefinitionHandler(
             new StubIndexService(Index()), new StubScope(inScope), new DialogFactProducer(Schema),
             new FileHelper(new MockFileSystem()),
-            new StubTextSource(Uri, text), NullLogger<DialogDefinitionHandler>.Instance,
-            Config(goToDefinition: flag));
+            new StubTextSource(Uri, text), NullLogger<DialogDefinitionHandler>.Instance);
     }
 
     private static InlayHintParams Hints(int endLine = 99)
@@ -161,14 +149,6 @@ public sealed class DialogNavigationTest
         Assert.Null(await handler.Handle(Hints(), CancellationToken.None));
     }
 
-    [Fact]
-    public async Task InlayHints_FlagOff_ReturnsNull()
-    {
-        var handler = HintHandler("[CHAPTER 0]\nTEXT TEXT_INTRO", flag: false);
-
-        Assert.Null(await handler.Handle(Hints(), CancellationToken.None));
-    }
-
     // ── Go-to-definition ─────────────────────────────────────────────────────
 
     [Fact]
@@ -218,14 +198,6 @@ public sealed class DialogNavigationTest
     public async Task Definition_OutOfScopeDocument_ReturnsNull()
     {
         var handler = DefinitionHandler("[CHAPTER 0]\nDIALOG Speech_Intro", false);
-
-        Assert.Null(await handler.Handle(At(1, 10), CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task Definition_FlagOff_ReturnsNull()
-    {
-        var handler = DefinitionHandler("[CHAPTER 0]\nDIALOG Speech_Intro", flag: false);
 
         Assert.Null(await handler.Handle(At(1, 10), CancellationToken.None));
     }

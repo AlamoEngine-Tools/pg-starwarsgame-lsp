@@ -7,7 +7,6 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -32,8 +31,6 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         XmlValueType.InaccuracyMap, XmlValueType.ListMap
     ];
 
-    private readonly ILspConfigurationProvider _config;
-
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
@@ -51,8 +48,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         IFileHelper fileHelper,
         IEaWXmlContext eaWXmlContext,
         IXmlTagNameCompletionStrategyRegistry tagNameRegistry,
-        IXmlTagValueCompletionStrategyRegistry tagValueRegistry,
-        ILspConfigurationProvider config)
+        IXmlTagValueCompletionStrategyRegistry tagValueRegistry)
     {
         _parseCache = parseCache;
         _schema = schema;
@@ -62,14 +58,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         _eaWXmlContext = eaWXmlContext;
         _tagNameRegistry = tagNameRegistry;
         _tagValueRegistry = tagValueRegistry;
-        _config = config;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Xml.Completion)
-            return Task.FromResult(new CompletionList());
-
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult(new CompletionList());

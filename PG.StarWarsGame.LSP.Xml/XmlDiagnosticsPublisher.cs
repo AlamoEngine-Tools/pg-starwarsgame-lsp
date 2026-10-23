@@ -215,10 +215,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     protected override string FileExtension => ".xml";
 
-    // Feature-flag gate: a null provider (test convenience ctors) means always enabled.
-    protected override bool DiagnosticsEnabled =>
-        _configProvider?.Current.Features.Xml.Diagnostics ?? true;
-
     /// <summary>The server's texts in the configured locale.</summary>
     private IMessageCatalog Messages => ResxMessageCatalog.Server(_configProvider?.Current.Locale ?? "en");
 
@@ -285,18 +281,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (IsStoryParserDocument(uri))
             Phase("story", () => facts.AddRange(_storyProducer.Produce(parsed, uri)));
 
-        // The strictness flag removes the XML strictness group only: a file the game drops is a
-        // Syntax error and stays reported whatever the flag says.
-        var strictness = _configProvider?.Current.Features.Xml.Strictness ?? true;
-        var strictnessGroup = (int)DiagnosticGroup.XmlStrictness;
-
         var allDiags = new List<Diagnostic>();
         Phase("dispatch", () =>
         {
             foreach (var fact in facts)
             foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
             {
-                if (!strictness && result.Id?.Group == strictnessGroup) continue;
                 allDiags.Add(ToLspDiagnostic(fact, result));
             }
         });
@@ -349,12 +339,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         // Every early return below used to be silent, which is why "no diagnostics anywhere" was
         // indistinguishable from "a handler that did not fire" and took a day of inference from
         // timestamps. Whatever else is true, the log should be able to answer "did it publish?".
-        if (!DiagnosticsEnabled)
-        {
-            _logger.LogDebug("Revalidate workspace skipped: XML diagnostics are turned off");
-            return;
-        }
-
         ClearAllPublished();
         var index = _indexService.Current;
         _logger.LogInformation("Revalidating {Count} indexed document(s)", index.Documents.Count);
@@ -421,12 +405,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     public Task RevalidateDocumentAsync(string uri, CancellationToken ct)
     {
-        if (!DiagnosticsEnabled)
-        {
-            _logger.LogDebug("Revalidate {Uri} skipped: XML diagnostics are turned off", uri);
-            return Task.CompletedTask;
-        }
-
         var index = _indexService.Current;
         var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
         if (text is null)

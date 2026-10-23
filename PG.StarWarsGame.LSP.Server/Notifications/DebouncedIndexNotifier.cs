@@ -24,8 +24,7 @@ namespace PG.StarWarsGame.LSP.Server.Notifications;
 ///     <para>
 ///         Only the timing lives here. What to send, whether to send at all, and how to survive a
 ///         client that has gone away are the subclass's, because those differ completely between
-///         the two - one posts a bare method name, the other gates on a feature flag and names the
-///         campaigns it invalidated.
+///         the two - one posts a bare method name, the other names the campaigns it invalidated.
 ///     </para>
 /// </remarks>
 public abstract class DebouncedIndexNotifier

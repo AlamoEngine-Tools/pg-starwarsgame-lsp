@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
@@ -19,10 +18,9 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.CodeLens;
 /// </remarks>
 public sealed class PreviewUnitCodeLensProviderTest
 {
-    private static PreviewUnitCodeLensProvider Provider(
-        IVariantTagSource source, ILspConfigurationProvider? config = null)
+    private static PreviewUnitCodeLensProvider Provider(IVariantTagSource source)
     {
-        return new PreviewUnitCodeLensProvider(source, config ?? new FakeLspConfigurationProvider());
+        return new PreviewUnitCodeLensProvider(source);
     }
 
     private static GameSymbol Sym(string id, string? baseId = null)
@@ -140,19 +138,6 @@ public sealed class PreviewUnitCodeLensProviderTest
         var source = new TagSource().With("A", Tag("Mass", "5")).With("B", Tag("Mass", "6"));
 
         Assert.Null(Provider(source).Handle(Ctx(a, index)));
-    }
-
-    [Fact]
-    public void Handle_ModelPreviewFlagOff_EmitsNothing()
-    {
-        // The same flag the command's own enablement uses. A lens that fired a disabled command
-        // would report "command not found" at the reader.
-        var symbol = Sym("U");
-        var source = new TagSource().With("U", Tag("Space_Model_Name", "X.ALO"));
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Tools = new ToolsFeatureFlags { ModelPreview = false } });
-
-        Assert.Null(Provider(source, config).Handle(Ctx(symbol, IndexWith(symbol))));
     }
 
     [Fact]

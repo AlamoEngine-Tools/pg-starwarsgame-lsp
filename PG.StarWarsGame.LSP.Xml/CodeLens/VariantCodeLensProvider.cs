@@ -4,7 +4,6 @@
 using System.Globalization;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -13,19 +12,11 @@ namespace PG.StarWarsGame.LSP.Xml.CodeLens;
 
 /// <summary>
 ///     Emits a code lens on variant objects ("▲ variant of BASE - show effective object", which triggers the
-///     effective-object view) and on base objects ("N variants"). Only the show-effective lens is gated on
-///     <c>features.tools.variants</c> - the "N variants" references peek is plain navigation and stays on.
+///     effective-object view) and on base objects ("N variants").
 /// </summary>
 internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
 {
     public const string ShowEffectiveCommand = "aet-eaw-edit.lsp.showEffectiveObject";
-
-    private readonly ILspConfigurationProvider _config;
-
-    public VariantCodeLensProvider(ILspConfigurationProvider config)
-    {
-        _config = config;
-    }
 
     public LspCodeLens? Handle(CodeLensSymbolContext ctx)
     {
@@ -33,9 +24,6 @@ internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
 
         if (!string.IsNullOrEmpty(ctx.Symbol.VariantBaseId))
         {
-            if (!_config.Current.Features.Tools.Variants)
-                return null;
-
             return new LspCodeLens
             {
                 Range = range,

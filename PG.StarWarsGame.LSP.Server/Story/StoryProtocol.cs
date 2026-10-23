@@ -9,29 +9,8 @@ using PG.StarWarsGame.LSP.Core.Messages;
 namespace PG.StarWarsGame.LSP.Server.Story;
 
 /// <summary>
-///     Shared gating for every <c>aet/getStory*</c> endpoint: results carry the message naming
-///     exactly the setting to flip. Dependent flags do not auto-enable their prerequisites —
-///     a storyEditor request with discovery off names the missing discovery flag.
-/// </summary>
-public static class StoryEditorFeature
-{
-    public const string DisabledKey = "StoryEditorFeature_Disabled";
-
-    public const string DiscoveryMissingKey = "StoryEditorFeature_DiscoveryMissing";
-
-    public static string? Rejection(ILspConfigurationProvider config)
-    {
-        if (!config.Current.Features.Tools.StoryEditor) return new ConfiguredMessageCatalog(config).Format(DisabledKey);
-        if (!config.Current.Features.Story.Discovery)
-            return new ConfiguredMessageCatalog(config).Format(DiscoveryMissingKey);
-        return null;
-    }
-}
-
-/// <summary>
 ///     Gating for the authoring endpoints behind Edit mode - the staged-batch preview and the writes
-///     themselves. Layered on top of <see cref="StoryEditorFeature" />: the panel must be on before
-///     editing within it means anything, and whichever flag is missing is the one named.
+///     themselves. The result carries the message naming the setting to turn on.
 ///     <para>
 ///         Note that <c>aet/validateStoryCommandBatch</c> is deliberately NOT here: validating
 ///         writes nothing and the Validate button is available in every mode, so it belongs to the
@@ -44,8 +23,7 @@ public static class StoryEditingFeature
 
     public static string? Rejection(ILspConfigurationProvider config)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection) return rejection;
-        if (!config.Current.Features.Tools.StoryEditing)
+        if (!config.Current.Features.StoryEditing)
             return new ConfiguredMessageCatalog(config).Format(DisabledKey);
         return null;
     }

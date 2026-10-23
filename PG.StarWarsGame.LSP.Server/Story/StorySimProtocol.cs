@@ -8,17 +8,15 @@ using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
-/// <summary>Gating for the <c>aet/storySim*</c> endpoints - same pattern as <see cref="StoryEditorFeature" />.</summary>
+/// <summary>Gating for the <c>aet/storySim*</c> endpoints - same pattern as <see cref="StoryEditingFeature" />.</summary>
 public static class StorySimFeature
 {
     public const string DisabledKey = "StorySimFeature_Disabled";
 
     public static string? Rejection(ILspConfigurationProvider config)
     {
-        if (!config.Current.Features.Tools.StorySimulator)
+        if (!config.Current.Features.StorySimulator)
             return new ConfiguredMessageCatalog(config).Format(DisabledKey);
-        if (!config.Current.Features.Story.Discovery)
-            return new ConfiguredMessageCatalog(config).Format(StoryEditorFeature.DiscoveryMissingKey);
         return null;
     }
 }

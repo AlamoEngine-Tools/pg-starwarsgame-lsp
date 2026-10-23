@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Xml;
@@ -14,20 +13,18 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class GameHoverHandler : HoverHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<GameHoverHandler> _logger;
     private readonly ILuaHoverProvider _lua;
     private readonly IXmlHoverProvider _xml;
 
     public GameHoverHandler(IXmlHoverProvider xml, ILuaHoverProvider lua, IFileHelper fileHelper,
-        ILogger<GameHoverHandler> logger, ILspConfigurationProvider config)
+        ILogger<GameHoverHandler> logger)
     {
         _xml = xml;
         _lua = lua;
         _fileHelper = fileHelper;
         _logger = logger;
-        _config = config;
     }
 
     public override Task<Hover?> Handle(HoverParams request, CancellationToken ct)
@@ -36,18 +33,12 @@ public sealed class GameHoverHandler : HoverHandlerBase
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
         {
-            if (!_config.Current.Features.Lua.Hover)
-                return Task.FromResult<Hover?>(null);
-
             _logger.LogDebug("Routing to lua hover handlers.");
             return _lua.Handle(request, ct);
         }
 
         if (uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
         {
-            if (!_config.Current.Features.Xml.Hover)
-                return Task.FromResult<Hover?>(null);
-
             _logger.LogDebug("Routing to xml hover handlers.");
             return _xml.Handle(request, ct);
         }

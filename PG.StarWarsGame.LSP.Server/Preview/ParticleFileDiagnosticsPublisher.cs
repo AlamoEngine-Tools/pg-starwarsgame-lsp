@@ -86,16 +86,8 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
 
     protected override string FileExtension => ".alo";
 
-    protected override bool DiagnosticsEnabled => _config.Current.Features.Tools.ModelPreview;
-
     public override Task RepublishAllAsync(CancellationToken ct)
     {
-        if (!DiagnosticsEnabled)
-        {
-            _logger.LogDebug("Particle file diagnostics skipped: the model preview is turned off");
-            return Task.CompletedTask;
-        }
-
         foreach (var uri in _published)
             Publish(EmptyParams(uri));
         var published = new HashSet<string>(StringComparer.Ordinal);
