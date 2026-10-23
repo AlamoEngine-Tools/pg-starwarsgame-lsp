@@ -36,6 +36,12 @@
   <data name="AdoptModProject_ProjectExists" xml:space="preserve">
     <value>A project file already exists - {0}</value>
   </data>
+  <data name="NewModProject_ProjectExists" xml:space="preserve">
+    <value>Mod project not created: A project file already exists - {0}</value>
+  </data>
+  <data name="NewModProject_Created" xml:space="preserve">
+    <value>Mod project '{0}' created - {1}</value>
+  </data>
   <data name="AllowedValues_HereOnlySupportsTheEngine" xml:space="preserve">
     <value>&lt;{0}&gt; here only supports {1} - the engine overwrites anything else.</value>
   </data>

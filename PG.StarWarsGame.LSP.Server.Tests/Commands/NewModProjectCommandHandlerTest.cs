@@ -8,6 +8,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -160,8 +161,42 @@ public sealed class NewModProjectCommandHandlerTest
 
     private static NewModProjectCommandHandler Build(MockFileSystem fs)
     {
-        return new NewModProjectCommandHandler(
-            new FileHelper(fs), new ListLogger<NewModProjectCommandHandler>());
+        return Build(fs, new RecordingUserNotifier());
+    }
+
+    private static NewModProjectCommandHandler Build(MockFileSystem fs, RecordingUserNotifier notifier)
+    {
+        return new NewModProjectCommandHandler(new FileHelper(fs), notifier, ResxMessageCatalog.Server("en"),
+            new ListLogger<NewModProjectCommandHandler>());
+    }
+
+    // The client announced "created" whenever the command returned, and a refusal returned like a
+    // success: a project file that already existed was reported as a new project.
+    [Fact]
+    public async Task AnExistingProjectFile_IsReportedAsTheRefusal_NotAsCreated()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile("/mods/mymod/My_Mod.pgproj", new MockFileData("existing"));
+        var notifier = new RecordingUserNotifier();
+
+        await Build(fs, notifier).Handle(Params("My Mod", "/mods/mymod"), CancellationToken.None);
+
+        var error = Assert.Single(notifier.Errors);
+        Assert.Contains("My_Mod.pgproj", error);
+        Assert.Empty(notifier.Infos);
+    }
+
+    [Fact]
+    public async Task ACreatedProject_IsAnnounced_WithWhereItIs()
+    {
+        var fs = new MockFileSystem();
+        var notifier = new RecordingUserNotifier();
+
+        await Build(fs, notifier).Handle(Params("My Mod", "/mods/mymod"), CancellationToken.None);
+
+        var info = Assert.Single(notifier.Infos);
+        Assert.Contains("My Mod", info);
+        Assert.Empty(notifier.Errors);
     }
 
     private static ExecuteCommandParams Params(string name, string path)
