@@ -139,6 +139,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var baselineLocalPath = TryGetString(elem, "baselineLocalPath");
         var baselineType = TryGetString(elem, "baselineType");
         var baselineUrl = TryGetString(elem, "baselineUrl");
+        var projectFileOffered = elem.TryGetProperty("projectFileOffered", out var offered)
+                                 && offered.ValueKind == JsonValueKind.True;
 
         _logger.LogInformation(
             "ParseInitOptions: schemaLocalPath={LocalPath}, schemaUrl={Url}, baselineType={BaselineType}",
@@ -148,6 +150,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         {
             WorkspaceRoot = workspaceRoot,
             ProjectPath = projectPath,
+            ProjectFileOffered = projectFileOffered,
             GamePath = baseGamePath,
             ExpansionPath = expansionGamePath,
             ShaderPath = shaderPath,
@@ -225,6 +228,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             Diagnostics = overlayDiagnostics ?? file.Diagnostics,
             WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
             ProjectPath = overlay.ProjectPath ?? file.ProjectPath,
+            ProjectFileOffered = overlay.ProjectFileOffered,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
             ShaderPath = overlay.ShaderPath ?? file.ShaderPath,

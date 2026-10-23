@@ -136,6 +136,20 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Null(provider.Current.ProjectPath);
     }
 
+    /// <summary>The client offers a project file for a mod folder without one, and says so (#295).</summary>
+    [Fact]
+    public void LoadFrom_ProjectFileOffered_IsKept_AndDefaultsToFalse()
+    {
+        var offered = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var plain = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+
+        offered.LoadFrom(Json(new { workspaceRoot = "/mod/eaw", projectFileOffered = true }));
+        plain.LoadFrom(Json(new { workspaceRoot = "/mod/eaw" }));
+
+        Assert.True(offered.Current.ProjectFileOffered);
+        Assert.False(plain.Current.ProjectFileOffered);
+    }
+
     [Fact]
     public void LoadFrom_WithGamePath_Extracted()
     {

@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { isModFolder, offersProject } from "./modLayout";
+import { isModFolder, offersProject, projectOfferDue } from "./modLayout";
 
 function tree(directories: Record<string, string[]>) {
     return (directory: string) => directories[directory];
@@ -137,5 +137,27 @@ describe("offersProject", () => {
                 exe,
             );
         }
+    });
+});
+
+/** Whether the offer comes - which also tells the server not to raise its own error (#295). */
+describe("projectOfferDue", () => {
+    const dirs = tree({ "c:/mod": ["Data"], "c:/mod/Data": ["XML"] });
+
+    it("is due for a mod folder not yet asked about", () => {
+        assert.equal(projectOfferDue("c:/mod", dirs, none, []), true);
+    });
+
+    /** Declined for good, or answered earlier this session: no offer comes, so the error must. */
+    it("is not due for a folder already asked about, in any case", () => {
+        assert.equal(projectOfferDue("c:/mod", dirs, none, ["c:/mod"]), false);
+        assert.equal(projectOfferDue("C:/Mod", dirs, none, ["c:/mod"]), false);
+    });
+
+    it("is not due for a folder that is not offered a project", () => {
+        assert.equal(
+            projectOfferDue("c:/notes", tree({ "c:/notes": [] }), none, []),
+            false,
+        );
     });
 });

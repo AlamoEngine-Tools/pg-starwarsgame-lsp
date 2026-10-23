@@ -73,7 +73,7 @@ import { LspGateway } from "./lsp/lspGateway";
 import { RoutedLspGateway } from "./lsp/routedLspGateway";
 import { stopClient } from "./lsp/stopClient";
 import { discoverProjects } from "./projectDiscovery";
-import { isModFolder, offersProject } from "./modLayout";
+import { isModFolder, projectOfferDue } from "./modLayout";
 import {
     type ClientSpec,
     type ClientState,
@@ -909,6 +909,15 @@ function startProjectClient(
                 ),
             },
             features: resolveFeatureFlags(),
+            // A mod folder about to be offered a project file: the offer says what is missing.
+            projectFileOffered:
+                spec.projectPath === undefined &&
+                projectOfferDue(
+                    spec.workspaceRoot,
+                    subdirectories,
+                    files,
+                    askedAboutProject(context),
+                ),
         },
     };
 
@@ -1310,6 +1319,14 @@ const PROJECT_OFFER_DECLINED = "aet-eaw-edit.projectOfferDeclined";
 /** Folders offered a project file this session, so a rediscovery does not ask again. */
 const projectOffered = new Set<string>();
 
+/** The folders already asked about a project file: declined for good, or offered this session. */
+function askedAboutProject(context: vscode.ExtensionContext): string[] {
+    return [
+        ...context.globalState.get<string[]>(PROJECT_OFFER_DECLINED, []),
+        ...projectOffered,
+    ];
+}
+
 /**
  * Offers a project file for a mod opened without one (#295), once: the server writes it from what
  * the folder holds and it opens, so what was guessed is in front of the reader. Its creation
@@ -1325,9 +1342,12 @@ async function offerProjectFile(
         [],
     );
     if (
-        projectOffered.has(key) ||
-        declined.includes(key) ||
-        !offersProject(folder, subdirectories, files)
+        !projectOfferDue(
+            folder,
+            subdirectories,
+            files,
+            askedAboutProject(context),
+        )
     ) {
         return;
     }

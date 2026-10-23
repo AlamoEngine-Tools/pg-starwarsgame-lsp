@@ -14,6 +14,12 @@ public record LspConfiguration
     /// </summary>
     public string? ProjectPath { get; init; }
 
+    /// <summary>
+    ///     Whether the client offers to write a project file for the folder, which has none. The
+    ///     offer is then the message about the missing project, so the server raises none of its own.
+    /// </summary>
+    public bool ProjectFileOffered { get; init; }
+
     public string? GamePath { get; init; }
     public string? ExpansionPath { get; init; }
 

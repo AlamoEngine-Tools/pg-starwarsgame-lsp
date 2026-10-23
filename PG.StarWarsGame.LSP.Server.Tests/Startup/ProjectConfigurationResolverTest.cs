@@ -164,6 +164,23 @@ public sealed class ProjectConfigurationResolverTest
         Assert.Contains(".pgproj", message);
     }
 
+    // The client offers to write the project file for a mod folder without one (#295): an error
+    // telling the reader to create one, one popup before the offer to, only repeats it.
+    [Fact]
+    public void Resolve_NoProjectFile_TheClientOffersOne_RecordsMissing_WithoutTheError()
+    {
+        var fs = new MockFileSystem();
+        fs.AddDirectory(WorkspaceRoot);
+        var status = new ServerStatusRecorder();
+
+        var config = Build(fs, out var notifier, status, new LspConfiguration { ProjectFileOffered = true })
+            .Resolve([WorkspaceRoot]);
+
+        Assert.Null(config);
+        Assert.Empty(notifier.Errors);
+        Assert.Equal(ProjectProblem.Missing, status.ProjectProblem);
+    }
+
     [Fact]
     public void Resolve_ProjectFileFound_ReturnsResolvedConfig()
     {

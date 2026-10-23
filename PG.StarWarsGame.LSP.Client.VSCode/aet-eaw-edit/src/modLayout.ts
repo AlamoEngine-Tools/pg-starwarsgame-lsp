@@ -82,3 +82,22 @@ function isGame(directory: string, files: Listing): boolean {
         GAME_EXECUTABLES.includes(f.toLowerCase()),
     );
 }
+
+/**
+ * Whether a folder without a project file is still to be offered one: it is offered one (see
+ * {@link offersProject}) and has not been asked about yet - not declined for good, not answered
+ * earlier this session. The server is told, so it does not raise its own error over the offer.
+ *
+ * @param asked The folders already asked about, lower-cased.
+ */
+export function projectOfferDue(
+    directory: string,
+    list: Listing,
+    files: Listing,
+    asked: readonly string[],
+): boolean {
+    return (
+        !asked.includes(directory.toLowerCase()) &&
+        offersProject(directory, list, files)
+    );
+}
