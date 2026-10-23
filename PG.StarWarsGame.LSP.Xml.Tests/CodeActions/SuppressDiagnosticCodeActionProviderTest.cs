@@ -30,9 +30,9 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
                                </Units>
                                """;
 
-    private static SuppressDiagnosticCodeActionProvider BuildProvider()
+    private static SuppressDiagnosticCodeActionProvider BuildProvider(string xml = Xml)
     {
-        var host = new FakeSuppressionWorkspaceHost(Uri, Xml);
+        var host = new FakeSuppressionWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new SuppressDiagnosticCodeActionProvider(
             TestParseCache.For(host, fileHelper), fileHelper, new UnitObjectSchema());
@@ -93,6 +93,32 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
     public void NoSuppressionIsMarkedPreferred()
     {
         Assert.DoesNotContain(Actions("aetswg-004-0001"), a => a.IsPreferred);
+    }
+
+    // A comment above the XML declaration is a file the game drops: a line directive for a finding
+    // on the declaration turned a warning into that error. The file-scoped one, inside the root,
+    // still silences it.
+    [Fact]
+    public void AFindingOnTheDeclaration_IsOfferedNoLineScope_ButTheFileScope()
+    {
+        const string declared = "<?xml version=\"1.0\"?>\n<Units>\n  <Unit Name=\"A\"/>\n</Units>";
+
+        var titles = BuildProvider(declared).Handle(Ctx("aetswg-015-0001", 0))
+            .Select(a => a.CodeAction!.Title).Where(t => t.StartsWith("Suppress")).ToList();
+
+        Assert.DoesNotContain(titles, t => t.Contains("this line"));
+        Assert.Contains(titles, t => t.Contains("this file"));
+    }
+
+    [Fact]
+    public void AFindingBelowTheDeclaration_KeepsItsLineScope()
+    {
+        const string declared = "<?xml version=\"1.0\"?>\n<Units>\n  <Unit Name=\"A\"/>\n</Units>";
+
+        var titles = BuildProvider(declared).Handle(Ctx("aetswg-004-0001", 2))
+            .Select(a => a.CodeAction!.Title).ToList();
+
+        Assert.Contains(titles, t => t.Contains("this line"));
     }
 
     [Fact]
