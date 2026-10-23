@@ -63,6 +63,29 @@ describe("clientSpecs", () => {
         assert.equal(specs[0].roots, undefined);
     });
 
+    /**
+     * A panel is bound to its project's key for its whole life (#276). The single project's client
+     * was filed under a fixed key and, once a second project started, under its project file: the
+     * panels opened before that talked to no server.
+     */
+    it("files a single project under the key it keeps when a second project starts", () => {
+        const one = ["c:/dev/EaWX/FotR"];
+        const two = ["c:/dev/EaWX/FotR", "c:/dev/EaWX/Rev"];
+        const single = clientSpecs(
+            discover(one, { "c:/dev/EaWX/FotR/fotr.pgproj": pgproj("FotR") }),
+            one,
+        );
+        const several = clientSpecs(
+            discover(two, {
+                "c:/dev/EaWX/FotR/fotr.pgproj": pgproj("FotR"),
+                "c:/dev/EaWX/Rev/rev.pgproj": pgproj("Rev"),
+            }),
+            two,
+        );
+
+        assert.ok(several.some((s) => s.key === single[0].key));
+    });
+
     it("runs one client for a folder laid out like a mod with no project file", () => {
         const folders = ["c:/mods/Legacy"];
         const specs = clientSpecs(

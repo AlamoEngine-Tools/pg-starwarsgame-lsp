@@ -36,7 +36,11 @@ export interface ClientSpec {
     signature: string;
 }
 
-/** The key of the single client a one-project window runs. */
+/**
+ * The key of the client a window runs for a mod folder without a project file. A project's client is
+ * filed under its project file, with one project as with several, so a panel bound to it keeps its
+ * server when a second project starts (#276).
+ */
 export const WINDOW_CLIENT = "window";
 
 /**
@@ -64,7 +68,7 @@ export function clientSpecs(
         }
         return [
             withSignature({
-                key: WINDOW_CLIENT,
+                key: project?.path.toLowerCase() ?? WINDOW_CLIENT,
                 name: project?.name ?? "EaWEdit",
                 projectPath: project?.path,
                 workspaceRoot: first,
