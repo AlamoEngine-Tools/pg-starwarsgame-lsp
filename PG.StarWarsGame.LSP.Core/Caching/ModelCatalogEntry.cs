@@ -16,7 +16,11 @@ namespace PG.StarWarsGame.LSP.Core.Caching;
 /// </remarks>
 /// <param name="Bones">Skeleton bones unioned with mesh names.</param>
 /// <param name="Textures">Texture names bound inside the model or particle system.</param>
-public sealed record ModelCatalogEntry(string[] Bones, string[] Textures)
+/// <param name="ParticleSystem">The file is a particle system rather than a model (#270).</param>
+public sealed record ModelCatalogEntry(string[] Bones, string[] Textures, bool ParticleSystem = false)
 {
     public static readonly ModelCatalogEntry Empty = new([], []);
+
+    /// <summary>The particle names the model's proxies carry, as the file spells them (#270).</summary>
+    public string[] Proxies { get; init; } = [];
 }

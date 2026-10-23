@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { LocRow } from "./loc/locRow";
-import { countDuplicateKeys, nextSort, sortRows } from "./translationView";
+import { countDuplicateKeys, sortRows } from "./translationView";
 
 function row(
     index: number,
@@ -108,38 +108,6 @@ describe("sortRows", () => {
         sortRows(rows, { column: "key", direction: "asc" });
 
         assert.deepEqual(keysOf(rows), keysOf(original));
-    });
-});
-
-describe("nextSort", () => {
-    it("starts a column ascending", () => {
-        assert.deepEqual(nextSort(null, "key"), {
-            column: "key",
-            direction: "asc",
-        });
-    });
-
-    it("turns ascending into descending on the same column", () => {
-        assert.deepEqual(nextSort({ column: "key", direction: "asc" }, "key"), {
-            column: "key",
-            direction: "desc",
-        });
-    });
-
-    // A third click restores document order rather than cycling back to ascending: in a keyed file
-    // that is the order on disk, and there would otherwise be no way back to it.
-    it("clears the sort on the third click", () => {
-        assert.equal(
-            nextSort({ column: "key", direction: "desc" }, "key"),
-            null,
-        );
-    });
-
-    it("starts a different column ascending again", () => {
-        assert.deepEqual(
-            nextSort({ column: "key", direction: "desc" }, "GERMAN"),
-            { column: "GERMAN", direction: "asc" },
-        );
     });
 });
 

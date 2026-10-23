@@ -1,0 +1,11 @@
+[
+  {"type": "Star_Destroyer"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"dblclick": "Star_Destroyer", "in": ".data-table"},
+  {"wait": 300},
+  {"click": "Hardpoints", "in": ".rail"},
+  {"wait": 600},
+  {"click": "Star_Destroyer", "in": ".rail"},
+  {"wait": 600}
+]

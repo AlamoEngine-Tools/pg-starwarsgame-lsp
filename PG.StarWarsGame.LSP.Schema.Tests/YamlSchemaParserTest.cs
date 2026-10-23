@@ -621,6 +621,25 @@ public sealed class YamlSchemaParserTest
         Assert.Equal("Fires when control of a planet changes.", value.Description["en"]);
     }
 
+    // A member is a key and a value: the name XML writes, and what the engine uses for it where that
+    // differs - an animation type's file name. Absent, the value is the name.
+    [Fact]
+    public void ParseEnumFile_AMemberValueApartFromItsName_IsKept()
+    {
+        const string yaml = """
+                            name: AnimationType
+                            values:
+                              - name: "Transition To Move"
+                                value: MOVESTART
+                              - name: Idle
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+
+        Assert.Equal([("Transition To Move", "MOVESTART"), ("Idle", null)],
+            def.Values.Select(v => (v.Name, v.Value)));
+    }
+
     [Fact]
     public void ParseEnumFile_UntestedValue_MapsAnUntestedNote()
     {

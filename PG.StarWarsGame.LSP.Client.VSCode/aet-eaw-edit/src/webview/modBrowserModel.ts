@@ -1,0 +1,564 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+// The Mod Browser's words for the keys the server answers with (#270), and the choices its search
+// form offers. Pure, so it is testable without a webview.
+
+import * as l10n from "@vscode/l10n";
+
+import type {
+    PreviewProperty,
+    SymbolAction,
+    SymbolKindCount,
+    SymbolLayer,
+    SymbolLocation,
+    SymbolRow,
+} from "../protocol/modBrowser";
+import type { IconName } from "./shared/Icon";
+
+const XML_PREFIX = "xml:";
+/** A Scripts outline list: the scripts in one folder under Data/Scripts. */
+const SCRIPTS_PREFIX = "scripts:";
+
+/** A list's name: the game objects' list by what it holds, every other XML type by its own name. */
+export function pageLabel(page: string): string {
+    switch (page) {
+        case "xml:GameObjectType":
+            return l10n.t("Game Objects");
+        case "models":
+            return l10n.t("Models");
+        case "particleSystems":
+            return l10n.t("Particle Systems");
+        case "animations":
+            return l10n.t("Animations");
+        case "textures":
+            return l10n.t("Textures");
+        case "audio":
+            return l10n.t("Audio");
+        case "luaScripts":
+            return l10n.t("Lua Scripts");
+        case "enums":
+            return l10n.t("Enums");
+        case "schemaTypes":
+            return l10n.t("Types");
+        case "schemaTags":
+            return l10n.t("Tags");
+        case "behaviours":
+            return l10n.t("Behaviours");
+        case "enumValues":
+            return l10n.t("Values");
+        default:
+            return page.startsWith(XML_PREFIX)
+                ? page.slice(XML_PREFIX.length)
+                : page.startsWith(SCRIPTS_PREFIX)
+                  ? page.slice(SCRIPTS_PREFIX.length)
+                  : page;
+    }
+}
+
+/** A list's and an entry's picture in the rail, by the type it holds or is. */
+export function pageIcon(page: string): IconName {
+    switch (page) {
+        case "models":
+            return "model";
+        case "particleSystems":
+            return "effects";
+        case "animations":
+            return "animation";
+        case "textures":
+            return "texture";
+        case "audio":
+            return "audio";
+        case "luaScripts":
+            return "script";
+        case "enums":
+            return "enumeration";
+        case "schemaTypes":
+            return "schemaType";
+        case "schemaTags":
+            return "tag";
+        case "behaviours":
+            return "behaviour";
+        case "enumValues":
+            return "enumValue";
+        default:
+            return page.startsWith(SCRIPTS_PREFIX) ? "script" : "gameObject";
+    }
+}
+
+/** A relation's picture, by what it holds; one named after a tag is pictured as the tag. */
+export function relationIcon(relation: string): IconName {
+    switch (relation) {
+        case "models":
+        case "model":
+            return "model";
+        case "particleSystems":
+        case "particles":
+            return "effects";
+        case "sfxEvents":
+        case "samples":
+            return "audio";
+        case "speechEvents":
+            return "speech";
+        case "hardpoints":
+            return "target";
+        case "textures":
+            return "texture";
+        case "animations":
+            return "animation";
+        case "luaScript":
+        case "loadedBy":
+        case "requires":
+            return "script";
+        case "referencedBy":
+        case "usedBy":
+        case "otherReferences":
+            return "references";
+        case "definitions":
+            return "definition";
+        case "tags":
+            return "tag";
+        case "objects":
+            return "gameObject";
+        case "values":
+            return "enumValue";
+        default:
+            return "tag";
+    }
+}
+
+/** A relation's name. */
+export function relationLabel(relation: string): string {
+    switch (relation) {
+        case "models":
+            return l10n.t("Models");
+        case "particleSystems":
+            return l10n.t("Particle Systems");
+        case "particles":
+            return l10n.t("Particles");
+        case "sfxEvents":
+            return l10n.t("SFX Events");
+        case "speechEvents":
+            return l10n.t("Speech Events");
+        case "hardpoints":
+            return l10n.t("Hardpoints");
+        case "otherReferences":
+            return l10n.t("Other references");
+        case "textures":
+            return l10n.t("Textures");
+        case "samples":
+            return l10n.t("Samples");
+        case "luaScript":
+            return l10n.t("Lua Script");
+        // What names an entry is its references, as the code lens counts them; an asset's are
+        // the objects whose tags name it, an object's those the reference index holds.
+        case "referencedBy":
+        case "usedBy":
+            return l10n.t("References");
+        case "definitions":
+            return l10n.t("Definitions");
+        case "animations":
+            return l10n.t("Animations");
+        case "model":
+            return l10n.t("Model");
+        case "loadedBy":
+            return l10n.t("Loaded by");
+        case "requires":
+            return l10n.t("Requires");
+        case "tags":
+            return l10n.t("Tags");
+        case "objects":
+            return l10n.t("Game objects");
+        case "values":
+            return l10n.t("Values");
+        default:
+            return relation;
+    }
+}
+
+/**
+ * Where an entry comes from, as the panel names it: the root project is this mod, a dependency is
+ * named, then the game. The word "layer" is the plan's, never the panel's.
+ */
+export function originLabel(
+    origin: string,
+    originName: string | null | undefined,
+    layers: readonly SymbolLayer[],
+): string {
+    switch (origin) {
+        case "game":
+            return l10n.t("Game");
+        case "project":
+            return l10n.t("This project");
+        case "missing":
+            return l10n.t("Not found");
+        case "schema":
+            return l10n.t("Schema");
+    }
+    const rank = Number(origin.slice("layer:".length));
+    const leaf = Math.max(-1, ...layers.map((l) => l.rank));
+    if (layers.length > 1 && rank === leaf) {
+        return l10n.t("This mod");
+    }
+    return originName ?? layers.find((l) => l.rank === rank)?.name ?? origin;
+}
+
+/** Where a definition is, as the header names it: the file and the one-based line. */
+export function locationLabel(location: SymbolLocation): string {
+    const name = location.uri.slice(location.uri.lastIndexOf("/") + 1);
+    return `${decodeURIComponent(name)}:${location.line + 1}`;
+}
+
+/** Why a relation lists nothing. */
+export function reasonLabel(reason: string | null | undefined): string {
+    switch (reason) {
+        case "none":
+            return l10n.t("None");
+        case "notInModFiles":
+            return l10n.t("Not in the mod's files");
+        default:
+            return reason ?? "";
+    }
+}
+
+/** The origins the search form offers: every layer, the root project first, then the game. */
+export function originChoices(layers: readonly SymbolLayer[]): string[] {
+    return [
+        ...[...layers]
+            .sort((a, b) => b.rank - a.rank)
+            .map((l) => `layer:${l.rank}`),
+        "game",
+    ];
+}
+
+/** One kind the search form offers. */
+export interface KindChoice {
+    kind: string;
+    label: string;
+    /** The list holds none of it; a picked kind stays enabled, so it can be unpicked. */
+    disabled: boolean;
+}
+
+/** The kinds the search form offers: every kind the server counted, in its order. */
+export function kindChoices(
+    kinds: readonly SymbolKindCount[],
+    picked: readonly string[],
+): KindChoice[] {
+    return kinds.map((k) => ({
+        kind: k.kind,
+        label: `${k.kind} (${k.count.toLocaleString()})`,
+        disabled: k.count === 0 && !picked.includes(k.kind),
+    }));
+}
+
+/** One item of an entry's menu. */
+export interface ActionChoice {
+    action: string;
+    label: string;
+    disabled: boolean;
+    /** Why it is disabled. */
+    reason?: string;
+    /** The key that does the same. */
+    keys?: string;
+}
+
+/**
+ * An entry's menu, in groups: open and go to definition, then what the server says the entry offers,
+ * then copying its name. Before the server has answered, go to definition waits for it; a row that
+ * is no entry of its own - a missing name, a definition place - offers only its name.
+ */
+export function actionChoices(
+    canOpen: boolean,
+    actions: readonly SymbolAction[] | undefined,
+    /** Opening the entry into its preview, as the server answered; absent until it has. */
+    open?: SymbolAction | null,
+): ActionChoice[][] {
+    const choice = (
+        action: string,
+        reason: string | null | undefined,
+        keys?: string,
+    ): ActionChoice => ({
+        action,
+        label: actionLabel(action),
+        disabled: !!reason,
+        reason: reason ? actionReasonLabel(reason) : undefined,
+        keys,
+    });
+    const disabled = (item: ActionChoice, reason: string): ActionChoice => ({
+        ...item,
+        disabled: true,
+        reason,
+    });
+    if (!canOpen) {
+        const none = l10n.t("Not an entry of its own");
+        return [
+            [
+                disabled(choice("open", null, "Enter"), none),
+                disabled(choice("definition", null, "F12"), none),
+            ],
+            [choice("copyName", null)],
+        ];
+    }
+    const definition = actions?.find((a) => a.action === "definition");
+    const offered = (actions ?? []).filter((a) => a.action !== "definition");
+    return [
+        [
+            choice("open", open?.reason, "Enter"),
+            definition
+                ? choice("definition", definition.reason, "F12")
+                : disabled(
+                      choice("definition", null, "F12"),
+                      l10n.t("Loading..."),
+                  ),
+        ],
+        ...(offered.length
+            ? [offered.map((a) => choice(a.action, a.reason))]
+            : []),
+        [choice("copyName", null)],
+    ];
+}
+
+/**
+ * An entry's context menu: only what can be done. The one place an unavailable action is left out
+ * rather than disabled - a menu is a list of what to do next, not a map of the entry's actions,
+ * which the action column on its page keeps (maintainer, 2026-10-22).
+ */
+export function menuChoices(groups: ActionChoice[][]): ActionChoice[][] {
+    return groups
+        .map((group) => group.filter((c) => !c.disabled))
+        .filter((group) => group.length > 0);
+}
+
+/** A file's size in the unit it is closest to: bytes, then KB and MB, one decimal at most. */
+export function fileSize(bytes: number): string {
+    const units = ["B", "KB", "MB", "GB"];
+    let size = bytes;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+        size /= 1024;
+        unit++;
+    }
+    const shown = unit === 0 ? size : Math.round(size * 10) / 10;
+    return `${shown.toLocaleString("en-US")} ${units[unit]}`;
+}
+
+/** What a model's header counts. */
+export function factLabel(key: string): string {
+    switch (key) {
+        case "bones":
+            return l10n.t("Bones");
+        case "textures":
+            return l10n.t("Textures");
+        case "particleSystems":
+            return l10n.t("Particle Systems");
+        case "animations":
+            return l10n.t("Animations");
+        default:
+            return key;
+    }
+}
+
+/** A schema element's property, as its documentation tile names it. */
+export function propertyLabel(key: string): string {
+    switch (key) {
+        case "valueType":
+            return l10n.t("Value type");
+        case "type":
+            return l10n.t("Tag of");
+        case "references":
+            return l10n.t("References");
+        case "enum":
+            return l10n.t("Enum");
+        case "repeats":
+            return l10n.t("Repeats");
+        case "nameTag":
+            return l10n.t("Name tag");
+        case "behaviours":
+            return l10n.t("Behaviours");
+        case "flags":
+            return l10n.t("Flags");
+        case "memberOf":
+            return l10n.t("Member of");
+        case "kind":
+            return l10n.t("Kind");
+        case "bitfield":
+            return l10n.t("Bitfield");
+        default:
+            return key;
+    }
+}
+
+/**
+ * A property's value as the documentation tile shows it: an enum's kind by its name, one that is
+ * only there or not as a yes, any other as the schema names it.
+ */
+export function propertyValue(property: PreviewProperty): string {
+    if (property.key === "kind") {
+        return enumKindLabel(property.value);
+    }
+    return property.value || l10n.t("Yes");
+}
+
+/**
+ * A list table's columns, in the table's own order: an enum's values list its key and value as two
+ * fields - the name XML writes and what the engine uses - where every other list says what an entry
+ * behaves like.
+ */
+export function listColumns(relation: string | undefined): string[] {
+    return relation === "values"
+        ? ["name", "value", "type", "origin"]
+        : ["name", "type", "kinds", "origin"];
+}
+
+/** A row's type as the table and the entry's header show it: an enum by whether it is built in. */
+export function rowTypeLabel(row: SymbolRow): string {
+    return row.page === "enums" && row.type
+        ? enumKindLabel(row.type)
+        : (row.type ?? "");
+}
+
+/** Whether an enum is built into the engine or read from the game's files. */
+function enumKindLabel(kind: string): string {
+    switch (kind) {
+        case "fixed":
+            return l10n.t("Built in");
+        case "dynamic":
+            return l10n.t("Dynamic");
+        case "gameConstants":
+            return l10n.t("Game constants");
+        default:
+            return kind;
+    }
+}
+
+/** What sort of note a schema element carries, as the hovers say it. */
+export function noteLabel(kind: string): string {
+    switch (kind) {
+        case "BuggedInEngine":
+            return l10n.t("Bugged in the engine");
+        case "Deprecated":
+            return l10n.t("Deprecated");
+        case "Untested":
+            return l10n.t("Untested");
+        case "Remark":
+            return l10n.t("Remark");
+        case "Since":
+            return l10n.t("Since");
+        default:
+            return kind;
+    }
+}
+
+/**
+ * A preview problem's message: a diagnostic's is its own, one the server found in an asset is
+ * worded here from its reason, naming what no file holds.
+ */
+export function problemMessage(entry: {
+    name: string;
+    reason?: string | null;
+}): string {
+    switch (entry.reason) {
+        case "missingTexture":
+            return l10n.t("No file holds the texture - {0}", entry.name);
+        case "missingParticleSystem":
+            return l10n.t(
+                "No file holds the particle system - {0}",
+                entry.name,
+            );
+        default:
+            return entry.name;
+    }
+}
+
+/** The preview grid's cell: its least width and height, in pixels, and the gap between cells. */
+export const PREVIEW_CELL = { width: 120, height: 80, gap: 16 };
+/** The action column, flush right beside the grid, and what surrounds the two. */
+export const PREVIEW_ACTIONS = 180;
+/** The preview's padding and the gap before the action column - the stylesheet's --space-16. */
+const PREVIEW_PADDING = 16;
+
+/** How the preview lays out at a width. */
+export interface PreviewLayout {
+    actionsBeside: boolean;
+    /** A cell's width once the grid stretches over what the width leaves it. */
+    cellWidth: number;
+}
+
+/**
+ * The preview at a given width. Its grid is fixed - the adapter's columns and rows, each tile in its
+ * own cells, as Scout's logical grid - and stretches over the tab; below its least cell size it
+ * scrolls rather than reflowing. The actions keep their own column, flush right, while the whole grid
+ * fits beside them at its least cell, and go above the grid as one row when not.
+ */
+export function previewLayout(width: number, columns: number): PreviewLayout {
+    const least =
+        columns * PREVIEW_CELL.width + (columns - 1) * PREVIEW_CELL.gap;
+    const besideRoom =
+        width - 2 * PREVIEW_PADDING - PREVIEW_ACTIONS - PREVIEW_PADDING;
+    const actionsBeside = besideRoom >= least;
+    const room = actionsBeside ? besideRoom : width - 2 * PREVIEW_PADDING;
+    return {
+        actionsBeside,
+        cellWidth: Math.max(
+            PREVIEW_CELL.width,
+            (room - (columns - 1) * PREVIEW_CELL.gap) / columns,
+        ),
+    };
+}
+
+function actionLabel(action: string): string {
+    switch (action) {
+        case "open":
+            return l10n.t("Open");
+        case "definition":
+            return l10n.t("Go to definition");
+        case "previewUnit":
+            return l10n.t("Preview unit");
+        case "encyclopedia":
+            return l10n.t("Show encyclopedia card");
+        case "effectiveObject":
+            return l10n.t("Show effective object");
+        case "previewModel":
+            return l10n.t("Preview model");
+        case "previewClip":
+            return l10n.t("Preview on its model");
+        case "copyName":
+            return l10n.t("Copy name");
+        case "reveal":
+            return l10n.t("Reveal in File Explorer");
+        default:
+            return action;
+    }
+}
+
+/** Why an action is unavailable. */
+function actionReasonLabel(reason: string): string {
+    switch (reason) {
+        case "shipped":
+            return l10n.t("Only the game defines it");
+        case "binary":
+            return l10n.t("Not a text file");
+        case "schema":
+            return l10n.t("Defined by the schema");
+        case "noModel":
+            return l10n.t("Names no model");
+        case "unpaired":
+            return l10n.t("No model by its name");
+        case "noEncyclopedia":
+            return l10n.t("No encyclopedia text");
+        case "planet":
+            return l10n.t("Not for a planet");
+        case "packed":
+            return l10n.t("Packed in the game's archives");
+        case "notFound":
+            return l10n.t("No file on disk");
+        case "notAVariant":
+            return l10n.t("Not a variant");
+        case "noPreview":
+            return l10n.t("No preview for this type");
+        case "off":
+            return l10n.t("Turned off in the settings");
+        default:
+            return reason;
+    }
+}

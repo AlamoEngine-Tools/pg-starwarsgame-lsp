@@ -94,9 +94,9 @@ public static class BoneNameExtractor
     ///         the entire cost of a workspace diagnostics sweep. See <see cref="ModelTextureNames" />.
     ///     </para>
     /// </remarks>
-    public static Dictionary<string, string[]> ExtractTextures(IFileSystem fileSystem, string rootPath)
+    public static Dictionary<string, AloScan> ExtractTextures(IFileSystem fileSystem, string rootPath)
     {
-        var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, AloScan>(StringComparer.OrdinalIgnoreCase);
         if (string.IsNullOrEmpty(rootPath) || !fileSystem.Directory.Exists(rootPath))
             return result;
 
@@ -107,10 +107,10 @@ public static class BoneNameExtractor
             if (!fileSystem.Path.GetExtension(file).Equals(".alo", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            string[] textures;
+            AloScan scan;
             try
             {
-                textures = ModelTextureNames.Read(fileSystem.File.ReadAllBytes(file)).ToArray();
+                scan = ModelTextureNames.Scan(fileSystem.File.ReadAllBytes(file));
             }
             catch
             {
@@ -119,8 +119,9 @@ public static class BoneNameExtractor
             }
 
             // An empty list is a REAL answer and is kept: "this model names no textures" is what
-            // stops the validator falling back to parsing the file again on every reference.
-            result[ModelBoneKey.From(file)] = textures;
+            // stops the validator falling back to parsing the file again on every reference. The
+            // scan also says whether the file is a model or a particle system (#270).
+            result[ModelBoneKey.From(file)] = scan;
         }
 
         return result;

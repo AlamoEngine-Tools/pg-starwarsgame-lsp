@@ -86,7 +86,7 @@ public sealed class PreviewHandlersTest
 
     // ── the model list ────────────────────────────────────────────────────────
 
-    private static ListModelsHandler ListModels(bool modelPreview = true)
+    private static ListModelsHandler ListModels(bool modelPreview = true, params string[] particleSystems)
     {
         var index = GameIndex.Empty with
         {
@@ -95,7 +95,8 @@ public sealed class PreviewHandlersTest
                     "data/art/models/ev_stardestroyer.alo", "data/art/models/p_smoke.alo",
                     "data/art/textures/ev_stardestroyer.tga", "data/art/models/ev_stardestroyer.ala"
                 ],
-                ["data/art/models/my_frigate.alo"])
+                ["data/art/models/my_frigate.alo"]),
+            ParticleSystems = particleSystems.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase)
         };
         return new ListModelsHandler(new FakeGameIndexService(index), Config(modelPreview));
     }
@@ -113,6 +114,16 @@ public sealed class PreviewHandlersTest
         Assert.Equal(
             ["ev_stardestroyer.alo", "my_frigate.alo", "p_smoke.alo"],
             result.Models.Select(m => m.Name));
+    }
+
+    // Models and particle systems share the extension (#270); the scan that reads every .alo knows
+    // which is which. One it never classified - packed somewhere unscanned - is still offered.
+    [Fact]
+    public async Task ListModels_LeavesOutTheParticleSystemsTheCatalogKnows()
+    {
+        var result = await ListModels(true, "P_SMOKE.ALO").Handle(new ListModelsParams(), CancellationToken.None);
+
+        Assert.Equal(["ev_stardestroyer.alo", "my_frigate.alo"], result.Models.Select(m => m.Name));
     }
 
     [Fact]

@@ -49,7 +49,9 @@ public sealed class DeathAnimationClipHandler : XmlDiagnosticsHandler<DeathAnima
         var model = ClipModel(unit);
         if (model is null || !ctx.Index.ModelBones.ContainsKey(ModelBoneKey.From(model))) return [];
 
-        var takes = ModelAnimationClips.CountOfType(ModelAnimationClips.For(ctx.Index, model), model, type);
+        // Clips are filed under the type's own name, which is not always the name XML writes.
+        var fileName = ModelAnimationClips.FileNameOf(ctx.Schema.GetTag(TypeTag)?.Enum, type);
+        var takes = ModelAnimationClips.CountOfType(ModelAnimationClips.For(ctx.Index, model), model, fileName);
 
         // Unset or empty is a random take, which needs one take to exist. A value that is not a number is the
         // value validator's finding.

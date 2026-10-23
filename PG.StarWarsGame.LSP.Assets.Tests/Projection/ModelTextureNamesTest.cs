@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
+using PG.StarWarsGame.LSP.Assets.Tests.Models;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
@@ -39,5 +40,37 @@ public sealed class ModelTextureNamesTest
         // this is the same rule the 3D preview follows.
         Assert.Equal(AloFileKind.Unknown, AloFile.Classify([0, 0, 0, 0]));
         Assert.Empty(ModelTextureNames.Read([0, 0, 0, 0]));
+    }
+
+    // The kind comes off the root chunk alone (#270): a particle system is known as one even when
+    // its emitters cannot be read, so the model list can leave it out without parsing anything.
+    [Theory]
+    [InlineData(new byte[] { 0x00, 0x09, 0x00, 0x00 }, AloFileKind.Particle)]
+    [InlineData(new byte[] { 0x00, 0x15, 0x00, 0x00 }, AloFileKind.Particle)]
+    [InlineData(new byte[] { 0x00, 0x02, 0x00, 0x00 }, AloFileKind.Model)]
+    [InlineData(new byte[] { 1, 2, 3, 4 }, AloFileKind.Unknown)]
+    public void Scan_KnowsTheKind_EvenWhenTheTexturesCannotBeRead(byte[] bytes, AloFileKind kind)
+    {
+        var scan = ModelTextureNames.Scan(bytes);
+
+        Assert.Equal(kind, scan.Kind);
+        Assert.Empty(scan.Textures);
+    }
+
+    // The particle systems a model's proxies name come from the same read as its textures, so a
+    // system can list the models that carry it without a second pass over every model (#270).
+    [Fact]
+    public void Scan_AModel_AlsoNamesItsProxies()
+    {
+        var alo = AloChunkFixture.Concat(
+            AloChunkFixture.Skeleton(
+                AloChunkFixture.Bone("ROOT", -1, true, AloChunkFixture.Translation(0, 0, 0)),
+                AloChunkFixture.Bone("Engine_00", 0, true, AloChunkFixture.Translation(0, 0, 0))),
+            AloChunkFixture.Connections(proxies: [AloChunkFixture.Proxy("P_Engine_Glow_ALT2", 1)]));
+
+        var scan = ModelTextureNames.Scan(alo);
+
+        Assert.Equal(AloFileKind.Model, scan.Kind);
+        Assert.Equal(["P_Engine_Glow_ALT2"], scan.Proxies);
     }
 }

@@ -225,25 +225,28 @@ describe("documentSelectorFor", () => {
         const folders = ["c:/dev/EaWX/Rev", "c:/dev/EaWX/FotR"];
         const [, fotr] = clientSpecs(discover(folders, EAWX), folders);
 
+        const root = "[cC]:/[dD][eE][vV]/[eE][aA][wW][xX]/[fF][oO][tT][rR]";
         assert.deepEqual(documentSelectorFor(fotr), [
-            { scheme: "file", language: "xml", pattern: "c:/dev/EaWX/FotR/**" },
-            { scheme: "file", language: "lua", pattern: "c:/dev/EaWX/FotR/**" },
+            { scheme: "file", language: "xml", pattern: `${root}/**` },
+            { scheme: "file", language: "lua", pattern: `${root}/**` },
             {
                 scheme: "file",
                 language: "plaintext",
-                pattern: "c:/dev/EaWX/FotR/**/*.txt",
+                pattern: `${root}/**/*.txt`,
             },
         ]);
     });
 });
 
-describe("documentSelectorFor drive letters", () => {
+describe("documentSelectorFor case", () => {
     /**
      * Measured in a live window: VS Code matches a selector's pattern against its own spelling of
-     * the path, which has a lower-case drive letter, and the match is case-sensitive. A root spelled
-     * from the disk ("C:/...") selected nothing, and no project's server received a single file.
+     * the path, case-sensitively. A root spelled from the disk ("C:/...") selected nothing against
+     * VS Code's lower-case drive letter, and a file opened under another spelling of its path - a
+     * definition the server handed out (#291) - reached no project's server and got no
+     * diagnostics. A project owns a path the way the server compares one: ignoring case.
      */
-    it("spells the drive letter as VS Code does", () => {
+    it("matches the root in any case", () => {
         const spec = {
             ...clientSpecs(
                 discover(["c:/m", "c:/n"], {
@@ -255,7 +258,10 @@ describe("documentSelectorFor drive letters", () => {
             roots: ["C:\\Mods\\M"],
         };
 
-        assert.equal(documentSelectorFor(spec)[0].pattern, "c:/Mods/M/**");
+        assert.equal(
+            documentSelectorFor(spec)[0].pattern,
+            "[cC]:/[mM][oO][dD][sS]/[mM]/**",
+        );
     });
 });
 

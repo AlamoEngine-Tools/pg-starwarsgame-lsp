@@ -117,6 +117,10 @@ export const fittedCss = `
        which would run the search text under the buttons. */
     --search-modes-inset: 78px;
 
+    /* The bar down a row's leading edge that says it carries a finding, in the finding's severity
+       colour. 3px is the width the loc grids drew it at; every table of rows shares it. */
+    --severity-stripe: 3px;
+
     /* The 3D viewport's own ground, and the one colour in the layer that deliberately does NOT
        follow the theme. The canvas has to paint something: left transparent it borrows the panel
        background, an unlit hull on a dark theme goes invisible, and a blend punches black through
@@ -275,6 +279,11 @@ export const colourTokens: readonly ColourToken[] = [
         fallback: "#04395e",
     },
     {
+        name: "--colour-selected-ink",
+        from: "--vscode-list-activeSelectionForeground",
+        fallback: "#ffffff",
+    },
+    {
         name: "--colour-toolbar-hover",
         from: "--vscode-toolbar-hoverBackground",
         fallback: "#5a5d5e",
@@ -328,6 +337,73 @@ export const colourTokens: readonly ColourToken[] = [
         name: "--colour-data-neutral",
         from: "--vscode-charts-foreground",
         fallback: "#e7e7e7",
+    },
+
+    // A link: a name that goes somewhere - a file, a base object, an entry. The same host colour
+    // as --colour-heading, under the role it actually has.
+    {
+        name: "--colour-link",
+        from: "--vscode-textLink-foreground",
+        fallback: "#4daafc",
+    },
+    {
+        name: "--colour-link-hover",
+        from: "--vscode-textLink-activeForeground",
+        fallback: "#6fb3ff",
+    },
+
+    // A tag: what classifies a thing, as the editor's own count badges.
+    {
+        name: "--colour-badge",
+        from: "--vscode-badge-background",
+        fallback: "#616161",
+    },
+    {
+        name: "--colour-badge-ink",
+        from: "--vscode-badge-foreground",
+        fallback: "#f8f8f8",
+    },
+
+    // Tabs inside a panel, read as the editor's own tab strip.
+    {
+        name: "--colour-tabs",
+        from: "--vscode-editorGroupHeader-tabsBackground",
+        fallback: "#252526",
+    },
+    {
+        name: "--colour-tabs-line",
+        from: "--vscode-editorGroupHeader-tabsBorder",
+        fallback: "#2b2b2b",
+    },
+    {
+        name: "--colour-tab",
+        from: "--vscode-tab-inactiveBackground",
+        fallback: "#2d2d2d",
+    },
+    {
+        name: "--colour-tab-ink",
+        from: "--vscode-tab-inactiveForeground",
+        fallback: "#969696",
+    },
+    {
+        name: "--colour-tab-line",
+        from: "--vscode-tab-border",
+        fallback: "#252526",
+    },
+    {
+        name: "--colour-tab-active",
+        from: "--vscode-tab-activeBackground",
+        fallback: "#1e1e1e",
+    },
+    {
+        name: "--colour-tab-active-ink",
+        from: "--vscode-tab-activeForeground",
+        fallback: "#ffffff",
+    },
+    {
+        name: "--colour-tab-active-edge",
+        from: "--vscode-tab-activeBorderTop",
+        fallback: "#0078d4",
     },
 ];
 

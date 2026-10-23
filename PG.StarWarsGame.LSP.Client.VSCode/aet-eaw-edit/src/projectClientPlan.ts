@@ -132,19 +132,22 @@ export function documentSelectorFor(spec: ClientSpec): DocumentFilter[] {
         ];
     }
 
-    // VS Code matches the pattern against its own spelling of the path, case-sensitively, and spells
-    // a drive letter in lower case: a root spelled "C:/..." selects nothing.
-    return spec.roots.map(vscodeSpelling).flatMap((root) => [
+    // VS Code matches the pattern against its own spelling of the path, case-sensitively: a root
+    // spelled "C:/..." selected nothing against its lower-case drive letter, and a file opened under
+    // another spelling of its path reached no server (#291). A project owns a path the way the
+    // server compares one, ignoring case - as ownerKey does.
+    return spec.roots.map(anyCase).flatMap((root) => [
         { scheme: "file", language: "xml", pattern: `${root}/**` },
         { scheme: "file", language: "lua", pattern: `${root}/**` },
         { scheme: "file", language: "plaintext", pattern: `${root}/**/*.txt` },
     ]);
 }
 
-function vscodeSpelling(path: string): string {
+/** A glob for `path` in any case: each letter a class of both of its cases. */
+function anyCase(path: string): string {
     return slashed(path).replace(
-        /^([A-Za-z]):/,
-        (_, drive: string) => `${drive.toLowerCase()}:`,
+        /[A-Za-z]/g,
+        (c) => `[${c.toLowerCase()}${c.toUpperCase()}]`,
     );
 }
 

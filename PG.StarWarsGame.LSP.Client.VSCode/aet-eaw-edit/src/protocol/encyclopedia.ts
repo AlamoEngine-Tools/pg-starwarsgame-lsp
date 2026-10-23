@@ -7,6 +7,8 @@
 
 // ── aet/getEncyclopediaEntry ─────────────────────────────────────────────────
 
+export const GET_ENCYCLOPEDIA_ENTRY = "aet/getEncyclopediaEntry";
+
 export interface GetEncyclopediaEntryParams {
     objectId: string;
     /**

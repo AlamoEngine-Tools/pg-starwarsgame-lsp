@@ -32,32 +32,48 @@ public static class ModelTextureNames
     /// </summary>
     public static IReadOnlyList<string> Read(byte[] bytes)
     {
-        if (bytes.Length == 0) return [];
+        return Scan(bytes).Textures;
+    }
+
+    /// <summary>
+    ///     What the file is and the textures it names. The kind comes off the root chunk alone, so
+    ///     a particle system is known as one even when its emitters cannot be read (#270).
+    /// </summary>
+    public static AloScan Scan(byte[] bytes)
+    {
+        if (bytes.Length == 0) return AloScan.Unreadable;
+
+        var kind = AloFile.Classify(bytes);
 
         try
         {
             // A particle system and a model are both .alo and are told apart by their first chunk,
             // exactly as the preview does it. Reading one as the other throws rather than lying.
-            return AloFile.Classify(bytes) switch
+            if (kind == AloFileKind.Model)
             {
-                AloFileKind.Particle => ParticleTextures(bytes),
-                AloFileKind.Model => ModelTextures(bytes),
-                _ => []
-            };
+                // One read for both: the model's textures and the particle systems its proxies name.
+                var model = AloModelReader.Read(bytes);
+                return new AloScan(kind, ModelTextures(model))
+                {
+                    Proxies = [.. model.Proxies.Select(p => p.Name)]
+                };
+            }
+
+            return new AloScan(kind, kind == AloFileKind.Particle ? ParticleTextures(bytes) : []);
         }
         catch
         {
             // Corrupt, unsupported, or not a model at all. ModelFileFormat is the diagnostic that
             // owns "this .alo is not readable"; one bad file must never abort the scan.
-            return [];
+            return new AloScan(kind, []);
         }
     }
 
-    private static IReadOnlyList<string> ModelTextures(byte[] bytes)
+    private static IReadOnlyList<string> ModelTextures(AlamoModelContent model)
     {
         var names = new List<string>();
 
-        foreach (var mesh in AloModelReader.Read(bytes).Meshes)
+        foreach (var mesh in model.Meshes)
         foreach (var sub in mesh.SubMeshes)
         foreach (var parameter in sub.Parameters)
             if (parameter.Type == AlamoShaderParameterType.Texture

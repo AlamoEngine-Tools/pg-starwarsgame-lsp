@@ -1,0 +1,10 @@
+[
+  ["aet/getSymbolOutline", {"outline": "gameData"}],
+  ["aet/getSymbolPage", {"page": "xml:GameObjectType", "offset": 0, "limit": 200}],
+  ["aet/getSymbolPage", {"page": "xml:GameObjectType", "query": "Star_Destroyer", "offset": 0, "limit": 200}],
+  ["aet/getSymbolNode", {"page": "xml:GameObjectType", "id": "Star_Destroyer"}],
+  ["aet/getEncyclopediaEntry", {"objectId": "Star_Destroyer"}],
+  ["aet/getSymbolNode", {"page": "xml:GameObjectType", "id": "Generic_Star_Destroyer"}],
+  ["aet/getEncyclopediaEntry", {"objectId": "Generic_Star_Destroyer"}],
+  ["aet/getSymbolPage", {"page": "xml:GameObjectType", "parent": {"page": "xml:GameObjectType", "id": "Star_Destroyer", "relation": "hardpoints"}, "offset": 0, "limit": 200}]
+]

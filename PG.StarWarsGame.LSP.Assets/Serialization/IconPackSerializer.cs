@@ -38,6 +38,23 @@ public static class IconPackSerializer
         return baselinePath + ".icons";
     }
 
+    /// <summary>
+    ///     The bytes to write over <paramref name="previous" />: those bytes themselves when they hold
+    ///     the same icons, their build time included; otherwise a new build. Like
+    ///     <see cref="BaselineSerializer.SerializeOver" />, so a rebuild that changes nothing changes no byte.
+    /// </summary>
+    public static byte[] SerializeOver(
+        IReadOnlyDictionary<string, byte[]> icons,
+        string sourceManifestHash,
+        DateTimeOffset builtAt,
+        byte[]? previous)
+    {
+        if (previous is null || Deserialize(previous) is not { } earlier)
+            return Serialize(icons, sourceManifestHash, builtAt);
+        var same = Serialize(icons, sourceManifestHash, earlier.BuiltAt);
+        return same.AsSpan().SequenceEqual(previous) ? previous : Serialize(icons, sourceManifestHash, builtAt);
+    }
+
     public static byte[] Serialize(
         IReadOnlyDictionary<string, byte[]> icons,
         string sourceManifestHash,
@@ -47,7 +64,12 @@ public static class IconPackSerializer
 
         var dto = new SerializedIconPack
         {
-            Icons = icons.Select(kv => new SerializedIcon { Name = kv.Key, Png = kv.Value }).ToArray(),
+            // Ordinal order, so two builds of the same icons are one file.
+            Icons =
+            [
+                .. icons.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                    .Select(kv => new SerializedIcon { Name = kv.Key, Png = kv.Value })
+            ],
             SchemaVersion = SerializedIconPack.CurrentSchemaVersion,
             SourceManifestHash = sourceManifestHash,
             BuiltAtMs = builtAt.ToUnixTimeMilliseconds()

@@ -4,7 +4,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { modelPickItems, pickedModelName } from "./modelPicker";
+import {
+    modelPickItems,
+    pickedModelName,
+    previewSubjectFor,
+} from "./modelPicker";
 
 describe("modelPickItems", () => {
     it("labels each model by name and says where it comes from", () => {
@@ -42,5 +46,22 @@ describe("pickedModelName", () => {
 
     it("opens nothing for an empty entry", () => {
         assert.equal(pickedModelName(undefined, "   "), null);
+    });
+});
+
+describe("previewSubjectFor", () => {
+    it("previews a model by its name", () => {
+        assert.deepEqual(previewSubjectFor("ev_tie.alo"), {
+            kind: "model",
+            modelReference: "ev_tie.alo",
+        });
+    });
+
+    // An animation names no model: the server pairs it with one and selects it there.
+    it("previews an animation on its model, whatever the extension's case", () => {
+        assert.deepEqual(previewSubjectFor("EV_TIE_IDLE.ALA"), {
+            kind: "animation",
+            animationReference: "EV_TIE_IDLE.ALA",
+        });
     });
 });

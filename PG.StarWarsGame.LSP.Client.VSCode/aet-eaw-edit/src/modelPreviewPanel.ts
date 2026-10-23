@@ -14,6 +14,7 @@ import { subMeshGeometryReply } from "./lsp/subMeshGeometry";
 import { ModelInspectorPanel } from "./modelInspectorPanel";
 import { PanelProject } from "./panelProject";
 import {
+    GET_MODEL_DETAIL,
     GetModelDetailResult,
     GetModelGlbResult,
     GetModelTextureResult,
@@ -566,7 +567,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      */
     private async sendModelDetail(modelReference: string): Promise<void> {
         const result = await this.project.gateway.request<GetModelDetailResult>(
-            "aet/getModelDetail",
+            GET_MODEL_DETAIL,
             { modelReference },
         );
 

@@ -45,6 +45,7 @@ using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Debug;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Icons;
+using PG.StarWarsGame.LSP.Server.ModBrowser;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -184,6 +185,10 @@ public static class ServerConfigurator
             .WithHandler<GetEncyclopediaEntryHandler>()
             .WithHandler<GetPreviewSceneHandler>()
             .WithHandler<ListModelsHandler>()
+            .WithHandler<GetSymbolOutlineHandler>()
+            .WithHandler<GetSymbolPageHandler>()
+            .WithHandler<GetSymbolNodeHandler>()
+            .WithHandler<GetSymbolPreviewHandler>()
             .WithHandler<GetServerStatusHandler>()
             .WithHandler<GetModelGlbHandler>()
             .WithHandler<GetModelDetailHandler>()

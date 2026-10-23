@@ -20,15 +20,19 @@
 // the webview's content-security policy to allow. Tree-shaken, so only what this table names ships.
 
 import {
+    IconActivity,
     IconAdjustments,
     IconAlertTriangle,
     IconArrowBackUp,
+    IconArrowDown,
+    IconArrowUp,
     IconAsterisk,
     IconAxisX,
     IconBone,
     IconBook,
     IconBox,
     IconCamera,
+    IconCategory,
     IconCheck,
     IconChevronDown,
     IconChevronRight,
@@ -40,12 +44,16 @@ import {
     IconCoins,
     IconCrosshair,
     IconCube,
+    IconCube3dSphere,
     IconDeviceFloppy,
+    IconDots,
     IconExternalLink,
     IconEye,
     IconEyeClosed,
     IconEyeDotted,
     IconFileCode,
+    IconFilter,
+    IconFolderOpen,
     IconFilterOff,
     IconFlag,
     IconFlame,
@@ -54,15 +62,22 @@ import {
     IconHeartBroken,
     IconHierarchy,
     IconHistory,
+    IconId,
     IconInfoCircle,
+    IconLayersUnion,
     IconLayoutGrid,
     IconLetterCase,
+    IconLink,
+    IconListDetails,
     IconListTree,
     IconMesh,
+    IconMessage,
     IconMinus,
+    IconMovie,
     IconPencil,
     IconPerspective,
     IconPhoto,
+    IconPin,
     IconPlanet,
     IconPlayerPause,
     IconPlayerPlay,
@@ -71,6 +86,7 @@ import {
     IconPlayerStop,
     IconPlayerTrackNext,
     IconPlayerTrackPrev,
+    IconPoint,
     IconPlus,
     IconPolygon,
     type IconProps,
@@ -80,6 +96,7 @@ import {
     IconRepeat,
     IconRoute,
     IconRuler,
+    IconSchema,
     IconScript,
     IconSearch,
     IconSettings,
@@ -91,12 +108,15 @@ import {
     IconSunHigh,
     IconSunLow,
     IconSwords,
+    IconTag,
     IconTargetArrow,
     IconTexture,
     IconTimeline,
     IconTool,
     IconTrash,
     IconUsers,
+    IconView360,
+    IconVolume,
     IconWind,
     IconWorld,
     IconX,
@@ -219,12 +239,26 @@ const ICONS = {
     check: IconCheck,
     download: IconCloudDownload,
     open: IconExternalLink,
+    moreActions: IconDots,
+    /** Keeps a preview tab open, so the next entry opened gets a tab of its own. */
+    pin: IconPin,
+    /** The column a table is sorted by, and which way. */
+    sortAscending: IconArrowUp,
+    sortDescending: IconArrowDown,
+
+    // What an entry of the Mod Browser opens in: the assembled unit or a model in the 3D preview,
+    // the object's encyclopedia card, the object with its variant chain merged.
+    preview3d: IconView360,
+    encyclopediaCard: IconId,
+    effectiveObject: IconLayersUnion,
 
     // Jumping to where a name is DECLARED, which is not the same as `open` - that one is an
     // external link and means "hand this to another application". Drawn as the EDITOR's own
     // go-to-file, because the story graph already draws it that way and one action must not look
     // like two. `iconSource` routes it; the entry stays here so the meaning is still listed.
     definition: IconFileCode,
+    /** Shows a file in the operating system's file manager. */
+    reveal: IconFolderOpen,
     expanded: IconChevronDown,
     collapsed: IconChevronRight,
 
@@ -234,6 +268,8 @@ const ICONS = {
     // Taking every filter OFF at once. Not `reset`, which undoes what you did to the SUBJECT, and
     // not `search`, which is the control that put a filter on in the first place.
     clearFilter: IconFilterOff,
+    // A column's own filter, in its header.
+    filter: IconFilter,
 
     // Recomputing the automatic layout. The glyph is the shape the layout produces - a graph laid
     // out in ranks - because "arrange" on its own could mean sorting a list.
@@ -276,6 +312,21 @@ const ICONS = {
     breakpoint: IconCircleDot,
     // The tint that shows which edges the story has run along.
     flow: IconRoute,
+    // What the Mod Browser lists, by what each thing is. A game object is an object of an XML type,
+    // never a unit: most of them are not units. `script` above is the Lua script, as the story's.
+    gameObject: IconCategory,
+    model: IconCube3dSphere,
+    animation: IconMovie,
+    audio: IconVolume,
+    speech: IconMessage,
+    enumeration: IconListDetails,
+    references: IconLink,
+    tag: IconTag,
+    // The Schema outline's types and behaviours.
+    schemaType: IconSchema,
+    behaviour: IconActivity,
+    // One value of an enum.
+    enumValue: IconPoint,
 } satisfies Record<string, ComponentType<IconProps>>;
 
 export type IconName = keyof typeof ICONS;

@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -76,6 +77,34 @@ public sealed class DeathAnimationClipHandlerTest
         Assert.Contains("Crushed", d.Message);
         Assert.Contains("no death animation", d.Message);
         Assert.DoesNotContain("removed", d.Message);
+    }
+
+    // The engine files a type's clips under its own name for it, not the name XML writes: Choke_Die's are
+    // <model>_CHOKEDEATH_<NN>. Measured on the 2024 build - the model loader's per-type names.
+    [Fact]
+    public void A_type_is_looked_up_by_the_name_its_files_are_filed_under()
+    {
+        var ctx = Ctx(Mandalorian, ["data/art/models/ni_mandalorian_chokedeath_00.ala"],
+                ("Land_Model_Name", "NI_Mandalorian.alo"), ("Specific_Death_Anim_Type", "Choke_Die"))
+            with
+            {
+                Schema = new DeathTypeSchema()
+            };
+
+        Assert.Empty(Sut.Handle(Fact(), ctx));
+    }
+
+    [Fact]
+    public void A_file_named_after_the_xml_name_is_not_the_types()
+    {
+        var ctx = Ctx(Mandalorian, ["data/art/models/ni_mandalorian_choke_die_00.ala"],
+                ("Land_Model_Name", "NI_Mandalorian.alo"), ("Specific_Death_Anim_Type", "Choke_Die"))
+            with
+            {
+                Schema = new DeathTypeSchema()
+            };
+
+        Assert.Contains("no death animation", Assert.Single(Sut.Handle(Fact(), ctx).ToList()).Message);
     }
 
     // Remove_Upon_Death turns a missing animation into a unit that vanishes: Init destroys it on the failure.
@@ -191,5 +220,60 @@ public sealed class DeathAnimationClipHandlerTest
             return new EffectiveObject(id, "GameObjectType", true, false, null, [id],
                 [.. tags.Select(t => new EffectiveTag(t.Tag, t.Value, t.Value, VariantProvenance.Own, id, null))]);
         }
+    }
+}
+
+/// <summary>The death type tag, typed with the animation types: Choke_Die filed apart from its name, as the engine files it.</summary>
+file sealed class DeathTypeSchema : ISchemaProvider
+{
+    private static readonly XmlTagDefinition DeathType = new()
+    {
+        Tag = "Specific_Death_Anim_Type", ValueType = XmlValueType.DynamicEnumValue, ReferenceKind = ReferenceKind.Enum,
+        Enum = new EnumDefinition
+        {
+            Name = "AnimationType",
+            Values =
+            [
+                new EnumValueDefinition { Name = "Die" },
+                new EnumValueDefinition { Name = "Choke_Die", Value = "CHOKEDEATH" }
+            ]
+        }
+    };
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return tagName.Equals(DeathType.Tag, StringComparison.OrdinalIgnoreCase) ? DeathType : null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [DeathType];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [DeathType];
+    }
+
+    public EnumDefinition? GetEnum(string enumName)
+    {
+        return enumName == "AnimationType" ? DeathType.Enum : null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => [DeathType];
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+    public IReadOnlyList<EnumDefinition> AllEnums => [DeathType.Enum!];
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
     }
 }

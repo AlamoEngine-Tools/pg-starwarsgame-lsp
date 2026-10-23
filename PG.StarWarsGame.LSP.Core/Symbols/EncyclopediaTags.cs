@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Schema;
+
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 /// <summary>
@@ -104,6 +106,21 @@ public static class EncyclopediaTags
         }
 
         return false;
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="symbol" /> has an encyclopedia card to show: its text defines a body
+    ///     (<see cref="DefinesBody" />) and it does not behave like a planet. A planet's popup is a
+    ///     preview of its own, not the unit card, so nothing offers the card for one.
+    /// </summary>
+    /// <remarks>
+    ///     <c>planet</c> is the schema's Planet kind; where the schema has none, the text alone decides.
+    /// </remarks>
+    public static bool HasCard(GameIndex index, IVariantTagSource workspaceSource, GameSymbol symbol,
+        ObjectKindDefinition? planet)
+    {
+        return DefinesBody(index, workspaceSource, symbol)
+               && (planet is null || ObjectKinds.Match(index, symbol, planet) != KindMatch.Yes);
     }
 
     private static bool LayerDefinesBody(

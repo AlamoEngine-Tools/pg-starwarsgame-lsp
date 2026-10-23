@@ -152,38 +152,8 @@ const Shell = styled.div`
 
     /* ── Foot of the editor: what the tag has to say ────────────────────── */
 
-    .encyclopedia-problems {
-        position: relative;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
-        background: var(--vscode-sideBar-background, #252526);
-        font-size: var(--font-size-12);
-    }
-
-    /* This editor's notices are PROSE, not the short entry labels the other two report, so they
-       wrap instead of being clamped to the row - the shared rule's one-line ellipsis would hide
-       most of every message. Full width is available here, which is the whole reason these moved
-       out of the dock. */
-
-    .encyclopedia-problems .problem-row {
-        align-items: flex-start;
-        padding: var(--space-2) var(--space-6);
-    }
-
-    .encyclopedia-problems .problem-msg {
-        white-space: normal;
-        overflow: visible;
-        line-height: 1.35;
-        /* A Windows path has no break opportunity in it, so without this it runs off the edge. */
-        overflow-wrap: anywhere;
-    }
-
-    .encyclopedia-problems .problem-row .codicon {
-        margin-top: var(--space-2);
-    }
+    /* The band and its prose rows are problemsPanelCss's .problems-band and .prose-problems: these
+       notices are prose, and full width is available here, which is why they moved out of the dock. */
 
     /* ── Content: the ship name pool ────────────────────────────────────── */
     /* A real list, one name per row, scrolling in place - the Star Destroyer pool alone is nineteen
@@ -401,7 +371,7 @@ function App(): React.JSX.Element {
 
                 {noticesOpen && notices.length > 0 && (
                     <ProblemsPanel
-                        className="encyclopedia-problems"
+                        className="encyclopedia-problems problems-band prose-problems"
                         memoKey="encyclopedia.problems"
                         defaultHeight={120}
                         title={noticeTitle}

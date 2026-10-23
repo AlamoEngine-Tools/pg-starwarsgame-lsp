@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Projection;
+using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -246,6 +247,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         foreach (var (path, textures) in baselineTextures)
             mergedTextures[path] = textures;
 
+        // Which .alo files are particle systems (#270), the workspace's entry deciding for its name.
+        var particleSystems = _indexService.Current.Baseline.ParticleSystems.ToBuilder();
+        // Each model's proxy names (#270), the workspace's model replacing the shipped one's.
+        var proxies = _indexService.Current.Baseline.ModelProxies.ToBuilder();
+
         var workspaceCount = 0;
         var reusedLayers = 0;
         var layerCount = 0;
@@ -266,6 +272,9 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 // An empty texture list is recorded on purpose: it is the answer "this model names
                 // none", and it is what keeps the validator from reopening the file to find out.
                 mergedTextures[path] = [.. entry.Textures];
+                if (entry.ParticleSystem) particleSystems.Add(path);
+                else particleSystems.Remove(path);
+                proxies[path] = [.. entry.Proxies];
                 workspaceCount++;
             }
         }
@@ -279,6 +288,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         _indexService.ApplyModelBones(mergedBones.ToImmutable());
         _indexService.ApplyModelTextures(mergedTextures.ToImmutable());
+        _indexService.ApplyParticleSystems(particleSystems.ToImmutable());
+        _indexService.ApplyModelProxies(proxies.ToImmutable());
     }
 
 
@@ -475,10 +486,12 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             foreach (var (path, names) in BoneNameExtractor.Extract(_fileHelper.FileSystem, root))
                 models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with { Bones = names };
 
-            foreach (var (path, textures) in BoneNameExtractor.ExtractTextures(_fileHelper.FileSystem, root))
+            foreach (var (path, scan) in BoneNameExtractor.ExtractTextures(_fileHelper.FileSystem, root))
                 models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with
                 {
-                    Textures = textures
+                    Textures = [.. scan.Textures],
+                    ParticleSystem = scan.Kind == AloFileKind.Particle,
+                    Proxies = [.. scan.Proxies]
                 };
         }
 

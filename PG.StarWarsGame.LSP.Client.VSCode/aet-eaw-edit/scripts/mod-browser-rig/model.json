@@ -1,0 +1,9 @@
+[
+  {"click": "Models", "in": ".rail"},
+  {"wait": 600},
+  {"type": "Ev_stardestroyer"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"dblclick": "ev_stardestroyer.alo", "in": ".data-table"},
+  {"wait": 600}
+]

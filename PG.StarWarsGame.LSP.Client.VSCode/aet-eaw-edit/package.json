@@ -222,6 +222,12 @@
           "name": "%view.lsp.storyNavigator.name%",
           "icon": "resources/icons/book-journal-whills-solid-full.svg",
           "when": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+        },
+        {
+          "id": "aet-eaw-edit.lsp.modBrowser",
+          "name": "%view.lsp.modBrowser.name%",
+          "icon": "$(list-tree)",
+          "when": "config.aet-eaw-edit.features.tools.modBrowser"
         }
       ],
       "debug": [
@@ -411,6 +417,11 @@
         "command": "aet-eaw-edit.lsp.showEncyclopedia",
         "title": "%command.lsp.showEncyclopedia.title%",
         "enablement": "config.aet-eaw-edit.features.tools.encyclopedia"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.openModBrowser",
+        "title": "%command.lsp.openModBrowser.title%",
+        "enablement": "config.aet-eaw-edit.features.tools.modBrowser"
       },
       {
         "command": "aet-eaw-edit.lsp.openStoryGraph",
@@ -1018,6 +1029,12 @@
             "type": "boolean",
             "default": true,
             "markdownDescription": "%config.features.tools.encyclopedia.markdownDescription%"
+          },
+          "aet-eaw-edit.features.tools.modBrowser": {
+            "order": 2120,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.features.tools.modBrowser.markdownDescription%"
           },
           "aet-eaw-edit.features.tools.modelPreview": {
             "order": 2150,

@@ -5,7 +5,18 @@ namespace PG.StarWarsGame.LSP.Core.Schema;
 
 public sealed record EnumValueDefinition
 {
+    /// <summary>The member's key: the name XML writes, which the engine matches ignoring case.</summary>
     public required string Name { get; init; }
+
+    /// <summary>
+    ///     What the engine uses for the member where that is not its name - for an animation type, the name
+    ///     its files are filed under (<c>&lt;model&gt;_&lt;value&gt;_&lt;NN&gt;.ala</c>). Null: the value is the name.
+    /// </summary>
+    public string? Value { get; init; }
+
+    /// <summary>The member's value: <see cref="Value" /> where the schema writes one, else its name.</summary>
+    public string EngineValue => Value ?? Name;
+
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
 
     /// <summary>

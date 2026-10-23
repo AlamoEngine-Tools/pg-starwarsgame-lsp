@@ -1,0 +1,16 @@
+﻿[
+  {"click": "Types", "in": ".rail"},
+  {"wait": 600},
+  {"type": "GameObjectType"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"dblclick": "GameObjectType", "in": ".data-table"},
+  {"wait": 600},
+  {"click": "Tags", "in": ".rail"},
+  {"wait": 600},
+  {"type": "Damage_Type"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"dblclick": "Damage_Type", "in": ".data-table"},
+  {"wait": 600}
+]

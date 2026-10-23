@@ -3,6 +3,8 @@
 
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -12,16 +14,30 @@ internal sealed class ReferencesCodeLensProvider : IXmlCodeLensProvider
 {
     public LspCodeLens? Handle(CodeLensSymbolContext ctx)
     {
-        var count = ctx.Index.WorkspaceReferences.TryGetValue(ctx.Symbol.Id, out var refs) ? refs.Length : 0;
+        var refs = ctx.Index.WorkspaceReferences.TryGetValue(ctx.Symbol.Id, out var found) ? found : [];
+        return For(ctx.Origin.Uri, ctx.Origin.Line, ctx.Origin.Column ?? 0, refs, ctx.Messages);
+    }
+
+    /// <summary>
+    ///     A definition's references lens: their count, opening them where there are any. Shared by the
+    ///     symbols and by the dynamic enum values, whose uses are references of their own.
+    /// </summary>
+    /// <param name="uri">The document the definition is in.</param>
+    /// <param name="line">The definition's line; the lens sits at its start.</param>
+    /// <param name="column">Where the definition starts on its line, for the references view.</param>
+    public static LspCodeLens For(string uri, int line, int column, IReadOnlyList<GameReference> refs,
+        IMessageCatalog messages)
+    {
+        var count = refs.Count;
         var title = count == 1
-            ? ctx.Messages.Format("ReferencesCodeLens_Reference")
-            : ctx.Messages.Format("ReferencesCodeLens_References", count);
-        var range = new LspRange(new Position(ctx.Origin.Line, 0), new Position(ctx.Origin.Line, 0));
+            ? messages.Format("ReferencesCodeLens_Reference")
+            : messages.Format("ReferencesCodeLens_References", count);
+        var range = new LspRange(new Position(line, 0), new Position(line, 0));
 
         Command command;
         if (count > 0)
         {
-            var locations = refs!.Select(r => new
+            var locations = refs.Select(r => new
             {
                 uri = r.DocumentUri,
                 range = new
@@ -37,8 +53,8 @@ internal sealed class ReferencesCodeLensProvider : IXmlCodeLensProvider
                 Name = "aet-eaw-edit.lsp.showReferences",
                 Arguments = JArray.FromObject(new object[]
                 {
-                    ctx.Origin.Uri,
-                    new { line = ctx.Origin.Line, character = ctx.Origin.Column ?? 0 },
+                    uri,
+                    new { line, character = column },
                     locations.ToArray()
                 })
             };

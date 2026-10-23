@@ -17,8 +17,8 @@ namespace PG.StarWarsGame.LSP.Testing;
 /// </summary>
 /// <remarks>
 ///     The layers are what <c>ModProjectResolver</c> builds from <see cref="Disk" />'s project files -
-///     roots absolute, forward-slashed and lower-cased, ranks dependencies first - and a test holds
-///     them to it. A document URI keeps the case on disk, as the editor sends it.
+///     roots absolute, forward-slashed and spelled as the project files spell them, ranks
+///     dependencies first - and a test holds them to it.
 /// </remarks>
 public sealed class ProjectSetup
 {
@@ -187,16 +187,16 @@ public sealed class ProjectSetup
 
     private ProjectLayer LayerOf(int rank)
     {
-        var root = Folded(FolderOf(rank));
-        return new ProjectLayer(rank, Projects[rank], [root + "/data/xml"], [root + "/data/scripts"],
-            [root + "/data/text"], [root + "/data/art", root + "/data/audio"], "CSV", Folded(ProjectFileOf(rank)))
+        var root = Forward(FolderOf(rank));
+        return new ProjectLayer(rank, Projects[rank], [root + "/Data/Xml"], [root + "/Data/Scripts"],
+            [root + "/Data/Text"], [root + "/Data/Art", root + "/Data/Audio"], "CSV", Forward(ProjectFileOf(rank)))
         {
-            StoryDialogRoots = [root + "/data/scripts/story"]
+            StoryDialogRoots = [root + "/Data/Scripts/Story"]
         };
     }
 
-    private static string Folded(string path)
+    private static string Forward(string path)
     {
-        return path.Replace('\\', '/').ToLowerInvariant();
+        return path.Replace('\\', '/');
     }
 }

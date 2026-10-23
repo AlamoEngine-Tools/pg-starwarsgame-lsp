@@ -1,0 +1,7 @@
+[
+  {"type": "Star_Destroyer"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"menu": "Star_Destroyer", "in": ".data-table"},
+  {"wait": 600}
+]

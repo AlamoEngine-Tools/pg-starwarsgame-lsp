@@ -286,7 +286,8 @@ export const Shell = styled.div`
             var(--vscode-errorForeground, #f48771) 13%,
             transparent
         );
-        box-shadow: inset 3px 0 0 var(--vscode-errorForeground, #f48771);
+        box-shadow: inset var(--severity-stripe) 0 0
+            var(--vscode-errorForeground, #f48771);
     }
 
     .data-row.row-sev-warning {
@@ -295,7 +296,8 @@ export const Shell = styled.div`
             var(--vscode-charts-yellow, #cca700) 13%,
             transparent
         );
-        box-shadow: inset 3px 0 0 var(--vscode-charts-yellow, #cca700);
+        box-shadow: inset var(--severity-stripe) 0 0
+            var(--vscode-charts-yellow, #cca700);
     }
 
     .data-row.row-sev-info {
@@ -304,7 +306,8 @@ export const Shell = styled.div`
             var(--vscode-charts-blue, #3794ff) 11%,
             transparent
         );
-        box-shadow: inset 3px 0 0 var(--vscode-charts-blue, #3794ff);
+        box-shadow: inset var(--severity-stripe) 0 0
+            var(--vscode-charts-blue, #3794ff);
     }
 
     .data-row.selected {
@@ -466,46 +469,6 @@ export const Shell = styled.div`
     .mode-group {
         display: flex;
         gap: var(--space-4);
-    }
-
-    .row-menu {
-        position: fixed;
-        z-index: 20;
-        min-width: 200px;
-        display: flex;
-        flex-direction: column;
-        padding: var(--space-4) 0;
-        background: var(
-            --vscode-menu-background,
-            var(--vscode-editorWidget-background, #252526)
-        );
-        color: var(--vscode-menu-foreground, #ccc);
-        border: var(--space-1) solid
-            var(--vscode-menu-border, var(--vscode-panel-border, #454545));
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    }
-
-    .row-menu button {
-        background: transparent;
-        color: inherit;
-        text-align: left;
-        padding: var(--space-4) var(--space-12);
-        border: none;
-    }
-
-    .row-menu button:hover:not(:disabled) {
-        background: var(--vscode-menu-selectionBackground, #04395e);
-        color: var(--vscode-menu-selectionForeground, #fff);
-    }
-
-    .row-menu button.danger:hover:not(:disabled) {
-        background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
-    }
-
-    .row-menu .sep {
-        height: 1px;
-        margin: var(--space-4) 0;
-        background: var(--vscode-menu-separatorBackground, #454545);
     }
 
     /* A spacer is a marker, not content: it spans the row, reads as a rule, and cannot be typed

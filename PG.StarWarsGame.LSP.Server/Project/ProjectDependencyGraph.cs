@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Project;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
@@ -23,8 +24,10 @@ public sealed class ProjectDependencyGraph
         out ProjectDependencyShape shape)
     {
         var ordered = new List<(string Path, ModProjectFile File)>();
-        var emitted = new HashSet<string>();
-        var onStack = new HashSet<string>();
+        // A path keeps its spelling, since every URI under its layer is built from it; two spellings
+        // are one project the way the engine sees one file.
+        var emitted = new HashSet<string>(DocumentUris.Comparer);
+        var onStack = new HashSet<string>(DocumentUris.Comparer);
         var tally = new Tally();
 
         Visit(Normalize(rootPath), root, loadReference, ordered, emitted, onStack, 0, tally);
@@ -97,7 +100,7 @@ public sealed class ProjectDependencyGraph
 
     private static string Normalize(string path)
     {
-        return path.Replace('\\', '/').ToLowerInvariant();
+        return path.Replace('\\', '/');
     }
 
     private static string GetDirectory(string normalizedPath)

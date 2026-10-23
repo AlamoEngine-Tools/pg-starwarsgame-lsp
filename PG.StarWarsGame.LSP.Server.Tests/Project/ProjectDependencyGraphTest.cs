@@ -54,6 +54,42 @@ public sealed class ProjectDependencyGraphTest
         Assert.Equal(new ProjectDependencyShape(2, 3, 2, 0), shape);
     }
 
+    // ── spelling ─────────────────────────────────────────────────────────────
+    //
+    // A layer's path becomes the URI of every file under it, so it keeps the spelling it was given;
+    // case folds only when two spellings are asked whether they are the same project.
+
+    [Fact]
+    public void Build_KeepsThePathsSpelling()
+    {
+        var files = new Dictionary<string, ModProjectFile>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/Mods/Dep/Dep.pgproj"] = Project()
+        };
+
+        var ordered = new ProjectDependencyGraph(NullLoggerFactory()).Build("/Mods/Root/Root.pgproj",
+            Project("../Dep/Dep.pgproj"),
+            p => files.TryGetValue(p, out var f) ? f : null);
+
+        Assert.Equal(["/Mods/Dep/Dep.pgproj", "/Mods/Root/Root.pgproj"], ordered.Select(o => o.Path));
+    }
+
+    [Fact]
+    public void Build_TwoSpellingsOfOneProject_AppearOnce()
+    {
+        // root -> a, root -> A: the same file to the engine.
+        var files = new Dictionary<string, ModProjectFile>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/mods/a/a.pgproj"] = Project()
+        };
+
+        var ordered = new ProjectDependencyGraph(NullLoggerFactory()).Build("/mods/root/root.pgproj",
+            Project("../a/a.pgproj", "../A/A.pgproj"),
+            p => files.TryGetValue(p, out var f) ? f : null);
+
+        Assert.Equal(["/mods/a/a.pgproj", "/mods/root/root.pgproj"], ordered.Select(o => o.Path));
+    }
+
     [Fact]
     public void Build_ReferenceThatDoesNotLoad_IsCountedAsUnresolved()
     {

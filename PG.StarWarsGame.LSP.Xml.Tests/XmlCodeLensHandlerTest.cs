@@ -114,6 +114,36 @@ public sealed class XmlCodeLensHandlerTest
 
     // ── symbol iteration ──────────────────────────────────────────────────────
 
+    // ── dynamic enum values ───────────────────────────────────────────────────
+
+    // A value an enum file or GameConstants defines is not a symbol, but its uses are indexed as
+    // references to enum:<Enum>/<Value>, as rename finds them: its definition gets their count.
+    [Fact]
+    public async Task Handle_DynamicEnumValueDefinedHere_GetsAReferencesLensAtItsDefinition()
+    {
+        var doc = new DocumentIndex(TestUri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty);
+        var index = BuildIndex(doc, ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                .Add("enum:ArmorType/Armor_Fighter",
+                [
+                    new GameReference("enum:ArmorType/Armor_Fighter", null, null, OtherUri, 2, 10, 13),
+                    new GameReference("enum:ArmorType/Armor_Fighter", null, null, OtherUri, 9, 10, 13)
+                ])) with
+            {
+                WorkspaceEnumValueDefinitions = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>
+                    .Empty
+                    .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
+                        .Add("Armor_Fighter", new FileOrigin(TestUri, 5, 8))
+                        .Add("Armor_Elsewhere", new FileOrigin(OtherUri, 1, 8)))
+            };
+
+        var result = await BuildHandler(index).Handle(ForDoc(), CancellationToken.None);
+
+        var lens = Assert.Single(result!);
+        Assert.Equal(5, lens.Range.Start.Line);
+        Assert.Contains("2", lens.Command!.Title);
+        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens.Command.Name);
+    }
+
     [Fact]
     public async Task Handle_DocumentWithSymbolAndZeroRefs_ReturnsLensWithZeroCount()
     {

@@ -1,0 +1,9 @@
+[
+  {"click": "Particle Systems", "in": ".rail"},
+  {"wait": 600},
+  {"type": "P_cin_stardestroyerengines"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"dblclick": "p_cin_stardestroyerengines.alo", "in": ".data-table"},
+  {"wait": 600}
+]

@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
@@ -18,13 +19,14 @@ public sealed class EncyclopediaCodeLensProviderTest
     private static EncyclopediaCodeLensProvider Provider(
         IVariantTagSource source, ILspConfigurationProvider? config = null)
     {
-        return new EncyclopediaCodeLensProvider(source, config ?? new FakeLspConfigurationProvider());
+        return new EncyclopediaCodeLensProvider(source, config ?? new FakeLspConfigurationProvider(),
+            new PlanetSchema());
     }
 
-    private static GameSymbol Sym(string id, string? baseId = null)
+    private static GameSymbol Sym(string id, string? baseId = null, string[]? behaviors = null)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, "SpaceUnit",
-            new FileOrigin($"file:///{id}.xml", 3, 0), null, baseId);
+            new FileOrigin($"file:///{id}.xml", 3, 0), null, baseId, behaviors);
     }
 
     private static GameIndex IndexWith(params GameSymbol[] symbols)
@@ -110,6 +112,66 @@ public sealed class EncyclopediaCodeLensProviderTest
             new FeatureFlags { Tools = new ToolsFeatureFlags { Encyclopedia = false } });
 
         Assert.Null(Provider(source, config).Handle(Ctx(symbol, IndexWith(symbol))));
+    }
+
+    // A planet's popup is a preview of its own, not the unit card (maintainer, 2026-10-22).
+    [Fact]
+    public void Handle_PlanetWithEncyclopediaText_EmitsNothing()
+    {
+        var symbol = Sym("Coruscant", behaviors: ["PLANET"]);
+        var source = new TagSource().With("Coruscant", Tag("Encyclopedia_Text", "TEXT_PLANET"));
+
+        Assert.Null(Provider(source).Handle(Ctx(symbol, IndexWith(symbol))));
+    }
+
+    // Only the Planet kind is known, as a schema that defines the object kinds has it.
+    private sealed class PlanetSchema : ISchemaProvider
+    {
+        public ObjectKindDefinition? GetKind(string kindName)
+        {
+            return string.Equals(kindName, ObjectKindNames.Planet, StringComparison.OrdinalIgnoreCase)
+                ? new ObjectKindDefinition { Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"] }
+                : null;
+        }
+
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
     }
 
     private sealed class TagSource : IVariantTagSource

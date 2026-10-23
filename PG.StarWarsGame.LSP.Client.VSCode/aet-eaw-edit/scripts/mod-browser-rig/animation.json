@@ -1,0 +1,11 @@
+[
+  {"click": "Animations", "in": ".rail"},
+  {"wait": 600},
+  {"type": "Ev_stardestroyer_d_die"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"menu": "ev_stardestroyer_d_die_00.ala", "in": ".data-table"},
+  {"wait": 600},
+  {"click": "Preview on its model"},
+  {"wait": 300}
+]
