@@ -1232,7 +1232,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>This script's state is reused for its next instance, and nothing in it defines Flush_G: Every global, tables included, carries over.</value>
   </data>
   <data name="LuaPooledState_RunsAtDefinitionTime" xml:space="preserve">
-    <value>'{0}', which runs at definition time,</value>
+    <value>'{0}', which runs at definition time</value>
   </data>
   <data name="LuaScriptReference_LuaScriptCarriesItsExtension" xml:space="preserve">
     <value>Lua script '{0}' carries its extension. The game appends '.lua' itself and looks for '{1}.lua'.</value>
