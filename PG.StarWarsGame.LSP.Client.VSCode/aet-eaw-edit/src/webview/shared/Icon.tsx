@@ -25,6 +25,7 @@ import {
     IconAlertTriangle,
     IconArrowBackUp,
     IconArrowDown,
+    IconArrowForward,
     IconArrowUp,
     IconAsterisk,
     IconAxisX,
@@ -72,6 +73,7 @@ import {
     IconListTree,
     IconMesh,
     IconMessage,
+    IconMessageCheck,
     IconMinus,
     IconMovie,
     IconPencil,
@@ -310,6 +312,10 @@ const ICONS = {
     // are the point of it.
     trace: IconTimeline,
     breakpoint: IconCircleDot,
+    // Play picks itself up again once the decision it stopped for is answered.
+    autoResume: IconArrowForward,
+    // A speech or movie ends on its own on the next tick, rather than waiting for the author.
+    mediaCompletes: IconMessageCheck,
     // The tint that shows which edges the story has run along.
     flow: IconRoute,
     // What the Mod Browser lists, by what each thing is. A game object is an object of an XML type,

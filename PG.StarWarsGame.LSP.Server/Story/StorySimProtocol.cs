@@ -58,7 +58,7 @@ public sealed record StorySimStateDto(
     // running (with its own tick), won or lost.
     IReadOnlyList<StorySimBattleDto>? Battles = null,
     // Whether a speech or movie a reward starts is owed its completion on the next tick (the
-    // session's option at start); off, the listener waits for the author or the engine's timeout.
+    // session's option, set at start and by aet/storySimOptions); off, the listener waits for the author.
     bool AssumeMediaCompletes = true,
     // Armed listeners the author ruled out for this run: no decision until reconsidered.
     IReadOnlyList<string>? RuledOut = null)
@@ -173,8 +173,8 @@ public sealed record StorySimStartParams(
     string Campaign,
     string Faction,
     string? Scope = null,
-    // See StorySimStateDto.AssumeMediaCompletes; the session keeps it from start to stop. Nullable
-    // because a missing field deserializes as false, never as the record's default; absent is on.
+    // See StorySimStateDto.AssumeMediaCompletes; what the session starts under. Nullable because a
+    // missing field deserializes as false, never as the record's default; absent is on.
     bool? AssumeMediaCompletes = null)
     : IRequest<StorySimStateResult>;
 
@@ -275,6 +275,14 @@ public sealed record StorySimBreakpointsParams(
     string Faction,
     IReadOnlyList<string> NodeIds,
     bool OnConditionalGates,
+    string? Scope = null) : IRequest<StorySimStateResult>;
+
+/// <summary>The running session's options, changed from the next tick on. See StorySimStateDto.AssumeMediaCompletes.</summary>
+[Method("aet/storySimOptions", Direction.ClientToServer)]
+public sealed record StorySimOptionsParams(
+    string Campaign,
+    string Faction,
+    bool AssumeMediaCompletes,
     string? Scope = null) : IRequest<StorySimStateResult>;
 
 /// <summary>

@@ -128,6 +128,33 @@ public sealed class StorySimulatorMediaTest
     }
 
     [Fact]
+    public void MediaAssumption_TurnedOnMidRun_OwesThePlayingSpeech_FromTheNextTick()
+    {
+        var sim = new StorySimulator(Model(), Schema, options: new StorySimOptions(false));
+        var start = sim.Start();
+        Assert.Contains(sim.GetInterventions(start), i => i.EventName == "WelcomeDone");
+
+        var on = sim.SetAssumeMediaCompletes(start, true);
+
+        Assert.True(on.AssumeMediaCompletes);
+        Assert.DoesNotContain(sim.GetInterventions(on), i => i.EventName == "WelcomeDone");
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, sim.Tick(on), "WelcomeDone"));
+    }
+
+    [Fact]
+    public void MediaAssumption_TurnedOffMidRun_LeavesThePlayingSpeechToTheAuthor()
+    {
+        var sim = new StorySimulator(Model(), Schema);
+
+        var off = sim.SetAssumeMediaCompletes(sim.Start(), false);
+        var later = sim.Tick(off, 600);
+
+        Assert.False(later.AssumeMediaCompletes);
+        Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, later, "WelcomeDone"));
+        Assert.Contains(sim.GetInterventions(later), i => i.EventName == "WelcomeDone");
+    }
+
+    [Fact]
     public void SpeechDoneNothingStarts_IsADecisionWithNoGate_AndNeverFiresOnItsOwn()
     {
         var sim = new StorySimulator(Model(), Schema);

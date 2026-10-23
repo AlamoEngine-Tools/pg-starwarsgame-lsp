@@ -226,6 +226,7 @@ public static class ServerConfigurator
             .WithHandler<StorySimRunToDecisionHandler>()
             .WithHandler<StorySimSeekHandler>()
             .WithHandler<StorySimBreakpointsHandler>()
+            .WithHandler<StorySimOptionsHandler>()
             .WithHandler<StorySimWorldHandler>()
             .WithHandler<StorySimResolveBattleHandler>()
             .WithHandler<StorySimRetryBattleHandler>()

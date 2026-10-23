@@ -55,6 +55,9 @@ public interface IStorySimulationService
     (StorySimStateDto? State, string? Error) SetBreakpoints(StorySimKey key, IReadOnlyList<string> nodeIds,
         bool onConditionalGates);
 
+    /// <summary>Changes the running session's options, from the next tick on; a seek keeps them.</summary>
+    (StorySimStateDto? State, string? Error) SetOptions(StorySimKey key, StorySimOptions options);
+
     (StorySimStateDto? State, string? Error) ApplyWorldChange(StorySimKey key, StorySimWorldChangeDto change,
         int sinceSeq = 0);
 
@@ -147,7 +150,7 @@ public sealed class StorySimulationService(
                 // Without a galactic session it runs on its own from the campaign seed.
                 _sessions.TryGetValue(key.Galactic, out var galactic);
                 var simulator = new StorySimulator(model, schema, symbols, key.Scope,
-                    galactic?.Simulator.Options ?? options, _messages);
+                    OptionsOf(galactic) ?? options, _messages);
                 var seedFlags = galactic?.Snapshot.Runtime.Flags;
                 var seedWorld = galactic?.Snapshot.Runtime.World;
                 session = new Session(key, simulator,
@@ -306,6 +309,25 @@ public sealed class StorySimulationService(
         return (ToDto(next, next.Snapshot.Steps.Count), null);
     }
 
+    public (StorySimStateDto? State, string? Error) SetOptions(StorySimKey key, StorySimOptions options)
+    {
+        Session next;
+        lock (_gate)
+        {
+            if (!_sessions.TryGetValue(key, out var session))
+                return (null, _messages.Format("StorySimService_NoSimulationRunning", key));
+            // Not a command in the log: the option is the session's, so a seek or a restart keeps it.
+            next = session with
+            {
+                Snapshot = session.Simulator.SetAssumeMediaCompletes(session.Snapshot, options.AssumeMediaCompletes)
+            };
+            _sessions[key] = next;
+        }
+
+        notifyChanged(key);
+        return (ToDto(next, next.Snapshot.Steps.Count), null);
+    }
+
     /// <summary>
     ///     The game's retry after a lost battle reloads the pre-battle autosave. Here: the galaxy goes
     ///     back to just before the battle's resolution - the battle at its choice again, nothing of the
@@ -391,7 +413,7 @@ public sealed class StorySimulationService(
             else
             {
                 var implicitSim = new StorySimulator(model, schema, symbols, battleSession.Scope,
-                    galactic?.Simulator.Options, _messages);
+                    OptionsOf(galactic), _messages);
                 seed = galactic?.Snapshot.Runtime.Flags ?? StoryRuntimeState.Initial.Flags;
                 ended = Apply(implicitSim, implicitSim.Start(seed, galactic?.Snapshot.Runtime.World), outcome,
                     StorySimBreakpoints.None);
@@ -535,7 +557,8 @@ public sealed class StorySimulationService(
     private static Session Replay(Session session, int tick)
     {
         var sim = session.Simulator;
-        var snapshot = sim.Start(session.Key.IsGalactic ? null : session.SeedFlags, session.SeedWorld);
+        var snapshot = sim.Start(session.Key.IsGalactic ? null : session.SeedFlags, session.SeedWorld,
+            session.Snapshot.AssumeMediaCompletes);
         var commands = ImmutableList<SimCommand>.Empty;
         foreach (var command in session.Commands)
         {
@@ -559,6 +582,12 @@ public sealed class StorySimulationService(
         }
 
         return session with { Snapshot = snapshot, Commands = commands };
+    }
+
+    /// <summary>The options a session runs under now, for a battle started from it. </summary>
+    private static StorySimOptions? OptionsOf(Session? session)
+    {
+        return session is null ? null : new StorySimOptions(session.Snapshot.AssumeMediaCompletes);
     }
 
     /// <summary>The battles a galactic log has resolved, last word per battle. </summary>
@@ -644,7 +673,7 @@ public sealed class StorySimulationService(
             pausedFor,
             session.Outcome,
             battles,
-            session.Simulator.Options.AssumeMediaCompletes,
+            snapshot.AssumeMediaCompletes,
             snapshot.Runtime.RuledOut.OrderBy(x => x, StringComparer.Ordinal).ToList());
     }
 

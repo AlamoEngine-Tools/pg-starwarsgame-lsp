@@ -454,7 +454,8 @@ export interface StorySimStateDto {
     battles?: StorySimBattleDto[] | null;
     /**
      * Whether a speech or movie a reward starts is owed its completion on the next tick, the
-     * session's option at start. Off, the listener waits for the author or the engine's timeout.
+     * session's option: set at start, changed by `aet/storySimOptions`. Off, the listener waits
+     * for the author.
      */
     assumeMediaCompletes?: boolean;
 }

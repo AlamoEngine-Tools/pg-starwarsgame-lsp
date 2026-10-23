@@ -763,6 +763,8 @@
   "One tick - clock idle": "One tick - clock idle",
   "Run to next decision or breakpoint": "Run to next decision or breakpoint",
   "Break on gates": "Break on gates",
+  "Resume after an answer": "Resume after an answer",
+  "Speech and movies finish on their own": "Speech and movies finish on their own",
   "Trace": "Trace",
   "Flow": "Flow",
   "Active path": "Active path",
