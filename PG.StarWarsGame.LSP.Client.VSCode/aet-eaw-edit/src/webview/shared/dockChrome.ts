@@ -1391,7 +1391,13 @@ export const rotarySwitchCss = `
         cursor: pointer;
         opacity: 0.6;
     }
-    .rotary-pos:hover { opacity: 1; }
+    .rotary-pos:hover:not(:disabled) { opacity: 1; }
+    /* A position that cannot be entered. With no rule of its own it kept the enabled look, so Edit
+       on a read-only story graph looked pressable and only its tooltip said otherwise. */
+    .rotary-pos:disabled {
+        opacity: 0.25;
+        cursor: default;
+    }
     /* The active position is LIT, like the indicator lamp over a console switch - that is the feel
        this control is after, and a merely tinted glyph does not read as a lamp.
 
