@@ -2875,6 +2875,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="XmlGameReader_InsertXMLDeclaration" xml:space="preserve">
     <value>Insert the XML declaration</value>
   </data>
+  <data name="XmlGameReader_MoveXMLDeclaration" xml:space="preserve">
+    <value>Move the XML declaration to the top</value>
+  </data>
   <data name="XmlGameReader_InsideCommentGameDropsWhole" xml:space="preserve">
     <value>'--' inside a comment: The game drops the whole file</value>
   </data>
