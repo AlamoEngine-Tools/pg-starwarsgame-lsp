@@ -231,6 +231,8 @@ public static class ServerConfigurator
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
+                // Game paths the editor leaves unset are the detected installs'.
+                services.AddSingleton<IGameInstallLocator, GameInstallLocator>();
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();
                 // The server's own texts outside a diagnostics run, in the configured locale.
                 services.AddSingleton<IMessageCatalog, ConfiguredMessageCatalog>();

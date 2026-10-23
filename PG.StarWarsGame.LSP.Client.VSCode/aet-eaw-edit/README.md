@@ -562,8 +562,8 @@ persist per campaign faction in `.aetswg/story-layout.json`.
   `aet-eaw-edit.tools.particleEditorExecutable`
 - **Shaders** - **Set Up Base Shader Sources** fetches Petroglyph's published shader sources into
   `aet-eaw-edit.shaders.directory`; never redistributed
-- **Game models** - require `aet-eaw-edit.lsp.source.baseGameDirectory` and, for Forces of Corruption,
-  `expansionDirectory`
+- **Game models** - from the game install: found in the Steam library or the Windows registry, or set in
+  `aet-eaw-edit.lsp.source.baseGameDirectory` and, for Forces of Corruption, `expansionDirectory`
 - **Energy pool** - behind `aet-eaw-edit.features.preview.energyPool`, set in `settings.json` and off on purpose: the
   engine implements it, the shipped game disables it
 - **Not covered** - sounds and animation SFX maps; AloViewer remains the tool for those
@@ -747,12 +747,13 @@ Off by default, each on its own; a change restarts the language server.
 
 ### Game installation and external tools
 
-Never searched for; used only once set.
+The game directories are found in the Steam library or the Windows registry; a set one wins. The tools are used only
+once set.
 
 | Setting                                       | Default   | Description                                                                                               |
 |-----------------------------------------------|-----------|-----------------------------------------------------------------------------------------------------------|
-| `aet-eaw-edit.lsp.source.baseGameDirectory`   | _(empty)_ | Empire at War install; models, textures and string table that ship with the game                          |
-| `aet-eaw-edit.lsp.source.expansionDirectory`  | _(empty)_ | Forces of Corruption install, searched alongside the base game                                            |
+| `aet-eaw-edit.lsp.source.baseGameDirectory`   | _(found)_ | Empire at War install (`GameData`); models, textures and string table that ship with the game             |
+| `aet-eaw-edit.lsp.source.expansionDirectory`  | _(found)_ | Forces of Corruption install (`corruption`), searched alongside the base game                             |
 | `aet-eaw-edit.tools.aloViewerExecutable`      | _(empty)_ | `AloViewer.exe`, for *Open in AloViewer*                                                                  |
 | `aet-eaw-edit.tools.particleEditorExecutable` | _(empty)_ | `ParticleEditor.exe`, for *Open in Particle Editor*                                                       |
 | `aet-eaw-edit.shaders.directory`              | _(empty)_ | Base game shader sources (`.fx`) for the preview; filled by *Set Up Base Shader Sources* or a copy at hand |

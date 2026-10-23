@@ -187,7 +187,7 @@ Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `S
   - Gameplay: attacker weapons and abilities, hardpoint destroy and repair, damage log with armour types
 - Particle systems, saved shots, handoff to AloViewer and the Particle Editor
 - **Set Up Base Shader Sources** fetches Petroglyph's published shader sources; never redistributed
-- Game models need `aet-eaw-edit.lsp.source.baseGameDirectory` and `expansionDirectory`
+- Game models come from the game install, found in the Steam library or the Windows registry; `aet-eaw-edit.lsp.source.baseGameDirectory` and `expansionDirectory` override it
 - No sounds
 
 ---

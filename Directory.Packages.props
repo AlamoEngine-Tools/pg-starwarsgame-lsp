@@ -6,6 +6,10 @@
 
     <ItemGroup Label="Production">
         <PackageVersion Include="AlamoEngineTools.Modinfo" Version="8.0.6"/>
+        <!-- Finds the game installs (Steam, then the Windows registry) for game paths the editor
+             leaves unset; the same detectors ModVerify uses. -->
+        <PackageVersion Include="AlamoEngineTools.PG.StarWarsGame.Infrastructure" Version="5.0.19"/>
+        <PackageVersion Include="AlamoEngineTools.PG.StarWarsGame.Infrastructure.Steam" Version="5.0.19"/>
         <!-- Pinned to the version PG.StarWarsGame.Localisation uses, so the editor's own CSV reads
              cannot diverge from the importers the rest of the server shares with it. -->
         <PackageVersion Include="CsvHelper" Version="33.1.0"/>
@@ -66,5 +70,4 @@
     </ItemGroup>
 
 </Project>
-
 

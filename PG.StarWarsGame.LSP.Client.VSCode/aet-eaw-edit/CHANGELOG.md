@@ -87,6 +87,8 @@
     debugger
   - The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod (`Data/XML`);
     any other folder gets none
+  - The game installs are found in the Steam library or the Windows registry; `aet-eaw-edit.lsp.source.baseGameDirectory`
+    and `aet-eaw-edit.lsp.source.expansionDirectory` override them
   - Development and troubleshooting settings are read but no longer on the settings page; the extension README
     lists them
 - **Server and Lua analyzer in the extension** - nothing to download or configure; the language server and

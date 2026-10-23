@@ -37,6 +37,63 @@ public sealed class LspConfigurationProviderTest : IDisposable
         return JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(obj));
     }
 
+    // ── game installs ────────────────────────────────────────────────────────
+
+    private sealed class FakeInstalls(string? baseGame, string? expansion) : IGameInstallLocator
+    {
+        public int Calls { get; private set; }
+
+        public string? FindBaseGame()
+        {
+            Calls++;
+            return baseGame;
+        }
+
+        public string? FindExpansion()
+        {
+            Calls++;
+            return expansion;
+        }
+    }
+
+    [Fact]
+    public void LoadFrom_NoGamePaths_TakesTheDetectedInstalls()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls("C:/Steam/Empire at War/GameData", "C:/Steam/Empire at War/corruption"));
+
+        provider.LoadFrom(Json(new { workspaceRoot = "/mod/eaw" }));
+
+        Assert.Equal("C:/Steam/Empire at War/GameData", provider.Current.GamePath);
+        Assert.Equal("C:/Steam/Empire at War/corruption", provider.Current.ExpansionPath);
+    }
+
+    [Fact]
+    public void LoadFrom_ASetGamePath_WinsOverTheDetectedOne()
+    {
+        var installs = new FakeInstalls("C:/detected/GameData", "C:/detected/corruption");
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            installs);
+
+        provider.LoadFrom(Json(new { baseGamePath = "D:/eaw", expansionGamePath = "D:/foc" }));
+
+        Assert.Equal("D:/eaw", provider.Current.GamePath);
+        Assert.Equal("D:/foc", provider.Current.ExpansionPath);
+        Assert.Equal(0, installs.Calls);
+    }
+
+    [Fact]
+    public void LoadFrom_NothingDetected_LeavesTheGamePathsUnset()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
+
+        provider.LoadFrom(null);
+
+        Assert.Null(provider.Current.GamePath);
+        Assert.Null(provider.Current.ExpansionPath);
+    }
+
     // ── null / default ───────────────────────────────────────────────────────
 
     [Fact]

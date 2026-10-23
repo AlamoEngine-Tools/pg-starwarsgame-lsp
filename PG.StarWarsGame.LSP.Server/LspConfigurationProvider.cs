@@ -12,18 +12,21 @@ namespace PG.StarWarsGame.LSP.Server;
 ///     Resolves <see cref="LspConfiguration" /> by merging two sources:
 ///     1. <c>.pg-lsp.json</c> in the workspace root (static defaults).
 ///     2. <c>initializationOptions</c> from the editor's LSP initialize request (dynamic overrides).
-///     Editor values win over file values.
+///     Editor values win over file values. A game path neither sets is the detected install's.
 /// </summary>
 public sealed class LspConfigurationProvider : ILspConfigurationProvider
 {
     private static readonly JsonSerializerOptions FeatureJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly IFileSystem _fileSystem;
+    private readonly IGameInstallLocator? _installs;
     private readonly ILogger<LspConfigurationProvider> _logger;
 
-    public LspConfigurationProvider(IFileSystem fileSystem, ILogger<LspConfigurationProvider> logger)
+    public LspConfigurationProvider(IFileSystem fileSystem, ILogger<LspConfigurationProvider> logger,
+        IGameInstallLocator? installs = null)
     {
         _fileSystem = fileSystem;
         _logger = logger;
+        _installs = installs;
     }
 
     public LspConfiguration Current { get; private set; } = new();
@@ -41,9 +44,24 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var overlay = ParseInitOptions(initializationOptions, out var overlayFeatures,
             out var overlayDiagnostics, out var overlayEncyclopedia);
         Current = Merge(fromFile, overlay, overlayFeatures, overlayDiagnostics, overlayEncyclopedia);
+        Current = WithDetectedInstalls(Current);
 
         _logger.LogInformation("LSP configuration loaded (locale={Locale}, gamePath={GamePath})",
             Current.Locale, Current.GamePath ?? "<none>");
+    }
+
+    // Only a path left unset is looked for; one the editor or the file sets is taken as given.
+    private LspConfiguration WithDetectedInstalls(LspConfiguration config)
+    {
+        if (_installs is null) return config;
+        var gamePath = string.IsNullOrWhiteSpace(config.GamePath) ? _installs.FindBaseGame() : config.GamePath;
+        var expansionPath = string.IsNullOrWhiteSpace(config.ExpansionPath)
+            ? _installs.FindExpansion()
+            : config.ExpansionPath;
+        if (gamePath != config.GamePath || expansionPath != config.ExpansionPath)
+            _logger.LogInformation("Game installs detected (base game={GamePath}, expansion={ExpansionPath})",
+                gamePath ?? "<none>", expansionPath ?? "<none>");
+        return config with { GamePath = gamePath, ExpansionPath = expansionPath };
     }
 
     private static string? ResolveWorkspaceRoot(object? initOptions)
