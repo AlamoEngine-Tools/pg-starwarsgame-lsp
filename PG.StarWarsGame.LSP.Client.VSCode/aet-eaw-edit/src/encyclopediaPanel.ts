@@ -4,6 +4,10 @@
 import * as vscode from "vscode";
 
 import { GetEncyclopediaEntryResult } from "./protocol";
+import {
+    readEncyclopediaScreen,
+    saveEncyclopediaScreen,
+} from "./encyclopediaScreenStorage";
 import { PanelProject } from "./panelProject";
 import {
     PanelRegistry,
@@ -139,23 +143,31 @@ export class EncyclopediaPanel extends WebviewPanelHost {
             this._multiplayer = msg.multiplayer === true;
             this._reload?.(this._multiplayer);
         }
+        if (msg.type === "setScreen") {
+            // The person's choice, not the project's: every open card redraws for it.
+            saveEncyclopediaScreen(msg.screen);
+            for (const panel of EncyclopediaPanel._panels.all) {
+                panel._reload?.(panel._multiplayer);
+            }
+        }
         if (msg.type === "close") {
             this.dispose();
         }
     }
 
     /**
-     * Sends an entry together with the mode it was requested in.
+     * Sends an entry together with the mode and the screen it was requested in.
      *
-     * The mode travels with the entry so the toggle cannot drift out of step with what was
-     * fetched - a webview that VS Code reloaded would otherwise come back showing an unticked box
-     * over a multiplayer body.
+     * Both travel with the entry so the controls cannot drift out of step with what was fetched - a
+     * webview that VS Code reloaded would otherwise come back showing an unticked box over a
+     * multiplayer body.
      */
     private _sendEntry(entry: GetEncyclopediaEntryResult): void {
         this._send({
             type: "entry",
             entry,
             multiplayer: this._multiplayer,
+            screen: readEncyclopediaScreen(),
             shipName: this._drawShipName(entry),
         });
     }

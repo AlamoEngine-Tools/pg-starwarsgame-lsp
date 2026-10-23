@@ -82,10 +82,11 @@ public sealed class GetEncyclopediaEntryHandler
     {
         var index = _indexService.Current;
         var resolver = new EffectiveObjectResolver(index, _schema, _tagSource);
-        // The card is drawn for a particular screen, because the game sizes these glyphs from the
-        // display it runs on - see EncyclopediaGlyphSize.
-        var screen = _config.Current.Encyclopedia;
-        var layout = new EncyclopediaLayoutResolver(resolver, screen.ScreenWidth, screen.ScreenHeight)
+        // The card is drawn for the screen the request names, because the game sizes these glyphs
+        // from the display it runs on - see EncyclopediaGlyphSize.
+        var layout = new EncyclopediaLayoutResolver(resolver,
+                request.ScreenWidth ?? EncyclopediaGlyphSize.DefaultScreenWidth,
+                request.ScreenHeight ?? EncyclopediaGlyphSize.DefaultScreenHeight)
             .Resolve();
 
         var effective = resolver.Resolve(request.ObjectId);

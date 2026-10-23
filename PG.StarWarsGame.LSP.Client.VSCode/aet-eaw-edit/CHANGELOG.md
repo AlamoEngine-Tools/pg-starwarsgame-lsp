@@ -79,7 +79,7 @@
   ([#202](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/202))
   - Well-formed files only; a refused file names its line and column
   - Vanilla: 993 well-formed files format with unchanged diagnostics and line endings
-- **Twelve settings** - everything is on except two experimental modes; the settings page holds what a modder
+- **Ten settings** - everything is on except two experimental modes; the settings page holds what a modder
   decides ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
   - `aet-eaw-edit.experimental.storyEditing` and `aet-eaw-edit.experimental.storySimulator`, off by default
   - Now on: Lua hover and diagnostics, story discovery, graph diagnostics, symbols and rename, story-dialog
@@ -455,6 +455,10 @@
   an answer* and `aet-eaw-edit.storySimulator.assumeMediaCompletes` is *Speech and movies finish on their own*, two
   toggles beside *Break on gates* in the transport. Resume is kept per viewer; the media option belongs to the run,
   changes it from the next tick on and holds through Back and Restart
+- **Encyclopedia screen moved into the preview** - `aet-eaw-edit.encyclopedia.screenWidth` and
+  `aet-eaw-edit.encyclopedia.screenHeight` are the *Screen* dropdown in the encyclopedia preview: the common
+  resolutions and the game's own detail presets, 1920x1080 by default, kept per user. A change redraws every
+  open card, with no server restart; the Mod Browser's card is drawn for the same screen
 - **Lua debugger settings moved to `launch.json`** - `aet-eaw-edit.game.executable` is `program`,
   `aet-eaw-edit.game.luaDebugHost` is `host`, `aet-eaw-edit.game.luaDebugPort` is `port`,
   `aet-eaw-edit.game.unsafeTableExpansion` is `unsafeTableExpansion`; `aet-eaw-edit.game.arguments` is `args`, which

@@ -363,6 +363,28 @@ public sealed class GetEncyclopediaEntryHandlerTest
         Assert.Equal("Arial", result.Layout.Body.FontName);
     }
 
+    [Fact]
+    public async Task Handle_DrawsForTheScreenTheRequestNames()
+    {
+        var loca = new FakeLocalisation().With("SP", "single");
+        var index = IndexWith(loca, Sym("U"));
+        var source = new FakeVariantTagSource().With("U", Tag("Encyclopedia_Text", "SP"));
+
+        var unnamed = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+        var common = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U", ScreenWidth = 1920, ScreenHeight = 1080 },
+                CancellationToken.None);
+        var design = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U", ScreenWidth = 1024, ScreenHeight = 768 },
+                CancellationToken.None);
+
+        // No screen named is the common one; another screen sizes the glyphs differently.
+        Assert.Equal(common.Layout.Body.FontUnits, unnamed.Layout.Body.FontUnits);
+        Assert.Equal(common.Layout.Body.WrapChars, unnamed.Layout.Body.WrapChars);
+        Assert.NotEqual(common.Layout.Body.FontUnits, design.Layout.Body.FontUnits);
+    }
+
     // ── absent object and feature flag ───────────────────────────────────────
 
     [Fact]

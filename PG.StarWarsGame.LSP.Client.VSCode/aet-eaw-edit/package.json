@@ -609,22 +609,8 @@
             "scope": "machine-overridable",
             "markdownDescription": "%config.shaders.directory.markdownDescription%"
           },
-          "aet-eaw-edit.encyclopedia.screenWidth": {
-            "order": 4,
-            "type": "number",
-            "default": 1920,
-            "minimum": 320,
-            "markdownDescription": "%config.encyclopedia.screenWidth.markdownDescription%"
-          },
-          "aet-eaw-edit.encyclopedia.screenHeight": {
-            "order": 5,
-            "type": "number",
-            "default": 1080,
-            "minimum": 240,
-            "markdownDescription": "%config.encyclopedia.screenHeight.markdownDescription%"
-          },
           "aet-eaw-edit.features.preview.energyPool": {
-            "order": 6,
+            "order": 4,
             "type": "boolean",
             "default": false,
             "tags": [

@@ -583,6 +583,8 @@ Read-only.
   - `Encyclopedia_Text` wrapped as the game wraps it
   - Ship names from the game's tables
   - Faction switch
+  - Screen it is drawn for - the game sizes the glyphs from its display; 1920x1080 unless another is
+    picked, kept per user
 - **Language** - `aet-eaw-edit.lsp.localisation.language` (the game's language, not the extension's)
 - **Icons** - from the mega texture
   - Game icons baked into the baseline
@@ -732,7 +734,7 @@ Command Palette (`Ctrl+Shift+P`).
 
 ## Settings reference
 
-Twelve settings; everything else is always on.
+Ten settings on the settings page; everything else is always on. The development settings are hidden from it.
 
 ### Experimental
 
@@ -773,16 +775,6 @@ once set.
 | Setting                                       | Default | Meaning                                                                                                                                                                                                                                                                 |
 |-----------------------------------------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `aet-eaw-edit.diagnostics.workspaceOnStartup` | `false` | Diagnose every indexed file once the scan finishes, instead of only the files that are opened. Expensive - on the base game, 580 files, that is 18,281 diagnostics and 21.8 MiB the editor holds. Turn it on only when a session has started with no diagnostics at all |
-
-### Encyclopedia preview
-
-The game sizes the popup's glyphs from the display it runs on, and wraps its body text by character
-count rather than by measured width - so the card's proportions follow the screen it is drawn for.
-
-| Setting                                  | Default | Meaning                                                    |
-|------------------------------------------|---------|------------------------------------------------------------|
-| `aet-eaw-edit.encyclopedia.screenWidth`  | `1920`  | Screen width, in pixels, the card is drawn for             |
-| `aet-eaw-edit.encyclopedia.screenHeight` | `1080`  | Screen height, in pixels; this is what sets the glyph size |
 
 ### Development
 

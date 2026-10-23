@@ -57,6 +57,10 @@ import { offerShaderSources, shaderDirectory } from "./shaderSources";
 import { initDialogGeometryStorage } from "./dialogGeometryStorage";
 import { initPanelLayoutStorage } from "./panelLayoutStorage";
 import { initViewerSettingsStorage } from "./viewerSettingsStorage";
+import {
+    encyclopediaScreenParams,
+    initEncyclopediaScreenStorage,
+} from "./encyclopediaScreenStorage";
 import { initProjectSettingsStorage } from "./projectSettingsStorage";
 import { LocalisationEditorPanel } from "./localisationEditorPanel";
 import {
@@ -904,18 +908,6 @@ function startProjectClient(
                     false,
                 ),
             },
-            // Which screen the encyclopedia card is drawn for. The game sizes that popup's glyphs
-            // from the display it runs on, so a preview has to be told which display to match.
-            encyclopedia: {
-                screenWidth: cfg("encyclopedia").get<number>(
-                    "screenWidth",
-                    1920,
-                ),
-                screenHeight: cfg("encyclopedia").get<number>(
-                    "screenHeight",
-                    1080,
-                ),
-            },
             features: resolveFeatureFlags(),
         },
     };
@@ -1711,6 +1703,8 @@ export async function activate(
     // things out of the mod's own tree - so they go to workspaceState beside the dialog geometry.
     initViewerSettingsStorage(context.globalState);
     initProjectSettingsStorage(context.workspaceState);
+    // The screen the encyclopedia card is drawn for is the display the person targets.
+    initEncyclopediaScreenStorage(context.globalState);
 
     // Same reasoning: how wide you like a dock is a property of your screen and your habits,
     // not of the mod you have open.
@@ -3258,7 +3252,11 @@ export async function activate(
                     const entry =
                         await lsp.requestOrReport<GetEncyclopediaEntryResult>(
                             GET_ENCYCLOPEDIA_ENTRY,
-                            { objectId: id, multiplayer },
+                            {
+                                objectId: id,
+                                multiplayer,
+                                ...encyclopediaScreenParams(),
+                            },
                             "load the encyclopedia entry",
                         );
                     if (entry === undefined) {
