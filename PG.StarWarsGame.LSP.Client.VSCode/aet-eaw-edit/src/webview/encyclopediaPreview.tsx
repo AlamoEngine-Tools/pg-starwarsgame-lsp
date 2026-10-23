@@ -32,6 +32,7 @@ import {
     encyclopediaScreenId,
 } from "./encyclopediaScreens";
 import {
+    comboboxCss,
     dockBodyCss,
     dockChromeCss,
     dockHeaderCss,
@@ -91,6 +92,8 @@ const Shell = styled.div`
     ${dockBodyCss}
     ${dockOverviewCss}
     ${problemsPanelCss}
+    /* The Screen field is the shared Combobox; without its rules the list falls into the dock's flow. */
+    ${comboboxCss}
 
     height: 100%;
     display: flex;
