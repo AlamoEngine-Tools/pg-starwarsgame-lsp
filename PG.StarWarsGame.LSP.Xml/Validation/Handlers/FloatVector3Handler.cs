@@ -18,7 +18,7 @@ public sealed partial class FloatVector3Handler : SingleValueTypeHandlerBase
     {
         var trimmed = fact.RawValue.Trim();
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
-        if (parts.Length != 3 || parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
+        if (parts.Length != 3 || parts.Any(p => !EngineNumber.TryParseFloat(p, out _)))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

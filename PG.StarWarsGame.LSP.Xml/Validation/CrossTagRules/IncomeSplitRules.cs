@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -68,9 +67,7 @@ public sealed class OwnerIncomeShareRule : IncomeStreamRuleBase
         if (node is null) return [];
 
         var raw = node.InnerText.Trim();
-        if (!double.TryParse(raw.TrimEnd('f', 'F'), NumberStyles.Float, CultureInfo.InvariantCulture,
-                out var value))
-            return [];
+        if (EngineNumber.ReadDouble(raw) is not { } value) return [];
 
         if (value >= 0.0 && value < 1.0) return [];
 

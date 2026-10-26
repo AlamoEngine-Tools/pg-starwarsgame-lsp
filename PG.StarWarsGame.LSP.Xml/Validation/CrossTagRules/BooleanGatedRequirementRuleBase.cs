@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -92,8 +91,6 @@ public abstract class BooleanGatedRequirementRuleBase : IXmlCrossTagRule
     /// <summary>Parses a value the way the numeric-gated subclass needs it.</summary>
     protected static bool IsPositiveNumber(string value)
     {
-        return double.TryParse(value.TrimEnd('f', 'F'), NumberStyles.Float,
-                   CultureInfo.InvariantCulture, out var parsed)
-               && parsed > 0.0;
+        return EngineNumber.ReadDouble(value) is > 0.0;
     }
 }

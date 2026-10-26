@@ -16,8 +16,7 @@ public sealed class NormalizedFloatHandler : SingleValueTypeHandlerBase
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        var trimmed = fact.RawValue.Trim().TrimEnd('f', 'F');
-        if (!double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+        if (!EngineNumber.TryParseDouble(fact.RawValue, out var d))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

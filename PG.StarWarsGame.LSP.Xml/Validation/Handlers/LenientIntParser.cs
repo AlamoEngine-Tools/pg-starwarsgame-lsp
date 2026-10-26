@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Globalization;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -21,7 +22,7 @@ internal static class LenientIntParser
             return true;
         }
 
-        if (LenientFloatParser.TryParse(token, out var floatVal)
+        if (EngineNumber.TryParseFloat(token, out var floatVal)
             && floatVal is >= int.MinValue and <= int.MaxValue)
         {
             value = (int)floatVal;

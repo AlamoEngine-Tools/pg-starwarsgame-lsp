@@ -25,7 +25,7 @@ public abstract class NumberValueHandlerBase : XmlDiagnosticsHandler<XmlTagValue
             return [];
 
         var trimmed = fact.RawValue.Trim();
-        if (!LenientFloatParser.TryParse(trimmed, out var floatVal))
+        if (!EngineNumber.TryParseFloat(trimmed, out var floatVal))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
 using HtmlAgilityPack;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
@@ -76,9 +76,7 @@ public sealed class ForceHealingApplicableUnitsRule : ApplicableUnitRuleBase
     {
         if (!childrenByName.TryGetValue(RangeTag, out var nodes)) return false;
 
-        return nodes.Any(n =>
-            double.TryParse(n.InnerText.Trim().TrimEnd('f', 'F'), NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var range) && range > 0.0);
+        return nodes.Any(n => EngineNumber.ReadDouble(n.InnerText) is > 0.0);
     }
 }
 

@@ -571,8 +571,8 @@ public sealed class PreviewSceneBuilder(
                 ability.Tag("GUI_Activated_Ability_Name"),
                 ability.Tag("Owner_Attachment_Bone"),
                 ability.Tag("Particle_Effect"),
-                Parse(ability.Tag("Recharge_Seconds")),
-                Parse(ability.Tag("Expiration_Seconds")),
+                EngineNumber.ReadFloat(ability.Tag("Recharge_Seconds")),
+                EngineNumber.ReadFloat(ability.Tag("Expiration_Seconds")),
                 bound.For(ability.Type),
                 animations.FirstOrDefault(IsDeploy),
                 animations.FirstOrDefault(IsUndeploy),
@@ -614,7 +614,7 @@ public sealed class PreviewSceneBuilder(
             if (parts.Length < 2 || parts[0].Length == 0)
                 continue;
 
-            if (Parse(parts[1].TrimEnd('f', 'F')) is { } factor)
+            if (EngineNumber.ReadFloat(parts[1]) is { } factor)
                 modifiers.Add(new PreviewAbilityModifier(parts[0], factor));
         }
 
@@ -654,13 +654,6 @@ public sealed class PreviewSceneBuilder(
     private static int? Count(EffectiveObject effective, string tagName)
     {
         return Number(effective, tagName) is { } value ? (int)value : null;
-    }
-
-    private static float? Parse(string? value)
-    {
-        return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
-            ? parsed
-            : null;
     }
 
     /// <summary>
@@ -713,7 +706,7 @@ public sealed class PreviewSceneBuilder(
         foreach (var value in RepeatedTagReader.Values(
                      indexService.Current, tagSource, EncyclopediaTags.GameConstantsId,
                      "Hull_Vs_Hard_Points_Health_Constraint"))
-            if (Parse(value) is { } parsed)
+            if (EngineNumber.ReadFloat(value) is { } parsed)
                 return parsed;
 
         return DefaultHullVsHardpointsConstraint;
@@ -1872,44 +1865,16 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static PreviewSpinAway? SpinAway(EffectiveObject effective)
     {
-        if (!IsYes(Tag(effective, "Spin_Away_On_Death")))
+        if (!EngineBoolean.IsTrue(Tag(effective, "Spin_Away_On_Death")))
             return null;
 
         return new PreviewSpinAway(
             // 2.0 where the file is silent: 31 of the 34 write exactly that, so it is the corpus's
             // own answer rather than a number picked to fill a gap.
-            Float(Tag(effective, "Spin_Away_On_Death_Time")) ?? 2.0f,
-            Float(Tag(effective, "Spin_Away_On_Death_Chance")) ?? 0f,
+            EngineNumber.ReadFloat(Tag(effective, "Spin_Away_On_Death_Time")) ?? 2.0f,
+            EngineNumber.ReadFloat(Tag(effective, "Spin_Away_On_Death_Chance")) ?? 0f,
             Tag(effective, "Spin_Away_On_Death_Explosion"),
-            Float(Tag(effective, "Max_Speed")) ?? 0f);
-    }
-
-    /// <summary>A boolean as the files write it. 34 of 34 spell this one <c>Yes</c>.</summary>
-    private static bool IsYes(string? value)
-    {
-        return value is not null
-               && (value.Equals("yes", StringComparison.OrdinalIgnoreCase)
-                   || value.Equals("true", StringComparison.OrdinalIgnoreCase)
-                   || value.Equals("1", StringComparison.Ordinal));
-    }
-
-    /// <summary>
-    ///     A float as the files write it, <c>f</c> suffix and all.
-    /// </summary>
-    /// <remarks>
-    ///     The suffix is not a curiosity: 31 shipped objects write <c>2.0f</c> and 3 write
-    ///     <c>1.0f</c>, so a plain parse drops every spin time in the game to its default. Invariant
-    ///     culture, because the files are written with a point whatever the reader's locale is.
-    /// </remarks>
-    private static float? Float(string? value)
-    {
-        var text = value?.Trim().TrimEnd('f', 'F');
-
-        return string.IsNullOrEmpty(text)
-            ? null
-            : float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
-                ? parsed
-                : null;
+            EngineNumber.ReadFloat(Tag(effective, "Max_Speed")) ?? 0f);
     }
 
     private static string? Tag(EffectiveObject effective, string tagName)
@@ -1930,10 +1895,7 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static float? Number(EffectiveObject effective, string tagName)
     {
-        return Tag(effective, tagName) is { } raw &&
-               float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
-            ? value
-            : null;
+        return EngineNumber.ReadFloat(Tag(effective, tagName));
     }
 
     private static PreviewRgba? Colour(EffectiveObject effective, string tagName)

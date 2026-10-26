@@ -20,7 +20,7 @@ public sealed class UintHandler : XmlDiagnosticsHandler<XmlTagValueFact>
             return [];
 
         var trimmed = fact.RawValue.Trim();
-        if (!LenientFloatParser.TryParse(trimmed, out var floatVal))
+        if (!EngineNumber.TryParseFloat(trimmed, out var floatVal))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

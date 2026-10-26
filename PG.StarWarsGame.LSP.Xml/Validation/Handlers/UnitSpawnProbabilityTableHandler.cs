@@ -30,7 +30,7 @@ public sealed class UnitSpawnProbabilityTableHandler : CommaSeparatedPairHandler
             var (name, nameOffset) = tokens[i];
             var (prob, probOffset) = tokens[i + 1];
 
-            if (!LenientFloatParser.TryParse(prob, out var probability) ||
+            if (!EngineNumber.TryParseFloat(prob, out var probability) ||
                 probability < 0.0f || probability > 1.0f)
             {
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

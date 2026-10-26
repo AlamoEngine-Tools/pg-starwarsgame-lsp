@@ -16,7 +16,7 @@ public sealed class FloatValueHandler : SingleValueTypeHandlerBase
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         var trimmed = fact.RawValue.Trim();
-        if (!LenientFloatParser.TryParse(trimmed, out _))
+        if (!EngineNumber.TryParseFloat(trimmed, out _))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

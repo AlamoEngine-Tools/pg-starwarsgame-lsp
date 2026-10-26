@@ -27,7 +27,7 @@ public sealed partial class IntListHandler : SingleValueTypeHandlerBase
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
 
         // Any token that is not a valid float at all → error
-        if (parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
+        if (parts.Any(p => !EngineNumber.TryParseFloat(p, out _)))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
@@ -43,7 +43,7 @@ public sealed partial class IntListHandler : SingleValueTypeHandlerBase
         {
             if (int.TryParse(p, out var iv))
                 return iv.ToString();
-            LenientFloatParser.TryParse(p, out var fv);
+            EngineNumber.TryParseFloat(p, out var fv);
             return ((int)fv).ToString();
         }));
 

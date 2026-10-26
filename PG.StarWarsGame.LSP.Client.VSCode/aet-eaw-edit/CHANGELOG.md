@@ -281,6 +281,11 @@
 
 ### Fixes
 
+- **Numbers are read the way the game reads them** - one parser serves every validator, rule and the preview.
+  The preview and the comparison rules take the number at the front of a value as the game does, so `2.0ff` and
+  `2.0 f` read 2.0 where the preview dropped the spin time to its default; a validator accepts a number with at
+  most one `f` suffix, so `0.5ff` under a normalised float is reported where one validator let it pass
+  ([#302](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/302))
 - **Preview project settings per project** - the weapon bench, the faction and its colour are kept per project
   file, not per window; two mods open together no longer share one set, which the move out of the global
   settings had set out to end ([#276](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/276))

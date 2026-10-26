@@ -248,6 +248,26 @@ public sealed class PreviewDeathCloneTest
     }
 
     /// <summary>
+    ///     The preview reads a number the way the game does: the number at the front of the text,
+    ///     whatever follows it. A doubled suffix or a blank before it changes nothing in the game,
+    ///     so it changes nothing here - the validator, not the preview, is where the author hears
+    ///     that the value is not well formed.
+    /// </summary>
+    [Theory]
+    [InlineData("2.0ff", 2.0f)]
+    [InlineData("2.0 f", 2.0f)]
+    [InlineData("2,5", 2.0f)]
+    public void SpinAway_ReadsTheNumberTheGameReads(string written, float expected)
+    {
+        var scene = Scene(
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Spin_Away_On_Death", "Yes"),
+            Tag("Spin_Away_On_Death_Time", written));
+
+        Assert.Equal(expected, scene.SpinAway!.TimeSeconds);
+    }
+
+    /// <summary>
     ///     The <c>f</c> suffix is in the shipped files - 31 write <c>2.0f</c> and 3 write
     ///     <c>1.0f</c>. Reading it as a plain float drops every one of them to the default.
     /// </summary>
