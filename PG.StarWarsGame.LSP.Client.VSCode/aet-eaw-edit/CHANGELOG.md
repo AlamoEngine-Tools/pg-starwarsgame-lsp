@@ -341,6 +341,10 @@
   and the game's own folder; every refusal is shown, where an empty name or folder returned silently; `modinfo.json` is
   found in any spelling; the not-a-mod refusal names the folders it looked for
   ([#317](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/317))
+- **A panel no longer waits out the timeout after a client restart** - every project's gateway hears a route change,
+  where only the window's did, so a preview opened while its server restarted sat blank for 30 seconds; a panel opened
+  while no project runs binds to the one project that starts, never to the editor in front
+  ([#318](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/318))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))

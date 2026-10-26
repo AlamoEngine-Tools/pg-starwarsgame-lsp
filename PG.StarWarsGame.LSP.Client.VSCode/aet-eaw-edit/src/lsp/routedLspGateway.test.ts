@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { LspGateway, SERVER_NOT_RUNNING } from "./lspGateway";
-import { RoutedLspGateway } from "./routedLspGateway";
+import { RouteChanges, RoutedLspGateway } from "./routedLspGateway";
 
 /** A gateway over a fake server that answers every request with its own name. */
 function serverNamed(name: string): LspGateway {
@@ -82,5 +82,72 @@ describe("RoutedLspGateway", () => {
         const routed = new RoutedLspGateway(() => undefined);
 
         assert.equal(await routed.whenReady(10), false);
+    });
+
+    // Only the window's gateway was told when the routes changed. A project's own gateway, whose
+    // client was between stopping and starting when a panel asked, sat out the whole timeout and
+    // returned false (#318). Routes are an event now; every gateway built on it hears every change.
+    it("hears a route change through the shared routes, whichever gateway it is", async () => {
+        const routes = new RouteChanges();
+        let window: LspGateway | undefined;
+        let project: LspGateway | undefined;
+        const windowGateway = new RoutedLspGateway(
+            () => window,
+            undefined,
+            routes,
+        );
+        const projectGateway = new RoutedLspGateway(
+            () => project,
+            undefined,
+            routes,
+        );
+
+        const windowWaits = windowGateway.whenReady(1000);
+        const projectWaits = projectGateway.whenReady(1000);
+        window = serverNamed("window");
+        project = serverNamed("rev");
+        routes.fire();
+        window.markReady();
+        project.markReady();
+
+        assert.equal(await windowWaits, true);
+        assert.equal(await projectWaits, true);
+    });
+
+    it("waits for a restarting client rather than for the timeout", async () => {
+        const routes = new RouteChanges();
+        let current: LspGateway | undefined;
+        const projectGateway = new RoutedLspGateway(
+            () => current,
+            undefined,
+            routes,
+        );
+        const started = Date.now();
+
+        const waiting = projectGateway.whenReady(2000);
+        // The restart: the old client is gone, the new one registers and comes up.
+        current = serverNamed("rev");
+        routes.fire();
+        current.markReady();
+
+        assert.equal(await waiting, true);
+        assert.ok(
+            Date.now() - started < 1000,
+            "released by the route change, not the timeout",
+        );
+    });
+
+    it("keeps waiting through a change that still routes nowhere", async () => {
+        const routes = new RouteChanges();
+        let current: LspGateway | undefined;
+        const gateway = new RoutedLspGateway(() => current, undefined, routes);
+
+        const waiting = gateway.whenReady(1000);
+        routes.fire();
+        current = serverNamed("rev");
+        routes.fire();
+        current.markReady();
+
+        assert.equal(await waiting, true);
     });
 });
