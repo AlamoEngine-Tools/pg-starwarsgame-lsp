@@ -2001,7 +2001,10 @@ export class PreviewViewport {
         this.rebuildMaterials();
     }
 
-    /** How many loaded sub-meshes a translated shader actually reaches, out of how many there are. */
+    /**
+     * How many loaded sub-meshes and emitters a translated effect actually reaches, out of how many
+     * there are. The emitters count because a particle file has no sub-meshes at all.
+     */
     translatedCoverage(): { translated: number; total: number } {
         let translated = 0;
         let total = 0;
@@ -2016,6 +2019,12 @@ export class PreviewViewport {
                 translated++;
             }
         });
+
+        for (const entry of this.particleSystems.values()) {
+            const coverage = entry.instance.effectCoverage();
+            translated += coverage.translated;
+            total += coverage.total;
+        }
 
         return { translated, total };
     }

@@ -878,6 +878,11 @@ class EmitterRenderer {
             : particleEffectName(this.emitter.properties.blendMode);
     }
 
+    /** Whether this emitter is drawn through an engine effect right now. */
+    get drawnThroughEffect(): boolean {
+        return this.engine !== null;
+    }
+
     /**
      * Draws through the engine's own effect, or goes back to the preview's shader with null.
      *
@@ -1875,6 +1880,32 @@ export class ParticleSystemInstance {
                     .filter((name): name is string => name !== null),
             ),
         ].sort();
+    }
+
+    /**
+     * How many emitters an engine effect reaches, out of how many name one.
+     *
+     * The viewport adds this to its sub-mesh count for the Renderer control: a particle file has
+     * no sub-meshes, and a count of "0 of 0" would say its effects were not drawn when they are. A
+     * heat sprite names no effect and is outside both numbers; a tailed emitter names one it never
+     * takes, so it is in the total and never reached.
+     */
+    effectCoverage(): { translated: number; total: number } {
+        let translated = 0;
+        let total = 0;
+
+        for (const emitter of this.emitters) {
+            if (emitter.effectName === null) {
+                continue;
+            }
+
+            total++;
+            if (emitter.drawnThroughEffect) {
+                translated++;
+            }
+        }
+
+        return { translated, total };
     }
 
     /**

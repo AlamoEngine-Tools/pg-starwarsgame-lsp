@@ -359,7 +359,11 @@
   no longer appears on the registry itself; it still appears on a file nothing names
   ([#269](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/269))
 - **Shader note on particle systems** - "No shader sources are reachable" is shown only for a scene that asked for
-  an effect; a particle system asks for none and opened with a note about shaders it never needed
+  an effect under the Game renderer; a particle system opened with the note about shaders it was not drawing with
+- **Renderer switch on a particle file** - the Effects section withheld its Renderer control from a particle file,
+  although its emitters are drawn through the engine's own effects under Game; the control is offered there, and
+  its Game tooltip counts the emitters an effect reaches along with the sub-meshes
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
 - **Loading cover on a particle file** - a particle system opened on its own is a scene with one part, asked
   for as a particle system rather than as geometry; the cover counted geometry alone and stayed over the field
   for the full idle deadline, hiding the first eight seconds of any effect opened this way

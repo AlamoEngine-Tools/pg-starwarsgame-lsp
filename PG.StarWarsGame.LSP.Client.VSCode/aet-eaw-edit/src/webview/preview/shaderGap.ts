@@ -5,9 +5,10 @@
  * Whether the "no shader sources are reachable" note has anything to explain.
  *
  * The note is the explanation of a gap: translation is on, the scene asked for effects, and no
- * source came back for any of them. Without the middle condition it fired on every particle
- * system - those ask for no effect at all, their sprites being drawn by the preview's own shaders -
- * and an asteroid field opened with a note about shaders it never needed.
+ * source came back for any of them. Without the middle condition it fired on every scene that
+ * named no effect. A particle system does name its emitters' `Prim*.fx` effects since they are
+ * drawn through the engine's own, so under the Game renderer with no sources the note is as right
+ * on an asteroid field as on a hull.
  */
 export function shaderGapNotice(
     translatedOn: boolean,

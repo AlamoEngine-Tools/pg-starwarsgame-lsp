@@ -1201,6 +1201,40 @@ describe("engine effects", () => {
         ]);
     });
 
+    it("counts the emitters an engine effect reaches, out of those that name one", () => {
+        // A heat sprite names no effect and is outside the count either way; the Inverse emitter
+        // names one that is never in hand, so it is in the total and never reached.
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                still(),
+                emitter({ properties: properties({ blendMode: "Inverse" }) }),
+                emitter({
+                    properties: properties({
+                        blendMode: "Transparent",
+                        isHeatParticle: true,
+                    }),
+                }),
+            ]),
+        );
+        assert.deepEqual(instance.effectCoverage(), {
+            translated: 0,
+            total: 2,
+        });
+
+        withEffect(instance);
+        assert.deepEqual(instance.effectCoverage(), {
+            translated: 1,
+            total: 2,
+        });
+
+        withEffect(instance, false);
+        assert.deepEqual(instance.effectCoverage(), {
+            translated: 0,
+            total: 2,
+        });
+    });
+
     it("draws an emitter through its translated effect once the effect is in hand", () => {
         const instance = withEffect(
             new ParticleSystemInstance("test", testSystem([still()])),
