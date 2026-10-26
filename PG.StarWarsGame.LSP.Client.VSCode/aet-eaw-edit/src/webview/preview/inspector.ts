@@ -253,7 +253,7 @@ export function inspectPanels(
     const panels = sources.map((source) => inspectPanel(source, detail));
 
     return {
-        title: panels[0]?.title ?? "Nothing selected",
+        title: panels[0]?.title ?? l10n.t("Nothing selected"),
         subtitle: panels[0]?.subtitle,
         sections: panels.flatMap((panel) => panel.sections),
     };

@@ -903,7 +903,9 @@ function AddTranslationDialog(props: {
                         submit
                         className="primary"
                         disabled={error !== null}
-                        disabledReason={error ?? "Fill in the fields above"}
+                        disabledReason={
+                            error ?? l10n.t("Fill in the fields above")
+                        }
                     >
                         {l10n.t("Add")}
                     </Button>

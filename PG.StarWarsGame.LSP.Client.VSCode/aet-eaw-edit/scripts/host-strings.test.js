@@ -95,6 +95,36 @@ describe("host strings", () => {
         );
     });
 
+    /** A status setter feeds the slot a reader watches, so its text is shown like a notification's. */
+    it("finds text fed to a status setter, and looks through a fallback", () => {
+        assert.deepEqual(
+            jsx(
+                'setStatus("No events match the current filters.");\n' +
+                'reportStatus("Warning: " + String(msg.message));\n' +
+                "setStatus(null);\n" +
+                'const a = <span>{status ?? "Arranging layout..."}</span>;\n' +
+                'const b = <span>{status || "Idle"}</span>;',
+            ),
+            [
+                '"No events match the current filters."',
+                '"Warning: " + String(msg.message)',
+                'status ?? "Arranging layout..."',
+                'status || "Idle"',
+            ],
+        );
+    });
+
+    it("accepts a catalogued status text", () => {
+        assert.deepEqual(
+            jsx(
+                'setStatus(l10n.t("No events match the current filters."));\n' +
+                'reportStatus(l10n.t("Warning: {0}", String(msg.message)));\n' +
+                'const a = <span>{status ?? l10n.t("Arranging layout...")}</span>;',
+            ),
+            [],
+        );
+    });
+
     it("tells label uses of a catalogue text from message uses", () => {
         const calls = (source) =>
             catalogueCalls("fixture.tsx", source).map((c) => `${c.text}|${c.label}`);

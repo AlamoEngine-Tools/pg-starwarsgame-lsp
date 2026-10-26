@@ -345,6 +345,11 @@
   where only the window's did, so a preview opened while its server restarted sat blank for 30 seconds; a panel opened
   while no project runs binds to the one project that starts, never to the editor in front
   ([#318](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/318))
+- **Every status text and every fallback text comes from the catalogue** - the story graph's status slot wrote its
+  texts in place, and a text standing in for a missing value (`No model`, `Nothing selected`, `Neutral`) escaped the
+  lint everywhere; the lint now checks `setStatus` and `reportStatus` and looks through `??` and `||`, and the
+  nineteen texts it found are catalogued
+  ([#319](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/319))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))

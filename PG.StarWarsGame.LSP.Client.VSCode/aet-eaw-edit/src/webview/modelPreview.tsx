@@ -10495,7 +10495,7 @@ function ModelPreview(): React.JSX.Element {
                                     "header-left" + (infoOpen ? " active" : "")
                                 }
                                 expanded={infoOpen}
-                                title={scene?.subject ?? "No model"}
+                                title={scene?.subject ?? l10n.t("No model")}
                                 onClick={() => setInfoOpen((open) => !open)}
                             />
 
@@ -10514,7 +10514,7 @@ function ModelPreview(): React.JSX.Element {
                                         className="model-info-name"
                                         title={scene?.subject}
                                     >
-                                        {scene?.subject ?? "No model"}
+                                        {scene?.subject ?? l10n.t("No model")}
                                     </div>
                                     {stats === null ? (
                                         <div className="dock-hint">
@@ -12040,7 +12040,9 @@ ${becauseText(node.because)}`
                                                             {scene.spinAway
                                                                 .explosion ??
                                                                 scene.deathExplosions ??
-                                                                "no explosion named"}
+                                                                l10n.t(
+                                                                    "no explosion named",
+                                                                )}
                                                         </span>
 
                                                         <span className="detail">

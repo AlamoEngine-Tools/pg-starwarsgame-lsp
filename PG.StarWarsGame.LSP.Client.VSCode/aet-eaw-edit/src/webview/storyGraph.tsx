@@ -6736,7 +6736,9 @@ function App(): React.JSX.Element {
             const thread = handle.nearestEventThread(position, threads);
             if (!thread) {
                 setStatus(
-                    "This campaign has no thread file to add events to - create a thread first.",
+                    l10n.t(
+                        "This campaign has no thread file to add events to - create a thread first.",
+                    ),
                 );
                 return;
             }
@@ -6745,7 +6747,10 @@ function App(): React.JSX.Element {
             const owner = threadReadOnlyOwner(thread);
             if (owner) {
                 setStatus(
-                    `${readOnlyMessage(owner)}. Drop the event beside this project's own events`,
+                    l10n.t(
+                        "{0}. Drop the event beside this project's own events",
+                        readOnlyMessage(owner),
+                    ),
                 );
                 return;
             }
@@ -7237,7 +7242,7 @@ function App(): React.JSX.Element {
             // node still leaves the canvas taking drops.
             setEditBlockedBy(editModeBlockedBy(nodes));
             if (!nodes.length) {
-                setStatus("No events match the current filters.");
+                setStatus(l10n.t("No events match the current filters."));
                 return;
             }
             setStatus(null);
@@ -7545,7 +7550,7 @@ function App(): React.JSX.Element {
                     break;
                 }
                 case "error":
-                    setStatus("Warning: " + String(msg.message));
+                    setStatus(l10n.t("Warning: {0}", String(msg.message)));
                     break;
             }
         };
@@ -7735,7 +7740,7 @@ function App(): React.JSX.Element {
                             />
                             {status || layouting ? (
                                 <p className="status">
-                                    {status ?? "Arranging layout..."}
+                                    {status ?? l10n.t("Arranging layout...")}
                                 </p>
                             ) : null}
                             {/* The colour key, on a corner plate like the preview's stage controls. After

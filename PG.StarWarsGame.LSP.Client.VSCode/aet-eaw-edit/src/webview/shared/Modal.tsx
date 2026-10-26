@@ -138,11 +138,11 @@ export function Modal(props: ModalProps): React.JSX.Element {
                                 disabled={!confirmable}
                                 disabledReason={
                                     props.disabledReason ??
-                                    "Fill the fields above first"
+                                    l10n.t("Fill the fields above first")
                                 }
                                 onClick={props.onConfirm}
                             >
-                                {props.confirmLabel ?? "OK"}
+                                {props.confirmLabel ?? l10n.t("OK")}
                             </Button>
                         </>
                     ) : (
