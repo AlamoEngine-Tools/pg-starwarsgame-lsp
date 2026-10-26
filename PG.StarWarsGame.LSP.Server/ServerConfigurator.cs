@@ -70,6 +70,8 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public static class ServerConfigurator
 {
+    /// <param name="options">The OmniSharp options the server is built on.</param>
+    /// <param name="serverOptions">The server's own options; the defaults when null.</param>
     /// <param name="logLevel">
     ///     How loud to be. Comes from <c>--log-level=</c> via <see cref="ServerLogLevel" />; the
     ///     default is Information. Raise it to Debug to see whether a document actually reached the
@@ -569,7 +571,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IXmlRenameProvider, XmlRenameHandler>();
                 services.AddSingleton<ILuaRenameProvider, LuaRenameHandler>();
             })
-            .OnInitialize(async (server, request, ct) =>
+            .OnInitialize(async (server, request, _) =>
             {
                 // Keep this cheap: just load configuration and respond with capabilities so the
                 // client sees the server "ready" immediately. All heavy work (schema, baseline,
@@ -664,7 +666,7 @@ public static class ServerConfigurator
 
                 await Task.CompletedTask;
             })
-            .OnStarted(async (server, ct) =>
+            .OnStarted(async (server, _) =>
             {
                 // The dynamic half of the formatting registration in OnInitialize.
                 RegisterFormatting(server, formattingAfterStart.Document, formattingAfterStart.Range);

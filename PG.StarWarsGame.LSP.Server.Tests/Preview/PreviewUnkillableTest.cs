@@ -64,7 +64,7 @@ public sealed class PreviewUnkillableTest
                 Tag("Attachment_Bone", "HP_GUN"), Tag("Collision_Mesh", "HP_GUN_COL")
             ]));
 
-        Assert.Empty(scene.Problems.Where(p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable));
+        Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable);
     }
 
     [Fact]
@@ -76,8 +76,7 @@ public sealed class PreviewUnkillableTest
                 Tag("Attachment_Bone", "HP_GUN"), Tag("Collision_Mesh", "HP_GUN_COLL")
             ]));
 
-        Assert.Empty(
-            scene.Problems.Where(p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable));
+        Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable);
     }
 
     // 22 vanilla hardpoints in foc point their Collision_Mesh at their own bone - the Executor's
@@ -91,8 +90,7 @@ public sealed class PreviewUnkillableTest
                 Tag("Attachment_Bone", "HP_GUN"), Tag("Collision_Mesh", "HP_GUN")
             ]));
 
-        Assert.Empty(
-            scene.Problems.Where(p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable));
+        Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable);
     }
 
     [Fact]
@@ -105,8 +103,7 @@ public sealed class PreviewUnkillableTest
                 Tag("Health", "350"), Tag("Is_Destroyable", "Yes"), Tag("Attachment_Bone", "HP_GUN")
             ]));
 
-        Assert.Single(
-            scene.Problems.Where(p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable));
+        Assert.Single(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable);
     }
 
     [Fact]
@@ -118,8 +115,7 @@ public sealed class PreviewUnkillableTest
                 Tag("Attachment_Bone", "HP_GUN"), Tag("Collision_Mesh", "HP_GUN_COL")
             ]));
 
-        Assert.Empty(
-            scene.Problems.Where(p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable));
+        Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable);
     }
 
     [Fact]
@@ -134,8 +130,7 @@ public sealed class PreviewUnkillableTest
                 Tag("Attachment_Bone", "HP_GUN"), Tag("Collision_Mesh", "HP_GUN_COL")
             ]));
 
-        Assert.Empty(
-            scene.Problems.Where(p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable));
+        Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable);
     }
 
     // ── fixture ───────────────────────────────────────────────────────────────

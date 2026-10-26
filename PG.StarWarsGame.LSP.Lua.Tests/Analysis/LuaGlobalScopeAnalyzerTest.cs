@@ -43,7 +43,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
     }
 
     // Adds the current document to the index (needed for workspace URI resolution).
-    private static GameIndex AddCurrentDoc(GameIndex index, string text = "")
+    private static GameIndex AddCurrentDoc(GameIndex index)
     {
         var doc = new DocumentIndex(CurrentUri, 1, [], []);
         return index with { Documents = index.Documents.Add(CurrentUri, doc) };

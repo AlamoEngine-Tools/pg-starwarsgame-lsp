@@ -136,10 +136,6 @@ file sealed class StubLocalisationIndex : ILocalisationIndex
         foreach (var (k, v) in pairs) _values[k] = v;
     }
 
-    public StubLocalisationIndex(string key, string value) : this((key, value))
-    {
-    }
-
     public StubLocalisationIndex() : this([])
     {
     }

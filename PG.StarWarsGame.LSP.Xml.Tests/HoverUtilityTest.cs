@@ -186,7 +186,7 @@ public sealed class HoverUtilityTest
             Loose("data/art/textures/foo.dds"), 0, 0, 7);
 
         Assert.NotNull(hover);
-        var md = hover!.Contents.MarkupContent!.Value;
+        var md = hover.Contents.MarkupContent!.Value;
         Assert.Contains("data/art/textures/foo.dds", md);
     }
 
@@ -198,7 +198,7 @@ public sealed class HoverUtilityTest
             Loose("data/art/textures/foo.tga"), 0, 0, 7);
 
         Assert.NotNull(hover);
-        Assert.Contains("data/art/textures/foo.tga", hover!.Contents.MarkupContent!.Value);
+        Assert.Contains("data/art/textures/foo.tga", hover.Contents.MarkupContent!.Value);
     }
 
     [Fact]

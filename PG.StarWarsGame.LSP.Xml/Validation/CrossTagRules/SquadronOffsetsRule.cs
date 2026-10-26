@@ -48,7 +48,7 @@ public sealed class SquadronOffsetsRule : IXmlCrossTagRule
                 totalUnits,
                 totalOffsets,
                 unitNodes.Select(ToLocation).ToList(),
-                (offsetNodes ?? []).Select(ToLocation).ToList())
+                offsetNodes.Select(ToLocation).ToList())
         ];
     }
 

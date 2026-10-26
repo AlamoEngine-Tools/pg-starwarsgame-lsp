@@ -83,6 +83,8 @@ public sealed class DocumentSignatureTest
         Assert.True(repinned.Matches(typeof(LayoutWithChangedNestedType), bumped));
     }
 
+    // The fixtures are serialized by System.Text.Json and compared as text; nothing reads them back.
+    // ReSharper disable UnusedMember.Local
     private sealed record Entry
     {
         public string File { get; init; } = string.Empty;

@@ -81,10 +81,13 @@ public static class BaselineSerializer
         var fileTypeMap = FromSerializedArray(dto.FileTypeMap);
         var groupMemberships = FromSerializedGroupMemberships(dto.GroupMemberships);
         var assetFiles = dto.AssetFiles.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
         var modelBones = (dto.ModelBones ?? []).ToImmutableDictionary(
             e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
+        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
         var modelTextures = (dto.ModelTextures ?? []).ToImmutableDictionary(
             e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
+        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
         var objectTags = FromSerializedObjectTags(dto.ObjectTags ?? []);
         return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded, fileTypeMap)
         {
@@ -92,7 +95,9 @@ public static class BaselineSerializer
             AssetFiles = assetFiles,
             ModelBones = modelBones,
             ModelTextures = modelTextures,
+            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
             ParticleSystems = (dto.ParticleSystems ?? []).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
+            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
             ModelProxies = (dto.ModelProxies ?? []).ToImmutableDictionary(
                 e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase),
             ObjectTags = objectTags

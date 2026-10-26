@@ -60,7 +60,7 @@ public sealed class GameSymbolProjectorTest
 
         var result = Build().Project([entry], [], "hash");
 
-        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], result.Symbols["CORUSCANT"].Behaviors);
+        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], result.Symbols["CORUSCANT"].Behaviors!);
     }
 
     [Fact]

@@ -1,9 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Schema.Yaml;
 
 /// <summary>One entry of a tag's <c>slots</c> list, as written in the YAML.</summary>
+[PublicAPI]
 internal sealed class YamlTupleSlot
 {
     public string Label { get; set; } = string.Empty;

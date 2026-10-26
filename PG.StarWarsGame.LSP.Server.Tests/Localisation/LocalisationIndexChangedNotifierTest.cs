@@ -81,6 +81,7 @@ public sealed class LocalisationIndexChangedNotifierTest
     [Fact]
     public void NoNotifierConstructed_LocalisationChangedFires_NothingSent()
     {
+        // ReSharper disable once CollectionNeverUpdated.Local - the spy's target; the test is that nothing writes to it
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
 

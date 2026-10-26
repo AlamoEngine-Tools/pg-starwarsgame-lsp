@@ -44,7 +44,7 @@ public static class FileReferenceRenameBuilder
 
         var isLua = WorkspaceFileKey.HasType(id, WorkspaceFileKey.LuaScriptType);
 
-        var (dir, _, ext) = SplitPath(fo.Uri);
+        var (dir, ext) = SplitPath(fo.Uri);
         var newUri = dir + newStem + ext;
         if (string.Equals(newUri, fo.Uri, StringComparison.Ordinal)) return null;
 
@@ -119,12 +119,13 @@ public static class FileReferenceRenameBuilder
         return last is not ('.' or ' ');
     }
 
-    private static (string Dir, string Stem, string Ext) SplitPath(string uri)
+    /// <summary>The directory (with its trailing slash) and the extension (with its dot) of a URI.</summary>
+    private static (string Dir, string Ext) SplitPath(string uri)
     {
         var slash = uri.LastIndexOf('/');
         var dir = slash >= 0 ? uri[..(slash + 1)] : "";
         var name = slash >= 0 ? uri[(slash + 1)..] : uri;
         var dot = name.LastIndexOf('.');
-        return dot > 0 ? (dir, name[..dot], name[dot..]) : (dir, name, "");
+        return dot > 0 ? (dir, name[dot..]) : (dir, "");
     }
 }

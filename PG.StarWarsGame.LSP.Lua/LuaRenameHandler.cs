@@ -89,7 +89,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
 
     // The state name under the position, where the script's library keeps the game's contract.
     // Machine is null for a story event's state: its name is the story XML's, not the script's.
-    private (LuaStateHit Hit, LuaStateMachine? Machine)? StateNameAt(string uri, Loretta.CodeAnalysis.SyntaxTree tree,
+    private (LuaStateHit Hit, LuaStateMachine? Machine)? StateNameAt(string uri, SyntaxTree tree,
         int line, int character, GameIndex index)
     {
         var machine = LuaStateMachine.Read(tree.GetRoot());

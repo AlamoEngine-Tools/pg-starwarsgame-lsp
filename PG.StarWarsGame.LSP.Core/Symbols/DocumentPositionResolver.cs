@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 ///     Shared "what symbol/reference is under the cursor" scan, used by both XML and Lua position
 ///     resolution. References win over group memberships, which win over definitions on the same line.
 ///     Callers supply the language-specific parts: which references are eligible
-///     (<paramref name="referenceFilter" /> is a parameter of <see cref="FindAtPosition" />), and how
+///     (<c>referenceFilter</c> on <see cref="FindAtPosition" />), and how
 ///     wide a definition's range should be, or whether it should be considered at all
 ///     (<c>symbolRangeLength</c>, which returns <see langword="null" /> to skip a symbol).
 /// </summary>

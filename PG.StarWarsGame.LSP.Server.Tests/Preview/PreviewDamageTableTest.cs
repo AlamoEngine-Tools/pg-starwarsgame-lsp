@@ -167,7 +167,7 @@ public sealed class PreviewTargetDefenceTest
 
         var defence = scene.Defence;
         Assert.NotNull(defence);
-        Assert.Equal("Armor_Star_Destroyer", defence!.ArmorType);
+        Assert.Equal("Armor_Star_Destroyer", defence.ArmorType);
         Assert.Equal("Shield_Capital", defence.ShieldArmorType);
         Assert.Equal(2000f, defence.ShieldPoints);
         Assert.Equal(7500f, defence.TacticalHealth);

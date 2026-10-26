@@ -57,7 +57,7 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
     {
         return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Information,
-            messages.Format("CampaignStoryAttachment_CampaignAttachesPlotsThroughBoth", Named(fact, messages),
+            messages.Format("CampaignStoryAttachment_CampaignAttachesPlotsThroughBoth", Named(fact),
                 StoryNameTagSyntax.GenericTag),
             Id: DiagnosticIds.CampaignStoryMixedAuthoringForms);
     }
@@ -69,7 +69,7 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
             : messages.Format("CampaignStoryAttachment_InCampaign", fact.CampaignName);
     }
 
-    private static string Named(CampaignStoryAttachmentFact fact, IMessageCatalog messages)
+    private static string Named(CampaignStoryAttachmentFact fact)
     {
         return fact.CampaignName.Length == 0 ? string.Empty : $" '{fact.CampaignName}'";
     }

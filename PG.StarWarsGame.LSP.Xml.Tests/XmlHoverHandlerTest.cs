@@ -247,7 +247,7 @@ public sealed class XmlHoverHandlerTest
         var result = await handler.Handle(At(1, 1), CancellationToken.None);
 
         Assert.NotNull(result?.Range);
-        Assert.Equal(1, result!.Range!.Start.Character);
+        Assert.Equal(1, result.Range!.Start.Character);
         Assert.Equal(4, result.Range.End.Character); // 1 + len("Foo")
     }
 
@@ -342,7 +342,7 @@ public sealed class XmlHoverHandlerTest
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
         Assert.NotNull(result);
-        var md = result!.Contents.MarkupContent!.Value;
+        var md = result.Contents.MarkupContent!.Value;
         Assert.Contains("fighter_mk2", md);
     }
 
@@ -363,7 +363,7 @@ public sealed class XmlHoverHandlerTest
         var result = await handler.Handle(At(2, 2), CancellationToken.None);
 
         Assert.NotNull(result);
-        var md = result!.Contents.MarkupContent!.Value;
+        var md = result.Contents.MarkupContent!.Value;
         Assert.Contains("Float", md); // tag hover includes value type
         Assert.DoesNotContain("name tag", md, StringComparison.OrdinalIgnoreCase);
     }
@@ -452,7 +452,7 @@ public sealed class XmlHoverHandlerTest
         // </Max_Speed> on line 3: '<' at 0, '/' at 1, 'M' at 2
         var result = await handler.Handle(At(3, 2), CancellationToken.None);
         Assert.NotNull(result);
-        Assert.Contains("Max_Speed", result!.Contents.MarkupContent!.Value);
+        Assert.Contains("Max_Speed", result.Contents.MarkupContent!.Value);
     }
 
     // ── reference hover ──────────────────────────────────────────────────────
@@ -476,7 +476,7 @@ public sealed class XmlHoverHandlerTest
         var result = await handler.Handle(At(1, 14), CancellationToken.None);
 
         Assert.NotNull(result);
-        var md = result!.Contents.MarkupContent!.Value;
+        var md = result.Contents.MarkupContent!.Value;
         Assert.Contains("Faction", md);
         Assert.Contains("EMPIRE", md);
     }
@@ -519,7 +519,7 @@ public sealed class XmlHoverHandlerTest
         var result = await handler.Handle(At(1, 14), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains("Beta", result!.Contents.MarkupContent!.Value);
+        Assert.Contains("Beta", result.Contents.MarkupContent!.Value);
         Assert.DoesNotContain("Alpha", result.Contents.MarkupContent!.Value);
     }
 
@@ -555,7 +555,7 @@ public sealed class XmlHoverHandlerTest
         var result = await handler.Handle(At(1, 19), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains("SFXEvent", result!.Contents.MarkupContent!.Value);
+        Assert.Contains("SFXEvent", result.Contents.MarkupContent!.Value);
         Assert.DoesNotContain("TradeRouteLine", result.Contents.MarkupContent!.Value);
     }
 

@@ -107,7 +107,7 @@ public sealed class PreviewReticleIconTest
         // A real PNG, not an empty string dressed up as one.
         var png = Convert.FromBase64String(uri["data:image/png;base64,".Length..]);
         Assert.True(png.Length > 100);
-        Assert.Equal<byte[]>([0x89, 0x50, 0x4E, 0x47], png[..4]);
+        Assert.Equal([0x89, 0x50, 0x4E, 0x47], png[..4]);
     }
 
     [Fact]

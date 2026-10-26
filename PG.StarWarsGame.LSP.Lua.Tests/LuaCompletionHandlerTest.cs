@@ -365,7 +365,7 @@ public sealed class LuaCompletionHandlerTest
         Assert.NotNull(libItem);
         Assert.NotNull(depItem);
         // Library sort text starts with "0_", dependency with "1_" → library sorts before dependency
-        Assert.True(string.Compare(libItem!.SortText, depItem!.SortText, StringComparison.Ordinal) < 0,
+        Assert.True(string.Compare(libItem.SortText, depItem.SortText, StringComparison.Ordinal) < 0,
             $"Library '{libItem.SortText}' should sort before Dependency '{depItem.SortText}'");
     }
 

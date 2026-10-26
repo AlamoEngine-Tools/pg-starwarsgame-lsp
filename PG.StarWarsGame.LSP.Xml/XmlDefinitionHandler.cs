@@ -56,7 +56,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
                 if (m.MemberOrigin is FileOrigin { IsNavigable: true } memberOrigin)
                     links.Add(new LocationOrLocationLink(memberOrigin.ToLspLocationLink(hit.Value.Range)));
 
-            return Task.FromResult<LocationOrLocationLinks?>(
+            return Task.FromResult(
                 links.Count > 0 ? new LocationOrLocationLinks(links) : null);
         }
 

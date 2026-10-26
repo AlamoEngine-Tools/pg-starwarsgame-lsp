@@ -17,6 +17,9 @@ public static class ReferenceResolutionEvaluator
     /// <summary>
     ///     Evaluates a reference and returns a diagnostic, or <c>null</c> when the reference is valid.
     /// </summary>
+    /// <param name="targetId">The referenced id, as written.</param>
+    /// <param name="expectedTypeName">The type the slot expects, or null when any type will do.</param>
+    /// <param name="resolved">The symbol the id resolved to, or null when nothing did.</param>
     /// <param name="indexedTypeNames">
     ///     Every type name the workspace index holds at least one instance of, or <c>null</c> from a
     ///     caller that does not track it. When an unresolved reference expects a type absent from this
@@ -33,6 +36,7 @@ public static class ReferenceResolutionEvaluator
     ///     for a predicate resting on facts the index does not hold, the reference goes unjudged:
     ///     an error on data we cannot read is the one outcome the author cannot act on.
     /// </param>
+    /// <param name="messages">The catalogue the message is taken from; English when null.</param>
     public static (XmlDiagnosticSeverity Severity, string Message, DiagnosticId Id)? Evaluate(
         string targetId, string? expectedTypeName, GameSymbol? resolved,
         IReadOnlySet<string>? indexedTypeNames = null,

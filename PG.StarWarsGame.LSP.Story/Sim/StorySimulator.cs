@@ -788,9 +788,10 @@ public sealed partial class StorySimulator
         var lines = _prereqLinesById[node.Id];
         if (!lines.Any(line => line.All(runtime.FiredEvents.Contains))) return snapshot;
 
+        var armedAt = snapshot.GameplayClock;
         snapshot = Transition(snapshot, node, sourceId, StorySimCause.Prereq,
             "  -> " + _messages.Format("StorySim_Armed", node.Event!.Name),
-            r => r.WithArmed(node.Id, snapshot.GameplayClock));
+            r => r.WithArmed(node.Id, armedAt));
         return IsStoryTrigger(node.Event) ? Fire(snapshot, node, StorySimCause.Prereq, sourceId, depth) : snapshot;
     }
 

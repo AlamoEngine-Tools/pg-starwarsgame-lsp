@@ -167,7 +167,7 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
         }
     }
 
-    public async Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+    public async Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
     {
         var request = JToken.FromObject(parameters, s_json);
         // A lens names its declaration alone (measured, 0.25.1), so each carries the script whose

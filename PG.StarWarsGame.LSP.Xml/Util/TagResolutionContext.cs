@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using HtmlAgilityPack;
 
 namespace PG.StarWarsGame.LSP.Xml.Util;
@@ -11,6 +12,7 @@ namespace PG.StarWarsGame.LSP.Xml.Util;
 ///     <c>Node</c> is a pointer into the already-parsed HAP tree, enabling lazy cross-reference
 ///     navigation without re-parsing. <c>Depth</c> is precomputed for future handler dispatch.
 /// </summary>
+[PublicAPI]
 internal sealed class TagResolutionContext
 {
     public TagResolutionContext(

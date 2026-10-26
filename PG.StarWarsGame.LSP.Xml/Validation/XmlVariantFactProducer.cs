@@ -12,8 +12,6 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSource tagSource)
     : IXmlVariantFactProducer
 {
-    private const string NameAttribute = "Name";
-
     /// <summary>
     ///     Sweeps the engine gives variant resolution before it stops
     ///     (<c>Overlay_Types</c>). A chain this long or shorter resolves

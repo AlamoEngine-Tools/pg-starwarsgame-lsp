@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 /// <summary>
 ///     A validation that needs an object's whole child set rather than one tag value. Evaluated by
 ///     <see cref="XmlDocumentFactProducer" /> once per object node.
-///     <paramref name="lineIndex" /> is the document's line index, so a rule can anchor a fact on a
+///     <c>lineIndex</c> is the document's line index, so a rule can anchor a fact on a
 ///     leaf VALUE via <c>XmlUtility.GetValuePosition</c> / <c>GetInnerOffsetValuePosition</c>
 ///     instead of only on the opening tag - never derive value positions from HAP's per-node
 ///     line/column.

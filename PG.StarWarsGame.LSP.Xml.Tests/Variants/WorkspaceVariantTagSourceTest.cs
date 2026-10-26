@@ -104,7 +104,7 @@ public sealed class WorkspaceVariantTagSourceTest
         var tags = source.TryGetTags("V");
 
         Assert.NotNull(tags);
-        Assert.Equal(2, tags!.Count);
+        Assert.Equal(2, tags.Count);
         Assert.Contains(tags, t => t.TagName == "Max_Health" && t.Value == "100");
         Assert.Contains(tags, t => t.TagName == "Mass" && t.Value == "5");
     }
@@ -130,9 +130,9 @@ public sealed class WorkspaceVariantTagSourceTest
         var tags = source.TryGetTags("GameConstants");
 
         Assert.NotNull(tags);
-        Assert.Contains(tags!, t => t.TagName == "ShipNameTextFiles"
+        Assert.Contains(tags, t => t.TagName == "ShipNameTextFiles"
                                     && t.Value == "Star_Destroyer, Data\\SD.txt");
-        Assert.Contains(tags!, t => t.TagName == "Credits_Per_CP" && t.Value == "50");
+        Assert.Contains(tags, t => t.TagName == "Credits_Per_CP" && t.Value == "50");
     }
 
     [Fact]
@@ -243,7 +243,7 @@ public sealed class WorkspaceVariantTagSourceTest
         var tags = source.TryGetTags("V");
 
         Assert.NotNull(tags);
-        Assert.Contains(tags!, t => t.TagName == "Mass" && t.Value == "7");
+        Assert.Contains(tags, t => t.TagName == "Mass" && t.Value == "7");
     }
 
     [Fact]

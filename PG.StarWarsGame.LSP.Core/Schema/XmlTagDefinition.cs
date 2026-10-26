@@ -17,7 +17,7 @@ public record XmlTagDefinition
     /// <summary>
     ///     The raw <c>referenceType</c> string from the schema. For <see cref="ReferenceKind.WorkspaceFile" />
     ///     this names the target file-type (e.g. <c>StoryPlotManifest</c>, <c>StoryParser</c>,
-    ///     <c>LuaScript</c>) used to build the <see cref="WorkspaceFileKey" />. Null when unset.
+    ///     <c>LuaScript</c>) used to build the <see cref="Symbols.WorkspaceFileKey" />. Null when unset.
     /// </summary>
     public string? ReferenceTypeName { get; init; }
 

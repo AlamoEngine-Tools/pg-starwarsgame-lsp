@@ -103,7 +103,7 @@ public sealed class StartupGateTest
         await gate.RunOrBufferAsync(_ =>
         {
             order.Add("first");
-            return gate.RunOrBufferAsync(__ =>
+            return gate.RunOrBufferAsync(_ =>
                 {
                     order.Add("nested");
                     return Task.CompletedTask;

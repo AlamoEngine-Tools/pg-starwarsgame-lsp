@@ -69,6 +69,7 @@ public sealed class XmlDiagnosticsPublisherTest
                 .Add(targetId, ImmutableArray.Create(reference)));
     }
 
+    // ReSharper disable UnusedTupleComponentInReturnValue - the helpers return everything a test might need; some tests ignore a part
     private static (XmlDiagnosticsPublisher publisher,
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
@@ -165,7 +166,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Equal(2, diag.Range.Start.Line);
         Assert.Equal(4, diag.Range.Start.Character);
@@ -187,7 +188,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     // ── subscription / routing ───────────────────────────────────────────────
@@ -245,7 +246,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var clear = Assert.Single(published);
         Assert.Equal("file:///a.xml", clear.Uri.ToString());
-        Assert.Empty(clear.Diagnostics!);
+        Assert.Empty(clear.Diagnostics);
     }
 
     [Fact]
@@ -447,7 +448,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///A.xml");
         Assert.NotNull(pub);
-        Assert.Contains(pub.Diagnostics!, d => d.Message.Contains("UNIT_A"));
+        Assert.Contains(pub.Diagnostics, d => d.Message.Contains("UNIT_A"));
     }
 
     [Fact]
@@ -458,7 +459,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         indexService.Fire(IndexWithDoc("file:///a.xml"));
 
-        var d = Assert.Single(published.Last().Diagnostics!,
+        var d = Assert.Single(published.Last().Diagnostics,
             x => x.Code?.String == DiagnosticIds.XmlStrayAmpersand.ToString());
         Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
         Assert.Equal(2, d.Range.Start.Line);
@@ -472,7 +473,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         indexService.Fire(IndexWithDoc("file:///a.xml"));
 
-        var d = Assert.Single(published.Last().Diagnostics!,
+        var d = Assert.Single(published.Last().Diagnostics,
             x => x.Code?.String == DiagnosticIds.XmlEndTagMismatch.ToString());
         Assert.Equal(DiagnosticSeverity.Error, d.Severity);
     }
@@ -487,7 +488,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         indexService.Fire(IndexWithDoc("file:///a.xml"));
 
-        Assert.DoesNotContain(published.Last().Diagnostics!,
+        Assert.DoesNotContain(published.Last().Diagnostics,
             x => x.Code?.String == DiagnosticIds.XmlStrayAmpersand.ToString());
     }
 
@@ -521,7 +522,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///a.xml");
         Assert.NotNull(pub);
-        Assert.DoesNotContain(pub.Diagnostics!, d => d.Message.Contains("Duplicate"));
+        Assert.DoesNotContain(pub.Diagnostics, d => d.Message.Contains("Duplicate"));
     }
 
     [Fact]
@@ -538,7 +539,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var pubB = published.FirstOrDefault(p => p.Uri.ToString() == "file:///b.xml");
         Assert.NotNull(pubB);
-        Assert.Contains(pubB.Diagnostics!, d => d.Message.Contains("Duplicate"));
+        Assert.Contains(pubB.Diagnostics, d => d.Message.Contains("Duplicate"));
     }
 
     // ── closed-file suppression ──────────────────────────────────────────────
@@ -566,7 +567,7 @@ public sealed class XmlDiagnosticsPublisherTest
         indexService.Fire(index);
 
         Assert.Equal(2, published.Count);
-        Assert.All(published, p => Assert.Contains(p.Diagnostics!, d => d.Message.Contains("UNIT_A")));
+        Assert.All(published, p => Assert.Contains(p.Diagnostics, d => d.Message.Contains("UNIT_A")));
     }
 
     [Fact]
@@ -593,7 +594,7 @@ public sealed class XmlDiagnosticsPublisherTest
         workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
         indexService.Fire(IndexWithDoc("file:///test.xml"));
 
-        var diags = published.Single().Diagnostics!.ToList();
+        var diags = published.Single().Diagnostics.ToList();
         var diag = Assert.Single(diags);
         Assert.Equal("42", diag.Data?["fix"]?.Value<string>());
     }
@@ -609,7 +610,7 @@ public sealed class XmlDiagnosticsPublisherTest
         workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
         indexService.Fire(IndexWithDoc("file:///test.xml"));
 
-        var diag = Assert.Single(published.Single().Diagnostics!);
+        var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Null(diag.Data);
     }
 
@@ -624,7 +625,7 @@ public sealed class XmlDiagnosticsPublisherTest
         workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
         indexService.Fire(IndexWithDoc("file:///test.xml"));
 
-        var diag = Assert.Single(published.Single().Diagnostics!);
+        var diag = Assert.Single(published.Single().Diagnostics);
         Assert.NotNull(diag.Tags);
         Assert.Contains(DiagnosticTag.Unnecessary, diag.Tags!);
         Assert.True(diag.Data?["removeRedundantOverride"]?.Value<bool>());
@@ -641,7 +642,7 @@ public sealed class XmlDiagnosticsPublisherTest
         workspaceHost.Set("file:///test.xml", "<Root><TextId>TEXT_FOO</TextId></Root>");
         indexService.Fire(IndexWithDoc("file:///test.xml"));
 
-        var diag = Assert.Single(published.Single().Diagnostics!);
+        var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Equal("TEXT_FOO", diag.Data?["createLocKey"]?.Value<string>());
     }
 
@@ -656,7 +657,7 @@ public sealed class XmlDiagnosticsPublisherTest
         workspaceHost.Set("file:///test.xml", "<Root><TextId>TEXT_FOO</TextId></Root>");
         indexService.Fire(IndexWithDoc("file:///test.xml"));
 
-        var diag = Assert.Single(published.Single().Diagnostics!);
+        var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Equal("suggested_fix", diag.Data?["fix"]?.Value<string>());
         Assert.Equal("TEXT_FOO", diag.Data?["createLocKey"]?.Value<string>());
     }
@@ -674,7 +675,7 @@ public sealed class XmlDiagnosticsPublisherTest
         workspaceHost.Set("file:///test.xml", "<Root>\n<Priority>1.5</Priority>\n</Root>");
         indexService.Fire(IndexWithDoc("file:///test.xml"));
 
-        var diag = Assert.Single(published.Single().Diagnostics!);
+        var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Equal(1, diag.Range.Start.Line);
         Assert.Equal(3, diag.Range.End.Line);
         Assert.Equal(7, diag.Range.End.Character);
@@ -691,7 +692,7 @@ public sealed class XmlDiagnosticsPublisherTest
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
         var fileHelper = new FileHelper(new MockFileSystem());
-        var publisher = new XmlDiagnosticsPublisher(
+        _ = new XmlDiagnosticsPublisher(
             p => published.Add(p),
             indexService,
             workspaceHost,
@@ -707,7 +708,7 @@ public sealed class XmlDiagnosticsPublisherTest
         workspaceHost.Set("file:///test.xml", "irrelevant text");
         indexService.Fire(IndexWithDoc("file:///test.xml"));
 
-        var diag = Assert.Single(published.Single().Diagnostics!);
+        var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Equal(2, diag.Range.Start.Line);
         Assert.Equal(4, diag.Range.Start.Character);
         Assert.Equal(6, diag.Range.End.Line);

@@ -29,7 +29,7 @@ public sealed class EawSchemaA1TagTest
     {
         var type = Schema.GetObjectType("BlackMarketItem");
         Assert.NotNull(type);
-        Assert.Equal("Name", type!.NameTag);
+        Assert.Equal("Name", type.NameTag);
 
         Assert.DoesNotContain(Schema.GetTagsForType("BlackMarketItem"),
             t => string.Equals(t.Tag, "Name", StringComparison.OrdinalIgnoreCase));

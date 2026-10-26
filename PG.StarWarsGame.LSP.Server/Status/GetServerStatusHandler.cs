@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using MediatR;
@@ -31,19 +32,24 @@ public sealed record GetServerStatusParams : IRequest<ServerStatusDto>
 }
 
 /// <param name="Layers">Project layers indexed, the root included.</param>
+[PublicAPI]
 public sealed record ServerStatusDependenciesDto(int Direct, int Total, int Depth, int Unresolved, int Layers);
 
 /// <param name="ProjectFiles">Indexed documents in the root project's own layer.</param>
 /// <param name="DependencyFiles">Indexed documents in every other layer.</param>
+[PublicAPI]
 public sealed record ServerStatusFilesDto(int ProjectFiles, int DependencyFiles, int XmlFiles, int LuaFiles);
 
 /// <param name="Baseline">Symbols the shipped-game baseline supplies.</param>
+[PublicAPI]
 public sealed record ServerStatusSymbolsDto(int Xml, int Lua, int Baseline, int LocalisationKeys);
 
 /// <param name="BaseGame">How many of <paramref name="Total" /> come from the shipped game alone.</param>
+[PublicAPI]
 public sealed record ServerStatusAssetCountDto(string Extension, int Total, int BaseGame);
 
 /// <param name="Schema">Hit, Rebuilt or NotUsed (a local schema has no cache).</param>
+[PublicAPI]
 public sealed record ServerStatusCachesDto(
     string Schema,
     int SnapshotLayers,
@@ -56,6 +62,7 @@ public sealed record ServerStatusCachesDto(
 public sealed record ServerStatusTypeCountDto(string TypeName, int Count);
 
 /// <summary>What the index holds for one layer, by RANK - never by name; this is pasted into public issues.</summary>
+[PublicAPI]
 public sealed record ServerStatusLayerDto(int Rank, int Documents, int Symbols, int References);
 
 /// <summary>One in-memory cache's self-description; nulls where the cache does not count that.</summary>
@@ -75,6 +82,7 @@ public sealed record ServerStatusCacheEntryDto(
 /// </summary>
 /// <param name="FragmentedBytes">Free space inside the managed heap the GC has not compacted.</param>
 /// <param name="LargeObjectHeapBytes">Objects over 85 KB - file buffers, big arrays - which are compacted only on demand.</param>
+[PublicAPI]
 public sealed record ServerStatusMemoryDto(
     long HeapBytes,
     long CommittedBytes,
@@ -101,6 +109,7 @@ public sealed record ServerStatusExtendedDto(
 /// <param name="Version">The schema's declared version, or null when it declares none.</param>
 /// <param name="Compatibility">The version check's verdict, or <c>NotChecked</c>.</param>
 /// <param name="Source">Release, CachedRelease, Branch, CustomUrl, Local or NotLoaded.</param>
+[PublicAPI]
 public sealed record ServerStatusSchemaDto(string? Version, string Compatibility, string Source);
 
 /// <param name="Source">Network, Cache, Local, Empty or NotLoaded.</param>
@@ -111,6 +120,7 @@ public sealed record ServerStatusIconPackDto(string Source, bool Official);
 
 /// <param name="ProjectProblem">A <see cref="Project.ProjectProblem" /> name, or null when valid.</param>
 /// <param name="OtherProjectFiles">Project files under the root besides the one loaded; a count, never names.</param>
+[PublicAPI]
 public sealed record ServerStatusWorkspaceDto(
     bool ProjectDetected,
     bool ProjectValid,
@@ -124,6 +134,7 @@ public sealed record ServerStatusIndexDto(string State);
 /// <summary>Result of <c>aet/getServerStatus</c>: outcomes only, never a path or a name.</summary>
 /// <param name="ServerVersion">The full informational version, commit included.</param>
 /// <param name="Warnings">Anything empty or failed that should not be, one line each.</param>
+[PublicAPI]
 public sealed record ServerStatusDto(
     string ServerVersion,
     string Runtime,
@@ -263,7 +274,7 @@ public sealed class GetServerStatusHandler(
     /// </summary>
     private static ServerStatusSymbolsDto Symbols(GameIndex index)
     {
-        var documents = index.Documents.Values;
+        var documents = index.Documents.Values.ToArray();
         return new ServerStatusSymbolsDto(
             documents.Where(d => IsLanguage(d, ".xml")).Sum(d => d.Symbols.Length),
             documents.Where(d => IsLanguage(d, ".lua")).Sum(d => d.Symbols.Length),

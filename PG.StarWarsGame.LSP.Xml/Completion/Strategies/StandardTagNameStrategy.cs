@@ -7,7 +7,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
 
-namespace PG.StarWarsGame.LSP.Xml.Completion;
+namespace PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 
 internal sealed class StandardTagNameStrategy : IXmlTagNameCompletionStrategy
 {

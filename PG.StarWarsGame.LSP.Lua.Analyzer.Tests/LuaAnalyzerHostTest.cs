@@ -61,18 +61,17 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
         return new AnalyzerPlan(["D:/Mods/MyMod/Data/Scripts"], ["D:/schema/lua/api.d.lua"]);
     }
 
-    private async Task<string> MessageAsync(Func<string, bool> match, int timeoutMs = 15000)
+    private async Task MessageAsync(Func<string, bool> match, int timeoutMs = 15000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (DateTime.UtcNow < deadline)
         {
             var hit = _messages.FirstOrDefault(match);
-            if (hit is not null) return hit;
+            if (hit is not null) return;
             await Task.Delay(25);
         }
 
         Assert.Fail($"No message matched; got: {string.Join(" / ", _messages)}");
-        return "";
     }
 
     private static HoverParams HoverAt()
@@ -131,9 +130,9 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
              attempt < 50 && !text.Contains("configuration=answered", StringComparison.Ordinal);
              attempt++)
         {
-            var hover = await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct));
+            var hover = await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct), ct: TestContext.Current.CancellationToken);
             text = hover!.Contents.MarkupContent!.Value;
-            await Task.Delay(100);
+            await Task.Delay(100, TestContext.Current.CancellationToken);
         }
 
         Assert.Contains("args=--load-stdlib false --editor vscode", text);
@@ -149,7 +148,7 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
         await host.StartAsync(Plan());
 
         var started = DateTime.UtcNow;
-        var hover = await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct));
+        var hover = await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct), ct: TestContext.Current.CancellationToken);
 
         Assert.Null(hover);
         Assert.InRange(DateTime.UtcNow - started, TimeSpan.FromSeconds(1.5), TimeSpan.FromSeconds(10));
@@ -164,7 +163,7 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
 
         host.DidOpen(Uri, "x = 1", 1);
         await MessageAsync(m => m.EndsWith("|open v1 len 5", StringComparison.Ordinal));
-        while (!File.Exists(marker)) await Task.Delay(25);
+        while (!File.Exists(marker)) await Task.Delay(25, TestContext.Current.CancellationToken);
         _messages.Clear();
 
         // The replacement process is told about the document without the editor sending it again.
@@ -182,7 +181,7 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
         await host.DisposeAsync();
 
         Assert.False(host.IsRunning);
-        Assert.Null(await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct)));
+        Assert.Null(await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct), ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -194,7 +193,7 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
         host.DidOpen(Uri, "x = 1", 1);
 
         Assert.False(host.IsRunning);
-        Assert.Null(await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct)));
+        Assert.Null(await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct), ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]

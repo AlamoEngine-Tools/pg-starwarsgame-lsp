@@ -86,7 +86,7 @@ public static class AlaAnimationReader
         var header = ReadHeader(bytes, info);
 
         // v2's shared blocks sit after every bone, so they are located before the bones are walked.
-        var shared = ReadSharedBlocks(bytes, children, header);
+        var shared = ReadSharedBlocks(children, header);
 
         var bones = new List<AlamoAnimationBone>(header.BoneCount);
         var boneChunks = 0;
@@ -154,7 +154,7 @@ public static class AlaAnimationReader
         return stride / shortsPerSample;
     }
 
-    private static SharedBlocks ReadSharedBlocks(byte[] bytes, List<AloChunk> children, Header header)
+    private static SharedBlocks ReadSharedBlocks(List<AloChunk> children, Header header)
     {
         AloChunk? rotation = null;
         AloChunk? translation = null;
@@ -245,7 +245,7 @@ public static class AlaAnimationReader
                 Require(by, MiniDefaultRotation, $"the default rotation of bone '{name}'").BodyStart);
         }
 
-        var tracks = ReadOwnTracks(bytes, children, name, header);
+        var tracks = ReadOwnTracks(children, name, header);
 
         var frames = new List<AlamoAnimationFrame>(header.FrameCount);
         for (var f = 0; f < header.FrameCount; f++)
@@ -285,8 +285,7 @@ public static class AlaAnimationReader
         return new AlamoAnimationBone(boneIndex, name, frames);
     }
 
-    private static OwnTracks ReadOwnTracks(
-        byte[] bytes, List<AloChunk> children, string name, Header header)
+    private static OwnTracks ReadOwnTracks(List<AloChunk> children, string name, Header header)
     {
         AloChunk? translation = null, scale = null, rotation = null, visibility = null;
         var rotationIsConstant = false;
@@ -361,6 +360,9 @@ public static class AlaAnimationReader
     }
 
     /// <summary>The slot a bone claims on one channel, or null when it claims none.</summary>
+    /// <param name="bytes">The file's bytes.</param>
+    /// <param name="by">The bone's mini-chunks by id.</param>
+    /// <param name="mini">The id of the mini-chunk holding this channel's slot.</param>
     /// <param name="shortsPerSample">
     ///     Stored slots are offsets in <c>int16</c> units, so a bone using translation slot 2 stores 6.
     /// </param>
@@ -451,6 +453,7 @@ public static class AlaAnimationReader
         bool IsVersion2,
         int RotationSlots,
         int TranslationSlots,
+        // ReSharper disable once NotAccessedPositionalProperty.Local - read from the file for completeness; nothing needs it yet
         int ScaleSlots);
 
     // ── shared sample blocks (version 2) ──────────────────────────────────────

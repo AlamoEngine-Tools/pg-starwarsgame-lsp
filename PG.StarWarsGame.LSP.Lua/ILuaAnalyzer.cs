@@ -29,5 +29,5 @@ public interface ILuaAnalyzer
     ///     Asks the analyzer <paramref name="method" /> with <paramref name="parameters" />. Null when
     ///     it is not running, does not answer in time, or fails - the caller answers with its own.
     /// </summary>
-    Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class;
+    Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?;
 }

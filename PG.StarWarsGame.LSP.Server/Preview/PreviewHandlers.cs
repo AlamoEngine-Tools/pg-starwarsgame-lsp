@@ -41,7 +41,7 @@ public sealed class GetProjectileHandler(
     public Task<GetProjectileResult> Handle(
         GetProjectileParams request, CancellationToken cancellationToken)
     {
-        var id = request.Name?.Trim() ?? string.Empty;
+        var id = request.Name.Trim();
         if (id.Length == 0)
             return Task.FromResult(new GetProjectileResult(null,
                 new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoProjectileWasNamed")));
@@ -388,7 +388,7 @@ public sealed class GetModelTextureHandler(
     public Task<GetModelTextureResult> Handle(
         GetModelTextureParams request, CancellationToken cancellationToken)
     {
-        var name = request.Name?.Trim();
+        var name = request.Name.Trim();
         if (string.IsNullOrEmpty(name))
             return Task.FromResult(new GetModelTextureResult(null, null,
                 new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoTextureWasNamed")));

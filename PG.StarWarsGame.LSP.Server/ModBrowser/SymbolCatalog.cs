@@ -58,6 +58,9 @@ public sealed class SymbolCatalog
         return s_built.GetValue(index, i => Build(i, schema.AllKinds, schema.AllEnums, schema));
     }
 
+    /// <param name="index">The index the catalog is built from.</param>
+    /// <param name="kinds">The object kinds the schema defines.</param>
+    /// <param name="enums">The enums the schema defines.</param>
     /// <param name="schema">The schema whose types and tags the Schema outline lists; none lists none.</param>
     public static SymbolCatalog Build(GameIndex index, IReadOnlyList<ObjectKindDefinition> kinds,
         IReadOnlyList<EnumDefinition> enums, ISchemaProvider? schema = null)
@@ -253,7 +256,7 @@ public sealed class SymbolCatalog
             if (id.Contains(GameIndex.OwnerScopeSeparator)) continue;
 
             var workspace = index.WorkspaceDefinitions.TryGetValue(id, out var definitions)
-                ? definitions.Where(s => s.Kind == GameSymbolKind.XmlObject && s.Origin is FileOrigin)
+                ? definitions.Where(symbol => symbol.Kind == GameSymbolKind.XmlObject && symbol.Origin is FileOrigin)
                     .OrderByDescending(index.LayerRankOf)
                     .ToList()
                 : [];

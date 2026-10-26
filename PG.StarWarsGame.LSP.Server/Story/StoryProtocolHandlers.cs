@@ -314,7 +314,7 @@ public sealed class GetStoryParamOptionsHandler(
             return Task.FromResult(new GetStoryParamOptionsResult([]));
 
         var query = request.Query?.Trim() ?? string.Empty;
-        var limit = request.Limit is int l and > 0 ? l : DefaultLimit;
+        var limit = request.Limit is { } l and > 0 ? l : DefaultLimit;
 
         // Story-scoped names resolve campaign-wide - the campaign model gives a far tighter
         // candidate set than the index (which mixes every campaign's names together).

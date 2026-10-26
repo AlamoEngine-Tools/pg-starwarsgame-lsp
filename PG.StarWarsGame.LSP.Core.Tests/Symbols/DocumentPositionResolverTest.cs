@@ -51,7 +51,7 @@ public sealed class DocumentPositionResolverTest
         var result = DocumentPositionResolver.FindAtPosition(doc, 0, 5, AllRefs, IdLengthSizer);
 
         Assert.NotNull(result);
-        Assert.Equal("UNIT_A", result!.Value.Id);
+        Assert.Equal("UNIT_A", result.Value.Id);
         Assert.Equal(new Position(0, 4), result.Value.Range.Start);
         Assert.Equal(new Position(0, 10), result.Value.Range.End);
     }
@@ -80,7 +80,7 @@ public sealed class DocumentPositionResolverTest
         var result = DocumentPositionResolver.FindAtPosition(doc, 2, 10, AllRefs, IdLengthSizer);
 
         Assert.NotNull(result);
-        Assert.Equal("GROUP_A", result!.Value.Id);
+        Assert.Equal("GROUP_A", result.Value.Id);
         Assert.Equal(new Position(2, 8), result.Value.Range.Start);
         Assert.Equal(new Position(2, 15), result.Value.Range.End);
     }
@@ -104,7 +104,7 @@ public sealed class DocumentPositionResolverTest
         var result = DocumentPositionResolver.FindAtPosition(doc, 5, 0, AllRefs, _ => 0);
 
         Assert.NotNull(result);
-        Assert.Equal("GLOBAL_A", result!.Value.Id);
+        Assert.Equal("GLOBAL_A", result.Value.Id);
         Assert.Equal(new Position(5, 3), result.Value.Range.Start);
         Assert.Equal(new Position(5, 3), result.Value.Range.End);
     }
@@ -119,6 +119,6 @@ public sealed class DocumentPositionResolverTest
         var result = DocumentPositionResolver.FindAtPosition(doc, 0, 6, AllRefs, IdLengthSizer);
 
         Assert.NotNull(result);
-        Assert.Equal("UNIT_REF", result!.Value.Id);
+        Assert.Equal("UNIT_REF", result.Value.Id);
     }
 }

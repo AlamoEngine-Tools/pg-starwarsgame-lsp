@@ -1,10 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using PG.StarWarsGame.LSP.Core.Project;
 
 namespace PG.StarWarsGame.LSP.Core.Workspace;
 
+[PublicAPI]
 public sealed record WorkspaceConfiguration(
     IReadOnlyList<string> XmlDirectories,
     IReadOnlyList<string> ScriptRoots,

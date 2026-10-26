@@ -35,7 +35,7 @@ public sealed class SchemaReleaseResolverTest
         return (resolver, fake);
     }
 
-    private static async Task<SchemaRelease?> Resolve(params object[] releases)
+    private static async Task<SchemaRelease?> ResolveAsync(params object[] releases)
     {
         var (resolver, _) = Build(_ => Releases(releases));
         return await resolver.ResolveAsync(Repository);
@@ -46,7 +46,7 @@ public sealed class SchemaReleaseResolverTest
     [Fact]
     public async Task TheHighestReleaseInRange_Wins()
     {
-        var release = await Resolve(Release("v2.1.0"), Release("v2.2.0"), Release("v2.0.5"));
+        var release = await ResolveAsync(Release("v2.1.0"), Release("v2.2.0"), Release("v2.0.5"));
 
         Assert.Equal("v2.2.0", release?.Tag);
         Assert.Equal("2.2.0", release?.Version.ToString());
@@ -55,7 +55,7 @@ public sealed class SchemaReleaseResolverTest
     [Fact]
     public async Task ANewerMajor_IsSkipped()
     {
-        var release = await Resolve(Release("v3.0.0"), Release("v2.1.0"));
+        var release = await ResolveAsync(Release("v3.0.0"), Release("v2.1.0"));
 
         Assert.Equal("v2.1.0", release?.Tag);
     }
@@ -63,13 +63,13 @@ public sealed class SchemaReleaseResolverTest
     [Fact]
     public async Task AnOlderMajorOnly_ResolvesNothing()
     {
-        Assert.Null(await Resolve(Release("v1.9.0")));
+        Assert.Null(await ResolveAsync(Release("v1.9.0")));
     }
 
     [Fact]
     public async Task ADraft_IsSkipped()
     {
-        var release = await Resolve(Release("v2.3.0", true), Release("v2.1.0"));
+        var release = await ResolveAsync(Release("v2.3.0", true), Release("v2.1.0"));
 
         Assert.Equal("v2.1.0", release?.Tag);
     }
@@ -77,7 +77,7 @@ public sealed class SchemaReleaseResolverTest
     [Fact]
     public async Task AReleaseMarkedPrerelease_IsSkipped()
     {
-        var release = await Resolve(Release("v2.3.0", prerelease: true), Release("v2.1.0"));
+        var release = await ResolveAsync(Release("v2.3.0", prerelease: true), Release("v2.1.0"));
 
         Assert.Equal("v2.1.0", release?.Tag);
     }
@@ -87,7 +87,7 @@ public sealed class SchemaReleaseResolverTest
     [Fact]
     public async Task APrereleaseSuffix_IsSkippedEvenWhenTheReleaseIsNotFlagged()
     {
-        var release = await Resolve(Release("v2.3.0-rc.1"), Release("v2.1.0"));
+        var release = await ResolveAsync(Release("v2.3.0-rc.1"), Release("v2.1.0"));
 
         Assert.Equal("v2.1.0", release?.Tag);
     }
@@ -99,7 +99,7 @@ public sealed class SchemaReleaseResolverTest
     [InlineData("v2.1.0.4")]
     public async Task AMalformedTag_IsSkipped(string tag)
     {
-        var release = await Resolve(Release(tag), Release("v2.0.0"));
+        var release = await ResolveAsync(Release(tag), Release("v2.0.0"));
 
         Assert.Equal("v2.0.0", release?.Tag);
     }
@@ -107,7 +107,7 @@ public sealed class SchemaReleaseResolverTest
     [Fact]
     public async Task ATagWithoutThePrefix_IsAccepted()
     {
-        var release = await Resolve(Release("2.1.0"));
+        var release = await ResolveAsync(Release("2.1.0"));
 
         Assert.Equal("2.1.0", release?.Tag);
     }
@@ -115,7 +115,7 @@ public sealed class SchemaReleaseResolverTest
     [Fact]
     public async Task NoReleases_ResolvesNothing()
     {
-        Assert.Null(await Resolve());
+        Assert.Null(await ResolveAsync());
     }
 
     // ── failures resolve nothing, so the caller can fall back to its cache ──
@@ -129,7 +129,7 @@ public sealed class SchemaReleaseResolverTest
     {
         var (resolver, _) = Build(_ => new HttpResponseMessage(status));
 
-        Assert.Null(await resolver.ResolveAsync(Repository));
+        Assert.Null(await resolver.ResolveAsync(Repository, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public sealed class SchemaReleaseResolverTest
             new HttpClient(new FakeFailingHttpHandler(new HttpRequestException("offline"))),
             NullLogger<SchemaReleaseResolver>.Instance);
 
-        Assert.Null(await resolver.ResolveAsync(Repository));
+        Assert.Null(await resolver.ResolveAsync(Repository, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class SchemaReleaseResolverTest
             Content = new StringContent("<html>not json</html>")
         });
 
-        Assert.Null(await resolver.ResolveAsync(Repository));
+        Assert.Null(await resolver.ResolveAsync(Repository, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public sealed class SchemaReleaseResolverTest
     {
         var (resolver, fake) = Build(_ => Releases(Release("v2.1.0")));
 
-        await resolver.ResolveAsync(Repository);
+        await resolver.ResolveAsync(Repository, ct: TestContext.Current.CancellationToken);
 
         var request = Assert.Single(fake.Requests);
         Assert.Equal("https://api.github.com/repos/AlamoEngine-Tools/eaw-schema/releases?per_page=100",
@@ -184,7 +184,7 @@ public sealed class SchemaReleaseResolverTest
     {
         var (resolver, fake) = Build(_ => Releases(Release("v2.1.0")));
 
-        await resolver.ResolveAsync(Repository);
+        await resolver.ResolveAsync(Repository, ct: TestContext.Current.CancellationToken);
 
         var request = Assert.Single(fake.Requests);
         Assert.NotEmpty(request.Headers.UserAgent);
@@ -197,7 +197,7 @@ public sealed class SchemaReleaseResolverTest
     {
         var (resolver, _) = Build(_ => Releases(Release("v3.0.0"), Release("v2.4.1")));
 
-        var release = await resolver.ResolveAsync(Repository);
+        var release = await resolver.ResolveAsync(Repository, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("v2.4.1", release?.Tag);
     }

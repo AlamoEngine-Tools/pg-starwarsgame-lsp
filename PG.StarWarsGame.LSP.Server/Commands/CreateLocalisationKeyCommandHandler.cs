@@ -42,8 +42,8 @@ public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerB
             return Unit.Value;
         }
 
-        var keyName = request.Arguments[0]?.Value<string>();
-        var filePath = request.Arguments[1]?.Value<string>();
+        var keyName = request.Arguments[0].Value<string>();
+        var filePath = request.Arguments[1].Value<string>();
 
         if (string.IsNullOrWhiteSpace(keyName))
         {

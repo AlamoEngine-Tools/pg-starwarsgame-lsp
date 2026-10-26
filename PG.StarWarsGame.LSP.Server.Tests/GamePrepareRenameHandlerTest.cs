@@ -189,16 +189,13 @@ public sealed class GamePrepareRenameHandlerTest
             _range = range;
         }
 
-        public bool PrepareCalled { get; private set; }
-
         public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
         {
             return null;
         }
 
-        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        public RangeOrPlaceholderRange HandlePrepare(string uri, int line, int character, GameIndex index)
         {
-            PrepareCalled = true;
             return _range;
         }
     }

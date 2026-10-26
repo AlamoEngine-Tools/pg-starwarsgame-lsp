@@ -111,7 +111,7 @@ public sealed class ReferenceHoverStrategyTest
         var hover = strategy.Handle(ctx);
 
         Assert.NotNull(hover);
-        var md = hover!.Contents.MarkupContent!.Value;
+        var md = hover.Contents.MarkupContent!.Value;
         Assert.Contains("EMPIRE", md);
         Assert.Contains("Faction", md);
     }
@@ -134,7 +134,7 @@ public sealed class ReferenceHoverStrategyTest
         var hover = strategy.Handle(ctx);
 
         Assert.NotNull(hover);
-        var md = hover!.Contents.MarkupContent!.Value;
+        var md = hover.Contents.MarkupContent!.Value;
         Assert.Contains("dependency", md, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Base EaW", md);
     }
@@ -151,7 +151,7 @@ public sealed class ReferenceHoverStrategyTest
         var hover = strategy.Handle(ctx);
 
         Assert.NotNull(hover);
-        Assert.Contains("dependency", hover!.Contents.MarkupContent!.Value,
+        Assert.Contains("dependency", hover.Contents.MarkupContent!.Value,
             StringComparison.OrdinalIgnoreCase);
     }
 
@@ -168,7 +168,7 @@ public sealed class ReferenceHoverStrategyTest
         var hover = strategy.Handle(ctx);
 
         Assert.NotNull(hover);
-        Assert.DoesNotContain("dependency", hover!.Contents.MarkupContent!.Value,
+        Assert.DoesNotContain("dependency", hover.Contents.MarkupContent!.Value,
             StringComparison.OrdinalIgnoreCase);
     }
 

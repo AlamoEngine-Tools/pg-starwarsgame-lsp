@@ -148,7 +148,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             // from now on, then fully re-resolve the .pgproj (a scoped reload wouldn't pick up
             // the new config since it reuses the stale WorkspaceConfiguration).
             await _fileWriter.SetLocalisationAsync(
-                rootLayer!.ProjectPath!, format.ToUpperInvariant(), bootstrapDirectory, ct);
+                rootLayer.ProjectPath!, format.ToUpperInvariant(), bootstrapDirectory, ct);
             await _reloadService.ReloadAsync(ct);
         }
         else

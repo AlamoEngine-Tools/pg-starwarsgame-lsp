@@ -60,7 +60,7 @@ public sealed class IconPackSerializerTest
             SourceManifestHash = "h"
         };
 
-        Assert.Null(IconPackSerializer.Deserialize(MessagePackSerializer.Serialize(dto)));
+        Assert.Null(IconPackSerializer.Deserialize(MessagePackSerializer.Serialize(dto, cancellationToken: TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -76,8 +76,7 @@ public sealed class IconPackSerializerTest
         string[] names = ["I_ZETA.TGA", "I_ALPHA.TGA", "I_MIKE.TGA", "I_BRAVO.TGA", "I_YANKEE.TGA", "I_CHARLIE.TGA"];
         var icons = names.ToDictionary(n => n, _ => new byte[] { 1 });
 
-        var dto = MessagePackSerializer.Deserialize<SerializedIconPack>(
-            IconPackSerializer.Serialize(icons, "h", BuiltAt));
+        var dto = MessagePackSerializer.Deserialize<SerializedIconPack>(IconPackSerializer.Serialize(icons, "h", BuiltAt), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(names.Order(StringComparer.Ordinal), dto.Icons.Select(i => i.Name));
     }

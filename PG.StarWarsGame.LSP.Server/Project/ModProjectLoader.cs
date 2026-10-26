@@ -138,6 +138,7 @@ public sealed class ModProjectLoader
         var modinfo = parsed is null
             ? null
             : new CoreModinfoData(
+                // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
                 parsed.Name ?? string.Empty,
                 parsed.Version?.ToString(),
                 parsed.Summary,
@@ -421,6 +422,8 @@ public sealed class ModProjectLoader
         public IconsDto? Icons { get; init; }
     }
 
+    // The shapes below are filled by System.Text.Json; their setters have no caller in the code.
+    // ReSharper disable UnusedAutoPropertyAccessor.Local
     private sealed class IconsDto
     {
         public string? MegaTexture { get; init; }
@@ -429,12 +432,12 @@ public sealed class ModProjectLoader
 
     private sealed class DirectoryMapDto
     {
-        public List<string>? Xml { get; init; }
-        public List<string>? Scripts { get; init; }
-        public List<string>? Art { get; init; }
-        public List<string>? Audio { get; init; }
-        public List<string>? Ai { get; init; }
-        public List<string>? StoryDialog { get; init; }
+        public IReadOnlyList<string>? Xml { get; init; }
+        public IReadOnlyList<string>? Scripts { get; init; }
+        public IReadOnlyList<string>? Art { get; init; }
+        public IReadOnlyList<string>? Audio { get; init; }
+        public IReadOnlyList<string>? Ai { get; init; }
+        public IReadOnlyList<string>? StoryDialog { get; init; }
     }
 
     private sealed class ProjectReferenceDto

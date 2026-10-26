@@ -66,6 +66,8 @@ public static class SuppressionsDocument
     /// </summary>
     private sealed class AddDefaultOffEntries : IDocumentMigration
     {
+        // The interface member returns the outer constant it is named after; hiding it is the point.
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         public string TypeName => SuppressionsDocument.TypeName;
         public TypeVersion From => TypeVersion.Of("aetswg", 1);
         public TypeVersion To => Version;
@@ -93,6 +95,7 @@ public static class SuppressionsDocument
     /// </summary>
     private sealed class AdoptBareArray : IDocumentMigration
     {
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         public string TypeName => SuppressionsDocument.TypeName;
         public TypeVersion From => TypeVersion.Zero("aetswg");
         public TypeVersion To => TypeVersion.Of("aetswg", 1);

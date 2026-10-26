@@ -292,25 +292,6 @@ public sealed class GetEncyclopediaEntryHandler
     ///     </para>
     /// </remarks>
     /// <summary>
-    ///     The icon the engine draws for an ability of <paramref name="type" />, if we can find one.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         A HEURISTIC, and knowingly so. Ability icons are named <c>I_SA_&lt;something&gt;</c> in
-    ///         the mega texture, but nothing in the game's data connects an ability to its icon -
-    ///         <c>I_SA_*</c> occurs in exactly one file across an install, the .mtd itself, so the
-    ///         engine hardcodes the mapping and there is nothing to read. Guessing
-    ///         <c>I_SA_&lt;TYPE&gt;</c> matches 43 of the ability types FoC ships.
-    ///     </para>
-    ///     <para>
-    ///         Safe despite being a guess, because the catalog validates it: a name only resolves if
-    ///         that exact entry exists, so a wrong guess yields NO icon rather than the WRONG one.
-    ///         The misses are real naming variants - <c>BARRAGE</c> has no <c>I_SA_BARRAGE</c> though
-    ///         the atlas carries <c>I_SA_BARRAGE_AREA</c>, and the <c>I_SA_BL_*</c> family takes a
-    ///         prefix no type name has. Those slots keep showing the type as text, exactly as before.
-    ///     </para>
-    /// </remarks>
-    /// <summary>
     ///     The card's own chrome from the atlas. Null throughout when icons are unavailable, and
     ///     null per field when that entry is absent - the client keeps its CSS rendition either way,
     ///     so this can only improve the card, never break it.

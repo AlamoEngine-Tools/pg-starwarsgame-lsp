@@ -10,11 +10,6 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Completion;
 
 public sealed class XmlCompletionRegistryTest
 {
-    private static XmlTagDefinition FloatTag()
-    {
-        return new XmlTagDefinition { Tag = "Speed", ValueType = XmlValueType.Float };
-    }
-
     private static XmlTagDefinition RefTag()
     {
         return new XmlTagDefinition { Tag = "Target", ValueType = XmlValueType.NameReference };

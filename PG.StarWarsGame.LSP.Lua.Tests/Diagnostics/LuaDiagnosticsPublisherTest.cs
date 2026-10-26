@@ -27,6 +27,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    // ReSharper disable once UnusedTupleComponentInReturnValue - the helper returns everything a test might need; some tests ignore a part
     private static (LuaDiagnosticsPublisher publisher,
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
@@ -270,7 +271,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
         Assert.Equal(DiagnosticIds.LocalisationKeyExistence.ToString(), diag.Code?.String);
         Assert.Contains("TEXT_MISSING", diag.Message);
@@ -286,7 +287,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     // ── shared parse (cache) ──────────────────────────────────────────────────
@@ -298,7 +299,7 @@ public sealed class LuaDiagnosticsPublisherTest
         workspaceHost.Set(LuaUri, "TaskForce = { { \"MainForce\" } }\n");
         indexService.Fire(GameIndex.Empty);
 
-        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString(), diagnostic.Code?.String);
     }
 
@@ -318,7 +319,7 @@ public sealed class LuaDiagnosticsPublisherTest
         workspaceHost.Set(LuaUri, "local origin = nil\nFind_Nearest(origin, PlayerObject)\n");
         indexService.Fire(GameIndex.Empty);
 
-        Assert.Contains(Assert.Single(published).Diagnostics!,
+        Assert.Contains(Assert.Single(published).Diagnostics,
             d => d.Code?.String == DiagnosticIds.LuaNoCallFormFits.ToString());
     }
 
@@ -340,7 +341,7 @@ public sealed class LuaDiagnosticsPublisherTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty));
 
-        var diagnostics = published.Single(p => p.Uri.ToString() == LuaUri).Diagnostics!;
+        var diagnostics = published.Single(p => p.Uri.ToString() == LuaUri).Diagnostics;
         Assert.Single(diagnostics, d => d.Code?.String == DiagnosticIds.LuaStateTransitionUnregistered.ToString());
     }
 
@@ -352,7 +353,7 @@ public sealed class LuaDiagnosticsPublisherTest
         workspaceHost.Set(LuaUri, "function Definitions()\n  difficulty = PlayerObject.Get_Difficulty()\nend\n");
         indexService.Fire(GameIndex.Empty);
 
-        Assert.Single(Assert.Single(published).Diagnostics!,
+        Assert.Single(Assert.Single(published).Diagnostics,
             d => d.Code?.String == DiagnosticIds.LuaHostGlobalInDefinitions.ToString());
     }
 
@@ -366,7 +367,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var workspaceHost = new FakeGameWorkspaceHost();
         var fileHelper = new FileHelper(new MockFileSystem());
         var cache = TestLuaParseCache.For(workspaceHost, fileHelper);
-        var publisher = new LuaDiagnosticsPublisher(
+        _ = new LuaDiagnosticsPublisher(
             p => published.Add(p),
             indexService,
             workspaceHost,
@@ -419,7 +420,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Contains("UNIT_MISSING", diag.Message);
         Assert.Contains("No object with this name exists", diag.Message);
@@ -438,7 +439,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     // The directive names one id; everything else it does not name stays visible.
@@ -453,7 +454,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        Assert.Single(Assert.Single(published).Diagnostics!);
+        Assert.Single(Assert.Single(published).Diagnostics);
     }
 
     // The failure this prevents: a mistyped directive suppresses nothing and says nothing, so the
@@ -469,7 +470,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        var diagnostics = Assert.Single(published).Diagnostics!.ToList();
+        var diagnostics = Assert.Single(published).Diagnostics.ToList();
         var warning = Assert.Single(diagnostics,
             d => d.Code?.String == DiagnosticIds.SuppressionUnknownRule.ToString());
 
@@ -494,7 +495,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(IndexWithLuaRef(LuaUri, "UNIT_MISSING"));
 
-        var diagnostics = Assert.Single(published).Diagnostics!.ToList();
+        var diagnostics = Assert.Single(published).Diagnostics.ToList();
 
         Assert.DoesNotContain(diagnostics,
             d => d.Code?.String == DiagnosticIds.SuppressionUnknownRule.ToString());
@@ -515,7 +516,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -530,7 +531,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Contains("UNIT_A", diag.Message);
         Assert.Contains("Faction", diag.Message);
@@ -548,7 +549,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -563,7 +564,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -575,7 +576,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(0, diag.Range.Start.Line);
         Assert.Equal(20, diag.Range.Start.Character);
         Assert.Equal(0, diag.Range.End.Line);
@@ -599,7 +600,7 @@ public sealed class LuaDiagnosticsPublisherTest
         indexService.Fire(index);
 
         var pub = Assert.Single(published);
-        Assert.Contains(pub.Diagnostics!, d => d.Severity == DiagnosticSeverity.Error);
+        Assert.Contains(pub.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]
@@ -615,7 +616,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         indexService.Fire(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     // Loretta's ids are surfaced through our own scheme rather than raw, so a syntax error can be
@@ -634,7 +635,7 @@ public sealed class LuaDiagnosticsPublisherTest
         indexService.Fire(index);
 
         var pub = Assert.Single(published);
-        var errorDiags = pub.Diagnostics!.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+        var errorDiags = pub.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
         Assert.NotEmpty(errorDiags);
         Assert.All(errorDiags, d =>
         {
@@ -662,7 +663,7 @@ public sealed class LuaDiagnosticsPublisherTest
         indexService.Fire(index);
 
         var pub = Assert.Single(published);
-        Assert.Contains(pub.Diagnostics!,
+        Assert.Contains(pub.Diagnostics,
             d => d.Severity == DiagnosticSeverity.Error && d.Message.Contains("MissingLib"));
     }
 
@@ -684,7 +685,7 @@ public sealed class LuaDiagnosticsPublisherTest
         indexService.Fire(index);
 
         // No import error; the unused-require hint (L-6) is acceptable.
-        Assert.DoesNotContain(Assert.Single(published).Diagnostics!,
+        Assert.DoesNotContain(Assert.Single(published).Diagnostics,
             d => d.Severity == DiagnosticSeverity.Error);
     }
 
@@ -711,7 +712,7 @@ public sealed class LuaDiagnosticsPublisherTest
         indexService.Fire(index);
 
         var pub = Assert.Single(published);
-        Assert.Contains(pub.Diagnostics!,
+        Assert.Contains(pub.Diagnostics,
             d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("RunStateMachine"));
     }
 
@@ -730,7 +731,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         var clear = Assert.Single(published);
         Assert.Equal(LuaUri, clear.Uri.ToString());
-        Assert.Empty(clear.Diagnostics!);
+        Assert.Empty(clear.Diagnostics);
     }
 
     private sealed class CapturingLogger : ILogger<LuaDiagnosticsPublisher>
@@ -768,7 +769,7 @@ public sealed class LuaDiagnosticsPublisherTest
         {
         }
 
-        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
         {
             return Task.FromResult<T?>(null);
         }
@@ -837,8 +838,8 @@ public sealed class LuaDiagnosticsPublisherTest
 
         public event Action<GameIndex>? IndexChanged
         {
-            add => _indexChanged += value;
-            remove => _indexChanged -= value;
+            add => IndexChangedHandlers += value;
+            remove => IndexChangedHandlers -= value;
         }
 
         public event Action<ILocalisationIndex>? LocalisationChanged
@@ -898,11 +899,11 @@ public sealed class LuaDiagnosticsPublisherTest
             return NullDisposable.Instance;
         }
 
-        private event Action<GameIndex>? _indexChanged;
+        private event Action<GameIndex>? IndexChangedHandlers;
 
         public void Fire(GameIndex index)
         {
-            _indexChanged?.Invoke(index);
+            IndexChangedHandlers?.Invoke(index);
         }
 
         private sealed class NullDisposable : IDisposable

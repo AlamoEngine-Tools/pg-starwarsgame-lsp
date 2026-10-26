@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using Newtonsoft.Json;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -39,6 +40,7 @@ public enum PreviewPartOrigin
 }
 
 /// <summary>Four 0-255 channels, alpha last, exactly as the game writes them.</summary>
+[PublicAPI]
 public sealed record PreviewRgba(int R, int G, int B, int A);
 
 /// <summary>
@@ -129,10 +131,8 @@ public sealed record PreviewWeapon(
     float? MinRange,
     float? ConeWidthDegrees,
     float? ConeHeightDegrees,
-    /// <summary>
-    ///     How far a shot may stray from the aim point, per TARGET CATEGORY. Empty when the weapon
-    ///     declares none. See <see cref="PreviewInaccuracy" />.
-    /// </summary>
+    // How far a shot may stray from the aim point, per TARGET CATEGORY. Empty when the weapon
+    // declares none. See PreviewInaccuracy.
     IReadOnlyList<PreviewInaccuracy> Inaccuracy,
     int? PulseCount,
     float? PulseDelaySeconds,
@@ -140,14 +140,10 @@ public sealed record PreviewWeapon(
     IReadOnlyList<string> FireModes,
     PreviewTurret? Turret,
     string? FireSfxEvent,
-    /// <summary>
-    ///     The arc while DEPLOYED, as full angles, or null for a weapon whose unit is never deployed.
-    /// </summary>
-    /// <remarks>
-    ///     Only a unit with <c>Deploys</c> and the walk locomotor is ever deployed, and while it is the
-    ///     engine reads <c>Deployed_Turret_*_Extent_Degrees</c> in place of the normal pair - defaults 360
-    ///     and 180, so unwritten means unrestricted. Same conventions as <see cref="ConeWidthDegrees" />.
-    /// </remarks>
+    // The arc while DEPLOYED, as full angles, or null for a weapon whose unit is never deployed.
+    // Only a unit with Deploys and the walk locomotor is ever deployed, and while it is the
+    // engine reads Deployed_Turret_*_Extent_Degrees in place of the normal pair - defaults 360
+    // and 180, so unwritten means unrestricted. Same conventions as ConeWidthDegrees.
     float? DeployedConeWidthDegrees = null,
     float? DeployedConeHeightDegrees = null);
 
@@ -196,20 +192,17 @@ public sealed record PreviewTurret(
 ///         <see cref="EngineBoolean.IsTrueUnlessDenied" />.
 ///     </para>
 /// </remarks>
+[PublicAPI]
 public sealed record PreviewHardpoint(
     string Id,
     string? PartId,
     string? Type,
     string? AttachBone,
     bool IsDestroyable,
-    /// <summary>
-    ///     Whether the game lets a player target this hardpoint, from <c>Is_Targetable</c>.
-    /// </summary>
-    /// <remarks>
-    ///     Decides whether a reticle is drawn over it. Every shipped hardpoint states it - 258 Yes
-    ///     and 97 No in foc, none omitted - so the absent case defaults to false like every other
-    ///     engine boolean here, and is untested against real data.
-    /// </remarks>
+    // Whether the game lets a player target this hardpoint, from Is_Targetable.
+    // Decides whether a reticle is drawn over it. Every shipped hardpoint states it - 258 Yes
+    // and 97 No in foc, none omitted - so the absent case defaults to false like every other
+    // engine boolean here, and is untested against real data.
     bool IsTargetable,
     float? Health,
     string? DamageParticlesBone,
@@ -219,24 +212,16 @@ public sealed record PreviewHardpoint(
     string? DeathExplosionParticles,
     string? DeathBreakoffProp,
     bool EngineDeathHidesEngineParticles,
-    /// <summary>
-    ///     The <c>Tooltip_Text</c> tag verbatim, which is a localisation KEY. 422 objects write one.
-    /// </summary>
-    /// <remarks>
-    ///     Kept beside the resolved <paramref name="TooltipText" /> rather than replaced by it: the
-    ///     key is what the author wrote and what they would search their own files for, and the text
-    ///     is what a player reads. The ability rows make the same split between <c>GuiName</c> and
-    ///     <c>Name</c>.
-    /// </remarks>
+    // The Tooltip_Text tag verbatim, which is a localisation KEY. 422 objects write one.
+    // Kept beside the resolved TooltipText rather than replaced by it: the
+    // key is what the author wrote and what they would search their own files for, and the text
+    // is what a player reads. The ability rows make the same split between GuiName and
+    // Name.
     string? TooltipKey,
-    /// <summary>
-    ///     What <paramref name="TooltipKey" /> resolves to, or null when it resolves to nothing.
-    /// </summary>
-    /// <remarks>
-    ///     Null rather than an echo of the key. A key with no row is a real authoring mistake, but
-    ///     it is the localisation editor's to report - showing the key as though it were text would
-    ///     hide it behind something that looks like an answer.
-    /// </remarks>
+    // What TooltipKey resolves to, or null when it resolves to nothing.
+    // Null rather than an echo of the key. A key with no row is a real authoring mistake, but
+    // it is the localisation editor's to report - showing the key as though it were text would
+    // hide it behind something that looks like an answer.
     string? TooltipText,
     PreviewTurret? Turret);
 
@@ -255,6 +240,7 @@ public sealed record PreviewHardpoint(
 ///         reticles, so that is a quiet omission rather than a problem.
 ///     </para>
 /// </remarks>
+[PublicAPI]
 public sealed record PreviewReticles(
     // Both keyed by game data - a hardpoint's Type, and an icon's name - which the camel-case naming
     // strategy would otherwise rewrite. See VerbatimKeyDictionaryConverter.
@@ -294,6 +280,7 @@ public enum PreviewProjectileRender
 ///     With its two siblings, decides what a hit touches. A projectile that does only hitpoint
 ///     damage BYPASSES the shield entirely rather than being stopped by it.
 /// </param>
+[PublicAPI]
 public sealed record PreviewProjectile(
     string Id,
     PreviewProjectileRender Render,
@@ -313,21 +300,15 @@ public sealed record PreviewProjectile(
     bool DoesHitpointDamage,
     float? BlastAreaDamage,
     float? BlastAreaRange,
-    /// <summary>
-    ///     How many objects one blast may damage, where the projectile caps it.
-    /// </summary>
-    /// <remarks>Declared twice in the whole of foc, so an absent cap is the normal case.</remarks>
+    // How many objects one blast may damage, where the projectile caps it.
+    // Declared twice in the whole of foc, so an absent cap is the normal case.
     int? BlastAreaMaxVictims,
-    /// <summary>
-    ///     Whether blast damage falls off with distance, rather than being flat inside the range.
-    /// </summary>
-    /// <remarks>
-    ///     Ten projectiles in foc set it, always alongside
-    ///     <paramref name="BlastAreaDropoffTiers" /> of 3, 4 or 5. The other 53 with a blast area
-    ///     apply their full damage anywhere inside the radius.
-    /// </remarks>
+    // Whether blast damage falls off with distance, rather than being flat inside the range.
+    // Ten projectiles in foc set it, always alongside
+    // BlastAreaDropoffTiers of 3, 4 or 5. The other 53 with a blast area
+    // apply their full damage anywhere inside the radius.
     bool BlastAreaDropoff,
-    /// <summary>How many concentric bands the falloff is quantised into.</summary>
+    // How many concentric bands the falloff is quantised into.
     int? BlastAreaDropoffTiers,
     string? DetonationParticles,
     string? ShieldAbsorbParticles,
@@ -387,84 +368,6 @@ public sealed record PreviewBreakoffProp(
     public IReadOnlyList<PreviewParticle> Particles { get; init; } = Particles ?? [];
 }
 
-/// <summary>A faction's colours, for the colourisation controls.</summary>
-/// <param name="Color">Team tint, applied to <c>Colorization</c> and <c>FC_</c>-prefixed meshes.</param>
-/// <param name="NoColorizationColor">
-///     Blended into white pixels of the hull texture's alpha channel - a different mechanism from the
-///     team tint, and the reason both travel.
-/// </param>
-/// <summary>
-///     What a hit on this subject has to get through.
-/// </summary>
-/// <remarks>
-///     <para>
-///         The previewed object is the TARGET. The attacker is a weapon the reader builds in the
-///         panel, so everything defensive travels with the scene and everything offensive is theirs
-///         to type.
-///     </para>
-///     <para>
-///         The armor axis of <c>Damage_To_Armor_Mod</c> is FIXED by the target - one
-///         <c>Armor_Type</c> and one <c>Shield_Armor_Type</c> - so only those two columns are sent
-///         rather than all 2426 rows. The damage axis is not fixed, because the reader picks it,
-///         which is why <paramref name="DamageTypes" /> carries the whole list.
-///     </para>
-///     <para>
-///         A damage type absent from <paramref name="HullFactors" /> or
-///         <paramref name="ShieldFactors" /> is <strong>1.0</strong>, not zero. The shipped table
-///         names barely half of its 4293 possible pairs, so the gap is hit constantly.
-///     </para>
-/// </remarks>
-/// <param name="IsShielded">
-///     Whether any of the three behaviour lists names <c>SHIELDED</c>. Measured over foc:
-///     <c>SpaceBehavior</c> 98 times, plain <c>Behavior</c> 32, <c>LandBehavior</c> 19 - so all
-///     three have to be read. Without it the shield is not in play at all, whatever
-///     <c>Shield_Points</c> says.
-/// </param>
-/// <summary>
-///     One ability the subject declares, and what it drives on the model.
-/// </summary>
-/// <remarks>
-///     <para>
-///         68 ability types exist over the two trees and MOST DRIVE NOTHING on the model - SPREAD_OUT
-///         and HUNT are orders, not effects. So an ability with no bone, no particle and no clip is
-///         the common case and is reported plainly rather than hidden: what a unit can do is worth
-///         reading even when the answer is "nothing you can see here".
-///     </para>
-///     <para>
-///         <paramref name="ProxyNames" /> are the particle proxies BOUND to this ability by their
-///         name prefix - see <c>AbilityProxyPrefix</c>. The prefix is a hint, so a proxy is bound
-///         only when the object also declares the type it names.
-///     </para>
-/// </remarks>
-/// <param name="DeployClip">
-///     The clip this ability plays when it activates, when the model ships one. 25 models in foc
-///     carry a <c>_deploy_00</c>; 23 carry the matching <c>_undeploy_00</c>, and the X-Wing is one of
-///     the two that ship a deploy with NO undeploy - so the pair is genuinely optional on both sides.
-/// </param>
-/// <summary>
-///     What this object leaves behind when it dies, and what killed it decides which one.
-/// </summary>
-/// <remarks>
-///     <para>
-///         <c>&lt;Death_Clone&gt; Damage_Type, Object_Id &lt;/...&gt;</c> - 345 rows in foc, 134 in
-///         eaw, and 344 of the 345 carry exactly those two fields. The damage type is what ties this
-///         to the attacker panel: the weapon a reader builds decides which clone the target would
-///         leave.
-///     </para>
-///     <para>
-///         The ONE tag in the schema with <c>variantMode: merge</c> plus <c>multipleAllowed</c>, so
-///         the resolver keeps every occurrence and no <c>RepeatedTagReader</c> is needed - and the
-///         merge is ADDITIVE across a variant chain, so a re-skinned variant keeps its base's clones
-///         as well as its own.
-///     </para>
-/// </remarks>
-/// <param name="PlaysIdle">
-///     <c>Should_Death_Clone_Play_Idle</c>, which is a Boolean on the OBJECT rather than a field on
-///     the row - so it reads the same on every clone this object names. 28 shipped uses, all
-///     <c>true</c>. Worth knowing that it asks for an idle the clone models do not appear to carry:
-///     of eaw's 44 clone objects with a model, 42 ship only a <c>_die</c> clip and NONE ships an
-///     idle.
-/// </param>
 /// <summary>
 ///     One stat an ability multiplies while it is active.
 /// </summary>
@@ -476,26 +379,6 @@ public sealed record PreviewBreakoffProp(
 /// </remarks>
 public sealed record PreviewAbilityModifier(string Stat, float Factor);
 
-/// <param name="Animations">
-///     The clips of the CLONE'S OWN model, by file name.
-/// </param>
-/// <remarks>
-///     <para>
-///         Carried here rather than left to the scene's list, which describes the subject. That the
-///         clone ever played at all was an accident of naming: a clone's model is conventionally the
-///         hull's name plus a suffix - <c>Ev_stardestroyer_d.alo</c> beside
-///         <c>Ev_stardestroyer.alo</c> - so its <c>_die_00.ala</c> matched the hull's stem prefix
-///         and rode along in the hull's list, to be dropped from the hull's own GLB when it failed
-///         to bind to that skeleton. A clone named anything else got no clip whatsoever.
-///     </para>
-/// </remarks>
-/// <param name="Particles">
-///     The proxies the clone's own model carries - for the Star Destroyer's wreck, eight of them:
-///     the explosions, the fire smoke and the debris trails that ARE the death.
-///     Their <c>PartId</c> names the CLONE OBJECT, not a part in the scene, because the server
-///     cannot know what the client will call the instance it loads. It is a descriptor of a model,
-///     and the client rewrites both it and the ids when it puts one in the scene.
-/// </param>
 /// <summary>
 ///     The automated death clone: a unit that declares none keeps flying and comes apart.
 /// </summary>
@@ -539,6 +422,50 @@ public sealed record PreviewSpinAway(
     string? Explosion,
     float MaxSpeed);
 
+/// <summary>
+///     What this object leaves behind when it dies, and what killed it decides which one.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <c>&lt;Death_Clone&gt; Damage_Type, Object_Id &lt;/...&gt;</c> - 345 rows in foc, 134 in
+///         eaw, and 344 of the 345 carry exactly those two fields. The damage type is what ties this
+///         to the attacker panel: the weapon a reader builds decides which clone the target would
+///         leave.
+///     </para>
+///     <para>
+///         The ONE tag in the schema with <c>variantMode: merge</c> plus <c>multipleAllowed</c>, so
+///         the resolver keeps every occurrence and no <c>RepeatedTagReader</c> is needed - and the
+///         merge is ADDITIVE across a variant chain, so a re-skinned variant keeps its base's clones
+///         as well as its own.
+///     </para>
+/// </remarks>
+/// <param name="PlaysIdle">
+///     <c>Should_Death_Clone_Play_Idle</c>, which is a Boolean on the OBJECT rather than a field on
+///     the row - so it reads the same on every clone this object names. 28 shipped uses, all
+///     <c>true</c>. Worth knowing that it asks for an idle the clone models do not appear to carry:
+///     of eaw's 44 clone objects with a model, 42 ship only a <c>_die</c> clip and NONE ships an
+///     idle.
+/// </param>
+/// <param name="Animations">
+///     The clips of the CLONE'S OWN model, by file name.
+/// </param>
+/// <remarks>
+///     <para>
+///         Carried here rather than left to the scene's list, which describes the subject. That the
+///         clone ever played at all was an accident of naming: a clone's model is conventionally the
+///         hull's name plus a suffix - <c>Ev_stardestroyer_d.alo</c> beside
+///         <c>Ev_stardestroyer.alo</c> - so its <c>_die_00.ala</c> matched the hull's stem prefix
+///         and rode along in the hull's list, to be dropped from the hull's own GLB when it failed
+///         to bind to that skeleton. A clone named anything else got no clip whatsoever.
+///     </para>
+/// </remarks>
+/// <param name="Particles">
+///     The proxies the clone's own model carries - for the Star Destroyer's wreck, eight of them:
+///     the explosions, the fire smoke and the debris trails that ARE the death.
+///     Their <c>PartId</c> names the CLONE OBJECT, not a part in the scene, because the server
+///     cannot know what the client will call the instance it loads. It is a descriptor of a model,
+///     and the client rewrites both it and the ids when it puts one in the scene.
+/// </param>
 public sealed record PreviewDeathClone(
     string? DamageType,
     string ObjectId,
@@ -546,16 +473,12 @@ public sealed record PreviewDeathClone(
     bool PlaysIdle,
     IReadOnlyList<string>? Animations = null,
     IReadOnlyList<PreviewParticle>? Particles = null,
-    /// <summary>
-    ///     The CLONE's own <c>Scale_Factor</c>, or 1 - not the ship's.
-    /// </summary>
-    /// <remarks>
-    ///     A death clone is spawned as its own object, so the engine's transform update draws it at its own
-    ///     scale and nothing relates it to the ship's. The two usually agree but often do not:
-    ///     measured over 265 ship-to-clone pairs in <c>eaw/</c> and <c>foc/</c>, 206 declare the
-    ///     same scale and 59 differ - the Millennium Falcon is 0.5 and its clone 1.0, the slave
-    ///     infantry 1.5 against clones at 1.0.
-    /// </remarks>
+    // The CLONE's own Scale_Factor, or 1 - not the ship's.
+    // A death clone is spawned as its own object, so the engine's transform update draws it at its own
+    // scale and nothing relates it to the ship's. The two usually agree but often do not:
+    // measured over 265 ship-to-clone pairs in eaw/ and foc/, 206 declare the
+    // same scale and 59 differ - the Millennium Falcon is 0.5 and its clone 1.0, the slave
+    // infantry 1.5 against clones at 1.0.
     float ScaleFactor = 1f)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
@@ -565,6 +488,27 @@ public sealed record PreviewDeathClone(
     public IReadOnlyList<PreviewParticle> Particles { get; init; } = Particles ?? [];
 }
 
+/// <summary>
+///     One ability the subject declares, and what it drives on the model.
+/// </summary>
+/// <remarks>
+///     <para>
+///         68 ability types exist over the two trees and MOST DRIVE NOTHING on the model - SPREAD_OUT
+///         and HUNT are orders, not effects. So an ability with no bone, no particle and no clip is
+///         the common case and is reported plainly rather than hidden: what a unit can do is worth
+///         reading even when the answer is "nothing you can see here".
+///     </para>
+///     <para>
+///         <paramref name="ProxyNames" /> are the particle proxies BOUND to this ability by their
+///         name prefix - see <c>AbilityProxyPrefix</c>. The prefix is a hint, so a proxy is bound
+///         only when the object also declares the type it names.
+///     </para>
+/// </remarks>
+/// <param name="DeployClip">
+///     The clip this ability plays when it activates, when the model ships one. 25 models in foc
+///     carry a <c>_deploy_00</c>; 23 carry the matching <c>_undeploy_00</c>, and the X-Wing is one of
+///     the two that ship a deploy with NO undeploy - so the pair is genuinely optional on both sides.
+/// </param>
 /// <param name="GuiName">
 ///     The ability's <c>GUI_Activated_Ability_Name</c>: NOT display text, but the name of a
 ///     <c>SpecialAbility</c> block defined elsewhere in the XML. Carried so the lens can offer a jump
@@ -588,6 +532,7 @@ public sealed record PreviewDeathClone(
 ///     beside it. The atlas slot is 26x26 - draw it near native size rather than blown up, which is
 ///     how the game itself shows it.
 /// </param>
+[PublicAPI]
 public sealed record PreviewAbility(
     string Type,
     string? GuiName,
@@ -603,6 +548,33 @@ public sealed record PreviewAbility(
     string? Description = null,
     string? IconDataUri = null);
 
+/// <summary>
+///     What a hit on this subject has to get through.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The previewed object is the TARGET. The attacker is a weapon the reader builds in the
+///         panel, so everything defensive travels with the scene and everything offensive is theirs
+///         to type.
+///     </para>
+///     <para>
+///         The armor axis of <c>Damage_To_Armor_Mod</c> is FIXED by the target - one
+///         <c>Armor_Type</c> and one <c>Shield_Armor_Type</c> - so only those two columns are sent
+///         rather than all 2426 rows. The damage axis is not fixed, because the reader picks it,
+///         which is why <paramref name="DamageTypes" /> carries the whole list.
+///     </para>
+///     <para>
+///         A damage type absent from <paramref name="HullFactors" /> or
+///         <paramref name="ShieldFactors" /> is <strong>1.0</strong>, not zero. The shipped table
+///         names barely half of its 4293 possible pairs, so the gap is hit constantly.
+///     </para>
+/// </remarks>
+/// <param name="IsShielded">
+///     Whether any of the three behaviour lists names <c>SHIELDED</c>. Measured over foc:
+///     <c>SpaceBehavior</c> 98 times, plain <c>Behavior</c> 32, <c>LandBehavior</c> 19 - so all
+///     three have to be read. Without it the shield is not in play at all, whatever
+///     <c>Shield_Points</c> says.
+/// </param>
 public sealed record PreviewTargetDefence(
     bool IsShielded,
     string? ArmorType,
@@ -610,47 +582,31 @@ public sealed record PreviewTargetDefence(
     float? ShieldPoints,
     float? TacticalHealth,
     float? EnergyCapacity,
-    /// <summary>
-    ///     The summed <c>Health</c> of every DESTRUCTIBLE hardpoint, or null where there are none.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         A unit with hardpoints cannot be targeted itself - only its hardpoints can - and it dies
-    ///         when the last of them does. Untargetable hardpoints count: the game warns about that
-    ///         combination and at least two mods use it deliberately, so an untargetable hardpoint still
-    ///         has to die before the unit does. Indestructible ones cannot contribute to a death and
-    ///         are left out.
-    ///     </para>
-    ///     <para>
-    ///         Sent ALONGSIDE <paramref name="TacticalHealth" /> rather than replacing it, because
-    ///         the two are SEPARATE POOLS and disagree in the shipped data - the Star Destroyer
-    ///         declares 2000 against 4075 of hardpoint health. How the engine reconciles them was
-    ///         settled by decompiling the 2018 build: each pool is capped at the other's PERCENTAGE
-    ///         plus <see cref="HullVsHardpointsConstraint" />, so the absolute totals never have to
-    ///         agree. See <paramref name="DiesWithHardpoints" /> for the half that is gated.
-    ///     </para>
-    /// </remarks>
+    // The summed Health of every DESTRUCTIBLE hardpoint, or null where there are none.
+    //     A unit with hardpoints cannot be targeted itself - only its hardpoints can - and it dies
+    //     when the last of them does. Untargetable hardpoints count: the game warns about that
+    //     combination and at least two mods use it deliberately, so an untargetable hardpoint still
+    //     has to die before the unit does. Indestructible ones cannot contribute to a death and
+    //     are left out.
+    //     Sent ALONGSIDE TacticalHealth rather than replacing it, because
+    //     the two are SEPARATE POOLS and disagree in the shipped data - the Star Destroyer
+    //     declares 2000 against 4075 of hardpoint health. How the engine reconciles them was
+    //     settled by decompiling the 2018 build: each pool is capped at the other's PERCENTAGE
+    //     plus HullVsHardpointsConstraint, so the absolute totals never have to
+    //     agree. See DiesWithHardpoints for the half that is gated.
     float? HardpointHealthTotal,
-    /// <summary>
-    ///     <c>Should_Be_Destroyed_When_All_Hardpoints_Destroyed</c>, defaulting to true.
-    /// </summary>
-    /// <remarks>
-    ///     Gates three links from the hardpoints back to the hull: dying when the last destroyable
-    ///     hardpoint does, the per-tick pull of the hull down toward the hardpoints, and the health
-    ///     bar's use of the hardpoint pool. With it off - <c>U_Ground_Palace</c> is the one vanilla
-    ///     object that says so - hardpoints still absorb and still die, they just stop reaching the
-    ///     hull by any route. Absent means true: exactly one shipped object writes the tag.
-    /// </remarks>
+    // Should_Be_Destroyed_When_All_Hardpoints_Destroyed, defaulting to true.
+    // Gates three links from the hardpoints back to the hull: dying when the last destroyable
+    // hardpoint does, the per-tick pull of the hull down toward the hardpoints, and the health
+    // bar's use of the hardpoint pool. With it off - U_Ground_Palace is the one vanilla
+    // object that says so - hardpoints still absorb and still die, they just stop reaching the
+    // hull by any route. Absent means true: exactly one shipped object writes the tag.
     bool DiesWithHardpoints,
-    /// <summary>
-    ///     <c>Hull_Vs_Hard_Points_Health_Constraint</c> from GameConstants, shipped at 0.2.
-    /// </summary>
-    /// <remarks>
-    ///     How far either pool may run ahead of the other, as a fraction. Read rather than assumed
-    ///     because it is a global a mod can change, and the change is drastic: at 1 every cap clamps
-    ///     to 100% and BOTH corrections stop running, leaving the pools fully independent. Drawing
-    ///     vanilla's 0.2 for such a mod would show a leash their game does not have.
-    /// </remarks>
+    // Hull_Vs_Hard_Points_Health_Constraint from GameConstants, shipped at 0.2.
+    // How far either pool may run ahead of the other, as a fraction. Read rather than assumed
+    // because it is a global a mod can change, and the change is drastic: at 1 every cap clamps
+    // to 100% and BOTH corrections stop running, leaving the pools fully independent. Drawing
+    // vanilla's 0.2 for such a mod would show a leash their game does not have.
     float HullVsHardpointsConstraint,
     // Keyed by game data - a damage type name - which the camel-case naming strategy would otherwise
     // rewrite. See VerbatimKeyDictionaryConverter.
@@ -660,19 +616,19 @@ public sealed record PreviewTargetDefence(
     IReadOnlyDictionary<string, float> ShieldFactors,
     IReadOnlyList<string> DamageTypes);
 
+/// <summary>A faction's colours, for the colourisation controls.</summary>
+/// <param name="Color">Team tint, applied to <c>Colorization</c> and <c>FC_</c>-prefixed meshes.</param>
+/// <param name="NoColorizationColor">
+///     Blended into white pixels of the hull texture's alpha channel - a different mechanism from the
+///     team tint, and the reason both travel.
+/// </param>
+[PublicAPI]
 public sealed record PreviewFaction(
     string Name,
     PreviewRgba? Color,
     PreviewRgba? NoColorizationColor,
     PreviewRgba? DisplayFontColor);
 
-/// <summary>Something the author should see about this scene.</summary>
-/// <param name="DiagnosticId">
-///     Which kind of finding this is. Required rather than optional, and first rather than last, so
-///     a new preview finding cannot be added without one - which is exactly how every one of these
-///     came to have no id at all.
-/// </param>
-/// <param name="Severity"><c>error</c>, <c>warning</c> or <c>info</c>.</param>
 /// <summary>
 ///     One row of the damage table: the health band's upper bound, and the stage shown inside it.
 /// </summary>
@@ -692,6 +648,13 @@ public sealed record PreviewFaction(
 /// </remarks>
 public sealed record PreviewDamageBand(float Threshold, int Stage);
 
+/// <summary>Something the author should see about this scene.</summary>
+/// <param name="DiagnosticId">
+///     Which kind of finding this is. Required rather than optional, and first rather than last, so
+///     a new preview finding cannot be added without one - which is exactly how every one of these
+///     came to have no id at all.
+/// </param>
+/// <param name="Severity"><c>error</c>, <c>warning</c> or <c>info</c>.</param>
 public sealed record PreviewProblem(
     DiagnosticId DiagnosticId,
     string Severity,
@@ -706,6 +669,7 @@ public sealed record PreviewProblem(
 ///     inside a MEG archive, where no tool can open it.
 /// </param>
 /// <param name="Packed">True when the model was found only inside a MEG archive.</param>
+[PublicAPI]
 public sealed record PreviewSourceFile(string? Path, bool Packed);
 
 /// <summary>
@@ -726,6 +690,7 @@ public sealed record PreviewSourceFile(string? Path, bool Packed);
 ///         at all while the game plays a full set.
 ///     </para>
 /// </param>
+[PublicAPI]
 public sealed record PreviewScene(
     PreviewSceneKind Kind,
     string Subject,
@@ -736,188 +701,116 @@ public sealed record PreviewScene(
     GameAssetTiers Tiers,
     string? AnimationSource = null,
     IReadOnlyList<PreviewParticle>? Particles = null,
-    /// <summary>
-    ///     The animation files that belong to this subject's model, by filename.
-    ///
-    ///     Enumerated rather than requested: previewing a MODEL offered no clips at all, because
-    ///     nothing could ask which existed - the client sent an empty list and the GLB was baked
-    ///     with none. Each is still verified against the skeleton when it is loaded, since 50
-    ///     shipped animations sit beside a model they were not authored against.
-    /// </summary>
+    // The animation files that belong to this subject's model, by filename.
+    //
+    // Enumerated rather than requested: previewing a MODEL offered no clips at all, because
+    // nothing could ask which existed - the client sent an empty list and the GLB was baked
+    // with none. Each is still verified against the skeleton when it is loaded, since 50
+    // shipped animations sit beside a model they were not authored against.
     IReadOnlyList<string>? Animations = null,
-    /// <summary>
-    ///     The cameras the subject's own model carries, in MODEL space.
-    ///
-    ///     Empty for the 87% of models that declare none, which the client reports rather than
-    ///     hides - a control with nothing to act on is disabled, not absent.
-    /// </summary>
+    // The cameras the subject's own model carries, in MODEL space.
+    //
+    // Empty for the 87% of models that declare none, which the client reports rather than
+    // hides - a control with nothing to act on is disabled, not absent.
     IReadOnlyList<PreviewCamera>? Cameras = null,
-    /// <summary>
-    ///     The subject's <c>Type</c> tag, or null when previewing a bare model.
-    ///
-    ///     Carried so a camera preset can be BOUND to what a subject is rather than to its name.
-    /// </summary>
+    // The subject's Type tag, or null when previewing a bare model.
+    //
+    // Carried so a camera preset can be BOUND to what a subject is rather than to its name.
     string? ObjectType = null,
-    /// <summary>
-    ///     The subject's category tokens, split out of its <c>CategoryMask</c>.
-    ///
-    ///     Split here rather than sent whole because the mask is MULTI-VALUED -
-    ///     <c>Vehicle | AntiInfantry | AntiVehicle</c> - which is exactly why it cannot be used as a
-    ///     plain lookup key. One token per entry is the form a match rule can actually test.
-    /// </summary>
+    // The subject's category tokens, split out of its CategoryMask.
+    //
+    // Split here rather than sent whole because the mask is MULTI-VALUED -
+    // Vehicle | AntiInfantry | AntiVehicle - which is exactly why it cannot be used as a
+    // plain lookup key. One token per entry is the form a match rule can actually test.
     IReadOnlyList<string>? Categories = null,
-    /// <summary>
-    ///     The wreckage this subject's hardpoints shed, one entry per distinct prop.
-    /// </summary>
+    // The wreckage this subject's hardpoints shed, one entry per distinct prop.
     IReadOnlyList<PreviewBreakoffProp>? BreakoffProps = null,
-    /// <summary>
-    ///     Every weapon on the subject, wherever it is declared. See <see cref="PreviewWeapon" />.
-    /// </summary>
+    // Every weapon on the subject, wherever it is declared. See PreviewWeapon.
     IReadOnlyList<PreviewWeapon>? Weapons = null,
-    /// <summary>
-    ///     The targeting reticles for this subject's hardpoint types, or null for a bare model.
-    /// </summary>
+    // The targeting reticles for this subject's hardpoint types, or null for a bare model.
     PreviewReticles? Reticles = null,
-    /// <summary>
-    ///     The projectiles this subject's weapons name, one entry per distinct projectile.
-    /// </summary>
+    // The projectiles this subject's weapons name, one entry per distinct projectile.
     IReadOnlyList<PreviewProjectile>? Projectiles = null,
-    /// <summary>
-    ///     What a hit on this subject has to get through, or null for a bare model.
-    /// </summary>
+    // What a hit on this subject has to get through, or null for a bare model.
     PreviewTargetDefence? Defence = null,
-    /// <summary>
-    ///     The abilities the subject declares, in document order.
-    /// </summary>
+    // The abilities the subject declares, in document order.
     IReadOnlyList<PreviewAbility>? Abilities = null,
-    /// <summary>
-    ///     What this subject leaves behind when it dies, one entry per declared damage type.
-    /// </summary>
+    // What this subject leaves behind when it dies, one entry per declared damage type.
     IReadOnlyList<PreviewDeathClone>? DeathClones = null,
-    /// <summary>
-    ///     How the subject comes apart when it declares no death clone, or null where it does not.
-    /// </summary>
+    // How the subject comes apart when it declares no death clone, or null where it does not.
     PreviewSpinAway? SpinAway = null,
-    /// <summary>
-    ///     The explosion the SUBJECT sets off when it dies, from its own <c>Death_Explosions</c>.
-    /// </summary>
-    /// <remarks>
-    ///     Distinct from a hardpoint's and from a breakoff prop's, both of which already travel on
-    ///     their own records. This is the one that goes off where the ship was, and without it on
-    ///     the wire the client had nothing to play when the last hardpoint died.
-    /// </remarks>
+    // The explosion the SUBJECT sets off when it dies, from its own Death_Explosions.
+    // Distinct from a hardpoint's and from a breakoff prop's, both of which already travel on
+    // their own records. This is the one that goes off where the ship was, and without it on
+    // the wire the client had nothing to play when the last hardpoint died.
     string? DeathExplosions = null,
-    /// <summary>
-    ///     Every projectile the tree defines, BY NAME - the attacker panel picks from all of them,
-    ///     because a weapon built to shoot AT the subject has nothing to do with its own armament.
-    /// </summary>
+    // Every projectile the tree defines, BY NAME - the attacker panel picks from all of them,
+    // because a weapon built to shoot AT the subject has nothing to do with its own armament.
     IReadOnlyList<string>? ProjectileCatalog = null,
-    /// <summary>
-    ///     The colour the subject wears when NO faction colour applies, or null when it declares
-    ///     none.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         The usual case, not the exception: faction colour is a SKIRMISH thing, so most of the
-    ///         time a unit is wearing this. 25 shipped objects declare one and it is genuinely
-    ///         per-object - a TIE Fighter is <c>75,75,75</c> whoever owns it, an indigenous Bantha is
-    ///         <c>128,101,79</c>, and ten of the 25 write pure white, which is the identity for the
-    ///         <c>Colorization</c> multiply and means "leave my texture alone".
-    ///     </para>
-    ///     <para>
-    ///         Fed to the SAME <c>Colorization</c> parameter as the team tint - the effects declare
-    ///         exactly one colourisation uniform, so this is a different VALUE rather than a second
-    ///         mechanism. Null rather than white when absent, so the client can tell "declared
-    ///         untinted" from "said nothing".
-    ///     </para>
-    /// </remarks>
+    // The colour the subject wears when NO faction colour applies, or null when it declares
+    // none.
+    //     The usual case, not the exception: faction colour is a SKIRMISH thing, so most of the
+    //     time a unit is wearing this. 25 shipped objects declare one and it is genuinely
+    //     per-object - a TIE Fighter is 75,75,75 whoever owns it, an indigenous Bantha is
+    //     128,101,79, and ten of the 25 write pure white, which is the identity for the
+    //     Colorization multiply and means "leave my texture alone".
+    //     Fed to the SAME Colorization parameter as the team tint - the effects declare
+    //     exactly one colourisation uniform, so this is a different VALUE rather than a second
+    //     mechanism. Null rather than white when absent, so the client can tell "declared
+    //     untinted" from "said nothing".
     PreviewRgba? NoColorizationColor = null,
-    /// <summary>
-    ///     The faction this subject belongs to, or null when it names none.
-    /// </summary>
-    /// <remarks>
-    ///     Which faction's <c>No_Colorization_Color</c> applies when no team tint does - the usual
-    ///     case, since team colour is a skirmish thing. 772 shipped objects declare an
-    ///     <c>Affiliation</c> and only 24 of those also declare a colour of their own, so the
-    ///     faction's is what most units actually wear.
-    ///
-    ///     The FIRST of several: 29 of the 775 tags name more than one - <c>Neutral, Rebel,
-    ///     Empire</c> on the capturable structures - and a unit cannot wear two fallback colours.
-    /// </remarks>
+    // The faction this subject belongs to, or null when it names none.
+    // Which faction's No_Colorization_Color applies when no team tint does - the usual
+    // case, since team colour is a skirmish thing. 772 shipped objects declare an
+    // Affiliation and only 24 of those also declare a colour of their own, so the
+    // faction's is what most units actually wear.
+    //
+    // The FIRST of several: 29 of the 775 tags name more than one - Neutral, Rebel,
+    // Empire on the capturable structures - and a unit cannot wear two fallback colours.
     string? Affiliation = null,
-    /// <summary>
-    ///     The damage stages the object DECLARES, ascending, or empty where it declares none.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         From <c>Land_Damage_Alternates</c>, the middle column of a positional table it shares
-    ///         with <c>Land_Damage_Thresholds</c> and <c>Land_Damage_SFX</c>: at this fraction of
-    ///         health, show this <c>_ALT</c>, and play this sound. 222 shipped objects declare it.
-    ///     </para>
-    ///     <para>
-    ///         Sent because the client CANNOT work this out. It derives its ALT levels by walking
-    ///         the loaded geometry for <c>alamoAlt</c> tags, which only ever finds stages the model
-    ///         draws something for - and a stage need not draw anything, being possibly no more
-    ///         than an explosion and a sound. The shipped data proves the gap rather than merely
-    ///         allowing for it: <b>35</b> objects declare the lone alternate <c>3</c>, and
-    ///         <b>7</b> declare <c>1, 2, 3</c> with no stage zero at all.
-    ///     </para>
-    ///     <para>
-    ///         Sorted and de-duplicated here, because as a SET of which stages exist the written
-    ///         order is meaningless - it belongs to the thresholds standing beside it.
-    ///     </para>
-    /// </remarks>
+    // The damage stages the object DECLARES, ascending, or empty where it declares none.
+    //     From Land_Damage_Alternates, the middle column of a positional table it shares
+    //     with Land_Damage_Thresholds and Land_Damage_SFX: at this fraction of
+    //     health, show this _ALT, and play this sound. 222 shipped objects declare it.
+    //     Sent because the client CANNOT work this out. It derives its ALT levels by walking
+    //     the loaded geometry for alamoAlt tags, which only ever finds stages the model
+    //     draws something for - and a stage need not draw anything, being possibly no more
+    //     than an explosion and a sound. The shipped data proves the gap rather than merely
+    //     allowing for it: <b>35</b> objects declare the lone alternate 3, and
+    //     <b>7</b> declare 1, 2, 3 with no stage zero at all.
+    //     Sorted and de-duplicated here, because as a SET of which stages exist the written
+    //     order is meaningless - it belongs to the thresholds standing beside it.
     IReadOnlyList<int>? DamageStages = null,
-    /// <summary>
-    ///     The damage table in WRITTEN order, or empty when the object declares none usable.
-    /// </summary>
-    /// <remarks>
-    ///     What drives the stage in Gameplay: the hull's remaining fraction picks a band. Empty
-    ///     rather than guessed when the two columns disagree in length or the thresholds are
-    ///     missing - the pairing is positional, so half a table is not a table, and inventing an
-    ///     alignment would put the wrong mesh on screen at the wrong health.
-    /// </remarks>
+    // The damage table in WRITTEN order, or empty when the object declares none usable.
+    // What drives the stage in Gameplay: the hull's remaining fraction picks a band. Empty
+    // rather than guessed when the two columns disagree in length or the thresholds are
+    // missing - the pairing is positional, so half a table is not a table, and inventing an
+    // alignment would put the wrong mesh on screen at the wrong health.
     IReadOnlyList<PreviewDamageBand>? DamageTable = null,
-    /// <summary>
-    ///     The object's uniform render scale - <c>Scale_Factor</c> - or 1 where it declares none.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         THE BRIDGE BETWEEN TWO SPACES, and without it the preview mixes them.
-    ///         the engine's transform update builds the object's world matrix from a
-    ///         translation and three rotations with NO scale in it, then calls
-    ///         <c>Model-&gt;the model-scale setter(the type's scale factor(Type))</c> - so the scale lives on the MODEL
-    ///         alone. Geometry and bones are model units and reach the world multiplied by this;
-    ///         positions, and therefore every range and distance the XML declares, are already
-    ///         world units and are not.
-    ///     </para>
-    ///     <para>
-    ///         The two are otherwise the same unit, which the shipped data states outright:
-    ///         <c>TIE_Crawler</c> writes <c>&lt;Overall_Length&gt;25.0&lt;/...&gt;</c> with the
-    ///         comment "(35 by geometry)", and reading <c>Ev_tiecrawler.alo</c> gives 34.0.
-    ///     </para>
-    ///     <para>
-    ///         Measured: 118 of the 174 armed objects across <c>eaw/</c> and <c>foc/</c> declare a
-    ///         scale that is not 1 - the Corellian Corvette 0.5, the Tartan 0.56, the Nebulon-B and
-    ///         the TIE Fighter 0.7 - so drawing hulls unscaled put the MAJORITY of armed subjects
-    ///         at odds with their own weapon ranges.
-    ///     </para>
-    /// </remarks>
+    // The object's uniform render scale - Scale_Factor - or 1 where it declares none.
+    //     THE BRIDGE BETWEEN TWO SPACES, and without it the preview mixes them.
+    //     the engine's transform update builds the object's world matrix from a
+    //     translation and three rotations with NO scale in it, then calls
+    //     Model->the model-scale setter(the type's scale factor(Type)) - so the scale lives on the MODEL
+    //     alone. Geometry and bones are model units and reach the world multiplied by this;
+    //     positions, and therefore every range and distance the XML declares, are already
+    //     world units and are not.
+    //     The two are otherwise the same unit, which the shipped data states outright:
+    //     TIE_Crawler writes <Overall_Length>25.0</...> with the
+    //     comment "(35 by geometry)", and reading Ev_tiecrawler.alo gives 34.0.
+    //     Measured: 118 of the 174 armed objects across eaw/ and foc/ declare a
+    //     scale that is not 1 - the Corellian Corvette 0.5, the Tartan 0.56, the Nebulon-B and
+    //     the TIE Fighter 0.7 - so drawing hulls unscaled put the MAJORITY of armed subjects
+    //     at odds with their own weapon ranges.
     float ScaleFactor = 1f,
-    /// <summary>
-    ///     The subject's <c>Icon_Name</c>, verbatim, or null for a bare model or an object that
-    ///     declares none.
-    /// </summary>
-    /// <remarks>
-    ///     Carried for the capture's file name. The large command-bar icon has no tag of its own: the
-    ///     engine formats <c>big_</c> + <c>Icon_Name</c> and falls back to the plain icon when that
-    ///     texture is missing, so the name is the whole link between a capture and its slot.
-    /// </remarks>
+    // The subject's Icon_Name, verbatim, or null for a bare model or an object that
+    // declares none.
+    // Carried for the capture's file name. The large command-bar icon has no tag of its own: the
+    // engine formats big_ + Icon_Name and falls back to the plain icon when that
+    // texture is missing, so the name is the whole link between a capture and its slot.
     string? IconName = null,
-    /// <summary>
-    ///     The file a bare model resolved to, for handing it to AloViewer or the Particle Editor.
-    ///     Null for an object scene and for a model that resolves nowhere.
-    /// </summary>
+    // The file a bare model resolved to, for handing it to AloViewer or the Particle Editor.
+    // Null for an object scene and for a model that resolves nowhere.
     PreviewSourceFile? SourceFile = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>

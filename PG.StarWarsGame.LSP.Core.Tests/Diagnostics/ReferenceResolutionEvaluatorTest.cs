@@ -58,7 +58,7 @@ public sealed class ReferenceResolutionEvaluatorTest
             index.Resolve("X_Wing"), expectedKind: PlanetKind, index: index);
 
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
         Assert.Contains("Expected a Planet", result.Value.Message);
         Assert.Contains("PLANET behaviour", result.Value.Message);
     }
@@ -95,7 +95,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     {
         var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", null, null);
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     {
         var result = ReferenceResolutionEvaluator.Evaluate("MISSING", "Unit", null);
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     // ── unresolved because the TYPE is not indexed at all ─────────────────────
@@ -128,7 +128,7 @@ public sealed class ReferenceResolutionEvaluatorTest
             new HashSet<string> { "Faction", "GameObjectType" });
 
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Information, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Information, result.Value.Severity);
     }
 
     [Fact]
@@ -281,7 +281,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         var result = ReferenceResolutionEvaluator.Evaluate(
             "X", "SpecialAbility", Symbol("X", "Unit"));
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     [Fact]
@@ -292,7 +292,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         var result = ReferenceResolutionEvaluator.Evaluate(
             "X", "UnitAbility", Symbol("X", "ProximityMinesAbility"));
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     // ── type mismatch ─────────────────────────────────────────────────────────
@@ -302,7 +302,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     {
         var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Faction", Symbol("UNIT_A", "Unit"));
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     [Fact]
@@ -317,6 +317,6 @@ public sealed class ReferenceResolutionEvaluatorTest
     {
         var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Faction", Symbol("UNIT_A", "Unit"));
         Assert.Contains("Faction", result!.Value.Message);
-        Assert.Contains("Unit", result!.Value.Message);
+        Assert.Contains("Unit", result.Value.Message);
     }
 }

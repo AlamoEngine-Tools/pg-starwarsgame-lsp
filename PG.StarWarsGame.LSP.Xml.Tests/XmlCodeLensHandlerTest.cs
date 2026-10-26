@@ -83,7 +83,7 @@ public sealed class XmlCodeLensHandlerTest
         var handler = BuildHandler(GameIndex.Empty);
         var result = await handler.Handle(ForDoc(), CancellationToken.None);
         Assert.NotNull(result);
-        Assert.Empty(result!);
+        Assert.Empty(result);
     }
 
     [Fact]
@@ -309,7 +309,7 @@ public sealed class XmlCodeLensHandlerTest
         var result = await handler.Handle(ForDoc(mixedCaseUri), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Single(result!);
+        Assert.Single(result);
     }
 
     // ── resolve passthrough ───────────────────────────────────────────────────

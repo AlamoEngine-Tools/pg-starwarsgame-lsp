@@ -1,12 +1,14 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using System.Buffers.Binary;
 using System.Text;
 
 namespace PG.StarWarsGame.LSP.Assets.Models;
 
 /// <summary>One chunk header and the absolute bounds of its body.</summary>
+[PublicAPI]
 internal readonly record struct AloChunk(uint Type, int BodyStart, int BodyLength, bool IsContainer)
 {
     public int BodyEnd => BodyStart + BodyLength;

@@ -53,8 +53,8 @@ public sealed class LuaParseCacheTest
 
         var parsed = cache.GetOrParse(Uri, "function Foo() end");
 
-        Assert.Empty(parsed.Tree.GetDiagnostics());
-        Assert.Contains("Foo", parsed.Tree.GetRoot().ToFullString());
+        Assert.Empty(parsed.Tree.GetDiagnostics(TestContext.Current.CancellationToken));
+        Assert.Contains("Foo", parsed.Tree.GetRoot(TestContext.Current.CancellationToken).ToFullString());
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class LuaParseCacheTest
         var parsed = cache.GetOrParse(Uri);
 
         Assert.NotNull(parsed);
-        Assert.Equal("function FromBuffer() end", parsed!.Text);
+        Assert.Equal("function FromBuffer() end", parsed.Text);
         Assert.Same(parsed, cache.GetOrParse(Uri));
     }
 
@@ -80,7 +80,7 @@ public sealed class LuaParseCacheTest
         var parsed = cache.GetOrParse(Uri);
 
         Assert.NotNull(parsed);
-        Assert.Equal("function FromDisk() end", parsed!.Text);
+        Assert.Equal("function FromDisk() end", parsed.Text);
     }
 
     [Fact]

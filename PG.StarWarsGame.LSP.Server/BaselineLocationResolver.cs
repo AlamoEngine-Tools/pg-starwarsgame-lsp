@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Serialization;
@@ -25,6 +26,7 @@ public enum BaselineOrigin
 /// <summary>Where the baseline file is read from.</summary>
 /// <param name="Url">The <c>.aet</c> file; its icon sidecar sits beside it.</param>
 /// <param name="Tag">The release tag, when <paramref name="Origin" /> is a release.</param>
+[PublicAPI]
 public sealed record BaselineLocation(string Url, string? Tag, BaselineOrigin Origin);
 
 /// <summary>

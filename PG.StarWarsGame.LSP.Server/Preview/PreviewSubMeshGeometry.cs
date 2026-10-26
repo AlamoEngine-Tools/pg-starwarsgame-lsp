@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using System.Numerics;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Messages;
@@ -24,6 +25,7 @@ namespace PG.StarWarsGame.LSP.Server.Preview;
 ///         needs the numbers they wrote, not the ones three.js ended up with.
 ///     </para>
 /// </remarks>
+[PublicAPI]
 public sealed record PreviewSubMeshGeometry(
     string Model,
     int MeshIndex,

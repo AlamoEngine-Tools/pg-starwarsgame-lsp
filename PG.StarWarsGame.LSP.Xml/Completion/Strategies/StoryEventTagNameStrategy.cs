@@ -4,7 +4,7 @@
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
-namespace PG.StarWarsGame.LSP.Xml.Completion;
+namespace PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 
 internal sealed class StoryEventTagNameStrategy : IXmlTagNameCompletionStrategy
 {

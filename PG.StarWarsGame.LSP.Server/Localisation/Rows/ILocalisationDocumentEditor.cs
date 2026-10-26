@@ -19,6 +19,9 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 /// </summary>
 public interface ILocalisationDocumentEditor
 {
+    /// <param name="originalText">The file's text as read.</param>
+    /// <param name="extension">The file's extension, which selects the format.</param>
+    /// <param name="commands">The edits, applied in order.</param>
     /// <param name="fileName">
     ///     Where a single-language format's language is read from - see
     ///     <see cref="ILocalisationRowReader.Read" />. Omit it and a <c>.properties</c> file falls back

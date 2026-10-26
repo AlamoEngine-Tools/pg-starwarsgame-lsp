@@ -178,7 +178,7 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
         var response = await SetBreakpointsAsync(HeroPath, new SourceBreakpoint { Line = 4 },
             new SourceBreakpoint { Line = 5 });
 
-        Assert.All(response.Breakpoints!, b => Assert.True(b.Verified));
+        Assert.All(response.Breakpoints, b => Assert.True(b.Verified));
         await WaitUntilAsync(() => _game.Breakpoints.Count == 2);
         Assert.All(_game.Breakpoints, b =>
         {
@@ -195,7 +195,7 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
     {
         var response = await SetBreakpointsAsync(HeroPath, new SourceBreakpoint { Line = 4 });
 
-        var pending = Assert.Single(response.Breakpoints!);
+        var pending = Assert.Single(response.Breakpoints);
         Assert.False(pending.Verified);
         Assert.NotNull(pending.Id);
         Assert.Empty(_game.Breakpoints);
@@ -229,7 +229,7 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
 
         var response = await SetBreakpointsAsync(HeroPath, new SourceBreakpoint { Line = 4, Condition = "speed > 1" });
 
-        var breakpoint = Assert.Single(response.Breakpoints!);
+        var breakpoint = Assert.Single(response.Breakpoints);
         Assert.False(breakpoint.Verified);
         Assert.Contains("condition", breakpoint.Message);
         await Task.Delay(50, TestContext.Current.CancellationToken);
@@ -243,8 +243,8 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
 
         var response = await SetBreakpointsAsync(@"D:\Elsewhere\Thing.lua", new SourceBreakpoint { Line = 1 });
 
-        Assert.False(response.Breakpoints!.Single().Verified);
-        Assert.Contains("script roots", response.Breakpoints!.Single().Message);
+        Assert.False(response.Breakpoints.Single().Verified);
+        Assert.Contains("script roots", response.Breakpoints.Single().Message);
     }
 
     // -- stop, stack, scopes, variables -------------------------------------------------------
@@ -335,7 +335,7 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
             await _harness.Client.RequestScopes(new ScopesArguments { FrameId = trace.StackFrames!.First().Id }, None);
 
         var variables = await _harness.Client.RequestVariables(
-            new VariablesArguments { VariablesReference = scopes.Scopes!.Single().VariablesReference }, None);
+            new VariablesArguments { VariablesReference = scopes.Scopes.Single().VariablesReference }, None);
 
         var byName = variables.Variables!.ToDictionary(v => v.Name);
         Assert.Equal(["dt", "planet", "speed", "unit"], byName.Keys.Order());
@@ -355,7 +355,7 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
         var scopes =
             await _harness.Client.RequestScopes(new ScopesArguments { FrameId = trace.StackFrames!.First().Id }, None);
         var locals = await _harness.Client.RequestVariables(
-            new VariablesArguments { VariablesReference = scopes.Scopes!.Single().VariablesReference }, None);
+            new VariablesArguments { VariablesReference = scopes.Scopes.Single().VariablesReference }, None);
         var planet = locals.Variables!.Single(v => v.Name == "planet");
         Assert.NotEqual(0, planet.VariablesReference);
 
@@ -381,7 +381,7 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
         await _harness.Client.RequestContinue(new ContinueArguments { ThreadId = stopped.ThreadId!.Value }, None);
 
         await Assert.ThrowsAnyAsync<Exception>(() => _harness.Client.RequestVariables(
-            new VariablesArguments { VariablesReference = scopes.Scopes!.Single().VariablesReference }, None));
+            new VariablesArguments { VariablesReference = scopes.Scopes.Single().VariablesReference }, None));
     }
 
     // -- evaluate -----------------------------------------------------------------------------
@@ -495,9 +495,9 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
 
         var sources = await _harness.Client.RequestLoadedSources(new LoadedSourcesArguments(), None);
 
-        Assert.Equal(2, sources.Sources!.Count());
-        Assert.Contains(sources.Sources!, s => s.Path == HeroPath);
-        Assert.Contains(sources.Sources!, s => s.Path is null && s.Name == @"Data\Scripts\AI\SpaceMode\Attack.lua");
+        Assert.Equal(2, sources.Sources.Count());
+        Assert.Contains(sources.Sources, s => s.Path == HeroPath);
+        Assert.Contains(sources.Sources, s => s.Path is null && s.Name == @"Data\Scripts\AI\SpaceMode\Attack.lua");
     }
 
     [Fact]

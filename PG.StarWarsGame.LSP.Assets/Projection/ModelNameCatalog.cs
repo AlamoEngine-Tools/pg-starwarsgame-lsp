@@ -42,7 +42,7 @@ public static class ModelNameCatalog
     public static IReadOnlyList<string> ReadBoneReferenceTargets(
         byte[] aloBytes, Func<byte[], IReadOnlyList<string>> boneExtractor)
     {
-        var bones = boneExtractor(aloBytes) ?? [];
+        var bones = boneExtractor(aloBytes);
         var result = new List<string>(bones);
 
         // Seeded from the bones so a mesh sharing a bone's name (the L1 blast decals are both) is not

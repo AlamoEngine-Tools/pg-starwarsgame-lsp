@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 
@@ -26,6 +27,7 @@ public sealed record GetLaunchLayersResult(bool Enabled, IReadOnlyList<LaunchLay
 ///     The directory to pass the game as this layer's mod, when the project is laid out as one;
 ///     null otherwise, with <paramref name="NotRunnableReason" /> saying why.
 /// </param>
+[PublicAPI]
 public sealed record LaunchLayer(
     string Name,
     int Rank,

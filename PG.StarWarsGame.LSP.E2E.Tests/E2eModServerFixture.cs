@@ -8,6 +8,8 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     a copy of the game. Tests that need a particular condition in the data write it there; the
 ///     shipped corpora have to stay faithful, so they cannot.
 /// </summary>
+// E2e is spelled as a word throughout the E2E test project.
+// ReSharper disable once InconsistentNaming
 public sealed class E2eModServerFixture : E2eWorkspaceServerFixture
 {
     public override string? ModPath => LspTestEnvironment.E2eWorkspacePath;

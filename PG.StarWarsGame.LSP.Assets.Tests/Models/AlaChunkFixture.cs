@@ -57,10 +57,17 @@ internal static class AlaChunkFixture
     /// <summary>
     ///     A version 2 animation: bones hold indices, and the samples live in shared blocks at the end.
     /// </summary>
+    /// <param name="frameCount">How many frames the clip has.</param>
+    /// <param name="fps">Frames per second.</param>
+    /// <param name="rotationSlots">How many rotation slots each frame holds.</param>
+    /// <param name="translationSlots">How many translation slots each frame holds.</param>
+    /// <param name="scaleSlots">How many scale slots each frame holds.</param>
+    /// <param name="bones">The bone chunks.</param>
     /// <param name="rotationBlock">
     ///     Every bone's rotation samples, frame-major: frame 0's slot for each indexed bone, then frame
     ///     1's, and so on. Omitted entirely when there are no rotation slots.
     /// </param>
+    /// <param name="translationBlock">Every bone's translation samples, laid out like <paramref name="rotationBlock" />; omitted when there are no translation slots.</param>
     public static byte[] AnimationV2(
         int frameCount,
         float fps,
@@ -96,6 +103,13 @@ internal static class AlaChunkFixture
     /// <summary>
     ///     A version 1 animated bone.
     /// </summary>
+    /// <param name="name">The bone's name.</param>
+    /// <param name="boneIndex">The bone's index in the model.</param>
+    /// <param name="translationOffset">The translation track's offset, as stored.</param>
+    /// <param name="translationScale">The translation track's scale, as stored.</param>
+    /// <param name="scaleOffset">The scale track's offset, as stored.</param>
+    /// <param name="scaleScale">The scale track's scale, as stored.</param>
+    /// <param name="scaleSamples">One <see cref="PackedVector" /> per frame, or null for none.</param>
     /// <param name="translationSamples">One <see cref="PackedVector" /> per frame, or null for none.</param>
     /// <param name="rotationSamples">
     ///     One <see cref="PackedQuaternion" /> per frame, or null for none. A block holding exactly one
@@ -104,6 +118,8 @@ internal static class AlaChunkFixture
     /// <param name="visibility">
     ///     One bit per frame, least-significant bit first, or null to leave every frame visible.
     /// </param>
+    /// <param name="includeIgnoredMini10">Whether to write mini-chunk 10, which the engine ignores.</param>
+    /// <param name="includeSkippedTrack">Whether to write a track chunk the reader skips.</param>
     public static byte[] BoneV1(
         string name,
         int boneIndex,
@@ -180,6 +196,13 @@ internal static class AlaChunkFixture
     /// <summary>
     ///     The bone descriptor both versions share, plus v2's index block when supplied.
     /// </summary>
+    /// <param name="name">The bone's name.</param>
+    /// <param name="boneIndex">The bone's index in the model.</param>
+    /// <param name="tOffset">The translation track's offset.</param>
+    /// <param name="tScale">The translation track's scale.</param>
+    /// <param name="sOffset">The scale track's offset.</param>
+    /// <param name="sScale">The scale track's scale.</param>
+    /// <param name="v2Indices">Version 2's slot index block, or null for version 1.</param>
     /// <param name="includeIgnoredMini10">
     ///     Mini-chunk 10 sits between the index and the offsets and is ignored by the engine. Present
     ///     on 101844 of the 103650 shipped bone descriptors, absent on 1806, so both shapes occur.

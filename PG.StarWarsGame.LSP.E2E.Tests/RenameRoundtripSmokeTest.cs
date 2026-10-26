@@ -150,7 +150,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
                 }, cts1.Token);
 
             Assert.NotNull(prepared);
-            Assert.NotNull(prepared!.Range);
+            Assert.NotNull(prepared.Range);
             Assert.Equal(OriginalName.Length,
                 prepared.Range!.End.Character - prepared.Range.Start.Character);
 
@@ -165,7 +165,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
                 }, cts2.Token);
 
             Assert.NotNull(edit);
-            Assert.NotNull(edit!.Changes);
+            Assert.NotNull(edit.Changes);
 
             var changedUris = edit.Changes!.Keys.Select(u => u.ToString()).ToList();
 
@@ -188,15 +188,15 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             // publish that was already in flight - which says nothing about whether the rename left
             // anything stale.
             var diagTask = _fixture.WaitForDiagnosticsAsync(corvettesUri,
-                p => !(p.Diagnostics?.Any(d =>
-                    d.Message.Contains(OriginalName, StringComparison.OrdinalIgnoreCase)) ?? false),
+                p => !p.Diagnostics.Any(d =>
+                    d.Message.Contains(OriginalName, StringComparison.OrdinalIgnoreCase)),
                 TimeSpan.FromSeconds(15));
 
             await ApplyWorkspaceEditAsync(edit, inMemory, versions);
             renamed = true;
 
             var diags = await diagTask;
-            var diagMessages = diags?.Diagnostics?.Select(d => d.Message).ToList() ?? [];
+            var diagMessages = diags?.Diagnostics.Select(d => d.Message).ToList() ?? [];
 
             // "Rename_Test" must not be unresolved (proves symbol was properly defined/indexed).
             Assert.False(
@@ -232,7 +232,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
                 }, cts3.Token);
 
             Assert.NotNull(preparedBack);
-            Assert.NotNull(preparedBack!.Range);
+            Assert.NotNull(preparedBack.Range);
             Assert.Equal(NewName.Length,
                 preparedBack.Range!.End.Character - preparedBack.Range.Start.Character);
 
@@ -247,7 +247,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
                 }, cts4.Token);
 
             Assert.NotNull(editBack);
-            Assert.NotNull(editBack!.Changes);
+            Assert.NotNull(editBack.Changes);
 
             var backUris = editBack.Changes!.Keys.Select(u => u.ToString()).ToList();
             Assert.True(
@@ -276,7 +276,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
 
             var diagsBack = await diagBackTask;
             Assert.NotNull(diagsBack);
-            var backMessages = diagsBack.Diagnostics?.Select(d => d.Message).ToList() ?? [];
+            var backMessages = diagsBack.Diagnostics.Select(d => d.Message).ToList();
 
             Assert.False(
                 backMessages.Any(m =>
@@ -300,7 +300,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
                 {
                     var uri = DocumentUri.From(uriStr);
                     var path = uri.GetFileSystemPath();
-                    if (path is null || !File.Exists(path)) continue;
+                    if (!File.Exists(path)) continue;
                     var diskContent = await File.ReadAllTextAsync(path);
                     _fixture.Client.DidChangeTextDocument(new DidChangeTextDocumentParams
                     {
@@ -342,14 +342,14 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             if (inMemory.TryGetValue(uriStr, out var cached))
                 current = cached;
             else
-                current = path is not null && File.Exists(path)
+                current = File.Exists(path)
                     ? await File.ReadAllTextAsync(path)
                     : string.Empty;
 
             var updated = ApplyTextEdits(current, textEdits);
             inMemory[uriStr] = updated;
 
-            var ext = Path.GetExtension(path ?? "");
+            var ext = Path.GetExtension(path);
             var lang = ext.Equals(".lua", StringComparison.OrdinalIgnoreCase) ? "lua" : "xml";
 
             if (!versions.TryGetValue(uriStr, out var ver))

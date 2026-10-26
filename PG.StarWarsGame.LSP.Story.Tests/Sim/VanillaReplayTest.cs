@@ -50,7 +50,7 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
         // measures how much of the Lua overlay the vanilla scripts light up.
         var scriptsDir = Path.Combine(root, game, "Data", "Scripts", "Story");
         var scriptFiles = Directory.Exists(scriptsDir)
-            ? Directory.EnumerateFiles(scriptsDir, "*.lua").ToDictionary(Path.GetFileNameWithoutExtension,
+            ? Directory.EnumerateFiles(scriptsDir, "*.lua").ToDictionary(file => Path.GetFileNameWithoutExtension(file),
                 p => p, StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var model = new StoryCampaignAssembler(schema).Assemble(campaign, faction, chain, rel =>

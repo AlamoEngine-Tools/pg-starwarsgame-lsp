@@ -94,7 +94,7 @@ public static class LocalisationFileNameLanguageResolver
     public static IAlamoLanguageDefinition Configured(
         ILanguageService langService, LocalisationConfig config)
     {
-        return langService.TryGetByIdentifier(config.Language, out var language) && language is not null
+        return langService.TryGetByIdentifier(config.Language, out var language)
             ? language
             : langService.Default;
     }

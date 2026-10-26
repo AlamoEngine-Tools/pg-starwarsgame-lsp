@@ -115,7 +115,7 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
     {
         const string declared = "<?xml version=\"1.0\"?>\n<Units>\n  <Unit Name=\"A\"/>\n</Units>";
 
-        var titles = BuildProvider(declared).Handle(Ctx("aetswg-004-0001", 2))
+        var titles = BuildProvider(declared).Handle(Ctx("aetswg-004-0001"))
             .Select(a => a.CodeAction!.Title).ToList();
 
         Assert.Contains(titles, t => t.Contains("this line"));

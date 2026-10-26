@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Server.Variants;
 
 /// <summary>Result of <c>aet/getEffectiveObject</c>.</summary>
@@ -10,6 +12,7 @@ namespace PG.StarWarsGame.LSP.Server.Variants;
 /// <param name="Chain">Base chain from most-derived to root.</param>
 /// <param name="Xml">The rendered effective XML with provenance comments.</param>
 /// <param name="TypeName">The resolved object's GameObject type.</param>
+[PublicAPI]
 public sealed record GetEffectiveObjectResult(
     bool Found,
     bool Cyclic,

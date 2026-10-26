@@ -87,8 +87,8 @@ public sealed class CreateLocalisationLanguageFileHandler
                 _layers, _fileHelper, request.ProjectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
             return Fail(readOnly);
 
-        if (!_langService.TryGetByIdentifier(request.Language ?? string.Empty, out var language)
-            || language is null)
+        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
+        if (!_langService.TryGetByIdentifier(request.Language ?? string.Empty, out var language))
             return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_NotLanguageThisGameSupports",
                 request.Language));
 

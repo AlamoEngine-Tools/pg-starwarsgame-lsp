@@ -50,7 +50,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AValueTheParameterTypeNames_IsNoReference()
     {
-        var result = await Build().ParseAsync("file:///s.lua", """Find_Player("local")""", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """Find_Player("local")""", 1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.References);
     }
@@ -58,7 +58,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AnyOtherValueOfThatParameter_IsStillAReference()
     {
-        var result = await Build().ParseAsync("file:///s.lua", """Find_Player("Empire")""", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """Find_Player("Empire")""", 1, TestContext.Current.CancellationToken);
 
         Assert.Equal("Empire", Assert.Single(result.References).TargetId);
     }
@@ -68,10 +68,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_LocalisationKeyTag_EmitsLocalisationKeyReference()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """Game_Message("TEXT_HELLO")""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """Game_Message("TEXT_HELLO")""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("TEXT_HELLO", reference.TargetId);
@@ -83,13 +80,10 @@ public sealed class LuaGameDocumentParserTest
     public async Task ParseAsync_DotCallOnAnyReceiver_EmitsTheMethodsReference()
     {
         // The receiver's type is not inferred; the method name alone selects the tag.
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """
+        var result = await Build().ParseAsync("file:///s.lua", """
             local ship = Find_First_Object("X")
             ship.Play_SFX_Event("SFX_Boom")
-            """,
-            1, default);
+            """, 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References, r => r.TargetId == "SFX_Boom");
         Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
@@ -101,10 +95,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ColonCallOnAnyReceiver_EmitsTheMethodsReference()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """ship:Play_SFX_Event("SFX_Boom")""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """ship:Play_SFX_Event("SFX_Boom")""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References, r => r.TargetId == "SFX_Boom");
         Assert.Equal("SFXEvent", reference.ExpectedTypeName);
@@ -114,10 +105,7 @@ public sealed class LuaGameDocumentParserTest
     public async Task ParseAsync_DotCallOfUntaggedMethod_EmitsNoLuaGlobalReference()
     {
         // Only a bare identifier call is a global-function call site; a member call is not.
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """ship.Get_Owner()""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """ship.Get_Owner()""", 1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.References);
     }
@@ -144,7 +132,7 @@ public sealed class LuaGameDocumentParserTest
                             end
                             """;
 
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
 
         var forces = result.Symbols.Where(s => s.Kind == GameSymbolKind.LuaGlobal && s.Id != "Definitions").ToList();
         Assert.Equal(["MainForce", "ReserveForce"], forces.Select(s => s.Id));
@@ -163,7 +151,7 @@ public sealed class LuaGameDocumentParserTest
                             }
                             """;
 
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
 
         var force = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("MainForce", force.Id);
@@ -172,7 +160,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_OtherTableNamedDifferently_DeclaresNothing()
     {
-        var result = await Build().ParseAsync("file:///s.lua", """Forces = { { "MainForce" } }""", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """Forces = { { "MainForce" } }""", 1, TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
     }
@@ -206,10 +194,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_GlobalFunction_EmitsLuaGlobalSymbol()
     {
-        var result = await Build().ParseAsync(
-            "file:///script.lua",
-            "function Definitions() end",
-            1, default);
+        var result = await Build().ParseAsync("file:///script.lua", "function Definitions() end", 1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("Definitions", sym.Id);
@@ -221,14 +206,11 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_MultipleGlobalFunctions_EmitsOneSymbolEach()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """
+        var result = await Build().ParseAsync("file:///s.lua", """
             function Definitions() end
             function State_Init(message) end
             function main() end
-            """,
-            1, default);
+            """, 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(3, result.Symbols.Count(s => s.Kind == GameSymbolKind.LuaGlobal));
         Assert.Contains(result.Symbols, s => s.Id == "Definitions");
@@ -239,10 +221,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_LocalFunction_EmitsNoSymbol()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            "local function Helper() end",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", "local function Helper() end", 1, TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
     }
@@ -250,7 +229,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_EmptyFile_ReturnsEmptyIndex()
     {
-        var result = await Build().ParseAsync("file:///s.lua", "", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", "", 1, TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Empty(result.References);
@@ -264,7 +243,7 @@ public sealed class LuaGameDocumentParserTest
                             function Definitions() end
                             """;
 
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         var origin = (FileOrigin)sym.Origin;
@@ -275,7 +254,7 @@ public sealed class LuaGameDocumentParserTest
     public async Task ParseAsync_Symbol_Origin_ColumnPointsToFunctionName_NotKeyword()
     {
         // "function Foo()" - 'F' is at column 9 ("function " = 9 chars)
-        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         var origin = (FileOrigin)sym.Origin;
@@ -286,7 +265,7 @@ public sealed class LuaGameDocumentParserTest
     public async Task ParseAsync_Symbol_Origin_Column_IndentedFunction()
     {
         // "  function Bar() end" - 'B' is at column 11 ("  function " = 11 chars)
-        var result = await Build().ParseAsync("file:///s.lua", "  function Bar() end", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", "  function Bar() end", 1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         var origin = (FileOrigin)sym.Origin;
@@ -296,7 +275,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Sets_DocumentUri_And_Version()
     {
-        var result = await Build().ParseAsync("file:///s.lua", "", 7, default);
+        var result = await Build().ParseAsync("file:///s.lua", "", 7, TestContext.Current.CancellationToken);
 
         Assert.Equal("file:///s.lua", result.DocumentUri);
         Assert.Equal(7, result.Version);
@@ -307,10 +286,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Find_First_Object_Call_EmitsXmlObjectReference()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """Find_First_Object("UNIT_REBEL")""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """Find_First_Object("UNIT_REBEL")""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("UNIT_REBEL", reference.TargetId);
@@ -322,10 +298,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Find_Player_Call_EmitsXmlObjectReference_WithFactionType()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """Find_Player("Rebel")""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """Find_Player("Rebel")""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("Rebel", reference.TargetId);
@@ -336,10 +309,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Find_Object_Type_Call_EmitsXmlObjectReference()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """Find_Object_Type("UNIT_HEAVY_TANK")""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """Find_Object_Type("UNIT_HEAVY_TANK")""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("UNIT_HEAVY_TANK", reference.TargetId);
@@ -352,10 +322,7 @@ public sealed class LuaGameDocumentParserTest
         // SomeRandomFunction is not in the EaW API schema, so no XML ref is emitted for its
         // argument; instead, the callee itself is tracked as a LuaGlobal call reference so
         // rename can locate all call sites via the index.
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """SomeRandomFunction("UNIT_REBEL")""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """SomeRandomFunction("UNIT_REBEL")""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("SomeRandomFunction", reference.TargetId);
@@ -366,10 +333,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_FunctionCallCallee_EmitsLuaGlobalReference()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            "RunMission()",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", "RunMission()", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("RunMission", reference.TargetId);
@@ -384,10 +348,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_KnownFunction_WithVariableArg_EmitsNoReference()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """Find_First_Object(unit_name)""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """Find_First_Object(unit_name)""", 1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.References);
     }
@@ -399,7 +360,7 @@ public sealed class LuaGameDocumentParserTest
                             Find_First_Object("UNIT_REBEL")
                             """;
 
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal(0, reference.Line); // 0-based, first line
@@ -415,7 +376,7 @@ public sealed class LuaGameDocumentParserTest
                             local y = Find_Player("Rebel")
                             """;
 
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.References.Length);
         Assert.Contains(result.References, r => r.TargetId == "UNIT_A");
@@ -427,10 +388,7 @@ public sealed class LuaGameDocumentParserTest
     {
         // The game's Lua functions are case-sensitive at runtime, but our registry lookup
         // should be case-insensitive to handle any inconsistent casing in scripts.
-        var result = await Build().ParseAsync(
-            "file:///s.lua",
-            """find_first_object("UNIT_REBEL")""",
-            1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """find_first_object("UNIT_REBEL")""", 1, TestContext.Current.CancellationToken);
 
         // Registry lookup is case-insensitive per design
         var reference = Assert.Single(result.References);
@@ -448,7 +406,7 @@ public sealed class LuaGameDocumentParserTest
                             --- Does something useful.
                             function Foo() end
                             """;
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("Does something useful.", sym.Description);
     }
@@ -461,7 +419,7 @@ public sealed class LuaGameDocumentParserTest
                             --- Line two.
                             function Foo() end
                             """;
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("Line one.\nLine two.", sym.Description);
     }
@@ -470,7 +428,7 @@ public sealed class LuaGameDocumentParserTest
     public async Task ParseAsync_BlankLineBetweenCommentAndFunction_DescriptionIsNull()
     {
         const string text = "--- Separated.\n\nfunction Foo() end";
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Null(sym.Description);
     }
@@ -484,7 +442,7 @@ public sealed class LuaGameDocumentParserTest
                             ---@return boolean
                             function Foo() end
                             """;
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("Does something.", sym.Description);
     }
@@ -496,7 +454,7 @@ public sealed class LuaGameDocumentParserTest
                             ---@param x number
                             function Foo() end
                             """;
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Null(sym.Description);
     }
@@ -504,7 +462,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_NoDocComment_DescriptionIsNull()
     {
-        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, TestContext.Current.CancellationToken);
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Null(sym.Description);
     }
@@ -514,7 +472,7 @@ public sealed class LuaGameDocumentParserTest
     {
         // Single-dash `--` comments are NOT doc comments; only `---` lines count.
         const string text = "-- not a doc comment\nfunction Foo() end";
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
         var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Null(sym.Description);
     }
@@ -524,7 +482,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_NoRequireCalls_RequireArgs_IsEmpty()
     {
-        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, TestContext.Current.CancellationToken);
         Assert.False(result.RequireArgs.IsDefault);
         Assert.Empty(result.RequireArgs);
     }
@@ -532,8 +490,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_SingleRequire_RequireArgs_ContainsRawArg()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua", """require("PGStateMachine")""", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """require("PGStateMachine")""", 1, TestContext.Current.CancellationToken);
         var arg = Assert.Single(result.RequireArgs);
         Assert.Equal("PGStateMachine", arg);
     }
@@ -543,16 +500,14 @@ public sealed class LuaGameDocumentParserTest
     {
         // Relative requires are stored in RequireArgs so callers that have the callerUri
         // (hover, go-to-def, diagnostics, completion) can resolve them at query time.
-        var result = await Build().ParseAsync(
-            "file:///s.lua", """require("./relative/path")""", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", """require("./relative/path")""", 1, TestContext.Current.CancellationToken);
         Assert.Equal("./relative/path", Assert.Single(result.RequireArgs));
     }
 
     [Fact]
     public async Task ParseAsync_DynamicRequire_IsExcluded()
     {
-        var result = await Build().ParseAsync(
-            "file:///s.lua", "require(someVariable)", 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", "require(someVariable)", 1, TestContext.Current.CancellationToken);
         Assert.Empty(result.RequireArgs);
     }
 
@@ -563,7 +518,7 @@ public sealed class LuaGameDocumentParserTest
                             require("pgstatemachine")
                             require("eawx-std/ModContentLoader")
                             """;
-        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
         Assert.Equal(2, result.RequireArgs.Length);
         Assert.Equal("pgstatemachine", result.RequireArgs[0]);
         Assert.Equal("eawx-std/ModContentLoader", result.RequireArgs[1]);
@@ -580,7 +535,7 @@ public sealed class LuaGameDocumentParserTest
                             function RunMission(name) end
                             """;
 
-        var result = await Build().ParseAsync("file:///funcs.lua", text, 1, default);
+        var result = await Build().ParseAsync("file:///funcs.lua", text, 1, TestContext.Current.CancellationToken);
 
         var symbol = Assert.Single(result.Symbols, s => s.Id == "RunMission");
         Assert.Equal("Runs the named mission.", symbol.Description);

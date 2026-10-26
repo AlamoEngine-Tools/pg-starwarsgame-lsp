@@ -39,6 +39,7 @@ public static class PreviewAbilityText
     /// <param name="alternateDescriptionKey">
     ///     The instance's <c>Alternate_Description_Text</c>, if any.
     /// </param>
+    /// <param name="messages">The catalogue the problem texts come from; English when null.</param>
     public static PreviewAbility Fill(
         PreviewAbility ability,
         string? alternateNameKey,

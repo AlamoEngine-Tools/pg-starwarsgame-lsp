@@ -60,7 +60,7 @@ public sealed class XmlParseCacheTest
         var parsed = cache.GetOrParse(Uri);
 
         Assert.NotNull(parsed);
-        Assert.Equal("<Buffer/>", parsed!.Text);
+        Assert.Equal("<Buffer/>", parsed.Text);
         Assert.Same(parsed, cache.GetOrParse(Uri));
     }
 
@@ -74,7 +74,7 @@ public sealed class XmlParseCacheTest
         var parsed = cache.GetOrParse(Uri);
 
         Assert.NotNull(parsed);
-        Assert.Equal("<Disk/>", parsed!.Text);
+        Assert.Equal("<Disk/>", parsed.Text);
     }
 
     [Fact]

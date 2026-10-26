@@ -4,7 +4,6 @@
 using System.Text;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua.Syntax;
-using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -22,7 +21,6 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
     private readonly ILuaAnalyzer? _analyzer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
-    private readonly ILogger<LuaHoverHandler> _logger;
     private readonly IMessageCatalog _messages;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
@@ -32,7 +30,6 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
-        ILogger<LuaHoverHandler> logger,
         // Optional: with the analyzer running, its card follows ours.
         ILuaAnalyzer? analyzer = null,
         IMessageCatalog? messages = null)
@@ -42,7 +39,6 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         _parseCache = parseCache;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
-        _logger = logger;
         _analyzer = analyzer;
     }
 

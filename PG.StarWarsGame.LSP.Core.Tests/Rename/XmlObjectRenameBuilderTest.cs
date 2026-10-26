@@ -76,7 +76,7 @@ public sealed class XmlObjectRenameBuilderTest
             NullLogger.Instance);
 
         Assert.NotNull(result);
-        var edits = result!.Changes![DocumentUri.From(XmlUri)].ToList();
+        var edits = result.Changes![DocumentUri.From(XmlUri)].ToList();
         var defEdit = Assert.Single(edits);
         Assert.Equal("UNIT_B", defEdit.NewText);
         Assert.Equal(0, defEdit.Range.Start.Line);
@@ -102,7 +102,7 @@ public sealed class XmlObjectRenameBuilderTest
             NullLogger.Instance);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(OtherXmlUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(OtherXmlUri)));
         var refEdit = Assert.Single(result.Changes[DocumentUri.From(OtherXmlUri)]);
         Assert.Equal(2, refEdit.Range.Start.Line);
         Assert.Equal(5, refEdit.Range.Start.Character);
@@ -132,7 +132,7 @@ public sealed class XmlObjectRenameBuilderTest
             schema, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
-        var edit = Assert.Single(result!.Changes![DocumentUri.From(XmlUri)]); // deduped, not two
+        var edit = Assert.Single(result.Changes![DocumentUri.From(XmlUri)]); // deduped, not two
         Assert.Equal("Renamed_Ev", edit.NewText);
         Assert.Equal(13, edit.Range.Start.Character);
         Assert.Equal(21, edit.Range.End.Character);
@@ -155,7 +155,7 @@ public sealed class XmlObjectRenameBuilderTest
             NullLogger.Instance);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(LuaUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(LuaUri)));
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────

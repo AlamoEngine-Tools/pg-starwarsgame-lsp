@@ -1,9 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Schema.Yaml;
 
 /// <summary>YAML deserialization model for a single positional parameter slot on an event/reward enum value.</summary>
+[PublicAPI]
 internal sealed class YamlParamEntry
 {
     /// <summary>0-based slot index. Event_Param1 = position 0, Reward_Param1 = position 0.</summary>

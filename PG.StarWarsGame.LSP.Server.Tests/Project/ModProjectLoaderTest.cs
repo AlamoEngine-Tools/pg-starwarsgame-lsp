@@ -1014,7 +1014,7 @@ public sealed class ModProjectLoaderTest
         public string TypeName => PgprojFormat.TypeName;
         public TypeVersion From => TypeVersion.Of("aetswg", 0, 9);
         public TypeVersion To => PgprojFormat.Current;
-        public CatalogueText? UserNotice => new("StoryLayout_DroppedPositions", 1);
+        public CatalogueText UserNotice => new("StoryLayout_DroppedPositions", 1);
 
         public JsonNode Migrate(JsonNode document)
         {
@@ -1039,6 +1039,7 @@ public sealed class ModProjectLoaderTest
         }
     }
 
+    // ReSharper disable once NotAccessedPositionalProperty.Local - captured for the debugger, counted by the tests
     private sealed record LogEntry(LogLevel Level, string Message);
 
     private sealed class ListLogger : ILogger<ModProjectLoader>

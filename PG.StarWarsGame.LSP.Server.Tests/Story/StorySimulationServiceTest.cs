@@ -129,7 +129,7 @@ public sealed class StorySimulationServiceTest
         Assert.Empty(sought.Interventions);
 
         var back = service.RuleOut(Key, armed.NodeId, false).State!;
-        Assert.Empty(back.RuledOut);
+        Assert.Empty(back.RuledOut!);
         Assert.Single(back.Interventions);
     }
 
@@ -500,11 +500,11 @@ public sealed class StorySimulationServiceTest
         {
         }
 
-        public void ApplyLocalisation(ILocalisationIndex index)
+        public void ApplyLocalisation(ILocalisationIndex localisation)
         {
         }
 
-        public void ApplyAssetFiles(IAssetFileIndex index)
+        public void ApplyAssetFiles(IAssetFileIndex assetFiles)
         {
         }
 

@@ -92,7 +92,7 @@ public static class UnitAbilityReader
 
             foreach (var child in node.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
             {
-                var text = HtmlEntity.DeEntitize(child.InnerText)?.Trim() ?? string.Empty;
+                var text = HtmlEntity.DeEntitize(child.InnerText).Trim();
                 if (text.Length == 0)
                     continue;
 

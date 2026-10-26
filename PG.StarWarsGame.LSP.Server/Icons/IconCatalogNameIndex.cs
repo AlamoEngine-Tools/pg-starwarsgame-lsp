@@ -12,7 +12,7 @@ namespace PG.StarWarsGame.LSP.Server.Icons;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Deliberately a thin adapter over <see cref="IconCatalog.Resolve" /> rather than a second
+///         Deliberately a thin adapter over <see cref="PG.StarWarsGame.LSP.Assets.Icons.IconCatalog.Resolve" /> rather than a second
 ///         index of its own. The catalog already owns the precedence - a workspace mega texture
 ///         REPLACES the baked baseline wholesale, raw sources come next, and the baseline answers
 ///         only when the workspace ships no mega texture at all - and a diagnostic that disagreed

@@ -27,14 +27,14 @@ public sealed class LocalisationProjectFormatSmokeTest : IClassFixture<Localisat
     [Fact]
     public async Task SetLocalisationProjectFormat_CsvToDat_RepointsTheProjectAndConvertsNothing()
     {
-        await _fixture.ScanCompleted.WaitAsync(TimeSpan.FromSeconds(90));
+        await _fixture.ScanCompleted.WaitAsync(TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         // A real DAT beside the CSV, as the reporter had.
         var eaw = LspTestEnvironment.EawWorkspacePath;
         Assert.NotNull(eaw);
         var datPath = Path.Combine(_fixture.TextDirectory, "mastertextfile_english.dat");
-        File.Copy(Path.Combine(eaw!, "Data", "Text", "mastertextfile_english.dat"), datPath);
+        File.Copy(Path.Combine(eaw, "Data", "Text", "mastertextfile_english.dat"), datPath);
         var csvBefore = await File.ReadAllTextAsync(_fixture.MasterTextPath, cts.Token);
 
         var result = await _fixture.Client.SendRequest(new SetLocalisationProjectFormatParams("Dat"), cts.Token);

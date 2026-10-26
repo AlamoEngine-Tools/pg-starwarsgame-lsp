@@ -108,7 +108,7 @@ public sealed class EawSchemaCategoryMaskTagTest
         var tags = YamlSchemaParser.ParseTagFile(File.ReadAllText(Find("tags", file)));
         var tag = tags.FirstOrDefault(t => string.Equals(t.Tag, name, StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(tag);
-        return tag!;
+        return tag;
     }
 
     private static RawTagDefinition Tag(string name)
@@ -116,7 +116,7 @@ public sealed class EawSchemaCategoryMaskTagTest
         var tags = YamlSchemaParser.ParseTagFile(File.ReadAllText(Find("tags", "SpecialAbility.yaml")));
         var tag = tags.FirstOrDefault(t => string.Equals(t.Tag, name, StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(tag);
-        return tag!;
+        return tag;
     }
 
     private static string Find(string folder, string file)

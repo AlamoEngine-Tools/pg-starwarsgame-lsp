@@ -17,7 +17,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </summary>
 public sealed class PreviewHandlersTest
 {
-    private static readonly string[] NoAnimations = [];
 
     private static ILspConfigurationProvider Config()
     {
@@ -167,7 +166,7 @@ public sealed class PreviewHandlersTest
 
         // "glTF" in ASCII is the GLB magic; decoding proves this is a real container, not a blob.
         var bytes = Convert.FromBase64String(result.Glb);
-        Assert.Equal<byte[]>([0x67, 0x6C, 0x54, 0x46], bytes[..4]);
+        Assert.Equal([0x67, 0x6C, 0x54, 0x46], bytes[..4]);
     }
 
     /// <summary>
@@ -616,9 +615,9 @@ public sealed class PreviewHandlersTest
     /// <summary>Keeps what was logged, so a test can assert the preview said what it did.</summary>
     private sealed class ListLogger<T> : ILogger<T>
     {
-        private readonly List<string> messages = [];
+        private readonly List<string> _messages = [];
 
-        public IReadOnlyList<string> Messages => messages;
+        public IReadOnlyList<string> Messages => _messages;
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
         {
@@ -634,7 +633,7 @@ public sealed class PreviewHandlersTest
             LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            messages.Add(formatter(state, exception));
+            _messages.Add(formatter(state, exception));
         }
     }
 
@@ -666,6 +665,8 @@ public sealed class PreviewHandlersTest
             return _files.TryGetValue(gameRelativePath, out var file) ? file.Bytes : null;
         }
 
+        /// <param name="path">The asset's game-relative path.</param>
+        /// <param name="bytes">The asset's bytes.</param>
         /// <param name="resolvedAs">
         ///     The path to report as found, which may differ in extension from the request - that is
         ///     the whole point of the .tga/.dds interchange.

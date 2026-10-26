@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
 // Shared result shape for the structured localisation write requests (set/delete/add-language) —
@@ -8,6 +10,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 // (createLocalisationKey, initLocalisationProject, importLocalisationProject), because these are
 // called frequently from the live editor grid and it needs to know precisely whether an edit
 // landed (in particular, whether the concurrency guard rejected a stale write).
+[PublicAPI]
 public sealed record LocalisationWriteResult(bool Success, string? Error, string? NewContentHash)
 {
     public static LocalisationWriteResult Ok(string newContentHash)

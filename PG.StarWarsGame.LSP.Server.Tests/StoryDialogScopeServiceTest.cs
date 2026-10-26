@@ -153,7 +153,7 @@ public sealed class StoryDialogScopeServiceTest
     private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
+        public WorkspaceConfiguration LastWorkspaceConfig => config;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)

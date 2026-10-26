@@ -26,7 +26,6 @@ internal sealed class FakeGameLauncher : IGameLauncher
     {
         public bool Killed { get; private set; }
 
-        public bool Disposed { get; private set; }
         public int Id { get; } = id;
 
         public bool HasExited => ExitCode is not null;
@@ -41,7 +40,6 @@ internal sealed class FakeGameLauncher : IGameLauncher
 
         public void Dispose()
         {
-            Disposed = true;
         }
     }
 }

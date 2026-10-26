@@ -97,8 +97,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     /// </summary>
     private readonly IVariantTagSource? _variantTagSource;
 
-    private readonly IGameWorkspaceHost _workspaceHost;
-
     public XmlDiagnosticsPublisher(
         ILanguageServerFacade server,
         IGameIndexService indexService,
@@ -183,7 +181,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         _damageStageProducer = damageStageProducer;
         _configProvider = configProvider;
         _indexService = indexService;
-        _workspaceHost = workspaceHost;
         _textSource = textSource ?? new DocumentTextSource(workspaceHost, fileHelper,
             NullLogger<DocumentTextSource>.Instance);
         _parseCache = parseCache ?? new XmlParseCache(_textSource, ServerOptions.Default.ParseCacheCapacity);

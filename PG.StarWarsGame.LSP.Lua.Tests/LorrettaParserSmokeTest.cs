@@ -68,7 +68,7 @@ public sealed class LorrettaParserSmokeTest
 
         foreach (var (name, options) in presets)
         {
-            var (fileErrors, totalErrors) = CountErrors(scriptsDir, files, options);
+            var (fileErrors, totalErrors) = CountErrors(files, options);
             _output.WriteLine($"{name,-12} {fileErrors,18} {totalErrors,14}");
         }
     }
@@ -102,8 +102,7 @@ public sealed class LorrettaParserSmokeTest
         Assert.Empty(errors);
     }
 
-    private static (int FileErrors, int TotalErrors) CountErrors(
-        string scriptsDir, string[] files, LuaSyntaxOptions options)
+    private static (int FileErrors, int TotalErrors) CountErrors(string[] files, LuaSyntaxOptions options)
     {
         var parseOptions = new LuaParseOptions(options);
         var totalErrors = 0;

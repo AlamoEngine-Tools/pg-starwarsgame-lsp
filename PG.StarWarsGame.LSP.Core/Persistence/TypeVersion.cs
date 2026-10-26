@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -89,6 +90,7 @@ public readonly record struct TypeVersion(string Namespace, SemVersion Version)
 /// <param name="TypeName">The document's <c>_type</c>, e.g. <c>aetswg.StoryLayout</c>.</param>
 /// <param name="Version">The version the pinned shape belongs to.</param>
 /// <param name="Signature">The shape's signature, from <see cref="DocumentSignature.Of" />.</param>
+[PublicAPI]
 public sealed record DocumentShapePin(string TypeName, TypeVersion Version, string Signature)
 {
     /// <summary>

@@ -19,6 +19,8 @@ public static class AssetFileLookup
     /// <summary>
     ///     True when <paramref name="normalised" /> names something in the catalog.
     /// </summary>
+    /// <param name="index">The asset catalog.</param>
+    /// <param name="normalised">The referenced path, normalised the way the catalog keys are.</param>
     /// <param name="allowedExtensions">
     ///     The extensions a bare filename may be matched against, so a partial path is only matched
     ///     to catalog entries of the right asset type.

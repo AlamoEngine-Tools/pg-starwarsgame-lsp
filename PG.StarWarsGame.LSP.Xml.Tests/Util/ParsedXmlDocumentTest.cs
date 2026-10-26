@@ -26,7 +26,7 @@ public sealed class ParsedXmlDocumentTest
         var unit = parsed.Html.DocumentNode.Descendants()
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element && n.Name == "unit");
         Assert.NotNull(unit);
-        Assert.Equal(2, unit!.Line);
+        Assert.Equal(2, unit.Line);
     }
 
     [Fact]

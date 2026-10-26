@@ -84,7 +84,7 @@ public sealed class XmlDocumentFactProducer(
         }
 
         if (isTypeContainerLevel)
-            CollectUnnamedObjects(doc, facts, lineIndex, documentUri);
+            CollectUnnamedObjects(doc, facts, documentUri);
 
         // Collect notes hints for every element in the document
         foreach (var node in doc.DocumentNode.Descendants()
@@ -246,8 +246,7 @@ public sealed class XmlDocumentFactProducer(
             documentUri, XmlUtility.GetLine(rootNode), rootNode.LinePosition + 1, rootNode.Name.Length, fileName));
     }
 
-    private void CollectUnnamedObjects(
-        HtmlDocument doc, List<XmlFact> facts, LineOffsetIndex lineIndex, string documentUri)
+    private void CollectUnnamedObjects(HtmlDocument doc, List<XmlFact> facts, string documentUri)
     {
         var typeDef = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri))
             .Select(t => schema.GetObjectType(t))
@@ -348,6 +347,10 @@ public sealed class XmlDocumentFactProducer(
         }
     }
 
+    /// <param name="node">The element being walked.</param>
+    /// <param name="state">The walk's facts and the document they are about.</param>
+    /// <param name="context">The tag resolution context of the enclosing type, or null above the type level.</param>
+    /// <param name="isTypeContainerLevel">Whether <paramref name="node" /> is the file's root, whose children are the objects.</param>
     /// <param name="isObjectLevel">
     ///     Whether <paramref name="node" /> is an OBJECT element, so its direct element children are
     ///     tags and can be judged against the tag vocabulary. False everywhere below that: the

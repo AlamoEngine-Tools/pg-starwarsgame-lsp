@@ -50,7 +50,7 @@ public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
         if (openRange is null || closeRange is null)
             return Task.FromResult<LinkedEditingRanges>(null!);
 
-        return Task.FromResult<LinkedEditingRanges>(new LinkedEditingRanges
+        return Task.FromResult(new LinkedEditingRanges
         {
             Ranges = new Container<LspRange>(openRange, closeRange),
             WordPattern = @"[a-zA-Z_][a-zA-Z0-9_]*"

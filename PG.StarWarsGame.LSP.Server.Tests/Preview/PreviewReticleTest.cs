@@ -26,7 +26,7 @@ public sealed class PreviewReticleTest
 
         var engine = map.ForType("HARD_POINT_ENGINE");
         Assert.NotNull(engine);
-        Assert.Equal("I_Hard_Point_Reticle_Engines", engine!.Enemy);
+        Assert.Equal("I_Hard_Point_Reticle_Engines", engine.Enemy);
         Assert.Equal("I_Hard_Point_Reticle_Engines_Tracked", engine.EnemyTracked);
         Assert.Equal("I_Hard_Point_Reticle_Engines", engine.Friendly);
         Assert.Equal("I_Hard_Point_Reticle_Engines_Tracked", engine.FriendlyTracked);

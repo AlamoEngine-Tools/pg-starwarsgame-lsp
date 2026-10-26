@@ -108,7 +108,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
         var ns = XNamespace.Get(XmlNs);
         var entries = xdoc.Root!.Elements(ns + "Localisation").ToList();
-        Assert.Single(entries.Where(e => e.Attribute("key")?.Value == "TEXT_NEW"));
+        Assert.Single(entries, e => e.Attribute("key")?.Value == "TEXT_NEW");
     }
 
     [Fact]

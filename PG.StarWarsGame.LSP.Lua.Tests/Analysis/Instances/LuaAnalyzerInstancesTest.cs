@@ -270,11 +270,11 @@ public sealed class LuaAnalyzerInstancesTest
         instances.DidOpen(Other, "", 1);
         var process = _processes[0];
         var range = new { start = new { line = 0, character = 9 }, end = new { line = 0, character = 18 } };
-        process.Answer = (method, request) => method == "textDocument/codeLens"
+        process.Answer = (m, payload) => m == "textDocument/codeLens"
             ? JToken.FromObject(new[] { new { range, data = new { DeclId = "0|2074" } } })
             : new JObject
             {
-                ["range"] = request["range"], ["data"] = request["data"],
+                ["range"] = payload["range"], ["data"] = payload["data"],
                 ["command"] = new JObject { ["title"] = "1 usage", ["command"] = "editor.action.showReferences" }
             };
 
@@ -414,7 +414,7 @@ public sealed class LuaAnalyzerInstancesTest
             lock (Texts) Texts.Remove(uri);
         }
 
-        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
         {
             var json = JToken.FromObject(parameters);
             Requests.Add((method, json));

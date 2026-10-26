@@ -355,6 +355,7 @@ public sealed class SidecarStoreTest
         CatalogueText? userNotice = null)
         : IDocumentMigration
     {
+        // ReSharper disable once MemberHidesStaticFromOuterClass - the interface member returns the outer constant it is named after
         public string TypeName => SidecarStoreTest.TypeName;
         public TypeVersion From { get; } = Parse(from);
         public TypeVersion To { get; } = Parse(to);

@@ -74,7 +74,7 @@ public sealed class VariantOverrideInlayHintProviderTest
         var hint = Assert.Single(hints);
         var label = hint.Label.String;
         Assert.NotNull(label);
-        return label!;
+        return label;
     }
 
     [Fact]

@@ -62,7 +62,7 @@ public sealed class XmlFormattingHandlersTest
             TextDocument = Doc, Options = new FormattingOptions { TabSize = 2, InsertSpaces = true }
         }, CancellationToken.None);
 
-        Assert.All(All(edits), e => Assert.Equal<string>("  ", e.NewText));
+        Assert.All(All(edits), e => Assert.Equal("  ", e.NewText));
     }
 
     [Fact]

@@ -25,10 +25,6 @@ public sealed record ConvertLocalisationFormatParams(string ProjectFilePath, str
 ///     language found in the source, since the format cannot hold more than one and writing a single
 ///     file would silently discard the rest.
 /// </param>
-/// <param name="WrittenPath">
-///     The first of <paramref name="WrittenPaths" />, or null if nothing was written. Kept so a
-///     caller that only wants something to open does not have to reason about the fan-out.
-/// </param>
 /// <param name="ProjectFormatChanged">
 ///     Whether the <c>.pgproj</c> localisation node was repointed at the new format. False when the
 ///     converted file was not the one the project's declared format describes - the new file is
@@ -45,5 +41,9 @@ public sealed record ConvertLocalisationFormatResult(
     int OtherFilesInOldFormat = 0,
     string? Error = null)
 {
+    /// <summary>
+    ///     The first of <see cref="WrittenPaths" />, or null if nothing was written. Kept so a
+    ///     caller that only wants something to open does not have to reason about the fan-out.
+    /// </summary>
     public string? WrittenPath => WrittenPaths.Count > 0 ? WrittenPaths[0] : null;
 }

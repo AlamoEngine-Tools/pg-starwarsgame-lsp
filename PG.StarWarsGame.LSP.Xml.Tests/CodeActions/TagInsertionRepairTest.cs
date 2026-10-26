@@ -125,7 +125,7 @@ public sealed class TagInsertionRepairTest
     {
         var insertion = Fact(body).InsertionEdits;
         Assert.NotNull(insertion);
-        return Assert.Single(insertion!);
+        return Assert.Single(insertion);
     }
 
     private static MissingRequiredTagFact Fact(string body)

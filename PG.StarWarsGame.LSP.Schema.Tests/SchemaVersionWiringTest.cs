@@ -160,7 +160,7 @@ public sealed class SchemaVersionWiringTest : IDisposable
 
         await provider.LoadAsync(CancellationToken.None);
 
-        await provider.ReadyAsync.WaitAsync(TimeSpan.FromSeconds(5));
+        await provider.ReadyAsync.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     private sealed class StubHandler(Dictionary<string, string> byPath) : HttpMessageHandler

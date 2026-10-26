@@ -54,7 +54,7 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
             return [];
 
         var effective = ResolveCached(ctx, objectId);
-        if (effective is null || !effective.Found || effective.Cyclic)
+        if (!effective.Found || effective.Cyclic)
             return [];
 
         // A repeatable additive tag contributes one entry per occurrence - the base's inherited ones
@@ -123,7 +123,7 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
         return collapsed.Length <= MaxValueLength ? collapsed : collapsed[..MaxValueLength] + "...";
     }
 
-    private EffectiveObject? ResolveCached(InlayHintContext ctx, string objectId)
+    private EffectiveObject ResolveCached(InlayHintContext ctx, string objectId)
     {
         var perIndex = Cache.GetOrCreateValue(ctx.Index);
         lock (perIndex)

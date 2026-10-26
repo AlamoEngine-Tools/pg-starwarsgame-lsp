@@ -54,11 +54,9 @@ public sealed record PreviewParticle(
     string SystemRef,
     string PartId,
     string Bone,
-    /// <summary>
-    ///     The bone's index in the model, which is the only thing that tells two same-named bones
-    ///     apart. Boba Fett carries two <c>p_boba_jetpack</c> bones and the client keys its own by
-    ///     name, so with a name alone both effects landed on one jet.
-    /// </summary>
+    // The bone's index in the model, which is the only thing that tells two same-named bones
+    // apart. Boba Fett carries two p_boba_jetpack bones and the client keys its own by
+    // name, so with a name alone both effects landed on one jet.
     int BoneIndex,
     PreviewParticleGate Gate,
     string? HardpointId,

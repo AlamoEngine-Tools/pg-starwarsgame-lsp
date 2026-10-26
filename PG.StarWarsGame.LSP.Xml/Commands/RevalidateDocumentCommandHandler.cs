@@ -27,7 +27,7 @@ public sealed class RevalidateDocumentCommandHandler : ExecuteCommandHandlerBase
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
-        var uri = request.Arguments?[0]?.Value<string>() ?? string.Empty;
+        var uri = request.Arguments?[0].Value<string>() ?? string.Empty;
         await ExecuteAsync(uri, ct);
         return Unit.Value;
     }

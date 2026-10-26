@@ -253,6 +253,10 @@ internal static class HoverUtility
     // know whether they are looking at a caveat or at "the engine ignores this". English is the
     // fallback for a note that has not been translated yet: a note in the wrong language still says
     // more than no note at all.
+    /// <param name="sb">The hover text being built.</param>
+    /// <param name="notes">The element's notes.</param>
+    /// <param name="locale">The locale the notes are shown in.</param>
+    /// <param name="messages">The catalogue the kind labels come from.</param>
     /// <param name="summarised">
     ///     Kinds a caller has already put in its own status line. A note of such a kind is still
     ///     listed when it has words of its own - the reason a tag was retired is worth reading - but

@@ -32,7 +32,7 @@ var server = await LanguageServer.From(options => options
             {
                 Items = new Container<ConfigurationItem>(new ConfigurationItem { Section = "emmylua" })
             }, ct);
-            FakeState.Configuration = answer is null ? "null" : $"answered {answer.Count()}";
+            FakeState.Configuration = $"answered {answer.Count()}";
         }
         catch (Exception ex)
         {

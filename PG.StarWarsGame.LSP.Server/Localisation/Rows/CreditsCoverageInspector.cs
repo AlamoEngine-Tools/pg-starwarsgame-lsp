@@ -25,7 +25,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 ///         Keyed on the shipped directives. A file using its own vocabulary simply reports nothing
 ///         rather than guessing at structure it cannot see.
 ///     </para>
-///     </summary>
+/// </remarks>
 public static class CreditsCoverageInspector
 {
     private const string Header = "HEADER";

@@ -31,7 +31,10 @@ public sealed class LuaTextDocumentSyncHandlerTest
         var fileHelper = new FileHelper(fs ?? new MockFileSystem());
         // An already-open gate runs handler actions immediately (normal post-startup operation).
         var gate = new StartupGate();
+        // A fresh gate holds nothing to pump, so opening it completes synchronously; a constructor cannot await.
+#pragma warning disable VSTHRD002
         gate.OpenAsync().GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002
         return (new LuaTextDocumentSyncHandler(host, index, fileHelper, gate), host, index);
     }
 
@@ -343,7 +346,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
             Calls.Add($"change {uri} v{version} {text}");
         }
 
-        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
         {
             return Task.FromResult<T?>(null);
         }
@@ -379,6 +382,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
 
         public IEnumerable<TrackedDocument> All => [];
 
+        // ReSharper disable once NotAccessedPositionalProperty.Global - recorded for the assertions; not every member is asserted
         public record Call(string Uri, string Text, int Version, bool PublishDiagnostics = true);
     }
 

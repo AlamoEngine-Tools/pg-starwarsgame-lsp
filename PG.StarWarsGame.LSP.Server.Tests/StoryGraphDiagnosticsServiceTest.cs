@@ -50,7 +50,7 @@ public sealed class StoryGraphDiagnosticsServiceTest
                 .Select(c => new StoryModelKey(c, "Rebel")).ToList();
         }
 
-        public StoryCampaignModel? GetCampaignModel(string campaignName, string faction)
+        public StoryCampaignModel GetCampaignModel(string campaignName, string faction)
         {
             var thread = StoryThreadParser.Parse(
                 "<Story><Event Name=\"B\"><Prereq>Ghost</Prereq></Event></Story>", ThreadUri);
@@ -63,8 +63,7 @@ public sealed class StoryGraphDiagnosticsServiceTest
         {
             return GetModelKeys()
                 .Select(k => GetCampaignModel(k.Campaign, k.Faction))
-                .Where(m => m is not null)
-                .ToList()!;
+                .ToList();
         }
 
         public StoryChainScanResult GetChainResult()

@@ -22,8 +22,6 @@ namespace PG.StarWarsGame.LSP.Xml.Variants;
 /// </remarks>
 public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatisticsSource
 {
-    private const string NameAttribute = "Name";
-
     // Per-document tag maps keyed by canonical URI. Guarded by _gate.
     private readonly Dictionary<string, CacheEntry> _cache = new(StringComparer.Ordinal);
     private readonly object _gate = new();
@@ -48,7 +46,7 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatist
             foreach (var entry in _cache.Values)
             foreach (var tags in entry.TagsById.Values)
             foreach (var tag in tags)
-                chars += tag.TagName.Length + (tag.Value?.Length ?? 0);
+                chars += tag.TagName.Length + tag.Value.Length;
 
             return new CacheStatistics("variant-tags", _cache.Count, chars * sizeof(char));
         }

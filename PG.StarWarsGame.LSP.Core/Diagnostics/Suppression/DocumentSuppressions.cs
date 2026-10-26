@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 
 /// <summary>The four scopes from issue #66, narrowest last.</summary>
@@ -33,6 +35,7 @@ public enum SuppressionScope
 ///     Free text the author gave after <c>reason::</c>, or null. A directive naming several ids
 ///     produces one range each, all sharing the one reason it was written with.
 /// </param>
+[PublicAPI]
 public sealed record SuppressionRange(
     SuppressionMatcher Matcher,
     SuppressionScope Scope,

@@ -47,7 +47,7 @@ public sealed class XmlProjectileReferencesSmokeTest : IClassFixture<LspServerFi
         }, cts.Token);
 
         Assert.NotNull(refs);
-        var locations = refs!.ToList();
+        var locations = refs.ToList();
         Assert.NotEmpty(locations);
         Assert.Contains(locations, l =>
             l.Uri.ToString().Contains("Hardpoints", StringComparison.OrdinalIgnoreCase));
@@ -74,7 +74,7 @@ public sealed class XmlProjectileReferencesSmokeTest : IClassFixture<LspServerFi
         }, cts.Token);
 
         Assert.NotNull(refs);
-        var locations = refs!.ToList();
+        var locations = refs.ToList();
         Assert.Contains(locations, l =>
             l.Uri.ToString().Contains("Projectiles", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(locations, l =>

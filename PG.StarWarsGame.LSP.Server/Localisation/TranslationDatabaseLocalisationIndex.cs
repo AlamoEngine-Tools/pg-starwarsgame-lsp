@@ -48,7 +48,7 @@ internal sealed class TranslationDatabaseLocalisationIndex : ILocalisationIndex
     public string? GetValue(string key)
     {
         foreach (var db in _databases)
-            if (db.TryGetEntry(key, out var entry) && entry is not null &&
+            if (db.TryGetEntry(key, out var entry) &&
                 entry.TryGetTranslation(_language, out var value))
                 return value;
         return null;

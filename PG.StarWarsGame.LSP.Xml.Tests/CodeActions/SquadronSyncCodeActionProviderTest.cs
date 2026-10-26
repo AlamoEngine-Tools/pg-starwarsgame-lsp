@@ -104,7 +104,7 @@ public sealed class SquadronSyncCodeActionProviderTest
         var actions = provider.Handle(ctx).ToList();
         var preferred = actions.FirstOrDefault(a => a.CodeAction?.IsPreferred == true);
         Assert.NotNull(preferred);
-        Assert.Contains("Add 3 missing", preferred!.CodeAction!.Title);
+        Assert.Contains("Add 3 missing", preferred.CodeAction!.Title);
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public sealed class SquadronSyncCodeActionProviderTest
         var actions = provider.Handle(ctx).ToList();
         var preferred = actions.FirstOrDefault(a => a.CodeAction?.IsPreferred == true);
         Assert.NotNull(preferred);
-        Assert.Contains("Remove 3 excess", preferred!.CodeAction!.Title);
+        Assert.Contains("Remove 3 excess", preferred.CodeAction!.Title);
     }
 
     [Fact]

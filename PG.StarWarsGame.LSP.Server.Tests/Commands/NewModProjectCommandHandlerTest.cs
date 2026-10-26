@@ -207,10 +207,13 @@ public sealed class NewModProjectCommandHandlerTest
         };
     }
 
+    // ReSharper disable NotAccessedPositionalProperty.Local - captured for the debugger, counted by the tests
     private sealed record LogEntry(LogLevel Level, string Message);
+    // ReSharper restore NotAccessedPositionalProperty.Local
 
     private sealed class ListLogger<T> : ILogger<T>
     {
+        // ReSharper disable once CollectionNeverQueried.Local - captured for the debugger
         public ConcurrentBag<LogEntry> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull

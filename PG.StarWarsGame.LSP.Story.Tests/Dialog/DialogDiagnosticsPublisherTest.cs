@@ -49,7 +49,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Contains("BOGUS_COMMAND", diag.Message);
         // A real id, not a single catch-all code: without one it could not be suppressed, nor told
         // apart from any other dialog problem.
@@ -66,7 +66,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
-        Assert.Single(Assert.Single(published).Diagnostics!);
+        Assert.Single(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Contains("chapter header", diag.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
     }
@@ -102,7 +102,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(OutOfScopeUri, CancellationToken.None);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public sealed class DialogDiagnosticsPublisherTest
         publisher.ClearDocument(InScopeUri);
 
         Assert.Equal(2, published.Count);
-        Assert.Empty(published[1].Diagnostics!);
+        Assert.Empty(published[1].Diagnostics);
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         indexService.Fire(GameIndex.Empty);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Contains("BOGUS", diag.Message);
     }
 

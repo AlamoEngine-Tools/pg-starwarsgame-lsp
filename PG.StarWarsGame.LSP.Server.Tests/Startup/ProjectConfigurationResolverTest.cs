@@ -198,7 +198,7 @@ public sealed class ProjectConfigurationResolverTest
         var config = Build(fs).Resolve([WorkspaceRoot]);
 
         Assert.NotNull(config);
-        Assert.Contains(Abs("data/xml"), config!.XmlDirectories);
+        Assert.Contains(Abs("data/xml"), config.XmlDirectories);
         Assert.Contains(Abs("data/scripts"), config.ScriptRoots);
     }
 

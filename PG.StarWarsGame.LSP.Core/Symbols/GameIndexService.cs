@@ -303,14 +303,18 @@ public sealed class GameIndexService : IGameIndexService
         }
 
         // Cancel any in-flight parse for this URI and register the new one.
-        // AddOrUpdate is atomic: the prior CTS is cancelled before the new one is stored.
+        // AddOrUpdate is atomic: the prior CTS is cancelled before the new one is stored. Both
+        // lambdas run inside AddOrUpdate, before the dispose in the finally block below, so the
+        // "captured variable is disposed" warning does not apply.
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _inflightCts.AddOrUpdate(
             uri,
+            // ReSharper disable once AccessToDisposedClosure
             _ => cts,
             (_, prior) =>
             {
                 prior.Cancel();
+                // ReSharper disable once AccessToDisposedClosure
                 return cts;
             });
 
@@ -632,23 +636,23 @@ public sealed class GameIndexService : IGameIndexService
             return index with { Documents = index.Documents.SetItem(doc.DocumentUri, doc) };
 
         // Strip the previous version of this document before applying the new one.
-        var base_ = index.Documents.ContainsKey(doc.DocumentUri)
+        var stripped = index.Documents.ContainsKey(doc.DocumentUri)
             ? StripDocumentFromIndex(index, doc.DocumentUri)
             : index;
 
-        var defs = base_.WorkspaceDefinitions;
+        var defs = stripped.WorkspaceDefinitions;
         foreach (var sym in doc.Symbols)
             defs = defs.TryGetValue(sym.Id, out var arr)
                 ? defs.SetItem(sym.Id, arr.Add(sym))
                 : defs.Add(sym.Id, ImmutableArray.Create(sym));
 
-        var refs = base_.WorkspaceReferences;
+        var refs = stripped.WorkspaceReferences;
         foreach (var reference in doc.References)
             refs = refs.TryGetValue(reference.TargetId, out var arr)
                 ? refs.SetItem(reference.TargetId, arr.Add(reference))
                 : refs.Add(reference.TargetId, ImmutableArray.Create(reference));
 
-        var groups = base_.WorkspaceGroupMemberships;
+        var groups = stripped.WorkspaceGroupMemberships;
         if (!doc.GroupMemberships.IsDefault)
             foreach (var dgm in doc.GroupMemberships)
             {
@@ -658,13 +662,13 @@ public sealed class GameIndexService : IGameIndexService
                     : groups.Add(key, ImmutableArray.Create(dgm.Membership));
             }
 
-        return base_ with
+        return stripped with
         {
-            Documents = base_.Documents.SetItem(doc.DocumentUri, doc),
+            Documents = stripped.Documents.SetItem(doc.DocumentUri, doc),
             WorkspaceDefinitions = defs,
             WorkspaceReferences = refs,
             WorkspaceGroupMemberships = groups,
-            WorkspaceNameHashes = HashedTable(base_.WorkspaceNameHashes, doc.Symbols, [])
+            WorkspaceNameHashes = HashedTable(stripped.WorkspaceNameHashes, doc.Symbols, [])
         };
     }
 

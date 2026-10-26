@@ -108,7 +108,7 @@ public sealed class WorkspaceIconCatalogStartupTest
         public bool HasLoadedProjects { get; init; }
         public IReadOnlyList<string>? LastAssetRoots => null;
         public WorkspaceConfiguration? LastWorkspaceConfig { get; init; }
-        public IReadOnlyList<string>? LastWorkspaceRoots => [Root];
+        public IReadOnlyList<string> LastWorkspaceRoots => [Root];
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
         {

@@ -316,10 +316,6 @@ public static class XmlUtility
     }
 
     /// <summary>
-    ///     Converts an absolute byte <paramref name="offset" /> in <paramref name="text" /> to a
-    ///     0-based LSP <c>(Line, Col)</c> position by counting newlines.
-    /// </summary>
-    /// <summary>
     ///     Returns the position immediately after <paramref name="node" />'s closing <c>&gt;</c> —
     ///     the closing tag's for a normal element, or the opening tag's own for a self-closing one.
     ///     Used to build a diagnostic <c>Range</c> that spans the whole element (opening tag through

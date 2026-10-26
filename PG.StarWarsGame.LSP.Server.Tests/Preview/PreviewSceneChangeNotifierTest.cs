@@ -61,7 +61,7 @@ public sealed class PreviewSceneChangeNotifierTest
 
         for (var at = 0; at < 20; at++) indexService.Raise(GameIndex.Empty);
 
-        await Task.Delay(300);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
 
         Assert.Single(sent);
     }
@@ -76,9 +76,9 @@ public sealed class PreviewSceneChangeNotifierTest
             NullLogger<PreviewSceneChangeNotifier>.Instance, 40);
 
         indexService.Raise(GameIndex.Empty);
-        await Task.Delay(250);
+        await Task.Delay(250, TestContext.Current.CancellationToken);
         indexService.Raise(GameIndex.Empty);
-        await Task.Delay(250);
+        await Task.Delay(250, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, sent.Count);
     }
@@ -134,14 +134,14 @@ public sealed class PreviewSceneChangeNotifierTest
             NullLogger<PreviewSceneChangeNotifier>.Instance, 40);
 
         for (var at = 0; at < 5; at++) indexService.Raise(GameIndex.Empty);
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         Assert.Empty(sent);
 
         await gate.OpenAsync();
 
         // Sent while the gate opens, not after a debounce: nothing is in flight afterwards.
         Assert.Equal(["aet/previewSceneChanged"], sent);
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         Assert.Single(sent);
     }
 

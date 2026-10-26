@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 
@@ -53,6 +54,7 @@ public sealed record ValidateTranslationBatchParams(
 ///     <paramref name="Key" /> because the one problem a key cannot identify is a row that has no
 ///     key - and a blank key is precisely the row worth pointing at.
 /// </param>
+[PublicAPI]
 public sealed record LocTranslationProblemDto(
     string? Key,
     string? Language,

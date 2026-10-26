@@ -20,7 +20,7 @@ public sealed class EncyclopediaTagsTest
 
     private sealed class Tags : IVariantTagSource
     {
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        public IReadOnlyList<VariantTag> TryGetTags(string objectId)
         {
             return objectId is "Star_Destroyer" or "Coruscant"
                 ? [new VariantTag(EncyclopediaTags.Body, "TEXT_X", "<Encyclopedia_Text>TEXT_X</Encyclopedia_Text>", 0)]

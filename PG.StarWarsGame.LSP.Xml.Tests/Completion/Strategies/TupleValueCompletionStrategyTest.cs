@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -146,7 +147,7 @@ public sealed class TupleValueCompletionStrategyTest
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(Tag("X", XmlValueType.HardPointSfxMap), 1, "SFX_")).ToList();
+        _ = strategy.Handle(Ctx(Tag("X", XmlValueType.HardPointSfxMap), 1, "SFX_")).ToList();
 
         Assert.Equal(ReferenceKind.XmlObject, completion.LastTag?.ReferenceKind);
         Assert.Equal("SFXEvent", completion.LastTag?.ObjectType?.TypeName);
@@ -163,7 +164,7 @@ public sealed class TupleValueCompletionStrategyTest
         var completion = new CapturingCompletionRegistry();
         var strategy = new TupleValueCompletionStrategy(schema, new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(Tag("X", XmlValueType.AbilitySfxMap), 0)).ToList();
+        _ = strategy.Handle(Ctx(Tag("X", XmlValueType.AbilitySfxMap), 0)).ToList();
 
         Assert.Equal(ReferenceKind.HardcodedSet, completion.LastTag?.ReferenceKind);
         Assert.Equal("AbilityType", completion.LastTag?.HardcodedSet?.Name);
@@ -176,7 +177,7 @@ public sealed class TupleValueCompletionStrategyTest
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(Tag("X", XmlValueType.AbilitySfxMap), 1)).ToList();
+        _ = strategy.Handle(Ctx(Tag("X", XmlValueType.AbilitySfxMap), 1)).ToList();
 
         Assert.Equal("SFXEvent", completion.LastTag?.ObjectType?.TypeName);
     }
@@ -203,7 +204,7 @@ public sealed class TupleValueCompletionStrategyTest
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(Tag("X", XmlValueType.ConditionalSfxEvent), 1)).ToList();
+        _ = strategy.Handle(Ctx(Tag("X", XmlValueType.ConditionalSfxEvent), 1)).ToList();
 
         Assert.Equal("SFXEvent", completion.LastTag?.ObjectType?.TypeName);
     }
@@ -217,7 +218,7 @@ public sealed class TupleValueCompletionStrategyTest
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(Tag("X", XmlValueType.UnitSpawnTable), 0)).ToList();
+        _ = strategy.Handle(Ctx(Tag("X", XmlValueType.UnitSpawnTable), 0)).ToList();
 
         Assert.Equal("GameObjectType", completion.LastTag?.ObjectType?.TypeName);
     }
@@ -248,7 +249,7 @@ public sealed class TupleValueCompletionStrategyTest
         var proposals = new CapturingProposalRegistry();
         var strategy = new TupleValueCompletionStrategy(schema, proposals, new CapturingCompletionRegistry());
 
-        strategy.Handle(Ctx(Tag("X", XmlValueType.AbilityModMultiplier), 0, schema: schema)).ToList();
+        _ = strategy.Handle(Ctx(Tag("X", XmlValueType.AbilityModMultiplier), 0, schema: schema)).ToList();
 
         Assert.Equal("AbilityMultiplierType", proposals.LastTag?.Enum?.Name);
     }
@@ -285,7 +286,7 @@ public sealed class TupleValueCompletionStrategyTest
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(MusicList, 1)).ToList();
+        _ = strategy.Handle(Ctx(MusicList, 1)).ToList();
 
         Assert.Equal("MusicEvent", completion.LastTag?.ObjectType?.TypeName);
     }
@@ -315,7 +316,7 @@ public sealed class TupleValueCompletionStrategyTest
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(TerrainModel, itemIndex)).ToList();
+        _ = strategy.Handle(Ctx(TerrainModel, itemIndex)).ToList();
 
         Assert.Equal(ReferenceKind.ModelFile, completion.LastTag?.ReferenceKind);
     }
@@ -328,7 +329,7 @@ public sealed class TupleValueCompletionStrategyTest
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(Buildables, 0)).ToList();
+        _ = strategy.Handle(Ctx(Buildables, 0)).ToList();
 
         Assert.Equal(["Faction"], completion.Asked.Select(t => t.ObjectType?.TypeName));
     }
@@ -340,7 +341,7 @@ public sealed class TupleValueCompletionStrategyTest
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
-        strategy.Handle(Ctx(Buildables, 3)).ToList();
+        _ = strategy.Handle(Ctx(Buildables, 3)).ToList();
 
         Assert.Equal(["Faction", "GameObjectType"], completion.Asked.Select(t => t.ObjectType?.TypeName));
     }

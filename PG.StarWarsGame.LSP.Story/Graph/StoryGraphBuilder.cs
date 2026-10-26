@@ -44,6 +44,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
     ///     → the document URIs of the threads it includes. Drives the <see cref="StoryEdgeKind.TacticalEntry" />
     ///     pass linking each tactical stub to its battle's own root events.
     /// </param>
+    /// <param name="luaMachines">The Lua state machines attached to the plots, or none.</param>
     public StoryGraph Build(IReadOnlyList<StoryThread> threads,
         IReadOnlyDictionary<string, IReadOnlySet<string>>? tacticalManifestThreads = null,
         IReadOnlyList<LuaStoryMachine>? luaMachines = null)
@@ -91,9 +92,9 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         {
             var storyEvent = node.Event!;
             AddPrereqEdges(state, thread, storyEvent, node);
-            AddParamEdges(state, thread, storyEvent, node, storyEvent.EventType,
+            AddParamEdges(state, thread, node, storyEvent.EventType,
                 storyEvent.EventParams, state.EventParamRefTypes);
-            AddParamEdges(state, thread, storyEvent, node, storyEvent.RewardType,
+            AddParamEdges(state, thread, node, storyEvent.RewardType,
                 storyEvent.RewardParams, state.RewardParamRefTypes);
         }
 
@@ -392,8 +393,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
 
     // ── Schema-driven param edges ────────────────────────────────────────────
 
-    private void AddParamEdges(BuildState state, StoryThread thread, StoryEvent storyEvent,
-        StoryNode node, string? typeName, IReadOnlyList<StoryParamSlot> slots,
+    private void AddParamEdges(BuildState state, StoryThread thread, StoryNode node, string? typeName, IReadOnlyList<StoryParamSlot> slots,
         IReadOnlyDictionary<(string, int), string> refTypes)
     {
         if (typeName is null) return;

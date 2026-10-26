@@ -40,6 +40,7 @@ public sealed class DiagnosticsPublisherBaseTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
     }
 
+    // ReSharper disable once UnusedTupleComponentInReturnValue - the helper returns everything a test might need; some tests ignore a part
     private static (ConcretePublisher publisher,
         List<PublishDiagnosticsParams> published,
         FakeIndexService indexService,
@@ -184,7 +185,7 @@ public sealed class DiagnosticsPublisherBaseTest
         var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
         // Raised by the project, about a file of its dependency: both are named.
         Assert.Equal("aetswg (My Mod)", diagnostic.Source);
-        var related = Assert.Single(diagnostic.RelatedInformation);
+        var related = Assert.Single(diagnostic.RelatedInformation!);
         Assert.Equal("Layer - Core Library", related.Message);
         Assert.Equal(DocumentUri.From(uri), related.Location.Uri);
     }
@@ -258,9 +259,9 @@ public sealed class DiagnosticsPublisherBaseTest
         for (var i = 0; i < 10; i++)
             indexService.Fire(IndexWithDoc("file:///a.xml"));
 
-        await Task.Delay(250);
+        await Task.Delay(250, TestContext.Current.CancellationToken);
 
-        Assert.Equal(1, published.Count);
+        Assert.Single(published);
     }
 
     [Fact]
@@ -273,7 +274,7 @@ public sealed class DiagnosticsPublisherBaseTest
 
         Assert.Empty(published); // not yet - still within debounce window
 
-        await Task.Delay(250);
+        await Task.Delay(250, TestContext.Current.CancellationToken);
 
         Assert.Single(published); // published after debounce
     }
@@ -384,7 +385,7 @@ public sealed class DiagnosticsPublisherBaseTest
         var indexService = new FakeIndexService();
         var workspaceHost = new FakeWorkspaceHost();
         // a.xml throws; b.xml should still receive diagnostics
-        var publisher = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
+        _ = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
             "file:///a.xml");
         workspaceHost.Add("file:///a.xml", "content");
         workspaceHost.Add("file:///b.xml", "content");
@@ -401,7 +402,7 @@ public sealed class DiagnosticsPublisherBaseTest
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeIndexService();
         var workspaceHost = new FakeWorkspaceHost();
-        var publisher = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
+        _ = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
             "file:///a.xml");
         workspaceHost.Add("file:///a.xml", "content");
 
@@ -409,7 +410,7 @@ public sealed class DiagnosticsPublisherBaseTest
 
         var forA = published.FirstOrDefault(p => p.Uri.ToString() == "file:///a.xml");
         Assert.NotNull(forA);
-        Assert.Empty(forA!.Diagnostics);
+        Assert.Empty(forA.Diagnostics);
     }
 
     // ── suppression (applied in the base, so every language gets it) ──────────

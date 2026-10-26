@@ -77,6 +77,7 @@ public sealed class BooleanGatedRequirementRuleTest
     [MemberData(nameof(Pairs))]
     public void Gate_off_is_silent(string element, string gate, string required)
     {
+        _ = required; // the pair's requirement does not matter while the gate is off
         var body = $"<{gate}>No</{gate}>";
 
         Assert.Empty(Gated(Run($"<{element} Name='S'>{body}</{element}>")));

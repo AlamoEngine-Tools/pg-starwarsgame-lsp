@@ -297,7 +297,7 @@ public sealed class XmlUtilityTest
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Child>hello</Child>\n</Root>");
         var node = XmlUtility.FindEnclosingElement(doc, 1);
         Assert.NotNull(node);
-        Assert.Equal("child", node!.Name, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("child", node.Name, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -311,7 +311,7 @@ public sealed class XmlUtilityTest
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n  <A>1</A>\n  \n  <B>2</B>\n</Root>");
         var node = XmlUtility.FindEnclosingElement(doc, 2);
         Assert.NotNull(node);
-        Assert.Equal("root", node!.Name, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("root", node.Name, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -325,7 +325,7 @@ public sealed class XmlUtilityTest
         var doc = XmlUtility.CreateHtmlDocument("<Outer>\n  <Inner>\n    \n  </Inner>\n</Outer>");
         var node = XmlUtility.FindEnclosingElement(doc, 2);
         Assert.NotNull(node);
-        Assert.Equal("inner", node!.Name, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("inner", node.Name, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -339,7 +339,7 @@ public sealed class XmlUtilityTest
         // cursor line = 3 (the line with just spaces, inside GameObjectType)
         var node = XmlUtility.FindEnclosingElement(doc, 3);
         Assert.NotNull(node);
-        Assert.Equal("gameobjecttype", node!.Name, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("gameobjecttype", node.Name, StringComparer.OrdinalIgnoreCase);
     }
 
 
@@ -377,7 +377,7 @@ public sealed class XmlUtilityTest
         var node = XmlUtility.FindEnclosingElement(doc, 6); // cursor inside Unit2
 
         Assert.NotNull(node);
-        Assert.Equal("spaceunit", node!.Name, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("spaceunit", node.Name, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -408,7 +408,7 @@ public sealed class XmlUtilityTest
         var doc = XmlUtility.CreateHtmlDocument(xml);
         var node = XmlUtility.FindEnclosingElement(doc, 4); // cursor inside <div>
         Assert.NotNull(node);
-        Assert.Equal("div", node!.Name, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("div", node.Name, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]

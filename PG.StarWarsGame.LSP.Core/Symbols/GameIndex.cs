@@ -162,7 +162,7 @@ public sealed record GameIndex(
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    ///     File origins for individual values in workspace-defined <see cref="EnumKind.DynamicXml" /> enum
+    ///     File origins for individual values in workspace-defined <see cref="Schema.EnumKind.DynamicXml" /> enum
     ///     files. Outer key: enum name (case-insensitive, e.g. <c>SurfaceFXTriggerType</c>).
     ///     Inner key: value name (case-insensitive). Used by go-to-definition on enum-value references.
     /// </summary>

@@ -241,7 +241,7 @@ public sealed class PreviewDeathCloneTest
         var spin = scene.SpinAway;
 
         Assert.NotNull(spin);
-        Assert.Equal(2.0f, spin!.TimeSeconds);
+        Assert.Equal(2.0f, spin.TimeSeconds);
         Assert.Equal(0.2f, spin.Chance);
         Assert.Equal("Small_Explosion_Space", spin.Explosion);
         Assert.Equal(4.5f, spin.MaxSpeed);

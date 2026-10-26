@@ -142,7 +142,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler(host, schema).HandleRename(XmlUri, RenameAt(0, 12, "UNIT_B"), index);
 
         Assert.NotNull(result);
-        var edits = result!.Changes![DocumentUri.From(XmlUri)].ToList();
+        var edits = result.Changes![DocumentUri.From(XmlUri)].ToList();
         var refEdit = edits.First(e => e.Range.Start.Line == 0);
         Assert.Equal(10, refEdit.Range.Start.Character);
         Assert.Equal(16, refEdit.Range.End.Character);
@@ -169,7 +169,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler(host, schema).HandleRename(XmlUri, RenameAt(1, 5, "UNIT_NEW"), index);
 
         Assert.NotNull(result);
-        var edits = result!.Changes![DocumentUri.From(XmlUri)].ToList();
+        var edits = result.Changes![DocumentUri.From(XmlUri)].ToList();
         var defEdit = Assert.Single(edits);
         Assert.Equal("UNIT_NEW", defEdit.NewText);
         Assert.Equal(1, defEdit.Range.Start.Line);
@@ -201,7 +201,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler(host, schema).HandleRename(XmlUri, RenameAt(0, 5, "UNIT_B"), index);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(LuaUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(LuaUri)));
         var luaEdits = result.Changes[DocumentUri.From(LuaUri)].ToList();
         Assert.Contains(luaEdits, e => e.NewText == "UNIT_B");
     }
@@ -230,7 +230,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler(host, schema).HandleRename(XmlUri, RenameAt(0, 5, "UNIT_B"), index);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(LuaUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(LuaUri)));
         var luaEdit = Assert.Single(result.Changes[DocumentUri.From(LuaUri)]);
         Assert.Equal(0, luaEdit.Range.Start.Line);
         Assert.Equal(7, luaEdit.Range.Start.Character);
@@ -261,7 +261,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler(host, schema).HandleRename(XmlUri, RenameAt(0, 5, "UNIT_Z"), index);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(XmlUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(XmlUri)));
         Assert.True(result.Changes.ContainsKey(DocumentUri.From(OtherXmlUri)));
     }
 
@@ -293,7 +293,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler(host).HandleRename(XmlUri, RenameAt(0, 12, "Armor_Renamed"), index);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(defUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(defUri)));
         Assert.True(result.Changes.ContainsKey(DocumentUri.From(XmlUri)));
     }
 
@@ -316,7 +316,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler().HandlePrepare(XmlUri, 0, 12, index);
 
         Assert.NotNull(result);
-        Assert.NotNull(result!.Range);
+        Assert.NotNull(result.Range);
     }
 
     [Fact]
@@ -420,7 +420,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler().HandleRename(XmlUri, RenameAt(2, 16, "Story_Set2"), GroupIndex());
 
         Assert.NotNull(result);
-        var edits = result!.DocumentChanges!
+        var edits = result.DocumentChanges!
             .Where(c => c.IsTextDocumentEdit)
             .Select(c => c.TextDocumentEdit!)
             .ToList();
@@ -472,7 +472,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler().HandlePrepare(XmlUri, 0, 12, index);
 
         Assert.NotNull(result);
-        Assert.NotNull(result!.Range);
+        Assert.NotNull(result.Range);
         Assert.Equal(0, result.Range!.Start.Line);
         Assert.Equal(10, result.Range.Start.Character);
         Assert.Equal(16, result.Range.End.Character);
@@ -489,7 +489,7 @@ public sealed class XmlRenameHandlerTest
         var result = MakeHandler().HandlePrepare(XmlUri, 1, 3, index);
 
         Assert.NotNull(result);
-        Assert.NotNull(result!.Range);
+        Assert.NotNull(result.Range);
         Assert.Equal(1, result.Range!.Start.Line);
     }
 

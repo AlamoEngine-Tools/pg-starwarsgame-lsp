@@ -451,7 +451,6 @@ public sealed class ModProjectReloadServiceTest
         public int IndexCallCount { get; private set; }
         public bool AssetCatalogApplied { get; private set; }
         public bool BonesApplied { get; private set; }
-        public bool DynamicEnumCatalogApplied { get; private set; }
 
         public void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots)
         {
@@ -468,7 +467,6 @@ public sealed class ModProjectReloadServiceTest
 
         public void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots)
         {
-            DynamicEnumCatalogApplied = true;
         }
 
         public void ApplyAssetCatalog(WorkspaceConfiguration config)
@@ -503,6 +501,7 @@ public sealed class ModProjectReloadServiceTest
         }
     }
 
+    // ReSharper disable once NotAccessedPositionalProperty.Local - captured for the debugger, counted by the tests
     private sealed record LogEntry(LogLevel Level, string Message);
 
     private sealed class ListLogger : ILogger<ModProjectReloadService>

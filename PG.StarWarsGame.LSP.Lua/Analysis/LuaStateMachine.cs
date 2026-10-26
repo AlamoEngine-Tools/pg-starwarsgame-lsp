@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
@@ -66,6 +67,7 @@ public sealed record LuaStateHit(
 ///     (#252): the states it registers - through <c>Define_State</c> and, under story mode, through
 ///     <c>StoryModeEvents</c> - and the transitions it names.
 /// </summary>
+[PublicAPI]
 public sealed class LuaStateMachine
 {
     /// <summary>The state story mode registers first, ahead of every StoryModeEvents entry.</summary>

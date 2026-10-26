@@ -65,10 +65,10 @@ public sealed class BaselineBootstrapper : IBaselineBootstrapper
             if (!_languageService.TryGetByIdentifier(
                     _config.Current.Localisation.Language, out var language))
                 language = _languageService.Default;
-            var eawDb = _localisationProvider.GetMasterText(GameContext.EaW, language!);
-            var focDb = _localisationProvider.GetMasterText(GameContext.FoC, language!);
+            var eawDb = _localisationProvider.GetMasterText(GameContext.EaW, language);
+            var focDb = _localisationProvider.GetMasterText(GameContext.FoC, language);
             _indexService.ApplyLocalisation(
-                new TranslationDatabaseLocalisationIndex([eawDb, focDb], language!));
+                new TranslationDatabaseLocalisationIndex([eawDb, focDb], language));
         }
         catch (Exception ex)
         {

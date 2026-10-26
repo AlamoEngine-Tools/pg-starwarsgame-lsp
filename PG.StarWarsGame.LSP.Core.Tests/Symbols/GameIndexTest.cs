@@ -19,7 +19,7 @@ public sealed class GameIndexTest
         var resolved = index.ResolveOwnerAgnostic("Tyber_Zann_Black_Market");
 
         Assert.NotNull(resolved);
-        Assert.Equal("Tyber_Zann$Tyber_Zann_Black_Market", resolved!.Id);
+        Assert.Equal("Tyber_Zann$Tyber_Zann_Black_Market", resolved.Id);
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public sealed class GameIndexTest
         var resolved = index.ResolveOwnerAgnostic("Shared_Ability");
 
         Assert.NotNull(resolved);
-        Assert.EndsWith("$Shared_Ability", resolved!.Id);
+        Assert.EndsWith("$Shared_Ability", resolved.Id);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class GameIndexTest
         var resolved = index.ResolveOwnerAgnostic("Stock_Ability");
 
         Assert.NotNull(resolved);
-        Assert.Equal("Stock_Unit$Stock_Ability", resolved!.Id);
+        Assert.Equal("Stock_Unit$Stock_Ability", resolved.Id);
     }
 
     [Fact]
@@ -286,7 +286,7 @@ public sealed class GameIndexTest
         var result = index.ResolveWithShadow("UNIT_A");
 
         Assert.NotNull(result);
-        Assert.Equal(rev, result!.Value.Winner);
+        Assert.Equal(rev, result.Value.Winner);
         Assert.Equal(core, result.Value.Shadowed);
     }
 

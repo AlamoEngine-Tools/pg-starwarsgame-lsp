@@ -1075,7 +1075,7 @@ public sealed class StorySimulatorTest
     [Fact]
     public void SameCommandSequence_ProducesIdenticalState()
     {
-        static string Fingerprint(StorySimulator sim, StorySimSnapshot snapshot)
+        static string Fingerprint(StorySimSnapshot snapshot)
         {
             var fired = string.Join(",", snapshot.Runtime.FiredEvents.OrderBy(x => x, StringComparer.Ordinal));
             var flags = string.Join(",", snapshot.Runtime.Flags
@@ -1094,7 +1094,7 @@ public sealed class StorySimulatorTest
             snapshot = sim.AdvanceClock(snapshot, 10);
             snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Setter"));
             snapshot = sim.LuaNotify(snapshot, "Alert_One");
-            return Fingerprint(sim, snapshot);
+            return Fingerprint(snapshot);
         }
 
         Assert.Equal(Run(), Run());

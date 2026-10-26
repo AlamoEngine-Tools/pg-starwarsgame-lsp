@@ -27,7 +27,7 @@ public sealed class DatLocalisationConvertSmokeTest : IClassFixture<DatLocalisat
     [Fact]
     public async Task Convert_DatToCsv_WritesTheCsvAndRepointsThePgproj()
     {
-        await _fixture.ScanCompleted.WaitAsync(TimeSpan.FromSeconds(90));
+        await _fixture.ScanCompleted.WaitAsync(TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var pgproj = Directory.GetFiles(_fixture.WorkspaceRoot, "*.pgproj").Single();
 

@@ -75,6 +75,7 @@ public sealed class EncyclopediaLayoutResolver
     private readonly int _screenHeight;
     private readonly int _screenWidth;
 
+    /// <param name="resolver">Resolves the effective tags of the object the card is for.</param>
     /// <param name="screenWidth">
     ///     The screen the card is drawn for. The game sizes this popup's glyphs from the display it
     ///     runs on, so the preview has to be told which one to be faithful to; the defaults are the

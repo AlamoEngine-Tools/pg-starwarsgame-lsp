@@ -32,23 +32,16 @@ internal sealed class DapTestHarness : IAsyncDisposable
     private readonly List<StoppedEvent> _stopped = [];
     private readonly List<TerminatedEvent> _terminated = [];
 
-    private DapTestHarness(FakeTimeProvider time, MockFileSystem fileSystem, FakeGameLauncher launcher,
-        IServiceProvider services)
+    private DapTestHarness(FakeTimeProvider time, FakeGameLauncher launcher, IServiceProvider services)
     {
         Time = time;
-        FileSystem = fileSystem;
         Launcher = launcher;
-        Services = services;
         Adapter = services.GetRequiredService<LuaDebugAdapter>();
     }
 
     public FakeTimeProvider Time { get; }
 
-    public MockFileSystem FileSystem { get; }
-
     public FakeGameLauncher Launcher { get; }
-
-    public IServiceProvider Services { get; }
 
     public LuaDebugAdapter Adapter { get; }
 
@@ -157,7 +150,7 @@ internal sealed class DapTestHarness : IAsyncDisposable
             s.AddSingleton<IFileSystem>(fileSystem);
             s.AddSingleton<IGameLauncher>(launcher);
         });
-        var harness = new DapTestHarness(time, fileSystem, launcher, services);
+        var harness = new DapTestHarness(time, launcher, services);
 
         var clientToServer = new Pipe();
         var serverToClient = new Pipe();

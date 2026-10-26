@@ -50,7 +50,7 @@ public sealed class DialogCodeActionHandlerTest
         };
     }
 
-    private static async Task<List<CodeAction>> Actions(
+    private static async Task<List<CodeAction>> ActionsAsync(
         DialogCodeActionHandler handler, CodeActionParams request)
     {
         var result = await handler.Handle(request, CancellationToken.None);
@@ -65,7 +65,7 @@ public sealed class DialogCodeActionHandlerTest
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n");
 
         // The two report actions follow the suppressions; this pins the suppressions alone.
-        var titles = (await Actions(handler, Request(1, Unknown.ToString()))).Select(a => a.Title)
+        var titles = (await ActionsAsync(handler, Request(1, Unknown.ToString()))).Select(a => a.Title)
             .Where(t => t.StartsWith("Suppress"));
 
         Assert.Equal([
@@ -83,11 +83,11 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("BOGUS 1\n");
 
-        var titles = (await Actions(handler, Request(0, Unknown.ToString()))).Select(a => a.Title)
-            .Where(t => t.StartsWith("Suppress"));
+        var titles = (await ActionsAsync(handler, Request(0, Unknown.ToString()))).Select(a => a.Title)
+            .Where(t => t.StartsWith("Suppress")).ToList();
 
         Assert.DoesNotContain($"Suppress {Unknown} for this chapter", titles);
-        Assert.Equal(3, titles.Count());
+        Assert.Equal(3, titles.Count);
     }
 
     // ── the edits ────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\n  BOGUS 1\n");
 
-        var action = (await Actions(handler, Request(1, Unknown.ToString()))).First();
+        var action = (await ActionsAsync(handler, Request(1, Unknown.ToString()))).First();
         var edit = Assert.Single(
             action.Edit!.Changes![new DocumentUri("file", "", "/ws/dialogs/dialog_test.txt", "", "")]);
 
@@ -112,7 +112,7 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\nWAIT 500\nBOGUS 1\n");
 
-        var actions = await Actions(handler, Request(2, Unknown.ToString()));
+        var actions = await ActionsAsync(handler, Request(2, Unknown.ToString()));
         var chapter = actions.Single(a => a.Title.EndsWith("for this chapter", StringComparison.Ordinal));
         var edit = chapter.Edit!.Changes!.Values.Single().Single();
 
@@ -126,7 +126,7 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n");
 
-        var action = (await Actions(handler, Request(1, Unknown.ToString())))
+        var action = (await ActionsAsync(handler, Request(1, Unknown.ToString())))
             .Last(a => a.Title.StartsWith("Suppress"));
 
         Assert.Null(action.Edit);
@@ -139,9 +139,9 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n");
 
-        var actions = await Actions(handler, Request(1, Unknown.ToString()));
+        var actions = await ActionsAsync(handler, Request(1, Unknown.ToString()));
 
-        Assert.All(actions, a => Assert.NotEqual(true, a.IsPreferred));
+        Assert.All(actions, a => Assert.False(a.IsPreferred));
     }
 
     // ── when nothing is offered ──────────────────────────────────────────────
@@ -151,7 +151,7 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n");
 
-        Assert.Empty(await Actions(handler, Request(1, null)));
+        Assert.Empty(await ActionsAsync(handler, Request(1, null)));
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n");
 
-        Assert.Empty(await Actions(handler, Request(1, "some-other-tool-code")));
+        Assert.Empty(await ActionsAsync(handler, Request(1, "some-other-tool-code")));
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n", false);
 
-        Assert.Empty(await Actions(handler, Request(1, Unknown.ToString())));
+        Assert.Empty(await ActionsAsync(handler, Request(1, Unknown.ToString())));
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

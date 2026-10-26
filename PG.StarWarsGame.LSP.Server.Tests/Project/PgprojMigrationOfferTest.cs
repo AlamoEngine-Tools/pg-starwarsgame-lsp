@@ -99,7 +99,7 @@ public sealed class PgprojMigrationOfferTest
     [Fact]
     public async Task TheProposal_CarriesTheFileAndTheTextThatWouldBeWritten()
     {
-        var (offer, fs, prompt) = Build(false);
+        var (offer, _, prompt) = Build(false);
         offer.Migrated(Path, Migrated(), []);
 
         await offer.OfferPendingAsync(CancellationToken.None);

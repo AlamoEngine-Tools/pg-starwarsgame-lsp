@@ -39,7 +39,10 @@ public sealed class XmlTextDocumentSyncHandlerTest
     private static StartupGate OpenGate()
     {
         var gate = new StartupGate();
+        // A fresh gate holds nothing to pump, so opening it completes synchronously; a constructor cannot await.
+#pragma warning disable VSTHRD002
         gate.OpenAsync().GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002
         return gate;
     }
 
@@ -348,6 +351,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
 
         public IEnumerable<TrackedDocument> All => [];
 
+        // ReSharper disable once NotAccessedPositionalProperty.Global - recorded for the assertions; not every member is asserted
         public record Call(string Uri, string Text, int Version, bool PublishDiagnostics = true);
     }
 

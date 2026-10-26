@@ -112,7 +112,7 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
             .ToList();
     }
 
-    private static SymbolOrigin? TagOrigin(SymbolOrigin objectOrigin, int startLine)
+    private static SymbolOrigin TagOrigin(SymbolOrigin objectOrigin, int startLine)
     {
         return objectOrigin switch
         {

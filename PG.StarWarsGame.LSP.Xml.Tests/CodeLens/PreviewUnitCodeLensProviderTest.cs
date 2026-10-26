@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
-using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.CodeLens;
 
@@ -56,7 +55,7 @@ public sealed class PreviewUnitCodeLensProviderTest
         var lens = Provider(source).Handle(Ctx(symbol, IndexWith(symbol)));
 
         Assert.NotNull(lens);
-        Assert.Equal(PreviewUnitCodeLensProvider.PreviewUnitCommand, lens!.Command!.Name);
+        Assert.Equal(PreviewUnitCodeLensProvider.PreviewUnitCommand, lens.Command!.Name);
 
         // The OBJECT id, never the model file: only an objectId request assembles the hardpoints,
         // weapons and reticles that the Gameplay lens is made of.

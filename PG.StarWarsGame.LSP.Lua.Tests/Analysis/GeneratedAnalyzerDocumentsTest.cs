@@ -539,7 +539,7 @@ public sealed class GeneratedAnalyzerDocumentsTest
 
         Assert.Equal(4, SentParams(inner)["range"]!["start"]!["line"]!.Value<int>());
         Assert.Equal(1, lens!.Range.Start.Line);
-        Assert.Equal(4, ((JArray)lens.Command!.Arguments![2])[0]!["range"]!["start"]!["line"]!.Value<int>());
+        Assert.Equal(4, ((JArray)lens.Command!.Arguments![2])[0]["range"]!["start"]!["line"]!.Value<int>());
     }
 
     [Fact]

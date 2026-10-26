@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Services;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
@@ -142,7 +141,7 @@ public sealed class GetBaselineEntriesHandlerTest
     [Fact]
     public async Task Handle_UnknownProjectFilePath_FallsBackToBaselineOnly()
     {
-        var (handler, projectRegistry, layerRegistry, factory, langService) = BuildHandlerWithRegistries();
+        var (handler, _, layerRegistry, factory, langService) = BuildHandlerWithRegistries();
         var english = langService.Default;
 
         var depDb = factory.CreateKeyed([english]);
@@ -159,15 +158,15 @@ public sealed class GetBaselineEntriesHandlerTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static GetBaselineEntriesHandler BuildHandler(ILspConfigurationProvider? config = null)
+    private static GetBaselineEntriesHandler BuildHandler()
     {
-        var (handler, _, _, _, _) = BuildHandlerWithRegistries(config);
+        var (handler, _, _, _, _) = BuildHandlerWithRegistries();
         return handler;
     }
 
     private static (GetBaselineEntriesHandler Handler, LocalisationProjectRegistry ProjectRegistry,
         LocalisationLayerRegistry LayerRegistry, ITranslationDatabaseFactory Factory,
-        ILanguageService LangService) BuildHandlerWithRegistries(ILspConfigurationProvider? config = null)
+        ILanguageService LangService) BuildHandlerWithRegistries()
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());

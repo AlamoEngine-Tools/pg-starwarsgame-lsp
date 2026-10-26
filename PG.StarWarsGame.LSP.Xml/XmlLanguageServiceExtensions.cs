@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Commands;
+using PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Completion.Providers;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;

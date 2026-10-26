@@ -34,13 +34,13 @@ using Tag = PG.StarWarsGame.LSP.Core.Symbols.BaselineTag;
 
 // Both verbs name a game folder the same way, and each folder can come from the environment, so one
 // run configuration serves every machine.
-const string EawPathVariable = "AET_EAW_PATH";
-const string FocPathVariable = "AET_FOC_PATH";
+const string eawPathVariable = "AET_EAW_PATH";
+const string focPathVariable = "AET_FOC_PATH";
 
 var eawOption = new Option<DirectoryInfo?>("--eaw", "-e")
 {
-    Description = $"EaW game data directory (GameData), the base asset layer; {EawPathVariable} if omitted",
-    DefaultValueFactory = _ => FromEnvironment(EawPathVariable)
+    Description = $"EaW game data directory (GameData), the base asset layer; {eawPathVariable} if omitted",
+    DefaultValueFactory = _ => FromEnvironment(eawPathVariable)
 };
 var outputOption = new Option<FileInfo?>("--output", "-o")
 {
@@ -61,7 +61,7 @@ var eawCommand = new Command("eaw",
 };
 eawCommand.SetAction((parseResult, _) =>
 {
-    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", EawPathVariable);
+    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", eawPathVariable);
     var output = Output(parseResult.GetValue(outputOption), "eaw");
     var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindInRepository("schema", "eaw");
     return eawPath is null || output is null ? Task.FromResult(1) : RunAsync(eawPath, null, output, schema);
@@ -71,8 +71,8 @@ eawCommand.SetAction((parseResult, _) =>
 
 var focOption = new Option<DirectoryInfo?>("--foc", "-f")
 {
-    Description = $"FoC game data directory (corruption); {FocPathVariable} if omitted",
-    DefaultValueFactory = _ => FromEnvironment(FocPathVariable)
+    Description = $"FoC game data directory (corruption); {focPathVariable} if omitted",
+    DefaultValueFactory = _ => FromEnvironment(focPathVariable)
 };
 
 var focCommand = new Command("foc",
@@ -82,8 +82,8 @@ var focCommand = new Command("foc",
 };
 focCommand.SetAction((parseResult, _) =>
 {
-    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", EawPathVariable);
-    var focPath = Folder(parseResult.GetValue(focOption), "--foc", FocPathVariable);
+    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", eawPathVariable);
+    var focPath = Folder(parseResult.GetValue(focOption), "--foc", focPathVariable);
     var output = Output(parseResult.GetValue(outputOption), "foc");
     var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindInRepository("schema", "eaw");
     return eawPath is null || focPath is null || output is null
@@ -346,7 +346,6 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     // them for the same normalised path.
 
     var megFileService = sp.GetRequiredService<IMegService>();
-    var megExtractor = sp.GetRequiredService<IMegFileExtractor>();
     var aloFileService = sp.GetRequiredService<IAloFileService>();
     var mtdFileService = sp.GetRequiredService<IMtdService>();
     var assetLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(MegAssetCatalogBuilder));

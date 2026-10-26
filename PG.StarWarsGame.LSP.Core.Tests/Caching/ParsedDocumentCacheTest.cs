@@ -200,6 +200,7 @@ public sealed class ParsedDocumentCacheTest
         Assert.Same(results[0], cache.GetOrParse("file:///a.xml", text, hash, Parse));
     }
 
+    // ReSharper disable once NotAccessedPositionalProperty.Local - a fixture; the cache never looks inside
     private sealed record Artifact(string Source);
 
     private sealed class CapturingLogger : ILogger

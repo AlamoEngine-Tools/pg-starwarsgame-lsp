@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Core.Schema;
 
 /// <summary>
@@ -17,6 +19,7 @@ namespace PG.StarWarsGame.LSP.Core.Schema;
 ///     confused with a file.
 /// </param>
 /// <param name="Types">Object types the files in this directory hold, where the schema knows them.</param>
+[PublicAPI]
 public sealed record ScannedDirectoryDefinition(
     string Path,
     IReadOnlyList<string> Types)

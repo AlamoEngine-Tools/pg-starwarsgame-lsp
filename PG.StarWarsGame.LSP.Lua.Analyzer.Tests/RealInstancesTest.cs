@@ -40,9 +40,8 @@ public sealed class RealInstancesTest
         var library = fileHelper.PathToFileUri(Path.Combine(game, "Library", "PGBase.lua"));
         var script = fileHelper.PathToFileUri(Path.Combine(mod, "A.lua"));
         var other = fileHelper.PathToFileUri(Path.Combine(mod, "B.lua"));
-        await File.WriteAllTextAsync(fileHelper.FileUriToPath(library)!,
-            "function TestValid(wrapper)\n\tif wrapper == nil then\n\t\treturn false\n\tend\n" +
-            "\treturn wrapper.Is_Valid and wrapper.Is_Valid()\nend\n");
+        await File.WriteAllTextAsync(fileHelper.FileUriToPath(library)!, "function TestValid(wrapper)\n\tif wrapper == nil then\n\t\treturn false\n\tend\n" +
+            "\treturn wrapper.Is_Valid and wrapper.Is_Valid()\nend\n", TestContext.Current.CancellationToken);
         const string scriptText = "require(\"PGBase\")\nlocal ok = TestValid(nil)\nlocal t = transport\n";
 
         var stubDirectory = Path.Combine(AppContext.BaseDirectory, "schema", "lua");
@@ -82,6 +81,7 @@ public sealed class RealInstancesTest
         Assert.DoesNotContain("any", ok);
         Assert.DoesNotContain("integer", transport);
 
+        // ReSharper disable once DisposeOnUsingVariable - disposed early on purpose, to test the behaviour after disposal; the using covers the failure path
         await instances.DisposeAsync();
         try
         {

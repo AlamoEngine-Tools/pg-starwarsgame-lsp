@@ -11,7 +11,10 @@ internal static class StartupGates
     public static StartupGate Open()
     {
         var gate = new StartupGate();
+        // A fresh gate holds nothing to pump, so opening it completes synchronously; a constructor cannot await.
+#pragma warning disable VSTHRD002
         gate.OpenAsync().GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002
         return gate;
     }
 

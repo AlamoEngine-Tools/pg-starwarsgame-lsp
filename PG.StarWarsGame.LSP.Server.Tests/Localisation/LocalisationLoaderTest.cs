@@ -182,7 +182,7 @@ public sealed class LocalisationLoaderTest
             }
         };
 
-        var (loader, indexService, _, _) = BuildLoader(fs, config);
+        var (loader, _, _, _) = BuildLoader(fs, config);
         var ex = await Record.ExceptionAsync(() =>
             loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None));
 

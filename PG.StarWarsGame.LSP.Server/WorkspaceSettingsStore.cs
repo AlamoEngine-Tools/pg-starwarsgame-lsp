@@ -55,6 +55,8 @@ public static class WorkspaceSettingsDocument
     /// </summary>
     private sealed class AdoptUnversionedFile : IDocumentMigration
     {
+        // The interface member returns the outer constant it is named after; hiding it is the point.
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         public string TypeName => WorkspaceSettingsDocument.TypeName;
         public TypeVersion From => TypeVersion.Zero("aetswg");
         public TypeVersion To => Version;

@@ -49,7 +49,7 @@ public sealed class ModelBoneCatalogCacheTest
         var loaded = cache.TryLoad(PgprojPath, "fp-1");
 
         Assert.NotNull(loaded);
-        Assert.Equal(["root", "bone_turret"], loaded!["ev_speeder.alo"].Bones);
+        Assert.Equal(["root", "bone_turret"], loaded["ev_speeder.alo"].Bones);
         Assert.Equal(["root"], loaded["uv_walker.alo"].Bones);
         Assert.Equal(["hull.tga", "glow.dds"], loaded["ev_speeder.alo"].Textures);
         Assert.Empty(loaded["uv_walker.alo"].Textures);
@@ -170,7 +170,7 @@ public sealed class ModelBoneCatalogCacheTest
         Assert.Null(cache.TryLoad(PgprojPath, "fp-1"));
         var loaded = cache.TryLoad(PgprojPath, "fp-2");
         Assert.NotNull(loaded);
-        Assert.Single(loaded!);
+        Assert.Single(loaded);
     }
 
     [Fact]
@@ -185,6 +185,6 @@ public sealed class ModelBoneCatalogCacheTest
         var loaded = cache.TryLoad(PgprojPath, "fp-1");
 
         Assert.NotNull(loaded);
-        Assert.Empty(loaded!);
+        Assert.Empty(loaded);
     }
 }

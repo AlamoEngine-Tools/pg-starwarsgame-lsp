@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -12,6 +13,7 @@ namespace PG.StarWarsGame.LSP.Story.Dialog;
 ///     One parsed dialog command paired with its <c>StoryDialogCommand</c> schema definition
 ///     (<c>null</c> when the command is unknown to the schema).
 /// </summary>
+[PublicAPI]
 public sealed record DialogCommandFact(
     string DocumentUri,
     StoryDialogCommand Command,

@@ -653,7 +653,7 @@ public sealed class ExecuteStoryCommandHandlerTest
     private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
+        public WorkspaceConfiguration LastWorkspaceConfig => config;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
@@ -735,11 +735,11 @@ public sealed class ExecuteStoryCommandHandlerTest
         {
         }
 
-        public void ApplyLocalisation(ILocalisationIndex index)
+        public void ApplyLocalisation(ILocalisationIndex localisation)
         {
         }
 
-        public void ApplyAssetFiles(IAssetFileIndex index)
+        public void ApplyAssetFiles(IAssetFileIndex assetFiles)
         {
         }
 

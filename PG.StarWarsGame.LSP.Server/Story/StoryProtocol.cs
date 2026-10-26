@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -57,6 +58,7 @@ public sealed record StoryCampaignDto(
 ///     The faction's <c>AI_Player_Control</c> player type as written (<c>BasicEmpire</c>, <c>None</c>,
 ///     <c>Human</c>, ...), or null when the campaign has no pair for it.
 /// </param>
+[PublicAPI]
 public sealed record StoryFactionDto(
     string Faction,
     string ManifestFile,
@@ -80,6 +82,7 @@ public sealed record StoryFactionDto(
 ///     The scripts the battle's tactical manifest attaches, resolved like the faction's own; the
 ///     faction's script list never carries these either.
 /// </param>
+[PublicAPI]
 public sealed record StoryBattleDto(
     string Key,
     string Label,
@@ -144,6 +147,7 @@ public sealed record GetStoryGraphResult(
     IReadOnlyList<string>? Branches = null,
     IReadOnlyList<string>? Threads = null);
 
+[PublicAPI]
 public sealed record StoryGraphNodeDto(
     string Id,
     string Kind,
@@ -171,6 +175,7 @@ public sealed record StoryGraphNodeDto(
     // editable, so an unlayered workspace and every existing caller are unaffected.
     string? ReadOnlyOwner = null);
 
+[PublicAPI]
 public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, string? Label);
 
 // ── aet/getStoryNodeDetail - full event payload for the property view ────────
@@ -181,6 +186,7 @@ public sealed record GetStoryNodeDetailParams(string Campaign, string Faction, s
 
 public sealed record GetStoryNodeDetailResult(StoryNodeDetailDto? Node, string? Error = null);
 
+[PublicAPI]
 public sealed record StoryNodeDetailDto(
     string Id,
     string Name,
@@ -198,8 +204,10 @@ public sealed record StoryNodeDetailDto(
     int? StoryChapter,
     IReadOnlyList<StoryTagDto> Tags);
 
+[PublicAPI]
 public sealed record StoryParamValueDto(int Position, string Value);
 
+[PublicAPI]
 public sealed record StoryTagDto(string Name, string Value);
 
 // ── aet/getStorySchema - the client hardcodes nothing ────────────────────────
@@ -212,6 +220,7 @@ public sealed record GetStorySchemaResult(
     IReadOnlyList<StoryTypeSchemaDto> RewardTypes,
     string? Error = null);
 
+[PublicAPI]
 public sealed record StoryTypeSchemaDto(
     string Name,
     string? Description,
@@ -226,6 +235,7 @@ public sealed record StoryTypeSchemaDto(
 /// <param name="Value">What the kind carries instead of prose - a version for <c>Since</c>.</param>
 public sealed record StoryNoteDto(string Kind, string? Text, string? Value);
 
+[PublicAPI]
 public sealed record StoryParamSchemaDto(
     int Position,
     string ValueType,
@@ -264,6 +274,7 @@ public sealed record GetStoryParamOptionsResult(
     IReadOnlyList<StoryParamOptionDto> Options,
     string? Error = null);
 
+[PublicAPI]
 public sealed record StoryParamOptionDto(string Value, string? Detail = null);
 
 // ── aet/resolveStoryReference - go-to for a reference-typed param value ──────
@@ -290,6 +301,7 @@ public sealed record GetStoryDiagnosticsResult(
 /// <param name="NodeId">The graph node the diagnostic belongs to; null for file-level problems.</param>
 /// <param name="Side"><c>event</c>/<c>reward</c> when the range falls inside a param slot.</param>
 /// <param name="Position">0-based param slot, when <paramref name="Side" /> is set.</param>
+[PublicAPI]
 public sealed record StoryDiagnosticDto(
     string? NodeId,
     string? Side,
@@ -302,20 +314,22 @@ public sealed record StoryDiagnosticDto(
 
 // ── aet/getStoryLayout / aet/setStoryLayout - node position sidecar ──────────
 
-[Method("aet/getStoryLayout", Direction.ClientToServer)]
 /// <param name="Scope">
 ///     The battle whose panel asks, or null for the galactic level: a battle graph's portals exist
 ///     only in that scope, and the answer names the nodes the panel holds.
 /// </param>
+[Method("aet/getStoryLayout", Direction.ClientToServer)]
 public sealed record GetStoryLayoutParams(string Campaign, string Faction, string? Scope = null)
     : IRequest<GetStoryLayoutResult>;
 
+[PublicAPI]
 public sealed record GetStoryLayoutResult(IReadOnlyList<StoryLayoutEntryDto> Entries, string? Error = null);
 
 [Method("aet/setStoryLayout", Direction.ClientToServer)]
 public sealed record SetStoryLayoutParams(string Campaign, string Faction, IReadOnlyList<StoryLayoutEntryDto> Entries)
     : IRequest<SetStoryLayoutResult>;
 
+[PublicAPI]
 public sealed record SetStoryLayoutResult(bool Success, string? Error = null);
 
 /// <param name="NodeId">

@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
 ///     A game object whose name shares the engine's name hash with another object's - see
-///     <see cref="ObjectNameCollisions" />.
+///     <c>ObjectNameCollisions</c>.
 /// </summary>
 /// <remarks>
 ///     A Warning on EVERY side, naming the others. The engine keeps whichever it loads first, and the

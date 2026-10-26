@@ -81,18 +81,18 @@ public sealed class FileHelper : IFileHelper
     }
 
     // Case-insensitive path traversal so game files with mixed case work on Linux too.
-    public string? TraverseCaseInsensitive(IFileSystem _fs, string dir, string[] parts)
+    public string? TraverseCaseInsensitive(IFileSystem fs, string dir, string[] parts)
     {
         var current = dir;
         for (var i = 0; i < parts.Length; i++)
         {
-            if (!_fs.Directory.Exists(current)) return null;
-            var match = _fs.Directory.EnumerateFileSystemEntries(current)
+            if (!fs.Directory.Exists(current)) return null;
+            var match = fs.Directory.EnumerateFileSystemEntries(current)
                 .FirstOrDefault(e => string.Equals(
-                    _fs.Path.GetFileName(e), parts[i], StringComparison.OrdinalIgnoreCase));
+                    fs.Path.GetFileName(e), parts[i], StringComparison.OrdinalIgnoreCase));
             if (match is null) return null;
             if (i == parts.Length - 1)
-                return _fs.File.Exists(match) ? match : null;
+                return fs.File.Exists(match) ? match : null;
             current = match;
         }
 

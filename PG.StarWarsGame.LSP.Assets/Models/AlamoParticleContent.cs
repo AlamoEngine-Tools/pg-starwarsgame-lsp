@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using System.Numerics;
 
 namespace PG.StarWarsGame.LSP.Assets.Models;
@@ -50,6 +51,7 @@ public enum AlamoTrackChannel
 ///     the active shape's fields, because a mod switching a shape in the editor expects the numbers it
 ///     typed for the other shapes to still be there.
 /// </remarks>
+[PublicAPI]
 public sealed record AlamoSpawnVolume(
     AlamoSpawnShape Shape,
     Vector3 Min,
@@ -125,6 +127,7 @@ public enum AlamoEmitFromMesh
 ///     file omits any property left at its default, so a reader that zero-initialises instead would
 ///     give every emitter a one-second lifetime of zero and draw nothing.
 /// </remarks>
+[PublicAPI]
 public sealed record AlamoEmitterProperties
 {
     public AlamoParticleBlendMode BlendMode { get; init; } = AlamoParticleBlendMode.Additive;

@@ -112,7 +112,7 @@ public sealed class AssetHoverStrategyTest
         var hover = new AssetHoverStrategy().Handle(ctx);
 
         Assert.NotNull(hover);
-        Assert.Contains("foo.tga", hover!.Contents.MarkupContent!.Value);
+        Assert.Contains("foo.tga", hover.Contents.MarkupContent!.Value);
     }
 
     // ── file-scoped fakes ─────────────────────────────────────────────────────

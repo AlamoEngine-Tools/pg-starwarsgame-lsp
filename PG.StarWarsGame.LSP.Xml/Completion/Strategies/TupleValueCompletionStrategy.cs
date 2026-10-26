@@ -5,7 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 
-namespace PG.StarWarsGame.LSP.Xml.Completion;
+namespace PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 
 /// <summary>
 ///     Positional completion for comma-separated tuple value types (e.g. <c>HardPointSfxMap</c>,

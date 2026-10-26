@@ -296,7 +296,7 @@ public sealed class ProjectIndexCacheTest
         Assert.Contains("indices/", content);
         Assert.Contains("bones/", content);
         // Appended once, not duplicated.
-        Assert.Single(content.Split('\n').Where(l => l.Trim() == "indices/"));
+        Assert.Single(content.Split('\n'), l => l.Trim() == "indices/");
     }
 
     [Fact]
@@ -309,7 +309,7 @@ public sealed class ProjectIndexCacheTest
         cache.EnsureGitHygiene(PgprojPath);
 
         var lines = fs.File.ReadAllText(AetswgDir + "/.gitignore").Split('\n');
-        Assert.Single(lines.Where(l => l.Trim() == "bones/"));
+        Assert.Single(lines, l => l.Trim() == "bones/");
     }
 
     /// <summary>

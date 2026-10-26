@@ -58,6 +58,7 @@ public static class ModelGlbExporter
         Matrix4x4.CreateRotationX(-MathF.PI / 2f);
 
     /// <summary>Exports <paramref name="model" /> to GLB bytes.</summary>
+    /// <param name="model">The model to export.</param>
     /// <param name="animations">
     ///     Animations to include, each with the clip name to expose. Their bone indices are the model's;
     ///     a bone an animation does not drive simply keeps its rest pose.
@@ -74,7 +75,7 @@ public static class ModelGlbExporter
 
         foreach (var mesh in model.Meshes)
         foreach (var (subMesh, index) in mesh.SubMeshes.Select((s, i) => (s, i)))
-            AddSubMesh(scene, model, nodes, mesh, subMesh, index, faces);
+            AddSubMesh(scene, nodes, mesh, subMesh, index, faces);
 
         var gltf = scene.ToGltf2();
         RestoreDroppedFaces(gltf, faces);
@@ -277,13 +278,12 @@ public static class ModelGlbExporter
         }
 
         foreach (var (name, animation) in animations)
-            AddAnimation(nodes, model, name, animation);
+            AddAnimation(nodes, name, animation);
 
         return nodes;
     }
 
-    private static void AddAnimation(
-        NodeBuilder[] nodes, AlamoModelContent model, string name, AlamoAnimationContent animation)
+    private static void AddAnimation(NodeBuilder[] nodes, string name, AlamoAnimationContent animation)
     {
         if (animation.FrameCount <= 0 || animation.Fps <= 0)
             return;
@@ -339,7 +339,6 @@ public static class ModelGlbExporter
     /// </remarks>
     private static void AddSubMesh(
         SceneBuilder scene,
-        AlamoModelContent model,
         NodeBuilder[] nodes,
         AlamoMesh mesh,
         AlamoSubMesh subMesh,
@@ -354,7 +353,7 @@ public static class ModelGlbExporter
         var hasTangents = subMesh.VertexFormat.Contains(
             TangentFormatMarker, StringComparison.OrdinalIgnoreCase);
 
-        var joints = SkinJoints(model, nodes, subMesh);
+        var joints = SkinJoints(nodes, subMesh);
 
         if (joints is null)
         {
@@ -579,8 +578,7 @@ public static class ModelGlbExporter
     /// <summary>
     ///     The joint nodes a skinned sub-mesh binds to, or null when it is rigid.
     /// </summary>
-    private static NodeBuilder[]? SkinJoints(
-        AlamoModelContent model, NodeBuilder[] nodes, AlamoSubMesh subMesh)
+    private static NodeBuilder[]? SkinJoints(NodeBuilder[] nodes, AlamoSubMesh subMesh)
     {
         if (subMesh.Skinning == AlamoSkinningMode.Static || subMesh.SkinBones.Count == 0)
             return null;

@@ -9,7 +9,6 @@ public sealed class ProjectIndexLocatorTest
 {
     [Theory]
     [InlineData("/projects/mymod/mymod.pgproj", "/projects/mymod/.aetswg")]
-    [InlineData("/projects/mymod/mymod.pgproj", "/projects/mymod/.aetswg")]
     public void GetAetswgDirectory_ReturnsDirectoryAlongsidePgproj(string pgprojPath, string expected)
     {
         Assert.Equal(expected, ProjectIndexLocator.GetAetswgDirectory(pgprojPath));

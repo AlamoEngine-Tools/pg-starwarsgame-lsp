@@ -118,7 +118,7 @@ public sealed class DialogNavigationTest
 
         var hint = Assert.Single(hints!);
         Assert.Equal("\"The battle begins.\"", hint.Label.String);
-        Assert.Equal(1, hint.Position!.Line);
+        Assert.Equal(1, hint.Position.Line);
     }
 
     [Fact]
@@ -335,11 +335,11 @@ public sealed class DialogNavigationTest
         {
         }
 
-        public void ApplyLocalisation(ILocalisationIndex index)
+        public void ApplyLocalisation(ILocalisationIndex localisation)
         {
         }
 
-        public void ApplyAssetFiles(IAssetFileIndex index)
+        public void ApplyAssetFiles(IAssetFileIndex assetFiles)
         {
         }
 

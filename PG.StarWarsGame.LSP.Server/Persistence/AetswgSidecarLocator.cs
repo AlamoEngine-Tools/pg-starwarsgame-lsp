@@ -15,11 +15,11 @@ namespace PG.StarWarsGame.LSP.Server.Persistence;
 ///         is no project: return null, and let the store keep its value for the session only.
 ///     </para>
 /// </summary>
-/// <param name="fileName">
-///     Relative to <c>.aetswg/</c>, so it may carry a subdirectory (<c>settings/...</c>).
-/// </param>
 public sealed class AetswgSidecarLocator(IModProjectReloadService reloadService) : ISidecarLocator
 {
+    /// <param name="fileName">
+    ///     Relative to <c>.aetswg/</c>, so it may carry a subdirectory (<c>settings/...</c>).
+    /// </param>
     public string? TryLocate(string fileName)
     {
         var rootLayer = reloadService.LastWorkspaceConfig?.Layers

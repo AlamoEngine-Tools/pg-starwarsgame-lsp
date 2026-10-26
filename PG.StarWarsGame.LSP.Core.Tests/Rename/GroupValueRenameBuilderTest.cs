@@ -55,7 +55,7 @@ public sealed class GroupValueRenameBuilderTest
             index, NullLogger.Instance);
 
         Assert.NotNull(result);
-        var edits = Edits(result!);
+        var edits = Edits(result);
         Assert.Equal(2, edits.Count);
         Assert.All(edits, e => Assert.Equal("Story_Test_Set2", e.Edit.NewText));
         Assert.Contains(edits, e => e.Uri == DocA && e.Edit.Range.Start.Line == 5 &&

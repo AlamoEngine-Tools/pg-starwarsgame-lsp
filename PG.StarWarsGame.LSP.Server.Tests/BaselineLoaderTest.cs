@@ -417,7 +417,7 @@ public sealed class BaselineLoaderTest
             TestContext.Current.CancellationToken);
 
         Assert.Single(result.Symbols);
-        var warning = Assert.Single(logger.Entries.Where(e => e.Level == LogLevel.Warning));
+        var warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
         Assert.Contains("no behaviours", warning.Message);
     }
 
@@ -439,7 +439,7 @@ public sealed class BaselineLoaderTest
             new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = "C:\\b.bin" },
             TestContext.Current.CancellationToken);
 
-        Assert.Empty(logger.Entries.Where(e => e.Level == LogLevel.Warning));
+        Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning);
     }
 
     // An empty baseline is its own, already-reported problem; saying it also has no behaviours adds
@@ -455,7 +455,7 @@ public sealed class BaselineLoaderTest
             new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = "C:\\missing.bin" },
             TestContext.Current.CancellationToken);
 
-        Assert.Empty(logger.Entries.Where(e => e.Message.Contains("no behaviours")));
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("no behaviours"));
     }
 
     private sealed record LogEntry(LogLevel Level, string Message);

@@ -52,7 +52,7 @@ public sealed class FlatFallbackNarrowingTest
         var resolved = Resolve("StunAbility");
 
         Assert.NotNull(resolved);
-        Assert.Empty(resolved!.AllowedValues);
+        Assert.Empty(resolved.AllowedValues);
         Assert.Null(resolved.ValidationOverride);
     }
 

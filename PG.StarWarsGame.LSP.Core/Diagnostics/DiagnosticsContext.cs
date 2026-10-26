@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -26,6 +27,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     handler that uses it must stay silent when it is absent: a context without one is a caller
 ///     that cannot answer the question, not an object that fails the check.
 /// </param>
+[PublicAPI]
 public record DiagnosticsContext(
     ISchemaProvider Schema,
     GameIndex Index,

@@ -434,7 +434,7 @@ public sealed class GetServerStatusHandlerTest
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
         public WorkspaceConfiguration? LastWorkspaceConfig => config;
-        public IReadOnlyList<string>? LastWorkspaceRoots => roots;
+        public IReadOnlyList<string> LastWorkspaceRoots => roots;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
         {

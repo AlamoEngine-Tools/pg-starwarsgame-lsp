@@ -31,7 +31,7 @@ namespace PG.StarWarsGame.LSP.Lua.Analyzer;
 ///         <see cref="LuaAnalyzerOptions.MaxConsecutiveCrashes" /> in a row it stays off.
 ///     </para>
 /// </remarks>
-public sealed class LuaAnalyzerHost : ILuaAnalyzerProcess, IDisposable
+public sealed class LuaAnalyzerHost : ILuaAnalyzerProcess
 {
     private const string ConfigFileName = "emmyrc.json";
 
@@ -130,7 +130,7 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzerProcess, IDisposable
         });
     }
 
-    public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+    public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
     {
         return RequestAsync((client, token) => client.SendRequest(method, parameters).Returning<T>(token), ct: ct);
     }
@@ -179,7 +179,7 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzerProcess, IDisposable
     ///     <paramref name="timeout" /> (or the configured default), or fails.
     /// </summary>
     public async Task<T?> RequestAsync<T>(Func<ILanguageClient, CancellationToken, Task<T>> request,
-        TimeSpan? timeout = null, CancellationToken ct = default) where T : class
+        TimeSpan? timeout = null, CancellationToken ct = default) where T : class?
     {
         if (_session is not { } session || _disposed) return null;
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

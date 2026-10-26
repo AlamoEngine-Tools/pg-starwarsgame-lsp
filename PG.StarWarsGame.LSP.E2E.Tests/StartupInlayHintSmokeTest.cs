@@ -39,7 +39,7 @@ public sealed class StartupInlayHintSmokeTest : IClassFixture<EawLspServerFixtur
             throw new Exception("$XunitDynamicSkip$Set the EaW workspace to run this test.");
 
         var path = Path.Combine(LspTestEnvironment.EawWorkspacePath, SourceRel);
-        var text = await File.ReadAllTextAsync(path);
+        var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
         var uri = DocumentUri.FromFileSystemPath(path);
         var fullRange = new Range(new Position(0, 0), new Position(text.Split('\n').Length, 0));
 
@@ -52,12 +52,12 @@ public sealed class StartupInlayHintSmokeTest : IClassFixture<EawLspServerFixtur
 
         try
         {
-            var completed = await Task.WhenAny(_fixture.ScanCompleted, Task.Delay(TimeSpan.FromSeconds(90)));
+            var completed = await Task.WhenAny(_fixture.ScanCompleted, Task.Delay(TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken));
             if (completed != _fixture.ScanCompleted)
                 throw new Exception("$XunitDynamicSkip$Workspace scan did not complete within 90 s.");
 
             // Give the gate's buffered didOpen a moment to reach the workspace host.
-            await Task.Delay(1500);
+            await Task.Delay(1500, TestContext.Current.CancellationToken);
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var hints = await _fixture.Client.RequestInlayHints(new InlayHintParams
@@ -66,7 +66,7 @@ public sealed class StartupInlayHintSmokeTest : IClassFixture<EawLspServerFixtur
             }, cts.Token);
 
             Assert.NotNull(hints);
-            Assert.NotEmpty(hints!);
+            Assert.NotEmpty(hints);
         }
         finally
         {

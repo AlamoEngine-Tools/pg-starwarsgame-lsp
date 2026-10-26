@@ -104,7 +104,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 0), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Empty(result!);
+        Assert.Empty(result);
     }
 
     // ── reference lookup ─────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 5), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Equal(2, locations.Count);
         Assert.Contains(locations, l => l.Uri.ToString() == TestUri && l.Range.Start.Line == 0);
         Assert.Contains(locations, l => l.Uri.ToString() == OtherUri && l.Range.Start.Line == 2);
@@ -139,7 +139,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(1, 8), CancellationToken.None);
 
         Assert.NotNull(result);
-        var loc = Assert.Single(result!);
+        var loc = Assert.Single(result);
         Assert.Equal(1, loc.Range.Start.Line);
         Assert.Equal(7, loc.Range.Start.Character);
         Assert.Equal(1, loc.Range.End.Line);
@@ -163,7 +163,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 0), CancellationToken.None);
 
         Assert.NotNull(result);
-        var loc = Assert.Single(result!);
+        var loc = Assert.Single(result);
         Assert.Equal(OtherUri, loc.Uri.ToString());
     }
 
@@ -182,7 +182,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 5, true), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Equal(2, locations.Count);
         Assert.Contains(locations, l => l.Uri.ToString() == OtherUri && l.Range.Start.Line == 5);
         Assert.Contains(locations, l => l.Uri.ToString() == TestUri && l.Range.Start.Line == 0);
@@ -201,7 +201,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 5), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Single(locations);
         Assert.DoesNotContain(locations, l => l.Uri.ToString() == OtherUri);
     }
@@ -223,7 +223,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 5, uri: mixedCaseUri), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Single(locations);
     }
 
@@ -260,7 +260,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(6, 25), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Equal(2, locations.Count);
         Assert.Contains(locations, l => l.Range.Start.Line == 5 && l.Range.Start.Character == 10);
         Assert.Contains(locations, l => l.Range.Start.Line == 3 && l.Range.Start.Character == 8);
@@ -294,7 +294,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(1, 7), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         // Should return only the group member (line 2), NOT the regular ref (line 9)
         Assert.Single(locations);
         Assert.Equal(2, locations[0].Range.Start.Line);
@@ -332,7 +332,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(1, 7), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         // Should include the baseline-shipped member (line 5 of shipped.xml)
         Assert.Contains(locations, l => l.Uri.ToString().Contains("shipped.xml") && l.Range.Start.Line == 5);
     }

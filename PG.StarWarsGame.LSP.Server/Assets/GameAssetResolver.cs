@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
@@ -29,6 +30,7 @@ public enum GameAssetTier
 /// <param name="ResolvedPath">
 ///     The absolute file path, or the archive-relative entry path for <see cref="GameAssetTier.Archive" />.
 /// </param>
+[PublicAPI]
 public sealed record GameAssetLocation(
     string RequestedPath,
     string ResolvedPath,

@@ -82,14 +82,6 @@ file sealed class EmptyFixCache : IXmlFixCache
     {
         return null;
     }
-
-    public void SetSuggestedFix(string uri, int line, int character, string fix)
-    {
-    }
-
-    public void ClearSuggestedFixes(string uri)
-    {
-    }
 }
 
 file sealed class StubFixCache : IXmlFixCache
@@ -104,13 +96,5 @@ file sealed class StubFixCache : IXmlFixCache
     public string? GetSuggestedFix(string uri, int line, int character)
     {
         return _fix;
-    }
-
-    public void SetSuggestedFix(string uri, int line, int character, string fix)
-    {
-    }
-
-    public void ClearSuggestedFixes(string uri)
-    {
     }
 }

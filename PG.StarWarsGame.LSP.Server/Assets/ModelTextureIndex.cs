@@ -117,7 +117,7 @@ public sealed class ModelTextureIndex(
         foreach (var parameter in sub.Parameters)
             if (parameter.Type == AlamoShaderParameterType.Texture
                 && !string.IsNullOrWhiteSpace(parameter.Texture))
-                names.Add(parameter.Texture!);
+                names.Add(parameter.Texture);
 
         return names;
     }

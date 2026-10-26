@@ -140,7 +140,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         var rgbaTag = new XmlTagDefinition { Tag = "Color", ValueType = XmlValueType.RGBA };
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, rgbaTag, "x");
 
-        registry.Dispatch(fact, EmptyCtx).ToList();
+        _ = registry.Dispatch(fact, EmptyCtx).ToList();
 
         Assert.True(calledBoolean, "Boolean-typed handler should still be dispatched.");
         Assert.True(calledFloat, "Float-typed handler should still be dispatched.");
@@ -162,7 +162,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, FloatTag, "bad");
 
-        registry.Dispatch(fact, EmptyCtx).ToList();
+        _ = registry.Dispatch(fact, EmptyCtx).ToList();
 
         Assert.Same(EmptyCtx, received);
     }
@@ -238,7 +238,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, tag, "0");
 
-        registry.Dispatch(fact, EmptyCtx).ToList();
+        _ = registry.Dispatch(fact, EmptyCtx).ToList();
 
         Assert.Equal(["named", "default"], invocationOrder);
     }
@@ -263,7 +263,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, tag, "0");
 
-        registry.Dispatch(fact, EmptyCtx).ToList();
+        _ = registry.Dispatch(fact, EmptyCtx).ToList();
 
         Assert.Equal(["default", "named"], invocationOrder);
     }

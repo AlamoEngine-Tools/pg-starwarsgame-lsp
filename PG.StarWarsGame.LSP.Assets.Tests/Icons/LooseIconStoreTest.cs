@@ -53,7 +53,7 @@ public sealed class LooseIconStoreTest
         });
 
         Assert.True(store.TryGet("b", out var png));
-        Assert.Equal<byte[]>([1], png);
+        Assert.Equal([1], png);
         Assert.Equal(["b"], decoded);
     }
 
@@ -131,7 +131,7 @@ public sealed class LooseIconStoreTest
         var store = new LooseIconStore(Catalog("I_Button_Dp2"), _ => [7]);
 
         Assert.True(store.TryGet("i_button_dp2", out var png));
-        Assert.Equal<byte[]>([7], png);
+        Assert.Equal([7], png);
     }
 
     /// <summary>
@@ -146,6 +146,6 @@ public sealed class LooseIconStoreTest
 
         Assert.Equal(["a"], store.Names);
         Assert.True(store.TryGet("A", out var png));
-        Assert.Equal<byte[]>([9], png);
+        Assert.Equal([9], png);
     }
 }

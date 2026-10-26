@@ -4,7 +4,6 @@
 using System.Collections.Concurrent;
 using System.Text;
 using Loretta.CodeAnalysis.Lua;
-using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Generated;

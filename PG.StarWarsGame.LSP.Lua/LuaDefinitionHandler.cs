@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Loretta.CodeAnalysis;
-using Loretta.CodeAnalysis.Lua;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -19,7 +18,6 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 {
-    private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
     private readonly ILuaAnalyzer? _analyzer;
 
     private readonly IFileHelper _fileHelper;

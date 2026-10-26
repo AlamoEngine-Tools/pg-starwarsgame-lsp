@@ -27,8 +27,9 @@ public sealed class LspConfigurationProviderTest : IDisposable
         {
             Directory.Delete(_tempDir, true);
         }
-        catch
+        catch (IOException)
         {
+            // A temp directory that cannot be deleted is not a test failure.
         }
     }
 

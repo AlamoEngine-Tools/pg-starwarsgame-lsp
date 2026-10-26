@@ -28,7 +28,7 @@ public sealed class RealEmmyluaTest
         var file = Path.Combine(scripts, "probe.lua");
         // A syntax error the analyzer reports, and an engine function only the stubs declare.
         const string text = "local player = Find_Player(\"Empire\")\nlocal broken = {1 2}\n";
-        await File.WriteAllTextAsync(file, text);
+        await File.WriteAllTextAsync(file, text, TestContext.Current.CancellationToken);
         var uri = DocumentUri.FromFileSystemPath(file);
 
         var messages = new ConcurrentQueue<string>();
@@ -50,15 +50,16 @@ public sealed class RealEmmyluaTest
         host.DidOpen(uri.ToString(), text, 1);
 
         var deadline = DateTime.UtcNow.AddSeconds(20);
-        while (!messages.Contains("syntax-error") && DateTime.UtcNow < deadline) await Task.Delay(50);
+        while (!messages.Contains("syntax-error") && DateTime.UtcNow < deadline) await Task.Delay(50, TestContext.Current.CancellationToken);
         Assert.Contains("syntax-error", messages);
 
         var hover = await host.RequestAsync((client, ct) => client.RequestHover(new HoverParams
         {
             TextDocument = new TextDocumentIdentifier(uri), Position = new Position(0, 18)
-        }, ct));
+        }, ct), ct: TestContext.Current.CancellationToken);
         Assert.Contains("Find_Player", hover!.Contents.MarkupContent!.Value);
 
+        // ReSharper disable once DisposeOnUsingVariable - disposed early on purpose, to test the behaviour after disposal; the using covers the failure path
         await host.DisposeAsync();
         try
         {

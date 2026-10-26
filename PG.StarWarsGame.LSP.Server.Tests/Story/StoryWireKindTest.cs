@@ -59,6 +59,7 @@ public sealed class StoryWireKindTest
     ///     guards; anything added here needs a reason that survives someone asking "what is that grey
     ///     line?".
     /// </remarks>
+    // ReSharper disable once CollectionNeverUpdated.Local - empty by design today; the test reads it
     private static readonly HashSet<string> EdgeKindsExemptFromTheColourKey =
         new(StringComparer.Ordinal);
 

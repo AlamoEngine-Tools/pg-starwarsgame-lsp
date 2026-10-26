@@ -129,12 +129,10 @@ internal static class StoryCommandTestFixtures
     public sealed class CapturingApplier(bool result = true) : IWorkspaceEditApplier
     {
         public WorkspaceEdit? Edit { get; private set; }
-        public string? Label { get; private set; }
 
         public Task<bool> ApplyAsync(WorkspaceEdit edit, string label, CancellationToken ct)
         {
             Edit = edit;
-            Label = label;
             return Task.FromResult(result);
         }
     }
@@ -222,7 +220,7 @@ internal static class StoryCommandTestFixtures
     public sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
+        public WorkspaceConfiguration LastWorkspaceConfig => config;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)

@@ -48,7 +48,7 @@ public sealed class EawSchemaCommandBarTextureTagTest
             File.ReadAllText(Find("tags", "CommandBarComponent.yaml")));
         var tag = tags.FirstOrDefault(t => string.Equals(t.Tag, name, StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(tag);
-        return tag!;
+        return tag;
     }
 
     private static string Find(string folder, string file)

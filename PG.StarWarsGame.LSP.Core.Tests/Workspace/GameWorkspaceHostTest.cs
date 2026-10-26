@@ -141,7 +141,7 @@ public sealed class GameWorkspaceHostTest
         host.AddOrUpdate("file:///d:/units.xml", "<Old/>", 1);
         host.AddOrUpdate("file:///D:/units.xml", "<New/>", 2);
 
-        Assert.Equal(1, host.All.Count());
+        Assert.Single(host.All);
         Assert.True(host.TryGet("file:///d:/units.xml", out var doc));
         Assert.Equal("<New/>", doc.Text);
     }

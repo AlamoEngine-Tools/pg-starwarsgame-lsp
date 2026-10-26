@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using Newtonsoft.Json.Linq;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
-using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.CodeLens;
 
@@ -41,7 +40,7 @@ public sealed class VariantCodeLensProviderTest
         var lens = Provider().Handle(Ctx(v, IndexWith(v, Sym("B"))));
 
         Assert.NotNull(lens);
-        Assert.Equal(VariantCodeLensProvider.ShowEffectiveCommand, lens!.Command!.Name);
+        Assert.Equal(VariantCodeLensProvider.ShowEffectiveCommand, lens.Command!.Name);
         Assert.Contains("Variant of B", lens.Command.Title);
         Assert.Equal("V", (string)lens.Command.Arguments![0]!);
     }
@@ -55,10 +54,10 @@ public sealed class VariantCodeLensProviderTest
         var lens = Provider().Handle(Ctx(b, index));
 
         Assert.NotNull(lens);
-        Assert.Equal("2 variants", lens!.Command!.Title);
+        Assert.Equal("2 variants", lens.Command!.Title);
         // Clicking must open the references peek (previously the lens had no command and did nothing).
         Assert.Equal("aet-eaw-edit.lsp.showReferences", lens.Command.Name);
-        var locations = (JArray)lens.Command.Arguments![2]!;
+        var locations = (JArray)lens.Command.Arguments![2];
         Assert.Equal(2, locations.Count);
     }
 

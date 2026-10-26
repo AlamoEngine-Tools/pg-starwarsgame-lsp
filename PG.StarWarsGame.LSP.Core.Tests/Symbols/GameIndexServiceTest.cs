@@ -169,7 +169,7 @@ public sealed class GameIndexServiceTest
         // dictionary's comparer, not a flattened key - see DocumentUris.
         var svc = Build(new FakeParser(Doc("", 0)));
 
-        await svc.UpdateDocumentAsync("file:///C:/Data/Units.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///C:/Data/Units.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.Equal("file:///C:/Data/Units.xml", Assert.Single(svc.Current.Documents).Key);
         Assert.True(svc.Current.Documents.ContainsKey("file:///c:/data/units.xml"));
@@ -183,8 +183,8 @@ public sealed class GameIndexServiceTest
         // not create two entries for the same file.
         var svc = Build(new FakeParser(Doc("", 0)));
 
-        await svc.UpdateDocumentAsync("file:///C:/Data/Units.xml", "<X/>", 1, default);
-        await svc.UpdateDocumentAsync("file:///c:/data/units.xml", "<Y/>", 2, default);
+        await svc.UpdateDocumentAsync("file:///C:/Data/Units.xml", "<X/>", 1, TestContext.Current.CancellationToken);
+        await svc.UpdateDocumentAsync("file:///c:/data/units.xml", "<Y/>", 2, TestContext.Current.CancellationToken);
 
         Assert.Single(svc.Current.Documents);
     }
@@ -194,7 +194,7 @@ public sealed class GameIndexServiceTest
     {
         var sym = Symbol("UNIT_A");
         var svc = Build(new FakeParser(Doc("", 0, [sym])));
-        await svc.UpdateDocumentAsync("file:///c:/data/units.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///c:/data/units.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         svc.RemoveDocument("file:///C:/DATA/UNITS.XML");
 
@@ -210,8 +210,8 @@ public sealed class GameIndexServiceTest
         var sym = Symbol("UNIT_A");
         var svc = Build(new FakeParser(Doc("", 0, [sym])));
 
-        await svc.UpdateDocumentAsync(@"d:\data\units.xml", "<X/>", 1, default);
-        await svc.UpdateDocumentAsync("file:///d:/data/units.xml", "<X/>", 2, default);
+        await svc.UpdateDocumentAsync(@"d:\data\units.xml", "<X/>", 1, TestContext.Current.CancellationToken);
+        await svc.UpdateDocumentAsync("file:///d:/data/units.xml", "<X/>", 2, TestContext.Current.CancellationToken);
 
         Assert.Single(svc.Current.Documents);
         Assert.Single(svc.Current.WorkspaceDefinitions["UNIT_A"]);
@@ -223,7 +223,7 @@ public sealed class GameIndexServiceTest
         var sym = Symbol("UNIT_A");
         var svc = Build(new FakeParser(Doc("", 0, [sym])));
 
-        await svc.UpdateDocumentAsync("file:///units.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///units.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
     }
@@ -234,7 +234,7 @@ public sealed class GameIndexServiceTest
         var reference = Reference("TARGET");
         var svc = Build(new FakeParser(Doc("", 0, refs: [reference])));
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.True(svc.Current.WorkspaceReferences.ContainsKey("TARGET"));
     }
@@ -245,7 +245,7 @@ public sealed class GameIndexServiceTest
         var gm = GroupMembership("MY_GROUP");
         var svc = Build(new FakeParser(Doc("", 0, groupMemberships: [gm])));
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.True(svc.Current.WorkspaceGroupMemberships.ContainsKey("MY_GROUP"));
         Assert.Single(svc.Current.WorkspaceGroupMemberships["MY_GROUP"]);
@@ -257,7 +257,7 @@ public sealed class GameIndexServiceTest
     {
         var gm = GroupMembership("MY_GROUP");
         var svc = Build(new FakeParser(Doc("", 0, groupMemberships: [gm])));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         svc.RemoveDocument("file:///f.xml");
 
@@ -273,8 +273,8 @@ public sealed class GameIndexServiceTest
         var parserB = new FakeParser(Doc("", 0, groupMemberships: [gm2]));
         var svc = Build(new MultiParser(parserA, parserB));
 
-        await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, default);
-        await svc.UpdateDocumentAsync("file:///b.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, TestContext.Current.CancellationToken);
+        await svc.UpdateDocumentAsync("file:///b.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, svc.Current.WorkspaceGroupMemberships["SHARED_GROUP"].Length);
     }
@@ -286,7 +286,7 @@ public sealed class GameIndexServiceTest
         GameIndex? fired = null;
         svc.IndexChanged += idx => fired = idx;
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.NotNull(fired);
     }
@@ -298,7 +298,7 @@ public sealed class GameIndexServiceTest
         svc.IndexChanged += _ => throw new Exception("should not fire");
 
         // .lua extension - FakeParser only handles .xml
-        await svc.UpdateDocumentAsync("file:///script.lua", "fn()", 1, default);
+        await svc.UpdateDocumentAsync("file:///script.lua", "fn()", 1, TestContext.Current.CancellationToken);
 
         Assert.Empty(svc.Current.WorkspaceDefinitions);
     }
@@ -309,10 +309,10 @@ public sealed class GameIndexServiceTest
     public async Task UpdateDocumentAsync_Drops_Strictly_Older_Version()
     {
         var svc = Build(new FakeParser(Doc("", 0, [Symbol("UNIT_V2")])));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 2, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 2, TestContext.Current.CancellationToken);
 
         // A strictly older version must not overwrite a newer committed version.
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
     }
@@ -323,11 +323,11 @@ public sealed class GameIndexServiceTest
         // Re-opening the same file at the same version (e.g. DidOpen after a scan at v0,
         // then DidOpen again at v1) must still fire IndexChanged so diagnostics are published.
         var svc = Build(new FakeParser(Doc("", 0)));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         var fired = false;
         svc.IndexChanged += _ => fired = true;
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.True(fired);
     }
@@ -342,9 +342,9 @@ public sealed class GameIndexServiceTest
     public async Task OpenDocumentAsync_LowerVersionChangedContent_AppliesNewContent()
     {
         var svc = Build(new TextSymbolParser());
-        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, TestContext.Current.CancellationToken);
 
-        await svc.OpenDocumentAsync("file:///f.xml", "NEW", 1, default);
+        await svc.OpenDocumentAsync("file:///f.xml", "NEW", 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
         Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("NEW"));
@@ -356,9 +356,9 @@ public sealed class GameIndexServiceTest
     {
         var counting = new CountingParser(Doc("", 0, [Symbol("A")]));
         var svc = Build(counting);
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 3, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 3, TestContext.Current.CancellationToken);
 
-        await svc.OpenDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.OpenDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
         Assert.Equal(1, counting.ParseCount);
@@ -370,10 +370,10 @@ public sealed class GameIndexServiceTest
         // The full reported sequence: session 1 leaves v3 committed; session 2 opens at v1
         // (unchanged content) and edits at v2 - the edit must not be dropped as stale.
         var svc = Build(new TextSymbolParser());
-        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, TestContext.Current.CancellationToken);
 
-        await svc.OpenDocumentAsync("file:///f.xml", "OLD", 1, default);
-        await svc.UpdateDocumentAsync("file:///f.xml", "NEW", 2, default);
+        await svc.OpenDocumentAsync("file:///f.xml", "OLD", 1, TestContext.Current.CancellationToken);
+        await svc.UpdateDocumentAsync("file:///f.xml", "NEW", 2, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
         Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("NEW"));
@@ -384,11 +384,11 @@ public sealed class GameIndexServiceTest
     public async Task OpenDocumentAsync_InBulk_AppliesOverHigherCommittedVersion()
     {
         var svc = Build(new TextSymbolParser());
-        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, TestContext.Current.CancellationToken);
 
         using (svc.BeginBulkUpdate())
         {
-            await svc.OpenDocumentAsync("file:///f.xml", "NEW", 1, default);
+            await svc.OpenDocumentAsync("file:///f.xml", "NEW", 1, TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
@@ -402,11 +402,11 @@ public sealed class GameIndexServiceTest
         // Mirrors UpdateDocumentAsync_Same_Version_Fires_IndexChanged for the open path:
         // diagnostics must re-publish on re-open even when nothing changed.
         var svc = Build(new FakeParser(Doc("", 0)));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         var fired = false;
         svc.IndexChanged += _ => fired = true;
-        await svc.OpenDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.OpenDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.True(fired);
     }
@@ -421,7 +421,7 @@ public sealed class GameIndexServiceTest
 
         // First parse: returns OLD_UNIT
         var svc = Build(new FakeParser(Doc("", 0, [old])));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("OLD_UNIT"));
 
@@ -430,8 +430,8 @@ public sealed class GameIndexServiceTest
         var svc2 = new GameIndexService(new FileHelper(new MockFileSystem()),
             [new FakeParser(Doc("", 0, [updated]))], NullLogger<GameIndexService>.Instance);
         // Apply the first document manually then update
-        await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
-        await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
+        await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
+        await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, TestContext.Current.CancellationToken);
 
         Assert.False(svc2.Current.WorkspaceDefinitions.ContainsKey("OLD_UNIT"));
         Assert.True(svc2.Current.WorkspaceDefinitions.ContainsKey("NEW_UNIT"));
@@ -444,14 +444,14 @@ public sealed class GameIndexServiceTest
         var newRef = Reference("NEW_TARGET");
 
         var svc = Build(new FakeParser(Doc("", 0, refs: [oldRef])));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.True(svc.Current.WorkspaceReferences.ContainsKey("OLD_TARGET"));
 
         var svc2 = new GameIndexService(new FileHelper(new MockFileSystem()),
             [new FakeParser(Doc("", 0, refs: [newRef]))], NullLogger<GameIndexService>.Instance);
-        await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
-        await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
+        await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
+        await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, TestContext.Current.CancellationToken);
 
         Assert.False(svc2.Current.WorkspaceReferences.ContainsKey("OLD_TARGET"));
         Assert.True(svc2.Current.WorkspaceReferences.ContainsKey("NEW_TARGET"));
@@ -503,7 +503,7 @@ public sealed class GameIndexServiceTest
         var sym = Symbol("UNIT_A");
         var svc = Build(new FakeParser(Doc("", 0, [sym])));
         // Commit version 5 via UpdateDocumentAsync
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 5, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 5, TestContext.Current.CancellationToken);
 
         // Inject version 0 (stale) - should be ignored
         svc.InjectDocument(Doc("file:///f.xml", 0, []));
@@ -519,7 +519,7 @@ public sealed class GameIndexServiceTest
     {
         var sym = Symbol("UNIT_A");
         var svc = Build(new FakeParser(Doc("", 0, [sym])));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         svc.RemoveDocument("file:///f.xml");
 
@@ -532,7 +532,7 @@ public sealed class GameIndexServiceTest
     {
         var reference = Reference("TARGET");
         var svc = Build(new FakeParser(Doc("", 0, refs: [reference])));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         svc.RemoveDocument("file:///f.xml");
 
@@ -543,7 +543,7 @@ public sealed class GameIndexServiceTest
     public async Task RemoveDocument_Fires_IndexChanged()
     {
         var svc = Build(new FakeParser(Doc("", 0)));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         var fired = false;
         svc.IndexChanged += _ => fired = true;
@@ -572,12 +572,12 @@ public sealed class GameIndexServiceTest
         var symB = Symbol("DUP", "file:///b.xml");
 
         var svcA = Build(new FakeParser(Doc("", 0, [symA])));
-        await svcA.UpdateDocumentAsync("file:///a.xml", "", 1, default);
+        await svcA.UpdateDocumentAsync("file:///a.xml", "", 1, TestContext.Current.CancellationToken);
 
         var svcB = new GameIndexService(new FileHelper(new MockFileSystem()),
             [new FakeParser(Doc("", 0, [symB]))], NullLogger<GameIndexService>.Instance);
-        await svcB.UpdateDocumentAsync("file:///a.xml", "", 1, default);
-        await svcB.UpdateDocumentAsync("file:///b.xml", "", 1, default);
+        await svcB.UpdateDocumentAsync("file:///a.xml", "", 1, TestContext.Current.CancellationToken);
+        await svcB.UpdateDocumentAsync("file:///b.xml", "", 1, TestContext.Current.CancellationToken);
 
         svcB.RemoveDocument("file:///a.xml");
 
@@ -594,7 +594,7 @@ public sealed class GameIndexServiceTest
         var parser = new CountingParser(Doc("", 0, [Symbol("UNIT_A")]));
         var svc = Build(parser);
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
         Assert.Equal(1, parser.ParseCount);
 
         var fired = 0;
@@ -602,7 +602,7 @@ public sealed class GameIndexServiceTest
 
         // Re-opening the same content (e.g. didOpen after the workspace scan) must NOT re-parse the
         // (potentially huge) document, but must still notify so diagnostics re-publish.
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 2, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 2, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, parser.ParseCount);
         Assert.Equal(1, fired);
@@ -614,8 +614,8 @@ public sealed class GameIndexServiceTest
         var parser = new CountingParser(Doc("", 0, [Symbol("UNIT_A")]));
         var svc = Build(parser);
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
-        await svc.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, parser.ParseCount);
     }
@@ -629,8 +629,8 @@ public sealed class GameIndexServiceTest
         var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
             [new PerUriParser("UNIT_A")], NullLogger<GameIndexService>.Instance, layerMap);
 
-        await svc.UpdateDocumentAsync("file:///core/u.xml", "<X/>", 1, default);
-        await svc.UpdateDocumentAsync("file:///rev/u.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///core/u.xml", "<X/>", 1, TestContext.Current.CancellationToken);
+        await svc.UpdateDocumentAsync("file:///rev/u.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(0, svc.Current.Documents["file:///core/u.xml"].LayerRank);
         Assert.Equal(1, svc.Current.Documents["file:///rev/u.xml"].LayerRank);
@@ -655,7 +655,7 @@ public sealed class GameIndexServiceTest
             layerMap);
 
         foreach (var layer in setup.Layers)
-            await svc.UpdateDocumentAsync(setup.Uri(layer.Rank, "Xml/Units.xml"), "<X/>", 1, default);
+            await svc.UpdateDocumentAsync(setup.Uri(layer.Rank, "Xml/Units.xml"), "<X/>", 1, TestContext.Current.CancellationToken);
 
         foreach (var layer in setup.Layers)
         {
@@ -724,8 +724,8 @@ public sealed class GameIndexServiceTest
 
         using (svc.BeginBulkUpdate())
         {
-            await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, default);
-            await svc.UpdateDocumentAsync("file:///b.xml", "<X/>", 1, default);
+            await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, TestContext.Current.CancellationToken);
+            await svc.UpdateDocumentAsync("file:///b.xml", "<X/>", 1, TestContext.Current.CancellationToken);
             Assert.Equal(0, fired); // still suppressed mid-scope
         }
 
@@ -742,7 +742,7 @@ public sealed class GameIndexServiceTest
         using (svc.BeginBulkUpdate())
         {
             for (var i = 0; i < 10; i++)
-                await svc.UpdateDocumentAsync($"file:///{i}.xml", "<X/>", 1, default);
+                await svc.UpdateDocumentAsync($"file:///{i}.xml", "<X/>", 1, TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(1, fireCount);
@@ -773,7 +773,7 @@ public sealed class GameIndexServiceTest
 
         using (svc.BeginBulkUpdate())
         {
-            await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+            await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
         }
 
         Assert.NotNull(captured);
@@ -789,7 +789,7 @@ public sealed class GameIndexServiceTest
 
         using (svc.BeginBulkUpdate())
         {
-            await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, default);
+            await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, TestContext.Current.CancellationToken);
             Assert.False(svc.Current.Documents.ContainsKey("file:///a.xml"));
         }
 
@@ -812,12 +812,12 @@ public sealed class GameIndexServiceTest
 
         using (bulkSvc.BeginBulkUpdate())
         {
-            await bulkSvc.UpdateDocumentAsync("file:///a.xml", "<A/>", 1, default);
-            await bulkSvc.UpdateDocumentAsync("file:///b.xml", "<B/>", 1, default);
+            await bulkSvc.UpdateDocumentAsync("file:///a.xml", "<A/>", 1, TestContext.Current.CancellationToken);
+            await bulkSvc.UpdateDocumentAsync("file:///b.xml", "<B/>", 1, TestContext.Current.CancellationToken);
         }
 
-        await seqSvc.UpdateDocumentAsync("file:///a.xml", "<A/>", 1, default);
-        await seqSvc.UpdateDocumentAsync("file:///b.xml", "<B/>", 1, default);
+        await seqSvc.UpdateDocumentAsync("file:///a.xml", "<A/>", 1, TestContext.Current.CancellationToken);
+        await seqSvc.UpdateDocumentAsync("file:///b.xml", "<B/>", 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(seqSvc.Current.Documents.Keys.Order(), bulkSvc.Current.Documents.Keys.Order());
         Assert.Equal(2, bulkSvc.Current.WorkspaceReferences["SHARED_TARGET"].Length);
@@ -832,12 +832,12 @@ public sealed class GameIndexServiceTest
         var svc = Build(new DelegateParser((uri, text, v, _) => ValueTask.FromResult(
             Doc(uri, v, [Symbol(text.Contains("v2") ? "UNIT_NEW" : "UNIT_OLD", uri)]))));
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X v1/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v1/>", 1, TestContext.Current.CancellationToken);
         Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_OLD"));
 
         using (svc.BeginBulkUpdate())
         {
-            await svc.UpdateDocumentAsync("file:///f.xml", "<X v2/>", 2, default);
+            await svc.UpdateDocumentAsync("file:///f.xml", "<X v2/>", 2, TestContext.Current.CancellationToken);
         }
 
         Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_OLD"));
@@ -853,12 +853,12 @@ public sealed class GameIndexServiceTest
         var svc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(
             Doc(uri, v, [Symbol("UNIT_A", uri)]))));
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<same/>", 3, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<same/>", 3, TestContext.Current.CancellationToken);
 
         using (svc.BeginBulkUpdate())
         {
             svc.RemoveDocument("file:///f.xml");
-            await svc.UpdateDocumentAsync("file:///f.xml", "<same/>", 0, default);
+            await svc.UpdateDocumentAsync("file:///f.xml", "<same/>", 0, TestContext.Current.CancellationToken);
         }
 
         Assert.True(svc.Current.Documents.ContainsKey("file:///f.xml"));
@@ -872,7 +872,7 @@ public sealed class GameIndexServiceTest
 
         using (svc.BeginBulkUpdate())
         {
-            await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+            await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
             svc.RemoveDocument("file:///f.xml");
         }
 
@@ -888,8 +888,8 @@ public sealed class GameIndexServiceTest
 
         using (svc.BeginBulkUpdate())
         {
-            await svc.UpdateDocumentAsync("file:///f.xml", "<new/>", 2, default);
-            await svc.UpdateDocumentAsync("file:///f.xml", "<old/>", 1, default);
+            await svc.UpdateDocumentAsync("file:///f.xml", "<new/>", 2, TestContext.Current.CancellationToken);
+            await svc.UpdateDocumentAsync("file:///f.xml", "<old/>", 1, TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
@@ -901,7 +901,7 @@ public sealed class GameIndexServiceTest
     public async Task RemoveDocument_DuringBulk_DefersRemovalUntilScopeEnds()
     {
         var svc = Build(new FakeParser(Doc("", 0, [Symbol("UNIT_A")])));
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
 
         using (svc.BeginBulkUpdate())
         {
@@ -940,10 +940,10 @@ public sealed class GameIndexServiceTest
             Doc(uri, v, [Symbol("UNIT_A", uri)], [Reference("TARGET", uri)],
                 [GroupMembership("GROUP", uri)]))));
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
         var before = svc.Current;
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X edited/>", 2, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X edited/>", 2, TestContext.Current.CancellationToken);
         var after = svc.Current;
 
         Assert.Equal(2, after.Documents["file:///f.xml"].Version);
@@ -958,10 +958,10 @@ public sealed class GameIndexServiceTest
         var svc = Build(new DelegateParser((uri, text, v, _) => ValueTask.FromResult(
             Doc(uri, v, [Symbol(text.Contains("v2") ? "UNIT_B" : "UNIT_A", uri)]))));
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X v1/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v1/>", 1, TestContext.Current.CancellationToken);
         var before = svc.Current;
 
-        await svc.UpdateDocumentAsync("file:///f.xml", "<X v2/>", 2, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v2/>", 2, TestContext.Current.CancellationToken);
         var after = svc.Current;
 
         Assert.False(ReferenceEquals(before.WorkspaceDefinitions, after.WorkspaceDefinitions));
@@ -976,7 +976,7 @@ public sealed class GameIndexServiceTest
     {
         var svc = Build(new CancellingParser());
         using var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, cts.Token));
@@ -992,6 +992,7 @@ public sealed class GameIndexServiceTest
         {
             if (version == 1)
             {
+                // ReSharper disable once AccessToDisposedClosure - the test awaits the parse before the using scope ends
                 firstParseStarted.Release();
                 try
                 {
@@ -1007,13 +1008,13 @@ public sealed class GameIndexServiceTest
             return Doc(uri, version);
         }));
 
-        var firstTask = svc.UpdateDocumentAsync("file:///f.xml", "v1", 1, default);
+        var firstTask = svc.UpdateDocumentAsync("file:///f.xml", "v1", 1, TestContext.Current.CancellationToken);
 
         // Wait for the first parse to actually be in-flight
-        Assert.True(await firstParseStarted.WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.True(await firstParseStarted.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
 
         // A newer edit for the same URI - should cancel the first parse
-        await svc.UpdateDocumentAsync("file:///f.xml", "v2", 2, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "v2", 2, TestContext.Current.CancellationToken);
 
         // The first UpdateDocumentAsync must complete without throwing
         await firstTask;
@@ -1033,9 +1034,11 @@ public sealed class GameIndexServiceTest
         {
             if (uri.Contains("a.xml"))
             {
+                // ReSharper disable once AccessToDisposedClosure - the test awaits the parse before the using scope ends
                 aStarted.Release();
                 try
                 {
+                    // ReSharper disable once AccessToDisposedClosure - the test awaits the parse before the using scope ends
                     await aRelease.WaitAsync(ct);
                 }
                 catch (OperationCanceledException)
@@ -1048,11 +1051,11 @@ public sealed class GameIndexServiceTest
             return Doc(uri, version);
         }));
 
-        var aTask = svc.UpdateDocumentAsync("file:///a.xml", "v1", 1, default);
-        Assert.True(await aStarted.WaitAsync(TimeSpan.FromSeconds(2)));
+        var aTask = svc.UpdateDocumentAsync("file:///a.xml", "v1", 1, TestContext.Current.CancellationToken);
+        Assert.True(await aStarted.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
 
         // Edit a different URI - must not cancel a.xml's in-flight parse
-        await svc.UpdateDocumentAsync("file:///b.xml", "v1", 1, default);
+        await svc.UpdateDocumentAsync("file:///b.xml", "v1", 1, TestContext.Current.CancellationToken);
 
         aRelease.Release();
         await aTask;

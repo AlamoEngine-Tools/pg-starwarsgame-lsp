@@ -45,13 +45,13 @@ public sealed class OverrideCodeLensProviderTest
             new CodeLensSymbolContext(rev, (FileOrigin)rev.Origin, index));
 
         Assert.NotNull(lens);
-        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens!.Command!.Name);
+        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens.Command!.Name);
         Assert.Contains("UNIT_A", lens.Command.Title);
         Assert.Contains("Core Library", lens.Command.Title);
 
-        var locations = (JArray)lens.Command.Arguments![2]!;
+        var locations = (JArray)lens.Command.Arguments![2];
         Assert.Single(locations);
-        Assert.Equal("file:///core/u.xml", (string)locations[0]!["uri"]!);
+        Assert.Equal("file:///core/u.xml", (string)locations[0]["uri"]!);
     }
 
     [Fact]

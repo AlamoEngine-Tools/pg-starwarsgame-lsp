@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
-using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.CodeLens;
 
@@ -53,7 +52,7 @@ public sealed class EncyclopediaCodeLensProviderTest
         var lens = Provider(source).Handle(Ctx(symbol, IndexWith(symbol)));
 
         Assert.NotNull(lens);
-        Assert.Equal(EncyclopediaCodeLensProvider.ShowEncyclopediaCommand, lens!.Command!.Name);
+        Assert.Equal(EncyclopediaCodeLensProvider.ShowEncyclopediaCommand, lens.Command!.Name);
         Assert.Contains("Etahn", lens.Command.Arguments!.ToString());
         Assert.Equal(3, lens.Range.Start.Line);
     }

@@ -6,7 +6,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Xml;
 
@@ -17,7 +16,6 @@ public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
     private readonly ILuaAnalyzer? _analyzer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
-    private readonly IProjectLayerMap? _layers;
     private readonly ILuaRenameProvider _luaProvider;
     private readonly IXmlRenameProvider _xmlProvider;
 
@@ -27,15 +25,13 @@ public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
         ILuaRenameProvider luaProvider,
         IFileHelper fileHelper,
         // Optional, as for rename: what we do not claim, the analyzer prepares.
-        ILuaAnalyzer? analyzer = null,
-        IProjectLayerMap? layers = null)
+        ILuaAnalyzer? analyzer = null)
     {
         _indexService = indexService;
         _xmlProvider = xmlProvider;
         _luaProvider = luaProvider;
         _fileHelper = fileHelper;
         _analyzer = analyzer;
-        _layers = layers;
     }
 
     public override async Task<RangeOrPlaceholderRange?> Handle(PrepareRenameParams request, CancellationToken ct)

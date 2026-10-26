@@ -181,7 +181,7 @@ public sealed class GroupMembershipExtractorTest
 
         GroupMembershipExtractor.Extract(
             [("AT_AT_Run", "sfxevents.xml"), ("AT_AT_Shoot", "sfxevents.xml")],
-            path =>
+            _ =>
             {
                 readCount++;
                 return xml;

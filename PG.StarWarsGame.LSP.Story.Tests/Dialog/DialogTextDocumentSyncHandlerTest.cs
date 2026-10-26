@@ -22,7 +22,10 @@ public sealed class DialogTextDocumentSyncHandlerTest
         var host = new DialogDiagnosticsPublisherTest.FakeWorkspaceHost();
         var revalidator = new SpyRevalidator();
         var gate = new StartupGate();
+        // A fresh gate holds nothing to pump, so opening it completes synchronously; a constructor cannot await.
+#pragma warning disable VSTHRD002
         gate.OpenAsync().GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002
         var handler = new DialogTextDocumentSyncHandler(
             host,
             new FileHelper(new MockFileSystem()),

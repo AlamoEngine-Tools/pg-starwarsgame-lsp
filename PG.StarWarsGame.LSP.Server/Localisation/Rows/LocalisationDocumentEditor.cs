@@ -95,9 +95,6 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
     public (IReadOnlyList<LocRowDto> Rows, IReadOnlyList<string> Languages, string? Error) DryRunRows(
         string filePath, IReadOnlyList<LocEditCommandDto> commands)
     {
-        var fs = _fileHelper.FileSystem;
-        var extension = fs.Path.GetExtension(filePath).ToLowerInvariant();
-
         LocDocument document;
         try
         {

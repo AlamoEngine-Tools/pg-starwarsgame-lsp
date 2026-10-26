@@ -58,10 +58,7 @@ public class LspServerFixture : IAsyncLifetime
 
     public virtual async ValueTask DisposeAsync()
     {
-        if (_client is IAsyncDisposable asyncClient)
-            await asyncClient.DisposeAsync();
-        else
-            (_client as IDisposable)?.Dispose();
+        (_client as IDisposable)?.Dispose();
 
         _tcpClient?.Dispose();
 
@@ -294,7 +291,7 @@ public class LspServerFixture : IAsyncLifetime
             try
             {
                 while (await _process.StandardError.ReadLineAsync() is { } line)
-                    Console.Error.WriteLine($"[LSP] {line}");
+                    await Console.Error.WriteLineAsync($"[LSP] {line}");
             }
             catch
             {

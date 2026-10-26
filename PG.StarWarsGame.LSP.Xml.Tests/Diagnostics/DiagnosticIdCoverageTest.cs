@@ -76,7 +76,7 @@ public sealed class DiagnosticIdCoverageTest
             dir = Path.GetDirectoryName(dir);
 
         Assert.NotNull(dir);
-        return Path.Combine(dir!, "PG.StarWarsGame.LSP.Xml", "XmlDiagnosticsPublisher.cs");
+        return Path.Combine(dir, "PG.StarWarsGame.LSP.Xml", "XmlDiagnosticsPublisher.cs");
     }
 
     // Two handlers sharing a default id would make them indistinguishable to a suppression, and

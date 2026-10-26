@@ -159,7 +159,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(0, 7), CancellationToken.None);
 
         Assert.NotNull(result);
-        var link = Assert.Single(result!);
+        var link = Assert.Single(result);
         Assert.True(link.IsLocationLink);
         Assert.Equal(TargetUri, link.LocationLink!.TargetUri.ToString());
         Assert.Equal(5, link.LocationLink.TargetRange.Start.Line);
@@ -183,7 +183,7 @@ public sealed class XmlDefinitionHandlerTest
         Assert.True(link.IsLocationLink);
         var origin = link.LocationLink!.OriginSelectionRange;
         Assert.NotNull(origin);
-        Assert.Equal(0, origin!.Start.Line);
+        Assert.Equal(0, origin.Start.Line);
         Assert.Equal(4, origin.Start.Character);
         Assert.Equal(0, origin.End.Line);
         Assert.Equal(14, origin.End.Character);
@@ -201,7 +201,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(3, 0), CancellationToken.None);
 
         Assert.NotNull(result);
-        var link = Assert.Single(result!);
+        var link = Assert.Single(result);
         Assert.True(link.IsLocationLink);
         Assert.Equal(TestUri, link.LocationLink!.TargetUri.ToString());
         Assert.Equal(3, link.LocationLink.TargetRange.Start.Line);
@@ -224,7 +224,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(0, 5, mixedCaseUri), CancellationToken.None);
 
         Assert.NotNull(result);
-        var link = Assert.Single(result!);
+        var link = Assert.Single(result);
         Assert.Equal(lowercaseUri, link.LocationLink!.TargetUri.ToString());
     }
 
@@ -265,7 +265,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(1, 7), CancellationToken.None);
 
         Assert.NotNull(result);
-        var targetUris = result!
+        var targetUris = result
             .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri.ToString() : l.Location!.Uri.ToString())
             .ToList();
         Assert.Equal(2, targetUris.Count);
@@ -304,7 +304,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(0, 6), CancellationToken.None);
 
         Assert.NotNull(result);
-        var link = Assert.Single(result!);
+        var link = Assert.Single(result);
         Assert.True(link.IsLocationLink);
         Assert.Equal(enumFilePath, link.LocationLink!.TargetUri.ToString());
         Assert.Equal(2, link.LocationLink.TargetRange.Start.Line);

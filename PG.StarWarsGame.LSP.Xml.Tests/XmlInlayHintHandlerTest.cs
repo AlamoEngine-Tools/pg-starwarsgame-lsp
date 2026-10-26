@@ -24,6 +24,7 @@ public sealed class XmlInlayHintHandlerTest
 {
     private const string Uri = "file:///data/units.xml";
 
+    // ReSharper disable once UnusedTupleComponentInReturnValue - the helpers return everything a test might need; some tests ignore a part
     private static (XmlInlayHintHandler handler, FakeIndexService index) Build(
         string docText,
         ISchemaProvider? schema = null,
@@ -231,7 +232,6 @@ public sealed class XmlInlayHintHandlerTest
 
     private sealed class FakeIndexService : IGameIndexService
     {
-        private ILocalisationIndex _loc = new EmptyStubLoc();
 
         public ILocalisationIndex Localisation
         {
@@ -309,22 +309,8 @@ public sealed class XmlInlayHintHandlerTest
             {
             }
         }
-
-        private sealed class EmptyStubLoc : ILocalisationIndex
-        {
-            public bool ContainsKey(string key)
-            {
-                return false;
-            }
-
-            public IEnumerable<string> Keys => [];
-
-            public string? GetValue(string key)
-            {
-                return null;
-            }
-        }
     }
+
 }
 
 // ── file-scoped helpers ──────────────────────────────────────────────────────

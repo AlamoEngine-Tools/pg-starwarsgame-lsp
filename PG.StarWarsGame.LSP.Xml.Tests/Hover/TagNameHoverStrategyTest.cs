@@ -16,8 +16,7 @@ public sealed class TagNameHoverStrategyTest
     private static (HoverContext ctx, StubSchemaProvider schema) MakeCtx(
         string xml,
         int nodeLine,
-        bool isOnTagName = true,
-        IFileTypeRegistry? registry = null)
+        bool isOnTagName = true)
     {
         var schema = new StubSchemaProvider();
         var hapDoc = XmlUtility.CreateHtmlDocument(xml);
@@ -68,7 +67,7 @@ public sealed class TagNameHoverStrategyTest
         var hover = Strategy().Handle(ctx);
 
         Assert.NotNull(hover);
-        Assert.Contains("Max_Speed", hover!.Contents.MarkupContent!.Value);
+        Assert.Contains("Max_Speed", hover.Contents.MarkupContent!.Value);
     }
 
     // ── type hover ─────────────────────────────────────────────────────────────
@@ -87,7 +86,7 @@ public sealed class TagNameHoverStrategyTest
         var hover = Strategy().Handle(ctx);
 
         Assert.NotNull(hover);
-        Assert.Contains("SpaceUnit", hover!.Contents.MarkupContent!.Value);
+        Assert.Contains("SpaceUnit", hover.Contents.MarkupContent!.Value);
     }
 
     [Fact]
@@ -112,7 +111,7 @@ public sealed class TagNameHoverStrategyTest
         var hover = Strategy().Handle(ctx);
 
         Assert.NotNull(hover);
-        var content = hover!.Contents.MarkupContent!.Value;
+        var content = hover.Contents.MarkupContent!.Value;
         Assert.Contains("A playable or AI faction", content, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("A faction reference", content, StringComparison.OrdinalIgnoreCase);
     }

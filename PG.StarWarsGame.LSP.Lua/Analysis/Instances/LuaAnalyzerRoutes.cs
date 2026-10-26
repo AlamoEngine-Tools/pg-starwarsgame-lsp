@@ -80,7 +80,7 @@ public sealed class LuaAnalyzerRoutes : ILuaAnalyzer
         _project.DidClose(uri);
     }
 
-    public async Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+    public async Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
     {
         if (method == Resolve)
         {

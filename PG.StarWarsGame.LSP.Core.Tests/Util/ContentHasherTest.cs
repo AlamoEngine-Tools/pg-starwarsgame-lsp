@@ -40,7 +40,7 @@ public sealed class ContentHasherTest
         var svc = new GameIndexService(new FileHelper(new MockFileSystem()), [new StubParser()],
             NullLogger<GameIndexService>.Instance);
 
-        await svc.UpdateDocumentAsync("file:///f.xml", text, 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", text, 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(ContentHasher.Hash(text), svc.Current.Documents["file:///f.xml"].ContentHash);
     }

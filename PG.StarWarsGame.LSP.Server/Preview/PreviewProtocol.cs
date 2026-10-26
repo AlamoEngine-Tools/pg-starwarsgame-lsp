@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
@@ -15,6 +16,7 @@ namespace PG.StarWarsGame.LSP.Server.Preview;
 ///     scene with one part - so the client renders one thing either way.
 /// </remarks>
 [Method("aet/getPreviewScene", Direction.ClientToServer)]
+[PublicAPI]
 public sealed record GetPreviewSceneParams : IRequest<GetPreviewSceneResult>
 {
     /// <summary>Id of the GameObject to assemble, with its hardpoints mounted.</summary>
@@ -104,12 +106,14 @@ public sealed record GetModelDetailParams : IRequest<GetModelDetailResult>
 ///     a panel. Bundling it would put a Star Destroyer's 58 bone matrices into the load path of every
 ///     preview that never inspects one.
 /// </remarks>
+[PublicAPI]
 public sealed record GetModelDetailResult(
     PreviewModelDetail? Detail,
     string? Error = null);
 
 /// <summary>Request for one page of one sub-mesh's bulk geometry.</summary>
 [Method("aet/getSubMeshGeometry", Direction.ClientToServer)]
+[PublicAPI]
 public sealed record GetSubMeshGeometryParams : IRequest<GetSubMeshGeometryResult>
 {
     public string ModelReference { get; init; } = string.Empty;
@@ -129,6 +133,7 @@ public sealed record GetSubMeshGeometryParams : IRequest<GetSubMeshGeometryResul
 }
 
 /// <summary>Result of <c>aet/getSubMeshGeometry</c>.</summary>
+[PublicAPI]
 public sealed record GetSubMeshGeometryResult(
     PreviewSubMeshGeometry? Page,
     string? Error = null);
@@ -196,6 +201,7 @@ public sealed record GetParticleSystemParams : IRequest<GetParticleSystemResult>
 ///         bombing-run explosions, so all six drew at a twentieth and a half of their size.
 ///     </para>
 /// </remarks>
+[PublicAPI]
 public sealed record GetParticleSystemResult(
     AlamoParticleContent? System,
     float ScaleFactor = 1f,
@@ -227,6 +233,7 @@ public sealed record GetShaderSourceParams : IRequest<GetShaderSourceResult>
 ///     Whether a managed copy of the base game's shaders is reachable at all, so the UI can explain a
 ///     plain-looking preview rather than leaving the author guessing.
 /// </param>
+[PublicAPI]
 public sealed record GetShaderSourceResult(
     string? Source,
     bool HasManagedShaders,

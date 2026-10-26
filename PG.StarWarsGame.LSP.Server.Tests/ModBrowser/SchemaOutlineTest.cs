@@ -144,7 +144,7 @@ public sealed class SchemaOutlineTest
     [Fact]
     public void AType_OpensIntoItsTags_EachByWhatItTakes()
     {
-        var (catalog, relations, _) = Build();
+        var (_, relations, _) = Build();
 
         Assert.Equal(3,
             relations.Node("schemaTypes", "GameObjectType").Relations.Single(r => r.Relation == "tags").Count);
@@ -194,7 +194,7 @@ public sealed class SchemaOutlineTest
         // What it references is the enum, said once.
         Assert.DoesNotContain(damage.Tiles[1].Properties!, p => p.Key == "references");
         Assert.Equal([("Damage_Laser", "Lasers"), ("Damage_Ion", null), ("Damage_Mod", null)],
-            damage.Tiles[2].Entries!.Select(e => (e.Name, e.Detail)));
+            damage.Tiles[2].Entries.Select(e => (e.Name, e.Detail)));
     }
 
     // An enum says whether it is built into the engine or read from the game's files, and lists its

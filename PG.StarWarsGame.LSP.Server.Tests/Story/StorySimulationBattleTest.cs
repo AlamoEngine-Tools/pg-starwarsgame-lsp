@@ -52,10 +52,10 @@ public sealed class StorySimulationBattleTest
         Assert.Null(error);
         Assert.Null(state!.Scope);
         Assert.Null(state.PausedFor);
-        Assert.Equal(["Story_Plots_M2_Land", "Story_Plots_M5_Space"], state.Battles.Select(b => b.Label));
+        Assert.Equal(["Story_Plots_M2_Land", "Story_Plots_M5_Space"], state.Battles!.Select(b => b.Label));
         // Both links fire on the first frame: the first battle's choice is up, the second link
         // queued nothing (measured: the engine refuses a queue while one is pending).
-        Assert.Equal(["pending", "notStarted"], state.Battles.Select(b => b.Status));
+        Assert.Equal(["pending", "notStarted"], state.Battles!.Select(b => b.Status));
         // Win is the galaxy's own listener and waits; nothing from inside a battle is armed.
         Assert.Contains(state.Interventions, i => i.EventName == "Win" && i.BattleKey == M2Key);
         Assert.DoesNotContain(state.Nodes, n => n.NodeId == Id(Battle, "Ambush"));
@@ -80,7 +80,7 @@ public sealed class StorySimulationBattleTest
 
         var galaxy = service.GetState(GalaxyKey).State!;
         Assert.Equal("Story_Plots_M2_Land", galaxy.PausedFor);
-        Assert.Equal("running", galaxy.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("running", galaxy.Battles!.Single(b => b.Key == M2Key).Status);
         var (_, refused) = service.Tick(GalaxyKey, 1);
         Assert.Contains("paused", refused, StringComparison.OrdinalIgnoreCase);
         // Both panels learn of it: the battle exists, the galaxy is paused.
@@ -135,7 +135,7 @@ public sealed class StorySimulationBattleTest
         // A STORY_FLAG is polled, so the merged flag is read on the galaxy's next tick, not on the
         // write itself.
         Assert.Equal("Armed", LifecycleOf(galaxy, Galaxy, "Reader"));
-        Assert.Equal("won", galaxy.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("won", galaxy.Battles!.Single(b => b.Key == M2Key).Status);
         Assert.Contains(M2Session, notified);
         Assert.Contains(GalaxyKey, notified);
         // The battle's own state keeps its outcome and refuses to run on.
@@ -168,13 +168,13 @@ public sealed class StorySimulationBattleTest
         Assert.Equal(3, state!.Tick);
         Assert.Equal("Fired", LifecycleOf(state, Galaxy, "Win"));
         Assert.Contains(state.Flags, f => f.Name == "F" && f.Value == 1);
-        Assert.Equal("won", state.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("won", state.Battles!.Single(b => b.Key == M2Key).Status);
 
         // Before the battle was ever entered: the outcome is gone, the battle is back to its
         // pending choice, where the link left it on the first frame.
         var earlier = service.Seek(GalaxyKey, 1).State!;
         Assert.Equal("Armed", LifecycleOf(earlier, Galaxy, "Win"));
-        Assert.Equal("pending", earlier.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("pending", earlier.Battles!.Single(b => b.Key == M2Key).Status);
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed class StorySimulationBattleTest
         var (state, error) = service.ResolveBattle(GalaxyKey, M2Key, false);
 
         Assert.Null(error);
-        Assert.Equal("lost", state!.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("lost", state!.Battles!.Single(b => b.Key == M2Key).Status);
         // A defeat fires no STORY_VICTORY; the galaxy's listener is moot now, not a decision.
         Assert.Equal("Armed", LifecycleOf(state, Galaxy, "Win"));
         Assert.DoesNotContain(state.Interventions, i => i.EventName == "Win");
@@ -266,8 +266,8 @@ public sealed class StorySimulationBattleTest
         var (state, error) = service.RetryBattle(GalaxyKey, M2Key);
 
         Assert.Null(error);
-        var battle = state!.Battles.Single(b => b.Key == M2Key);
-        Assert.Equal(before.Battles.Single(b => b.Key == M2Key).Status, battle.Status);
+        var battle = state!.Battles!.Single(b => b.Key == M2Key);
+        Assert.Equal(before.Battles!.Single(b => b.Key == M2Key).Status, battle.Status);
         Assert.Equal(before.Tick, state.Tick);
         // The battle can be decided again.
         Assert.Null(service.ResolveBattle(GalaxyKey, M2Key, true).Error);
@@ -305,10 +305,10 @@ public sealed class StorySimulationBattleTest
 
         var state = service.Start(GalaxyKey).State!;
 
-        var m2 = state.Battles.Single(b => b.Key == M2Key);
+        var m2 = state.Battles!.Single(b => b.Key == M2Key);
         // W is written by M2's own victory listener: deciding the battle writes it, so it is no pick.
-        Assert.Equal([("F", 1)], m2.Writes.Select(w => (w.Name, w.Value)).Order());
-        Assert.Empty(state.Battles.Single(b => b.Key == M5Key).Writes);
+        Assert.Equal([("F", 1)], m2.Writes!.Select(w => (w.Name, w.Value)).Order());
+        Assert.Empty(state.Battles!.Single(b => b.Key == M5Key).Writes!);
     }
 
     // Measured: LINK_TACTICAL from the galaxy brings up the pending-battle choice and pauses
@@ -321,8 +321,8 @@ public sealed class StorySimulationBattleTest
 
         var state = service.Start(GalaxyKey).State!;
 
-        Assert.Equal("pending", state.Battles.Single(b => b.Key == M2Key).Status);
-        Assert.Equal("notStarted", state.Battles.Single(b => b.Key == M5Key).Status);
+        Assert.Equal("pending", state.Battles!.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("notStarted", state.Battles!.Single(b => b.Key == M5Key).Status);
         // Pending is not frozen: the galaxy still takes ticks.
         Assert.Null(state.PausedFor);
         Assert.Null(service.Tick(GalaxyKey, 1).Error);
@@ -337,18 +337,18 @@ public sealed class StorySimulationBattleTest
         var chosen = service.ApplyWorldChange(GalaxyKey,
             new StorySimWorldChangeDto(StoryWorldChangeKind.ClickGui) { Name = "choice_button_left" }).State!;
 
-        Assert.Equal("fight", chosen.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("fight", chosen.Battles!.Single(b => b.Key == M2Key).Status);
         Assert.Equal("Story_Plots_M2_Land", chosen.PausedFor);
         Assert.Contains("paused", service.Tick(GalaxyKey, 1).Error, StringComparison.OrdinalIgnoreCase);
 
         Assert.Null(service.Start(M2Session).Error);
-        Assert.Equal("running", service.GetState(GalaxyKey).State!.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("running", service.GetState(GalaxyKey).State!.Battles!.Single(b => b.Key == M2Key).Status);
 
         var resolved = service.ResolveBattle(M2Session, M2Key, true).State!;
         var galaxy = service.GetState(GalaxyKey).State!;
         Assert.Equal("won", resolved.Outcome);
         Assert.Null(galaxy.PausedFor);
-        Assert.Equal("won", galaxy.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("won", galaxy.Battles!.Single(b => b.Key == M2Key).Status);
         Assert.Null(service.Tick(GalaxyKey, 1).Error);
     }
 
@@ -361,13 +361,13 @@ public sealed class StorySimulationBattleTest
         var chosen = service.ApplyWorldChange(GalaxyKey,
             new StorySimWorldChangeDto(StoryWorldChangeKind.ClickGui) { Name = "choice_button_right" }).State!;
 
-        Assert.Equal("autoResolve", chosen.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("autoResolve", chosen.Battles!.Single(b => b.Key == M2Key).Status);
         Assert.Null(chosen.PausedFor);
         Assert.Null(service.Tick(GalaxyKey, 1).Error);
 
         var galaxy = service.ResolveBattle(GalaxyKey, M2Key, false).State!;
 
-        Assert.Equal("lost", galaxy.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("lost", galaxy.Battles!.Single(b => b.Key == M2Key).Status);
         Assert.Null(galaxy.PausedFor);
     }
 
@@ -377,15 +377,15 @@ public sealed class StorySimulationBattleTest
         var (service, _) = BuildService();
         service.Start(GalaxyKey);
         Assert.Equal("lost",
-            service.ResolveBattle(GalaxyKey, M2Key, false).State!.Battles.Single(b => b.Key == M2Key).Status);
+            service.ResolveBattle(GalaxyKey, M2Key, false).State!.Battles!.Single(b => b.Key == M2Key).Status);
 
         // The failure branch links the same mission once more: pending again, no outcome on the books.
         var relinked = service.ApplyWorldChange(GalaxyKey,
             new StorySimWorldChangeDto(StoryWorldChangeKind.Generic) { Name = "again" }).State!;
-        Assert.Equal("pending", relinked.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("pending", relinked.Battles!.Single(b => b.Key == M2Key).Status);
 
         var won = service.ResolveBattle(GalaxyKey, M2Key, true).State!;
-        Assert.Equal("won", won.Battles.Single(b => b.Key == M2Key).Status);
+        Assert.Equal("won", won.Battles!.Single(b => b.Key == M2Key).Status);
     }
 
     [Fact]

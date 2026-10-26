@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
@@ -200,7 +201,7 @@ public sealed class XmlCompletionHandlerTest
     [Fact]
     public async Task Handle_TagNameContext_ParentNotInSchema_ReturnsEmpty()
     {
-        var (handler, host, schema, _) = Build();
+        var (handler, host, _, _) = Build();
         // No type registered for SpaceUnit
 
         host.AddOrUpdate(TestUri.ToString(), "<SpaceUnit>\n  <\n</SpaceUnit>", 1);
@@ -1473,12 +1474,10 @@ public sealed class XmlCompletionHandlerTest
     {
         public IReadOnlyList<ValueProposal> ProposalsToReturn { get; set; } = [];
         public XmlTagDefinition? LastTag { get; private set; }
-        public string? LastPartialValue { get; private set; }
 
         public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition tag, string partialValue)
         {
             LastTag = tag;
-            LastPartialValue = partialValue;
             return ProposalsToReturn;
         }
     }

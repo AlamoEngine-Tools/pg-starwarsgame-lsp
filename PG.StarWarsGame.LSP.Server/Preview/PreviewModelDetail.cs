@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using System.Numerics;
 using PG.StarWarsGame.LSP.Assets.Models;
 
@@ -118,6 +119,7 @@ public sealed record PreviewModelDetail(
 /// <summary>One bone, in the file's own axes.</summary>
 /// <param name="ParentIndex">The parent's index, or <c>-1</c> for a root.</param>
 /// <param name="Billboard">The billboard mode by name; <c>Disable</c> for the overwhelming majority.</param>
+[PublicAPI]
 public sealed record PreviewBoneDetail(
     int Index,
     string Name,
@@ -129,6 +131,7 @@ public sealed record PreviewBoneDetail(
 
 /// <summary>One mesh, with the bounding box the file stores rather than one measured here.</summary>
 /// <param name="BoneIndex">The bone it rides, or <c>-1</c> when the connections block attaches it to none.</param>
+[PublicAPI]
 public sealed record PreviewMeshDetail(
     int Index,
     string Name,
@@ -148,6 +151,7 @@ public sealed record PreviewMeshDetail(
 ///     Whether the proxy stays hidden when the damage state is REPAIRED rather than coming back. Set
 ///     on 1225 proxies across 86 shipped models, so the asymmetry is real rather than theoretical.
 /// </param>
+[PublicAPI]
 public sealed record PreviewProxyDetail(
     string Name,
     int BoneIndex,

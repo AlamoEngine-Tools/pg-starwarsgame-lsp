@@ -18,7 +18,7 @@ public sealed class XmlVariantFactProducerTest
         return new GameSymbol(id, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin(uri, 0, 0), null, baseId);
     }
 
-    private static GameIndex Index(string text, params GameSymbol[] symbols)
+    private static GameIndex Index(params GameSymbol[] symbols)
     {
         var docSymbols = symbols.Where(s => ((FileOrigin)s.Origin).Uri == Uri).ToImmutableArray();
         var docIndex = new DocumentIndex(Uri, 1, docSymbols, ImmutableArray<GameReference>.Empty);
@@ -34,7 +34,7 @@ public sealed class XmlVariantFactProducerTest
     private static IReadOnlyList<XmlFact> Produce(string text, FakeTagSource source, FakeSchema schema,
         params GameSymbol[] symbols)
     {
-        return new XmlVariantFactProducer(schema, source).Produce(Uri, text, Index(text, symbols));
+        return new XmlVariantFactProducer(schema, source).Produce(Uri, text, Index(symbols));
     }
 
     [Fact]

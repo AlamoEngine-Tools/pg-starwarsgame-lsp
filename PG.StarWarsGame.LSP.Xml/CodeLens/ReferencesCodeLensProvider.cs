@@ -12,7 +12,7 @@ namespace PG.StarWarsGame.LSP.Xml.CodeLens;
 
 internal sealed class ReferencesCodeLensProvider : IXmlCodeLensProvider
 {
-    public LspCodeLens? Handle(CodeLensSymbolContext ctx)
+    public LspCodeLens Handle(CodeLensSymbolContext ctx)
     {
         var refs = ctx.Index.WorkspaceReferences.TryGetValue(ctx.Symbol.Id, out var found) ? found : [];
         return For(ctx.Origin.Uri, ctx.Origin.Line, ctx.Origin.Column ?? 0, refs, ctx.Messages);
@@ -25,6 +25,8 @@ internal sealed class ReferencesCodeLensProvider : IXmlCodeLensProvider
     /// <param name="uri">The document the definition is in.</param>
     /// <param name="line">The definition's line; the lens sits at its start.</param>
     /// <param name="column">Where the definition starts on its line, for the references view.</param>
+    /// <param name="refs">The references to the definition.</param>
+    /// <param name="messages">The catalogue the lens text comes from.</param>
     public static LspCodeLens For(string uri, int line, int column, IReadOnlyList<GameReference> refs,
         IMessageCatalog messages)
     {

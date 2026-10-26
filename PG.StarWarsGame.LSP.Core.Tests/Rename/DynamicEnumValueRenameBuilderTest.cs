@@ -79,7 +79,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
             index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
-        var edit = Assert.Single(result!.Changes![DocumentUri.From(DefUri)]);
+        var edit = Assert.Single(result.Changes![DocumentUri.From(DefUri)]);
         Assert.Equal("Armor_Renamed", edit.NewText);
         Assert.Equal(0, edit.Range.Start.Line);
         Assert.Equal(29, edit.Range.Start.Character);
@@ -103,7 +103,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
             index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
-        var edits = result!.Changes![DocumentUri.From(EnumFileUri)].OrderBy(e => e.Range.Start.Character).ToList();
+        var edits = result.Changes![DocumentUri.From(EnumFileUri)].OrderBy(e => e.Range.Start.Character).ToList();
         Assert.Equal(2, edits.Count);
         Assert.All(edits, e => Assert.Equal("Building", e.NewText));
         // "\t<Structure>\t0x00000400\t</Structure>" — opening name starts right after '<' at col 2,
@@ -147,7 +147,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
             index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(RefUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(RefUri)));
         var refEdit = Assert.Single(result.Changes[DocumentUri.From(RefUri)]);
         Assert.Equal("Armor_Renamed", refEdit.NewText);
         Assert.Equal(3, refEdit.Range.Start.Line);

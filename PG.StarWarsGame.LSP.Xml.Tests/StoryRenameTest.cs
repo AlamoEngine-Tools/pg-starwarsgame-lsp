@@ -66,7 +66,7 @@ public sealed class StoryRenameTest
         var edit = Handler().HandleRename(ThreadA, Rename("Mission_Begin"), StoryIndex());
 
         Assert.NotNull(edit);
-        var changes = edit!.Changes!.ToDictionary(kvp => kvp.Key.ToString(), kvp => kvp.Value.ToList());
+        var changes = edit.Changes!.ToDictionary(kvp => kvp.Key.ToString(), kvp => kvp.Value.ToList());
         Assert.Equal(3, changes.Count);
 
         var definitionEdit = Assert.Single(changes[ThreadA]);

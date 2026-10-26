@@ -103,7 +103,7 @@ public sealed class IconCatalogLoaderLayeredTest
         var resolved = catalog.Resolve("shared");
         Assert.NotNull(resolved);
         // Byte-for-byte: the two sources differ only in colour, so nothing weaker distinguishes them.
-        Assert.Equal(SolidPng(255, 0, 0), resolved!.Png);
+        Assert.Equal(SolidPng(255, 0, 0), resolved.Png);
     }
 
     /// <summary>

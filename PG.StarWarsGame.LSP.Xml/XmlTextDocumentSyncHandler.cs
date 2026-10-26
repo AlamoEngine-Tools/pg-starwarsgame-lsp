@@ -131,8 +131,7 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         // host, and the session publishes no diagnostics for any file until it is restarted. A
         // debugger breakpoint proves the call happened but suspends the handshake, which makes an
         // intermittent fault impractical to count; this line can be counted over many restarts.
-        _logger?.LogDebug("XML document sync registered (client synchronization capability: {Capability})",
-            capability is null ? "not declared" : "declared");
+        _logger?.LogDebug("XML document sync registered");
 
         return new TextDocumentSyncRegistrationOptions
         {

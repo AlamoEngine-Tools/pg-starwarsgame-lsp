@@ -24,9 +24,9 @@ public sealed class AdoptModProjectHandlerTest
         return new AdoptModProjectHandler(new FileHelper(fs), ResxMessageCatalog.Server("en"));
     }
 
-    private static AdoptModProjectResult Adopt(MockFileSystem fs)
+    private static Task<AdoptModProjectResult> Adopt(MockFileSystem fs)
     {
-        return Build(fs).Handle(new AdoptModProjectParams(Root), CancellationToken.None).Result;
+        return Build(fs).Handle(new AdoptModProjectParams(Root), TestContext.Current.CancellationToken);
     }
 
     private static MockFileSystem Mod(params string[] files)
@@ -45,11 +45,11 @@ public sealed class AdoptModProjectHandlerTest
     }
 
     [Fact]
-    public void OnlyTheDirectoriesThatExist_AreListed_AndNoneIsCreated()
+    public async Task OnlyTheDirectoriesThatExist_AreListed_AndNoneIsCreated()
     {
         var fs = Mod("Data/XML/GameObjectFiles.xml", "Data/Scripts/Library/lib.lua", "Data/Art/Models/a.alo");
 
-        var written = Written(fs, Adopt(fs));
+        var written = Written(fs, await Adopt(fs));
 
         var directories = written["directories"]!.AsObject();
         Assert.Equal("Data/XML", (string?)directories["xml"]![0]);
@@ -61,11 +61,11 @@ public sealed class AdoptModProjectHandlerTest
     }
 
     [Fact]
-    public void TheDirectories_AreSpelledAsOnDisk()
+    public async Task TheDirectories_AreSpelledAsOnDisk()
     {
         var fs = Mod("data/xml/a.xml", "data/Scripts/a.lua");
 
-        var directories = Written(fs, Adopt(fs))["directories"]!.AsObject();
+        var directories = Written(fs, await Adopt(fs))["directories"]!.AsObject();
 
         Assert.Equal("data/xml", (string?)directories["xml"]![0]);
         Assert.Equal("data/Scripts", (string?)directories["scripts"]![0]);
@@ -74,11 +74,11 @@ public sealed class AdoptModProjectHandlerTest
     [Theory]
     [InlineData("Data/Text/MasterTextFile.csv", "CSV")]
     [InlineData("Data/Text/mastertextfile_english.dat", "DAT")]
-    public void TheTextFormat_IsTheOneFound(string textFile, string type)
+    public async Task TheTextFormat_IsTheOneFound(string textFile, string type)
     {
         var fs = Mod("Data/XML/a.xml", textFile);
 
-        var localisation = Written(fs, Adopt(fs))["localisation"]!.AsObject();
+        var localisation = Written(fs, await Adopt(fs))["localisation"]!.AsObject();
 
         Assert.Equal(type, (string?)localisation["type"]);
         Assert.Equal("Data/Text", (string?)localisation["directory"]);
@@ -86,31 +86,31 @@ public sealed class AdoptModProjectHandlerTest
 
     /// <summary>The csv is what a mod compiles its dat from, so with both the csv is the source.</summary>
     [Fact]
-    public void WithBothFormats_TheCsvIsTheSource()
+    public async Task WithBothFormats_TheCsvIsTheSource()
     {
         var fs = Mod("Data/XML/a.xml", "Data/Text/MasterTextFile.csv", "Data/Text/mastertextfile_english.dat");
 
-        Assert.Equal("CSV", (string?)Written(fs, Adopt(fs))["localisation"]!["type"]);
+        Assert.Equal("CSV", (string?)Written(fs, await Adopt(fs))["localisation"]!["type"]);
     }
 
     [Fact]
-    public void StoryDialog_IsListedWhereTheStoryScriptsHoldDialog()
+    public async Task StoryDialog_IsListedWhereTheStoryScriptsHoldDialog()
     {
         var fs = Mod("Data/XML/a.xml", "Data/Scripts/Story/Dialog_Intro.txt");
 
-        var directories = Written(fs, Adopt(fs))["directories"]!.AsObject();
+        var directories = Written(fs, await Adopt(fs))["directories"]!.AsObject();
 
         Assert.Equal("Data/Scripts/Story", (string?)directories["storyDialog"]![0]);
     }
 
     [Fact]
-    public void TheName_IsTheModsOwn_AndModinfoIsLeftAsItWas()
+    public async Task TheName_IsTheModsOwn_AndModinfoIsLeftAsItWas()
     {
         const string modinfo = """{ "name": "Thrawn's Revenge", "dependencies": [ "1125571106" ] }""";
         var fs = Mod("Data/XML/a.xml");
         fs.AddFile($"{Root}/modinfo.json", new MockFileData(modinfo));
 
-        var result = Adopt(fs);
+        var result = await Adopt(fs);
 
         Assert.Equal("Thrawn's Revenge", (string?)Written(fs, result)["name"]);
         Assert.EndsWith("Thrawns_Revenge.pgproj", result.ProjectFile);
@@ -118,22 +118,22 @@ public sealed class AdoptModProjectHandlerTest
     }
 
     [Fact]
-    public void WithoutModinfo_TheNameIsTheFolders()
+    public async Task WithoutModinfo_TheNameIsTheFolders()
     {
         var fs = Mod("Data/XML/a.xml");
 
-        var result = Adopt(fs);
+        var result = await Adopt(fs);
 
         Assert.Equal("legacy", (string?)Written(fs, result)["name"]);
         Assert.Equal($"{Root}/legacy.pgproj", result.ProjectFile!.Replace('\\', '/'));
     }
 
     [Fact]
-    public void TheFile_IsStampedAndLoads()
+    public async Task TheFile_IsStampedAndLoads()
     {
         var fs = Mod("Data/XML/a.xml", "Data/Text/MasterTextFile.csv");
 
-        var result = Adopt(fs);
+        var result = await Adopt(fs);
         var written = Written(fs, result);
 
         Assert.Equal(PgprojFormat.TypeName, (string?)written["_type"]);
@@ -146,11 +146,11 @@ public sealed class AdoptModProjectHandlerTest
     }
 
     [Fact]
-    public void AFolderWithAProject_IsRefused_AndNothingWritten()
+    public async Task AFolderWithAProject_IsRefused_AndNothingWritten()
     {
         var fs = Mod("Data/XML/a.xml", "existing.pgproj");
 
-        var result = Adopt(fs);
+        var result = await Adopt(fs);
 
         Assert.Null(result.ProjectFile);
         Assert.NotNull(result.Error);
@@ -158,11 +158,11 @@ public sealed class AdoptModProjectHandlerTest
     }
 
     [Fact]
-    public void AFolderNotLaidOutLikeAMod_IsRefused()
+    public async Task AFolderNotLaidOutLikeAMod_IsRefused()
     {
         var fs = Mod("notes/todo.xml");
 
-        var result = Adopt(fs);
+        var result = await Adopt(fs);
 
         Assert.Null(result.ProjectFile);
         Assert.NotNull(result.Error);
@@ -175,53 +175,53 @@ public sealed class AdoptModProjectHandlerTest
     [InlineData("Data/Scripts/Library/lib.lua", "scripts")]
     [InlineData("Data/Art/Models/a.alo", "art")]
     [InlineData("Data/Audio/Speech/a.wav", "audio")]
-    public void AModWithoutXml_IsAdopted_WithTheDirectoriesItHas(string file, string directory)
+    public async Task AModWithoutXml_IsAdopted_WithTheDirectoriesItHas(string file, string directory)
     {
         var fs = Mod(file);
 
-        var directories = Written(fs, Adopt(fs))["directories"]!.AsObject();
+        var directories = Written(fs, await Adopt(fs))["directories"]!.AsObject();
 
         Assert.True(directories.ContainsKey(directory));
         Assert.False(directories.ContainsKey("xml"));
     }
 
     [Fact]
-    public void AModOfTextOrArchivesOnly_IsAdopted()
+    public async Task AModOfTextOrArchivesOnly_IsAdopted()
     {
         var text = Mod("Data/Text/MasterTextFile_English.dat");
         var packed = Mod("Data/Config.meg");
 
-        Assert.Equal("DAT", (string?)Written(text, Adopt(text))["localisation"]!["type"]);
-        Assert.Empty(Written(packed, Adopt(packed))["directories"]!.AsObject());
+        Assert.Equal("DAT", (string?)Written(text, await Adopt(text))["localisation"]!["type"]);
+        Assert.Empty(Written(packed, await Adopt(packed))["directories"]!.AsObject());
     }
 
     [Fact]
-    public void AFolderWithOnlyModinfo_IsAdopted_UnderTheModsName()
+    public async Task AFolderWithOnlyModinfo_IsAdopted_UnderTheModsName()
     {
         var fs = new MockFileSystem();
         fs.AddFile($"{Root}/modinfo.json", new MockFileData("""{ "name": "Legacy Mod" }"""));
 
-        Assert.Equal("Legacy Mod", (string?)Written(fs, Adopt(fs))["name"]);
+        Assert.Equal("Legacy Mod", (string?)Written(fs, await Adopt(fs))["name"]);
     }
 
     [Theory]
     [InlineData("sweaw.exe")]
     [InlineData("StarWarsG.exe")]
-    public void TheGamesOwnFolder_IsRefused(string executable)
+    public async Task TheGamesOwnFolder_IsRefused(string executable)
     {
         var fs = Mod("Data/XML/a.xml", executable);
 
-        var result = Adopt(fs);
+        var result = await Adopt(fs);
 
         Assert.Null(result.ProjectFile);
         Assert.NotNull(result.Error);
     }
 
     [Fact]
-    public void AFolderWithABareXmlFolder_IsRefused()
+    public async Task AFolderWithABareXmlFolder_IsRefused()
     {
         var fs = Mod("xml/a.xml");
 
-        Assert.Null(Adopt(fs).ProjectFile);
+        Assert.Null((await Adopt(fs)).ProjectFile);
     }
 }

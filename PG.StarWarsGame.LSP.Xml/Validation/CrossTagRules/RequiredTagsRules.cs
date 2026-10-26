@@ -30,7 +30,7 @@ public sealed class DemolitionBombTypeRule : RequiredTagsRuleBase
     protected override string RepairKey => "DemolitionBombTypeRule_Repair";
 
     /// <summary>Measured: the message itself names the substitute, <c>Demolition_Bomb</c>.</summary>
-    protected override string? DefaultValue => "Demolition_Bomb";
+    protected override string DefaultValue => "Demolition_Bomb";
 }
 
 /// <summary>

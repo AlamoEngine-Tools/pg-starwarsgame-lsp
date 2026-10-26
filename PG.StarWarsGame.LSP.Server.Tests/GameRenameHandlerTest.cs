@@ -236,12 +236,12 @@ public sealed class GameRenameHandlerTest
 
     private sealed class ClaimsNothing : ILuaRenameProvider
     {
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
+        public WorkspaceEdit HandleRename(string uri, RenameParams request, GameIndex index)
         {
             throw new InvalidOperationException("not claimed, never asked");
         }
 
-        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        public RangeOrPlaceholderRange HandlePrepare(string uri, int line, int character, GameIndex index)
         {
             throw new InvalidOperationException("not claimed, never asked");
         }
@@ -276,7 +276,7 @@ public sealed class GameRenameHandlerTest
         {
         }
 
-        public Task<T?> RequestAsync<T>(string asked, object parameters, CancellationToken ct) where T : class
+        public Task<T?> RequestAsync<T>(string asked, object parameters, CancellationToken ct) where T : class?
         {
             Asked = true;
             return Task.FromResult(asked == method ? answer as T : null);
@@ -395,11 +395,8 @@ public sealed class GameRenameHandlerTest
             _edit = edit;
         }
 
-        public bool RenameCalled { get; private set; }
-
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
+        public WorkspaceEdit HandleRename(string uri, RenameParams request, GameIndex index)
         {
-            RenameCalled = true;
             return _edit;
         }
 

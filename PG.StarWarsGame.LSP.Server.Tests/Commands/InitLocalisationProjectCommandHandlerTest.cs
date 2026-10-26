@@ -423,7 +423,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         public bool FullyReloaded { get; private set; }
         public IReadOnlyList<string>? LastAssetRoots => null;
         public WorkspaceConfiguration? LastWorkspaceConfig { get; init; }
-        public IReadOnlyList<string>? LastWorkspaceRoots { get; init; }
+        public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
         {

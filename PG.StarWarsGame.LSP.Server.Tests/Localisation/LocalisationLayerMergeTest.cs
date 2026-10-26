@@ -72,7 +72,7 @@ public sealed class LocalisationLayerMergeTest
         LocalisationLayerMerge.MergeBaselineAndLowerLayers(target, [baseline], layers, 1);
 
         Assert.True(target.TryGetEntry("TEXT_SHARED", out var entry));
-        Assert.Equal("From Dep", entry!.Translations[english]);
+        Assert.Equal("From Dep", entry.Translations[english]);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class LocalisationLayerMergeTest
         LocalisationLayerMerge.MergeBaselineAndLowerLayers(target, [], layers, 2);
 
         Assert.True(target.TryGetEntry("TEXT_SHARED", out var entry));
-        Assert.Equal("From Near Dep", entry!.Translations[english]);
+        Assert.Equal("From Near Dep", entry.Translations[english]);
     }
 
     // The failure this prevents: the library now throws when a write names a language the target
@@ -137,7 +137,7 @@ public sealed class LocalisationLayerMergeTest
         LocalisationLayerMerge.MergeBaselineAndLowerLayers(target, [source], [], null);
 
         Assert.True(target.TryGetEntry("TEXT_SHARED", out var entry));
-        Assert.Equal("English Value", entry!.Translations[english]);
+        Assert.Equal("English Value", entry.Translations[english]);
     }
 
     private static ProjectLayer Layer(int rank, string name)
@@ -171,7 +171,7 @@ public sealed class LocalisationLayerMergeTest
 
         Assert.True(target.TryGetEntry("TEXT_SHARED", out var shared));
         Assert.Equal(setup.LeafRank == 0 ? "Baseline" : setup.Projects[setup.LeafRank - 1],
-            shared!.Translations[english]);
+            shared.Translations[english]);
         foreach (var layer in setup.Layers)
             Assert.Equal(layer.Rank < setup.LeafRank, target.ContainsKey("TEXT_OF_" + layer.Name.ToUpperInvariant()));
     }

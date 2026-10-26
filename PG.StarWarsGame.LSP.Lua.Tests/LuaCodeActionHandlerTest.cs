@@ -60,6 +60,7 @@ public sealed class LuaCodeActionHandlerTest
 
     // ── suppression quick fixes ──────────────────────────────────────────────
 
+    // ReSharper disable once UnusedTupleComponentInReturnValue - the helper returns everything a test might need; some tests ignore a part
     private static (LuaCodeActionHandler Sut, FakeWorkspaceHost Host) SutWithDocument(string text)
     {
         var host = new FakeWorkspaceHost();
@@ -67,7 +68,7 @@ public sealed class LuaCodeActionHandlerTest
         return (MakeSut(host), host);
     }
 
-    private static async Task<IReadOnlyList<CodeAction>> SuppressionActions(string text, int line)
+    private static async Task<IReadOnlyList<CodeAction>> SuppressionActionsAsync(string text, int line)
     {
         var (sut, _) = SutWithDocument(text);
         var request = ParamsWithDiagnostics("file:///s.lua", RedundantRequireDiag(line, 0, 12));
@@ -82,7 +83,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_InsideAFunction_OffersAllFourScopes()
     {
-        var titles = (await SuppressionActions("function Foo()\n  require(\"x\")\nend\n", 1))
+        var titles = (await SuppressionActionsAsync("function Foo()\n  require(\"x\")\nend\n", 1))
             .Select(a => a.Title).ToList();
 
         Assert.Equal(4, titles.Count);
@@ -96,7 +97,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_AtFileLevel_OmitsTheFunctionScope()
     {
-        var titles = (await SuppressionActions("require(\"x\")\n", 0)).Select(a => a.Title).ToList();
+        var titles = (await SuppressionActionsAsync("require(\"x\")\n", 0)).Select(a => a.Title).ToList();
 
         Assert.Equal(3, titles.Count);
         Assert.DoesNotContain(titles, t => t.Contains("this function"));
@@ -105,7 +106,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_LineScopedAction_InsertsALuaCommentAboveTheDiagnostic()
     {
-        var action = (await SuppressionActions("function Foo()\n  require(\"x\")\nend\n", 1))
+        var action = (await SuppressionActionsAsync("function Foo()\n  require(\"x\")\nend\n", 1))
             .First(a => a.Title.Contains("this line"));
         var edit = action.Edit!.Changes![DocumentUri.From("file:///s.lua")].Single();
 
@@ -117,7 +118,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_ProjectScopedAction_IsACommandCarryingTheId()
     {
-        var action = (await SuppressionActions("require(\"x\")\n", 0))
+        var action = (await SuppressionActionsAsync("require(\"x\")\n", 0))
             .First(a => a.Title.Contains("across the project"));
 
         Assert.Null(action.Edit);
@@ -129,7 +130,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_NoSuppressionIsMarkedPreferred()
     {
-        var actions = await SuppressionActions("function Foo()\n  require(\"x\")\nend\n", 1);
+        var actions = await SuppressionActionsAsync("function Foo()\n  require(\"x\")\nend\n", 1);
 
         Assert.DoesNotContain(actions, a => a.IsPreferred);
     }
@@ -266,7 +267,7 @@ public sealed class LuaCodeActionHandlerTest
 
         var action = Assert.Single(result!).CodeAction;
         Assert.NotNull(action);
-        Assert.Equal(CodeActionKind.QuickFix, action!.Kind);
+        Assert.Equal(CodeActionKind.QuickFix, action.Kind);
     }
 
     [Fact]
@@ -354,7 +355,7 @@ public sealed class LuaCodeActionHandlerTest
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
 
-        Assert.Contains(result!, a => a.CodeAction?.Title?.Contains("upvalue-ok") == true);
+        Assert.Contains(result!, a => a.CodeAction?.Title.Contains("upvalue-ok") == true);
     }
 
     [Fact]
@@ -366,7 +367,7 @@ public sealed class LuaCodeActionHandlerTest
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
 
-        var action = result!.First(a => a.CodeAction?.Title?.Contains("upvalue-ok") == true).CodeAction!;
+        var action = result!.First(a => a.CodeAction?.Title.Contains("upvalue-ok") == true).CodeAction!;
         var edit = action.Edit!.Changes![DocumentUri.From("file:///s.lua")].Single();
         Assert.Equal(0, edit.Range.Start.Line);
         Assert.Equal(0, edit.Range.Start.Character);
@@ -386,9 +387,9 @@ public sealed class LuaCodeActionHandlerTest
 
         var result = await MakeSut(host).Handle(request, CancellationToken.None);
 
-        Assert.Contains(result!, a => a.CodeAction?.Title?.Contains("Move") == true ||
-                                      a.CodeAction?.Title?.Contains("move") == true ||
-                                      a.CodeAction?.Title?.Contains("inside") == true);
+        Assert.Contains(result!, a => a.CodeAction?.Title.Contains("Move") == true ||
+                                      a.CodeAction?.Title.Contains("move") == true ||
+                                      a.CodeAction?.Title.Contains("inside") == true);
     }
 
     [Fact]
@@ -401,7 +402,7 @@ public sealed class LuaCodeActionHandlerTest
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
 
-        Assert.DoesNotContain(result!, a => a.CodeAction?.Title?.Contains("inside") == true);
+        Assert.DoesNotContain(result!, a => a.CodeAction?.Title.Contains("inside") == true);
     }
 
     [Fact]
@@ -415,7 +416,7 @@ public sealed class LuaCodeActionHandlerTest
 
         var result = await MakeSut(host).Handle(request, CancellationToken.None);
 
-        var moveAction = result!.First(a => a.CodeAction?.Title?.Contains("inside") == true).CodeAction!;
+        var moveAction = result!.First(a => a.CodeAction?.Title.Contains("inside") == true).CodeAction!;
         Assert.True(moveAction.IsPreferred);
     }
 
@@ -431,7 +432,7 @@ public sealed class LuaCodeActionHandlerTest
 
         var result = await MakeSut(host).Handle(request, CancellationToken.None);
 
-        var edits = result!.First(a => a.CodeAction?.Title?.Contains("inside") == true)
+        var edits = result!.First(a => a.CodeAction?.Title.Contains("inside") == true)
             .CodeAction!.Edit!.Changes![DocumentUri.From("file:///s.lua")].ToList();
         Assert.Contains(edits, e =>
             e.Range.Start.Line == 0 && e.Range.Start.Character == 0 &&
@@ -451,7 +452,7 @@ public sealed class LuaCodeActionHandlerTest
 
         var result = await MakeSut(host).Handle(request, CancellationToken.None);
 
-        var edits = result!.First(a => a.CodeAction?.Title?.Contains("inside") == true)
+        var edits = result!.First(a => a.CodeAction?.Title.Contains("inside") == true)
             .CodeAction!.Edit!.Changes![DocumentUri.From("file:///s.lua")].ToList();
         Assert.Contains(edits, e =>
             e.Range.Start.Line == 2 && e.Range.Start.Character == 0 &&
@@ -485,7 +486,7 @@ public sealed class LuaCodeActionHandlerTest
 
         var result = await MakeSut(fileHelper: fileHelper).Handle(request, CancellationToken.None);
 
-        Assert.Contains(result!, a => a.CodeAction?.Title?.Contains("inside") == true);
+        Assert.Contains(result!, a => a.CodeAction?.Title.Contains("inside") == true);
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

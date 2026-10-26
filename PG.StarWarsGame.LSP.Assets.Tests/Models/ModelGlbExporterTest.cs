@@ -217,7 +217,7 @@ public sealed class ModelGlbExporterTest
 
         var primitive = Assert.Single(Assert.Single(gltf.LogicalMeshes).Primitives);
 
-        Assert.Equal(1, primitive.GetTriangleIndices().Count());
+        Assert.Single(primitive.GetTriangleIndices());
     }
 
     // ── structure ─────────────────────────────────────────────────────────────
@@ -640,7 +640,7 @@ public sealed class ModelGlbExporterTest
 
         var track = Visibility(Assert.Single(gltf.LogicalAnimations));
         Assert.NotNull(track);
-        Assert.Equal(30f, (float)track!["fps"]!, 3);
+        Assert.Equal(30f, (float)track["fps"]!, 3);
         Assert.Equal("0011", (string)track["bones"]!["TURRET#1"]!);
     }
 

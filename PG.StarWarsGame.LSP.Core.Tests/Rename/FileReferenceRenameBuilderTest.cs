@@ -66,9 +66,9 @@ public sealed class FileReferenceRenameBuilderTest
             index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
-        var (file, edits) = Decompose(result!);
+        var (file, edits) = Decompose(result);
         Assert.NotNull(file);
-        Assert.Equal(ManifestUri, file!.OldUri.ToString());
+        Assert.Equal(ManifestUri, file.OldUri.ToString());
         Assert.Equal(Dir + "Story_Plots_Rebel2.xml", file.NewUri.ToString());
 
         var (_, edit) = Assert.Single(edits);
@@ -114,7 +114,7 @@ public sealed class FileReferenceRenameBuilderTest
             index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
-        var (file, edits) = Decompose(result!);
+        var (file, edits) = Decompose(result);
         Assert.Equal(LuaDir + "Story_Campaign2.lua", file!.NewUri.ToString());
         var (_, edit) = Assert.Single(edits);
         Assert.Equal("Story_Campaign2", edit.NewText);

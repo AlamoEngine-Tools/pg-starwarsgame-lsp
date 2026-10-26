@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 
@@ -21,16 +22,19 @@ public sealed record GetSymbolOutlineParams(string Outline) : IRequest<GetSymbol
 
 /// <param name="Pages">The outline's pages, in the order the panel lists them.</param>
 /// <param name="Layers">The project's layers, lowest first; an origin <c>layer:N</c> names one by rank.</param>
+[PublicAPI]
 public sealed record GetSymbolOutlineResult(IReadOnlyList<SymbolPageSummary> Pages, IReadOnlyList<SymbolLayer> Layers);
 
 /// <param name="Page">The page's key: <c>xml:&lt;type&gt;</c>, <c>models</c>, <c>enums</c> and the rest.</param>
 /// <param name="Count">How many entries the page lists.</param>
 public sealed record SymbolPageSummary(string Page, int Count);
 
+[PublicAPI]
 public sealed record SymbolLayer(int Rank, string Name);
 
 /// <summary>One page of entries, filtered and paged on the server: a large mod's set is too big to ship.</summary>
 [Method("aet/getSymbolPage", Direction.ClientToServer)]
+[PublicAPI]
 public sealed record GetSymbolPageParams(string Page) : IRequest<GetSymbolPageResult>
 {
     /// <summary>A name to match, case-insensitively; names starting with it come first.</summary>
@@ -171,17 +175,20 @@ public sealed record PreviewTile(string Kind, int X, int Y, int Width, int Heigh
 
 /// <param name="Key">What the property is: <c>valueType</c>, <c>references</c>, <c>enum</c> and the rest.</param>
 /// <param name="Value">Its value, as the schema names it; empty for a property that is only there or not.</param>
+[PublicAPI]
 public sealed record PreviewProperty(string Key, string Value);
 
 /// <param name="Kind">The note's kind, as the schema names it: <c>Deprecated</c>, <c>Since</c> and the rest.</param>
 /// <param name="Text">What it says, in the language the server documents in.</param>
 /// <param name="Value">What a kind carries besides prose - a version for <c>Since</c>.</param>
+[PublicAPI]
 public sealed record PreviewNote(string Kind, string? Text, string? Value);
 
 /// <summary>A file on disk, as its header describes it.</summary>
 /// <param name="Size">Its size in bytes.</param>
 /// <param name="Created">When it was created, in UTC.</param>
 /// <param name="Modified">When it was last changed, in UTC.</param>
+[PublicAPI]
 public sealed record PreviewFile(long Size, DateTime Created, DateTime Modified)
 {
     /// <summary>A script's line count; null for any other file.</summary>
@@ -190,6 +197,7 @@ public sealed record PreviewFile(long Size, DateTime Created, DateTime Modified)
 
 /// <param name="Key">What is counted: <c>bones</c>, <c>textures</c>, <c>particleSystems</c>, <c>animations</c>.</param>
 /// <param name="Value">How many.</param>
+[PublicAPI]
 public sealed record PreviewFact(string Key, int Value);
 
 /// <param name="Name">What the line says: an entry's name, or a problem's message.</param>
@@ -223,18 +231,19 @@ public sealed record SymbolRelation(string Relation, int? Count, string? Reason)
 
 /// <param name="Rows">The requested slice, sorted by name, prefix matches of the query first.</param>
 /// <param name="Total">How many entries match before paging.</param>
-/// <param name="Kinds">
-///     Every kind a game object can be, with how many entries of it match the name and origin
-///     filters - the kind filter left out, so picking one kind does not hide the others. None for a
-///     list without game objects.
-/// </param>
 public sealed record GetSymbolPageResult(IReadOnlyList<SymbolRow> Rows, int Total)
 {
+    /// <summary>
+    ///     Every kind a game object can be, with how many entries of it match the name and origin
+    ///     filters - the kind filter left out, so picking one kind does not hide the others. None for a
+    ///     list without game objects.
+    /// </summary>
     public IReadOnlyList<SymbolKindCount> Kinds { get; init; } = [];
 }
 
 /// <param name="Kind">The kind's name.</param>
 /// <param name="Count">How many entries of the list are of it.</param>
+[PublicAPI]
 public sealed record SymbolKindCount(string Kind, int Count);
 
 /// <summary>One entry, as the definition the game uses.</summary>

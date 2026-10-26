@@ -67,6 +67,8 @@ public sealed class RawLspSession : IAsyncDisposable
     }
 
     /// <summary>Starts the server, initializes it, and waits until its workspace scan is complete.</summary>
+    /// <param name="clientCapabilities">The capabilities the client announces.</param>
+    /// <param name="initializationOptions">The initialization options sent to the server.</param>
     /// <param name="workspace">The workspace root; the suite's TestData folder when omitted.</param>
     /// <param name="environment">Variables set on the server process (a null value removes one).</param>
     public static async Task<RawLspSession> StartAsync(object clientCapabilities, object initializationOptions,

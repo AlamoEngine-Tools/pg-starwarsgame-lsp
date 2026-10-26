@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Server.Encyclopedia;
 
 /// <summary>
@@ -31,6 +33,7 @@ public sealed record EncyclopediaLine(string Key, string? Text);
 ///     missing-icon placeholder included, so a unit with no art looks identical wherever it is
 ///     drawn. Null only when the unit names no icon at all, or is unknown.
 /// </param>
+[PublicAPI]
 public sealed record EncyclopediaReference(
     string ObjectId,
     string? DisplayName,
@@ -50,12 +53,6 @@ public sealed record EncyclopediaReference(
 ///     second state, and does so per ability instance, so two units can give the same ability type
 ///     different icons. When present it is therefore the ability's icon outright. Null for the
 ///     overwhelming majority of abilities, which fall back to the engine's hardcoded default.
-/// </param>
-/// <param name="IconDataUri">
-///     The ability's icon as a <c>data:image/png;base64,...</c> URI, or <see langword="null" /> when
-///     none was found. Resolved by guessing <c>I_SA_&lt;TYPE&gt;</c> against the mega texture -
-///     nothing in the game's data links an ability to its icon, so the engine's mapping cannot be
-///     read. The guess is validated by the lookup, so a miss shows no icon rather than a wrong one.
 /// </param>
 /// <param name="Icon">
 ///     The slot's artwork with its natural size, which the card needs: the ability scale is applied
@@ -116,6 +113,7 @@ public sealed record EncyclopediaAbility(
 ///         therefore always holds the object's real class line; the client substitutes.
 ///     </para>
 /// </param>
+[PublicAPI]
 public sealed record GetEncyclopediaEntryResult(
     bool Found,
     string ObjectId,
@@ -177,6 +175,7 @@ public sealed record EncyclopediaShipNames(
 /// </remarks>
 /// <param name="Name">The name row, from <c>encyclopedia_header_text</c> plus the no-cost bonus.</param>
 /// <param name="UnitClass">The class row, narrowed by each drawn ability icon.</param>
+[PublicAPI]
 public sealed record EncyclopediaRowBudget(int Name, int UnitClass);
 
 /// <summary>A resolved icon, ready for the client to drop straight into an <c>img</c> element.</summary>
@@ -201,6 +200,7 @@ public sealed record EncyclopediaRowBudget(int Name, int UnitClass);
 ///     box so this is informational there, but ability icons are scaled from their natural size and
 ///     a mod may ship them at other than the base game's 26.
 /// </param>
+[PublicAPI]
 public sealed record EncyclopediaIcon(
     string Name,
     string DataUri,

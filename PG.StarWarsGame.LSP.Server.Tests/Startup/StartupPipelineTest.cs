@@ -165,7 +165,7 @@ public sealed class StartupPipelineTest
             NullLogger<StartupPipeline>.Instance);
 
         var pipelineTask = pipeline.RunAsync(["/ws"], CancellationToken.None);
-        var timeout = Task.Delay(TimeSpan.FromSeconds(5));
+        var timeout = Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var first = await Task.WhenAny(pipelineTask, timeout);
 
         Assert.True(first == pipelineTask,
@@ -473,7 +473,9 @@ public sealed class StartupPipelineTest
 
         public Task LoadAsync(CancellationToken ct)
         {
+#pragma warning disable VSTHRD003 // the fake hands back the signal the test controls
             return _unblockSignal;
+#pragma warning restore VSTHRD003
         }
     }
 

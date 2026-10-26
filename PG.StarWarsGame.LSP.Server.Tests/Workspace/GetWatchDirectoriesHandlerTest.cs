@@ -36,12 +36,10 @@ public sealed class GetWatchDirectoriesHandlerTest
         return new GetWatchDirectoriesHandler(map);
     }
 
-    private static IReadOnlyList<string> Resolve(params ProjectLayer[] layers)
+    private static async Task<IReadOnlyList<string>> Resolve(params ProjectLayer[] layers)
     {
-        return Handler(layers)
-            .Handle(new GetWatchDirectoriesParams(), CancellationToken.None)
-            .GetAwaiter().GetResult()
-            .Directories;
+        var result = await Handler(layers).Handle(new GetWatchDirectoriesParams(), TestContext.Current.CancellationToken);
+        return result.Directories;
     }
 
     /// <summary>
@@ -51,10 +49,10 @@ public sealed class GetWatchDirectoriesHandlerTest
     /// </summary>
     [Theory]
     [MemberData(nameof(Setups))]
-    public void EveryLayersContentIsCovered(string name)
+    public async Task EveryLayersContentIsCovered(string name)
     {
         var setup = ProjectSetup.Named(name);
-        var dirs = Resolve([.. setup.Layers]);
+        var dirs = await Resolve([.. setup.Layers]);
 
         var content = setup.Layers.SelectMany(l =>
             l.XmlDirectories.Concat(l.ScriptRoots).Concat(l.TextRoots).Concat(l.AssetRoots).Append(l.ProjectPath!));
@@ -71,9 +69,9 @@ public sealed class GetWatchDirectoriesHandlerTest
     ///     declared directories are absolute and nothing requires them to sit under the .pgproj.
     /// </summary>
     [Fact]
-    public void AContentDirectoryOutsideTheProjectDirectoryIsReported()
+    public async Task AContentDirectoryOutsideTheProjectDirectoryIsReported()
     {
-        var dirs = Resolve(Layer(0, "core", "c:/mods/data", ["d:/shared/xml"]));
+        var dirs = await Resolve(Layer(0, "core", "c:/mods/data", ["d:/shared/xml"]));
 
         Assert.Contains("d:/shared/xml", dirs);
         Assert.Contains("c:/mods/data", dirs);
@@ -85,9 +83,9 @@ public sealed class GetWatchDirectoriesHandlerTest
     ///     directory rather than under any declared directory.
     /// </summary>
     [Fact]
-    public void ItReportsEachLayersProjectDirectory()
+    public async Task ItReportsEachLayersProjectDirectory()
     {
-        var dirs = Resolve(Layer(0, "core", "c:/mods/data", ["c:/mods/data/xml"]));
+        var dirs = await Resolve(Layer(0, "core", "c:/mods/data", ["c:/mods/data/xml"]));
 
         Assert.Contains("c:/mods/data", dirs);
     }
@@ -97,9 +95,9 @@ public sealed class GetWatchDirectoriesHandlerTest
     ///     its parent's recursive glob.
     /// </summary>
     [Fact]
-    public void ItDropsADirectoryAlreadyCoveredByAnother()
+    public async Task ItDropsADirectoryAlreadyCoveredByAnother()
     {
-        var dirs = Resolve(Layer(0, "core", "c:/mods/data",
+        var dirs = await Resolve(Layer(0, "core", "c:/mods/data",
             ["c:/mods/data/xml", "c:/mods/data/xml/ai"], ["c:/mods/data/scripts"]));
 
         Assert.DoesNotContain("c:/mods/data/xml/ai", dirs);
@@ -109,9 +107,9 @@ public sealed class GetWatchDirectoriesHandlerTest
     }
 
     [Fact]
-    public void ItReportsEachDirectoryOnce()
+    public async Task ItReportsEachDirectoryOnce()
     {
-        var dirs = Resolve(
+        var dirs = await Resolve(
             Layer(1, "leaf", "c:/mods/rev", ["c:/shared/xml"]),
             Layer(0, "core", "c:/mods/data", ["c:/shared/xml"]));
 
@@ -120,8 +118,8 @@ public sealed class GetWatchDirectoriesHandlerTest
 
     /// <summary>A workspace with no project file resolves to no layers and asks for nothing.</summary>
     [Fact]
-    public void WithNoLayers_ItReportsNothing()
+    public async Task WithNoLayers_ItReportsNothing()
     {
-        Assert.Empty(Resolve());
+        Assert.Empty(await Resolve());
     }
 }

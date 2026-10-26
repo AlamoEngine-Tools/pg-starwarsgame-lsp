@@ -101,6 +101,7 @@ public sealed class ConvertLocalisationFormatHandler
                 _layers, _fileHelper, request.ProjectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
             return Fail(readOnly);
 
+        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
         var targetFormat = request.TargetFormat ?? string.Empty;
         if (string.Equals(targetFormat, "dat", StringComparison.OrdinalIgnoreCase))
             return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_DatNotATarget"));

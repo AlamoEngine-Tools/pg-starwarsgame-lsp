@@ -81,7 +81,7 @@ public sealed class EawSchemaDeathAnimTagTest
         var tags = YamlSchemaParser.ParseTagFile(File.ReadAllText(Find("tags", "GameObjectType.yaml")));
         var tag = tags.FirstOrDefault(t => string.Equals(t.Tag, name, StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(tag);
-        return tag!;
+        return tag;
     }
 
     private static IReadOnlyList<string> LoadEnumValues(string enumFile)
