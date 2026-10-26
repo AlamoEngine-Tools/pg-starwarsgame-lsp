@@ -207,7 +207,8 @@ public sealed class HttpSchemaProviderTest
         Assert.False(provider.LastLoadFromCache);
         fake.Requests.Clear();
 
-        await provider.LoadAsync(TestContext.Current.CancellationToken); // second load - cache hit; only manifest is fetched
+        await provider.LoadAsync(TestContext.Current
+            .CancellationToken); // second load - cache hit; only manifest is fetched
 
         Assert.Single(fake.Requests);
         Assert.EndsWith("_index.json", fake.Requests[0].RequestUri!.ToString());

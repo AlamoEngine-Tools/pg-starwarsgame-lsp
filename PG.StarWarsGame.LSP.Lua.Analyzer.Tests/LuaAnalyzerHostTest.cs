@@ -130,7 +130,8 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
              attempt < 50 && !text.Contains("configuration=answered", StringComparison.Ordinal);
              attempt++)
         {
-            var hover = await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct), ct: TestContext.Current.CancellationToken);
+            var hover = await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct),
+                ct: TestContext.Current.CancellationToken);
             text = hover!.Contents.MarkupContent!.Value;
             await Task.Delay(100, TestContext.Current.CancellationToken);
         }
@@ -148,7 +149,8 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
         await host.StartAsync(Plan());
 
         var started = DateTime.UtcNow;
-        var hover = await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct), ct: TestContext.Current.CancellationToken);
+        var hover = await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct),
+            ct: TestContext.Current.CancellationToken);
 
         Assert.Null(hover);
         Assert.InRange(DateTime.UtcNow - started, TimeSpan.FromSeconds(1.5), TimeSpan.FromSeconds(10));
@@ -181,7 +183,8 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
         await host.DisposeAsync();
 
         Assert.False(host.IsRunning);
-        Assert.Null(await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct), ct: TestContext.Current.CancellationToken));
+        Assert.Null(await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct),
+            ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -193,7 +196,8 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
         host.DidOpen(Uri, "x = 1", 1);
 
         Assert.False(host.IsRunning);
-        Assert.Null(await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct), ct: TestContext.Current.CancellationToken));
+        Assert.Null(await host.RequestAsync((client, ct) => client.RequestHover(HoverAt(), ct),
+            ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]

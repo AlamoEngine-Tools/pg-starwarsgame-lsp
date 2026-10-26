@@ -95,8 +95,9 @@ public sealed class XmlGameDocumentParserTest
         schema.AddTag(WorkspaceFileTag("Empire_Story_Name", "StoryPlotManifest"));
 
         var index = await Build(schema).ParseAsync("file:///c.xml", "<Campaigns><Campaign Name=\"T\">\n" +
-            "<Empire_Story_Name>Story_Plots_Campaign_Empire.xml</Empire_Story_Name>\n" +
-            "</Campaign></Campaigns>", 1, TestContext.Current.CancellationToken);
+                                                                    "<Empire_Story_Name>Story_Plots_Campaign_Empire.xml</Empire_Story_Name>\n" +
+                                                                    "</Campaign></Campaigns>", 1,
+            TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
         Assert.Equal("storyplotmanifest:story_plots_campaign_empire.xml", reference.TargetId);
@@ -124,8 +125,9 @@ public sealed class XmlGameDocumentParserTest
             valueType: XmlValueType.TypeReferenceList));
 
         var index = await Build(schema).ParseAsync("file:///gc.xml", "<GameConstants>\n" +
-            "<Debug_Hot_Key_Load_Map_Script> Story_Plots_UM00_CIN_Test.xml </Debug_Hot_Key_Load_Map_Script>\n" +
-            "</GameConstants>", 1, TestContext.Current.CancellationToken);
+                                                                     "<Debug_Hot_Key_Load_Map_Script> Story_Plots_UM00_CIN_Test.xml </Debug_Hot_Key_Load_Map_Script>\n" +
+                                                                     "</GameConstants>", 1,
+            TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
         Assert.Equal("storyplotmanifest:story_plots_um00_cin_test.xml", reference.TargetId);
@@ -141,7 +143,9 @@ public sealed class XmlGameDocumentParserTest
         var schema = new FakeSchemaProvider();
         schema.AddTag(WorkspaceFileTag("Active_Plot", "StoryParser"));
 
-        var index = await Build(schema).ParseAsync("file:///m.xml", "<Story_Mode_Plots><Active_Plot>Conquests\\Loader\\Story_Plots_Loader.xml</Active_Plot></Story_Mode_Plots>", 1, TestContext.Current.CancellationToken);
+        var index = await Build(schema).ParseAsync("file:///m.xml",
+            "<Story_Mode_Plots><Active_Plot>Conquests\\Loader\\Story_Plots_Loader.xml</Active_Plot></Story_Mode_Plots>",
+            1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
         Assert.Equal("storyparser:conquests/loader/story_plots_loader.xml", reference.TargetId);
@@ -153,7 +157,9 @@ public sealed class XmlGameDocumentParserTest
         var schema = new FakeSchemaProvider();
         schema.AddTag(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
 
-        var index = await Build(schema).ParseAsync("file:///c.xml", "<Campaign>\n<Rebel_Story_Name> Story_Plots_Rebel.xml </Rebel_Story_Name>\n</Campaign>", 1, TestContext.Current.CancellationToken);
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Rebel_Story_Name> Story_Plots_Rebel.xml </Rebel_Story_Name>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
         Assert.Equal("storyplotmanifest:story_plots_rebel.xml", reference.TargetId);
@@ -168,7 +174,9 @@ public sealed class XmlGameDocumentParserTest
         schema.AddTag(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
             TagSemanticType.FactionPlotFilePairList));
 
-        var index = await Build(schema).ParseAsync("file:///c.xml", "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>", 1, TestContext.Current.CancellationToken);
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         var refs = index.References.Where(r => r.ExpectedKind == GameSymbolKind.WorkspaceFile).ToList();
         Assert.Equal(
@@ -185,7 +193,9 @@ public sealed class XmlGameDocumentParserTest
         schema.AddTag(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
             TagSemanticType.FactionPlotFilePairList));
 
-        var index = await Build(schema).ParseAsync("file:///c.xml", "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>", 1, TestContext.Current.CancellationToken);
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         var factions = index.References
             .Where(r => r.ExpectedTypeName == "Faction")
@@ -214,7 +224,9 @@ public sealed class XmlGameDocumentParserTest
             SemanticType = TagSemanticType.FactionAiPlayerPairList
         });
 
-        var index = await Build(schema).ParseAsync("file:///c.xml", "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n</Campaign>", 1, TestContext.Current.CancellationToken);
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(["Empire"],
             index.References.Where(r => r.ExpectedTypeName == "Faction").Select(r => r.TargetId));
@@ -236,8 +248,10 @@ public sealed class XmlGameDocumentParserTest
             SemanticType = TagSemanticType.FactionAiPlayerPairList
         });
 
-        var index = await Build(schema).ParseAsync("file:///c.xml", "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n"
-            + "<AI_Player_Control> Rebel, BasicRebel </AI_Player_Control>\n</Campaign>", 1, TestContext.Current.CancellationToken);
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n"
+            + "<AI_Player_Control> Rebel, BasicRebel </AI_Player_Control>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(["Empire", "Rebel"],
             index.References.Where(r => r.ExpectedTypeName == "Faction").Select(r => r.TargetId));
@@ -253,7 +267,9 @@ public sealed class XmlGameDocumentParserTest
         var schema = new FakeSchemaProvider();
         schema.AddTag(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
 
-        var index = await Build(schema).ParseAsync("file:///c.xml", "<Campaign>\n<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>\n</Campaign>", 1, TestContext.Current.CancellationToken);
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(index.References, r => r.ExpectedTypeName == "Faction");
     }
@@ -954,7 +970,9 @@ public sealed class XmlGameDocumentParserTest
             SemanticType = TagSemanticType.FactionAiPlayerPairList
         });
 
-        var index = await Build(schema).ParseAsync("file:///c.xml", $"<Campaign>\n<AI_Player_Control> Rebel, {keyword} </AI_Player_Control>\n</Campaign>", 1, TestContext.Current.CancellationToken);
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            $"<Campaign>\n<AI_Player_Control> Rebel, {keyword} </AI_Player_Control>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(["Rebel"], index.References.Select(r => r.TargetId));
     }

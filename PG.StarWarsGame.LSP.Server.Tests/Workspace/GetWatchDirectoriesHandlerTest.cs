@@ -38,7 +38,8 @@ public sealed class GetWatchDirectoriesHandlerTest
 
     private static async Task<IReadOnlyList<string>> Resolve(params ProjectLayer[] layers)
     {
-        var result = await Handler(layers).Handle(new GetWatchDirectoriesParams(), TestContext.Current.CancellationToken);
+        var result = await Handler(layers)
+            .Handle(new GetWatchDirectoriesParams(), TestContext.Current.CancellationToken);
         return result.Directories;
     }
 

@@ -17,7 +17,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </summary>
 public sealed class PreviewHandlersTest
 {
-
     private static ILspConfigurationProvider Config()
     {
         return new StubConfig(new LspConfiguration());

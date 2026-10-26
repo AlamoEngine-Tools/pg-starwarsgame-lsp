@@ -46,7 +46,8 @@ public sealed class StartupBufferingSmokeTest : IClassFixture<LspServerFixture>
         });
 
         // If the gate hangs draining the buffered open, this notification never arrives.
-        var completed = await Task.WhenAny(_fixture.ScanCompleted, Task.Delay(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken));
+        var completed = await Task.WhenAny(_fixture.ScanCompleted,
+            Task.Delay(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken));
         Assert.True(completed == _fixture.ScanCompleted,
             "$/workspaceScanComplete never arrived - the StartupGate likely hung or threw while draining the buffered didOpen.");
 

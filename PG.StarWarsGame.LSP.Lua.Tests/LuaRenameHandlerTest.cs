@@ -898,5 +898,4 @@ public sealed class LuaRenameHandlerTest
             _types[def.TypeName] = def;
         }
     }
-
 }

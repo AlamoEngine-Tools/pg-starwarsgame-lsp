@@ -145,7 +145,8 @@ public sealed class GetEncyclopediaEntryShipNamesTest
             }),
             new NullSchemaProvider(), source, config, null, stub);
 
-        var result = await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, TestContext.Current.CancellationToken);
+        var result = await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("STAR_DESTROYER, Data\\SD.txt", stub.LastTagValue);
         Assert.NotNull(result.ShipNames);

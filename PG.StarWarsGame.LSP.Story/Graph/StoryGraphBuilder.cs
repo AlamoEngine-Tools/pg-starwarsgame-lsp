@@ -393,7 +393,8 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
 
     // ── Schema-driven param edges ────────────────────────────────────────────
 
-    private void AddParamEdges(BuildState state, StoryThread thread, StoryNode node, string? typeName, IReadOnlyList<StoryParamSlot> slots,
+    private void AddParamEdges(BuildState state, StoryThread thread, StoryNode node, string? typeName,
+        IReadOnlyList<StoryParamSlot> slots,
         IReadOnlyDictionary<(string, int), string> refTypes)
     {
         if (typeName is null) return;

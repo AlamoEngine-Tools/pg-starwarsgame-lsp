@@ -131,7 +131,7 @@ public sealed class WorkspaceVariantTagSourceTest
 
         Assert.NotNull(tags);
         Assert.Contains(tags, t => t.TagName == "ShipNameTextFiles"
-                                    && t.Value == "Star_Destroyer, Data\\SD.txt");
+                                   && t.Value == "Star_Destroyer, Data\\SD.txt");
         Assert.Contains(tags, t => t.TagName == "Credits_Per_CP" && t.Value == "50");
     }
 

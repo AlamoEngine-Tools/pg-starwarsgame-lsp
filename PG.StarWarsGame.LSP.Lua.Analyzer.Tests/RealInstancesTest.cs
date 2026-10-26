@@ -40,7 +40,8 @@ public sealed class RealInstancesTest
         var library = fileHelper.PathToFileUri(Path.Combine(game, "Library", "PGBase.lua"));
         var script = fileHelper.PathToFileUri(Path.Combine(mod, "A.lua"));
         var other = fileHelper.PathToFileUri(Path.Combine(mod, "B.lua"));
-        await File.WriteAllTextAsync(fileHelper.FileUriToPath(library)!, "function TestValid(wrapper)\n\tif wrapper == nil then\n\t\treturn false\n\tend\n" +
+        await File.WriteAllTextAsync(fileHelper.FileUriToPath(library)!,
+            "function TestValid(wrapper)\n\tif wrapper == nil then\n\t\treturn false\n\tend\n" +
             "\treturn wrapper.Is_Valid and wrapper.Is_Valid()\nend\n", TestContext.Current.CancellationToken);
         const string scriptText = "require(\"PGBase\")\nlocal ok = TestValid(nil)\nlocal t = transport\n";
 

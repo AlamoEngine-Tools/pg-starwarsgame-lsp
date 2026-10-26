@@ -50,6 +50,7 @@ public enum XmlValueType
 
     /// <summary>UV texture channel index (expected range 0–3).</summary>
     UvSlotIndex = 21,
+
     // Canonical spelling of the schema's type code; this enum is never renamed (CLAUDE.md).
     // ReSharper disable once InconsistentNaming
     RGBA = 22,

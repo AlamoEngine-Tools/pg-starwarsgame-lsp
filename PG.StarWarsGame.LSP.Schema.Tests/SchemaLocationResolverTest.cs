@@ -50,7 +50,8 @@ public sealed class SchemaLocationResolverTest
     {
         var (resolver, fake) = Build(_ => ReleasesResponse("v2.1.0"), EmptyCache());
 
-        var location = await resolver.ResolveAsync(Repository, "https://example.test/schema/eaw/", TestContext.Current.CancellationToken);
+        var location = await resolver.ResolveAsync(Repository, "https://example.test/schema/eaw/",
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(new SchemaLocation("https://example.test/schema/eaw/", null, SchemaOrigin.Explicit), location);
         Assert.Empty(fake.Requests);

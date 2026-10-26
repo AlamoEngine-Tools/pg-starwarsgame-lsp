@@ -49,7 +49,9 @@ public sealed class BaselineLocationResolverTest
     {
         var (resolver, requests) = Build(_ => Releases($"v{Dto}.1.0"));
 
-        var location = await resolver.ResolveAsync(new BaselineSourceConfig { Url = "https://example.test/foc-baseline.aet" }, TestContext.Current.CancellationToken);
+        var location = await resolver.ResolveAsync(
+            new BaselineSourceConfig { Url = "https://example.test/foc-baseline.aet" },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(
             new BaselineLocation("https://example.test/foc-baseline.aet", null, BaselineOrigin.Explicit),

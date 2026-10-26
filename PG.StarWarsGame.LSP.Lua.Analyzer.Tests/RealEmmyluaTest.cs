@@ -50,7 +50,8 @@ public sealed class RealEmmyluaTest
         host.DidOpen(uri.ToString(), text, 1);
 
         var deadline = DateTime.UtcNow.AddSeconds(20);
-        while (!messages.Contains("syntax-error") && DateTime.UtcNow < deadline) await Task.Delay(50, TestContext.Current.CancellationToken);
+        while (!messages.Contains("syntax-error") && DateTime.UtcNow < deadline)
+            await Task.Delay(50, TestContext.Current.CancellationToken);
         Assert.Contains("syntax-error", messages);
 
         var hover = await host.RequestAsync((client, ct) => client.RequestHover(new HoverParams

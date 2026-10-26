@@ -90,12 +90,14 @@ public sealed class BaselineSerializerTest
     public void Deserialize_SymbolWrittenBeforeBehaviours_ReadsAsNone()
     {
         var legacy = MessagePackSerializer.Serialize(new LegacyGameSymbol
-            {
-                Id = "CORUSCANT", Kind = GameSymbolKind.XmlObject, TypeName = "GameObjectType",
-                Origin = new UnknownOrigin("engine")
-            }, cancellationToken: TestContext.Current.CancellationToken);
+        {
+            Id = "CORUSCANT", Kind = GameSymbolKind.XmlObject, TypeName = "GameObjectType",
+            Origin = new UnknownOrigin("engine")
+        }, cancellationToken: TestContext.Current.CancellationToken);
 
-        var symbol = MessagePackSerializer.Deserialize<GameSymbol>(legacy, cancellationToken: TestContext.Current.CancellationToken);
+        var symbol =
+            MessagePackSerializer.Deserialize<GameSymbol>(legacy,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("CORUSCANT", symbol.Id);
         Assert.Null(symbol.Behaviors);

@@ -655,7 +655,8 @@ public sealed class GameIndexServiceTest
             layerMap);
 
         foreach (var layer in setup.Layers)
-            await svc.UpdateDocumentAsync(setup.Uri(layer.Rank, "Xml/Units.xml"), "<X/>", 1, TestContext.Current.CancellationToken);
+            await svc.UpdateDocumentAsync(setup.Uri(layer.Rank, "Xml/Units.xml"), "<X/>", 1,
+                TestContext.Current.CancellationToken);
 
         foreach (var layer in setup.Layers)
         {

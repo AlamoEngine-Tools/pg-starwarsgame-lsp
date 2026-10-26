@@ -52,7 +52,8 @@ public sealed class StartupInlayHintSmokeTest : IClassFixture<EawLspServerFixtur
 
         try
         {
-            var completed = await Task.WhenAny(_fixture.ScanCompleted, Task.Delay(TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken));
+            var completed = await Task.WhenAny(_fixture.ScanCompleted,
+                Task.Delay(TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken));
             if (completed != _fixture.ScanCompleted)
                 throw new Exception("$XunitDynamicSkip$Workspace scan did not complete within 90 s.");
 

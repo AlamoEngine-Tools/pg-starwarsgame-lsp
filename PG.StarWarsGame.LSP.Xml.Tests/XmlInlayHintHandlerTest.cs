@@ -232,7 +232,6 @@ public sealed class XmlInlayHintHandlerTest
 
     private sealed class FakeIndexService : IGameIndexService
     {
-
         public ILocalisationIndex Localisation
         {
             set => Current = Current with { Localisation = value };
@@ -310,7 +309,6 @@ public sealed class XmlInlayHintHandlerTest
             }
         }
     }
-
 }
 
 // ── file-scoped helpers ──────────────────────────────────────────────────────
