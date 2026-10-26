@@ -868,11 +868,10 @@
     "rig:translate": "node scripts/shader-rig/translate.js",
     "rig:glcheck": "node scripts/shader-rig/translate.js > scripts/shader-rig/out/translate.txt && node scripts/shader-rig/glcheck.js",
     "rig:render": "node scripts/shader-rig/render.js",
-    "pretest": "npm run compile && npm run lint",
     "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && node scripts/manifest-strings.js && node scripts/host-strings.js && node scripts/catalogue-texts.js && eslint src && prettier --check \"src/**/*.{ts,tsx}\"",
     "l10n:export": "vscode-l10n-dev export --outDir ./l10n ./src",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "test": "vscode-test",
+    "test": "npm run lint && npm run check-types && npm run test:unit",
     "package": "vsce package --no-dependencies"
   },
   "_overridesNote": [

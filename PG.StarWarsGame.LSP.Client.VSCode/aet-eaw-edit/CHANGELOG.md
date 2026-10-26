@@ -281,6 +281,12 @@
 
 ### Fixes
 
+- **Preview project settings per project** - the weapon bench, the faction and its colour are kept per project
+  file, not per window; two mods open together no longer share one set, which the move out of the global
+  settings had set out to end ([#276](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/276))
+- **Preview state per project and subject** - the camera, selection and damage state a preview keeps for a
+  subject are filed under its project as well, so two projects holding an object of one name no longer hand
+  each other their state ([#276](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/276))
 - **New Mod Project in an existing mod** - leaves the mod's `modinfo.json`, dependencies included, as it was; only a
   folder without one gets a new one; a folder that already has the project file is refused with its path, where
   "created" was reported ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
