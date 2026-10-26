@@ -28,7 +28,7 @@
     <value>cannot absorb fire from any source</value>
   </data>
   <data name="AdoptModProject_NotAMod" xml:space="preserve">
-    <value>Not laid out like a mod: No game folder or MEG archive under Data, no modinfo.json - {0}</value>
+    <value>Not a mod - {0} holds none of the Data folders XML, Scripts, Art, Audio or Text, no MEG archive under Data and no modinfo.json</value>
   </data>
   <data name="AdoptModProject_GameFolder" xml:space="preserve">
     <value>The game's own folder, not a mod - {0}</value>
@@ -38,6 +38,15 @@
   </data>
   <data name="NewModProject_ProjectExists" xml:space="preserve">
     <value>Mod project not created: A project file already exists - {0}</value>
+  </data>
+  <data name="NewModProject_GameFolder" xml:space="preserve">
+    <value>Mod project not created: The game's own folder, not a mod - {0}</value>
+  </data>
+  <data name="NewModProject_NameRequired" xml:space="preserve">
+    <value>Mod project not created: A mod name is required</value>
+  </data>
+  <data name="NewModProject_PathRequired" xml:space="preserve">
+    <value>Mod project not created: A target folder is required</value>
   </data>
   <data name="NewModProject_Created" xml:space="preserve">
     <value>Mod project '{0}' created - {1}</value>

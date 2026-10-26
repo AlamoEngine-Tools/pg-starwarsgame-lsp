@@ -337,6 +337,10 @@
 - **New Mod Project in an existing mod** - leaves the mod's `modinfo.json`, dependencies included, as it was; only a
   folder without one gets a new one; a folder that already has the project file is refused with its path, where
   "created" was reported ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+- **New Mod Project and Adopt Project refuse the same folders** - any project file in the folder, whatever its name,
+  and the game's own folder; every refusal is shown, where an empty name or folder returned silently; `modinfo.json` is
+  found in any spelling; the not-a-mod refusal names the folders it looked for
+  ([#317](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/317))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))

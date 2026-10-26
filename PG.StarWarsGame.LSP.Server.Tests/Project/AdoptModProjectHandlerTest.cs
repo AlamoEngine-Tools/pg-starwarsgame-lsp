@@ -21,7 +21,8 @@ public sealed class AdoptModProjectHandlerTest
 
     private static AdoptModProjectHandler Build(MockFileSystem fs)
     {
-        return new AdoptModProjectHandler(new FileHelper(fs), ResxMessageCatalog.Server("en"));
+        var fileHelper = new FileHelper(fs);
+        return new AdoptModProjectHandler(fileHelper, new ModLayout(fileHelper), ResxMessageCatalog.Server("en"));
     }
 
     private static Task<AdoptModProjectResult> Adopt(MockFileSystem fs)
@@ -204,6 +205,40 @@ public sealed class AdoptModProjectHandlerTest
         fs.AddFile($"{Root}/modinfo.json", new MockFileData("""{ "name": "Legacy Mod" }"""));
 
         Assert.Equal("Legacy Mod", (string?)Written(fs, await Adopt(fs))["name"]);
+    }
+
+    // Every folder lookup matched any case, the modinfo.json lookup matched the exact spelling: on a
+    // case-sensitive file system a mod the client offers (any case) was refused, or adopted under the
+    // folder's name instead of the mod's.
+    [Theory]
+    [InlineData("MODINFO.JSON")]
+    [InlineData("ModInfo.json")]
+    public async Task Modinfo_InAnyCase_GivesTheName(string spelling)
+    {
+        var fs = Mod("Data/XML/a.xml");
+        fs.AddFile($"{Root}/{spelling}", new MockFileData("""{ "name": "Spelled Mod" }"""));
+
+        var result = await Adopt(fs);
+
+        Assert.Equal("Spelled Mod", (string?)Written(fs, result)["name"]);
+        Assert.EndsWith("Spelled_Mod.pgproj", result.ProjectFile);
+    }
+
+    // "No game folder under Data" read as "the game is not installed". The refusal names what the
+    // check looks for.
+    [Fact]
+    public async Task TheNotAModRefusal_NamesWhatWasLookedFor()
+    {
+        var error = (await Adopt(Mod("notes/todo.xml"))).Error!;
+
+        Assert.Contains("XML", error);
+        Assert.Contains("Scripts", error);
+        Assert.Contains("Art", error);
+        Assert.Contains("Audio", error);
+        Assert.Contains("Text", error);
+        Assert.Contains("MEG", error);
+        Assert.Contains("modinfo.json", error);
+        Assert.Contains(Root.Replace('/', '\\').TrimStart('\\'), error.Replace('/', '\\'));
     }
 
     [Theory]
