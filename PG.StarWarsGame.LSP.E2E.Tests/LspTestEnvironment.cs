@@ -9,6 +9,9 @@ public static class LspTestEnvironment
     private static readonly string? SolutionRoot = FindSolutionRoot(
         Path.GetDirectoryName(typeof(LspTestEnvironment).Assembly.Location)!);
 
+    /// <summary>The repository root, for a test that reads or records a file kept in the source tree.</summary>
+    public static string? RepositoryRoot => SolutionRoot;
+
     /// <summary>
     ///     Schema directory.  Prefers <c>LSP_SCHEMA_LOCAL_PATH</c> env var; falls back to
     ///     <c>schema/eaw</c> inside the repository.  Returns <c>null</c> if neither exists.

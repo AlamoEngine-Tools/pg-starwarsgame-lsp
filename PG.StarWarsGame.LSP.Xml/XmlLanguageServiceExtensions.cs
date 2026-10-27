@@ -283,9 +283,22 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, SeeCreditIncomeBreakdownNeedsIncomeRule>();
         services.AddSingleton<IXmlCrossTagRule, SeePoliticalControlBreakdownNeedsControlRule>();
         services.AddSingleton<IXmlCrossTagRule, CreditHaltNeedsDurationRule>();
-        services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
-        services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
-        services.AddSingleton<IStoryFactProducer, StoryFactProducer>();
+
+        // The fact producers, in the order the publisher runs them - which is the order their facts
+        // and so their diagnostics come out in (#307). The document's own facts first, then what the
+        // index says about it, then the two rules that used to build their diagnostics by hand.
+        services.AddSingleton<IXmlFactProducer, XmlDocumentFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlIndexFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlVariantFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlLayerShadowFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlHardpointFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlDamageStageFactProducer>();
+        services.AddSingleton<IXmlFactProducer, StoryFactProducer>();
+        services.AddSingleton<IXmlFactProducer, HardcodedSetValueFactProducer>();
+        services.AddSingleton<IXmlFactProducer, DamageTypeTailFactProducer>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardcodedSetValueHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageTypesIncompleteHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageTypeOutOfOrderHandler>();
 
         // Proposal system - add IXmlValueProposalProvider implementations here to register new providers
         services.AddSingleton<IXmlValueProposalRegistry, XmlValueProposalRegistry>();
@@ -360,9 +373,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IVariantTagSource, WorkspaceVariantTagSource>();
         services.AddSingleton<ICacheStatisticsSource>(sp =>
             (ICacheStatisticsSource)sp.GetRequiredService<IVariantTagSource>());
-        services.AddSingleton<IXmlVariantFactProducer, XmlVariantFactProducer>();
-        services.AddSingleton<IXmlHardpointFactProducer, XmlHardpointFactProducer>();
-        services.AddSingleton<IXmlDamageStageFactProducer, XmlDamageStageFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
         // Deprecated but still registered - see the handler for why. Warnings are errors in this
         // project, so the obsolete reference is suppressed here rather than at every call site.
@@ -373,7 +383,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, VariantAdditiveMergeHandler>();
 
         // Layer-shadow and cross-type shadow warnings
-        services.AddSingleton<IXmlLayerShadowFactProducer, XmlLayerShadowFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, CrossLayerShadowHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, CrossTypeShadowHandler>();
 

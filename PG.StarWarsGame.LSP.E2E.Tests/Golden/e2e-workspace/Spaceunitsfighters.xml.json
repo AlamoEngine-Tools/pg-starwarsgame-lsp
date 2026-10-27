@@ -1,0 +1,29 @@
+[
+  {
+    "Code": "aetswg-005-0001",
+    "Severity": "Warning",
+    "StartLine": 16,
+    "StartCharacter": 17,
+    "EndLine": 16,
+    "EndCharacter": 41,
+    "Message": "Localisation key 'TEXT_E2E_ABILITY_FIGHTER' was not found in the loaded translation databases."
+  },
+  {
+    "Code": "aetswg-001-0011",
+    "Severity": "Error",
+    "StartLine": 19,
+    "StartCharacter": 22,
+    "EndLine": 19,
+    "EndCharacter": 25,
+    "Message": "'HUN' is not a known value for 'AbilityType' on <Type>."
+  },
+  {
+    "Code": "aetswg-005-0001",
+    "Severity": "Warning",
+    "StartLine": 26,
+    "StartCharacter": 17,
+    "EndLine": 26,
+    "EndCharacter": 47,
+    "Message": "Localisation key 'TEXT_E2E_ABILITY_FIGHTER_VALID' was not found in the loaded translation databases."
+  }
+]

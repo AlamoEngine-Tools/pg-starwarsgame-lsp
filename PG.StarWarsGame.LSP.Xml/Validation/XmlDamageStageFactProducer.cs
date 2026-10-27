@@ -11,8 +11,15 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 /// <inheritdoc />
 public sealed class XmlDamageStageFactProducer(ISchemaProvider schema, IVariantTagSource tagSource)
-    : IXmlDamageStageFactProducer
+    : IXmlFactProducer
 {
+    public string Name => "damageStage";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
     private const string AlternatesTag = "Land_Damage_Alternates";
 
     public IReadOnlyList<XmlFact> Produce(

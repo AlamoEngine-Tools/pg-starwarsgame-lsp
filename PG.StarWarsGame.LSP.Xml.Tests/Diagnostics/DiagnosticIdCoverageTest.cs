@@ -38,10 +38,10 @@ public sealed class DiagnosticIdCoverageTest
         Assert.Empty(missing);
     }
 
-    // A handful of diagnostics are built directly by XmlDiagnosticsPublisher instead of by a
-    // handler, so the reflection check above cannot see them - and they are exactly the ones that
-    // would quietly ship without a code. Source-level, because there is no runtime seam that
-    // enumerates them.
+    // Two diagnostics are built directly by XmlDiagnosticsPublisher instead of by a handler - the
+    // story chain's and the story graph's, which arrive as problems rather than facts - so the
+    // reflection check above cannot see them, and they are exactly the ones that would quietly ship
+    // without a code. Source-level, because there is no runtime seam that enumerates them.
     [Fact]
     public void EveryPublisherBuiltDiagnostic_SetsACode()
     {

@@ -1,0 +1,11 @@
+[
+  {
+    "Code": "aetswg-008-0004",
+    "Severity": "Hint",
+    "StartLine": 6,
+    "StartCharacter": 3,
+    "EndLine": 6,
+    "EndCharacter": 54,
+    "Message": "Tag 'Build_Initially_Locked' has the same value as the inherited base; this override is redundant."
+  }
+]

@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -77,7 +79,8 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Event_with_StoryDialog_and_chapter_emits_StoryDialogRefFact()
     {
-        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build(), new FakeFileTypeRegistry(),
+            new FileHelper(new MockFileSystem()));
         var xml = Xml("<Story_Dialog>Dialog_Mission_One</Story_Dialog><Story_Chapter>2</Story_Chapter>");
 
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>().ToList();
@@ -91,7 +94,8 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Event_with_StoryDialog_without_chapter_emits_fact_with_null_chapter()
     {
-        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build(), new FakeFileTypeRegistry(),
+            new FileHelper(new MockFileSystem()));
         var xml = Xml("<Story_Dialog>Dialog_Mission_One</Story_Dialog>");
 
         var f = Assert.Single(sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>());
@@ -102,7 +106,8 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Event_without_StoryDialog_emits_no_StoryDialogRefFact()
     {
-        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build(), new FakeFileTypeRegistry(),
+            new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>UNKNOWN</Event_Type>");
 
         Assert.Empty(sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>());
@@ -113,7 +118,8 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Known_event_type_emits_StoryEventFact_with_def()
     {
-        var sut = new StoryFactProducer(SchemaWithEvent("MY_EVENT"));
+        var sut = new StoryFactProducer(SchemaWithEvent("MY_EVENT"), new FakeFileTypeRegistry(),
+            new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryEventFact>().ToList();
         var f = Assert.Single(facts);
@@ -125,7 +131,8 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Unknown_event_type_emits_StoryEventFact_with_null_def()
     {
-        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build(), new FakeFileTypeRegistry(),
+            new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>UNKNOWN</Event_Type>");
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryEventFact>().ToList();
         var f = Assert.Single(facts);
@@ -135,7 +142,8 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Known_reward_type_emits_StoryEventFact_with_IsReward_true()
     {
-        var sut = new StoryFactProducer(SchemaWithReward("MY_REWARD"));
+        var sut = new StoryFactProducer(SchemaWithReward("MY_REWARD"), new FakeFileTypeRegistry(),
+            new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>X</Event_Type><Reward_Type>MY_REWARD</Reward_Type>");
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryEventFact>().ToList();
         var rewardFact = facts.Single(f => f.IsReward);
@@ -149,7 +157,8 @@ public sealed class StoryFactProducerTest
     public void Occupied_param_slot_emits_StoryParamFact_with_value()
     {
         var sut = new StoryFactProducer(SchemaWithEvent("MY_EVENT",
-            paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int }]));
+                paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int }]),
+            new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>42</Event_Param1>");
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryParamFact>().ToList();
         var f = Assert.Single(facts);
@@ -162,7 +171,8 @@ public sealed class StoryFactProducerTest
     public void Empty_param_slot_does_not_emit_StoryParamFact_for_optional_param()
     {
         var sut = new StoryFactProducer(SchemaWithEvent("MY_EVENT",
-            paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = true }]));
+                paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = true }]),
+            new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1></Event_Param1>");
         var paramFacts = sut.Produce(xml, "file:///test.xml").OfType<StoryParamFact>().ToList();
         Assert.Empty(paramFacts);
@@ -176,7 +186,7 @@ public sealed class StoryFactProducerTest
             Name = "StoryEventType",
             Kind = EnumKind.SchemaFixed,
             Values = [new EnumValueDefinition { Name = "UNCONSTRAINED", Params = null }]
-        }).Build());
+        }).Build(), new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>UNCONSTRAINED</Event_Type><Event_Param1>x</Event_Param1>");
         var paramFacts = sut.Produce(xml, "file:///test.xml").OfType<StoryParamFact>().ToList();
         Assert.Empty(paramFacts);
@@ -188,7 +198,8 @@ public sealed class StoryFactProducerTest
     public void Excess_param_slot_emits_StoryParamFact_with_null_def()
     {
         var sut = new StoryFactProducer(SchemaWithEvent("MY_EVENT",
-            paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int }]));
+                paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int }]),
+            new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type>" +
                       "<Event_Param1>1</Event_Param1>" +
                       "<Event_Param2>extra</Event_Param2>");
@@ -205,7 +216,8 @@ public sealed class StoryFactProducerTest
     public void Missing_required_param_emits_StoryParamFact_with_empty_RawValue()
     {
         var sut = new StoryFactProducer(SchemaWithEvent("MY_EVENT",
-            paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = false }]));
+                paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = false }]),
+            new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryParamFact>().ToList();
         var f = Assert.Single(facts);
@@ -244,7 +256,7 @@ public sealed class StoryFactProducerTest
                         Params = [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = false }]
                     }
                 ]
-            }).Build());
+            }).Build(), new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem()));
     }
 
     [Fact]
@@ -293,7 +305,8 @@ public sealed class StoryFactProducerTest
     public void Missing_optional_param_emits_no_StoryParamFact()
     {
         var sut = new StoryFactProducer(SchemaWithEvent("MY_EVENT",
-            paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = true }]));
+                paramDefs: [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = true }]),
+            new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryParamFact>().ToList();
         Assert.Empty(facts);
@@ -304,7 +317,8 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Unknown_event_type_emits_no_StoryParamFacts()
     {
-        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build(), new FakeFileTypeRegistry(),
+            new FileHelper(new MockFileSystem()));
         var xml = Xml("<Event_Type>UNKNOWN</Event_Type><Event_Param1>x</Event_Param1>");
         var paramFacts = sut.Produce(xml, "file:///test.xml").OfType<StoryParamFact>().ToList();
         Assert.Empty(paramFacts);

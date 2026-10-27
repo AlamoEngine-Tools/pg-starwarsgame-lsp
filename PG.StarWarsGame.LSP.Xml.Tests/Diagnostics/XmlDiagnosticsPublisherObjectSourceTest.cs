@@ -12,7 +12,6 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -79,10 +78,6 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
             new FakeGameWorkspaceHost(),
             schema,
             new XmlDiagnosticsHandlerRegistry([new SpecialWeaponBehaviorHandler()]),
-            new XmlDocumentFactProducer(fileHelper, schema, new ObjSrcFileTypeRegistry(),
-                new XmlStructuralValidator()),
-            new ObjSrcIndexFactProducer(),
-            new ObjSrcStoryFactProducer(),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             new ObjSrcFileTypeRegistry(),
             fileHelper,
@@ -120,24 +115,8 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
     }
 }
 
-// File-scoped stubs, as every other publisher test in this folder keeps its own. Only the tag
-// source and the schema above carry behaviour; these exist to satisfy the constructor.
-
-file sealed class ObjSrcIndexFactProducer : IXmlIndexFactProducer
-{
-    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
-    {
-        return [];
-    }
-}
-
-file sealed class ObjSrcStoryFactProducer : IStoryFactProducer
-{
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
-    {
-        return [];
-    }
-}
+// A file-scoped stub, as every other publisher test in this folder keeps its own. Only the tag
+// source and the schema above carry behaviour; this exists to satisfy the constructor.
 
 file sealed class ObjSrcFileTypeRegistry : IFileTypeRegistry
 {

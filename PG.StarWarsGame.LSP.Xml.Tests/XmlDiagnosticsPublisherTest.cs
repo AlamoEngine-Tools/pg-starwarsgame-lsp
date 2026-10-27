@@ -112,9 +112,6 @@ public sealed class XmlDiagnosticsPublisherTest
             workspaceHost,
             effectiveSchema,
             new XmlDiagnosticsHandlerRegistry(handlers),
-            new XmlDocumentFactProducer(fileHelper, effectiveSchema, effectiveRegistry, new XmlStructuralValidator()),
-            new XmlIndexFactProducer(DistinctObjectNameHash.Instance),
-            new StoryFactProducer(effectiveSchema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             effectiveRegistry,
             fileHelper,
@@ -141,9 +138,6 @@ public sealed class XmlDiagnosticsPublisherTest
             workspaceHost,
             schema,
             new XmlDiagnosticsHandlerRegistry(handlers),
-            new XmlDocumentFactProducer(fileHelper, schema, registry, new XmlStructuralValidator()),
-            new XmlIndexFactProducer(DistinctObjectNameHash.Instance),
-            new StoryFactProducer(schema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             registry,
             fileHelper);
@@ -717,12 +711,10 @@ public sealed class XmlDiagnosticsPublisherTest
             workspaceHost,
             new SchemaProviderBuilder().Build(),
             new XmlDiagnosticsHandlerRegistry([new PlainResultForSpanFactHandler()]),
-            new SpanFactStubDocumentProducer(),
-            new StubIndexFactProducerForSpan(),
-            new StoryFactProducer(new SchemaProviderBuilder().Build()),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             new FakeFileTypeRegistry(),
-            fileHelper);
+            fileHelper,
+            [new SpanFactStubDocumentProducer()]);
 
         workspaceHost.With("file:///test.xml", "irrelevant text");
         indexService.Raise(IndexWithDoc("file:///test.xml"));
@@ -755,9 +747,6 @@ public sealed class XmlDiagnosticsPublisherTest
             workspaceHost,
             schema,
             new XmlDiagnosticsHandlerRegistry(handlers),
-            new XmlDocumentFactProducer(fileHelper, schema, registry, new XmlStructuralValidator()),
-            new XmlIndexFactProducer(DistinctObjectNameHash.Instance),
-            new StoryFactProducer(schema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             registry,
             fileHelper);
@@ -887,19 +876,18 @@ public sealed class XmlDiagnosticsPublisherTest
         int? EndLine,
         int? EndColumn) : XmlFact(DocumentUri, Line, Column, Length, EndLine, EndColumn);
 
-    private sealed class SpanFactStubDocumentProducer : IXmlDocumentFactProducer
+    private sealed class SpanFactStubDocumentProducer : IXmlFactProducer
     {
-        public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+        public string Name => "span";
+
+        public bool AppliesTo(string documentUri)
+        {
+            return true;
+        }
+
+        public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
         {
             return [new SpanFact(documentUri, 2, 4, 3, 6, 9)];
-        }
-    }
-
-    private sealed class StubIndexFactProducerForSpan : IXmlIndexFactProducer
-    {
-        public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
-        {
-            return [];
         }
     }
 

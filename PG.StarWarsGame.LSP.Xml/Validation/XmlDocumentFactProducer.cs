@@ -17,11 +17,19 @@ public sealed class XmlDocumentFactProducer(
     IFileTypeRegistry fileTypeRegistry,
     IXmlStructuralValidator structuralValidator,
     IEnumerable<IXmlCrossTagRule>? crossTagRules = null)
-    : IXmlDocumentFactProducer
+    : IXmlFactProducer
 {
     private readonly IReadOnlyList<IXmlCrossTagRule> _crossTagRules = crossTagRules?.ToList() ?? [];
 
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+    public string Name => "document";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
+    /// <summary>Reads the document alone; the index plays no part in what one file says about itself.</summary>
+    public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         var facts = new List<XmlFact>();
 

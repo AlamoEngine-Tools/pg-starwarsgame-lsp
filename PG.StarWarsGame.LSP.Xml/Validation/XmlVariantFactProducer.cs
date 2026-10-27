@@ -10,8 +10,15 @@ using PG.StarWarsGame.LSP.Xml.Util;
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSource tagSource)
-    : IXmlVariantFactProducer
+    : IXmlFactProducer
 {
+    public string Name => "variant";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
     /// <summary>
     ///     Sweeps the engine gives variant resolution before it stops
     ///     (<c>Overlay_Types</c>). A chain this long or shorter resolves

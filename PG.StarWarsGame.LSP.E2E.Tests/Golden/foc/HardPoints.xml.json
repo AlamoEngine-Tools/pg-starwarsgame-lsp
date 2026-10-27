@@ -1,0 +1,533 @@
+[
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 1631,
+    "StartCharacter": 28,
+    "EndLine": 1631,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_C-F_COLL', which does not exist as a mesh or a bone on 'EV_VictoryStarDestroyer.alo', the model of 'Victory_Destroyer_No_Fighters' which attaches it, nor on 'EV_VictoryStarDestroyer_HP00_C-F.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2639,
+    "StartCharacter": 18,
+    "EndLine": 2639,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_01.ALO', the model of 'Skirmish_Rebel_Star_Base_1' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2639,
+    "StartCharacter": 18,
+    "EndLine": 2639,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_02.ALO', the model of 'Skirmish_Rebel_Star_Base_2' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2639,
+    "StartCharacter": 18,
+    "EndLine": 2639,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_03.ALO', the model of 'Skirmish_Rebel_Star_Base_3' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2639,
+    "StartCharacter": 18,
+    "EndLine": 2639,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_04.ALO', the model of 'Skirmish_Rebel_Star_Base_4' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2639,
+    "StartCharacter": 18,
+    "EndLine": 2639,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_05.ALO', the model of 'Skirmish_Rebel_Star_Base_5' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2653,
+    "StartCharacter": 18,
+    "EndLine": 2653,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_01.ALO', the model of 'Rebel_Star_Base_1' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2653,
+    "StartCharacter": 18,
+    "EndLine": 2653,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_02.ALO', the model of 'Rebel_Star_Base_2' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2653,
+    "StartCharacter": 18,
+    "EndLine": 2653,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_03.ALO', the model of 'Rebel_Star_Base_3' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2653,
+    "StartCharacter": 18,
+    "EndLine": 2653,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_04.ALO', the model of 'Rebel_Star_Base_4' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 2653,
+    "StartCharacter": 18,
+    "EndLine": 2653,
+    "EndCharacter": 32,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'RB_STATION_05.ALO', the model of 'Rebel_Star_Base_5' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 3360,
+    "StartCharacter": 12,
+    "EndLine": 3360,
+    "EndCharacter": 49,
+    "Message": "Duplicate tag 'Fire_Bone_B': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 3362, 3363."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 3361,
+    "StartCharacter": 12,
+    "EndLine": 3361,
+    "EndCharacter": 49,
+    "Message": "Duplicate tag 'Fire_Bone_B': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 3361, 3363."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 3362,
+    "StartCharacter": 12,
+    "EndLine": 3362,
+    "EndCharacter": 49,
+    "Message": "Duplicate tag 'Fire_Bone_B': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 3361, 3362."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3475,
+    "StartCharacter": 19,
+    "EndLine": 3475,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_01.ALO', the model of 'Skirmish_Empire_Star_Base_1' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3475,
+    "StartCharacter": 19,
+    "EndLine": 3475,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_02.ALO', the model of 'Skirmish_Empire_Star_Base_2' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3475,
+    "StartCharacter": 19,
+    "EndLine": 3475,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_03.ALO', the model of 'Skirmish_Empire_Star_Base_3' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3475,
+    "StartCharacter": 19,
+    "EndLine": 3475,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_04.ALO', the model of 'Skirmish_Empire_Star_Base_4' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3475,
+    "StartCharacter": 19,
+    "EndLine": 3475,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_05.ALO', the model of 'Skirmish_Empire_Star_Base_5' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3489,
+    "StartCharacter": 19,
+    "EndLine": 3489,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_01.ALO', the model of 'Empire_Star_Base_1' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3489,
+    "StartCharacter": 19,
+    "EndLine": 3489,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_02.ALO', the model of 'Empire_Star_Base_2' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3489,
+    "StartCharacter": 19,
+    "EndLine": 3489,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_03.ALO', the model of 'Empire_Star_Base_3' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3489,
+    "StartCharacter": 19,
+    "EndLine": 3489,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_04.ALO', the model of 'Empire_Star_Base_4' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3489,
+    "StartCharacter": 19,
+    "EndLine": 3489,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_05.ALO', the model of 'Empire_Star_Base_5' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 3489,
+    "StartCharacter": 19,
+    "EndLine": 3489,
+    "EndCharacter": 33,
+    "Message": "<Collision_Mesh> names 'HP01_SupD_COLL', which does not exist as a mesh or a bone on 'EB_STATION_05.ALO', the model of 'UM12_STAR_BASE' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4301,
+    "StartCharacter": 28,
+    "EndLine": 4301,
+    "EndCharacter": 37,
+    "Message": "<Collision_Mesh> names 'HP_E_COLL', which does not exist as a mesh or a bone on 'RV_HOMEONE.ALO', the model of 'Home_One' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4656,
+    "StartCharacter": 28,
+    "EndLine": 4656,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_B-M_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Hutt_Refurbished_Venator' which attaches it, nor on 'NV_Jedicruiser_HP_B-M.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4656,
+    "StartCharacter": 28,
+    "EndLine": 4656,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_B-M_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Jedi_Cruiser' which attaches it, nor on 'NV_Jedicruiser_HP_B-M.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4673,
+    "StartCharacter": 28,
+    "EndLine": 4673,
+    "EndCharacter": 37,
+    "Message": "<Collision_Mesh> names 'HP_E_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Hutt_Refurbished_Venator' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4673,
+    "StartCharacter": 28,
+    "EndLine": 4673,
+    "EndCharacter": 37,
+    "Message": "<Collision_Mesh> names 'HP_E_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Jedi_Cruiser' which attaches it. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4691,
+    "StartCharacter": 28,
+    "EndLine": 4691,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_F-L_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Hutt_Refurbished_Venator' which attaches it, nor on 'NV_JediCruiser_hp_F-L.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4691,
+    "StartCharacter": 28,
+    "EndLine": 4691,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_F-L_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Jedi_Cruiser' which attaches it, nor on 'NV_JediCruiser_hp_F-L.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4731,
+    "StartCharacter": 28,
+    "EndLine": 4731,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_F-R_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Hutt_Refurbished_Venator' which attaches it, nor on 'NV_JediCruiser_hp_F-R.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4731,
+    "StartCharacter": 28,
+    "EndLine": 4731,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_F-R_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Jedi_Cruiser' which attaches it, nor on 'NV_JediCruiser_hp_F-R.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4771,
+    "StartCharacter": 28,
+    "EndLine": 4771,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_M-L_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Hutt_Refurbished_Venator' which attaches it, nor on 'NV_JediCruiser_hp_M-L.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4771,
+    "StartCharacter": 28,
+    "EndLine": 4771,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_M-L_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Jedi_Cruiser' which attaches it, nor on 'NV_JediCruiser_hp_M-L.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4802,
+    "StartCharacter": 28,
+    "EndLine": 4802,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_M-R_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Hutt_Refurbished_Venator' which attaches it, nor on 'NV_JediCruiser_hp_M-R.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4802,
+    "StartCharacter": 28,
+    "EndLine": 4802,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_M-R_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Jedi_Cruiser' which attaches it, nor on 'NV_JediCruiser_hp_M-R.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4833,
+    "StartCharacter": 28,
+    "EndLine": 4833,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_B-L_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Hutt_Refurbished_Venator' which attaches it, nor on 'NV_JediCruiser_hp_B-L.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4833,
+    "StartCharacter": 28,
+    "EndLine": 4833,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_B-L_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Jedi_Cruiser' which attaches it, nor on 'NV_JediCruiser_hp_B-L.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4873,
+    "StartCharacter": 28,
+    "EndLine": 4873,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_B-R_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Hutt_Refurbished_Venator' which attaches it, nor on 'NV_JediCruiser_hp_B-R.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 4873,
+    "StartCharacter": 28,
+    "EndLine": 4873,
+    "EndCharacter": 39,
+    "Message": "<Collision_Mesh> names 'HP_B-R_COLL', which does not exist as a mesh or a bone on 'NV_JEDICRUISER.ALO', the model of 'Jedi_Cruiser' which attaches it, nor on 'NV_JediCruiser_hp_B-R.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 5235,
+    "StartCharacter": 12,
+    "EndLine": 5235,
+    "EndCharacter": 49,
+    "Message": "Duplicate tag 'Fire_Bone_B': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 5237, 5238."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 5236,
+    "StartCharacter": 12,
+    "EndLine": 5236,
+    "EndCharacter": 49,
+    "Message": "Duplicate tag 'Fire_Bone_B': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 5236, 5238."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 5237,
+    "StartCharacter": 12,
+    "EndLine": 5237,
+    "EndCharacter": 49,
+    "Message": "Duplicate tag 'Fire_Bone_B': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 5236, 5237."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 5335,
+    "StartCharacter": 28,
+    "EndLine": 5335,
+    "EndCharacter": 37,
+    "Message": "<Collision_Mesh> names 'HP_F_COLL', which does not exist as a mesh or a bone on 'NV_pirate_frigate.alo', the model of 'Pirate_Frigate' which attaches it, nor on 'NV_pirate_frigate_HP00_F.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-007-0004",
+    "Severity": "Warning",
+    "StartLine": 5335,
+    "StartCharacter": 28,
+    "EndLine": 5335,
+    "EndCharacter": 37,
+    "Message": "<Collision_Mesh> names 'HP_F_COLL', which does not exist as a mesh or a bone on 'NV_pirate_frigate.alo', the model of 'Pirate_Frigate_Captain' which attaches it, nor on 'NV_pirate_frigate_HP00_F.alo', the hardpoint's own Model_To_Attach. Aimed fire and land projectiles still reach it; untargeted space fire never does."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5468,
+    "StartCharacter": 17,
+    "EndLine": 5468,
+    "EndCharacter": 36,
+    "Message": "'Damage_Sation_Laser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5511,
+    "StartCharacter": 17,
+    "EndLine": 5511,
+    "EndCharacter": 36,
+    "Message": "'Damage_Sation_Laser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5554,
+    "StartCharacter": 17,
+    "EndLine": 5554,
+    "EndCharacter": 41,
+    "Message": "'Damage_Sation_Turbolaser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5597,
+    "StartCharacter": 17,
+    "EndLine": 5597,
+    "EndCharacter": 41,
+    "Message": "'Damage_Sation_Turbolaser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5640,
+    "StartCharacter": 17,
+    "EndLine": 5640,
+    "EndCharacter": 41,
+    "Message": "'Damage_Sation_Turbolaser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5683,
+    "StartCharacter": 17,
+    "EndLine": 5683,
+    "EndCharacter": 41,
+    "Message": "'Damage_Sation_Turbolaser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5836,
+    "StartCharacter": 17,
+    "EndLine": 5836,
+    "EndCharacter": 36,
+    "Message": "'Damage_Sation_Laser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5879,
+    "StartCharacter": 17,
+    "EndLine": 5879,
+    "EndCharacter": 36,
+    "Message": "'Damage_Sation_Laser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5922,
+    "StartCharacter": 17,
+    "EndLine": 5922,
+    "EndCharacter": 41,
+    "Message": "'Damage_Sation_Turbolaser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 5965,
+    "StartCharacter": 17,
+    "EndLine": 5965,
+    "EndCharacter": 41,
+    "Message": "'Damage_Sation_Turbolaser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 6008,
+    "StartCharacter": 17,
+    "EndLine": 6008,
+    "EndCharacter": 41,
+    "Message": "'Damage_Sation_Turbolaser' is not a known DamageType value."
+  },
+  {
+    "Code": "aetswg-002-0009",
+    "Severity": "Warning",
+    "StartLine": 6051,
+    "StartCharacter": 17,
+    "EndLine": 6051,
+    "EndCharacter": 41,
+    "Message": "'Damage_Sation_Turbolaser' is not a known DamageType value."
+  }
+]

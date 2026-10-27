@@ -21,9 +21,10 @@ namespace PG.StarWarsGame.LSP.Xml.Tests;
 /// </summary>
 /// <remarks>
 ///     The publisher's dependencies are all required (#305). A test names the ones it is about; the
-///     rest are the real producers over the test's own schema and tag source, a shared text source
-///     and parse cache over the test's host, and the quietest doubles for everything else: no
-///     suppressions, no layers, no story graph problems, no icons, no model textures, no debounce.
+///     rest are a shared text source and parse cache over the test's host, and the quietest doubles
+///     for everything else: no suppressions, no layers, no story graph problems, no icons, no model
+///     textures, no debounce. The producers are the test's own list, or - when it passes none - the
+///     real nine over its schema and tag source in the order the server registers them (#307).
 /// </remarks>
 internal static class XmlPublisherFixture
 {
@@ -33,12 +34,10 @@ internal static class XmlPublisherFixture
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
         IXmlDiagnosticsHandlerRegistry handlerRegistry,
-        IXmlDocumentFactProducer documentProducer,
-        IXmlIndexFactProducer indexProducer,
-        IStoryFactProducer storyProducer,
         ILogger<XmlDiagnosticsPublisher> logger,
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
+        IReadOnlyList<IXmlFactProducer>? producers = null,
         ILspConfigurationProvider? configProvider = null,
         IStoryChainProblemStore? storyChainProblems = null,
         IVariantTagSource? variantTagSource = null,
@@ -52,21 +51,15 @@ internal static class XmlPublisherFixture
             workspaceHost,
             schema,
             handlerRegistry,
-            documentProducer,
-            indexProducer,
-            storyProducer,
+            producers ?? Producers(schema, fileTypeRegistry, fileHelper, tagSource),
             logger,
             fileTypeRegistry,
             fileHelper,
-            new XmlVariantFactProducer(schema, tagSource),
-            new XmlLayerShadowFactProducer(),
             textSource,
             new XmlParseCache(textSource, 16, NullLogger<XmlParseCache>.Instance),
             configProvider ?? new FakeLspConfigurationProvider(),
             storyChainProblems ?? new StoryChainProblemStore(),
             new FakeStoryGraphDiagnosticsSource(),
-            new XmlHardpointFactProducer(schema, tagSource),
-            new XmlDamageStageFactProducer(schema, tagSource),
             tagSource,
             new FakeGlobalSuppressionStore(),
             new ProjectLayerMap(fileHelper),
@@ -75,5 +68,23 @@ internal static class XmlPublisherFixture
             new FakeModelTextureIndex(),
             new FakeIconNameIndex(),
             messages ?? TestCatalogues.English);
+    }
+
+    /// <summary>The nine producers the server registers, in its order, over the test's collaborators.</summary>
+    public static IReadOnlyList<IXmlFactProducer> Producers(
+        ISchemaProvider schema, IFileTypeRegistry fileTypeRegistry, IFileHelper fileHelper, IVariantTagSource tagSource)
+    {
+        return
+        [
+            new XmlDocumentFactProducer(fileHelper, schema, fileTypeRegistry, new XmlStructuralValidator()),
+            new XmlIndexFactProducer(DistinctObjectNameHash.Instance),
+            new XmlVariantFactProducer(schema, tagSource),
+            new XmlLayerShadowFactProducer(),
+            new XmlHardpointFactProducer(schema, tagSource),
+            new XmlDamageStageFactProducer(schema, tagSource),
+            new StoryFactProducer(schema, fileTypeRegistry, fileHelper),
+            new HardcodedSetValueFactProducer(schema, fileTypeRegistry, fileHelper),
+            new DamageTypeTailFactProducer()
+        ];
     }
 }

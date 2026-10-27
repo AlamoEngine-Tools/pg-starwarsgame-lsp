@@ -12,7 +12,6 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
@@ -102,10 +101,6 @@ public sealed class DiagnosticAdditivityProbe
             schema,
             new XmlDiagnosticsHandlerRegistry(
                 [new FirstProbeHandler(), new SecondProbeHandler()]),
-            new XmlDocumentFactProducer(fileHelper, schema, new ProbeFileTypeRegistry(),
-                new XmlStructuralValidator()),
-            new ProbeIndexFactProducer(),
-            new ProbeStoryFactProducer(),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             new ProbeFileTypeRegistry(),
             fileHelper);
@@ -145,22 +140,6 @@ file static class ProbeSchemaProvider
         return new SchemaProviderBuilder()
             .WithTag(Health)
             .Build();
-    }
-}
-
-file sealed class ProbeIndexFactProducer : IXmlIndexFactProducer
-{
-    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
-    {
-        return [];
-    }
-}
-
-file sealed class ProbeStoryFactProducer : IStoryFactProducer
-{
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
-    {
-        return [];
     }
 }
 

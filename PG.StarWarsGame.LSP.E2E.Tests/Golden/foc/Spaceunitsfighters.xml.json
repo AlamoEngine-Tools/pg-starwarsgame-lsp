@@ -1,0 +1,335 @@
+[
+  {
+    "Code": "aetswg-007-0028",
+    "Severity": "Hint",
+    "StartLine": 27,
+    "StartCharacter": 32,
+    "EndLine": 27,
+    "EndCharacter": 34,
+    "Message": "'A-Wing' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: Turret_Rotate_Extent_Degrees 20 (up to 20 degrees either side), Turret_Elevate_Extent_Degrees 40 (up to 40 degrees up or down)."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 51,
+    "StartCharacter": 2,
+    "EndLine": 51,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 108,
+    "StartCharacter": 2,
+    "EndLine": 108,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-007-0028",
+    "Severity": "Hint",
+    "StartLine": 206,
+    "StartCharacter": 32,
+    "EndLine": 206,
+    "EndCharacter": 34,
+    "Message": "'X-Wing' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: Turret_Rotate_Extent_Degrees 20 (up to 20 degrees either side), Turret_Elevate_Extent_Degrees 40 (up to 40 degrees up or down)."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 226,
+    "StartCharacter": 2,
+    "EndLine": 226,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 286,
+    "StartCharacter": 2,
+    "EndLine": 286,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-007-0028",
+    "Severity": "Hint",
+    "StartLine": 357,
+    "StartCharacter": 32,
+    "EndLine": 357,
+    "EndCharacter": 34,
+    "Message": "'TIE_Fighter' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: Turret_Rotate_Extent_Degrees 20 (up to 20 degrees either side), Turret_Elevate_Extent_Degrees 40 (up to 40 degrees up or down)."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 374,
+    "StartCharacter": 2,
+    "EndLine": 374,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 438,
+    "StartCharacter": 2,
+    "EndLine": 438,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 523,
+    "StartCharacter": 2,
+    "EndLine": 523,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 540,
+    "StartCharacter": 2,
+    "EndLine": 540,
+    "EndCharacter": 59,
+    "Message": "Duplicate tag 'SFXEvent_Select': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 545."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 544,
+    "StartCharacter": 2,
+    "EndLine": 544,
+    "EndCharacter": 59,
+    "Message": "Duplicate tag 'SFXEvent_Select': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 541."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 571,
+    "StartCharacter": 2,
+    "EndLine": 571,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 652,
+    "StartCharacter": 2,
+    "EndLine": 652,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 704,
+    "StartCharacter": 2,
+    "EndLine": 704,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-001-0021",
+    "Severity": "Error",
+    "StartLine": 744,
+    "StartCharacter": 65,
+    "EndLine": 744,
+    "EndCharacter": 71,
+    "Message": "Cannot resolve reference 'Pirate': No object with this name exists in the workspace."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 785,
+    "StartCharacter": 2,
+    "EndLine": 785,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 837,
+    "StartCharacter": 2,
+    "EndLine": 837,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-007-0028",
+    "Severity": "Hint",
+    "StartLine": 876,
+    "StartCharacter": 32,
+    "EndLine": 876,
+    "EndCharacter": 34,
+    "Message": "'TIE_Scout' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: Turret_Rotate_Extent_Degrees 20 (up to 20 degrees either side), Turret_Elevate_Extent_Degrees 40 (up to 40 degrees up or down)."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 879,
+    "StartCharacter": 2,
+    "EndLine": 879,
+    "EndCharacter": 24,
+    "Message": "Duplicate tag 'Max_Lift': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 890."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 889,
+    "StartCharacter": 2,
+    "EndLine": 889,
+    "EndCharacter": 24,
+    "Message": "Duplicate tag 'Max_Lift': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 880."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 913,
+    "StartCharacter": 2,
+    "EndLine": 913,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 958,
+    "StartCharacter": 2,
+    "EndLine": 958,
+    "EndCharacter": 80,
+    "Message": "Duplicate tag 'SFXEvent_Engine_Cinematic_Focus_Loop': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 960."
+  },
+  {
+    "Code": "aetswg-006-0006",
+    "Severity": "Warning",
+    "StartLine": 959,
+    "StartCharacter": 2,
+    "EndLine": 959,
+    "EndCharacter": 119,
+    "Message": "Duplicate tag 'SFXEvent_Engine_Cinematic_Focus_Loop': Only one occurrence is used per object - the game keeps the last one with a value. Line numbers of the other occurrences - 959."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 968,
+    "StartCharacter": 2,
+    "EndLine": 968,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-007-0028",
+    "Severity": "Hint",
+    "StartLine": 1021,
+    "StartCharacter": 32,
+    "EndLine": 1021,
+    "EndCharacter": 34,
+    "Message": "'Z-95_Headhunter' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: Turret_Rotate_Extent_Degrees 20 (up to 20 degrees either side), Turret_Elevate_Extent_Degrees 40 (up to 40 degrees up or down)."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1056,
+    "StartCharacter": 2,
+    "EndLine": 1056,
+    "EndCharacter": 30,
+    "Message": "<Surface_Bombardment_Capable> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1059,
+    "StartCharacter": 2,
+    "EndLine": 1059,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1094,
+    "StartCharacter": 2,
+    "EndLine": 1094,
+    "EndCharacter": 21,
+    "Message": "<SFXEvent_Hardpoint> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1106,
+    "StartCharacter": 2,
+    "EndLine": 1106,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-007-0028",
+    "Severity": "Hint",
+    "StartLine": 1147,
+    "StartCharacter": 32,
+    "EndLine": 1147,
+    "EndCharacter": 34,
+    "Message": "'Z-95_Headhunter_Rebel' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: Turret_Rotate_Extent_Degrees 20 (up to 20 degrees either side), Turret_Elevate_Extent_Degrees 40 (up to 40 degrees up or down)."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1182,
+    "StartCharacter": 2,
+    "EndLine": 1182,
+    "EndCharacter": 30,
+    "Message": "<Surface_Bombardment_Capable> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1185,
+    "StartCharacter": 2,
+    "EndLine": 1185,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1243,
+    "StartCharacter": 2,
+    "EndLine": 1243,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-007-0028",
+    "Severity": "Hint",
+    "StartLine": 1309,
+    "StartCharacter": 32,
+    "EndLine": 1309,
+    "EndCharacter": 34,
+    "Message": "'Pirate_Fighter' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: Turret_Rotate_Extent_Degrees 20 (up to 20 degrees either side), Turret_Elevate_Extent_Degrees 40 (up to 40 degrees up or down)."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1329,
+    "StartCharacter": 2,
+    "EndLine": 1329,
+    "EndCharacter": 22,
+    "Message": "<Number_per_Squadron> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 1385,
+    "StartCharacter": 2,
+    "EndLine": 1385,
+    "EndCharacter": 26,
+    "Message": "<Custom_Footprint_Radius> is not a known SpaceUnit tag. The engine discards it."
+  }
+]

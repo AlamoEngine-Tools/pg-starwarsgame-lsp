@@ -12,8 +12,15 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 /// <inheritdoc />
 public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTagSource tagSource)
-    : IXmlHardpointFactProducer
+    : IXmlFactProducer
 {
+    public string Name => "hardpoint";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
     private const string HardpointTypeName = "HardPoint";
     private const string HardpointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";

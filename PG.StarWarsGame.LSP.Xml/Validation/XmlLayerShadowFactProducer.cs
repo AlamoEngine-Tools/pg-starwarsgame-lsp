@@ -10,8 +10,15 @@ using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
-public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
+public sealed class XmlLayerShadowFactProducer : IXmlFactProducer
 {
+    public string Name => "shadow";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
     public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         if (!index.Documents.TryGetValue(documentUri, out var doc))

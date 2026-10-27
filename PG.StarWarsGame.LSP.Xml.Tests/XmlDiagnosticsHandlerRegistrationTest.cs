@@ -4,6 +4,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -323,9 +324,38 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // the file the game's Lua search path would load.
         // 158 -> 159: XmlEmptyRepeatedTagHandler (#290). An empty repeat of a tag sets nothing in the
         // game, so the earlier or inherited value stays - and the author is told.
-        const int expectedHandlerCount = 159;
+        // 159 -> 162: HardcodedSetValueHandler, DamageTypesIncompleteHandler and
+        // DamageTypeOutOfOrderHandler (#307). The two rules the publisher used to run by hand, building
+        // their diagnostics itself, are facts with handlers like every other rule.
+        const int expectedHandlerCount = 162;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
+    }
+
+    /// <summary>
+    ///     The publisher runs the producers in registration order, and that order is the order the
+    ///     diagnostics come out in - so it is pinned here, as the publisher's own phases had it before
+    ///     the producers became one collection (#307): the document's facts, the index's, the variant
+    ///     chain's, the layers', the hardpoints', the damage stages', the story's, then the two rules
+    ///     that used to run after dispatch.
+    /// </summary>
+    [Fact]
+    public void FactProducers_AreRegisteredInThePublishersOrder()
+    {
+        var services = new ServiceCollection();
+        services.AddXmlLanguageServices();
+
+        var producers = services
+            .Where(d => d.ServiceType == typeof(IXmlFactProducer))
+            .Select(d => d.ImplementationType)
+            .ToList();
+
+        Assert.Equal(
+        [
+            typeof(XmlDocumentFactProducer), typeof(XmlIndexFactProducer), typeof(XmlVariantFactProducer),
+            typeof(XmlLayerShadowFactProducer), typeof(XmlHardpointFactProducer), typeof(XmlDamageStageFactProducer),
+            typeof(StoryFactProducer), typeof(HardcodedSetValueFactProducer), typeof(DamageTypeTailFactProducer)
+        ], producers);
     }
 
     /// <summary>

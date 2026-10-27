@@ -1,0 +1,11 @@
+[
+  {
+    "Code": "aetswg-011-0006",
+    "Severity": "Error",
+    "StartLine": 21,
+    "StartCharacter": 16,
+    "EndLine": 21,
+    "EndCharacter": 28,
+    "Message": "'NOT_EQUAL_TO' is accepted but does nothing in the engine. The comparison has a branch for this value that does nothing at all, so the event never fires. Use a different operator, or invert the condition."
+  }
+]

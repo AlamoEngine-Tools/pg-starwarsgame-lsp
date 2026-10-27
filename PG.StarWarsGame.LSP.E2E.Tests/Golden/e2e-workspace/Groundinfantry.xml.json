@@ -1,0 +1,65 @@
+[
+  {
+    "Code": "aetswg-007-0001",
+    "Severity": "Warning",
+    "StartLine": 40,
+    "StartCharacter": 16,
+    "EndLine": 40,
+    "EndCharacter": 17,
+    "Message": "<Damage> must be greater than 0 for the AI to use this unit."
+  },
+  {
+    "Code": "aetswg-002-0019",
+    "Severity": "Error",
+    "StartLine": 45,
+    "StartCharacter": 12,
+    "EndLine": 45,
+    "EndCharacter": 25,
+    "Message": "'Not_A_Terrain' is not a MapEnvironment value, which the Environment of <Land_Terrain_Model_Mapping> has to be."
+  },
+  {
+    "Code": "aetswg-004-0013",
+    "Severity": "Warning",
+    "StartLine": 46,
+    "StartCharacter": 20,
+    "EndLine": 46,
+    "EndCharacter": 41,
+    "Message": "Model file 'E2E_NO_SUCH_MODEL.ALO' was not found in the game data or workspace asset files."
+  },
+  {
+    "Code": "aetswg-001-0021",
+    "Severity": "Error",
+    "StartLine": 51,
+    "StartCharacter": 37,
+    "EndLine": 51,
+    "EndCharacter": 45,
+    "Message": "Cannot resolve reference 'Atention': No object with this name exists in the workspace."
+  },
+  {
+    "Code": "aetswg-001-0025",
+    "Severity": "Error",
+    "StartLine": 51,
+    "StartCharacter": 37,
+    "EndLine": 51,
+    "EndCharacter": 45,
+    "Message": "<Presence_Induced_Animations> has to start with an Animation (AnimationType): 'Atention' is none. The engine drops the whole value."
+  },
+  {
+    "Code": "aetswg-010-0005",
+    "Severity": "Warning",
+    "StartLine": 54,
+    "StartCharacter": 26,
+    "EndLine": 54,
+    "EndCharacter": 26,
+    "Message": "'E2E_CRC_BXO9XL' has the same name hash as 'E2E_CRC_CDATBA' (0xC492BBC0). The engine finds objects by that hash, so only the one it loads first can be referenced."
+  },
+  {
+    "Code": "aetswg-010-0005",
+    "Severity": "Warning",
+    "StartLine": 57,
+    "StartCharacter": 26,
+    "EndLine": 57,
+    "EndCharacter": 26,
+    "Message": "'E2E_CRC_CDATBA' has the same name hash as 'E2E_CRC_BXO9XL' (0xC492BBC0). The engine finds objects by that hash, so only the one it loads first can be referenced."
+  }
+]
