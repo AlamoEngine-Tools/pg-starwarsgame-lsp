@@ -276,7 +276,7 @@ public sealed class ConvertLocalisationFormatHandler
         if (fs.Path.IsPathRooted(relative)) return (false, 0);
 
         await _fileWriter.SetLocalisationAsync(
-            pgprojPath, targetFormat.ToUpperInvariant(), relative.Replace('\\', '/').ToLowerInvariant(), ct);
+            pgprojPath, targetFormat.ToUpperInvariant(), GamePaths.Key(relative), ct);
         await _reloadService.ReloadAsync(ct);
 
         // Everything still in the old format is now inert: the loader reads the declared format

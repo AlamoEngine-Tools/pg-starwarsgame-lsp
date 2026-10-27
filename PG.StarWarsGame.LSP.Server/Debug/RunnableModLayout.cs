@@ -42,7 +42,7 @@ public static class RunnableModLayout
         ArgumentNullException.ThrowIfNull(layer);
         if (string.IsNullOrEmpty(layer.ProjectPath))
             return null;
-        var normalized = layer.ProjectPath.Replace('\\', '/');
+        var normalized = GamePaths.Forward(layer.ProjectPath);
         var cut = normalized.LastIndexOf('/');
         return cut < 0 ? null : normalized[..cut];
     }
@@ -54,6 +54,6 @@ public static class RunnableModLayout
             .Concat(layer.TextRoots)
             .Concat(layer.AssetRoots)
             .Concat(layer.StoryDialogRoots)
-            .Select(d => d.Replace('\\', '/').TrimEnd('/'));
+            .Select(d => GamePaths.Forward(d).TrimEnd('/'));
     }
 }

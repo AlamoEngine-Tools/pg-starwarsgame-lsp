@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -84,10 +85,10 @@ public static class AssetFileLookup
     /// </remarks>
     private static string Canonical(string reference)
     {
-        var path = reference.Replace('\\', '/');
+        var path = GamePaths.Forward(reference);
         if (path.StartsWith("./", StringComparison.Ordinal))
             path = path[2..];
-        return path.TrimStart('/');
+        return GamePaths.Normalize(path);
     }
 
     private static bool Exists(

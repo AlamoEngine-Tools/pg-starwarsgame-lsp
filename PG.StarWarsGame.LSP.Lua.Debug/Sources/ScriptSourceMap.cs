@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Lua.Debug.Sources;
 
@@ -80,7 +81,7 @@ public sealed class ScriptSourceMap : IScriptSourceMap
 
     private string? Resolve(string gamePath)
     {
-        var forward = gamePath.Replace('\\', '/');
+        var forward = GamePaths.Forward(gamePath);
         if (LooksAbsolute(forward) && _fileHelper.FileSystem.File.Exists(gamePath))
             return _fileHelper.NormalizeUri(gamePath);
 

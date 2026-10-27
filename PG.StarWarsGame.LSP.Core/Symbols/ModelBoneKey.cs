@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Workspace;
+
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 /// <summary>
@@ -24,9 +26,8 @@ public static class ModelBoneKey
     /// </summary>
     public static string From(string modelReference)
     {
-        var normalized = modelReference.Replace('\\', '/').Trim();
+        var normalized = GamePaths.Key(modelReference.Trim());
         var slash = normalized.LastIndexOf('/');
-        var fileName = slash >= 0 ? normalized[(slash + 1)..] : normalized;
-        return fileName.ToLowerInvariant();
+        return slash >= 0 ? normalized[(slash + 1)..] : normalized;
     }
 }

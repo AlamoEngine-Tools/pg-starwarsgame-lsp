@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.Files.DAT.Services;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Dat;
@@ -150,7 +151,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                 return Unit.Value;
             }
 
-            relativeDirectory = relative.Replace('\\', '/').ToLowerInvariant();
+            relativeDirectory = GamePaths.Key(relative);
             outcome = _messages.Format(
                 "LocImport_LocalisationProjectImportedRegisteredFile", sourceFiles.Count, sourceExt, relativeDirectory);
         }

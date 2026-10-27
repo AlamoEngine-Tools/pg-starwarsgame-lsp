@@ -5,6 +5,7 @@ using System.IO.Abstractions;
 using System.Text.Json.Nodes;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Project;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
 
@@ -94,7 +95,7 @@ public static class PgprojIconProposal
         return art
             .Select(node => node?.GetValue<string>())
             .Where(dir => !string.IsNullOrWhiteSpace(dir))
-            .Select(dir => dir!.Replace('\\', '/').TrimEnd('/'));
+            .Select(dir => GamePaths.Forward(dir!).TrimEnd('/'));
     }
 
     /// <summary>

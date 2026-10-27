@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Workspace;
+
 namespace PG.StarWarsGame.LSP.Core.Schema;
 
 /// <summary>
@@ -22,8 +24,9 @@ public static class SchemaProviderExtensions
     {
         if (schema.AllScannedDirectories.Count == 0) return false;
 
-        var normalized = path.Replace('\\', '/');
+        // Whole segments: a document under Data/XMLx is not under Data/XML.
+        var segments = "/" + GamePaths.Normalize(path) + "/";
         return schema.AllScannedDirectories.Any(d =>
-            normalized.Contains(d.Path, StringComparison.OrdinalIgnoreCase));
+            segments.Contains("/" + GamePaths.Normalize(d.Path) + "/", StringComparison.OrdinalIgnoreCase));
     }
 }

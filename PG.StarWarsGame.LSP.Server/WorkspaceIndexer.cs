@@ -82,7 +82,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
     /// <summary>
     ///     Seeds the EaW XML context with the project's declared XML directories, then walks the
-    ///     schema's metafile definitions to register concrete file → type mappings (from the
+    ///     schema's metafile definitions to register concrete file -> type mappings (from the
     ///     metafile on disk, or the shipped baseline when absent).
     /// </summary>
     public void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots)
@@ -501,7 +501,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
     /// <summary>
     ///     Follows a <see cref="MetafileType.Special" /> definition (campaignfiles.xml) through the
-    ///     campaign → plot manifest → story thread chain and types every discovered file
+    ///     campaign -> plot manifest -> story thread chain and types every discovered file
     ///     (<c>StoryPlotManifest</c> / <c>StoryParser</c>) under every xml root. Chain problems are
     ///     collected for the diagnostics pipeline.
     /// </summary>
@@ -661,7 +661,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         if (_luaSchema.Fingerprint is { Length: > 0 } luaFingerprint)
             schemaFingerprint += ";lua:" + luaFingerprint;
 
-        // (pgprojPath → overallHash), used to skip a redundant re-save of an unchanged snapshot.
+        // (pgprojPath -> overallHash), used to skip a redundant re-save of an unchanged snapshot.
         // Folded: a dependency is looked up here by the path a DIFFERENT project spelled in its
         // projectReferences, so the two sides only agree by luck under an ordinal comparison.
         var layerOverallHashes = new Dictionary<string, string>(DocumentUris.Comparer);
@@ -678,7 +678,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 l.Layer.XmlDirectories,
                 config.XmlDirectories));
 
-        // (pgprojPath → OverallHash) of snapshots that survived dependency validation - when the
+        // (pgprojPath -> OverallHash) of snapshots that survived dependency validation - when the
         // recomputed hash matches, the snapshot on disk is already current and is not re-saved.
         var validSnapshotHashes = new Dictionary<string, string>(DocumentUris.Comparer);
 
@@ -691,7 +691,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             {
                 // Normalize the pgproj path (production always normalizes via ProjectDependencyGraph,
                 // but defensive normalization ensures robustness in tests and edge cases).
-                var pgprojPath = layer.ProjectPath?.Replace('\\', '/');
+                var pgprojPath = layer.ProjectPath is { } projectPath ? GamePaths.Forward(projectPath) : null;
 
                 var crossLayer = crossLayerFingerprints[layer];
                 var snapshot = pgprojPath is not null ? _cache.TryLoad(pgprojPath, crossLayer) : null;
@@ -728,7 +728,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                     validSnapshotHashes[pgprojPath] = snapshot.OverallHash;
                 if (snapshot is not null) layersFromSnapshot++;
 
-                // Build lookup from relPath → cached entry.
+                // Build lookup from relPath -> cached entry.
                 var projectDir = pgprojPath is not null ? GetDirectory(pgprojPath) : null;
                 // Folded, like every other lookup keyed by a document path: the snapshot may spell
                 // a path in a case neither this scan nor this version would produce, and the
@@ -794,7 +794,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         // Write snapshots after the bulk update so Current.Documents is fully populated.
         foreach (var (layer, entries) in layerResults)
         {
-            var pgprojPath = layer.ProjectPath?.Replace('\\', '/');
+            var pgprojPath = layer.ProjectPath is { } projectPath ? GamePaths.Forward(projectPath) : null;
             if (pgprojPath is null) continue;
 
             var overallHash = layerOverallHashes.GetValueOrDefault(pgprojPath, string.Empty);
@@ -890,7 +890,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     // and a case-sensitive host cannot open a name we flattened on the way in.
     private static string NormalizePath(string path)
     {
-        return path.Replace('\\', '/');
+        return GamePaths.Forward(path);
     }
 
     private static string GetDirectory(string normalizedPath)
@@ -941,7 +941,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         }
     }
 
-    // Falls back to the shipped baseline's file→type map when a metafile is absent from the workspace.
+    // Falls back to the shipped baseline's file->type map when a metafile is absent from the workspace.
     // Preserves subdirectories and resolves each key against every xml root (mirrors RegisterFromMetafile).
     private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def,
         IReadOnlyList<string> xmlRoots)

@@ -25,6 +25,7 @@ using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Story.Discovery;
@@ -229,7 +230,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     //
     // Same stopgap as music events above (see that comment for the full rationale):
     // PG.StarWarsGame.Engine has no shadow-blob-material support, and Shadowblobmaterials.xml is
-    // another single direct-content file - a flat <Shadow_Blob_Materials><Material name="…">
+    // another single direct-content file - a flat <Shadow_Blob_Materials><Material name="...">
     // list, so a direct parse is sufficient. Note the LOWERCASE `name` attribute (unlike every
     // other object type's `Name`); matched case-insensitively for robustness.
     //
@@ -341,7 +342,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     // ── MEG loading (EaW layer first, then engine layer) ──────────────────────
     //
     // MegLoadOrderResolver ensures non-patch MEGs come first (sorted), then
-    // patch.meg → patch2.meg → 64patch.meg.  SFX MEGs are filtered to
+    // patch.meg -> patch2.meg -> 64patch.meg.  SFX MEGs are filtered to
     // non_localized + English.  The entry lookup is built with last-wins
     // semantics: EaW entries are written first, engine (FoC) entries overwrite
     // them for the same normalised path.
@@ -462,7 +463,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
                         var xmlContent = await new StreamReader(stream).ReadToEndAsync();
                         foreach (var filename in MetafileReader.ReadFileList(xmlContent))
                         {
-                            var normalizedPath = filename.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+                            var normalizedPath = GamePaths.Key(filename);
                             fileTypeMapBuilder[normalizedPath] = [.. def.Types];
                         }
                     }
@@ -660,7 +661,7 @@ static string ComputeManifestHash(string gamePath)
 // normalization as file-registry entries (forward slashes, lowercase).
 static string NormalizeChainPath(string xmlRelativePath)
 {
-    return xmlRelativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    return GamePaths.Key(xmlRelativePath);
 }
 
 // Walk up from the binary's directory until we find schema/eaw

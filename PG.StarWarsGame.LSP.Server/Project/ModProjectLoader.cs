@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using CoreModinfoData = PG.StarWarsGame.LSP.Core.Project.ModinfoData;
 using ModinfoData = AET.Modinfo.Model.ModinfoData;
 
@@ -296,7 +297,7 @@ public sealed class ModProjectLoader
     // case-sensitive host. Compare them through DocumentUris, never with Ordinal.
     private static string NormalizePath(string path)
     {
-        return path.Replace('\\', '/');
+        return GamePaths.Forward(path);
     }
 
     /// <summary>The name of the first property that repeats within one object, anywhere in the document.</summary>

@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Completion;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -160,7 +161,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;
             if (string.Equals(uri, currentUri, StringComparison.OrdinalIgnoreCase)) continue;
 
-            var normalized = uri.Replace('\\', '/');
+            var normalized = GamePaths.Forward(uri);
             var slashIdx = normalized.LastIndexOf('/');
             var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
             if (!filename.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Util;
 
@@ -24,7 +25,7 @@ public sealed class FileHelper : IFileHelper
     /// </remarks>
     public string PathToFileUri(string path)
     {
-        var forward = path.Replace('\\', '/');
+        var forward = GamePaths.Forward(path);
         return forward.StartsWith('/') ? "file://" + forward : "file:///" + forward;
     }
 
@@ -68,7 +69,7 @@ public sealed class FileHelper : IFileHelper
 
     public string NormalizeGamePath(string raw)
     {
-        return raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+        return GamePaths.Key(raw);
     }
 
     public string? FileUriToPath(string fileUri)

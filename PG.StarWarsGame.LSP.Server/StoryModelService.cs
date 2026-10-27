@@ -60,7 +60,7 @@ public interface IStoryModelService
     /// <summary>Every model whose thread closure contains the given document.</summary>
     IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri);
 
-    /// <summary>The current chain scan (campaign → faction → manifest → thread associations).</summary>
+    /// <summary>The current chain scan (campaign -> faction -> manifest -> thread associations).</summary>
     StoryChainScanResult GetChainResult();
 
     /// <summary>
@@ -270,11 +270,11 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
     {
         if (string.IsNullOrEmpty(xmlRelativeThread)) return false;
 
-        var relative = xmlRelativeThread.Replace('\\', '/').TrimStart('/');
+        var relative = GamePaths.Normalize(xmlRelativeThread);
         return documentUri.EndsWith("/" + relative, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── Chain scan (campaign → manifest → thread associations) ───────────────
+    // ── Chain scan (campaign -> manifest -> thread associations) ───────────────
 
     private ChainCache GetChain()
     {
@@ -381,7 +381,7 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
 
         public bool IsKnownToBaseline(string xmlRelativePath)
         {
-            var normalized = xmlRelativePath.Replace('\\', '/').ToLowerInvariant();
+            var normalized = GamePaths.Key(xmlRelativePath);
             var map = service._indexService.Current.Baseline.FileTypeMap;
             return map.ContainsKey(normalized) || map.ContainsKey("data/xml/" + normalized);
         }

@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -180,7 +181,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         string markdown;
         if (resolved is not null)
         {
-            var normalized = resolved.Replace('\\', '/');
+            var normalized = GamePaths.Forward(resolved);
             var slashIdx = normalized.LastIndexOf('/');
             var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
             markdown = _messages.Format("LuaHover_Require", requireArg, filename);

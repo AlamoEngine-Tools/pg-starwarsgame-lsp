@@ -6,6 +6,7 @@ using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
@@ -141,11 +142,11 @@ public static class MegAssetCatalogBuilder
 
     /// <summary>
     ///     Normalises a raw MEG entry path to lowercase forward-slash with no leading separator.
-    ///     e.g. <c>DATA\ART\TEXTURES\FOO.TGA</c> → <c>data/art/textures/foo.tga</c>.
+    ///     e.g. <c>DATA\ART\TEXTURES\FOO.TGA</c> -> <c>data/art/textures/foo.tga</c>.
     /// </summary>
     public static string NormalizeMegPath(string rawPath)
     {
-        return rawPath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+        return GamePaths.Key(rawPath);
     }
 
     /// <summary>

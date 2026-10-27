@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
@@ -81,7 +82,7 @@ public sealed class SetLocalisationProjectFormatHandler
 
         // The same shape the conversion writes, so the two never disagree about the node.
         await _fileWriter.SetLocalisationAsync(
-            pgprojPath, format, relative.Replace('\\', '/').ToLowerInvariant(), ct);
+            pgprojPath, format, GamePaths.Key(relative), ct);
         await _reloadService.ReloadAsync(ct);
 
         var count = CountInFormat(extension);

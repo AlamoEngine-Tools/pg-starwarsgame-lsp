@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Core.Xml;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -144,7 +145,7 @@ internal static class HoverUtility
         XmlTagDefinition tag, string rawValue, IAssetFileIndex assetFiles, int line, int col, int length,
         IMessageCatalog messages)
     {
-        var value = rawValue.Replace('\\', '/').Trim();
+        var value = GamePaths.Forward(rawValue).Trim();
         if (string.IsNullOrEmpty(value)) return null;
 
         var ext = Path.GetExtension(value);
@@ -232,7 +233,7 @@ internal static class HoverUtility
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.Append(messages.Format("HoverUtility_PackedInBaseGame", shipped.Uri.Replace('\\', '/')));
+        sb.Append(messages.Format("HoverUtility_PackedInBaseGame", GamePaths.Forward(shipped.Uri)));
     }
 
     // A navigable workspace definition that lives in a DEPENDENCY project's layer (rank below the

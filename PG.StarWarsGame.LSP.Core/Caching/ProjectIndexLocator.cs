@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Workspace;
+
 namespace PG.StarWarsGame.LSP.Core.Caching;
 
 public static class ProjectIndexLocator
@@ -63,14 +65,14 @@ public static class ProjectIndexLocator
 
     private static string GetDirectory(string path)
     {
-        var normalized = path.Replace('\\', '/');
+        var normalized = GamePaths.Forward(path);
         var idx = normalized.LastIndexOf('/');
         return idx < 0 ? "." : normalized[..idx];
     }
 
     private static string GetStem(string path)
     {
-        var normalized = path.Replace('\\', '/');
+        var normalized = GamePaths.Forward(path);
         var idx = normalized.LastIndexOf('/');
         var filename = idx < 0 ? normalized : normalized[(idx + 1)..];
         var dotIdx = filename.LastIndexOf('.');

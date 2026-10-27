@@ -8,6 +8,7 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
@@ -122,7 +123,7 @@ public sealed class AdoptModProjectHandler(IFileHelper fileHelper, IMessageCatal
 
     private JsonArray Relative(string root, string directory)
     {
-        return [fileHelper.FileSystem.Path.GetRelativePath(root, directory).Replace('\\', '/')];
+        return [GamePaths.Forward(fileHelper.FileSystem.Path.GetRelativePath(root, directory))];
     }
 
     // The csv is what a mod compiles its dat from, so with both the csv is the source.

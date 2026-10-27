@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis;
 
@@ -26,7 +27,7 @@ internal static class LuaFileClassifier
 
     public static bool IsInstanceScriptUri(string uri)
     {
-        var normalized = Uri.UnescapeDataString(uri).Replace('\\', '/');
+        var normalized = GamePaths.Forward(Uri.UnescapeDataString(uri));
         return s_instanceDirectories.Any(d => normalized.Contains(d, StringComparison.OrdinalIgnoreCase));
     }
 

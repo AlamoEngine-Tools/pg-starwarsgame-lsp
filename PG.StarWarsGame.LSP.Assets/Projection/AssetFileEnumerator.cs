@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
@@ -49,6 +50,6 @@ public static class AssetFileEnumerator
 
     private static string Normalize(string relativePath)
     {
-        return relativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+        return GamePaths.Key(relativePath);
     }
 }
