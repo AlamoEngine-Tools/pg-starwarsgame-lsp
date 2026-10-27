@@ -35,6 +35,11 @@ public static class EngineNumber
         @"^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    /// <summary>What <c>atoi</c> consumes: an optional sign and the digits, so <c>1.0</c> and <c>1e3</c> both read 1.</summary>
+    private static readonly Regex IntegerPrefix = new(
+        @"^[+-]?\d+",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     /// <summary>
     ///     A sign, a point and an exponent, but no blanks: the text is trimmed before the suffix comes
     ///     off, so a blank left over sat between the number and its suffix.
@@ -77,6 +82,24 @@ public static class EngineNumber
     {
         return NumberPrefix(text) is { } prefix &&
                double.TryParse(prefix, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
+    }
+
+    /// <summary>
+    ///     The whole number the game reads from the text, or null when no digit starts it - where the
+    ///     game reads 0. A fraction, a suffix or an exponent after the digits is ignored, so a count
+    ///     written <c>1.0</c>, as the shipped files write some, reads 1.
+    /// </summary>
+    public static int? ReadInt(string? text)
+    {
+        if (text is null)
+            return null;
+
+        var match = IntegerPrefix.Match(text.TrimStart());
+
+        return match.Success &&
+               int.TryParse(match.Value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
             ? value
             : null;
     }

@@ -358,7 +358,7 @@ public sealed class PreviewSceneBuilder(
         // Whether the hardpoints are a route to this object's death at all. Read once here rather
         // than per hardpoint: it is the owner's tag, not theirs.
         var diesWithHardpoints = EngineBoolean.IsTrueUnlessDenied(
-            Tag(effective, "Should_Be_Destroyed_When_All_Hardpoints_Destroyed"));
+            effective.ValueOf("Should_Be_Destroyed_When_All_Hardpoints_Destroyed"));
 
         foreach (var hardpointId in HardpointIds(effective))
             AddHardpoint(resolver, hull, hardpointId, diesWithHardpoints,
@@ -393,8 +393,8 @@ public sealed class PreviewSceneBuilder(
             // The HULL's cameras only. A turret carries its own skeleton and could in principle
             // declare one, but it was aimed at the turret, and the subject here is the whole unit.
             hull is null ? [] : CamerasOf(hull, problems),
-            Tag(effective, "Type"),
-            CategoryTokens(Tag(effective, "CategoryMask")),
+            effective.ValueOf("Type"),
+            CategoryTokens(effective.ValueOf("CategoryMask")),
             BreakoffProps(resolver, hardpoints, problems),
             weapons,
             Reticles(hardpoints, problems),
@@ -408,16 +408,16 @@ public sealed class PreviewSceneBuilder(
                 icons, index.Localisation),
             DeathClones(resolver, effective, problems),
             SpinAway(effective),
-            Tag(effective, "Death_Explosions"),
+            effective.ValueOf("Death_Explosions"),
             ProjectileCatalog(),
             // What it wears when no faction colour applies, which is most of the time - its own
             // colour first, and whose fallback to use when it declares none.
             Colour(effective, "No_Colorization_Color"),
-            FirstToken(Tag(effective, "Affiliation")),
+            FirstToken(effective.ValueOf("Affiliation")),
             stages,
             DamageTable(effective),
-            EngineScaleFactor.Of(Tag(effective, "Scale_Factor")),
-            Tag(effective, EncyclopediaTags.IconName));
+            EngineScaleFactor.Of(effective.ValueOf("Scale_Factor")),
+            effective.ValueOf(EncyclopediaTags.IconName));
     }
 
     /// <summary>
@@ -476,7 +476,7 @@ public sealed class PreviewSceneBuilder(
         EffectiveObjectResolver resolver, EffectiveObject effective, List<PreviewProblem> problems)
     {
         // On the OBJECT, not on the row, so it is the same answer for every clone it names.
-        var playsIdle = EngineBoolean.IsTrue(Tag(effective, "Should_Death_Clone_Play_Idle"));
+        var playsIdle = effective.BoolOf("Should_Death_Clone_Play_Idle");
         var clones = new List<PreviewDeathClone>();
 
         foreach (var tag in effective.Tags.Where(t =>
@@ -501,11 +501,7 @@ public sealed class PreviewSceneBuilder(
                 continue;
             }
 
-            var model = Tag(clone, "Space_Model_Name") is { Length: > 0 } space
-                ? space
-                : Tag(clone, "Land_Model_Name") is { Length: > 0 } land
-                    ? land
-                    : null;
+            var model = clone.ValueOf("Space_Model_Name") ?? clone.ValueOf("Land_Model_Name");
 
             // Its OWN model's clips and effects. Everything else on the wire describes the subject,
             // and a clone is a replacement for it rather than a piece of it.
@@ -514,7 +510,7 @@ public sealed class PreviewSceneBuilder(
                 model is null ? [] : ProxiesOf(model, row[1], [], problems),
                 // The clone's OWN scale, read off the resolved clone - variants included - through
                 // the same reader the subject's scale uses.
-                EngineScaleFactor.Of(Tag(clone, "Scale_Factor"))));
+                EngineScaleFactor.Of(clone.ValueOf("Scale_Factor"))));
         }
 
         return clones;
@@ -548,7 +544,7 @@ public sealed class PreviewSceneBuilder(
         IconCatalog? icons = null,
         ILocalisationIndex? localisation = null)
     {
-        var declared = UnitAbilityReader.Read(Fragment(effective, EncyclopediaTags.UnitAbilitiesData));
+        var declared = UnitAbilityReader.Read(effective.FragmentOf(EncyclopediaTags.UnitAbilitiesData));
 
         // Deliberately NOT gated on `declared.Count > 0`. An object with proxies and no abilities at
         // all is exactly where an unbound effect is most likely to be a real mistake - and returning
@@ -635,27 +631,6 @@ public sealed class PreviewSceneBuilder(
         return !IsUndeploy(name) && name.Contains("_deploy", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>The verbatim XML of a tag, for the sub-object lists whose value is only whitespace.</summary>
-    private static string? Fragment(EffectiveObject effective, string tagName)
-    {
-        return effective.Tags
-            .FirstOrDefault(t => t.TagName.Equals(tagName, StringComparison.OrdinalIgnoreCase))
-            ?.Fragment;
-    }
-
-    /// <summary>
-    ///     A whole-number tag, as a count.
-    /// </summary>
-    /// <remarks>
-    ///     Read through <see cref="Number" /> because the engine's integer tags are written as
-    ///     floats often enough to matter - <c>Projectile_Blast_Area_Max_Victims</c> ships as
-    ///     <c>1.0</c> in both of the two places it appears, and an integer parse would drop it.
-    /// </remarks>
-    private static int? Count(EffectiveObject effective, string tagName)
-    {
-        return Number(effective, tagName) is { } value ? (int)value : null;
-    }
-
     /// <summary>
     ///     What a hit on this subject has to get through.
     /// </summary>
@@ -669,8 +644,8 @@ public sealed class PreviewSceneBuilder(
     {
         var table = PreviewDamageTable.From(indexService.Current, tagSource);
 
-        var armor = Tag(effective, "Armor_Type");
-        var shieldArmor = Tag(effective, "Shield_Armor_Type");
+        var armor = effective.ValueOf("Armor_Type");
+        var shieldArmor = effective.ValueOf("Shield_Armor_Type");
 
         // Only the hardpoints that can actually die. An indestructible one can never be part of a
         // death, so counting its health would put a floor under the bar that nothing could remove.
@@ -680,12 +655,12 @@ public sealed class PreviewSceneBuilder(
             IsShielded(effective),
             string.IsNullOrWhiteSpace(armor) ? null : armor.Trim(),
             string.IsNullOrWhiteSpace(shieldArmor) ? null : shieldArmor.Trim(),
-            Number(effective, "Shield_Points"),
-            Number(effective, "Tactical_Health"),
-            Number(effective, "Energy_Capacity"),
+            effective.FloatOf("Shield_Points"),
+            effective.FloatOf("Tactical_Health"),
+            effective.FloatOf("Energy_Capacity"),
             destructible.Count == 0 ? null : destructible.Sum(h => h.Health ?? 0f),
             EngineBoolean.IsTrueUnlessDenied(
-                Tag(effective, "Should_Be_Destroyed_When_All_Hardpoints_Destroyed")),
+                effective.ValueOf("Should_Be_Destroyed_When_All_Hardpoints_Destroyed")),
             HullVsHardpointsConstraint(),
             table.FactorsFor(armor),
             table.FactorsFor(shieldArmor),
@@ -728,7 +703,7 @@ public sealed class PreviewSceneBuilder(
     private static bool IsShielded(EffectiveObject effective)
     {
         return ShieldBehaviorTags
-            .SelectMany(tag => (Tag(effective, tag) ?? string.Empty)
+            .SelectMany(tag => (effective.ValueOf(tag) ?? string.Empty)
                 .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Any(token => token.Equals("SHIELDED", StringComparison.OrdinalIgnoreCase));
     }
@@ -851,39 +826,35 @@ public sealed class PreviewSceneBuilder(
                 continue;
             }
 
-            var model = Tag(effective, "Space_Model_Name") is { Length: > 0 } space
-                ? space
-                : Tag(effective, "Land_Model_Name") is { Length: > 0 } land
-                    ? land
-                    : null;
+            var model = effective.ValueOf("Space_Model_Name") ?? effective.ValueOf("Land_Model_Name");
 
             projectiles.Add(new PreviewProjectile(
                 id,
-                EngineBoolean.IsTrue(Tag(effective, "Projectile_Custom_Render"))
+                effective.BoolOf("Projectile_Custom_Render")
                     ? PreviewProjectileRender.CustomQuad
                     : PreviewProjectileRender.Model,
                 model,
-                Number(effective, "Projectile_Width"),
-                Number(effective, "Projectile_Length"),
-                Tag(effective, "Projectile_Texture_Slot") is { Length: > 0 } slot ? slot : null,
-                Tag(effective, "Projectile_Laser_Color") is { Length: > 0 } colour ? colour : null,
-                Number(effective, "Max_Speed"),
-                Number(effective, "Projectile_Max_Flight_Distance"),
-                Number(effective, "Max_Rate_Of_Turn"),
-                Number(effective, "Projectile_Damage"),
-                Tag(effective, "Damage_Type") is { Length: > 0 } dmg ? dmg : null,
-                Tag(effective, "Projectile_Category") is { Length: > 0 } cat ? cat : null,
-                EngineBoolean.IsTrue(Tag(effective, "Projectile_Does_Shield_Damage")),
-                EngineBoolean.IsTrue(Tag(effective, "Projectile_Does_Energy_Damage")),
-                EngineBoolean.IsTrue(Tag(effective, "Projectile_Does_Hitpoint_Damage")),
-                Number(effective, "Projectile_Blast_Area_Damage"),
-                Number(effective, "Projectile_Blast_Area_Range"),
-                Count(effective, "Projectile_Blast_Area_Max_Victims"),
-                EngineBoolean.IsTrue(Tag(effective, "Projectile_Blast_Area_Dropoff")),
-                Count(effective, "Projectile_Blast_Area_Dropoff_Tiers"),
-                Tag(effective, "Projectile_Object_Detonation_Particle") is { Length: > 0 } det ? det : null,
-                Tag(effective, "Projectile_Absorbed_By_Shields_Particle") is { Length: > 0 } abs ? abs : null,
-                Tag(effective, "Projectile_SFXEvent_Detonate") is { Length: > 0 } sfx ? sfx : null));
+                effective.FloatOf("Projectile_Width"),
+                effective.FloatOf("Projectile_Length"),
+                effective.ValueOf("Projectile_Texture_Slot"),
+                effective.ValueOf("Projectile_Laser_Color"),
+                effective.FloatOf("Max_Speed"),
+                effective.FloatOf("Projectile_Max_Flight_Distance"),
+                effective.FloatOf("Max_Rate_Of_Turn"),
+                effective.FloatOf("Projectile_Damage"),
+                effective.ValueOf("Damage_Type"),
+                effective.ValueOf("Projectile_Category"),
+                effective.BoolOf("Projectile_Does_Shield_Damage"),
+                effective.BoolOf("Projectile_Does_Energy_Damage"),
+                effective.BoolOf("Projectile_Does_Hitpoint_Damage"),
+                effective.FloatOf("Projectile_Blast_Area_Damage"),
+                effective.FloatOf("Projectile_Blast_Area_Range"),
+                effective.IntOf("Projectile_Blast_Area_Max_Victims"),
+                effective.BoolOf("Projectile_Blast_Area_Dropoff"),
+                effective.IntOf("Projectile_Blast_Area_Dropoff_Tiers"),
+                effective.ValueOf("Projectile_Object_Detonation_Particle"),
+                effective.ValueOf("Projectile_Absorbed_By_Shields_Particle"),
+                effective.ValueOf("Projectile_SFXEvent_Detonate")));
         }
 
         return projectiles;
@@ -957,7 +928,7 @@ public sealed class PreviewSceneBuilder(
 
             // A breakoff prop is space debris; a ground hardpoint names none, so the land tag is not
             // consulted here.
-            var model = Tag(effective, "Space_Model_Name");
+            var model = effective.ValueOf("Space_Model_Name");
 
             var modelRef = string.IsNullOrEmpty(model) ? null : model;
 
@@ -967,11 +938,11 @@ public sealed class PreviewSceneBuilder(
                 true,
                 Vector3Tag(effective, "Debris_Movement_Vector"),
                 Vector3Tag(effective, "Debris_Facing_Rotate_Vector"),
-                Number(effective, "Debris_Min_Lifetime_Seconds"),
-                Number(effective, "Debris_Max_Lifetime_Seconds"),
-                Tag(effective, "Debris_Attached_Particle") is { Length: > 0 } p ? p : null,
-                Tag(effective, "Death_Explosions") is { Length: > 0 } d ? d : null,
-                EngineBoolean.IsTrue(Tag(effective, "Remove_Upon_Death")),
+                effective.FloatOf("Debris_Min_Lifetime_Seconds"),
+                effective.FloatOf("Debris_Max_Lifetime_Seconds"),
+                effective.ValueOf("Debris_Attached_Particle"),
+                effective.ValueOf("Death_Explosions"),
+                effective.BoolOf("Remove_Upon_Death"),
                 // Its OWN model's, like a death clone's - a burning piece of debris trails its own
                 // fire, and `Debris_Attached_Particle` is a second, separate effect the XML names.
                 modelRef is null ? [] : AnimationsFor(modelRef),
@@ -984,7 +955,7 @@ public sealed class PreviewSceneBuilder(
     /// <summary>A comma-separated triple, or null when the tag is absent or malformed.</summary>
     private static PreviewVector3? Vector3Tag(EffectiveObject effective, string tagName)
     {
-        var raw = Tag(effective, tagName);
+        var raw = effective.ValueOf(tagName);
         if (string.IsNullOrEmpty(raw))
             return null;
 
@@ -1103,7 +1074,7 @@ public sealed class PreviewSceneBuilder(
         EffectiveObject effective, string? hull, List<PreviewProblem> problems)
     {
         var overrideModel = AnimationOverrideTags
-            .Select(tag => Tag(effective, tag))
+            .Select(tag => effective.ValueOf(tag))
             .FirstOrDefault(value => value is not null);
 
         if (overrideModel is null)
@@ -1130,7 +1101,7 @@ public sealed class PreviewSceneBuilder(
 
     private static List<string> HardpointIds(EffectiveObject effective)
     {
-        return Tag(effective, HardPointsTag) is { } raw
+        return effective.ValueOf(HardPointsTag) is { } raw
             ? XmlUtility.SplitList(raw)
             : [];
     }
@@ -1153,8 +1124,8 @@ public sealed class PreviewSceneBuilder(
             return;
         }
 
-        var attachBone = Tag(effective, AttachmentBoneTag);
-        var model = Tag(effective, ModelToAttachTag);
+        var attachBone = effective.ValueOf(AttachmentBoneTag);
+        var model = effective.ValueOf(ModelToAttachTag);
         string? partId = null;
 
         if (!string.IsNullOrEmpty(model))
@@ -1173,7 +1144,7 @@ public sealed class PreviewSceneBuilder(
                     hardpointId));
         }
 
-        var isTargetable = EngineBoolean.IsTrue(Tag(effective, "Is_Targetable"));
+        var isTargetable = effective.BoolOf("Is_Targetable");
 
         // Measured in the game (FoC x64, 2024 release): a hardpoint with no attachment bone is
         // attached to NOTHING. Its world position falls back to Fire_Bone_A and, with that unset
@@ -1188,7 +1159,7 @@ public sealed class PreviewSceneBuilder(
         // way, shot at or not.
         if (string.IsNullOrEmpty(attachBone))
         {
-            var fireBoneA = Tag(effective, "Fire_Bone_A");
+            var fireBoneA = effective.ValueOf("Fire_Bone_A");
             var placed = string.IsNullOrEmpty(fireBoneA)
                 ? _messages.Format("PreviewScene_PlacedAtOrigin")
                 : _messages.Format("PreviewScene_PlacedAtFireBone", fireBoneA);
@@ -1227,30 +1198,30 @@ public sealed class PreviewSceneBuilder(
         //
         // Silent where the object does not die with its hardpoints - the palace keeps its
         // generators as destructible scenery, so one that cannot be shot takes nothing away.
-        if (EngineBoolean.IsTrue(Tag(effective, "Is_Destroyable"))
+        if (effective.BoolOf("Is_Destroyable")
             && diesWithHardpoints
-            && string.IsNullOrWhiteSpace(Tag(effective, "Collision_Mesh")))
+            && string.IsNullOrWhiteSpace(effective.ValueOf("Collision_Mesh")))
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointUnreachable, "error",
                 _messages.Format("PreviewScene_HardpointUnreachable", hardpointId),
                 hardpointId));
 
-        var tooltipKey = Tag(effective, "Tooltip_Text");
+        var tooltipKey = effective.ValueOf("Tooltip_Text");
 
         hardpoints.Add(new PreviewHardpoint(
             hardpointId,
             partId,
-            Tag(effective, "Type"),
+            effective.ValueOf("Type"),
             attachBone,
-            EngineBoolean.IsTrue(Tag(effective, "Is_Destroyable")),
+            effective.BoolOf("Is_Destroyable"),
             isTargetable,
-            Number(effective, "Health"),
-            Tag(effective, "Damage_Particles"),
-            Tag(effective, "Damage_Decal"),
-            Tag(effective, "Collision_Mesh"),
-            Tag(effective, "Engine_Particles"),
-            Tag(effective, "Death_Explosion_Particles"),
-            Tag(effective, "Death_Breakoff_Prop"),
-            EngineBoolean.IsTrueUnlessDenied(Tag(effective, "Engine_Death_Hide_Engine_Particles")),
+            effective.FloatOf("Health"),
+            effective.ValueOf("Damage_Particles"),
+            effective.ValueOf("Damage_Decal"),
+            effective.ValueOf("Collision_Mesh"),
+            effective.ValueOf("Engine_Particles"),
+            effective.ValueOf("Death_Explosion_Particles"),
+            effective.ValueOf("Death_Breakoff_Prop"),
+            EngineBoolean.IsTrueUnlessDenied(effective.ValueOf("Engine_Death_Hide_Engine_Particles")),
             tooltipKey,
             // Resolved here rather than left to the client, which has no text index at all. The
             // localisation index matches case-insensitively, and the shipped files are not
@@ -1267,19 +1238,19 @@ public sealed class PreviewSceneBuilder(
     /// <summary>The turret pose, or null when the hardpoint is not one.</summary>
     private static PreviewTurret? Turret(EffectiveObject effective)
     {
-        if (!EngineBoolean.IsTrue(Tag(effective, "Is_Turret")))
+        if (!effective.BoolOf("Is_Turret"))
             return null;
 
         // EFFECTIVE, not authored: the client clamps a drag handle to these, and the two owners
         // default differently. See DefaultHardpointRotateExtentDegrees.
         return new PreviewTurret(
-            Number(effective, "Turret_Rest_Angle"),
-            Number(effective, "Turret_Rotate_Extent_Degrees")
+            effective.FloatOf("Turret_Rest_Angle"),
+            effective.FloatOf("Turret_Rotate_Extent_Degrees")
             ?? DefaultHardpointRotateExtentDegrees,
-            Number(effective, "Turret_Elevate_Extent_Degrees")
+            effective.FloatOf("Turret_Elevate_Extent_Degrees")
             ?? DefaultHardpointElevateExtentDegrees,
-            Tag(effective, "Turret_Bone_Name"),
-            Tag(effective, "Barrel_Bone_Name"));
+            effective.ValueOf("Turret_Bone_Name"),
+            effective.ValueOf("Barrel_Bone_Name"));
     }
 
     /// <summary>
@@ -1323,19 +1294,19 @@ public sealed class PreviewSceneBuilder(
             // Randomize_Between_Fire_Bones is a HardPoint parameter and is not on GameObjectType at
             // all, so this case has no other branch.
             PreviewFirePointMode.CycleBones,
-            EngineBoolean.IsTrue(Tag(effective, "Fires_Forward")),
+            effective.BoolOf("Fires_Forward"),
             // A list, but only 2 of 95 shipped objects name more than one.
-            FirstToken(Tag(effective, "Projectile_Types")),
-            Number(effective, "Damage"),
-            Tag(effective, "Damage_Type") is { Length: > 0 } dmg ? dmg : null,
-            Number(effective, "Targeting_Max_Attack_Distance"),
+            FirstToken(effective.ValueOf("Projectile_Types")),
+            effective.FloatOf("Damage"),
+            effective.ValueOf("Damage_Type"),
+            effective.FloatOf("Targeting_Max_Attack_Distance"),
             null,
             UnitArcYawDegrees(effective),
             UnitArcPitchDegrees(effective),
             Inaccuracy(effective.ObjectId),
-            Integer(effective, "Projectile_Fire_Pulse_Count"),
-            Number(effective, "Projectile_Fire_Pulse_Delay_Seconds"),
-            Number(effective, "Projectile_Fire_Recharge_Seconds"),
+            effective.IntOf("Projectile_Fire_Pulse_Count"),
+            effective.FloatOf("Projectile_Fire_Pulse_Delay_Seconds"),
+            effective.FloatOf("Projectile_Fire_Recharge_Seconds"),
             [],
             turret,
             null,
@@ -1355,7 +1326,7 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static bool CanDeploy(EffectiveObject effective)
     {
-        return EngineBoolean.IsTrue(Tag(effective, "Deploys"))
+        return effective.BoolOf("Deploys")
                && ObjectBehaviors.Has(effective, "WALK_LOCOMOTOR");
     }
 
@@ -1387,7 +1358,7 @@ public sealed class PreviewSceneBuilder(
         if (FiresForward(effective) || (deployed && !CanDeploy(effective))) return null;
 
         var tag = deployed ? "Deployed_Turret_Rotate_Extent_Degrees" : "Turret_Rotate_Extent_Degrees";
-        return FullAngle(Number(effective, tag) ?? DefaultTurretRotateExtentDegrees);
+        return FullAngle(effective.FloatOf(tag) ?? DefaultTurretRotateExtentDegrees);
     }
 
     /// <summary>
@@ -1408,7 +1379,7 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static bool FiresForward(EffectiveObject effective)
     {
-        return EngineBoolean.IsTrue(Tag(effective, "Fires_Forward"));
+        return effective.BoolOf("Fires_Forward");
     }
 
     /// <summary>The vertical arc, as a full angle.</summary>
@@ -1423,11 +1394,11 @@ public sealed class PreviewSceneBuilder(
         if (FiresForward(effective) || (deployed && !CanDeploy(effective))) return null;
 
         // Tested before the pitch is read in the cone-of-fire test, so it drops the deployed test too.
-        if (EngineBoolean.IsTrue(Tag(effective, "Turret_XY_Only")))
+        if (effective.BoolOf("Turret_XY_Only"))
             return FullTurnDegrees;
 
         var tag = deployed ? "Deployed_Turret_Elevate_Extent_Degrees" : "Turret_Elevate_Extent_Degrees";
-        return FullAngle(Number(effective, tag) ?? DefaultTurretElevateExtentDegrees);
+        return FullAngle(effective.FloatOf(tag) ?? DefaultTurretElevateExtentDegrees);
     }
 
     /// <summary>
@@ -1462,10 +1433,10 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static float? HardpointArcYawDegrees(EffectiveObject effective)
     {
-        if (!EngineBoolean.IsTrue(Tag(effective, "Is_Turret")))
-            return Number(effective, "Fire_Cone_Width");
+        if (!effective.BoolOf("Is_Turret"))
+            return effective.FloatOf("Fire_Cone_Width");
 
-        return FullAngle(Number(effective, "Turret_Rotate_Extent_Degrees") ?? 0f);
+        return FullAngle(effective.FloatOf("Turret_Rotate_Extent_Degrees") ?? 0f);
     }
 
     /// <summary>The vertical arc, which a turret hardpoint simply does not have.</summary>
@@ -1477,8 +1448,8 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static float? HardpointArcPitchDegrees(EffectiveObject effective)
     {
-        if (!EngineBoolean.IsTrue(Tag(effective, "Is_Turret")))
-            return Number(effective, "Fire_Cone_Height");
+        if (!effective.BoolOf("Is_Turret"))
+            return effective.FloatOf("Fire_Cone_Height");
 
         return FullTurnDegrees;
     }
@@ -1487,7 +1458,7 @@ public sealed class PreviewSceneBuilder(
     private static bool HasWeaponBehavior(EffectiveObject effective)
     {
         return BehaviorTags
-            .SelectMany(tag => (Tag(effective, tag) ?? string.Empty)
+            .SelectMany(tag => (effective.ValueOf(tag) ?? string.Empty)
                 .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Any(token => token.Equals("WEAPON", StringComparison.OrdinalIgnoreCase));
     }
@@ -1501,8 +1472,8 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static PreviewTurret? UnitTurret(EffectiveObject effective)
     {
-        var turretBone = Tag(effective, "Turret_Bone_Name");
-        var barrelBone = Tag(effective, "Barrel_Bone_Name");
+        var turretBone = effective.ValueOf("Turret_Bone_Name");
+        var barrelBone = effective.ValueOf("Barrel_Bone_Name");
 
         if (string.IsNullOrEmpty(turretBone) && string.IsNullOrEmpty(barrelBone))
             return null;
@@ -1513,17 +1484,17 @@ public sealed class PreviewSceneBuilder(
         var canDeploy = CanDeploy(effective);
         return new PreviewTurret(
             null,
-            Number(effective, "Turret_Rotate_Extent_Degrees")
+            effective.FloatOf("Turret_Rotate_Extent_Degrees")
             ?? DefaultTurretRotateExtentDegrees,
-            Number(effective, "Turret_Elevate_Extent_Degrees")
+            effective.FloatOf("Turret_Elevate_Extent_Degrees")
             ?? DefaultTurretElevateExtentDegrees,
             string.IsNullOrEmpty(turretBone) ? null : turretBone,
             string.IsNullOrEmpty(barrelBone) ? null : barrelBone,
             canDeploy
-                ? Number(effective, "Deployed_Turret_Rotate_Extent_Degrees") ?? DefaultTurretRotateExtentDegrees
+                ? effective.FloatOf("Deployed_Turret_Rotate_Extent_Degrees") ?? DefaultTurretRotateExtentDegrees
                 : null,
             canDeploy
-                ? Number(effective, "Deployed_Turret_Elevate_Extent_Degrees") ?? DefaultTurretElevateExtentDegrees
+                ? effective.FloatOf("Deployed_Turret_Elevate_Extent_Degrees") ?? DefaultTurretElevateExtentDegrees
                 : null);
     }
 
@@ -1595,7 +1566,7 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static IReadOnlyList<int> DamageStages(EffectiveObject effective)
     {
-        var raw = Tag(effective, "Land_Damage_Alternates");
+        var raw = effective.ValueOf("Land_Damage_Alternates");
         if (string.IsNullOrWhiteSpace(raw))
             return [];
 
@@ -1628,8 +1599,8 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static IReadOnlyList<PreviewDamageBand> DamageTable(EffectiveObject effective)
     {
-        var stages = Numbers<int>(Tag(effective, "Land_Damage_Alternates"), int.TryParse);
-        var thresholds = Numbers<float>(Tag(effective, "Land_Damage_Thresholds"), float.TryParse);
+        var stages = Numbers<int>(effective.ValueOf("Land_Damage_Alternates"), int.TryParse);
+        var thresholds = Numbers<float>(effective.ValueOf("Land_Damage_Thresholds"), float.TryParse);
 
         if (stages.Count == 0 || stages.Count != thresholds.Count)
             return [];
@@ -1677,7 +1648,7 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private PreviewWeapon? Weapon(EffectiveObject effective, string hardpointId)
     {
-        var bones = new[] { Tag(effective, "Fire_Bone_A"), Tag(effective, "Fire_Bone_B") }
+        var bones = new[] { effective.ValueOf("Fire_Bone_A"), effective.ValueOf("Fire_Bone_B") }
             .Where(b => !string.IsNullOrEmpty(b))
             .Select(b => b!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -1690,28 +1661,28 @@ public sealed class PreviewSceneBuilder(
             $"hardpoint:{hardpointId}",
             PreviewWeaponSource.Hardpoint,
             hardpointId,
-            Tag(effective, "Type") is { Length: > 0 } type ? type : hardpointId,
+            effective.ValueOf("Type") ?? hardpointId,
             bones,
-            EngineBoolean.IsTrue(Tag(effective, "Randomize_Between_Fire_Bones"))
+            effective.BoolOf("Randomize_Between_Fire_Bones")
                 ? PreviewFirePointMode.RandomAlongLine
                 : PreviewFirePointMode.CycleBones,
             // Fires_Forward lives on GameObjectType, never on a hardpoint.
             false,
-            Tag(effective, "Fire_Projectile_Type") is { Length: > 0 } proj ? proj : null,
-            Number(effective, "Projectile_Damage"),
-            Tag(effective, "Damage_Type") is { Length: > 0 } dmg ? dmg : null,
-            Number(effective, "Fire_Range_Distance"),
-            Number(effective, "Fire_Min_Range_Distance"),
+            effective.ValueOf("Fire_Projectile_Type"),
+            effective.FloatOf("Projectile_Damage"),
+            effective.ValueOf("Damage_Type"),
+            effective.FloatOf("Fire_Range_Distance"),
+            effective.FloatOf("Fire_Min_Range_Distance"),
             HardpointArcYawDegrees(effective),
             HardpointArcPitchDegrees(effective),
             Inaccuracy(hardpointId),
-            Integer(effective, "Fire_Pulse_Count"),
-            Number(effective, "Fire_Pulse_Delay_Seconds"),
-            Number(effective, "Fire_Min_Recharge_Seconds") ??
-            Number(effective, "Fire_Max_Recharge_Seconds"),
+            effective.IntOf("Fire_Pulse_Count"),
+            effective.FloatOf("Fire_Pulse_Delay_Seconds"),
+            effective.FloatOf("Fire_Min_Recharge_Seconds") ??
+            effective.FloatOf("Fire_Max_Recharge_Seconds"),
             FireModes(effective),
             Turret(effective),
-            Tag(effective, "Fire_SFXEvent") is { Length: > 0 } sfx ? sfx : null);
+            effective.ValueOf("Fire_SFXEvent"));
     }
 
     /// <summary>
@@ -1748,15 +1719,7 @@ public sealed class PreviewSceneBuilder(
     /// <summary>The <c>Fire_When_*</c> gates this hardpoint sets.</summary>
     private static List<string> FireModes(EffectiveObject effective)
     {
-        return [.. FireModeTags.Where(tag => EngineBoolean.IsTrue(Tag(effective, tag)))];
-    }
-
-    private static int? Integer(EffectiveObject effective, string tagName)
-    {
-        return Tag(effective, tagName) is { } raw &&
-               int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
-            ? value
-            : null;
+        return [.. FireModeTags.Where(tag => effective.BoolOf(tag))];
     }
 
     // ── factions ──────────────────────────────────────────────────────────────
@@ -1865,42 +1828,21 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static PreviewSpinAway? SpinAway(EffectiveObject effective)
     {
-        if (!EngineBoolean.IsTrue(Tag(effective, "Spin_Away_On_Death")))
+        if (!effective.BoolOf("Spin_Away_On_Death"))
             return null;
 
         return new PreviewSpinAway(
             // 2.0 where the file is silent: 31 of the 34 write exactly that, so it is the corpus's
             // own answer rather than a number picked to fill a gap.
-            EngineNumber.ReadFloat(Tag(effective, "Spin_Away_On_Death_Time")) ?? 2.0f,
-            EngineNumber.ReadFloat(Tag(effective, "Spin_Away_On_Death_Chance")) ?? 0f,
-            Tag(effective, "Spin_Away_On_Death_Explosion"),
-            EngineNumber.ReadFloat(Tag(effective, "Max_Speed")) ?? 0f);
-    }
-
-    private static string? Tag(EffectiveObject effective, string tagName)
-    {
-        var value = effective.Tags
-            .FirstOrDefault(t => string.Equals(t.TagName, tagName, StringComparison.OrdinalIgnoreCase))
-            ?.Value.Trim();
-
-        return string.IsNullOrEmpty(value) ? null : value;
-    }
-
-    /// <summary>
-    ///     A numeric tag, or null when absent or unparsable.
-    /// </summary>
-    /// <remarks>
-    ///     Null rather than a defaulted zero. A fire cone of 0 degrees and a hardpoint that declares no
-    ///     cone are different things, and drawing the first for the second would be a confident lie.
-    /// </remarks>
-    private static float? Number(EffectiveObject effective, string tagName)
-    {
-        return EngineNumber.ReadFloat(Tag(effective, tagName));
+            effective.FloatOf("Spin_Away_On_Death_Time") ?? 2.0f,
+            effective.FloatOf("Spin_Away_On_Death_Chance") ?? 0f,
+            effective.ValueOf("Spin_Away_On_Death_Explosion"),
+            effective.FloatOf("Max_Speed") ?? 0f);
     }
 
     private static PreviewRgba? Colour(EffectiveObject effective, string tagName)
     {
-        if (Tag(effective, tagName) is not { } raw)
+        if (effective.ValueOf(tagName) is not { } raw)
             return null;
 
         var tokens = raw.Split([' ', '\t', ',', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);

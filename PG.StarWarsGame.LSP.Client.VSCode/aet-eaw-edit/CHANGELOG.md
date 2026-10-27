@@ -281,6 +281,11 @@
 
 ### Fixes
 
+- **A repeated or untrimmed tag reads the same everywhere** - the preview, the encyclopedia and the validation
+  rules read a tag through one set of accessors on the effective object: the last occurrence, trimmed, an empty
+  element as no value, and a number or a flag read as the game reads it. A `Scale_Factor` written `2.5f` draws
+  at 2.5 where the preview drew it at 1.0
+  ([#301](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/301))
 - **Numbers are read the way the game reads them** - one parser serves every validator, rule and the preview.
   The preview and the comparison rules take the number at the front of a value as the game does, so `2.0ff` and
   `2.0 f` read 2.0 where the preview dropped the spin time to its default; a validator accepts a number with at

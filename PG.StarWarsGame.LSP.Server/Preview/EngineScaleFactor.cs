@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -31,11 +31,7 @@ public static class EngineScaleFactor
     /// </summary>
     public static float Of(string? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw))
-            return None;
-
-        return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
-               && float.IsFinite(value) && value > 0f
+        return EngineNumber.ReadFloat(raw) is { } value && float.IsFinite(value) && value > 0f
             ? value
             : None;
     }

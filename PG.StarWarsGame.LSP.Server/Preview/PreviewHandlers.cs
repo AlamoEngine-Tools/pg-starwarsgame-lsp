@@ -460,7 +460,7 @@ public sealed class GetParticleSystemHandler(
         // - and the asset is filed under the bare name. Stripped AFTER the object lookup, so a
         // <Particle> object is still found by the name it was actually asked for.
         var name = PreviewModelReference.StripLevelSuffix(PreviewModelReference.Normalise(
-            (owner is null ? null : Tag(owner, "Space_Model_Name") ?? Tag(owner, "Land_Model_Name"))
+            (owner is null ? null : owner.ValueOf("Space_Model_Name") ?? owner.ValueOf("Land_Model_Name"))
             ?? request.Name));
 
         if (string.IsNullOrEmpty(name))
@@ -525,16 +525,7 @@ public sealed class GetParticleSystemHandler(
     {
         return effective is null
             ? EngineScaleFactor.None
-            : EngineScaleFactor.Of(Tag(effective, "Scale_Factor"));
-    }
-
-    private static string? Tag(EffectiveObject effective, string tagName)
-    {
-        var value = effective.Tags
-            .FirstOrDefault(t => string.Equals(t.TagName, tagName, StringComparison.OrdinalIgnoreCase))
-            ?.Value.Trim();
-
-        return string.IsNullOrEmpty(value) ? null : value;
+            : EngineScaleFactor.Of(effective.ValueOf("Scale_Factor"));
     }
 }
 

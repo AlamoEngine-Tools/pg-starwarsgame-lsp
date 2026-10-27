@@ -332,6 +332,36 @@ public sealed class GetEncyclopediaEntryHandlerTest
     }
 
     [Fact]
+    public async Task Handle_PopulationValueWrittenWithBlanks_ReadsIt()
+    {
+        var index = IndexWith(new FakeLocalisation(), Sym("U"));
+        var source = new FakeVariantTagSource().With("U", Tag("Population_Value", " 3 "));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Equal(3, result.PopulationValue);
+    }
+
+    [Fact]
+    public async Task Handle_RepeatedTag_ShowsTheLaterValue()
+    {
+        // The card reads every tag through EffectiveObject's accessors, so a repeated tag shows the
+        // occurrence the game keeps and the diagnostics report - the last one.
+        var loca = new FakeLocalisation().With("TEXT_FIRST", "First").With("TEXT_LATER", "Later");
+        var index = IndexWith(loca, Sym("U"));
+        var source = new FakeVariantTagSource().With("U",
+            Tag("Text_ID", "TEXT_FIRST"), Tag("Text_ID", "TEXT_LATER"),
+            Tag("Population_Value", "2"), Tag("Population_Value", "4"));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Equal("Later", result.DisplayName);
+        Assert.Equal(4, result.PopulationValue);
+    }
+
+    [Fact]
     public async Task Handle_Variant_InheritsPopulationValueFromBase()
     {
         var index = IndexWith(new FakeLocalisation(), Sym("V", "B"), Sym("B"));

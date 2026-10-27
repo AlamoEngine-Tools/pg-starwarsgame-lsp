@@ -57,11 +57,7 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
         if (!effective.Found || effective.Cyclic)
             return [];
 
-        // A repeatable additive tag contributes one entry per occurrence - the base's inherited ones
-        // first - so match on the displacing entry rather than simply the first with this name.
-        var tag = effective.Tags.FirstOrDefault(t =>
-            t.TagName.Equals(ctx.Node.Name, StringComparison.OrdinalIgnoreCase)
-            && t.Provenance is VariantProvenance.Overridden or VariantProvenance.Merged);
+        var tag = effective.DisplacingTag(ctx.Node.Name);
 
         if (tag is null)
             return [];

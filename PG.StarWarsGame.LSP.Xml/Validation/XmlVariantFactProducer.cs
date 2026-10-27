@@ -123,10 +123,9 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
             {
                 // Take the appended result from the resolver rather than recomputing it here, so
                 // what is reported cannot drift from what the effective-object view and hints show.
-                var mergedTag = effective.Tags.FirstOrDefault(t =>
-                    t.Provenance == VariantProvenance.Merged &&
-                    t.TagName.Equals(child.Name, StringComparison.OrdinalIgnoreCase));
-                if (mergedTag?.BaseValue is not null && reportedMerges.Add(child.Name))
+                var mergedTag = effective.DisplacingTag(child.Name);
+                if (mergedTag is { Provenance: VariantProvenance.Merged, BaseValue: not null }
+                    && reportedMerges.Add(child.Name))
                     facts.Add(new VariantAdditiveMergeFact(documentUri, line, col, len, name,
                         mergedTag.BaseValue, mergedTag.Value));
                 continue;

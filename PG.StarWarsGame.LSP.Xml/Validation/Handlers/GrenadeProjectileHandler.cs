@@ -73,9 +73,7 @@ public sealed class GrenadeProjectileHandler : XmlDiagnosticsHandler<XmlTagValue
         // The EFFECTIVE object, so a category inherited through Variant_Of_Existing_Type counts -
         // four of the ten shipped declarations name a variant that inherits it, and reading the
         // node instead would report every one of them.
-        var category = resolved.Tags
-            .LastOrDefault(t => string.Equals(t.TagName, CategoryTag, StringComparison.OrdinalIgnoreCase))
-            ?.Value.Trim();
+        var category = resolved.ValueOf(CategoryTag);
 
         // A target with no category at all cannot be judged. The engine has a default here and it
         // was not measured, so calling it "not a grenade" would be inventing the answer.

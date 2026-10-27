@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
 using System.IO.Abstractions;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Icons;
@@ -98,12 +97,12 @@ public sealed class GetEncyclopediaEntryHandler
 
         // MP replaces the body wholesale, but only when it actually carries keys - an empty MP tag
         // is not an instruction to show an empty popup.
-        var multiplayerBody = TagValue(effective, EncyclopediaTags.MultiplayerBody);
+        var multiplayerBody = effective.ValueOf(EncyclopediaTags.MultiplayerBody);
         var useMultiplayerBody = request.Multiplayer && !string.IsNullOrWhiteSpace(multiplayerBody);
         var body = XmlUtility
             .SplitList(useMultiplayerBody
                 ? multiplayerBody!
-                : TagValue(effective, EncyclopediaTags.Body) ?? string.Empty)
+                : effective.ValueOf(EncyclopediaTags.Body) ?? string.Empty)
             .Select(key => new EncyclopediaLine(key, loca.GetValue(key)))
             .ToList();
 
@@ -114,20 +113,20 @@ public sealed class GetEncyclopediaEntryHandler
         // Both feed a row's wrap budget, and both travel on the result so the numbers can be
         // checked against a card rather than taken on trust - see EncyclopediaRowBudgets.
         var abilities = ResolveAbilities(effective, catalog);
-        var buildCost = ParseCount(TagValue(effective, EncyclopediaTags.BuildCostCredits));
+        var buildCost = effective.IntOf(EncyclopediaTags.BuildCostCredits);
 
         return new GetEncyclopediaEntryResult(
             true,
             effective.ObjectId,
             effective.TypeName,
-            Translate(loca, TagValue(effective, EncyclopediaTags.TextId)),
-            Translate(loca, TagValue(effective, EncyclopediaTags.UnitClass)),
+            Translate(loca, effective.ValueOf(EncyclopediaTags.TextId)),
+            Translate(loca, effective.ValueOf(EncyclopediaTags.UnitClass)),
             body,
             useMultiplayerBody,
-            ParseCount(TagValue(effective, EncyclopediaTags.PopulationValue)),
+            effective.IntOf(EncyclopediaTags.PopulationValue),
             abilities,
-            ResolveReferences(resolver, loca, catalog, TagValue(effective, EncyclopediaTags.GoodAgainst)),
-            ResolveReferences(resolver, loca, catalog, TagValue(effective, EncyclopediaTags.VulnerableTo)),
+            ResolveReferences(resolver, loca, catalog, effective.ValueOf(EncyclopediaTags.GoodAgainst)),
+            ResolveReferences(resolver, loca, catalog, effective.ValueOf(EncyclopediaTags.VulnerableTo)),
             layout,
             ResolveIcon(catalog, effective),
             ResolveChrome(catalog, layout),
@@ -164,7 +163,7 @@ public sealed class GetEncyclopediaEntryHandler
                 return null;
 
             var pool = _shipNames
-                .Get(root, TagValue(constants, EncyclopediaTags.ShipNameTextFiles))
+                .Get(root, constants.ValueOf(EncyclopediaTags.ShipNameTextFiles))
                 .For(objectId);
 
             return pool is null
@@ -197,7 +196,7 @@ public sealed class GetEncyclopediaEntryHandler
 
     private static EncyclopediaIcon? ResolveIcon(IconCatalog? catalog, EffectiveObject effective)
     {
-        var iconName = TagValue(effective, EncyclopediaTags.IconName)?.Trim();
+        var iconName = effective.ValueOf(EncyclopediaTags.IconName);
         if (catalog is null || string.IsNullOrEmpty(iconName))
             return null;
 
@@ -247,26 +246,6 @@ public sealed class GetEncyclopediaEntryHandler
     {
         PngHeader.TryRead(png, out var width, out var height);
         return new EncyclopediaImage(DataUri(png), width, height);
-    }
-
-    private static string? TagValue(EffectiveObject effective, string tagName)
-    {
-        return effective.Tags
-            .FirstOrDefault(t => string.Equals(t.TagName, tagName, StringComparison.OrdinalIgnoreCase))
-            ?.Value;
-    }
-
-    /// <summary>
-    ///     Reads a whole-number tag, or null when absent or not a number. Null rather than a
-    ///     defaulted 0: the preview draws a blip only when there is a real value, and inventing one
-    ///     would put a wrong number on the card.
-    /// </summary>
-    private static int? ParseCount(string? rawValue)
-    {
-        return int.TryParse(rawValue?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture,
-            out var parsed)
-            ? parsed
-            : null;
     }
 
     /// <summary>
@@ -367,10 +346,7 @@ public sealed class GetEncyclopediaEntryHandler
         // Through the shared reader. This walked the block with its own HAP pass until the preview
         // needed the same list, and two walkers is two places for "which child names the type" to
         // drift apart.
-        var fragment = effective.Tags.FirstOrDefault(t =>
-                string.Equals(t.TagName, EncyclopediaTags.UnitAbilitiesData,
-                    StringComparison.OrdinalIgnoreCase))
-            ?.Fragment;
+        var fragment = effective.FragmentOf(EncyclopediaTags.UnitAbilitiesData);
 
         return
         [
@@ -417,7 +393,7 @@ public sealed class GetEncyclopediaEntryHandler
                 // the same resolution the card's portrait goes through, placeholder included.
                 return new EncyclopediaReference(
                     id,
-                    Translate(loca, TagValue(target, EncyclopediaTags.TextId)),
+                    Translate(loca, target.ValueOf(EncyclopediaTags.TextId)),
                     ResolveIcon(catalog, target)?.DataUri);
             })
             .ToList();

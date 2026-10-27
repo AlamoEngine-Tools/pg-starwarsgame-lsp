@@ -103,6 +103,35 @@ public sealed class PreviewSceneBuilderTest
         Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").IconName);
     }
 
+    [Fact]
+    public void BuildForObject_ReadsARepeatedTagsLaterValue_TheWriteTheGameKeeps()
+    {
+        // Every tag the scene reads goes through EffectiveObject's accessors, so the preview shows
+        // the occurrence the game keeps and the diagnostics report - the last - trimmed, and a
+        // number read as the game reads it, suffix and all.
+        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource().With("Ship",
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Scale_Factor", "1.0"), Tag("Scale_Factor", " 2.5f "),
+            Tag("Icon_Name", "I_FIRST.TGA"), Tag("Icon_Name", " I_LATER.TGA "));
+
+        var scene = Builder(index, tags, "hull.alo").BuildForObject("Ship");
+
+        Assert.Equal(2.5f, scene.ScaleFactor);
+        Assert.Equal("I_LATER.TGA", scene.IconName);
+    }
+
+    [Fact]
+    public void BuildForObject_ReadsAnEmptyElementAsNoValue()
+    {
+        // An empty element writes nothing, so the scene carries no icon name rather than a blank one.
+        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource().With("Ship",
+            Tag("Space_Model_Name", "hull.alo"), Tag("Icon_Name", "   "));
+
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").IconName);
+    }
+
     private static GameSymbol Sym(string id, string typeName, string? variantBaseId = null)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,

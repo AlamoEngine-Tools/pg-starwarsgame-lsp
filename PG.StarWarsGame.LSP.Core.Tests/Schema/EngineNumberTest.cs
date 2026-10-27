@@ -113,4 +113,33 @@ public sealed class EngineNumberTest
         Assert.Equal(1100.0, EngineNumber.ReadDouble("1100.0f"));
         Assert.Null(EngineNumber.ReadDouble("none"));
     }
+
+    /// <summary>The game converts with atoi: the sign and the digits at the front, the rest ignored.</summary>
+    [Theory]
+    [InlineData("3", 3)]
+    [InlineData(" -7 ", -7)]
+    [InlineData("+12", 12)]
+    [InlineData("1.0", 1)]
+    [InlineData("2.9", 2)]
+    [InlineData("3f", 3)]
+    [InlineData("1e3", 1)]
+    [InlineData("7abc", 7)]
+    [InlineData("0x10", 0)]
+    public void ReadInt_takes_the_whole_number_the_game_takes(string text, int expected)
+    {
+        Assert.Equal(expected, EngineNumber.ReadInt(text));
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData(".5")]
+    [InlineData("-")]
+    [InlineData("f3")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void ReadInt_is_null_when_no_digit_starts_the_text(string? text)
+    {
+        Assert.Null(EngineNumber.ReadInt(text));
+    }
 }
