@@ -196,7 +196,7 @@ public sealed class PreviewPassiveSubjectTest
             .With("Wreck", Tag("Space_Model_Name", "Ev_stardestroyer_d.alo"))
             .With("Debris", Tag("Space_Model_Name", "Ev_stardestroyer_dead.alo"));
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
                 tags, new PreviewSceneParticleTest.DirectoryAssets(models!))
             .BuildForObject("Ship");
     }
@@ -216,7 +216,7 @@ public sealed class PreviewPassiveSubjectTest
 
         var tags = extra(new FakeVariantTagSource().With("Ship", shipTags));
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("Ev_stardestroyer.alo")).BuildForObject("Ship");
     }
 

@@ -52,12 +52,13 @@ public sealed class WorkspaceVariantTagSourceTest
         return GameIndex.Empty with { Documents = docs, WorkspaceDefinitions = definitions };
     }
 
-    private static (WorkspaceVariantTagSource Source, FakeIndexService Index, FakeHost Host, MockFileSystem Fs)
+    private static (WorkspaceVariantTagSource Source, FakeGameIndexService Index, FakeGameWorkspaceHost Host,
+        MockFileSystem Fs)
         Build()
     {
         var fs = new MockFileSystem();
-        var host = new FakeHost();
-        var indexService = new FakeIndexService();
+        var host = new FakeGameWorkspaceHost();
+        var indexService = new FakeGameIndexService();
         var textSource = new DocumentTextSource(host, new FileHelper(fs),
             NullLogger<DocumentTextSource>.Instance);
         var source = new WorkspaceVariantTagSource(new XmlParseCache(textSource, 16), indexService);
@@ -294,86 +295,4 @@ public sealed class WorkspaceVariantTagSourceTest
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new NullDisposable();
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-#pragma warning disable CS0067
-        public event Action<GameIndex>? IndexChanged;
-        public event Action<ILocalisationIndex>? LocalisationChanged;
-        public event Action<GameIndex>? DynamicEnumChanged;
-#pragma warning restore CS0067
-    }
-
-    private sealed class FakeHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-    }
 }

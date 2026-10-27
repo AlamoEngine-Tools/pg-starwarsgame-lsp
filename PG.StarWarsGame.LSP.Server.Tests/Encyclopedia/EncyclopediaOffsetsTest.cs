@@ -32,7 +32,7 @@ public sealed class EncyclopediaOffsetsTest
                 .Add("GameConstants", [Constants()])
         };
         return new EncyclopediaLayoutResolver(
-            new EffectiveObjectResolver(index, new NullSchemaProvider(), source)).Resolve();
+            new EffectiveObjectResolver(index, new SchemaProviderBuilder().Build(), source)).Resolve();
     }
 
     private static VariantTag Tag(string name, string value)

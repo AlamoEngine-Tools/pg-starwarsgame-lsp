@@ -76,7 +76,7 @@ public sealed class TupleValueCompletionStrategyTest
         var doc = XmlUtility.CreateHtmlDocument("<Root><Foo>x</Foo></Root>");
         var node = doc.DocumentNode.SelectSingleNode("//Foo")!;
         return new TagValueCompletionContext(
-            "file:///test.xml", GameIndex.Empty, schema ?? new FakeSchemaProvider(), doc, node, "Foo", 2,
+            "file:///test.xml", GameIndex.Empty, schema ?? new SchemaProviderBuilder().Build(), doc, node, "Foo", 2,
             tagDef, partialValue, 0, 0, false, null, 0, tupleSlotIndex);
     }
 
@@ -90,8 +90,8 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void InaccuracyMap_Slot0_QueriesGameObjectCategoryTypeEnum()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddEnum(new EnumDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new EnumDefinition
         {
             Name = "GameObjectCategoryType", Kind = EnumKind.DynamicXml,
             Values = [new EnumValueDefinition { Name = "Bomber" }]
@@ -110,7 +110,7 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void InaccuracyMap_Slot1_HasNoCompletionSource()
     {
-        var schema = new FakeSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var strategy = new TupleValueCompletionStrategy(
             schema, new CapturingProposalRegistry(), new CapturingCompletionRegistry());
 
@@ -122,8 +122,8 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void HardPointSfxMap_Slot0_QueriesHardPointTypeEnum()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddEnum(new EnumDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new EnumDefinition
         {
             Name = "HardPointType", Kind = EnumKind.SchemaFixed,
             Values = [new EnumValueDefinition { Name = "HARD_POINT_WEAPON_LASER" }]
@@ -145,7 +145,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         _ = strategy.Handle(Ctx(Tag("X", XmlValueType.HardPointSfxMap), 1, "SFX_")).ToList();
 
@@ -159,8 +160,8 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void AbilitySfxMap_Slot0_QueriesAbilityTypeHardcodedSet()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddHardcodedSet(new HardcodedReferenceSet { Name = "AbilityType" });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new HardcodedReferenceSet { Name = "AbilityType" });
         var completion = new CapturingCompletionRegistry();
         var strategy = new TupleValueCompletionStrategy(schema, new CapturingProposalRegistry(), completion);
 
@@ -175,7 +176,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         _ = strategy.Handle(Ctx(Tag("X", XmlValueType.AbilitySfxMap), 1)).ToList();
 
@@ -189,7 +191,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         var result = strategy.Handle(Ctx(Tag("X", XmlValueType.ConditionalSfxEvent), 0)).ToList();
 
@@ -202,7 +205,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         _ = strategy.Handle(Ctx(Tag("X", XmlValueType.ConditionalSfxEvent), 1)).ToList();
 
@@ -216,7 +220,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         _ = strategy.Handle(Ctx(Tag("X", XmlValueType.UnitSpawnTable), 0)).ToList();
 
@@ -228,7 +233,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         var result = strategy.Handle(Ctx(Tag("X", XmlValueType.UnitSpawnTable), 1)).ToList();
 
@@ -241,8 +247,8 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void AbilityModMultiplier_Slot0_QueriesAbilityMultiplierTypeEnum()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddEnum(new EnumDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new EnumDefinition
         {
             Name = "AbilityMultiplierType", Kind = EnumKind.SchemaFixed, Values = []
         });
@@ -259,7 +265,7 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var proposals = new CapturingProposalRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), proposals, completion);
+        var strategy = new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), proposals, completion);
 
         var result = strategy.Handle(Ctx(Tag("X", XmlValueType.AbilityModMultiplier), 1)).ToList();
 
@@ -273,7 +279,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         Assert.Empty(strategy.Handle(Ctx(MusicList, 0)));
         Assert.Null(completion.LastTag);
@@ -284,7 +291,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         _ = strategy.Handle(Ctx(MusicList, 1)).ToList();
 
@@ -299,7 +307,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var proposals = new CapturingProposalRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), proposals, new CapturingCompletionRegistry());
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), proposals,
+                new CapturingCompletionRegistry());
 
         var result = strategy.Handle(Ctx(TerrainModel, itemIndex)).ToList();
 
@@ -314,7 +323,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         _ = strategy.Handle(Ctx(TerrainModel, itemIndex)).ToList();
 
@@ -327,7 +337,8 @@ public sealed class TupleValueCompletionStrategyTest
         // The engine drops a value that does not start with a key, so nothing else belongs there.
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         _ = strategy.Handle(Ctx(Buildables, 0)).ToList();
 
@@ -339,7 +350,8 @@ public sealed class TupleValueCompletionStrategyTest
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
-            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+            new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(), new CapturingProposalRegistry(),
+                completion);
 
         _ = strategy.Handle(Ctx(Buildables, 3)).ToList();
 
@@ -349,7 +361,8 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void TupleList_WithoutSlots_ProposesNothing()
     {
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(),
+        var strategy = new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(),
+            new CapturingProposalRegistry(),
             new CapturingCompletionRegistry());
 
         Assert.Empty(strategy.Handle(Ctx(Tag("Music_Events", XmlValueType.TupleList), 1)));
@@ -360,12 +373,13 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void StoryParamContext_ReturnsNoCompletions()
     {
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(),
+        var strategy = new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(),
+            new CapturingProposalRegistry(),
             new CapturingCompletionRegistry());
         var doc = XmlUtility.CreateHtmlDocument("<Root><Foo>x</Foo></Root>");
         var node = doc.DocumentNode.SelectSingleNode("//Foo")!;
         var ctx = new TagValueCompletionContext(
-            "file:///test.xml", GameIndex.Empty, new FakeSchemaProvider(), doc, node, "Foo", 2,
+            "file:///test.xml", GameIndex.Empty, new SchemaProviderBuilder().Build(), doc, node, "Foo", 2,
             Tag("X", XmlValueType.HardPointSfxMap), "", 0, 0, true, "Event", 0);
 
         Assert.Empty(strategy.Handle(ctx));
@@ -374,66 +388,14 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void NonTupleValueType_ReturnsNoCompletions()
     {
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(),
+        var strategy = new TupleValueCompletionStrategy(new SchemaProviderBuilder().Build(),
+            new CapturingProposalRegistry(),
             new CapturingCompletionRegistry());
 
         Assert.Empty(strategy.Handle(Ctx(Tag("X", XmlValueType.Float), 0)));
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, HardcodedReferenceSet> _sets = new(StringComparer.OrdinalIgnoreCase);
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [.. _sets.Values];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return _enums.GetValueOrDefault(enumName);
-        }
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddEnum(EnumDefinition enumDef)
-        {
-            _enums[enumDef.Name] = enumDef;
-        }
-
-        public void AddHardcodedSet(HardcodedReferenceSet set)
-        {
-            _sets[set.Name] = set;
-        }
-    }
 
     private sealed class CapturingProposalRegistry : IXmlValueProposalRegistry
     {

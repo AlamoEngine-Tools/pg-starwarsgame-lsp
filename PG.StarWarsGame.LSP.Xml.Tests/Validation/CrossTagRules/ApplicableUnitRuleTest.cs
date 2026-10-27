@@ -183,7 +183,7 @@ public sealed class ApplicableUnitRuleTest
     {
         return new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             [rule]);

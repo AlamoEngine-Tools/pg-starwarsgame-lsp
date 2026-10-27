@@ -23,11 +23,11 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 public sealed class ReferenceValidationPipelineTest
 {
     private static readonly DiagnosticsContext EmptyCtx = new(
-        new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
+        new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en");
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static XmlGameDocumentParser BuildParser(PipelineFakeSchema schema)
+    private static XmlGameDocumentParser BuildParser(FakeSchemaProvider schema)
     {
         return new XmlGameDocumentParser(
             new FileHelper(new MockFileSystem()),
@@ -64,8 +64,8 @@ public sealed class ReferenceValidationPipelineTest
     [Fact]
     public async Task GameObjectType_ref_with_SpaceUnit_symbol_emits_no_TypeMismatch()
     {
-        var schema = new PipelineFakeSchema();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Squadron_Units",
             ValueType = XmlValueType.GameObjectTypeReferenceList,
@@ -94,8 +94,8 @@ public sealed class ReferenceValidationPipelineTest
     [Fact]
     public async Task GameObjectType_ref_with_mixed_types_emits_no_TypeMismatch()
     {
-        var schema = new PipelineFakeSchema();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Encyclopedia_Good_Against",
             ValueType = XmlValueType.TypeReferenceList,
@@ -126,8 +126,8 @@ public sealed class ReferenceValidationPipelineTest
     [Fact]
     public async Task Non_GameObjectType_ref_with_wrong_symbol_type_emits_TypeMismatch()
     {
-        var schema = new PipelineFakeSchema();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Faction",
             ValueType = XmlValueType.FactionReference,
@@ -156,56 +156,6 @@ public sealed class ReferenceValidationPipelineTest
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
-
-    private sealed class PipelineFakeSchema : ISchemaProvider
-    {
-        private readonly Dictionary<string, XmlTagDefinition> _tags =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tags.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddTag(XmlTagDefinition tag)
-        {
-            _tags[tag.Tag] = tag;
-        }
-    }
 
     private sealed class PipelineFakeFileTypeRegistry : IFileTypeRegistry
     {

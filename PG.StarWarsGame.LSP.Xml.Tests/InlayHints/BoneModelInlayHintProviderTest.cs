@@ -15,13 +15,14 @@ public sealed class BoneModelInlayHintProviderTest
 {
     private static InlayHintContext MakeCtx(string xml, string boneXPath, FakeSchema schema, GameIndex index)
     {
+        var provider = schema.Build();
         var hapDoc = new HtmlDocument();
         hapDoc.LoadHtml(xml);
         var node = hapDoc.DocumentNode.SelectSingleNode(boneXPath)!;
-        var tagDef = schema.GetTag(node.Name)
+        var tagDef = provider.GetTag(node.Name)
                      ?? new XmlTagDefinition { Tag = node.Name, ValueType = XmlValueType.NameReference };
         var line = XmlUtility.GetLine(node);
-        return new InlayHintContext("file:///t.xml", index, schema, hapDoc, node, tagDef, line,
+        return new InlayHintContext("file:///t.xml", index, provider, hapDoc, node, tagDef, line,
             lineIndex: new LineOffsetIndex(xml));
     }
 
@@ -160,48 +161,9 @@ public sealed class BoneModelInlayHintProviderTest
 
     // ── fake schema ───────────────────────────────────────────────────────────
 
-    private sealed class FakeSchema : ISchemaProvider
+    private sealed class FakeSchema
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return _tags.GetValueOrDefault(tagName);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
 
         public void Add(string tag, ReferenceKind kind)
         {
@@ -209,6 +171,14 @@ public sealed class BoneModelInlayHintProviderTest
             {
                 Tag = tag, ValueType = XmlValueType.NameReference, ReferenceKind = kind
             };
+        }
+
+        public FakeSchemaProvider Build()
+        {
+            var builder = new SchemaProviderBuilder();
+            foreach (var item in _tags.Values)
+                builder.WithTag(item);
+            return builder.Build();
         }
     }
 }

@@ -15,7 +15,7 @@ public sealed class StoryPlotsBattleHandlerTest
     private static async Task<StoryFactionDto> Faction()
     {
         var result = await new GetStoryPlotsHandler(
-                new StoryBattleFixture.ModelService(), new StoryBattleFixture.IndexService())
+                new StoryBattleFixture.ModelService(), new FakeGameIndexService())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
         Assert.Null(result.Error);
         return Assert.Single(Assert.Single(result.Campaigns).Factions);

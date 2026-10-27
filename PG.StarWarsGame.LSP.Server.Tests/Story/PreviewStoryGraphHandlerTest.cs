@@ -15,9 +15,9 @@ public sealed class PreviewStoryGraphHandlerTest
         var fileHelper = FileHelperFor(fs);
         return new PreviewStoryGraphHandler(
             new StubModelService(),
-            new StubIndexService(DefaultIndex()),
+            new FakeGameIndexService(DefaultIndex()),
             TextSource(fileHelper),
-            new StoryTestSchema(),
+            new SchemaProviderBuilder().Build(),
             fileHelper,
             Reload(),
             Config(storyEditing));

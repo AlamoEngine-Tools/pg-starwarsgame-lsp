@@ -43,7 +43,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty);
 
         var result = DynamicEnumValueRenameBuilder.Build("ArmorType", "Armor_Structure", "Armor_Renamed",
-            index, Source(new FakeWorkspaceHost()), NullLogger.Instance);
+            index, Source(new FakeGameWorkspaceHost()), NullLogger.Instance);
 
         Assert.Null(result);
     }
@@ -57,7 +57,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(defs);
 
         var result = DynamicEnumValueRenameBuilder.Build("ArmorType", "Armor_Structure", "Armor_Renamed",
-            index, Source(new FakeWorkspaceHost()), NullLogger.Instance);
+            index, Source(new FakeGameWorkspaceHost()), NullLogger.Instance);
 
         Assert.Null(result);
     }
@@ -67,7 +67,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
     {
         // path$Element format (e.g. gameconstants.xml's <Armor_Types>...</Armor_Types> text list) —
         // the value is a plain text token at an exact (line, column).
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(DefUri, "<GameConstants><Armor_Types>Armor_Structure Armor_Wall</Armor_Types></GameConstants>",
             1);
         var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
@@ -91,7 +91,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
     {
         // Bare <EnumDefinition> format (e.g. gameobjectcategorytype.xml) — the value IS the XML
         // element name; Column is null (see DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations).
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(EnumFileUri,
             "<EnumDefinition>\n\t<Structure>\t0x00000400\t</Structure>\n</EnumDefinition>", 1);
         var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
@@ -117,7 +117,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
     [Fact]
     public void Build_BareEnumDefinitionFormat_ElementNotFoundOnLine_ReturnsNull()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(EnumFileUri, "<EnumDefinition>\n\t<SomethingElse>1</SomethingElse>\n</EnumDefinition>", 1);
         var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
             .Add("GameObjectCategoryType", ImmutableDictionary<string, FileOrigin>.Empty
@@ -133,7 +133,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
     [Fact]
     public void Build_IncludesAllReferenceOccurrences()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(DefUri, "<GameConstants><Armor_Types>Armor_Structure</Armor_Types></GameConstants>", 1);
         var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
             .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
@@ -162,7 +162,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
     {
         // Dependency's own gameconstants.xml (rank 0) defines the value; the leaf project (rank 1)
         // never overrode that file. Renaming would edit a shared dependency the leaf doesn't own.
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(DefUri, "<GameConstants><Armor_Types>Armor_Structure</Armor_Types></GameConstants>", 1);
         var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
             .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
@@ -183,7 +183,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
     {
         // Same value, but this time the leaf project's own gameconstants.xml (also rank 1, the
         // highest rank) defines it — rename must proceed.
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(DefUri, "<GameConstants><Armor_Types>Armor_Structure</Armor_Types></GameConstants>", 1);
         var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
             .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
@@ -205,27 +205,5 @@ public sealed class DynamicEnumValueRenameBuilderTest
     {
         return new DocumentTextSource(host, new FileHelper(new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 }

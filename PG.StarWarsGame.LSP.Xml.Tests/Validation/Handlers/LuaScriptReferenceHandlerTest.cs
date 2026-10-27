@@ -33,7 +33,7 @@ public sealed class LuaScriptReferenceHandlerTest
     private static DiagnosticsContext CtxWith(params string[] paths)
     {
         var index = GameIndex.Empty with { AssetFiles = new MergedAssetFileIndex(paths) };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
     }
 
     // ── resolves ─────────────────────────────────────────────────────────────

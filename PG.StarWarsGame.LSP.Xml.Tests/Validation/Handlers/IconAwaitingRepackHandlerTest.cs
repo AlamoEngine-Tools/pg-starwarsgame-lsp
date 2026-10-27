@@ -19,7 +19,7 @@ public sealed class IconAwaitingRepackHandlerTest
     private static DiagnosticsContext Context(params string[] awaitingRepack)
     {
         return new DiagnosticsContext(
-            new EmptySchemaProvider(), GameIndex.Empty, "file:///u.xml", "en",
+            new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///u.xml", "en",
             awaitingRepack.ToHashSet(StringComparer.OrdinalIgnoreCase));
     }
 
@@ -74,7 +74,7 @@ public sealed class IconAwaitingRepackHandlerTest
     [Fact]
     public void Silent_WhenTheContextCarriesNoIconInformation()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, "file:///u.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///u.xml", "en");
 
         Assert.Empty(Run(ctx, Fact("Icon_Name", "I_BUTTON_LUKE.TGA")));
     }

@@ -14,7 +14,7 @@ public sealed class StoryDialogReferenceHandlerTest
 
     private static IReadOnlyList<XmlDiagnosticResult> Handle(StoryDialogRefFact fact, FakeStoryDialogScope scope)
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, fact.DocumentUri, "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, fact.DocumentUri, "en");
         IXmlDiagnosticsHandler handler = new StoryDialogReferenceHandler(scope);
         return handler.Handle(fact, ctx).ToList();
     }

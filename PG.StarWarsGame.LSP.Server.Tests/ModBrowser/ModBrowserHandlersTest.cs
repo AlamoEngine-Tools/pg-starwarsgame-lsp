@@ -36,7 +36,7 @@ public sealed class ModBrowserHandlersTest
     public async Task EveryRequest_AnswersFromTheIndex()
     {
         var index = new FakeGameIndexService(s_index);
-        var schema = new NullSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var layers = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
         var assets = new FakeAssets();
 

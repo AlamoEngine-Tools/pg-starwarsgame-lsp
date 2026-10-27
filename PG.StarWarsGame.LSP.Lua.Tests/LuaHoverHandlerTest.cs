@@ -35,13 +35,13 @@ public sealed class LuaHoverHandlerTest
     private static LuaHoverHandler BuildHandler(
         GameIndex index,
         ILuaApiSchemaProvider schema,
-        FakeWorkspaceHost? host = null,
+        FakeGameWorkspaceHost? host = null,
         ILuaAnalyzer? analyzer = null)
     {
-        var svc = new FakeIndexService { Current = index };
+        var svc = new FakeGameIndexService { Current = index };
         return new LuaHoverHandler(
             svc,
-            TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
+            TestLuaParseCache.For(host ?? new FakeGameWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             schema,
             analyzer);
@@ -81,7 +81,7 @@ public sealed class LuaHoverHandlerTest
 
     private static async Task<string?> HoverWithAsync(string text, int character, ScriptedLuaAnalyzer analyzer)
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
         var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([EngineStub]), host, analyzer);
         var result = await handler.Handle(HoverAt(0, character), CancellationToken.None);
@@ -151,7 +151,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunMission", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "RunMission()", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -168,7 +168,7 @@ public sealed class LuaHoverHandlerTest
     [InlineData("---Runs it.\nfunction RunMission() end\nRunMission()", 2, 4)]
     public async Task TheWorkspacesOwnTypesAndFunctions_NothingOfOurs(string text, int line, int character)
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
         var sym = new GameSymbol("RunMission", GameSymbolKind.LuaGlobal, null, new FileOrigin(LuaUri, 1, 9),
             "Runs it.");
@@ -200,7 +200,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(targetId, [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT_A\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -226,7 +226,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(targetId, [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT_A\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -252,7 +252,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(targetId, [archiveSym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT_VANILLA\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -283,7 +283,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "require(\"PGStateMachine\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -304,7 +304,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "require(\"DefinitelyNotReal\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -333,7 +333,7 @@ public sealed class LuaHoverHandlerTest
                 """)
         ]);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Sleep(2)", 1);
 
         var handler = BuildHandler(GameIndex.Empty, schema, host);
@@ -358,7 +358,7 @@ public sealed class LuaHoverHandlerTest
             """
         ]);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT\")", 1);
 
         var handler = BuildHandler(GameIndex.Empty, schema, host);
@@ -377,7 +377,7 @@ public sealed class LuaHoverHandlerTest
 
     private static async Task<string?> HoverOnAsync(string text, int line, int character, LuaApiSchemaProvider schema)
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
         var result = await BuildHandler(GameIndex.Empty, schema, host)
             .Handle(HoverAt(line, character), CancellationToken.None);
@@ -457,7 +457,7 @@ public sealed class LuaHoverHandlerTest
 
     private static async Task<string?> HoverInMachineAsync(int line, int character, bool withLibrary = true)
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, MachineScript, 1);
         host.AddOrUpdate(MachineLibraryUri, withLibrary ? MachineLibrary : "function Define_State(s, f) end", 1);
         var index = new GameIndex(BaselineIndex.Empty,
@@ -521,7 +521,7 @@ public sealed class LuaHoverHandlerTest
             """
         ]);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT\")", 1);
 
         var handler = BuildHandler(GameIndex.Empty, schema, host);
@@ -538,7 +538,7 @@ public sealed class LuaHoverHandlerTest
     [Fact]
     public async Task Handle_CursorOnLocalVariable_ReturnsNull()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "local myVar = 1", 1);
 
         var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]), host);
@@ -564,8 +564,8 @@ public sealed class LuaHoverHandlerTest
         var uri = fileHelper.PathToFileUri(path);
 
         var handler = new LuaHoverHandler(
-            new FakeIndexService { Current = GameIndex.Empty },
-            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc - read from disk
+            new FakeGameIndexService { Current = GameIndex.Empty },
+            TestLuaParseCache.For(new FakeGameWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
             new LuaApiSchemaProvider([]));
 
@@ -582,103 +582,4 @@ public sealed class LuaHoverHandlerTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-    }
 }

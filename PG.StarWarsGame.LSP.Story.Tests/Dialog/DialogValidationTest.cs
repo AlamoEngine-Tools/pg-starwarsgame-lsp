@@ -16,7 +16,7 @@ public sealed class DialogValidationTest
 {
     private const string Uri = "file:///dialog_test.txt";
 
-    private static readonly ISchemaProvider Schema = new StubSchemaProvider(new EnumDefinition
+    private static readonly ISchemaProvider Schema = new SchemaProviderBuilder().WithEnums(new EnumDefinition
     {
         Name = "StoryDialogCommand",
         Values =
@@ -33,7 +33,7 @@ public sealed class DialogValidationTest
             Command("WAIT_SPEECH"),
             Command("CLEAR_TEXT", true)
         ]
-    });
+    }).Build();
 
     // ── Fixture: a hand-built StoryDialogCommand schema slice ────────────────
 
@@ -232,48 +232,6 @@ public sealed class DialogValidationTest
         var index = IndexWith([], Symbol("TAR_EVENT_00", "SpeechEvent"));
 
         Assert.Empty(Validate("DIALOG TAR_EVENT_00", index));
-    }
-}
-
-file sealed class StubSchemaProvider(EnumDefinition dialogCommands) : ISchemaProvider
-{
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [dialogCommands];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string t)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string name)
-    {
-        return string.Equals(name, dialogCommands.Name, StringComparison.OrdinalIgnoreCase)
-            ? dialogCommands
-            : null;
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string t)
-    {
-        return null;
     }
 }
 

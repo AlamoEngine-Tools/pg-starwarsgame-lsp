@@ -54,7 +54,7 @@ public sealed class StoryFactProducerTest
             Name = "StoryEventType",
             Kind = EnumKind.SchemaFixed,
             Values = [value]
-        });
+        }).Build();
     }
 
     private static ISchemaProvider SchemaWithReward(string name, ParamDefinition[]? paramDefs = null)
@@ -69,7 +69,7 @@ public sealed class StoryFactProducerTest
             Name = "StoryRewardType",
             Kind = EnumKind.SchemaFixed,
             Values = [value]
-        });
+        }).Build();
     }
 
     // ── Story dialog reference facts ─────────────────────────────────────────
@@ -77,7 +77,7 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Event_with_StoryDialog_and_chapter_emits_StoryDialogRefFact()
     {
-        var sut = new StoryFactProducer(new EmptySchemaProvider());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
         var xml = Xml("<Story_Dialog>Dialog_Mission_One</Story_Dialog><Story_Chapter>2</Story_Chapter>");
 
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>().ToList();
@@ -91,7 +91,7 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Event_with_StoryDialog_without_chapter_emits_fact_with_null_chapter()
     {
-        var sut = new StoryFactProducer(new EmptySchemaProvider());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
         var xml = Xml("<Story_Dialog>Dialog_Mission_One</Story_Dialog>");
 
         var f = Assert.Single(sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>());
@@ -102,7 +102,7 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Event_without_StoryDialog_emits_no_StoryDialogRefFact()
     {
-        var sut = new StoryFactProducer(new EmptySchemaProvider());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
         var xml = Xml("<Event_Type>UNKNOWN</Event_Type>");
 
         Assert.Empty(sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>());
@@ -125,7 +125,7 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Unknown_event_type_emits_StoryEventFact_with_null_def()
     {
-        var sut = new StoryFactProducer(new EmptySchemaProvider());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
         var xml = Xml("<Event_Type>UNKNOWN</Event_Type>");
         var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryEventFact>().ToList();
         var f = Assert.Single(facts);
@@ -176,7 +176,7 @@ public sealed class StoryFactProducerTest
             Name = "StoryEventType",
             Kind = EnumKind.SchemaFixed,
             Values = [new EnumValueDefinition { Name = "UNCONSTRAINED", Params = null }]
-        }));
+        }).Build());
         var xml = Xml("<Event_Type>UNCONSTRAINED</Event_Type><Event_Param1>x</Event_Param1>");
         var paramFacts = sut.Produce(xml, "file:///test.xml").OfType<StoryParamFact>().ToList();
         Assert.Empty(paramFacts);
@@ -244,7 +244,7 @@ public sealed class StoryFactProducerTest
                         Params = [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = false }]
                     }
                 ]
-            }));
+            }).Build());
     }
 
     [Fact]
@@ -304,14 +304,14 @@ public sealed class StoryFactProducerTest
     [Fact]
     public void Unknown_event_type_emits_no_StoryParamFacts()
     {
-        var sut = new StoryFactProducer(new EmptySchemaProvider());
+        var sut = new StoryFactProducer(new SchemaProviderBuilder().Build());
         var xml = Xml("<Event_Type>UNKNOWN</Event_Type><Event_Param1>x</Event_Param1>");
         var paramFacts = sut.Produce(xml, "file:///test.xml").OfType<StoryParamFact>().ToList();
         Assert.Empty(paramFacts);
     }
 }
 
-file sealed class SingleEventSchemaProvider : ISchemaProvider
+file sealed class SingleEventSchemaProvider
 {
     private readonly Dictionary<string, EnumDefinition> _enums;
 
@@ -322,40 +322,11 @@ file sealed class SingleEventSchemaProvider : ISchemaProvider
             _enums[enumDef.Name] = enumDef;
     }
 
-    public EnumDefinition? GetEnum(string name)
+    public FakeSchemaProvider Build()
     {
-        return _enums.GetValueOrDefault(name);
-    }
-
-    public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        var builder = new SchemaProviderBuilder();
+        foreach (var item in _enums.Values)
+            builder.WithEnum(item);
+        return builder.Build();
     }
 }

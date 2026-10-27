@@ -280,7 +280,7 @@ public sealed class StorySimulatorTest
 
     private static (StorySimulator Sim, StoryCampaignModel Model) Build()
     {
-        var schema = new SimSchemaProvider();
+        var schema = SimSchemaProvider.Build();
         var threadA = StoryThreadParser.Parse(ThreadAText, ThreadAUri);
         var threadB = StoryThreadParser.Parse(ThreadBText, ThreadBUri);
         var model = new StoryCampaignModel("GC", "Rebel", [threadA, threadB],
@@ -422,7 +422,7 @@ public sealed class StorySimulatorTest
 
     private static (StorySimulator Sim, StoryCampaignModel Model) BuildWorld(IStoryWorldSymbols? symbols = null)
     {
-        var schema = new SimSchemaProvider();
+        var schema = SimSchemaProvider.Build();
         var thread = StoryThreadParser.Parse(WorldThreadText, ThreadAUri);
         var model = new StoryCampaignModel("GC", "Rebel", [thread],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
@@ -606,7 +606,7 @@ public sealed class StorySimulatorTest
 
     private static (StorySimulator Sim, StoryCampaignModel Model) BuildLua()
     {
-        var schema = new SimSchemaProvider();
+        var schema = SimSchemaProvider.Build();
         var thread = StoryThreadParser.Parse(LuaThreadText, ThreadAUri);
         var model = new StoryCampaignModel("GC", "Rebel", [thread],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
@@ -722,7 +722,7 @@ public sealed class StorySimulatorTest
 
     private static (StorySimulator Sim, StoryCampaignModel Model) BuildTimerChain(string? text = null)
     {
-        var schema = new SimSchemaProvider();
+        var schema = SimSchemaProvider.Build();
         var thread = StoryThreadParser.Parse(text ?? TimerChainText, ThreadAUri);
         var model = new StoryCampaignModel("GC", "Rebel", [thread],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
@@ -1112,7 +1112,7 @@ public sealed class StorySimulatorTest
 
     // ── fakes ────────────────────────────────────────────────────────────────
 
-    private sealed class SimSchemaProvider : ISchemaProvider
+    private static class SimSchemaProvider
     {
         private static readonly EnumDefinition Events = new()
         {
@@ -1237,43 +1237,12 @@ public sealed class StorySimulatorTest
             ]
         };
 
-        public event EventHandler? SchemaRefreshed
+        public static FakeSchemaProvider Build()
         {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [Events, Rewards];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            if (string.Equals(name, Events.Name, StringComparison.OrdinalIgnoreCase)) return Events;
-            if (string.Equals(name, Rewards.Name, StringComparison.OrdinalIgnoreCase)) return Rewards;
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
+            return new SchemaProviderBuilder()
+                .WithEnum(Events)
+                .WithEnum(Rewards)
+                .Build();
         }
     }
 }

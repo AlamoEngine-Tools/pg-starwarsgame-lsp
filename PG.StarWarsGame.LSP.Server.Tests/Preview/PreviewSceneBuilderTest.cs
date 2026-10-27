@@ -142,12 +142,12 @@ public sealed class PreviewSceneBuilderTest
         // second read turns a mounted turret into a "bone missing" warning.
         var (index, tags) = Destroyer();
         var service = new FakeGameIndexService(index, GameIndex.Empty);
-        var builder = new PreviewSceneBuilder(service, new NullSchemaProvider(), tags,
+        var builder = new PreviewSceneBuilder(service, new SchemaProviderBuilder().Build(), tags,
             new FakeAssets("EV_StarDestroyer.ALO", "EV_StarDestroyer_HP00_L-F.alo"));
 
         var scene = builder.BuildForObject("Generic_Star_Destroyer");
 
-        Assert.Equal(1, service.Reads);
+        Assert.Equal(1, service.CurrentReads);
         Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewHardpointBoneMissing);
         Assert.Single(scene.Parts, p => p.Origin == PreviewPartOrigin.Hardpoint);
     }
@@ -160,11 +160,12 @@ public sealed class PreviewSceneBuilderTest
         var index = Index([Sym("Rebel", "Faction")], new Dictionary<string, string[]> { ["hull.alo"] = ["Root"] });
         var tags = new FakeVariantTagSource().With("Rebel", Tag("Color", "255, 0, 0, 255"));
         var service = new FakeGameIndexService(index, GameIndex.Empty);
-        var builder = new PreviewSceneBuilder(service, new NullSchemaProvider(), tags, new FakeAssets("hull.alo"));
+        var builder = new PreviewSceneBuilder(service, new SchemaProviderBuilder().Build(), tags,
+            new FakeAssets("hull.alo"));
 
         var scene = builder.BuildForModel("hull.alo");
 
-        Assert.Equal(1, service.Reads);
+        Assert.Equal(1, service.CurrentReads);
         Assert.Single(scene.Factions, f => f.Name == "Rebel");
     }
 
@@ -194,7 +195,7 @@ public sealed class PreviewSceneBuilderTest
     private static PreviewSceneBuilder Builder(
         GameIndex index, FakeVariantTagSource tags, FakeAssets assets)
     {
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, assets);
     }
 

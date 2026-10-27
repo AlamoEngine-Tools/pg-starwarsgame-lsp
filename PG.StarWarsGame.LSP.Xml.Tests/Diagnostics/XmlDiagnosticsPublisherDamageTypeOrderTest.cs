@@ -32,9 +32,9 @@ public sealed class XmlDiagnosticsPublisherDamageTypeOrderTest
     {
         return new XmlDiagnosticsPublisher(
             _ => { },
-            new StubIndexService2(),
-            new StubWorkspaceHost2(),
-            new StubSchemaProvider2(),
+            new FakeGameIndexService(),
+            new FakeGameWorkspaceHost(),
+            new SchemaProviderBuilder().Build(),
             new XmlDiagnosticsHandlerRegistry([]),
             new StubDocumentFactProducer2(),
             new StubIndexFactProducer2(),
@@ -182,46 +182,6 @@ public sealed class XmlDiagnosticsPublisherDamageTypeOrderTest
     }
 }
 
-file sealed class StubSchemaProvider2 : ISchemaProvider
-{
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-}
-
 file sealed class StubDocumentFactProducer2 : IXmlDocumentFactProducer
 {
     public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
@@ -246,81 +206,6 @@ file sealed class StubStoryFactProducer2 : IStoryFactProducer
     }
 }
 
-file sealed class StubIndexService2 : IGameIndexService
-{
-    public GameIndex Current => GameIndex.Empty;
-
-    public event Action<GameIndex>? IndexChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<ILocalisationIndex>? LocalisationChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<GameIndex>? DynamicEnumChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-    {
-        return Task.CompletedTask;
-    }
-
-    public void InjectDocument(DocumentIndex document)
-    {
-    }
-
-    public void RemoveDocument(string uri)
-    {
-    }
-
-    public void ApplyBaseline(BaselineIndex baseline)
-    {
-    }
-
-    public void ApplyLocalisation(ILocalisationIndex index)
-    {
-    }
-
-    public void ApplyAssetFiles(IAssetFileIndex index)
-    {
-    }
-
-    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-    {
-    }
-
-    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-    {
-    }
-
-    public void ApplyWorkspaceEnumValueDefinitions(
-        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-    {
-    }
-
-    public IDisposable BeginBulkUpdate()
-    {
-        return NullDisposable2.Instance;
-    }
-
-    private sealed class NullDisposable2 : IDisposable
-    {
-        public static readonly NullDisposable2 Instance = new();
-
-        public void Dispose()
-        {
-        }
-    }
-}
-
 file sealed class StubFileTypeRegistry2 : IFileTypeRegistry
 {
     public ImmutableArray<string> GetTypesForFile(string normalizedPath)
@@ -337,26 +222,4 @@ file sealed class StubFileTypeRegistry2 : IFileTypeRegistry
     }
 
     public IReadOnlyDictionary<string, ImmutableArray<string>> All => new Dictionary<string, ImmutableArray<string>>();
-}
-
-file sealed class StubWorkspaceHost2 : IGameWorkspaceHost
-{
-    private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-        _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-    }
-
-    public void Remove(string uri)
-    {
-        _docs.Remove(uri);
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        return _docs.TryGetValue(uri, out doc!);
-    }
-
-    public IEnumerable<TrackedDocument> All => _docs.Values;
 }

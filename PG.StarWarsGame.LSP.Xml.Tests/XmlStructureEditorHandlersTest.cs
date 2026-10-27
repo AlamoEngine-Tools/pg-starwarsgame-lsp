@@ -41,7 +41,7 @@ public sealed class XmlStructureEditorHandlersTest
     private static (IXmlParseCache Cache, IFileHelper Files) Parts(string text)
     {
         var files = new FileHelper(new MockFileSystem());
-        return (TestParseCache.For(new Host(Uri, text), files), files);
+        return (TestParseCache.For(new FakeGameWorkspaceHost(Uri, text), files), files);
     }
 
     // ── folding ─────────────────────────────────────────────────────────────
@@ -170,24 +170,5 @@ public sealed class XmlStructureEditorHandlersTest
     public async Task Highlight_OffAnyTagName_MarksNothing()
     {
         Assert.Empty(await HighlightsAsync(WellFormed, 5, 13));
-    }
-
-    private sealed class Host(string uri, string text) : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [new(uri, text, 1)];
-
-        public void AddOrUpdate(string u, string t, int v, bool publishDiagnostics = true)
-        {
-        }
-
-        public void Remove(string u)
-        {
-        }
-
-        public bool TryGet(string u, out TrackedDocument doc)
-        {
-            doc = new TrackedDocument(uri, text, 1);
-            return true;
-        }
     }
 }

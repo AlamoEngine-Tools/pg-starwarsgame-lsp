@@ -24,7 +24,7 @@ public sealed class DialogNavigationTest
 
     // ── Fixture ──────────────────────────────────────────────────────────────
 
-    private static readonly ISchemaProvider Schema = new StubSchemaProvider(new EnumDefinition
+    private static readonly ISchemaProvider Schema = new SchemaProviderBuilder().WithEnums(new EnumDefinition
     {
         Name = "StoryDialogCommand",
         Values =
@@ -55,7 +55,7 @@ public sealed class DialogNavigationTest
                 ]
             }
         ]
-    });
+    }).Build();
 
     private static GameIndex Index()
     {
@@ -76,7 +76,7 @@ public sealed class DialogNavigationTest
     private static DialogInlayHintHandler HintHandler(string text, bool inScope = true)
     {
         return new DialogInlayHintHandler(
-            new StubIndexService(Index()), new StubScope(inScope), new DialogFactProducer(Schema),
+            new FakeGameIndexService(Index()), new StubScope(inScope), new DialogFactProducer(Schema),
             new FileHelper(new MockFileSystem()),
             new StubTextSource(Uri, text));
     }
@@ -84,7 +84,7 @@ public sealed class DialogNavigationTest
     private static DialogDefinitionHandler DefinitionHandler(string text, bool inScope = true)
     {
         return new DialogDefinitionHandler(
-            new StubIndexService(Index()), new StubScope(inScope), new DialogFactProducer(Schema),
+            new FakeGameIndexService(Index()), new StubScope(inScope), new DialogFactProducer(Schema),
             new FileHelper(new MockFileSystem()),
             new StubTextSource(Uri, text), NullLogger<DialogDefinitionHandler>.Instance);
     }
@@ -246,126 +246,6 @@ public sealed class DialogNavigationTest
         public string? GetValue(string key)
         {
             return entries.GetValueOrDefault(key);
-        }
-    }
-
-    private sealed class StubSchemaProvider(EnumDefinition dialogCommands) : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [dialogCommands];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            return string.Equals(name, dialogCommands.Name, StringComparison.OrdinalIgnoreCase)
-                ? dialogCommands
-                : null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
-        }
-    }
-
-    private sealed class StubIndexService(GameIndex index) : IGameIndexService
-    {
-        public GameIndex Current => index;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex localisation)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex assetFiles)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Noop();
-        }
-
-        private sealed class Noop : IDisposable
-        {
-            public void Dispose()
-            {
-            }
         }
     }
 }

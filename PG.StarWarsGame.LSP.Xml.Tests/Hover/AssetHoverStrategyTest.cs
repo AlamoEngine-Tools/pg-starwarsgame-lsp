@@ -38,11 +38,11 @@ public sealed class AssetHoverStrategyTest
             false, line, character, "en");
     }
 
-    private static StubSchemaProvider SchemaWithTag(
+    private static FakeSchemaProvider SchemaWithTag(
         string tagName, ReferenceKind kind = ReferenceKind.TextureFile)
     {
-        var p = new StubSchemaProvider();
-        p.SetTag(tagName, new XmlTagDefinition
+        var p = new SchemaProviderBuilder().Build();
+        p.Add(new XmlTagDefinition
         {
             Tag = tagName,
             ValueType = XmlValueType.NameReference,
@@ -62,7 +62,7 @@ public sealed class AssetHoverStrategyTest
         var hapDoc = XmlUtility.CreateHtmlDocument("<Root><Tex>foo.tga</Tex></Root>");
         XmlUtility.TryGetRootNode(hapDoc, out var rootNode);
         XmlUtility.TryFindNode(hapDoc, 0, out var node);
-        var ctx = new HoverContext(DocUri, GameIndex.Empty, new StubSchemaProvider(),
+        var ctx = new HoverContext(DocUri, GameIndex.Empty, new SchemaProviderBuilder().Build(),
             hapDoc, rootNode!, node ?? new HtmlDocument().DocumentNode,
             true, 0, 1, "en");
         Assert.Null(new AssetHoverStrategy().Handle(ctx));
@@ -71,7 +71,7 @@ public sealed class AssetHoverStrategyTest
     [Fact]
     public void Handle_NoTagDef_ReturnsNull()
     {
-        var schema = new StubSchemaProvider(); // no tags registered
+        var schema = new SchemaProviderBuilder().Build(); // no tags registered
         var ctx = MakeCtx("<Root>\n<Texture_File>foo.tga</Texture_File>\n</Root>", 1, 9, schema);
         Assert.Null(new AssetHoverStrategy().Handle(ctx));
     }
@@ -116,52 +116,4 @@ public sealed class AssetHoverStrategyTest
     }
 
     // ── file-scoped fakes ─────────────────────────────────────────────────────
-
-    private sealed class StubSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, XmlTagDefinition> _tags =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tags.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void SetTag(string name, XmlTagDefinition tag)
-        {
-            _tags[name] = tag;
-        }
-    }
 }

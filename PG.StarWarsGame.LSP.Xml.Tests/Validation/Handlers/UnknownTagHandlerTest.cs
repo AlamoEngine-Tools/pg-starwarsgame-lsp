@@ -22,7 +22,7 @@ public sealed class UnknownTagHandlerTest
     private static readonly UnknownTagHandler Sut = new();
 
     private static readonly DiagnosticsContext Ctx =
-        new(new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
+        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en");
 
     private static XmlUnknownTagFact Fact(string? suggestion)
     {

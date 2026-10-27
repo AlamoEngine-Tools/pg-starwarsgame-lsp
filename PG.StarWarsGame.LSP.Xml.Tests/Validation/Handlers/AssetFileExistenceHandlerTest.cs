@@ -24,13 +24,13 @@ public sealed class AssetFileExistenceHandlerTest
     private static DiagnosticsContext CtxWith(params string[] paths)
     {
         var index = GameIndex.Empty with { AssetFiles = new MergedAssetFileIndex(paths) };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
     }
 
     private static DiagnosticsContext CtxWithIcons(IIconNameIndex icons, params string[] paths)
     {
         var index = GameIndex.Empty with { AssetFiles = new MergedAssetFileIndex(paths) };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en",
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en",
             IconNames: icons);
     }
 

@@ -54,7 +54,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
 
         var handler = new GetEncyclopediaEntryHandler(
             new FakeGameIndexService(GameIndex.Empty with { WorkspaceDefinitions = defs }),
-            new NullSchemaProvider(), source, config, null, shipNames);
+            new SchemaProviderBuilder().Build(), source, config, null, shipNames);
 
         return await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
     }
@@ -143,7 +143,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
             {
                 WorkspaceDefinitions = defs, Baseline = baseline
             }),
-            new NullSchemaProvider(), source, config, null, stub);
+            new SchemaProviderBuilder().Build(), source, config, null, stub);
 
         var result = await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId },
             TestContext.Current.CancellationToken);

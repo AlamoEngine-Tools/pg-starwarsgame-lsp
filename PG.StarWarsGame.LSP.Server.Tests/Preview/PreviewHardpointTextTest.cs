@@ -99,7 +99,7 @@ public sealed class PreviewHardpointTextTest
             .With("Frigate", Tag("Space_Model_Name", "frigate.alo"), Tag("HardPoints", "HP_Comm"))
             .With("HP_Comm", [.. hardpointTags]);
 
-        var scene = new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        var scene = new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("frigate.alo")).BuildForObject("Frigate");
 
         return Assert.Single(scene.Hardpoints);

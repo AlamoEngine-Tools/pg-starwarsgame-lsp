@@ -168,7 +168,7 @@ public sealed class PreviewDeathCloneTest
 
         var tags = extra(new FakeVariantTagSource().With("Ship", shipTags));
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new DeathCloneSchema(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), DeathCloneSchema(),
             tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
     }
 
@@ -295,25 +295,22 @@ public sealed class PreviewDeathCloneTest
     ///     A schema that says what the real one says about <c>Death_Clone</c>.
     /// </summary>
     /// <remarks>
-    ///     Not the bare <c>NullSchemaProvider</c>, deliberately. Reporting no schema makes the
+    ///     Not an empty schema, deliberately. Reporting no schema makes the
     ///     resolver treat every tag as <c>Replace</c>, which collapses the occurrence list to the
     ///     last row - so a test on the null provider would prove the OPPOSITE of production, where
     ///     <c>GameObjectType.yaml</c> declares this tag <c>variantMode: merge</c> plus
     ///     <c>multipleAllowed</c>. That mode is also what makes a variant keep its base's clones.
     /// </remarks>
-    private sealed class DeathCloneSchema : NullSchemaProvider
+    private static FakeSchemaProvider DeathCloneSchema()
     {
-        public override XmlTagDefinition? GetTag(string tagName)
-        {
-            return tagName.Equals("Death_Clone", StringComparison.OrdinalIgnoreCase)
-                ? new XmlTagDefinition
-                {
-                    Tag = "Death_Clone",
-                    ValueType = XmlValueType.DeathCloneSpec,
-                    MultipleAllowed = true,
-                    VariantMode = VariantMode.Merge
-                }
-                : null;
-        }
+        return new SchemaProviderBuilder()
+            .WithTag(new XmlTagDefinition
+            {
+                Tag = "Death_Clone",
+                ValueType = XmlValueType.DeathCloneSpec,
+                MultipleAllowed = true,
+                VariantMode = VariantMode.Merge
+            })
+            .Build();
     }
 }

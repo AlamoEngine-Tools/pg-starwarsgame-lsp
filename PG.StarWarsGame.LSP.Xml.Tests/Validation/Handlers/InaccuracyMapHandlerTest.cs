@@ -42,10 +42,10 @@ public sealed class InaccuracyMapHandlerTest
 
     private static DiagnosticsContext CtxWithCategories(params string[] workspaceValues)
     {
-        var schema = new StubSchemaWithCategoryEnum(new EnumDefinition
+        var schema = new SchemaProviderBuilder().WithEnum(new EnumDefinition
         {
             Name = "GameObjectCategoryType", Kind = EnumKind.DynamicXml, Values = []
-        });
+        }).Build();
         var index = GameIndex.Empty with
         {
             WorkspaceDynamicEnumValues = ImmutableDictionary
@@ -85,45 +85,5 @@ public sealed class InaccuracyMapHandlerTest
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(floatTag, ""), XmlHandlerTestFixtures.EmptyCtx)
             .ToList();
         Assert.Empty(results);
-    }
-
-    private sealed class StubSchemaWithCategoryEnum(EnumDefinition enumDef) : ISchemaProvider
-    {
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            return string.Equals(name, enumDef.Name, StringComparison.OrdinalIgnoreCase) ? enumDef : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [enumDef];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
     }
 }

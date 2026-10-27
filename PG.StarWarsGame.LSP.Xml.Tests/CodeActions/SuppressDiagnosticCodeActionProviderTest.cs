@@ -32,10 +32,12 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
 
     private static SuppressDiagnosticCodeActionProvider BuildProvider(string xml = Xml)
     {
-        var host = new FakeSuppressionWorkspaceHost(Uri, xml);
+        var host = new FakeGameWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new SuppressDiagnosticCodeActionProvider(
-            TestParseCache.For(host, fileHelper), fileHelper, new UnitObjectSchema());
+            TestParseCache.For(host, fileHelper), fileHelper,
+            new SchemaProviderBuilder()
+                .WithObjectType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" }).Build());
     }
 
     private static XmlCodeActionContext Ctx(string? code, int line = 2)
@@ -174,76 +176,5 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
 
         Assert.Equal(3, titles.Count);
         Assert.DoesNotContain(titles, t => t.Contains("<Unit>"));
-    }
-
-    /// <summary>Schema where only &lt;Unit&gt; is an object type.</summary>
-    private sealed class UnitObjectSchema : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return typeName.Equals("Unit", StringComparison.OrdinalIgnoreCase)
-                ? new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" }
-                : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-    }
-}
-
-file sealed class FakeSuppressionWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly string _text;
-    private readonly string _uri;
-
-    public FakeSuppressionWorkspaceHost(string uri, string text)
-    {
-        _uri = uri;
-        _text = text;
-    }
-
-    public IEnumerable<TrackedDocument> All => [new(_uri, _text, 1)];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string uri)
-    {
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(_uri, _text, 1);
-        return true;
     }
 }

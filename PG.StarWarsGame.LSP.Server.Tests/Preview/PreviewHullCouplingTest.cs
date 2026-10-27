@@ -102,7 +102,7 @@ public sealed class PreviewHullCouplingTest
         if (constants.Length > 0)
             tags = tags.With("GameConstants", constants);
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
     }
 
@@ -122,7 +122,7 @@ public sealed class PreviewHullCouplingTest
         foreach (var hardpoint in hardpoints)
             tags = tags.With(hardpoint.Id, hardpoint.Tags);
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
     }
 

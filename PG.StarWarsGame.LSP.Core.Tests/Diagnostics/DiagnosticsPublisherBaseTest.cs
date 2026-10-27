@@ -43,12 +43,12 @@ public sealed class DiagnosticsPublisherBaseTest
     // ReSharper disable once UnusedTupleComponentInReturnValue - the helper returns everything a test might need; some tests ignore a part
     private static (ConcretePublisher publisher,
         List<PublishDiagnosticsParams> published,
-        FakeIndexService indexService,
-        FakeWorkspaceHost workspaceHost) Build(string extension = ".xml", int debounceMs = 0, bool enabled = true)
+        FakeGameIndexService indexService,
+        FakeGameWorkspaceHost workspaceHost) Build(string extension = ".xml", int debounceMs = 0, bool enabled = true)
     {
         var published = new List<PublishDiagnosticsParams>();
-        var indexService = new FakeIndexService();
-        var workspaceHost = new FakeWorkspaceHost();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
         var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, extension,
             debounceMs, enabled);
         return (publisher, published, indexService, workspaceHost);
@@ -84,9 +84,9 @@ public sealed class DiagnosticsPublisherBaseTest
         map.SetLayers(setup.Layers);
         var uri = setup.Uri(rank, "Xml/Units.xml");
         var (published, indexService, host) = BuildWithOrigin(map, Problem());
-        host.Add(uri, "<Root/>");
+        host.With(uri, "<Root/>");
 
-        indexService.Fire(IndexWithDoc(uri));
+        indexService.Raise(IndexWithDoc(uri));
 
         var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal("aetswg (Mod)", diagnostic.Source);
@@ -108,12 +108,13 @@ public sealed class DiagnosticsPublisherBaseTest
         };
     }
 
-    private static (List<PublishDiagnosticsParams> published, FakeIndexService indexService, FakeWorkspaceHost host)
+    private static (List<PublishDiagnosticsParams> published, FakeGameIndexService indexService, FakeGameWorkspaceHost
+        host)
         BuildWithOrigin(IProjectLayerMap? layerMap, params Diagnostic[] diagnostics)
     {
         var published = new List<PublishDiagnosticsParams>();
-        var indexService = new FakeIndexService();
-        var host = new FakeWorkspaceHost();
+        var indexService = new FakeGameIndexService();
+        var host = new FakeGameWorkspaceHost();
         _ = new ConcretePublisher(p => published.Add(p), indexService, host, ".xml", 0, true,
             diagnostics, null, null, layerMap);
         return (published, indexService, host);
@@ -125,9 +126,9 @@ public sealed class DiagnosticsPublisherBaseTest
         var (map, _, modXml) = LayeredMap();
         var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(modXml, "units.xml"));
         var (published, indexService, host) = BuildWithOrigin(map, Problem());
-        host.Add(uri, "<Root/>");
+        host.With(uri, "<Root/>");
 
-        indexService.Fire(IndexWithDoc(uri));
+        indexService.Raise(IndexWithDoc(uri));
 
         var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal("aetswg (My Mod)", diagnostic.Source);
@@ -138,9 +139,9 @@ public sealed class DiagnosticsPublisherBaseTest
     public void Publish_WithoutLayers_StampsTheBareSource()
     {
         var (published, indexService, host) = BuildWithOrigin(null, Problem());
-        host.Add("file:///a.xml", "<Root/>");
+        host.With("file:///a.xml", "<Root/>");
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         Assert.Equal("aetswg", Assert.Single(Assert.Single(published).Diagnostics).Source);
     }
@@ -152,9 +153,9 @@ public sealed class DiagnosticsPublisherBaseTest
         var (map, _, modXml) = LayeredMap();
         var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(modXml, "units.xml"));
         var (published, indexService, host) = BuildWithOrigin(map, Problem(AppProperties.LspServerId));
-        host.Add(uri, "<Root/>");
+        host.With(uri, "<Root/>");
 
-        indexService.Fire(IndexWithDoc(uri));
+        indexService.Raise(IndexWithDoc(uri));
 
         Assert.Equal("aetswg (My Mod)", Assert.Single(Assert.Single(published).Diagnostics).Source);
     }
@@ -165,9 +166,9 @@ public sealed class DiagnosticsPublisherBaseTest
         var (map, _, modXml) = LayeredMap();
         var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(modXml, "units.xml"));
         var (published, indexService, host) = BuildWithOrigin(map, Problem("someone-else"));
-        host.Add(uri, "<Root/>");
+        host.With(uri, "<Root/>");
 
-        indexService.Fire(IndexWithDoc(uri));
+        indexService.Raise(IndexWithDoc(uri));
 
         Assert.Equal("someone-else", Assert.Single(Assert.Single(published).Diagnostics).Source);
     }
@@ -178,9 +179,9 @@ public sealed class DiagnosticsPublisherBaseTest
         var (map, depXml, _) = LayeredMap();
         var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(depXml, "infantry.xml"));
         var (published, indexService, host) = BuildWithOrigin(map, Problem());
-        host.Add(uri, "<Root/>");
+        host.With(uri, "<Root/>");
 
-        indexService.Fire(IndexWithDoc(uri));
+        indexService.Raise(IndexWithDoc(uri));
 
         var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
         // Raised by the project, about a file of its dependency: both are named.
@@ -196,10 +197,10 @@ public sealed class DiagnosticsPublisherBaseTest
     public void OnIndexChanged_PublishesForMatchingOpenDocuments()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Add("file:///a.xml", "content");
-        workspaceHost.Add("file:///b.lua", "content");
+        workspaceHost.With("file:///a.xml", "content");
+        workspaceHost.With("file:///b.lua", "content");
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         Assert.Single(published);
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
@@ -209,9 +210,9 @@ public sealed class DiagnosticsPublisherBaseTest
     public void OnIndexChanged_SkipsDocumentsWithWrongExtension()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Add("file:///b.lua", "content");
+        workspaceHost.With("file:///b.lua", "content");
 
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         Assert.Empty(published);
     }
@@ -220,13 +221,13 @@ public sealed class DiagnosticsPublisherBaseTest
     public void OnIndexChanged_ClearsStaleUrisOnClose()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Add("file:///a.xml", "content");
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        workspaceHost.With("file:///a.xml", "content");
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
         published.Clear();
 
         // Remove doc from workspace host - next fire should clear it
         workspaceHost.Remove("file:///a.xml");
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         Assert.Single(published);
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
@@ -237,12 +238,12 @@ public sealed class DiagnosticsPublisherBaseTest
     public void OnIndexChanged_DoesNotClearUrisThatRemainsOpen()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Add("file:///a.xml", "text1");
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        workspaceHost.With("file:///a.xml", "text1");
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
         var countAfterFirst = published.Count;
 
         // Doc remains open - fire again; no stale-clear publish expected for it
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         // Second fire: 1 publish for the open doc, no extra stale-clear
         Assert.Equal(countAfterFirst + 1, published.Count);
@@ -254,10 +255,10 @@ public sealed class DiagnosticsPublisherBaseTest
     public async Task OnIndexChanged_ManyRapidChanges_BatchesToSinglePublish()
     {
         var (_, published, indexService, workspaceHost) = Build(debounceMs: 50);
-        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
 
         for (var i = 0; i < 10; i++)
-            indexService.Fire(IndexWithDoc("file:///a.xml"));
+            indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         await Task.Delay(250, TestContext.Current.CancellationToken);
 
@@ -268,9 +269,9 @@ public sealed class DiagnosticsPublisherBaseTest
     public async Task OnIndexChanged_SingleChange_NotPublishedImmediately_ThenPublishedAfterDebounce()
     {
         var (_, published, indexService, workspaceHost) = Build(debounceMs: 50);
-        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         Assert.Empty(published); // not yet - still within debounce window
 
@@ -283,9 +284,9 @@ public sealed class DiagnosticsPublisherBaseTest
     public void OnIndexChanged_DiagnosticsDisabled_PublishesNothing()
     {
         var (_, published, indexService, workspaceHost) = Build(enabled: false);
-        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         Assert.Empty(published);
     }
@@ -296,7 +297,7 @@ public sealed class DiagnosticsPublisherBaseTest
         var (_, published, indexService, workspaceHost) = Build();
         workspaceHost.AddOrUpdate("file:///a.xml", "content", 1, false);
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         Assert.Empty(published);
     }
@@ -307,8 +308,8 @@ public sealed class DiagnosticsPublisherBaseTest
     public void IndexChanged_OnlyOneDocumentEntryChanged_RepublishesOnlyThatDocument()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Add("file:///a.xml", "content");
-        workspaceHost.Add("file:///b.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
+        workspaceHost.With("file:///b.xml", "content");
 
         var docA = new DocumentIndex("file:///a.xml", 1, ImmutableArray<GameSymbol>.Empty,
             ImmutableArray<GameReference>.Empty);
@@ -319,7 +320,7 @@ public sealed class DiagnosticsPublisherBaseTest
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add("file:///a.xml", docA).Add("file:///b.xml", docB)
         };
-        indexService.Fire(index1);
+        indexService.Raise(index1);
         published.Clear();
 
         // Content-only edit of a.xml: only its Documents entry is replaced; the workspace symbol
@@ -328,7 +329,7 @@ public sealed class DiagnosticsPublisherBaseTest
         {
             Documents = index1.Documents.SetItem("file:///a.xml", docA with { Version = 2 })
         };
-        indexService.Fire(index2);
+        indexService.Raise(index2);
 
         Assert.Single(published);
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
@@ -338,11 +339,11 @@ public sealed class DiagnosticsPublisherBaseTest
     public void IndexChanged_WorkspaceDefinitionsChanged_RepublishesAllOpenDocuments()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Add("file:///a.xml", "content");
-        workspaceHost.Add("file:///b.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
+        workspaceHost.With("file:///b.xml", "content");
 
         var index1 = IndexWithDoc("file:///a.xml");
-        indexService.Fire(index1);
+        indexService.Raise(index1);
         published.Clear();
 
         // A symbol-shape change can invalidate cross-document diagnostics everywhere.
@@ -352,7 +353,7 @@ public sealed class DiagnosticsPublisherBaseTest
         {
             WorkspaceDefinitions = index1.WorkspaceDefinitions.Add("UNIT_A", [sym])
         };
-        indexService.Fire(index2);
+        indexService.Raise(index2);
 
         Assert.Equal(2, published.Count);
     }
@@ -361,16 +362,16 @@ public sealed class DiagnosticsPublisherBaseTest
     public void IndexChanged_NewlyOpenedDocument_PublishedEvenWhenIndexIsIdentical()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
 
         var index = IndexWithDoc("file:///a.xml");
-        indexService.Fire(index);
+        indexService.Raise(index);
         published.Clear();
 
         // didOpen of an unedited, already-indexed file re-fires IndexChanged with the same index
         // (the unchanged-content fast path) - the newly opened doc still needs its diagnostics.
-        workspaceHost.Add("file:///b.xml", "content");
-        indexService.Fire(index);
+        workspaceHost.With("file:///b.xml", "content");
+        indexService.Raise(index);
 
         Assert.Single(published);
         Assert.Equal("file:///b.xml", published[0].Uri.ToString());
@@ -382,15 +383,15 @@ public sealed class DiagnosticsPublisherBaseTest
     public void PublishForDocument_Throws_DoesNotAbortOtherDocuments()
     {
         var published = new List<PublishDiagnosticsParams>();
-        var indexService = new FakeIndexService();
-        var workspaceHost = new FakeWorkspaceHost();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
         // a.xml throws; b.xml should still receive diagnostics
         _ = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
             "file:///a.xml");
-        workspaceHost.Add("file:///a.xml", "content");
-        workspaceHost.Add("file:///b.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
+        workspaceHost.With("file:///b.xml", "content");
 
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         Assert.True(published.Any(p => p.Uri.ToString() == "file:///b.xml"),
             "b.xml should receive diagnostics even though a.xml threw");
@@ -400,13 +401,13 @@ public sealed class DiagnosticsPublisherBaseTest
     public void PublishForDocument_Throws_EmptyDiagnosticsPublishedForFailedDocument()
     {
         var published = new List<PublishDiagnosticsParams>();
-        var indexService = new FakeIndexService();
-        var workspaceHost = new FakeWorkspaceHost();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
         _ = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
             "file:///a.xml");
-        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
 
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         var forA = published.FirstOrDefault(p => p.Uri.ToString() == "file:///a.xml");
         Assert.NotNull(forA);
@@ -425,19 +426,19 @@ public sealed class DiagnosticsPublisherBaseTest
         };
     }
 
-    private static (List<PublishDiagnosticsParams> published, FakeIndexService indexService)
+    private static (List<PublishDiagnosticsParams> published, FakeGameIndexService indexService)
         BuildSuppressing(
             IReadOnlyList<Diagnostic> diagnostics,
             IReadOnlyList<SuppressionRange>? ranges = null,
             IReadOnlyList<SuppressionMatcher>? global = null)
     {
         var published = new List<PublishDiagnosticsParams>();
-        var indexService = new FakeIndexService();
-        var workspaceHost = new FakeWorkspaceHost();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
         _ = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, ".xml",
             0, true, diagnostics, ranges,
             global is null ? null : new FakeGlobalSuppressionStore(global));
-        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.With("file:///a.xml", "content");
         return (published, indexService);
     }
 
@@ -447,7 +448,7 @@ public sealed class DiagnosticsPublisherBaseTest
         IReadOnlyList<SuppressionMatcher>? global = null)
     {
         var (published, indexService) = BuildSuppressing(diagnostics, ranges, global);
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
         return published.Single().Diagnostics.ToList();
     }
 
@@ -515,13 +516,13 @@ public sealed class DiagnosticsPublisherBaseTest
     public async Task ApplyGlobalSuppressions_DropsTheNewlySuppressed_WithoutAnalysingAgain()
     {
         var published = new List<PublishDiagnosticsParams>();
-        var indexService = new FakeIndexService();
-        var workspaceHost = new FakeWorkspaceHost();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
         var store = new FakeGlobalSuppressionStore([]);
         var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, ".xml",
             0, true, [Diag("aetswg-004-0001", 3), Diag("aetswg-005-0001", 4)], null, store);
-        workspaceHost.Add("file:///a.xml", "content");
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        workspaceHost.With("file:///a.xml", "content");
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         store.Add(SuppressionMatcher.ForId(new DiagnosticId(4, 1)));
         await publisher.ApplyGlobalSuppressionsAsync(TestContext.Current.CancellationToken);
@@ -535,13 +536,13 @@ public sealed class DiagnosticsPublisherBaseTest
     public async Task ApplyGlobalSuppressions_SendsNothingForADocumentItDoesNotChange()
     {
         var published = new List<PublishDiagnosticsParams>();
-        var indexService = new FakeIndexService();
-        var workspaceHost = new FakeWorkspaceHost();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
         var store = new FakeGlobalSuppressionStore([]);
         var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, ".xml",
             0, true, [Diag("aetswg-005-0001", 4)], null, store);
-        workspaceHost.Add("file:///a.xml", "content");
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        workspaceHost.With("file:///a.xml", "content");
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         store.Add(SuppressionMatcher.ForId(new DiagnosticId(4, 1)));
         await publisher.ApplyGlobalSuppressionsAsync(TestContext.Current.CancellationToken);
@@ -645,110 +646,6 @@ public sealed class DiagnosticsPublisherBaseTest
                 Uri = DocumentUri.From(uri),
                 Diagnostics = new Container<Diagnostic>()
             });
-        }
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current => GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged;
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        public void Fire(GameIndex index)
-        {
-            IndexChanged?.Invoke(index);
-        }
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public void Add(string uri, string text)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, 1);
-        }
-    }
-
-    private sealed class NullDisposable : IDisposable
-    {
-        public static readonly NullDisposable Instance = new();
-
-        public void Dispose()
-        {
         }
     }
 }

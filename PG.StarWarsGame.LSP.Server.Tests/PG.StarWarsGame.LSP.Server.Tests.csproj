@@ -35,6 +35,7 @@
 
     <ItemGroup>
         <Using Include="Xunit"/>
+        <Using Include="PG.StarWarsGame.LSP.Testing"/>
     </ItemGroup>
 
     <ItemGroup>

@@ -26,10 +26,10 @@ public sealed class PlanetModeExclusionListHandlerTest
 
     private static DiagnosticsContext CtxWithModes(params string[] modes)
     {
-        var schema = new StubSchemaWithModeEnum(new EnumDefinition
+        var schema = new SchemaProviderBuilder().WithEnum(new EnumDefinition
         {
             Name = "AutoresolveExclusionMode", Kind = EnumKind.DynamicXml, Values = []
-        });
+        }).Build();
         var index = GameIndex.Empty with
         {
             WorkspaceDynamicEnumValues = ImmutableDictionary
@@ -151,47 +151,5 @@ public sealed class PlanetModeExclusionListHandlerTest
         var ctx = CtxWithModes("Land", "Space");
 
         Assert.Empty(Sut.Handle(XmlHandlerTestFixtures.MakeFact(plainList, "Empire, Pirates, Hostile"), ctx));
-    }
-
-    private sealed class StubSchemaWithModeEnum(EnumDefinition enumDef) : ISchemaProvider
-    {
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [enumDef];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return string.Equals(enumName, enumDef.Name, StringComparison.OrdinalIgnoreCase)
-                ? enumDef
-                : null;
-        }
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
     }
 }

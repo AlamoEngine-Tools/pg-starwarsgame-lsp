@@ -94,7 +94,7 @@ public sealed class WorkspaceIndexerTest
     private static WorkspaceIndexer BuildWithBoneCache(
         MockFileSystem fs, IGameIndexService svc, IModelBoneCatalogCache boneCache)
     {
-        return BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+        return BuildWithHost(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
             null, null, null, null, boneCache).Indexer;
     }
 
@@ -109,7 +109,7 @@ public sealed class WorkspaceIndexerTest
     private static WorkspaceIndexer BuildWithMegReader(
         MockFileSystem fs, IGameIndexService svc, IMegEntryReader megReader)
     {
-        return BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+        return BuildWithHost(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
             null, null, null, megReader).Indexer;
     }
 
@@ -153,9 +153,10 @@ public sealed class WorkspaceIndexerTest
             [metafilePath] = new(@"<Game_Object_Files><File>DATA\XML\HARDPOINTS.XML</File></Game_Object_Files>")
         });
         var registry = new FileTypeRegistry();
-        var schema = new FakeSchemaProvider(
-            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+        var schema = new SchemaProviderBuilder().WithMetafiles(
+                new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]))
+            .Build();
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry, schema);
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
@@ -175,9 +176,10 @@ public sealed class WorkspaceIndexerTest
             [metafilePath] = new(@"<Game_Object_Files><File>DATA\XML\HARDPOINTS.XML</File></Game_Object_Files>")
         });
         var registry = new FileTypeRegistry();
-        var schema = new FakeSchemaProvider(
-            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+        var schema = new SchemaProviderBuilder().WithMetafiles(
+                new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]))
+            .Build();
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry, schema);
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
@@ -202,9 +204,10 @@ public sealed class WorkspaceIndexerTest
                 "<Game_Object_Files><File>Units\\Death_Clones.xml</File></Game_Object_Files>")
         });
         var registry = new FileTypeRegistry();
-        var schema = new FakeSchemaProvider(
-            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+        var schema = new SchemaProviderBuilder().WithMetafiles(
+                new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]))
+            .Build();
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry, schema);
 
         // config.XmlDirectories spans both projects (dependency first, root last).
         indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot]);
@@ -232,9 +235,10 @@ public sealed class WorkspaceIndexerTest
                 "<HardPointDataFiles><File>HardPoints\\HP_Weapons.xml</File></HardPointDataFiles>")
         });
         var registry = new FileTypeRegistry();
-        var schema = new FakeSchemaProvider(
-            new MetafileDefinition("data/xml/hardpointdatafiles.xml", MetafileType.FileRegistry, ["HardPoint"]));
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+        var schema = new SchemaProviderBuilder().WithMetafiles(
+                new MetafileDefinition("data/xml/hardpointdatafiles.xml", MetafileType.FileRegistry, ["HardPoint"]))
+            .Build();
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry, schema);
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot]);
 
@@ -261,9 +265,10 @@ public sealed class WorkspaceIndexerTest
                 new("<Game_Object_Files><File>Rev_Only.xml</File></Game_Object_Files>")
         });
         var registry = new FileTypeRegistry();
-        var schema = new FakeSchemaProvider(
-            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+        var schema = new SchemaProviderBuilder().WithMetafiles(
+                new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]))
+            .Build();
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry, schema);
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot]);
 
@@ -282,7 +287,8 @@ public sealed class WorkspaceIndexerTest
         var xmlDir = Path.Combine(root, "data", "xml");
         var fs = new MockFileSystem();
         fs.AddDirectory(xmlDir);
-        var (indexer, ctx) = Build(fs, new FakeIndexService(), new FileTypeRegistry(), new FakeSchemaProvider());
+        var (indexer, ctx) = Build(fs, new FakeGameIndexService(), new FileTypeRegistry(),
+            new SchemaProviderBuilder().Build());
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
@@ -301,9 +307,10 @@ public sealed class WorkspaceIndexerTest
             .Add("data/xml/hardpoints.xml", ["GameObjectType"]);
         var baseline = BaselineIndex.Empty with { FileTypeMap = fileTypeMap };
         var registry = new FileTypeRegistry();
-        var schema = new FakeSchemaProvider(
-            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
-        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
+        var schema = new SchemaProviderBuilder().WithMetafiles(
+                new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]))
+            .Build();
+        var svc = new FakeGameIndexService(GameIndex.Empty with { Baseline = baseline });
         var (indexer, _) = Build(fs, svc, registry, schema);
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
@@ -349,7 +356,8 @@ public sealed class WorkspaceIndexerTest
         var xmlDir = Path.Combine(root, "data", "xml");
         var fs = new MockFileSystem(StoryChainFixture(xmlDir));
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, new FakeSchemaProvider(StorySpecialDef()));
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry,
+            new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
@@ -365,7 +373,8 @@ public sealed class WorkspaceIndexerTest
         var xmlDir = Path.Combine(root, "data", "xml");
         var fs = new MockFileSystem(StoryChainFixture(xmlDir));
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, new FakeSchemaProvider(StorySpecialDef()));
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry,
+            new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
@@ -386,8 +395,8 @@ public sealed class WorkspaceIndexerTest
         var fs = new MockFileSystem(files);
         var registry = new FileTypeRegistry();
         var store = new StoryChainProblemStore();
-        var (indexer, _) = BuildWithHost(fs, new FakeIndexService(), registry,
-            new FakeSchemaProvider(StorySpecialDef()), null, store, null);
+        var (indexer, _) = BuildWithHost(fs, new FakeGameIndexService(), registry,
+            new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build(), null, store, null);
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
@@ -419,7 +428,8 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(coreXml, "Story_Core_Act.xml")] = new("<Story_Threads/>")
         });
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, new FakeSchemaProvider(StorySpecialDef()));
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry,
+            new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [Root("rev")]);
 
@@ -460,7 +470,8 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(revXml, "Story_Plots_Mod.xml")] = new("<Story_Mode_Plots/>")
         });
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, new FakeSchemaProvider(StorySpecialDef()));
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry,
+            new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot]);
 
@@ -480,12 +491,13 @@ public sealed class WorkspaceIndexerTest
         var fileTypeMap = ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("story_plots_vanilla.xml", ["StoryPlotManifest"])
             .Add("story_vanilla_act.xml", ["StoryParser"]);
-        var svc = new FakeIndexService(GameIndex.Empty with
+        var svc = new FakeGameIndexService(GameIndex.Empty with
         {
             Baseline = BaselineIndex.Empty with { FileTypeMap = fileTypeMap }
         });
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(StorySpecialDef()));
+        var (indexer, _) = Build(fs, svc, registry,
+            new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
@@ -508,18 +520,19 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(xmlDir, "a.xml")] = new("<Root/>"),
             [Path.Combine(xmlDir, "b.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), new FakeParser());
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
+            new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         var count = await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
         Assert.Equal(2, count);
-        Assert.Equal(2, svc.Calls.Count);
-        Assert.Equal(1, svc.BeginBulkUpdateCallCount);
-        Assert.All(svc.Calls, c => Assert.Equal(0, c.Version));
-        Assert.All(svc.Calls, c => Assert.StartsWith("file:///", c.Uri, StringComparison.Ordinal));
+        Assert.Equal(2, svc.Updates.Count);
+        Assert.Equal(1, svc.BulkUpdates);
+        Assert.All(svc.Updates, c => Assert.Equal(0, c.Version));
+        Assert.All(svc.Updates, c => Assert.StartsWith("file:///", c.Uri, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -532,14 +545,15 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(xmlDir, "units.xml")] = new("<Root/>"),
             [Path.Combine(root, "scripts", "build.xml")] = new("<project/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), new FakeParser());
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
+            new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        var call = Assert.Single(svc.Calls);
+        var call = Assert.Single(svc.Updates);
         Assert.EndsWith("units.xml", call.Uri, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -553,15 +567,15 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(scriptDir, "story.lua")] = new("function Definitions() end")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [scriptDir], [], [], null);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
             new FakeParser(), new FakeParser(".lua"));
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Contains(svc.Calls, c => c.Uri.EndsWith("story.lua", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(svc.Updates, c => c.Uri.EndsWith("story.lua", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -573,9 +587,10 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(xmlDir, "a.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), new FakeParser());
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
+            new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
@@ -583,7 +598,7 @@ public sealed class WorkspaceIndexerTest
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             indexer.IndexDocumentsAsync(config, cts.Token));
 
-        Assert.Empty(svc.Calls);
+        Assert.Empty(svc.Updates);
     }
 
     [Fact]
@@ -596,9 +611,10 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(xmlDir, "a.xml")] = new("<Root/>"),
             [Path.Combine(xmlDir, "b.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), new FakeParser());
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
+            new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         var maxTotal = 0;
@@ -627,14 +643,13 @@ public sealed class WorkspaceIndexerTest
         {
             AssetFiles = ImmutableHashSet.Create("data/art/textures/shipped.tga")
         };
-        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+        var svc = new FakeGameIndexService(GameIndex.Empty with { Baseline = baseline });
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build());
 
         indexer.ApplyAssetCatalog(AssetProject(root, root));
 
-        Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/local.tga"));
-        Assert.True(svc.AppliedAssetFiles.Contains("data/art/textures/shipped.tga"));
+        Assert.True(svc.Current.AssetFiles.Contains("data/art/textures/local.tga"));
+        Assert.True(svc.Current.AssetFiles.Contains("data/art/textures/shipped.tga"));
     }
 
     /// <summary>
@@ -657,15 +672,14 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(audioRoot, "Announcer", "Destroyed_ENG.wav")] = new("")
         });
-        var svc = new FakeIndexService(GameIndex.Empty);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+        var svc = new FakeGameIndexService(GameIndex.Empty);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build());
 
         // The asset ROOT is the audio directory itself, which is how a .pgproj declares it.
         indexer.ApplyAssetCatalog(AssetProject(root, audioRoot));
 
-        Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.True(svc.AppliedAssetFiles!.Contains("data/audio/announcer/destroyed_eng.wav"),
-            "expected the game-relative path, got: " + string.Join(", ", svc.AppliedAssetFiles));
+        Assert.True(svc.Current.AssetFiles.Contains("data/audio/announcer/destroyed_eng.wav"),
+            "expected the game-relative path, got: " + string.Join(", ", svc.Current.AssetFiles));
     }
 
     /// <summary>
@@ -681,14 +695,13 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(scripts, "GameObject", "BobaFettPlan.lua")] = new("")
         });
-        var svc = new FakeIndexService(GameIndex.Empty);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+        var svc = new FakeGameIndexService(GameIndex.Empty);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build());
 
         indexer.ApplyAssetCatalog(new WorkspaceConfiguration([], [scripts], [], [], null));
 
-        Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.True(svc.AppliedAssetFiles!.Contains("data/scripts/gameobject/bobafettplan.lua"),
-            "expected the script, got: " + string.Join(", ", svc.AppliedAssetFiles));
+        Assert.True(svc.Current.AssetFiles.Contains("data/scripts/gameobject/bobafettplan.lua"),
+            "expected the script, got: " + string.Join(", ", svc.Current.AssetFiles));
     }
 
     /// <summary>
@@ -703,13 +716,12 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "extra", "stray.tga")] = new("")
         });
-        var svc = new FakeIndexService(GameIndex.Empty);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+        var svc = new FakeGameIndexService(GameIndex.Empty);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build());
 
         indexer.ApplyAssetCatalog(AssetProject(root, root));
 
-        Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.True(svc.AppliedAssetFiles!.Contains("extra/stray.tga"));
+        Assert.True(svc.Current.AssetFiles.Contains("extra/stray.tga"));
     }
 
     /// <summary>
@@ -733,14 +745,13 @@ public sealed class WorkspaceIndexerTest
             [meg] = new("not a real archive - the reader is the seam")
         });
         fs.AddDirectory(art);
-        var svc = new FakeIndexService(GameIndex.Empty);
+        var svc = new FakeGameIndexService(GameIndex.Empty);
         var indexer = BuildWithMegReader(fs, svc,
             new FakeMegEntryReader((meg, [@"DATA\ART\TEXTURES\PACKED.TGA"])));
 
         indexer.ApplyAssetCatalog(AssetProject(root, art));
 
-        Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/packed.tga"));
+        Assert.True(svc.Current.AssetFiles.Contains("data/art/textures/packed.tga"));
     }
 
     /// <summary>The game loads no archive its list does not name, so neither does the catalog.</summary>
@@ -754,14 +765,13 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(root, "Data", "MegaFiles.xml")] = new(MegaFiles(@"Data\ModTextures.meg")),
             [meg] = new("not a real archive - the reader is the seam")
         });
-        var svc = new FakeIndexService(GameIndex.Empty);
+        var svc = new FakeGameIndexService(GameIndex.Empty);
         var indexer = BuildWithMegReader(fs, svc,
             new FakeMegEntryReader((meg, [@"DATA\ART\TEXTURES\STRAY.TGA"])));
 
         indexer.ApplyAssetCatalog(AssetProject(root, Path.Combine(root, "Data", "Art")));
 
-        Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.False(svc.AppliedAssetFiles!.Contains("data/art/textures/stray.tga"));
+        Assert.False(svc.Current.AssetFiles.Contains("data/art/textures/stray.tga"));
     }
 
     /// <summary>
@@ -784,7 +794,7 @@ public sealed class WorkspaceIndexerTest
             [dependencyModels] = new(""),
             [leafModels] = new("")
         });
-        var svc = new FakeIndexService(GameIndex.Empty);
+        var svc = new FakeGameIndexService(GameIndex.Empty);
         var indexer = BuildWithMegReader(fs, svc, new FakeMegEntryReader(
             (shared, [@"DATA\ART\TEXTURES\SHARED.TGA"]),
             (dependencyModels, [@"DATA\ART\MODELS\REPLACED.ALO"]),
@@ -796,10 +806,9 @@ public sealed class WorkspaceIndexerTest
 
         indexer.ApplyAssetCatalog(config);
 
-        Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/shared.tga"));
-        Assert.True(svc.AppliedAssetFiles.Contains("data/art/models/leaf.alo"));
-        Assert.False(svc.AppliedAssetFiles.Contains("data/art/models/replaced.alo"));
+        Assert.True(svc.Current.AssetFiles.Contains("data/art/textures/shared.tga"));
+        Assert.True(svc.Current.AssetFiles.Contains("data/art/models/leaf.alo"));
+        Assert.False(svc.Current.AssetFiles.Contains("data/art/models/replaced.alo"));
     }
 
     /// <summary>
@@ -815,14 +824,13 @@ public sealed class WorkspaceIndexerTest
         {
             [meg] = new("not a real archive - the reader is the seam")
         });
-        var svc = new FakeIndexService(GameIndex.Empty);
+        var svc = new FakeGameIndexService(GameIndex.Empty);
         var indexer = BuildWithMegReader(fs, svc,
             new FakeMegEntryReader((meg, ["U000_SPD0101_ENG.WAV"])));
 
         indexer.ApplyAssetCatalog(AssetProject(root, Path.Combine(root, "Data", "Audio")));
 
-        Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.True(svc.AppliedAssetFiles!.Contains("data/audio/sfx/u000_spd0101_eng.wav"));
+        Assert.True(svc.Current.AssetFiles.Contains("data/audio/sfx/u000_spd0101_eng.wav"));
     }
 
     [Fact]
@@ -836,13 +844,12 @@ public sealed class WorkspaceIndexerTest
             ModelBones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add("data/art/models/shipped.alo", ["root", "muzzle_bone"])
         };
-        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+        var svc = new FakeGameIndexService(GameIndex.Empty with { Baseline = baseline });
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build());
 
         indexer.ApplyModelBoneCatalog(WorkspaceConfiguration.Empty with { AssetRoots = [root] });
 
-        Assert.NotNull(svc.AppliedModelBones);
-        Assert.Equal(["root", "muzzle_bone"], svc.AppliedModelBones!["data/art/models/shipped.alo"].ToArray());
+        Assert.Equal(["root", "muzzle_bone"], svc.Current.ModelBones["data/art/models/shipped.alo"].ToArray());
     }
 
     // Models and particle systems share the extension (#270): the scan that reads every .alo records
@@ -863,15 +870,15 @@ public sealed class WorkspaceIndexerTest
             ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_shipped.alo",
                 "my_frigate.alo")
         };
-        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+        var svc = new FakeGameIndexService(GameIndex.Empty with { Baseline = baseline });
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build());
 
         indexer.ApplyModelBoneCatalog(WorkspaceConfiguration.Empty with
         {
             AssetRoots = [Path.Combine(root, "Data", "Art")]
         });
 
-        Assert.Equal(["p_shipped.alo", "p_smoke.alo"], svc.AppliedParticleSystems!.Order());
+        Assert.Equal(["p_shipped.alo", "p_smoke.alo"], svc.Current.ParticleSystems.Order());
     }
 
     /// <summary>
@@ -891,13 +898,12 @@ public sealed class WorkspaceIndexerTest
             ModelBones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add("shipped.alo", ["root"])
         };
-        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+        var svc = new FakeGameIndexService(GameIndex.Empty with { Baseline = baseline });
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build());
 
         indexer.ApplyModelBoneCatalog(WorkspaceConfiguration.Empty with { AssetRoots = [root], Layers = [] });
 
-        Assert.NotNull(svc.AppliedModelBones);
-        Assert.True(svc.AppliedModelBones!.ContainsKey("shipped.alo"));
+        Assert.True(svc.Current.ModelBones.ContainsKey("shipped.alo"));
     }
 
     // A model's proxies name the particle systems it carries (#270): the scan that reads every .alo
@@ -914,7 +920,7 @@ public sealed class WorkspaceIndexerTest
                 .WithComparers(StringComparer.OrdinalIgnoreCase)
                 .Add("shipped.alo", ["P_Shipped"]).Add("my_frigate.alo", ["P_Old_Engine"])
         };
-        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
+        var svc = new FakeGameIndexService(GameIndex.Empty with { Baseline = baseline });
         var cache = new StubBoneCache
         {
             Stored =
@@ -933,8 +939,8 @@ public sealed class WorkspaceIndexerTest
             Layers = [new ProjectLayer(0, "mod", [], [], [], [Root("mod/art")], null, Root("mod/mod.pgproj"))]
         });
 
-        Assert.Equal(["P_Engine_ALT2"], svc.AppliedModelProxies!["my_frigate.alo"].ToArray());
-        Assert.Equal(["P_Shipped"], svc.AppliedModelProxies["shipped.alo"].ToArray());
+        Assert.Equal(["P_Engine_ALT2"], svc.Current.ModelProxies["my_frigate.alo"].ToArray());
+        Assert.Equal(["P_Shipped"], svc.Current.ModelProxies["shipped.alo"].ToArray());
     }
 
     /// <summary>
@@ -947,7 +953,7 @@ public sealed class WorkspaceIndexerTest
         var fs = new MockFileSystem();
         fs.AddDirectory(Root("dep/art"));
         fs.AddDirectory(Root("leaf/art"));
-        var svc = new FakeIndexService(GameIndex.Empty);
+        var svc = new FakeGameIndexService(GameIndex.Empty);
         // Only the dependency has a snapshot; the leaf must still be extracted and then saved.
         var cache = new StubBoneCache
         {
@@ -971,7 +977,7 @@ public sealed class WorkspaceIndexerTest
             ]
         });
 
-        Assert.Equal(["dep_bone"], svc.AppliedModelBones!["dep_model.alo"].ToArray());
+        Assert.Equal(["dep_bone"], svc.Current.ModelBones["dep_model.alo"].ToArray());
         // The dependency was reused, so it was never re-saved; the leaf missed and was.
         Assert.DoesNotContain(Root("dep/dep.pgproj"), cache.Saved);
         Assert.Contains(Root("leaf/leaf.pgproj"), cache.Saved);
@@ -996,14 +1002,13 @@ public sealed class WorkspaceIndexerTest
             Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
             SourceFile = "surfacefxtriggertype.xml", Values = []
         };
-        var schema = new FakeSchemaWithEnums(enumDef);
-        var svc = new FakeIndexService();
+        var schema = new SchemaProviderBuilder().WithEnum(enumDef).Build();
+        var svc = new FakeGameIndexService();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
 
         indexer.ApplyDynamicEnumCatalog([xmlDir]);
 
-        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
-        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.True(svc.Current.WorkspaceDynamicEnumValues.TryGetValue("SurfaceFXTriggerType", out var vals));
         Assert.Contains("GENERIC_TRACK", vals);
         Assert.Contains("MY_MOD_TRACK", vals);
     }
@@ -1020,14 +1025,13 @@ public sealed class WorkspaceIndexerTest
             Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
             SourceFile = "surfacefxtriggertype.xml", Values = []
         };
-        var schema = new FakeSchemaWithEnums(enumDef);
-        var svc = new FakeIndexService();
+        var schema = new SchemaProviderBuilder().WithEnum(enumDef).Build();
+        var svc = new FakeGameIndexService();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
 
         indexer.ApplyDynamicEnumCatalog([xmlDir]);
 
-        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
-        Assert.Empty(svc.AppliedWorkspaceDynamicEnumValues!);
+        Assert.Empty(svc.Current.WorkspaceDynamicEnumValues);
     }
 
     [Fact]
@@ -1046,14 +1050,13 @@ public sealed class WorkspaceIndexerTest
             Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
             SourceFile = "surfacefxtriggertype.xml", Values = []
         };
-        var schema = new FakeSchemaWithEnums(enumDef);
-        var svc = new FakeIndexService();
+        var schema = new SchemaProviderBuilder().WithEnum(enumDef).Build();
+        var svc = new FakeGameIndexService();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
 
         indexer.ApplyDynamicEnumCatalog([xmlDir]);
 
-        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
-        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.True(svc.Current.WorkspaceDynamicEnumValues.TryGetValue("SurfaceFXTriggerType", out var vals));
         Assert.Contains("CUSTOM", vals);
     }
 
@@ -1074,13 +1077,13 @@ public sealed class WorkspaceIndexerTest
             Name = "GameObjectPropertiesType", Kind = EnumKind.DynamicXml,
             SourceFile = "gameobjectpropertiestype.xml", Values = []
         };
-        var schema = new FakeSchemaWithEnums(enumDef);
-        var svc = new FakeIndexService();
+        var schema = new SchemaProviderBuilder().WithEnum(enumDef).Build();
+        var svc = new FakeGameIndexService();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
 
         indexer.ApplyDynamicEnumCatalog([xmlDir]);
         Assert.DoesNotContain("IsANewFlag",
-            svc.AppliedWorkspaceDynamicEnumValues!["GameObjectPropertiesType"]);
+            svc.Current.WorkspaceDynamicEnumValues["GameObjectPropertiesType"]);
 
         fs.File.WriteAllText(enumFilePath,
             "<EnumDefinition><Turret>0x1</Turret><IsANewFlag>0x2</IsANewFlag></EnumDefinition>");
@@ -1088,7 +1091,7 @@ public sealed class WorkspaceIndexerTest
         indexer.ApplyDynamicEnumCatalog([xmlDir]);
 
         Assert.Contains("IsANewFlag",
-            svc.AppliedWorkspaceDynamicEnumValues!["GameObjectPropertiesType"]);
+            svc.Current.WorkspaceDynamicEnumValues["GameObjectPropertiesType"]);
     }
 
     [Fact]
@@ -1107,14 +1110,13 @@ public sealed class WorkspaceIndexerTest
             Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
             SourceFile = "surfacefxtriggertype.xml", Values = []
         };
-        var schema = new FakeSchemaWithEnums(enumDef);
-        var svc = new FakeIndexService();
+        var schema = new SchemaProviderBuilder().WithEnum(enumDef).Build();
+        var svc = new FakeGameIndexService();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
 
         indexer.ApplyDynamicEnumCatalog([xmlDir]); // pass parent dir, not the enum subdir
 
-        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
-        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.True(svc.Current.WorkspaceDynamicEnumValues.TryGetValue("SurfaceFXTriggerType", out var vals));
         Assert.Contains("GENERIC_TRACK", vals);
     }
 
@@ -1131,14 +1133,13 @@ public sealed class WorkspaceIndexerTest
             Name = "DamageType", Kind = EnumKind.DynamicXml,
             SourceFile = "data/xml/gameconstants.xml$Damage_Types", Values = []
         };
-        var schema = new FakeSchemaWithEnums(enumDef);
-        var svc = new FakeIndexService();
+        var schema = new SchemaProviderBuilder().WithEnum(enumDef).Build();
+        var svc = new FakeGameIndexService();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
 
         indexer.ApplyDynamicEnumCatalog([xmlDir]);
 
-        Assert.NotNull(svc.AppliedWorkspaceEnumValueDefinitions);
-        Assert.True(svc.AppliedWorkspaceEnumValueDefinitions!.TryGetValue("DamageType", out var valueMap));
+        Assert.True(svc.Current.WorkspaceEnumValueDefinitions.TryGetValue("DamageType", out var valueMap));
         Assert.True(valueMap.TryGetValue("EXPLOSIVE", out var explosiveOrigin));
         Assert.True(explosiveOrigin.IsNavigable);
         Assert.True(valueMap.TryGetValue("ENERGY", out var energyOrigin));
@@ -1164,14 +1165,13 @@ public sealed class WorkspaceIndexerTest
             Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
             SourceFile = "surfacefxtriggertype.xml", Values = []
         };
-        var schema = new FakeSchemaWithEnums(enumDef);
-        var svc = new FakeIndexService();
+        var schema = new SchemaProviderBuilder().WithEnum(enumDef).Build();
+        var svc = new FakeGameIndexService();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
 
         indexer.ApplyDynamicEnumCatalog([xmlDir]);
 
-        Assert.NotNull(svc.AppliedWorkspaceEnumValueDefinitions);
-        Assert.True(svc.AppliedWorkspaceEnumValueDefinitions!
+        Assert.True(svc.Current.WorkspaceEnumValueDefinitions
             .TryGetValue("SurfaceFXTriggerType", out var valueMap));
         Assert.True(valueMap.TryGetValue("GENERIC_TRACK", out var origin));
         Assert.True(origin.IsNavigable);
@@ -1198,15 +1198,14 @@ public sealed class WorkspaceIndexerTest
             Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
             SourceFile = "surfacefxtriggertype.xml", Values = []
         };
-        var schema = new FakeSchemaWithEnums(enumDef);
-        var svc = new FakeIndexService();
+        var schema = new SchemaProviderBuilder().WithEnum(enumDef).Build();
+        var svc = new FakeGameIndexService();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
 
         // Pass roots in deps-first / root-last order (same as ModProjectResolver produces).
         indexer.ApplyDynamicEnumCatalog([depXml, rootXml]);
 
-        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
-        var vals = svc.AppliedWorkspaceDynamicEnumValues!["SurfaceFXTriggerType"];
+        var vals = svc.Current.WorkspaceDynamicEnumValues["SurfaceFXTriggerType"];
         Assert.Contains("ROOT_TRACK", vals); // root project's value is present
         Assert.DoesNotContain("DEP_TRACK", vals); // dependency value is suppressed by override
     }
@@ -1223,17 +1222,17 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(xmlDir, "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var cache = new FakeProjectIndexCache(); // no snapshot stored
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(svc.Calls); // parsed normally
-        Assert.Empty(svc.InjectedDocuments);
+        Assert.Single(svc.Updates); // parsed normally
+        Assert.Empty(svc.Injected);
         Assert.Equal(new IndexCacheStats(0, 1, 0, 1),
             indexer.LastIndexCache);
     }
@@ -1249,7 +1248,7 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "data", "xml", "units.xml")] = new(fileContent)
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         // Build a snapshot whose hash matches the file content
         var fh = new FileHelper(fs);
@@ -1267,20 +1266,20 @@ public sealed class WorkspaceIndexerTest
             OverallHash = "anything",
             DependencyHashes = [],
             Files = [entry],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
         StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Empty(svc.Calls); // no re-parse
-        Assert.Single(svc.InjectedDocuments); // injected from cache
+        Assert.Empty(svc.Updates); // no re-parse
+        Assert.Single(svc.Injected); // injected from cache
         // Kept for the bug report, which otherwise could not tell a warm start from a cold one.
         Assert.Equal(new IndexCacheStats(1, 0, 1, 0),
             indexer.LastIndexCache);
@@ -1301,7 +1300,7 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "Data", "XML", "Units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         var fh = new FileHelper(fs);
         var hash = ProjectFileHasher.ComputeFileHash(
@@ -1318,20 +1317,20 @@ public sealed class WorkspaceIndexerTest
             OverallHash = "anything",
             DependencyHashes = [],
             Files = [entry],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
         StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Empty(svc.Calls); // no re-parse
-        Assert.Single(svc.InjectedDocuments); // injected from cache
+        Assert.Empty(svc.Updates); // no re-parse
+        Assert.Single(svc.Injected); // injected from cache
     }
 
     [Fact]
@@ -1344,7 +1343,7 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "Data", "XML", "Units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         var fh = new FileHelper(fs);
         var hash = ProjectFileHasher.ComputeFileHash(
@@ -1362,20 +1361,20 @@ public sealed class WorkspaceIndexerTest
             OverallHash = "anything",
             DependencyHashes = [],
             Files = [entry],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
         StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Empty(svc.Calls);
-        Assert.Single(svc.InjectedDocuments);
+        Assert.Empty(svc.Updates);
+        Assert.Single(svc.Injected);
     }
 
     [Fact]
@@ -1390,10 +1389,10 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "Data", "XML", "Units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var cache = new FakeProjectIndexCache();
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
@@ -1417,7 +1416,7 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         var fh = new FileHelper(fs);
         var hash = ProjectFileHasher.ComputeFileHash(
@@ -1437,14 +1436,14 @@ public sealed class WorkspaceIndexerTest
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(svc.Calls); // re-parsed
-        Assert.Empty(svc.InjectedDocuments);
+        Assert.Single(svc.Updates); // re-parsed
+        Assert.Empty(svc.Injected);
     }
 
     [Fact]
@@ -1457,10 +1456,10 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var cache = new FakeProjectIndexCache();
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var schema = new FakeSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema, cache, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
@@ -1497,8 +1496,8 @@ public sealed class WorkspaceIndexerTest
         });
         var cache = new FakeProjectIndexCache();
         var fh = new FileHelper(fs);
-        var indexer = new WorkspaceIndexer(fh, [new FakeParser()], new FakeIndexService(), new FileTypeRegistry(),
-            new FakeSchemaProvider(), new EaWXmlContext(fh), cache, new StoryChainProblemStore(),
+        var indexer = new WorkspaceIndexer(fh, [new FakeParser()], new FakeGameIndexService(), new FileTypeRegistry(),
+            new SchemaProviderBuilder().Build(), new EaWXmlContext(fh), cache, new StoryChainProblemStore(),
             new FakeLspConfigurationProvider(), NoMegEntries.Instance, new MegArchiveLoadOrder(fh),
             new NullModelBoneCatalogCache(),
             NullLogger<WorkspaceIndexer>.Instance, new LuaApiSchemaProvider([luaStub]));
@@ -1520,7 +1519,7 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         // Snapshot with a wrong hash
         var entry = new ProjectFileEntry
@@ -1534,18 +1533,18 @@ public sealed class WorkspaceIndexerTest
             OverallHash = "old",
             DependencyHashes = [],
             Files = [entry],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(svc.Calls); // re-parsed
-        Assert.Empty(svc.InjectedDocuments);
+        Assert.Single(svc.Updates); // re-parsed
+        Assert.Empty(svc.Injected);
     }
 
     [Fact]
@@ -1558,10 +1557,10 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var cache = new FakeProjectIndexCache();
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
@@ -1593,15 +1592,16 @@ public sealed class WorkspaceIndexerTest
         var fs = setup.Disk();
         foreach (var layer in setup.Layers)
             fs.AddFile(setup.PathOf(layer.Rank, "Xml/Units.xml"), new MockFileData("<Root/>"));
-        var svc = new FakeIndexService();
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), new FakeParser());
+        var svc = new FakeGameIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
+            new FakeParser());
         var configuration = setup.Configuration();
 
         indexer.PreScanMetafiles(configuration, [.. setup.Layers.Select(l => setup.FolderOf(l.Rank))]);
         await indexer.IndexDocumentsAsync(configuration, CancellationToken.None);
 
         foreach (var layer in setup.Layers)
-            Assert.Single(svc.Calls, c => DocumentUris.Same(c.Uri, setup.Uri(layer.Rank, "Xml/Units.xml")));
+            Assert.Single(svc.Updates, c => DocumentUris.Same(c.Uri, setup.Uri(layer.Rank, "Xml/Units.xml")));
     }
 
     [Fact]
@@ -1632,17 +1632,17 @@ public sealed class WorkspaceIndexerTest
         var aloneAgain = await StartAsync(coreAlone, coreRoot);
 
         // The leaf start served core from the snapshot the first start wrote...
-        Assert.DoesNotContain(underALeaf.Calls, c => c.Uri.Contains("/core/", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(underALeaf.Updates, c => c.Uri.Contains("/core/", StringComparison.OrdinalIgnoreCase));
         // ...and the third start found that snapshot untouched.
-        Assert.Empty(aloneAgain.Calls);
+        Assert.Empty(aloneAgain.Updates);
         // Same registry slice, same relevant roots: one context, one file for the dependency.
         Assert.Single(cache.SavedByContext.Keys, k => k.Pgproj == corePgproj);
         return;
 
-        async Task<FakeIndexService> StartAsync(WorkspaceConfiguration config, params string[] roots)
+        async Task<FakeGameIndexService> StartAsync(WorkspaceConfiguration config, params string[] roots)
         {
-            var svc = new FakeIndexService();
-            var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+            var svc = new FakeGameIndexService();
+            var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), cache,
                 new FakeParser());
             indexer.PreScanMetafiles(config, roots);
             await indexer.IndexDocumentsAsync(config, CancellationToken.None);
@@ -1675,7 +1675,7 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(depXml, "dep.xml")] = new("<Root><Changed/></Root>"),
             [Path.Combine(modXml, "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         var fh = new FileHelper(fs);
         var unitsHash = ProjectFileHasher.ComputeFileHash(
@@ -1693,7 +1693,7 @@ public sealed class WorkspaceIndexerTest
                     Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
                 }
             ],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [modPgproj] = modSnapshot };
         var config = new WorkspaceConfiguration([depXml, modXml], [], [], [], null)
@@ -1705,7 +1705,7 @@ public sealed class WorkspaceIndexerTest
             ]
         };
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [depRoot, modRoot]);
         StampCrossLayer(modSnapshot, fs, registry, config, modXml);
@@ -1713,8 +1713,8 @@ public sealed class WorkspaceIndexerTest
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
         // The dependency's own file is parsed; the mod's is served from its snapshot.
-        Assert.Single(svc.Calls);
-        Assert.Single(svc.InjectedDocuments);
+        Assert.Single(svc.Updates);
+        Assert.Single(svc.Injected);
     }
 
     /// <summary>
@@ -1736,7 +1736,7 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(depXml, "dep.xml")] = new("<Root/>"),
             [Path.Combine(modXml, "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         var fh = new FileHelper(fs);
         var unitsHash = ProjectFileHasher.ComputeFileHash(
@@ -1754,7 +1754,7 @@ public sealed class WorkspaceIndexerTest
                     Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
                 }
             ],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [modPgproj] = modSnapshot };
         var config = new WorkspaceConfiguration([depXml, modXml], [], [], [], null)
@@ -1766,7 +1766,7 @@ public sealed class WorkspaceIndexerTest
             ]
         };
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [depRoot, modRoot]);
         // Stamp the snapshot as it was when the mod's units.xml carried NO registered type...
@@ -1777,8 +1777,8 @@ public sealed class WorkspaceIndexerTest
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
         // Both re-parsed; nothing served from the now-stale mod snapshot.
-        Assert.Equal(2, svc.Calls.Count);
-        Assert.Empty(svc.InjectedDocuments);
+        Assert.Equal(2, svc.Updates.Count);
+        Assert.Empty(svc.Injected);
     }
 
     [Fact]
@@ -1798,7 +1798,7 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(depXml, "dep.xml")] = new("<Root/>"),
             [Path.Combine(modXml, "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         // Mod snapshot: own file hash MATCHES, but the recorded dependency hash is outdated.
         var fh = new FileHelper(fs);
@@ -1817,7 +1817,7 @@ public sealed class WorkspaceIndexerTest
                     Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
                 }
             ],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [modPgproj] = modSnapshot };
         var config = new WorkspaceConfiguration([depXml, modXml], [], [], [], null)
@@ -1829,7 +1829,7 @@ public sealed class WorkspaceIndexerTest
             ]
         };
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [depRoot, modRoot]);
         StampCrossLayer(modSnapshot, fs, registry, config, modXml);
@@ -1838,8 +1838,8 @@ public sealed class WorkspaceIndexerTest
 
         // The outdated dependency hash is ignored: only the dependency's own file is parsed, and
         // the mod's is still served from its snapshot.
-        Assert.Single(svc.Calls);
-        Assert.Single(svc.InjectedDocuments);
+        Assert.Single(svc.Updates);
+        Assert.Single(svc.Injected);
     }
 
     /// <summary>
@@ -1861,7 +1861,7 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(xmlDir, "units.xml")] = new([.. "<Root/>"u8])
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         var fh = new FileHelper(fs);
         var hash = ProjectFileHasher.ComputeFileHash(
@@ -1883,19 +1883,19 @@ public sealed class WorkspaceIndexerTest
                     }
                 }
             ],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var registry = new FileTypeRegistry();
         var parser = new StatefulFakeParser();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, parser);
+        var (indexer, _) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache, parser);
         indexer.PreScanMetafiles(config, [root]);
         StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(svc.InjectedDocuments);
+        Assert.Single(svc.Injected);
         var restored = Assert.Single(parser.Restored);
         Assert.Equal(state, restored.State);
         Assert.Contains("units.xml", restored.Uri, StringComparison.OrdinalIgnoreCase);
@@ -1911,13 +1911,13 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(xmlDir, "units.xml")] = new([.. "<Root/>"u8])
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var cache = new FakeProjectIndexCache();
         var config = ConfigWithLayer(xmlDir, pgproj);
         var parser = new StatefulFakeParser();
         var uri = new FileHelper(fs).PathToFileUri(Path.Combine(xmlDir, "units.xml"));
         parser.Captured[uri] = [4, 2];
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), cache,
             parser);
         indexer.PreScanMetafiles(config, [root]);
 
@@ -1939,7 +1939,7 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(xmlDir, "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         var fh = new FileHelper(fs);
         const string relPath = "data/xml/units.xml";
@@ -1958,19 +1958,19 @@ public sealed class WorkspaceIndexerTest
                     Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
                 }
             ],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var registry = new FileTypeRegistry();
-        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
         StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(svc.InjectedDocuments); // cache hit as usual …
+        Assert.Single(svc.Injected); // cache hit as usual …
         Assert.Empty(cache.SavedPaths); // … and no redundant re-save
     }
 
@@ -1994,15 +1994,15 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(xmlDir, "a.xml")] = new("<Root/>"),
             [Path.Combine(xmlDir, "b.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
-        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), null,
+        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), null,
             null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Equal(2, svc.Calls.Count);
+        Assert.Equal(2, svc.Updates.Count);
     }
 
     [Fact]
@@ -2015,15 +2015,15 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(xmlDir, "units.xml")] = new("<Root/>")
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
             null, null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(svc.Calls);
+        Assert.Single(svc.Updates);
     }
 
     [Fact]
@@ -2037,7 +2037,7 @@ public sealed class WorkspaceIndexerTest
         {
             [Path.Combine(xmlDir, "units.xml")] = new(fileContent)
         });
-        var svc = new FakeIndexService();
+        var svc = new FakeGameIndexService();
 
         var fh = new FileHelper(fs);
         var hash = ProjectFileHasher.ComputeFileHash(
@@ -2051,19 +2051,19 @@ public sealed class WorkspaceIndexerTest
         {
             SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
             OverallHash = "anything", DependencyHashes = [], Files = [entry],
-            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+            SchemaFingerprint = SchemaFingerprint.Compute(new SchemaProviderBuilder().Build())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var registry = new FileTypeRegistry();
-        var (indexer, _) = BuildWithHost(fs, svc, registry, new FakeSchemaProvider(),
+        var (indexer, _) = BuildWithHost(fs, svc, registry, new SchemaProviderBuilder().Build(),
             cache, null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
         StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(svc.InjectedDocuments); // cache hit lands in the index; no text is pinned anywhere
+        Assert.Single(svc.Injected); // cache hit lands in the index; no text is pinned anywhere
     }
 
     private sealed class StubBoneCache : IModelBoneCatalogCache
@@ -2181,224 +2181,6 @@ public sealed class WorkspaceIndexerTest
         public void RestoreParserState(string documentUri, byte[] state)
         {
             Restored.Add((documentUri, state));
-        }
-    }
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly MetafileDefinition[] _metafiles;
-
-        public FakeSchemaProvider(params MetafileDefinition[] metafiles)
-        {
-            _metafiles = metafiles;
-        }
-
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => _metafiles;
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-    }
-
-    private sealed class FakeSchemaWithEnums(params EnumDefinition[] enums) : ISchemaProvider
-    {
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => enums;
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            return enums.FirstOrDefault(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        }
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public readonly List<(string Uri, int Version)> Calls = [];
-
-        public readonly List<DocumentIndex> InjectedDocuments = [];
-        public int BeginBulkUpdateCallCount;
-
-        public FakeIndexService(GameIndex? current = null)
-        {
-            Current = current ?? GameIndex.Empty;
-        }
-
-        public IAssetFileIndex? AppliedAssetFiles { get; private set; }
-
-        public ImmutableDictionary<string, ImmutableArray<string>>? AppliedModelBones { get; private set; }
-
-        public ImmutableHashSet<string>? AppliedParticleSystems { get; private set; }
-
-        public ImmutableDictionary<string, ImmutableArray<string>>? AppliedWorkspaceDynamicEnumValues
-        {
-            get;
-            private set;
-        }
-
-        public ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>?
-            AppliedWorkspaceEnumValueDefinitions { get; private set; }
-
-        public GameIndex Current { get; private set; }
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            ct.ThrowIfCancellationRequested();
-            lock (Calls)
-            {
-                Calls.Add((uri, version));
-                var doc = new DocumentIndex(uri, version,
-                    ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty);
-                Current = Current with { Documents = Current.Documents.SetItem(uri, doc) };
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-            lock (InjectedDocuments)
-            {
-                InjectedDocuments.Add(document);
-                Current = Current with { Documents = Current.Documents.SetItem(document.DocumentUri, document) };
-            }
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-            AppliedAssetFiles = index;
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-            AppliedModelBones = bones;
-        }
-
-        public void ApplyParticleSystems(ImmutableHashSet<string> particleSystems)
-        {
-            AppliedParticleSystems = particleSystems;
-        }
-
-        public ImmutableDictionary<string, ImmutableArray<string>>? AppliedModelProxies { get; private set; }
-
-        public void ApplyModelProxies(ImmutableDictionary<string, ImmutableArray<string>> proxies)
-        {
-            AppliedModelProxies = proxies;
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-            AppliedWorkspaceDynamicEnumValues = values;
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-            AppliedWorkspaceEnumValueDefinitions = definitions;
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            Interlocked.Increment(ref BeginBulkUpdateCallCount);
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
         }
     }
 }

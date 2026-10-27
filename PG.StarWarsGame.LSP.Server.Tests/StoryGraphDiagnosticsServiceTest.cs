@@ -15,7 +15,7 @@ public sealed class StoryGraphDiagnosticsServiceTest
 
     private static StoryGraphDiagnosticsService Build()
     {
-        return new StoryGraphDiagnosticsService(new StubModelService(), new EmptySchema(),
+        return new StoryGraphDiagnosticsService(new StubModelService(), new SchemaProviderBuilder().Build(),
             ResxMessageCatalog.Server("en"));
     }
 
@@ -56,7 +56,7 @@ public sealed class StoryGraphDiagnosticsServiceTest
                 "<Story><Event Name=\"B\"><Prereq>Ghost</Prereq></Event></Story>", ThreadUri);
             return new StoryCampaignModel(campaignName, faction, [thread],
                 new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new EmptySchema()).Build([thread]));
+                new StoryGraphBuilder(new SchemaProviderBuilder().Build()).Build([thread]));
         }
 
         public IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri)
@@ -74,46 +74,6 @@ public sealed class StoryGraphDiagnosticsServiceTest
         public IReadOnlyList<string> GetInvalidatedCampaigns()
         {
             return [];
-        }
-    }
-
-    private sealed class EmptySchema : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string e)
-        {
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
         }
     }
 }

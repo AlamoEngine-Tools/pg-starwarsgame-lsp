@@ -18,7 +18,8 @@ public sealed class XmlInlayHintRegistryTest
         hapDoc.LoadHtml("<Name>foo</Name>");
         var node = hapDoc.DocumentNode.SelectSingleNode("//name")!;
         var tagDef = new XmlTagDefinition { Tag = "Name", ValueType = XmlValueType.Boolean };
-        return new InlayHintContext("file:///test.xml", GameIndex.Empty, new EmptySchemaProvider(), hapDoc, node,
+        return new InlayHintContext("file:///test.xml", GameIndex.Empty, new SchemaProviderBuilder().Build(), hapDoc,
+            node,
             tagDef, 0);
     }
 

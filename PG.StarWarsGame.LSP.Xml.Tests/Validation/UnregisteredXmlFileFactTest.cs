@@ -29,7 +29,7 @@ public sealed class UnregisteredXmlFileFactTest
     {
         return new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            schema ?? new BareSchemaProvider(),
+            schema ?? new SchemaProviderBuilder().Build(),
             registry ?? new BareFileTypeRegistry(),
             new XmlStructuralValidator());
     }
@@ -96,10 +96,9 @@ public sealed class UnregisteredXmlFileFactTest
 
         // The schema knows a global <Size> belonging to something else entirely - which is exactly
         // the situation that produced the false Float2 errors.
-        var schema = new BareSchemaProvider
-        {
-            GlobalTag = new XmlTagDefinition { Tag = "Size", ValueType = XmlValueType.FloatVector2 }
-        };
+        var schema = new SchemaProviderBuilder()
+            .WithTag(new XmlTagDefinition { Tag = "Size", ValueType = XmlValueType.FloatVector2 })
+            .Build();
 
         var facts = Build(schema, registry)
             .Produce("<GUIDialogs>\n  <Dialog>\n    <Size>7</Size>\n  </Dialog>\n</GUIDialogs>",
@@ -128,10 +127,9 @@ public sealed class UnregisteredXmlFileFactTest
     [Fact]
     public void AFileUnderAScannedDirectoryIsSilent()
     {
-        ISchemaProvider schema = new BareSchemaProvider
-        {
-            ScannedDirectories = [new ScannedDirectoryDefinition("data/xml/ai/goals/", [])]
-        };
+        var schema = new SchemaProviderBuilder()
+            .WithScannedDirectory(new ScannedDirectoryDefinition("data/xml/ai/goals/", []))
+            .Build();
 
         var facts = Build(schema).Produce(Xml, "file:///mod/Data/XML/AI/Goals/LandGoals.xml");
 
@@ -145,10 +143,9 @@ public sealed class UnregisteredXmlFileFactTest
     [Fact]
     public void AScannedDirectoryMatchesWhateverCaseTheDocumentUses()
     {
-        ISchemaProvider schema = new BareSchemaProvider
-        {
-            ScannedDirectories = [new ScannedDirectoryDefinition("data/xml/enum/", [])]
-        };
+        var schema = new SchemaProviderBuilder()
+            .WithScannedDirectory(new ScannedDirectoryDefinition("data/xml/enum/", []))
+            .Build();
 
         Assert.True(schema.IsInScannedDirectory("file:///mod/DATA/XML/Enum/GameObjectCategoryType.xml"));
         Assert.False(schema.IsInScannedDirectory("file:///mod/Data/XML/Enumerations.xml"));
@@ -184,54 +181,5 @@ file sealed class BareFileTypeRegistry : IFileTypeRegistry
     public void UnregisterFile(string fileUri)
     {
         _map.Remove(fileUri);
-    }
-}
-
-file sealed class BareSchemaProvider : ISchemaProvider
-{
-    public IReadOnlyList<ScannedDirectoryDefinition> ScannedDirectories { get; init; } = [];
-
-    /// <summary>A tag the schema knows globally, standing in for a name shared across types.</summary>
-    public XmlTagDefinition? GlobalTag { get; init; }
-
-    public IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories => ScannedDirectories;
-
-    public XmlTagDefinition? GetTag(string tagName)
-    {
-        return GlobalTag is not null && tagName.Equals(GlobalTag.Tag, StringComparison.OrdinalIgnoreCase)
-            ? GlobalTag
-            : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string enumName)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
     }
 }

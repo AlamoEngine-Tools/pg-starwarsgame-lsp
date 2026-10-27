@@ -43,8 +43,8 @@ public sealed class StorySimulationServiceTest
     {
         var notified = new List<StorySimKey>();
         var service = new StorySimulationService(
-            new StubModelService(), new StubIndexService(IndexWithLuaSymbol()),
-            new SimEnumSchema(), notified.Add);
+            new StubModelService(), new FakeGameIndexService(IndexWithLuaSymbol()),
+            SimEnumSchema.Build(), notified.Add);
         return (service, notified);
     }
 
@@ -398,7 +398,7 @@ public sealed class StorySimulationServiceTest
             ]);
             return new StoryCampaignModel("GC", "Rebel", [thread],
                 new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new SimEnumSchema()).Build([thread], null, [machine]))
+                new StoryGraphBuilder(SimEnumSchema.Build()).Build([thread], null, [machine]))
             {
                 LuaScripts = ["Story_Lua"],
                 LuaMachines = [machine]
@@ -406,7 +406,7 @@ public sealed class StorySimulationServiceTest
         }
     }
 
-    private sealed class SimEnumSchema : ISchemaProvider
+    private static class SimEnumSchema
     {
         private static readonly EnumDefinition Events = new()
         {
@@ -418,119 +418,11 @@ public sealed class StorySimulationServiceTest
             ]
         };
 
-        public event EventHandler? SchemaRefreshed
+        public static FakeSchemaProvider Build()
         {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [Events];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            return string.Equals(name, Events.Name, StringComparison.OrdinalIgnoreCase) ? Events : null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
-        }
-    }
-
-    private sealed class StubIndexService(GameIndex index) : IGameIndexService
-    {
-        public GameIndex Current => index;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex localisation)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex assetFiles)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Noop();
-        }
-
-        private sealed class Noop : IDisposable
-        {
-            public void Dispose()
-            {
-            }
+            return new SchemaProviderBuilder()
+                .WithEnum(Events)
+                .Build();
         }
     }
 }

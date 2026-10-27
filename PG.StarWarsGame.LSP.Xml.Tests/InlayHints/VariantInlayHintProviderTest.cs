@@ -33,7 +33,7 @@ public sealed class VariantInlayHintProviderTest
         var variantNode = hapDoc.DocumentNode.Descendants()
             .First(n => n.Name.Equals("variant_of_existing_type", StringComparison.OrdinalIgnoreCase));
 
-        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type").Build();
         var index = GameIndex.Empty with
         {
             WorkspaceDefinitions = new[] { Sym("V", "B", "file:///u.xml"), Sym("B", null, "file:///b.xml") }
@@ -62,7 +62,7 @@ public sealed class VariantInlayHintProviderTest
         var plain = new XmlTagDefinition { Tag = "Mass", ValueType = XmlValueType.Float };
 
         var hints = new VariantInlayHintProvider(new FakeTagSource())
-            .Handle(Ctx(massNode, plain, GameIndex.Empty, new FakeSchema()));
+            .Handle(Ctx(massNode, plain, GameIndex.Empty, new FakeSchema().Build()));
 
         Assert.Empty(hints);
     }
@@ -84,48 +84,9 @@ public sealed class VariantInlayHintProviderTest
         }
     }
 
-    private sealed class FakeSchema : ISchemaProvider
+    private sealed class FakeSchema
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return _tags.GetValueOrDefault(tagName);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
 
         public FakeSchema Variant(string tag)
         {
@@ -135,6 +96,14 @@ public sealed class VariantInlayHintProviderTest
                 ReferenceKind = ReferenceKind.XmlObject, SemanticType = TagSemanticType.VariantParent
             };
             return this;
+        }
+
+        public FakeSchemaProvider Build()
+        {
+            var builder = new SchemaProviderBuilder();
+            foreach (var item in _tags.Values)
+                builder.WithTag(item);
+            return builder.Build();
         }
     }
 }

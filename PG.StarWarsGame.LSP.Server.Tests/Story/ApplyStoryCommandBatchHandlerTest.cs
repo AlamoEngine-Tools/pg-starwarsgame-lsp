@@ -21,9 +21,9 @@ public sealed class ApplyStoryCommandBatchHandlerTest
         var fileHelper = FileHelperFor(fs);
         return new ApplyStoryCommandBatchHandler(
             new StubModelService(),
-            new StubIndexService(index ?? DefaultIndex()),
+            new FakeGameIndexService(index ?? DefaultIndex()),
             TextSource(fileHelper),
-            new StoryTestSchema(),
+            new SchemaProviderBuilder().Build(),
             fileHelper,
             Reload(),
             applier,

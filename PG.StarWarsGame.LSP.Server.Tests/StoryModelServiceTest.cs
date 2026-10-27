@@ -73,21 +73,22 @@ public sealed class StoryModelServiceTest
         };
     }
 
-    private static (StoryModelService Service, MockFileSystem Fs, MutableIndexService Index,
-        FakeHost Host, FileHelper FileHelper, StubReloadService Reload) Build(
+    private static (StoryModelService Service, MockFileSystem Fs, FakeGameIndexService Index,
+        FakeGameWorkspaceHost Host, FileHelper FileHelper, StubReloadService Reload) Build(
             Dictionary<string, MockFileData>? files = null, IReadOnlyList<string>? xmlDirs = null,
             bool configured = true)
     {
         var fs = new MockFileSystem(files ?? Fixture());
         var fileHelper = new FileHelper(fs);
-        var index = new MutableIndexService();
-        var host = new FakeHost();
+        var index = new FakeGameIndexService();
+        var host = new FakeGameWorkspaceHost();
         var config = WorkspaceConfiguration.Empty with { XmlDirectories = xmlDirs ?? [XmlDir] };
         var reload = new StubReloadService(configured ? config : null);
         var service = new StoryModelService(
             reload,
             index,
-            new SpecialDefSchemaProvider(),
+            new SchemaProviderBuilder().WithMetafile(new MetafileDefinition("data/xml/campaignfiles.xml",
+                MetafileType.Special, ["Campaign", "StoryParser", "StoryPlotManifest"])).Build(),
             fileHelper,
             new DocumentTextSource(host, fileHelper, NullLogger<DocumentTextSource>.Instance),
             NullLogger<StoryModelService>.Instance);
@@ -191,7 +192,7 @@ public sealed class StoryModelServiceTest
 
         // didChange: the host gets the new text, the index a new version for the document.
         host.AddOrUpdate(threadUri, "<Story><Event Name=\"Rewritten\"/></Story>", 2);
-        index.SetDocumentVersion(threadUri, 2);
+        index.InjectDocument(new DocumentIndex(threadUri, 2, [], []));
 
         var fresh = service.GetCampaignModel("GC_One", "Rebel")!;
 
@@ -345,158 +346,6 @@ public sealed class StoryModelServiceTest
         public Task ReloadLocalisationAsync(CancellationToken ct)
         {
             return Task.CompletedTask;
-        }
-    }
-
-    private sealed class FakeHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = new(StringComparer.OrdinalIgnoreCase);
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-    }
-
-    private sealed class MutableIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; private set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Noop();
-        }
-
-        public void SetDocumentVersion(string uri, int version)
-        {
-            var doc = new DocumentIndex(uri, version,
-                ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty);
-            Current = Current with { Documents = Current.Documents.SetItem(uri, doc) };
-        }
-
-        private sealed class Noop : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class SpecialDefSchemaProvider : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-
-        public IReadOnlyList<MetafileDefinition> AllMetafiles =>
-        [
-            new("data/xml/campaignfiles.xml", MetafileType.Special,
-                ["Campaign", "StoryParser", "StoryPlotManifest"])
-        ];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string e)
-        {
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
         }
     }
 }

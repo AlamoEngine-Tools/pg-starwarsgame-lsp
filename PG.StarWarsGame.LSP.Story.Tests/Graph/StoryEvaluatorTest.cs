@@ -17,7 +17,7 @@ public sealed class StoryEvaluatorTest
         var parsed = threads
             .Select(t => StoryThreadParser.Parse($"<Story>{t.Inner}</Story>", t.Uri))
             .ToList();
-        return new StoryGraphBuilder(new EmptyEnumSchemaProvider()).Build(parsed);
+        return new StoryGraphBuilder(EmptyEnumSchemaProvider.Build()).Build(parsed);
     }
 
     private static string Id(string uri, string name)
@@ -205,7 +205,7 @@ public sealed class StoryEvaluatorTest
     }
 }
 
-file sealed class EmptyEnumSchemaProvider : ISchemaProvider
+file static class EmptyEnumSchemaProvider
 {
     private static readonly EnumDefinition Rewards = new()
     {
@@ -227,40 +227,10 @@ file sealed class EmptyEnumSchemaProvider : ISchemaProvider
         ]
     };
 
-    public event EventHandler? SchemaRefreshed
+    public static FakeSchemaProvider Build()
     {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [Rewards];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string t)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string name)
-    {
-        return string.Equals(name, Rewards.Name, StringComparison.OrdinalIgnoreCase) ? Rewards : null;
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string t)
-    {
-        return null;
+        return new SchemaProviderBuilder()
+            .WithEnum(Rewards)
+            .Build();
     }
 }

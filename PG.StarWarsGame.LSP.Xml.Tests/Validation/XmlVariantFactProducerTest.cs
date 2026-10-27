@@ -34,7 +34,7 @@ public sealed class XmlVariantFactProducerTest
     private static IReadOnlyList<XmlFact> Produce(string text, FakeTagSource source, FakeSchema schema,
         params GameSymbol[] symbols)
     {
-        return new XmlVariantFactProducer(schema, source).Produce(Uri, text, Index(symbols));
+        return new XmlVariantFactProducer(schema.Build(), source).Produce(Uri, text, Index(symbols));
     }
 
     [Fact]
@@ -376,48 +376,9 @@ public sealed class XmlVariantFactProducerTest
         }
     }
 
-    private sealed class FakeSchema : ISchemaProvider
+    private sealed class FakeSchema
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return _tags.GetValueOrDefault(tagName);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
 
         public FakeSchema Variant(string tag)
         {
@@ -433,6 +394,14 @@ public sealed class XmlVariantFactProducerTest
         {
             _tags[tag] = new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.NameReference, VariantMode = mode };
             return this;
+        }
+
+        public FakeSchemaProvider Build()
+        {
+            var builder = new SchemaProviderBuilder();
+            foreach (var item in _tags.Values)
+                builder.WithTag(item);
+            return builder.Build();
         }
     }
 }

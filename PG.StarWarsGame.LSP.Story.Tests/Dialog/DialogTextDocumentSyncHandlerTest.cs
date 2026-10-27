@@ -16,10 +16,10 @@ public sealed class DialogTextDocumentSyncHandlerTest
     private const string OutOfScopeUri = "file:///ws/notes.txt";
 
     private static (DialogTextDocumentSyncHandler Handler,
-        DialogDiagnosticsPublisherTest.FakeWorkspaceHost Host,
+        FakeGameWorkspaceHost Host,
         SpyRevalidator Revalidator) Build(bool scopeEnabled = true)
     {
-        var host = new DialogDiagnosticsPublisherTest.FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         var revalidator = new SpyRevalidator();
         var gate = new StartupGate();
         // A fresh gate holds nothing to pump, so opening it completes synchronously; a constructor cannot await.

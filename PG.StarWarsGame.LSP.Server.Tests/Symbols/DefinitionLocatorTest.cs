@@ -21,7 +21,7 @@ public sealed class DefinitionLocatorTest
 {
     private static DefinitionLocator LocatorFor(GameIndex index)
     {
-        return new DefinitionLocator(new FakeGameIndexService(index), new TypedSchemaProvider());
+        return new DefinitionLocator(new FakeGameIndexService(index), TypedSchemaProvider());
     }
 
     private static GameIndex IndexWith(params (string Id, string TypeName)[] symbols)
@@ -127,13 +127,11 @@ public sealed class DefinitionLocatorTest
     ///     because no symbol is ever indexed under the umbrella. A fake that did not know the name
     ///     would let that regression through.
     /// </remarks>
-    private sealed class TypedSchemaProvider : NullSchemaProvider
+    private static FakeSchemaProvider TypedSchemaProvider()
     {
-        public override GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return typeName is "StoryEvent" or "SpecialAbility" or "Planet" or "GameObjectType"
-                ? new GameObjectTypeDefinition { TypeName = typeName }
-                : null;
-        }
+        var builder = new SchemaProviderBuilder();
+        foreach (var typeName in new[] { "StoryEvent", "SpecialAbility", "Planet", "GameObjectType" })
+            builder.WithObjectType(new GameObjectTypeDefinition { TypeName = typeName });
+        return builder.Build();
     }
 }

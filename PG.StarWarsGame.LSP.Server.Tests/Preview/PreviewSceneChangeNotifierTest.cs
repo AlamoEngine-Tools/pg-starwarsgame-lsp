@@ -16,7 +16,7 @@ public sealed class PreviewSceneChangeNotifierTest
     public void IndexChanged_Fires_SendsPreviewSceneChanged()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new PreviewSceneChangeNotifier(
             indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
@@ -35,7 +35,7 @@ public sealed class PreviewSceneChangeNotifierTest
     public void IndexChanged_FiresRepeatedly_SendsEachTimeWhenNotDebounced()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new PreviewSceneChangeNotifier(
             indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
@@ -54,7 +54,7 @@ public sealed class PreviewSceneChangeNotifierTest
     public async Task IndexChanged_BurstOfChanges_CollapsesToOneNotification()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new PreviewSceneChangeNotifier(
             indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 40);
@@ -70,7 +70,7 @@ public sealed class PreviewSceneChangeNotifierTest
     public async Task IndexChanged_SeparatedByMoreThanTheWindow_SendsBoth()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new PreviewSceneChangeNotifier(
             indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 40);
@@ -91,7 +91,7 @@ public sealed class PreviewSceneChangeNotifierTest
     [Fact]
     public void Send_Throws_ExceptionDoesNotPropagate()
     {
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new PreviewSceneChangeNotifier(
             indexService, StartupGates.Open(), _ => throw new InvalidOperationException("boom"),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
@@ -109,7 +109,7 @@ public sealed class PreviewSceneChangeNotifierTest
     public void LocalisationChanged_Fires_NothingSent()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new PreviewSceneChangeNotifier(
             indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
@@ -127,7 +127,7 @@ public sealed class PreviewSceneChangeNotifierTest
     public async Task IndexChanged_WhileStartupRuns_IsHeldThenSentOnceWhenTheGateOpens()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         var gate = StartupGates.Closed();
         _ = new PreviewSceneChangeNotifier(
             indexService, gate, m => sent.Add(m),
@@ -151,7 +151,7 @@ public sealed class PreviewSceneChangeNotifierTest
         var sent = new List<string>();
         var gate = StartupGates.Closed();
         _ = new PreviewSceneChangeNotifier(
-            new RaisableIndexService(), gate, m => sent.Add(m),
+            new FakeGameIndexService(), gate, m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
 
         await gate.OpenAsync();
@@ -160,80 +160,4 @@ public sealed class PreviewSceneChangeNotifierTest
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
-
-    private sealed class RaisableIndexService : IGameIndexService
-    {
-        public GameIndex Current => GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged;
-        public event Action<ILocalisationIndex>? LocalisationChanged;
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        public void Raise(GameIndex index)
-        {
-            IndexChanged?.Invoke(index);
-        }
-
-        public void RaiseLocalisation(ILocalisationIndex index)
-        {
-            LocalisationChanged?.Invoke(index);
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
 }

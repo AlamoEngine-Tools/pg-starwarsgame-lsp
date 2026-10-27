@@ -201,7 +201,7 @@ public sealed class PreviewAbilityTest
                 StringComparer.OrdinalIgnoreCase)
         };
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             new FakeVariantTagSource().With("Ship", shipTags),
             new FakeAssets("hull.alo")).BuildForObject("Ship");
     }

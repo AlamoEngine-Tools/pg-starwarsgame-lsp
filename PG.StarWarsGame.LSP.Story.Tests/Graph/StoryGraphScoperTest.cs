@@ -32,7 +32,7 @@ public sealed class StoryGraphScoperTest
         "<Reward_Type>SET_FLAG</Reward_Type><Reward_Param1>F</Reward_Param1></Event>" +
         "</Story>";
 
-    private static ISchemaProvider Schema { get; } = new ScoperSchemaProvider();
+    private static ISchemaProvider Schema { get; } = ScoperSchemaProvider.Build();
 
     private static StoryCampaignModel Model(params (string Uri, string Text)[] extra)
     {
@@ -143,7 +143,7 @@ public sealed class StoryGraphScoperTest
     }
 }
 
-file sealed class ScoperSchemaProvider : ISchemaProvider
+file static class ScoperSchemaProvider
 {
     private static readonly EnumDefinition Events = new()
     {
@@ -191,45 +191,11 @@ file sealed class ScoperSchemaProvider : ISchemaProvider
         ]
     };
 
-    public event EventHandler? SchemaRefreshed
+    public static FakeSchemaProvider Build()
     {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [Events, Rewards];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string t)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string name)
-    {
-        return name switch
-        {
-            "StoryEventType" => Events,
-            "StoryRewardType" => Rewards,
-            _ => null
-        };
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string t)
-    {
-        return null;
+        return new SchemaProviderBuilder()
+            .WithEnum(Events)
+            .WithEnum(Rewards)
+            .Build();
     }
 }

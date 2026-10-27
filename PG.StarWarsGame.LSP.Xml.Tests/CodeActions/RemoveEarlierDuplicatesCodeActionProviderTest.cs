@@ -37,7 +37,7 @@ public sealed class RemoveEarlierDuplicatesCodeActionProviderTest
 
     private static RemoveEarlierDuplicatesCodeActionProvider BuildProvider(string xml)
     {
-        var host = new FakeDuplicatesWorkspaceHost(Uri, xml);
+        var host = new FakeGameWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new RemoveEarlierDuplicatesCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper);
     }
@@ -120,33 +120,5 @@ public sealed class RemoveEarlierDuplicatesCodeActionProviderTest
         Assert.Contains(edits, e => e.Range.Start == new Position(2, 0) && e.Range.End == new Position(3, 0));
         Assert.Contains(edits, e => e.Range.Start == new Position(4, 0) && e.Range.End == new Position(5, 0));
         Assert.DoesNotContain(edits, e => e.Range.Start.Line == 3); // the winner stays
-    }
-}
-
-file sealed class FakeDuplicatesWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly string _normalizedUri;
-    private readonly string _text;
-
-    public FakeDuplicatesWorkspaceHost(string uri, string text)
-    {
-        _normalizedUri = uri;
-        _text = text;
-    }
-
-    public IEnumerable<TrackedDocument> All => [new(_normalizedUri, _text, 1)];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string uri)
-    {
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(_normalizedUri, _text, 1);
-        return true;
     }
 }

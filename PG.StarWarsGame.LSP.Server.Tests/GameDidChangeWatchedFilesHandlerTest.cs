@@ -46,8 +46,8 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     }
 
     private static GameDidChangeWatchedFilesHandler BuildHandler(
-        SpyIndexService? index = null,
-        FakeWorkspaceHost? host = null,
+        FakeGameIndexService? index = null,
+        FakeGameWorkspaceHost? host = null,
         MockFileSystem? fs = null,
         FakeReloadService? reload = null,
         ISchemaProvider? schema = null,
@@ -55,8 +55,8 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     {
         var fileSystem = fs ?? new MockFileSystem();
         var fileHelper = new FileHelper(fileSystem);
-        var idx = index ?? new SpyIndexService();
-        var schemaProvider = schema ?? new FakeSchemaProvider();
+        var idx = index ?? new FakeGameIndexService();
+        var schemaProvider = schema ?? new SchemaProviderBuilder().Build();
         var indexer = new WorkspaceIndexer(
             fileHelper,
             [],
@@ -73,7 +73,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,
-            host ?? new FakeWorkspaceHost(),
+            host ?? new FakeGameWorkspaceHost(),
             fileHelper,
             indexer,
             reload ?? new FakeReloadService(),
@@ -94,7 +94,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [path] = new(freshContent)
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy, fs: fs);
         await handler.Handle(Changed(XmlUri), CancellationToken.None);
@@ -110,9 +110,9 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [path] = new("-- stale disk content")
         });
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "-- live editor content", 5);
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy, host, fs);
         await handler.Handle(Changed(LuaUri), CancellationToken.None);
@@ -125,7 +125,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [Fact]
     public async Task Handle_DeletedFile_RemovesFromIndex()
     {
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy);
         await handler.Handle(Deleted(XmlUri), CancellationToken.None);
@@ -139,7 +139,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [Fact]
     public async Task Handle_ChangedFile_NotOnDisk_IsIgnored()
     {
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy, fs: new MockFileSystem()); // empty fs
         await handler.Handle(Changed(XmlUri), CancellationToken.None);
@@ -160,7 +160,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             [xmlPath] = new("<root/>"),
             [luaPath] = new("-- script")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var request = new DidChangeWatchedFilesParams
         {
@@ -184,7 +184,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\mymod.pgproj"] = new("{}")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService();
 
         var handler = BuildHandler(spy, fs: fs, reload: reload);
@@ -198,7 +198,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     public async Task Handle_PgprojDeleted_TriggersReload()
     {
         const string pgprojUri = "file:///c:/mods/mymod/mymod.pgproj";
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService();
 
         var handler = BuildHandler(spy, reload: reload);
@@ -218,7 +218,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\data\art\textures\foo.tga"] = new("")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy, fs: fs);
         await handler.Handle(Changed(assetUri), CancellationToken.None);
@@ -237,7 +237,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\scripts\mission.lua"] = new("-- script")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy, fs: fs);
         await handler.Handle(Changed(LuaUri), CancellationToken.None);
@@ -255,7 +255,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [InlineData("file:///c:/data/art/textures/foo.tga")]
     public async Task Handle_AssetDeleted_ReglobsTheCatalog(string uri)
     {
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy, fs: new MockFileSystem());
         await handler.Handle(Deleted(uri), CancellationToken.None);
@@ -266,7 +266,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [Fact]
     public async Task Handle_ScriptDeleted_RemovesItFromTheIndex()
     {
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy, fs: new MockFileSystem());
         await handler.Handle(Deleted(LuaUri), CancellationToken.None);
@@ -308,12 +308,12 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             [@"c:\mods\mymod\data\xml\gameconstants.xml"] =
                 new("<GameConstants><Armor_Types>Armor_Structure ArmourG_Structure</Armor_Types></GameConstants>")
         });
-        var spy = new SpyIndexService();
-        var schema = new FakeSchemaProvider(new EnumDefinition
+        var spy = new FakeGameIndexService();
+        var schema = new SchemaProviderBuilder().WithEnums(new EnumDefinition
         {
             Name = "ArmorType", Kind = EnumKind.DynamicXml,
             SourceFile = "data/xml/gameconstants.xml$Armor_Types", Values = []
-        });
+        }).Build();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration(["c:/mods/mymod/data/xml"], [], [], [], "csv")
@@ -335,12 +335,12 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\data\xml\gameconstants.xml"] = new("<GameConstants/>")
         });
-        var spy = new SpyIndexService();
-        var schema = new FakeSchemaProvider(new EnumDefinition
+        var spy = new FakeGameIndexService();
+        var schema = new SchemaProviderBuilder().WithEnums(new EnumDefinition
         {
             Name = "ArmorType", Kind = EnumKind.DynamicXml,
             SourceFile = "data/xml/gameconstants.xml$Armor_Types", Values = []
-        });
+        }).Build();
 
         var handler = BuildHandler(spy, fs: fs, reload: new FakeReloadService(), schema: schema);
         var ex = await Record.ExceptionAsync(() => handler.Handle(Changed(xmlUri), CancellationToken.None));
@@ -358,7 +358,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\data\text\mastertextfile.csv"] = new("key,ENGLISH\r\nTEXT_A,Hello\r\n")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
@@ -388,7 +388,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var ledger = new LocalisationWriteLedger(new FileHelper(fs));
         ledger.Record(path, LocalisationContentHash.Compute(content));
 
-        var handler = BuildHandler(new SpyIndexService(), fs: fs, reload: reload, writeLedger: ledger);
+        var handler = BuildHandler(new FakeGameIndexService(), fs: fs, reload: reload, writeLedger: ledger);
         await handler.Handle(Changed(csvUri), CancellationToken.None);
 
         Assert.Equal(0, reload.LocalisationReloadCount);
@@ -412,7 +412,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var ledger = new LocalisationWriteLedger(new FileHelper(fs));
         ledger.Record(path, LocalisationContentHash.Compute("key,ENGLISH\r\nTEXT_A,Hello\r\n"));
 
-        var handler = BuildHandler(new SpyIndexService(), fs: fs, reload: reload, writeLedger: ledger);
+        var handler = BuildHandler(new FakeGameIndexService(), fs: fs, reload: reload, writeLedger: ledger);
         await handler.Handle(Changed(csvUri), CancellationToken.None);
 
         Assert.Equal(1, reload.LocalisationReloadCount);
@@ -427,7 +427,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\data\text\mastertextfile.properties"] = new("TEXT_A=Hello")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "nls")
@@ -449,7 +449,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\data\text\mastertextfile.xml"] = new("<LocalisationData/>")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "xml")
@@ -466,7 +466,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     public async Task Handle_DeletedCsvUnderTextRoot_TriggersLocalisationReload_NotRemoveDocument()
     {
         const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
@@ -489,7 +489,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             [@"c:\mods\mymod\data\text\a.csv"] = new("key,ENGLISH"),
             [@"c:\mods\mymod\data\text\b.properties"] = new("")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
@@ -515,7 +515,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\notes\scratch.csv"] = new("a,b")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
@@ -545,7 +545,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\data\text\archive\old.csv"] = new("key,ENGLISH")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
@@ -570,7 +570,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\data\text\mastertextfile_english.dat"] = new([1, 2, 3])
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "dat")
@@ -592,7 +592,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             [@"c:\mods\mymod\data\text\mastertextfile.csv"] = new("key,ENGLISH")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService();
 
         var handler = BuildHandler(spy, fs: fs, reload: reload);
@@ -613,7 +613,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             [@"c:\data\art\textures\b.dds"] = new(""),
             [@"c:\data\art\models\c.alo"] = new("")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
 
         var handler = BuildHandler(spy, fs: fs);
         await handler.Handle(Changed(
@@ -634,8 +634,8 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             [@"c:\mods\mymod\data\xml\surfacefxtriggertype.xml"] =
                 new("<Enum><Entry>Dirt</Entry></Enum>")
         });
-        var spy = new SpyIndexService();
-        var schema = new FakeSchemaProvider(
+        var spy = new FakeGameIndexService();
+        var schema = new SchemaProviderBuilder().WithEnums(
             new EnumDefinition
             {
                 Name = "ArmorType", Kind = EnumKind.DynamicXml,
@@ -645,7 +645,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             {
                 Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
                 SourceFile = "data/xml/surfacefxtriggertype.xml", Values = []
-            });
+            }).Build();
         var reload = new FakeReloadService
         {
             LastWorkspaceConfig = new WorkspaceConfiguration(["c:/mods/mymod/data/xml"], [], [], [], "csv")
@@ -687,7 +687,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             [@"c:\mods\mymod\mymod.pgproj"] = new("{}"),
             [@"c:\data\art\textures\a.tga"] = new("")
         });
-        var spy = new SpyIndexService();
+        var spy = new FakeGameIndexService();
         var reload = new FakeReloadService();
 
         var handler = BuildHandler(spy, fs: fs, reload: reload);
@@ -748,154 +748,6 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             LocalisationReloadCount++;
             return Task.CompletedTask;
         }
-    }
-
-    private sealed class FakeSchemaProvider(params EnumDefinition[] enums) : ISchemaProvider
-    {
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => enums;
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { value?.Invoke(this, EventArgs.Empty); }
-            remove { }
-        }
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return enums.FirstOrDefault(e => e.Name.Equals(enumName, StringComparison.OrdinalIgnoreCase));
-        }
-    }
-
-    private sealed class SpyIndexService : IGameIndexService
-    {
-        public readonly List<ImmutableDictionary<string, ImmutableArray<string>>> DynamicEnumApplications = [];
-        public readonly List<string> Removals = [];
-
-        public readonly List<(string Uri, string Text)> Updates = [];
-
-        public int AssetApplications { get; private set; }
-        public GameIndex Current => GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            Updates.Add((uri, text));
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-            Removals.Add(uri);
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-            AssetApplications++;
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-            DynamicEnumApplications.Add(values);
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 
     /// <summary>

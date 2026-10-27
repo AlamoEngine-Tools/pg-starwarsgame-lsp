@@ -168,7 +168,7 @@ public sealed class PreviewUnkillableTest
         foreach (var hardpoint in hardpoints)
             tags = tags.With(hardpoint.Id, hardpoint.Tags);
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
     }
 

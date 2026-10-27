@@ -27,11 +27,11 @@ public sealed class StoryProtocolHandlersTest
     private const string SuspendedUri = "file:///ws/data/xml/story_act_ii.xml";
     private const string LuaUri = "file:///ws/data/scripts/story/story_lua.lua";
 
-    private static FiringIndexService Index()
+    private static FakeGameIndexService Index()
     {
         var documents = GameIndex.Empty.Documents.Add(
             LuaUri, new DocumentIndex(LuaUri, 1, [], []));
-        return new FiringIndexService { Current = GameIndex.Empty with { Documents = documents } };
+        return new FakeGameIndexService { Current = GameIndex.Empty with { Documents = documents } };
     }
 
     private static ILspConfigurationProvider Config()
@@ -104,7 +104,7 @@ public sealed class StoryProtocolHandlersTest
                 .Add("Story_Set", [member])
         };
 
-        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index })
+        var result = await new GetStoryPlotsHandler(Models(), new FakeGameIndexService { Current = index })
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Equal("Story_Set", Assert.Single(result.Campaigns).Set);
@@ -149,7 +149,7 @@ public sealed class StoryProtocolHandlersTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("GC", [campaignSym])
         };
 
-        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index })
+        var result = await new GetStoryPlotsHandler(Models(), new FakeGameIndexService { Current = index })
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         var campaign = Assert.Single(result.Campaigns);
@@ -477,7 +477,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_ProjectsEventAndRewardEnums()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
+        var result = await new GetStorySchemaHandler(ProtocolSchemaProvider.Build())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -500,7 +500,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_ShipsEveryNoteKind_WithItsTextAndValue()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
+        var result = await new GetStorySchemaHandler(ProtocolSchemaProvider.Build())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         var bugged = Assert.Single(result.EventTypes, t => t.Name == "STORY_BUGGED");
@@ -521,7 +521,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_EnumParams_ShipEnumValuesInline()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
+        var result = await new GetStorySchemaHandler(ProtocolSchemaProvider.Build())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         var battle = Assert.Single(result.RewardTypes, t => t.Name == "LINK_BATTLE");
@@ -534,13 +534,13 @@ public sealed class StoryProtocolHandlersTest
 
     // ── aet/getStoryParamOptions ─────────────────────────────────────────────
 
-    private static GetStoryParamOptionsHandler OptionsHandler(FiringIndexService? index = null)
+    private static GetStoryParamOptionsHandler OptionsHandler(FakeGameIndexService? index = null)
     {
-        return new GetStoryParamOptionsHandler(Models(), index ?? Index(), new ProtocolSchemaProvider(),
+        return new GetStoryParamOptionsHandler(Models(), index ?? Index(), ProtocolSchemaProvider.Build(),
             new StoryParamValueProposalProvider());
     }
 
-    private static FiringIndexService IndexWith(params (string Id, string TypeName)[] symbols)
+    private static FakeGameIndexService IndexWith(params (string Id, string TypeName)[] symbols)
     {
         var definitions = GameIndex.Empty.WorkspaceDefinitions;
         foreach (var (id, typeName) in symbols)
@@ -548,7 +548,7 @@ public sealed class StoryProtocolHandlersTest
                 new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
                     new FileOrigin($"file:///ws/data/xml/{typeName.ToLowerInvariant()}s.xml", 7, 2), null)
             ]);
-        return new FiringIndexService { Current = GameIndex.Empty with { WorkspaceDefinitions = definitions } };
+        return new FakeGameIndexService { Current = GameIndex.Empty with { WorkspaceDefinitions = definitions } };
     }
 
     [Fact]
@@ -701,10 +701,10 @@ public sealed class StoryProtocolHandlersTest
 
     // ── aet/resolveStoryReference ────────────────────────────────────────────
 
-    private static ResolveStoryReferenceHandler ResolveHandler(FiringIndexService index)
+    private static ResolveStoryReferenceHandler ResolveHandler(FakeGameIndexService index)
     {
         return new ResolveStoryReferenceHandler(
-            new DefinitionLocator(index, new ProtocolSchemaProvider()));
+            new DefinitionLocator(index, ProtocolSchemaProvider.Build()));
     }
 
     [Fact]
@@ -732,7 +732,7 @@ public sealed class StoryProtocolHandlersTest
             new GameSymbol("Start", GameSymbolKind.XmlObject, "StoryEvent",
                 new FileOrigin("file:///ws/data/xml/story_act_i.xml", 42, 15), null)
         ]);
-        var index = new FiringIndexService
+        var index = new FakeGameIndexService
         {
             Current = GameIndex.Empty with { WorkspaceDefinitions = definitions }
         };
@@ -762,7 +762,7 @@ public sealed class StoryProtocolHandlersTest
         var definitions = GameIndex.Empty.WorkspaceDefinitions.Add("Coruscant", [
             new GameSymbol("Coruscant", GameSymbolKind.XmlObject, "Planet", new UnknownOrigin("meg"), null)
         ]);
-        var index = new FiringIndexService
+        var index = new FakeGameIndexService
         {
             Current = GameIndex.Empty with { WorkspaceDefinitions = definitions }
         };
@@ -789,12 +789,12 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public void Notifier_InvalidatedCampaigns_SendsNotification()
     {
-        var index = new FiringIndexService();
+        var index = new FakeGameIndexService();
         var sent = new List<StoryGraphChangedParams>();
         _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(["GC"]),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
-        index.Fire();
+        index.Raise(GameIndex.Empty);
 
         Assert.Equal(["GC"], Assert.Single(sent).Campaigns);
     }
@@ -802,12 +802,12 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public void Notifier_NothingInvalidated_StaysQuiet()
     {
-        var index = new FiringIndexService();
+        var index = new FakeGameIndexService();
         var sent = new List<StoryGraphChangedParams>();
         _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
-        index.Fire();
+        index.Raise(GameIndex.Empty);
 
         Assert.Empty(sent);
     }
@@ -906,7 +906,7 @@ public sealed class StoryProtocolHandlersTest
             ]);
             return new StoryCampaignModel("GC", "Rebel", [active, suspended],
                 new HashSet<string>(StringComparer.Ordinal) { SuspendedUri },
-                new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended], null, [machine]))
+                new StoryGraphBuilder(ProtocolSchemaProvider.Build()).Build([active, suspended], null, [machine]))
             {
                 LuaScripts = ["Story_Lua"],
                 LuaMachines = [machine],
@@ -921,88 +921,7 @@ public sealed class StoryProtocolHandlersTest
         }
     }
 
-    private sealed class FiringIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; init; } = GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged;
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string,
-                ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Noop();
-        }
-
-        public void Fire()
-        {
-            IndexChanged?.Invoke(GameIndex.Empty);
-        }
-
-        private sealed class Noop : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class ProtocolSchemaProvider : ISchemaProvider
+    private static class ProtocolSchemaProvider
     {
         private static readonly EnumDefinition Events = new()
         {
@@ -1084,43 +1003,12 @@ public sealed class StoryProtocolHandlersTest
             ]
         };
 
-        public event EventHandler? SchemaRefreshed
+        public static FakeSchemaProvider Build()
         {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [Events, Rewards];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            if (string.Equals(name, Events.Name, StringComparison.OrdinalIgnoreCase)) return Events;
-            if (string.Equals(name, Rewards.Name, StringComparison.OrdinalIgnoreCase)) return Rewards;
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
+            return new SchemaProviderBuilder()
+                .WithEnum(Events)
+                .WithEnum(Rewards)
+                .Build();
         }
     }
 }

@@ -239,7 +239,7 @@ public sealed class HardpointModeRowTest
             WorkspaceDefinitions = defs,
             WorkspaceReferences = references
         };
-        return new XmlHardpointFactProducer(new BareSchema(), source)
+        return new XmlHardpointFactProducer(new SchemaProviderBuilder().Build(), source)
             .Produce(Uri, ParsedXmlDocument.Parse(text), index);
     }
 
@@ -262,46 +262,6 @@ public sealed class HardpointModeRowTest
         {
             _tags[id] = [.. tags];
             return this;
-        }
-    }
-
-    private sealed class BareSchema : ISchemaProvider
-    {
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
         }
     }
 }

@@ -418,7 +418,7 @@ public sealed class PreviewUnitWeaponTest
                 .Prepend(Tag("Space_Model_Name", hull))
                 .ToArray());
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
                 tags, new FakeAssets(hull))
             .BuildForObject("Unit");
     }

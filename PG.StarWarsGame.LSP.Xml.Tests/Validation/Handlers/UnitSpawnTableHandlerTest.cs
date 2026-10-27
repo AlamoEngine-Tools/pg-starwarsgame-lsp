@@ -67,7 +67,7 @@ public sealed class UnitSpawnTableHandlerTest
         var index = new GameIndex(BaselineIndex.Empty,
             ImmutableDictionary<string, DocumentIndex>.Empty, defs,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
 
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Missing_Unit, 3"), ctx).ToList();
 

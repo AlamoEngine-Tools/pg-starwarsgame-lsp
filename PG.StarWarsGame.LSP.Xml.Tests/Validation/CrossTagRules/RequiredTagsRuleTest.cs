@@ -214,7 +214,7 @@ public sealed class RequiredTagsRuleTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             CrossTagRuleSets.RequiredTags());

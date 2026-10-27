@@ -54,7 +54,7 @@ public sealed class SquadronSyncCodeActionProviderTest
 
     private static SquadronSyncCodeActionProvider BuildProvider(string xml)
     {
-        var host = new FakeWorkspaceHost(Uri, xml);
+        var host = new FakeGameWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new SquadronSyncCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper);
     }
@@ -171,33 +171,5 @@ public sealed class SquadronSyncCodeActionProviderTest
     {
         var changes = action.CodeAction!.Edit!.Changes!;
         return changes.Values.First().ToList();
-    }
-}
-
-file sealed class FakeWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly string _normalizedUri;
-    private readonly string _text;
-
-    public FakeWorkspaceHost(string uri, string text)
-    {
-        _normalizedUri = uri;
-        _text = text;
-    }
-
-    public IEnumerable<TrackedDocument> All => [new(_normalizedUri, _text, 1)];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string uri)
-    {
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(_normalizedUri, _text, 1);
-        return true;
     }
 }

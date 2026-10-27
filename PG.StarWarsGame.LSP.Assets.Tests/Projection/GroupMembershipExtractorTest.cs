@@ -12,9 +12,9 @@ public sealed class GroupMembershipExtractorTest
 {
     // ── Schema and helpers ────────────────────────────────────────────────────
 
-    private static readonly ISchemaProvider NoGroupSchema = new GroupSchemaFake();
+    private static readonly ISchemaProvider NoGroupSchema = new SchemaProviderBuilder().Build();
 
-    private static readonly ISchemaProvider OverlapTestSchema = new GroupSchemaFake(
+    private static readonly ISchemaProvider OverlapTestSchema = new SchemaProviderBuilder().WithTag(
         new XmlTagDefinition
         {
             Tag = "Overlap_Test",
@@ -22,7 +22,7 @@ public sealed class GroupMembershipExtractorTest
             SemanticType = TagSemanticType.ReferenceGroup,
             ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "SFXEvent", NameTag = "Name" }
-        });
+        }).Build();
     // ── Guard cases ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -212,45 +212,5 @@ public sealed class GroupMembershipExtractorTest
         var member = Assert.Single(result["Unit_AT_AT"]);
         var origin = Assert.IsType<FileOrigin>(member.MemberOrigin);
         Assert.Equal("data/xml/sfxevents.xml", origin.Uri);
-    }
-}
-
-file sealed class GroupSchemaFake(params XmlTagDefinition[] tags) : ISchemaProvider
-{
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => tags;
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string tagName)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string enumName)
-    {
-        return null;
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        return null;
     }
 }

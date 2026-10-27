@@ -56,7 +56,7 @@ public sealed class FileReferenceRenameBuilderTest
     [Fact]
     public void Build_RenamesFileOnDisk_KeepingDirectoryAndExtension()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(CampaignUri,
             "<Campaign>\n<Empire_Story_Name>Story_Plots_Rebel.xml</Empire_Story_Name>\n</Campaign>", 1);
         var index = IndexWith(ManifestKey, ManifestUri, "StoryPlotManifest",
@@ -81,7 +81,7 @@ public sealed class FileReferenceRenameBuilderTest
     [Fact]
     public void Build_SubdirReference_PreservesDirectoryPrefixAndExtension()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(CampaignUri,
             "<Campaign>\n<Story_Name>Rebel, Conquests\\Story_Plots_Rebel.xml</Story_Name>\n</Campaign>", 1);
         var index = IndexWith(ManifestKey, ManifestUri, "StoryPlotManifest",
@@ -103,7 +103,7 @@ public sealed class FileReferenceRenameBuilderTest
     [Fact]
     public void Build_LuaScript_RenamesExtensionlessTokenAndDotLuaFile()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(CampaignUri,
             "<Story_Mode_Plots>\n<Lua_Script>Story_Campaign</Lua_Script>\n</Story_Mode_Plots>", 1);
         var luaRef = new GameReference(LuaKey, GameSymbolKind.WorkspaceFile, "LuaScript",
@@ -129,7 +129,7 @@ public sealed class FileReferenceRenameBuilderTest
     {
         var index = IndexWith(ManifestKey, ManifestUri, "StoryPlotManifest");
         Assert.Null(FileReferenceRenameBuilder.Build(ManifestKey, "Foo/Bar",
-            index, Source(new FakeWorkspaceHost()), NullLogger.Instance));
+            index, Source(new FakeGameWorkspaceHost()), NullLogger.Instance));
     }
 
     [Theory]
@@ -147,14 +147,14 @@ public sealed class FileReferenceRenameBuilderTest
     {
         var index = IndexWith(ManifestKey, ManifestUri, "StoryPlotManifest");
         Assert.Null(FileReferenceRenameBuilder.Build(ManifestKey, newStem,
-            index, Source(new FakeWorkspaceHost()), NullLogger.Instance));
+            index, Source(new FakeGameWorkspaceHost()), NullLogger.Instance));
     }
 
     [Fact]
     public void Build_UnknownId_ReturnsNull()
     {
         Assert.Null(FileReferenceRenameBuilder.Build("storyplotmanifest:nope.xml", "X",
-            GameIndex.Empty, Source(new FakeWorkspaceHost()), NullLogger.Instance));
+            GameIndex.Empty, Source(new FakeGameWorkspaceHost()), NullLogger.Instance));
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
@@ -163,27 +163,5 @@ public sealed class FileReferenceRenameBuilderTest
     {
         return new DocumentTextSource(host, new FileHelper(new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 }

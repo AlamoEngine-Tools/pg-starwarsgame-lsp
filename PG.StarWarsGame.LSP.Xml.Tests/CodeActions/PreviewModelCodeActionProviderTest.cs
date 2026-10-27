@@ -50,15 +50,15 @@ public sealed class PreviewModelCodeActionProviderTest
 
     private static PreviewModelCodeActionProvider BuildProvider(string xml = Xml)
     {
-        var host = new OneDocumentHost(Uri, xml);
+        var host = new FakeGameWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         var index = GameIndex.Empty with
         {
             AssetFiles = MergedAssetFileIndex.Merge([],
                 ["data/art/models/ei_trooper.alo", "data/art/models/ei_snow.alo", "data/art/models/ei_sand.alo"])
         };
-        return new PreviewModelCodeActionProvider(TestParseCache.For(host, fileHelper), new ModelTagSchema(),
-            new FixedIndex(index), fileHelper, new FakeLspConfigurationProvider());
+        return new PreviewModelCodeActionProvider(TestParseCache.For(host, fileHelper), ModelTagSchema.Build(),
+            new FakeGameIndexService(index), fileHelper, new FakeLspConfigurationProvider());
     }
 
     private static List<CodeAction> At(int line, int character)
@@ -152,7 +152,7 @@ public sealed class PreviewModelCodeActionProviderTest
     }
 }
 
-file sealed class ModelTagSchema : ISchemaProvider
+file static class ModelTagSchema
 {
     private static readonly XmlTagDefinition[] Tags =
     [
@@ -172,125 +172,11 @@ file sealed class ModelTagSchema : ISchemaProvider
         }
     ];
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return Tags.FirstOrDefault(t => t.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return Tags;
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return Tags;
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => Tags;
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-}
-
-file sealed class OneDocumentHost(string uri, string text) : IGameWorkspaceHost
-{
-    public IEnumerable<TrackedDocument> All => [new(uri, text, 1)];
-
-    public void AddOrUpdate(string u, string t, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string u)
-    {
-    }
-
-    public bool TryGet(string u, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(uri, text, 1);
-        return true;
-    }
-}
-
-file sealed class FixedIndex(GameIndex index) : IGameIndexService
-{
-    public GameIndex Current => index;
-
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-    {
-        return Task.CompletedTask;
-    }
-
-    public void InjectDocument(DocumentIndex document)
-    {
-    }
-
-    public void RemoveDocument(string uri)
-    {
-    }
-
-    public void ApplyBaseline(BaselineIndex baseline)
-    {
-    }
-
-    public void ApplyLocalisation(ILocalisationIndex localisation)
-    {
-    }
-
-    public void ApplyAssetFiles(IAssetFileIndex assets)
-    {
-    }
-
-    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-    {
-    }
-
-    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-    {
-    }
-
-    public void ApplyWorkspaceEnumValueDefinitions(
-        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-    {
-    }
-
-    public IDisposable BeginBulkUpdate()
-    {
-        return new MemoryStream();
-    }
-
-    public event Action<GameIndex>? IndexChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<ILocalisationIndex>? LocalisationChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<GameIndex>? DynamicEnumChanged
-    {
-        add { }
-        remove { }
+        var builder = new SchemaProviderBuilder();
+        foreach (var tag in Tags)
+            builder.WithTag(tag);
+        return builder.Build();
     }
 }

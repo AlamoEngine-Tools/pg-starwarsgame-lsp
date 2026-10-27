@@ -49,7 +49,7 @@ public sealed class DynamicEnumValueProposalProviderTest
 
     private static DynamicEnumValueProposalProvider Sut(GameIndex? index = null)
     {
-        return new DynamicEnumValueProposalProvider(new FakeIndexService(index));
+        return new DynamicEnumValueProposalProvider(new FakeGameIndexService(index ?? GameIndex.Empty));
     }
 
     [Fact]
@@ -238,7 +238,7 @@ public sealed class DynamicEnumValueProposalProviderTest
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
         var tag = new XmlTagDefinition
             { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
-        var service = new FakeIndexService();
+        var service = new FakeGameIndexService();
         var sut = new DynamicEnumValueProposalProvider(service);
 
         Assert.Empty(sut.GetProposals(tag, ""));
@@ -271,81 +271,5 @@ public sealed class DynamicEnumValueProposalProviderTest
 
         Assert.Single(proposals);
         Assert.Equal("INITIAL", proposals[0].Label);
-    }
-}
-
-file sealed class FakeIndexService(GameIndex? current = null) : IGameIndexService
-{
-    public GameIndex Current { get; } = current ?? GameIndex.Empty;
-
-    public event Action<GameIndex>? IndexChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<ILocalisationIndex>? LocalisationChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<GameIndex>? DynamicEnumChanged;
-
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-    {
-        return Task.CompletedTask;
-    }
-
-    public void InjectDocument(DocumentIndex document)
-    {
-    }
-
-    public void RemoveDocument(string uri)
-    {
-    }
-
-    public void ApplyBaseline(BaselineIndex baseline)
-    {
-    }
-
-    public void ApplyLocalisation(ILocalisationIndex index)
-    {
-    }
-
-    public void ApplyAssetFiles(IAssetFileIndex index)
-    {
-    }
-
-    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-    {
-    }
-
-    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-    {
-    }
-
-    public void ApplyWorkspaceEnumValueDefinitions(
-        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-    {
-    }
-
-    public IDisposable BeginBulkUpdate()
-    {
-        return NullDisposable.Instance;
-    }
-
-    public void RaiseDynamicEnumChanged(GameIndex index)
-    {
-        DynamicEnumChanged?.Invoke(index);
-    }
-
-    private sealed class NullDisposable : IDisposable
-    {
-        public static readonly NullDisposable Instance = new();
-
-        public void Dispose()
-        {
-        }
     }
 }

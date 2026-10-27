@@ -42,7 +42,7 @@ public sealed class StoryCampaignAssemblerTest
     private static StoryCampaignModel? Assemble(
         StoryChainScanResult chain, string name = "GC", string faction = "Rebel")
     {
-        return new StoryCampaignAssembler(new NullSchema()).Assemble(name, faction, chain, Reader(
+        return new StoryCampaignAssembler(new SchemaProviderBuilder().Build()).Assemble(name, faction, chain, Reader(
             chain.Manifests.SelectMany(m => m.ActiveThreads.Concat(m.SuspendedThreads)).ToArray()));
     }
 
@@ -145,7 +145,7 @@ public sealed class StoryCampaignAssemblerTest
             ["T_E.xml"] = "<Story><Event Name=\"Universal_Story_Start\"/></Story>"
         });
 
-        var rebel = new StoryCampaignAssembler(new NullSchema())
+        var rebel = new StoryCampaignAssembler(new SchemaProviderBuilder().Build())
             .Assemble("GC", "Rebel", chain, read)!;
 
         Assert.DoesNotContain(rebel.Graph.Problems,
@@ -316,45 +316,5 @@ public sealed class StoryCampaignAssemblerTest
         var model = Assemble(chain)!;
 
         Assert.Single(model.Threads);
-    }
-
-    private sealed class NullSchema : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string e)
-        {
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
-        }
     }
 }

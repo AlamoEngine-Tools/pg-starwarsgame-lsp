@@ -26,7 +26,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
 
     private static XmlLinkedEditingRangeHandler Build(string text)
     {
-        var host = new FakeHost(TestUri, text);
+        var host = new FakeGameWorkspaceHost(TestUri, text);
         return new XmlLinkedEditingRangeHandler(TestParseCache.For(host), new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()));
     }
@@ -119,7 +119,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     [Fact]
     public async Task Handle_NonEaWFile_ReturnsNull()
     {
-        var host = new FakeHost(TestUri, "<Foo>\nbar\n</Foo>");
+        var host = new FakeGameWorkspaceHost(TestUri, "<Foo>\nbar\n</Foo>");
         var handler = new XmlLinkedEditingRangeHandler(TestParseCache.For(host), new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()));
         var result = await handler.Handle(At(0, 1), CancellationToken.None);
@@ -179,29 +179,4 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class FakeHost(string uri, string text) : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [new(uri, text, 1)];
-
-        public void AddOrUpdate(string u, string t, int v, bool publishDiagnostics = true)
-        {
-        }
-
-        public void Remove(string u)
-        {
-        }
-
-        public bool TryGet(string u, out TrackedDocument doc)
-        {
-            if (string.Equals(u, uri, StringComparison.OrdinalIgnoreCase))
-            {
-                doc = new TrackedDocument(uri, text, 1);
-                return true;
-            }
-
-            doc = default!;
-            return false;
-        }
-    }
 }

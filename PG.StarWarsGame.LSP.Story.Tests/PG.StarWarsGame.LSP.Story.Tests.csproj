@@ -29,6 +29,7 @@
 
     <ItemGroup>
         <Using Include="Xunit"/>
+        <Using Include="PG.StarWarsGame.LSP.Testing"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -37,6 +38,7 @@
              reads the campaign scripts as state machines through the Lua extractor. -->
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Schema\PG.StarWarsGame.LSP.Schema.csproj"/>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua\PG.StarWarsGame.LSP.Lua.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Testing\PG.StarWarsGame.LSP.Testing.csproj"/>
     </ItemGroup>
 
 </Project>

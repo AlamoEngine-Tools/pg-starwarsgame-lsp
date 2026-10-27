@@ -30,7 +30,7 @@ public sealed class PreviewHandlersTest
                 s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase)
         };
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             new FakeVariantTagSource(), assets);
     }
 
@@ -584,7 +584,7 @@ public sealed class PreviewHandlersTest
         };
 
         return new GetProjectileHandler(
-            Config(), new FakeGameIndexService(index), new NullSchemaProvider(), tags);
+            Config(), new FakeGameIndexService(index), new SchemaProviderBuilder().Build(), tags);
     }
 
     private static GetParticleSystemHandler Particles(
@@ -597,7 +597,7 @@ public sealed class PreviewHandlersTest
         };
 
         return new GetParticleSystemHandler(
-            assets, Config(), new FakeGameIndexService(index), new NullSchemaProvider(), tags);
+            assets, Config(), new FakeGameIndexService(index), new SchemaProviderBuilder().Build(), tags);
     }
 
     private static VariantTag Tag(string name, string value)

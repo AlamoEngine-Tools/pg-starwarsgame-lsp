@@ -62,24 +62,18 @@ public sealed class SymbolPreviewsTest
         ["Max_Speed"] = Tag("Max_Speed", ReferenceKind.None)
     };
 
+    private static FakeSchemaProvider Schema()
+    {
+        var builder = new SchemaProviderBuilder()
+            .WithKind(new ObjectKindDefinition { Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"] });
+        foreach (var tag in s_tags.Values)
+            builder.WithTag(tag);
+        return builder.Build();
+    }
+
     private static XmlTagDefinition Tag(string name, ReferenceKind kind)
     {
         return new XmlTagDefinition { Tag = name, ValueType = XmlValueType.NameReference, ReferenceKind = kind };
-    }
-
-    private sealed class Schema : NullSchemaProvider, ISchemaProvider
-    {
-        public override XmlTagDefinition? GetTag(string tagName)
-        {
-            return s_tags.GetValueOrDefault(tagName);
-        }
-
-        public ObjectKindDefinition? GetKind(string kindName)
-        {
-            return string.Equals(kindName, ObjectKindNames.Planet, StringComparison.OrdinalIgnoreCase)
-                ? new ObjectKindDefinition { Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"] }
-                : null;
-        }
     }
 
     private sealed class Tags : IVariantTagSource
@@ -189,7 +183,7 @@ public sealed class SymbolPreviewsTest
                 .Add(ModelBoneKey.From(Crowded), [.. Enumerable.Range(0, 25).Select(i => $"crowd_{i:00}.dds")]),
             ParticleSystems = [ModelBoneKey.From(Engine)]
         };
-        var schema = new Schema();
+        var schema = Schema();
         var tags = new Tags();
         var catalog = SymbolCatalog.Build(index, [], []);
         // The model's proxies name the engine effect and one no file holds.

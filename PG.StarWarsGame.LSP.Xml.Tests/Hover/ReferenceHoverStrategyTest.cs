@@ -26,7 +26,7 @@ public sealed class ReferenceHoverStrategyTest
         var hapDoc = XmlUtility.CreateHtmlDocument("<Root><Affiliation>EMPIRE</Affiliation></Root>");
         XmlUtility.TryGetRootNode(hapDoc, out var rootNode);
         XmlUtility.TryFindNode(hapDoc, 0, out var node);
-        return new HoverContext(DocUri, index, schema ?? new StubSchemaProvider(),
+        return new HoverContext(DocUri, index, schema ?? new SchemaProviderBuilder().Build(),
             hapDoc, rootNode!, node ?? new HtmlDocument().DocumentNode,
             isOnTagName, line, character, locale);
     }
@@ -64,10 +64,10 @@ public sealed class ReferenceHoverStrategyTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
     }
 
-    private static StubSchemaProvider SchemaWithType(string typeName)
+    private static FakeSchemaProvider SchemaWithType(string typeName)
     {
-        var p = new StubSchemaProvider();
-        p.AddType(new GameObjectTypeDefinition
+        var p = new SchemaProviderBuilder().Build();
+        p.Add(new GameObjectTypeDefinition
         {
             TypeName = typeName,
             Description = new Dictionary<string, string> { ["en"] = "A faction." }
@@ -186,56 +186,9 @@ public sealed class ReferenceHoverStrategyTest
     {
         var strategy = new ReferenceHoverStrategy();
         var index = IndexWith(Ref(1, 13, 6), Symbol("Faction"));
-        var ctx = MakeCtx(index, new StubSchemaProvider(), line: 1, character: 14);
+        var ctx = MakeCtx(index, new SchemaProviderBuilder().Build(), line: 1, character: 14);
         Assert.Null(strategy.Handle(ctx));
     }
 
     // ── file-scoped fakes ─────────────────────────────────────────────────────
-
-    private sealed class StubSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, GameObjectTypeDefinition> _types = new();
-
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddType(GameObjectTypeDefinition type)
-        {
-            _types[type.TypeName] = type;
-        }
-    }
 }

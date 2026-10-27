@@ -31,7 +31,7 @@ public sealed class HardpointAttachmentBoneRuleTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             [new HardpointAttachmentBoneRule()]);

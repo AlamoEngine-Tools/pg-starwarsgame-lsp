@@ -37,7 +37,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         return new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            schema ?? new SingleTagSchemaProvider(),
+            schema ?? SingleTagSchemaProvider.Build(),
             registry ?? new EmptyFileTypeRegistry(),
             validator ?? new XmlStructuralValidator(),
             crossTagRules ?? []);
@@ -76,7 +76,7 @@ public sealed class XmlDocumentFactProducerTest
     public void Unknown_tag_does_not_emit_XmlTagValueFact()
     {
         const string xml = "<GameObjectFiles><SpaceUnit><Unknown_Tag>42</Unknown_Tag></SpaceUnit></GameObjectFiles>";
-        var facts = Build(new EmptySchemaProvider()).Produce(xml, Uri);
+        var facts = Build(new SchemaProviderBuilder().Build()).Produce(xml, Uri);
         Assert.Empty(facts.OfType<XmlTagValueFact>());
     }
 
@@ -264,7 +264,7 @@ public sealed class XmlDocumentFactProducerTest
     public void MultipleAllowed_tag_appearing_twice_does_not_emit_XmlDuplicateTagFact()
     {
         const string xml = "<Root><Multi_Tag>a</Multi_Tag><Multi_Tag>b</Multi_Tag></Root>";
-        var schema = new MultiTagSchemaProvider();
+        var schema = MultiTagSchemaProvider.Build();
         var facts = Build(schema).Produce(xml, Uri);
         Assert.Empty(facts.OfType<XmlDuplicateTagFact>());
     }
@@ -275,7 +275,7 @@ public sealed class XmlDocumentFactProducerTest
     public void Tag_with_notes_emits_XmlNotesFact()
     {
         const string xml = "<Root><Notes_Tag>1.0</Notes_Tag></Root>";
-        var schema = new NotesTagSchemaProvider();
+        var schema = NotesTagSchemaProvider.Build();
         var facts = Build(schema).Produce(xml, Uri);
         Assert.Single(facts.OfType<XmlNotesFact>());
     }
@@ -285,7 +285,7 @@ public sealed class XmlDocumentFactProducerTest
     public void Tag_with_notes_marks_the_tag_name()
     {
         const string xml = "<Root>\n  <Notes_Tag>1.0</Notes_Tag>\n</Root>";
-        var f = Assert.Single(Build(new NotesTagSchemaProvider()).Produce(xml, Uri).OfType<XmlNotesFact>());
+        var f = Assert.Single(Build(NotesTagSchemaProvider.Build()).Produce(xml, Uri).OfType<XmlNotesFact>());
         Assert.Equal((1, 3, 9), (f.Line, f.Column, f.Length));
     }
 
@@ -352,7 +352,7 @@ public sealed class XmlDocumentFactProducerTest
             "<Applicable_Unit_Categories>INFANTRY</Applicable_Unit_Categories>" +
             "</Lucky_Shot_Attack_Ability></Abilities></Root>";
 
-        var facts = Build(new AbilitySubObjectSchemaProvider()).Produce(xml, Uri);
+        var facts = Build(AbilitySubObjectSchemaProvider.Build()).Produce(xml, Uri);
 
         var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
         Assert.Equal("Applicable_Unit_Categories", tvf.Tag.Tag, StringComparer.OrdinalIgnoreCase);
@@ -371,7 +371,7 @@ public sealed class XmlDocumentFactProducerTest
             "</Lucky_Shot_Attack_Ability></Abilities></Root>";
 
         // Max_Speed is not in LuckyShotAttackAbility schema, but IS a global tag (Float)
-        var facts = Build(new AbilitySubObjectSchemaProvider()).Produce(xml, Uri);
+        var facts = Build(AbilitySubObjectSchemaProvider.Build()).Produce(xml, Uri);
 
         var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
         Assert.Equal("Max_Speed", tvf.Tag.Tag, StringComparer.OrdinalIgnoreCase);
@@ -388,7 +388,7 @@ public sealed class XmlDocumentFactProducerTest
         const string uri = "file:///sfx/SFXEvents.xml";
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"foo\"><Text_ID>K1 K2</Text_ID></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, uri);
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry()).Produce(xml, uri);
         var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
         Assert.Equal(XmlValueType.NameReferenceList, tvf.Tag.ValueType);
     }
@@ -411,7 +411,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         var xml = $"<Root><{element} Name=\"X\"><Restricted_Tag>a, b</Restricted_Tag></{element}></Root>";
 
-        var facts = Build(new ContainerOverrideSchemaProvider(), new FixedFileTypeRegistry(containerType))
+        var facts = Build(ContainerOverrideSchemaProvider.Build(), new FixedFileTypeRegistry(containerType))
             .Produce(xml, GameObjectUri);
 
         var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
@@ -431,7 +431,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml = "<Root>\n<Pairs>\n  Temperate, A.ALO,\n  Urban, B.ALO\n</Pairs>\n</Root>";
 
-        var slots = Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlTupleSlotFact>().ToList();
+        var slots = Build(SlottedTagSchemaProvider.Build()).Produce(xml, Uri).OfType<XmlTupleSlotFact>().ToList();
 
         Assert.Equal(["Temperate", "A.ALO", "Urban", "B.ALO"], slots.Select(s => s.Value));
         Assert.Equal(["Terrain", "Model", "Terrain", "Model"], slots.Select(s => s.Slot.Label));
@@ -446,7 +446,7 @@ public sealed class XmlDocumentFactProducerTest
         // the reference pipeline - a slot fact as well would report it twice.
         const string xml = "<Root><Music>Space, Some_Event</Music></Root>";
 
-        Assert.Empty(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
+        Assert.Empty(Build(SlottedTagSchemaProvider.Build()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
     }
 
     [Fact]
@@ -454,7 +454,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml = "<Root><Icons>Space, i_unit.tga</Icons></Root>";
 
-        var slot = Assert.Single(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
+        var slot = Assert.Single(Build(SlottedTagSchemaProvider.Build()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
 
         Assert.Equal("i_unit.tga", slot.Value);
     }
@@ -471,7 +471,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml = "<Root>\n<Map>Empire, A,\n  Rebel, B</Map>\n<Map>C</Map>\n</Root>";
 
-        var fact = Assert.Single(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlListMapFact>());
+        var fact = Assert.Single(Build(SlottedTagSchemaProvider.Build()).Produce(xml, Uri).OfType<XmlListMapFact>());
 
         Assert.False(fact.IsVariant);
         Assert.Equal(2, fact.Occurrences.Count);
@@ -487,7 +487,7 @@ public sealed class XmlDocumentFactProducerTest
         const string xml =
             "<Root>\n<Variant_Of_Existing_Type>Base</Variant_Of_Existing_Type>\n<Map>Empire, A</Map>\n</Root>";
 
-        var fact = Assert.Single(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlListMapFact>());
+        var fact = Assert.Single(Build(SlottedTagSchemaProvider.Build()).Produce(xml, Uri).OfType<XmlListMapFact>());
 
         Assert.True(fact.IsVariant);
     }
@@ -499,7 +499,7 @@ public sealed class XmlDocumentFactProducerTest
         // key as a value.
         const string xml = "<Root><ModelMap>Empire, A.ALO</ModelMap></Root>";
 
-        Assert.Empty(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
+        Assert.Empty(Build(SlottedTagSchemaProvider.Build()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
     }
 
     // ── structural validation ─────────────────────────────────────────────────
@@ -577,7 +577,7 @@ public sealed class XmlDocumentFactProducerTest
     public void Empty_name_attribute_emits_UnnamedObjectFact()
     {
         const string xml = "<SFXEventFiles><SFXEvent Name=\"\"><Text_ID>A</Text_ID></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
 
         var fact = Assert.Single(facts.OfType<XmlUnnamedObjectFact>());
         Assert.Equal("SFXEvent", fact.TypeName);
@@ -633,7 +633,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         var xml = $"<SFXEventFiles><SFXEvent Name=\"{name}\"><Text_ID>A</Text_ID></SFXEvent></SFXEventFiles>";
 
-        return Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+        return Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
     }
 
     // Trimmed, like the parser does - whitespace is not a name.
@@ -641,7 +641,7 @@ public sealed class XmlDocumentFactProducerTest
     public void Whitespace_only_name_attribute_emits_UnnamedObjectFact()
     {
         const string xml = "<SFXEventFiles><SFXEvent Name=\"   \"/></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
 
         Assert.Single(facts.OfType<XmlUnnamedObjectFact>());
     }
@@ -650,7 +650,7 @@ public sealed class XmlDocumentFactProducerTest
     public void Missing_name_attribute_emits_UnnamedObjectFact()
     {
         const string xml = "<SFXEventFiles><SFXEvent/></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
 
         Assert.Single(facts.OfType<XmlUnnamedObjectFact>());
     }
@@ -659,7 +659,7 @@ public sealed class XmlDocumentFactProducerTest
     public void Named_object_emits_no_UnnamedObjectFact()
     {
         const string xml = "<SFXEventFiles><SFXEvent Name=\"Fine\"/></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
 
         Assert.Empty(facts.OfType<XmlUnnamedObjectFact>());
     }
@@ -670,7 +670,7 @@ public sealed class XmlDocumentFactProducerTest
     public void Commented_out_object_emits_no_UnnamedObjectFact()
     {
         const string xml = "<SFXEventFiles><!-- <SFXEvent Name=\"\"/> --></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
 
         Assert.Empty(facts.OfType<XmlUnnamedObjectFact>());
     }
@@ -693,7 +693,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"A\"><Bogus_Tag>1</Bogus_Tag></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         var fact = Assert.Single(facts.OfType<XmlUnknownTagFact>());
@@ -709,7 +709,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"A\"><CamelCased_Tag>1</CamelCased_Tag></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         Assert.Equal("CamelCased_Tag", Assert.Single(facts.OfType<XmlUnknownTagFact>()).TagName);
@@ -720,7 +720,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"A\"><Text_ID>X</Text_ID></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         Assert.Empty(facts.OfType<XmlUnknownTagFact>());
@@ -739,7 +739,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"A\"><Text_ID><Row>1</Row></Text_ID></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         Assert.Empty(facts.OfType<XmlUnknownTagFact>());
@@ -761,7 +761,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"A\"><Text_I>X</Text_I></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         Assert.Equal("Text_ID", Assert.Single(facts.OfType<XmlUnknownTagFact>()).Suggestion);
@@ -781,7 +781,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"A\"><Grouping><Text_ID>X</Text_ID></Grouping></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         Assert.Empty(facts.OfType<XmlUnknownTagFact>());
@@ -793,7 +793,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"A\"><Bogus_Tag>1</Bogus_Tag></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         Assert.Equal("Bogus_Tag", Assert.Single(facts.OfType<XmlUnknownTagFact>()).TagName);
@@ -813,7 +813,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<SFXEventFiles><SFXEvent Name=\"A\"><Tixt_XD>1</Tixt_XD></SFXEvent></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         Assert.Null(Assert.Single(facts.OfType<XmlUnknownTagFact>()).Suggestion);
@@ -839,7 +839,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<HardPoints><HardPoint Name=\"HP\"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></HardPoint></HardPoints>";
-        var facts = Build(new VariantAwareSchemaProvider(), new HardPointFileTypeRegistry())
+        var facts = Build(VariantAwareSchemaProvider.Build(), new HardPointFileTypeRegistry())
             .Produce(xml, HardPointUri);
 
         var fact = Assert.Single(facts.OfType<VariantTagNotSupportedFact>());
@@ -853,7 +853,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<GameObjectFiles><SpaceUnit Name=\"U\"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></SpaceUnit></GameObjectFiles>";
-        var facts = Build(new VariantAwareSchemaProvider(), new GameObjectFileTypeRegistry())
+        var facts = Build(VariantAwareSchemaProvider.Build(), new GameObjectFileTypeRegistry())
             .Produce(xml, GameObjectUri);
 
         Assert.Empty(facts.OfType<VariantTagNotSupportedFact>());
@@ -865,7 +865,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         const string xml =
             "<Root><Obj><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></Obj></Root>";
-        var facts = Build(new VariantAwareSchemaProvider()).Produce(xml, Uri);
+        var facts = Build(VariantAwareSchemaProvider.Build()).Produce(xml, Uri);
 
         Assert.Empty(facts.OfType<VariantTagNotSupportedFact>());
     }
@@ -875,7 +875,7 @@ public sealed class XmlDocumentFactProducerTest
     {
         // <SFXEvent> is an object, not a tag. Reporting it would fire on every object in the file.
         const string xml = "<SFXEventFiles><SFXEvent Name=\"A\"/></SFXEventFiles>";
-        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+        var facts = Build(SfxEventSchemaProvider.Build(), new SfxEventFileTypeRegistry())
             .Produce(xml, SfxUri);
 
         Assert.Empty(facts.OfType<XmlUnknownTagFact>());
@@ -884,93 +884,33 @@ public sealed class XmlDocumentFactProducerTest
 
 // ── fakes ────────────────────────────────────────────────────────────────────
 
-file sealed class SingleTagSchemaProvider : ISchemaProvider
+file static class SingleTagSchemaProvider
 {
     private static readonly XmlTagDefinition MaxSpeed = new()
         { Tag = "Max_Speed", ValueType = XmlValueType.Float, MultipleAllowed = false };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return tagName.Equals("Max_Speed", StringComparison.OrdinalIgnoreCase) ? MaxSpeed : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [MaxSpeed];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithTag(MaxSpeed)
+            .Build();
     }
 }
 
-file sealed class MultiTagSchemaProvider : ISchemaProvider
+file static class MultiTagSchemaProvider
 {
     private static readonly XmlTagDefinition MultiTag = new()
         { Tag = "Multi_Tag", ValueType = XmlValueType.Float, MultipleAllowed = true };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return tagName.Equals("Multi_Tag", StringComparison.OrdinalIgnoreCase) ? MultiTag : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [MultiTag];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithTag(MultiTag)
+            .Build();
     }
 }
 
-file sealed class NotesTagSchemaProvider : ISchemaProvider
+file static class NotesTagSchemaProvider
 {
     private static readonly XmlTagDefinition NotesTag = new()
     {
@@ -978,85 +918,15 @@ file sealed class NotesTagSchemaProvider : ISchemaProvider
         Notes = [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { ["en"] = "A tag with notes" })]
     };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return tagName.Equals("Notes_Tag", StringComparison.OrdinalIgnoreCase) ? NotesTag : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [NotesTag];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithTag(NotesTag)
+            .Build();
     }
 }
 
-file sealed class EmptySchemaProvider : ISchemaProvider
-{
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-}
-
-file sealed class AbilitySubObjectSchemaProvider : ISchemaProvider
+file static class AbilitySubObjectSchemaProvider
 {
     private static readonly XmlTagDefinition AbilitiesTag = new()
         { Tag = "Abilities", ValueType = XmlValueType.AbilityDefinitionSubObjectList };
@@ -1067,49 +937,17 @@ file sealed class AbilitySubObjectSchemaProvider : ISchemaProvider
     private static readonly XmlTagDefinition MaxSpeedTag = new()
         { Tag = "Max_Speed", ValueType = XmlValueType.Float };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        if (tagName.Equals("Abilities", StringComparison.OrdinalIgnoreCase)) return AbilitiesTag;
-        if (tagName.Equals("Max_Speed", StringComparison.OrdinalIgnoreCase)) return MaxSpeedTag;
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        if (typeName.Equals("LuckyShotAttackAbility", StringComparison.OrdinalIgnoreCase))
-            return [ApplicableUnitCategoriesTag];
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [AbilitiesTag, ApplicableUnitCategoriesTag, MaxSpeedTag];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithTag(AbilitiesTag)
+            .WithTags("LuckyShotAttackAbility", ApplicableUnitCategoriesTag)
+            .WithTag(MaxSpeedTag)
+            .Build();
     }
 }
 
-file sealed class SfxEventSchemaProvider : ISchemaProvider
+file static class SfxEventSchemaProvider
 {
     private static readonly XmlTagDefinition GlobalTextId = new()
         { Tag = "Text_ID", ValueType = XmlValueType.NameReference };
@@ -1120,41 +958,13 @@ file sealed class SfxEventSchemaProvider : ISchemaProvider
     private static readonly GameObjectTypeDefinition SfxEventTypeDef = new()
         { TypeName = "SFXEvent", NameTag = "Name" };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return tagName.Equals("Text_ID", StringComparison.OrdinalIgnoreCase) ? GlobalTextId : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        return typeName.Equals("SFXEvent", StringComparison.OrdinalIgnoreCase) ? SfxEventTypeDef : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        return typeName.Equals("SFXEvent", StringComparison.OrdinalIgnoreCase) ? [SfxTextId] : [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [GlobalTextId, SfxTextId];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [SfxEventTypeDef];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithTag(GlobalTextId)
+            .WithTags("SFXEvent", SfxTextId)
+            .WithObjectType(SfxEventTypeDef)
+            .Build();
     }
 }
 
@@ -1163,7 +973,7 @@ file sealed class SfxEventSchemaProvider : ISchemaProvider
 ///     exactly the shape of the real schema, where <c>Variant_Of_Existing_Type</c> appears in
 ///     <c>GameObjectType.yaml</c> and nowhere else.
 /// </summary>
-file sealed class VariantAwareSchemaProvider : ISchemaProvider
+file static class VariantAwareSchemaProvider
 {
     private static readonly XmlTagDefinition VariantTag = new()
     {
@@ -1180,48 +990,14 @@ file sealed class VariantAwareSchemaProvider : ISchemaProvider
     private static readonly GameObjectTypeDefinition GameObjectType = new()
         { TypeName = "GameObjectType", NameTag = "Name" };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        if (tagName.Equals("Variant_Of_Existing_Type", StringComparison.OrdinalIgnoreCase))
-            return VariantTag;
-        return tagName.Equals("Attachment_Bone", StringComparison.OrdinalIgnoreCase) ? BoneTag : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        if (typeName.Equals("HardPoint", StringComparison.OrdinalIgnoreCase)) return HardPointType;
-        return typeName.Equals("GameObjectType", StringComparison.OrdinalIgnoreCase)
-            ? GameObjectType
-            : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        if (typeName.Equals("GameObjectType", StringComparison.OrdinalIgnoreCase))
-            return [VariantTag, BoneTag];
-        return typeName.Equals("HardPoint", StringComparison.OrdinalIgnoreCase) ? [BoneTag] : [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [VariantTag, BoneTag];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [HardPointType, GameObjectType];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithTags("GameObjectType", VariantTag, BoneTag)
+            .WithTags("HardPoint", BoneTag)
+            .WithObjectType(HardPointType)
+            .WithObjectType(GameObjectType)
+            .Build();
     }
 }
 
@@ -1268,7 +1044,7 @@ file sealed class GameObjectFileTypeRegistry : IFileTypeRegistry
 ///     flat map holds the same definition, as the real schema does, so only a lookup through the
 ///     owning type keeps the override.
 /// </summary>
-file sealed class ContainerOverrideSchemaProvider : ISchemaProvider
+file static class ContainerOverrideSchemaProvider
 {
     private static readonly XmlTagDefinition Restricted = new()
     {
@@ -1283,41 +1059,14 @@ file sealed class ContainerOverrideSchemaProvider : ISchemaProvider
         new() { TypeName = "TerrainDecalFX", NameTag = "Name" }
     ];
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return tagName.Equals(Restricted.Tag, StringComparison.OrdinalIgnoreCase) ? Restricted : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        return Types.FirstOrDefault(t => t.TypeName.Equals(typeName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        return GetObjectType(typeName) is null ? [] : [Restricted];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [Restricted];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => Types;
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithObjectType(Types[0])
+            .WithObjectType(Types[1])
+            .WithTags(Types[0].TypeName, Restricted)
+            .WithTags(Types[1].TypeName, Restricted)
+            .Build();
     }
 }
 
@@ -1325,7 +1074,7 @@ file sealed class ContainerOverrideSchemaProvider : ISchemaProvider
 ///     <c>Pairs</c>: a terrain enum then a model, the shape of <c>Land_Terrain_Model_Mapping</c>.
 ///     <c>Music</c>: an untyped context then a music event object, the shape of the music lists.
 /// </summary>
-file sealed class SlottedTagSchemaProvider : ISchemaProvider
+file static class SlottedTagSchemaProvider
 {
     private static readonly XmlTagDefinition Pairs = new()
     {
@@ -1383,41 +1132,16 @@ file sealed class SlottedTagSchemaProvider : ISchemaProvider
         SemanticType = TagSemanticType.VariantParent
     };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return AllTags.FirstOrDefault(t => t.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [Pairs, Music, Icons, Map, ModelMap, VariantOf];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithTag(Pairs)
+            .WithTag(Music)
+            .WithTag(Icons)
+            .WithTag(Map)
+            .WithTag(ModelMap)
+            .WithTag(VariantOf)
+            .Build();
     }
 }
 

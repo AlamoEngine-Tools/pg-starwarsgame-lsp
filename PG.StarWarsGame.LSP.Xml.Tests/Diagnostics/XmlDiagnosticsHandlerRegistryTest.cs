@@ -14,7 +14,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         new() { Tag = "Speed", ValueType = XmlValueType.Float };
 
     private static readonly DiagnosticsContext EmptyCtx = new(
-        new StubSchemaProvider(),
+        new SchemaProviderBuilder().Build(),
         GameIndex.Empty,
         "file:///test.xml",
         "en");
@@ -354,45 +354,5 @@ file sealed class NamedLambdaHandler<TFact> : XmlDiagnosticsHandler<TFact>, IXml
     protected override IEnumerable<XmlDiagnosticResult> Handle(TFact fact, DiagnosticsContext ctx)
     {
         return _fn(fact, ctx);
-    }
-}
-
-file sealed class StubSchemaProvider : ISchemaProvider
-{
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
     }
 }

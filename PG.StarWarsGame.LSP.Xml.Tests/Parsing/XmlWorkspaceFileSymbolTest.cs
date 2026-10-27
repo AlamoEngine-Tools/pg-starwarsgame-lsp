@@ -36,7 +36,7 @@ public sealed class XmlWorkspaceFileSymbolTest
             ctx = context;
         }
 
-        var parser = new XmlGameDocumentParser(fileHelper, new EmptySchemaProvider(), registry,
+        var parser = new XmlGameDocumentParser(fileHelper, new SchemaProviderBuilder().Build(), registry,
             NullLogger<XmlGameDocumentParser>.Instance, eaWXmlContext: ctx);
         return await parser.ParseAsync(uri, "<Story_Mode_Plots/>", 1, CancellationToken.None);
     }

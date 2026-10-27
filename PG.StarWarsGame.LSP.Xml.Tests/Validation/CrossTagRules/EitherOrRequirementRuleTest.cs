@@ -140,7 +140,7 @@ public sealed class EitherOrRequirementRuleTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             CrossTagRuleSets.EitherOrRequirements());

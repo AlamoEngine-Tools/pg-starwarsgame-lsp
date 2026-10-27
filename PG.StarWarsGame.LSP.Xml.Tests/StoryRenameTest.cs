@@ -47,7 +47,7 @@ public sealed class StoryRenameTest
     private static XmlRenameHandler Handler()
     {
         return new XmlRenameHandler(new AllowAllEaWContext(),
-            new NullTextSource(), new EmptySchema(), NullLogger<XmlRenameHandler>.Instance);
+            new NullTextSource(), new SchemaProviderBuilder().Build(), NullLogger<XmlRenameHandler>.Instance);
     }
 
     private static RenameParams Rename(string newName)
@@ -118,46 +118,6 @@ public sealed class StoryRenameTest
     private sealed class NullTextSource : IDocumentTextSource
     {
         public DocumentText? GetText(string canonicalUri)
-        {
-            return null;
-        }
-    }
-
-    private sealed class EmptySchema : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string e)
-        {
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
         {
             return null;
         }

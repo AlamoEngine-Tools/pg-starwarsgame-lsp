@@ -31,9 +31,9 @@ public sealed class XmlObjectRenameBuilderTest
 
     private static FakeSchemaProvider SchemaWithUnit()
     {
-        var schema = new FakeSchemaProvider();
-        schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
-        return schema;
+        return new SchemaProviderBuilder()
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" })
+            .Build();
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class XmlObjectRenameBuilderTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
-            SchemaWithUnit(), Source(new FakeWorkspaceHost()),
+            SchemaWithUnit(), Source(new FakeGameWorkspaceHost()),
             NullLogger.Instance);
 
         Assert.Null(result);
@@ -55,7 +55,7 @@ public sealed class XmlObjectRenameBuilderTest
     public void Build_NoDefinitionsNoRefs_ReturnsNull()
     {
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", GameIndex.Empty,
-            SchemaWithUnit(), Source(new FakeWorkspaceHost()),
+            SchemaWithUnit(), Source(new FakeGameWorkspaceHost()),
             NullLogger.Instance);
 
         Assert.Null(result);
@@ -66,7 +66,7 @@ public sealed class XmlObjectRenameBuilderTest
     {
         var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin(XmlUri, 0, null), null);
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
         var index = BuildIndex(
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
@@ -91,7 +91,7 @@ public sealed class XmlObjectRenameBuilderTest
         var r = new GameReference("UNIT_A", GameSymbolKind.XmlObject, "Unit", OtherXmlUri, 2, 5, 6);
         var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin(XmlUri, 0, null), null);
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
         var index = BuildIndex(
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
@@ -121,10 +121,11 @@ public sealed class XmlObjectRenameBuilderTest
             new FileOrigin(XmlUri, 0, 13), null);
         var storyParser = new GameSymbol("Story_Ev", GameSymbolKind.XmlObject, "StoryParser",
             new FileOrigin(XmlUri, 0, 13), null);
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Event Name=\"Story_Ev\"/>", 1);
-        var schema = new FakeSchemaProvider();
-        schema.RegisterType(new GameObjectTypeDefinition { TypeName = "StoryParser", NameTag = "Name" });
+        var schema = new SchemaProviderBuilder()
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "StoryParser", NameTag = "Name" })
+            .Build();
         var index = BuildIndex(ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
             .Add("Story_Ev", [storyEvent, storyParser]));
 
@@ -144,7 +145,7 @@ public sealed class XmlObjectRenameBuilderTest
         var luaRef = new GameReference("UNIT_A", GameSymbolKind.XmlObject, null, LuaUri, 0, 7, 6);
         var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin(XmlUri, 0, null), null);
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
         var index = BuildIndex(
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
@@ -164,77 +165,5 @@ public sealed class XmlObjectRenameBuilderTest
     {
         return new DocumentTextSource(host, new FileHelper(new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-    }
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, GameObjectTypeDefinition> _types =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void RegisterType(GameObjectTypeDefinition def)
-        {
-            _types[def.TypeName] = def;
-        }
     }
 }

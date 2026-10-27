@@ -52,7 +52,8 @@ public sealed class GetEncyclopediaEntryHandlerTest
     private static GetEncyclopediaEntryHandler Handler(
         GameIndex index, FakeVariantTagSource source, ILspConfigurationProvider? config = null)
     {
-        return new GetEncyclopediaEntryHandler(new FakeGameIndexService(index), new NullSchemaProvider(), source,
+        return new GetEncyclopediaEntryHandler(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
+            source,
             config ?? new FakeLspConfigurationProvider());
     }
 

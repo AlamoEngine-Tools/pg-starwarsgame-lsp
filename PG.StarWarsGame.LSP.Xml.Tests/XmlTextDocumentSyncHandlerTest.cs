@@ -75,10 +75,10 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 { Uri = TestUri, Text = "<Foo/>", LanguageId = "xml", Version = 1 }
         }, CancellationToken.None);
 
-        Assert.Single(host.AddOrUpdateCalls);
-        Assert.Equal(TestUri.ToString(), host.AddOrUpdateCalls[0].Uri);
-        Assert.Equal("<Foo/>", host.AddOrUpdateCalls[0].Text);
-        Assert.Equal(1, host.AddOrUpdateCalls[0].Version);
+        Assert.Single(host.Writes);
+        Assert.Equal(TestUri.ToString(), host.Writes[0].Uri);
+        Assert.Equal("<Foo/>", host.Writes[0].Text);
+        Assert.Equal(1, host.Writes[0].Version);
     }
 
     [Fact]
@@ -95,11 +95,11 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 { Uri = TestUri, Text = "<Foo/>", LanguageId = "xml", Version = 1 }
         }, CancellationToken.None);
 
-        Assert.Empty(index.UpdateCalls);
-        Assert.Single(index.OpenCalls);
-        Assert.Equal(TestUri.ToString(), index.OpenCalls[0].Uri);
-        Assert.Equal("<Foo/>", index.OpenCalls[0].Text);
-        Assert.Equal(1, index.OpenCalls[0].Version);
+        Assert.Empty(index.Updates);
+        Assert.Single(index.Opens);
+        Assert.Equal(TestUri.ToString(), index.Opens[0].Uri);
+        Assert.Equal("<Foo/>", index.Opens[0].Text);
+        Assert.Equal(1, index.Opens[0].Version);
     }
 
     [Fact]
@@ -116,14 +116,14 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 { Uri = TestUri, Text = "<Foo/>", LanguageId = "xml", Version = 1 }
         }, CancellationToken.None);
 
-        Assert.Empty(host.AddOrUpdateCalls);
-        Assert.Empty(index.OpenCalls);
+        Assert.Empty(host.Writes);
+        Assert.Empty(index.Opens);
 
         await gate.OpenAsync();
 
-        Assert.Single(host.AddOrUpdateCalls);
-        Assert.Single(index.OpenCalls);
-        Assert.Equal("<Foo/>", index.OpenCalls[0].Text);
+        Assert.Single(host.Writes);
+        Assert.Single(index.Opens);
+        Assert.Equal("<Foo/>", index.Opens[0].Text);
     }
 
     // ── DidChange ────────────────────────────────────────────────────────────
@@ -141,9 +141,9 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 new TextDocumentContentChangeEvent { Text = "<New/>" })
         }, CancellationToken.None);
 
-        Assert.Single(host.AddOrUpdateCalls);
-        Assert.Equal("<New/>", host.AddOrUpdateCalls[0].Text);
-        Assert.Equal(2, host.AddOrUpdateCalls[0].Version);
+        Assert.Single(host.Writes);
+        Assert.Equal("<New/>", host.Writes[0].Text);
+        Assert.Equal(2, host.Writes[0].Version);
     }
 
     [Fact]
@@ -159,9 +159,9 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 new TextDocumentContentChangeEvent { Text = "<Changed/>" })
         }, CancellationToken.None);
 
-        Assert.Single(index.UpdateCalls);
-        Assert.Equal("<Changed/>", index.UpdateCalls[0].Text);
-        Assert.Equal(3, index.UpdateCalls[0].Version);
+        Assert.Single(index.Updates);
+        Assert.Equal("<Changed/>", index.Updates[0].Text);
+        Assert.Equal(3, index.Updates[0].Version);
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
             ContentChanges = new Container<TextDocumentContentChangeEvent>()
         }, CancellationToken.None);
 
-        Assert.Equal(string.Empty, host.AddOrUpdateCalls[0].Text);
+        Assert.Equal(string.Empty, host.Writes[0].Text);
     }
 
     // ── DidClose ─────────────────────────────────────────────────────────────
@@ -192,8 +192,8 @@ public sealed class XmlTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
-        Assert.Single(host.RemoveCalls);
-        Assert.Equal(DiskUri, host.RemoveCalls[0]);
+        Assert.Single(host.Removals);
+        Assert.Equal(DiskUri, host.Removals[0]);
     }
 
     [Fact]
@@ -212,10 +212,10 @@ public sealed class XmlTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
-        Assert.Empty(index.RemoveCalls);
-        Assert.Single(index.UpdateCalls);
-        Assert.Equal(DiskContent, index.UpdateCalls[0].Text);
-        Assert.Equal(0, index.BulkUpdateCount);
+        Assert.Empty(index.Removals);
+        Assert.Single(index.Updates);
+        Assert.Equal(DiskContent, index.Updates[0].Text);
+        Assert.Equal(0, index.BulkUpdates);
     }
 
     [Fact]
@@ -229,8 +229,8 @@ public sealed class XmlTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
-        Assert.Single(index.RemoveCalls);
-        Assert.Empty(index.UpdateCalls);
+        Assert.Single(index.Removals);
+        Assert.Empty(index.Updates);
     }
 
     [Fact]
@@ -247,8 +247,8 @@ public sealed class XmlTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
-        Assert.Single(host.RemoveCalls);
-        Assert.Empty(host.AddOrUpdateCalls);
+        Assert.Single(host.Removals);
+        Assert.Empty(host.Writes);
     }
 
     // ── DidSave ──────────────────────────────────────────────────────────────
@@ -263,8 +263,8 @@ public sealed class XmlTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = TestUri }
         }, CancellationToken.None);
 
-        Assert.Empty(host.AddOrUpdateCalls);
-        Assert.Empty(index.UpdateCalls);
+        Assert.Empty(host.Writes);
+        Assert.Empty(index.Updates);
     }
 
     // ── EaW directory gating ─────────────────────────────────────────────────
@@ -280,9 +280,9 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 { Uri = TestUri, Text = "<Foo/>", LanguageId = "xml", Version = 1 }
         }, CancellationToken.None);
 
-        Assert.Empty(host.AddOrUpdateCalls);
-        Assert.Empty(index.UpdateCalls);
-        Assert.Empty(index.OpenCalls);
+        Assert.Empty(host.Writes);
+        Assert.Empty(index.Updates);
+        Assert.Empty(index.Opens);
     }
 
     [Fact]
@@ -297,8 +297,8 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 new TextDocumentContentChangeEvent { Text = "<Changed/>" })
         }, CancellationToken.None);
 
-        Assert.Empty(host.AddOrUpdateCalls);
-        Assert.Empty(index.UpdateCalls);
+        Assert.Empty(host.Writes);
+        Assert.Empty(index.Updates);
     }
 
     [Fact]
@@ -311,9 +311,9 @@ public sealed class XmlTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = TestUri }
         }, CancellationToken.None);
 
-        Assert.Empty(host.RemoveCalls);
-        Assert.Empty(index.RemoveCalls);
-        Assert.Empty(index.UpdateCalls);
+        Assert.Empty(host.Removals);
+        Assert.Empty(index.Removals);
+        Assert.Empty(index.Updates);
     }
 
     // ── GetTextDocumentAttributes ─────────────────────────────────────────────
@@ -327,123 +327,4 @@ public sealed class XmlTextDocumentSyncHandlerTest
     }
 
     // ── Fakes ────────────────────────────────────────────────────────────────
-
-    internal sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
-    {
-        public List<Call> AddOrUpdateCalls { get; } = [];
-        public List<string> RemoveCalls { get; } = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            AddOrUpdateCalls.Add(new Call(uri, text, version, publishDiagnostics));
-        }
-
-        public void Remove(string uri)
-        {
-            RemoveCalls.Add(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            doc = null!;
-            return false;
-        }
-
-        public IEnumerable<TrackedDocument> All => [];
-
-        // ReSharper disable once NotAccessedPositionalProperty.Global - recorded for the assertions; not every member is asserted
-        public record Call(string Uri, string Text, int Version, bool PublishDiagnostics = true);
-    }
-
-    internal sealed class FakeGameIndexService : IGameIndexService
-    {
-        public List<UpdateCall> UpdateCalls { get; } = [];
-        public List<UpdateCall> OpenCalls { get; } = [];
-        public List<string> RemoveCalls { get; } = [];
-        public int BulkUpdateCount { get; private set; }
-
-        public GameIndex Current => GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            UpdateCalls.Add(new UpdateCall(uri, text, version));
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            OpenCalls.Add(new UpdateCall(uri, text, version));
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-            RemoveCalls.Add(uri);
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            BulkUpdateCount++;
-            return NullDisposable.Instance;
-        }
-
-        public record UpdateCall(string Uri, string Text, int Version);
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
 }

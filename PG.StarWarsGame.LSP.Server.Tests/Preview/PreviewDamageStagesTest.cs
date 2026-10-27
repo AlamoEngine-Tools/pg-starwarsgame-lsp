@@ -231,7 +231,7 @@ public sealed class PreviewDamageStagesTest
 
         var tags = new FakeVariantTagSource().With("Bunker", [.. declared]);
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("bunker.alo")).BuildForObject("Bunker");
     }
 

@@ -54,11 +54,14 @@ public sealed class RealInstancesTest
         };
         var schema = LuaApiSchemaProvider.FromFiles(stubs.Files.Select(f =>
             new LuaStubFile(f, File.ReadAllText(Path.Combine(stubDirectory, f)))));
-        var index = new FixedIndex(new Dictionary<string, DocumentIndex>(DocumentUris.Comparer)
+        var index = new FakeGameIndexService(GameIndex.Empty with
         {
-            [script] = new(script, 1, [], [], ["PGBase"], LayerRank: 1),
-            [other] = new(other, 1, [], [], [], LayerRank: 1),
-            [library] = new(library, 1, [], [], [], LayerRank: 0)
+            Documents = new Dictionary<string, DocumentIndex>(DocumentUris.Comparer)
+            {
+                [script] = new(script, 1, [], [], ["PGBase"], LayerRank: 1),
+                [other] = new(other, 1, [], [], [], LayerRank: 1),
+                [library] = new(library, 1, [], [], [], LayerRank: 0)
+            }.ToImmutableDictionary(DocumentUris.Comparer)
         });
         var texts = new LuaGeneratedTexts([new StubOverrideAnnotations(schema)], fileHelper);
         await using var instances = new LuaAnalyzerInstances(directory => new LuaAnalyzerHost(new LuaAnalyzerOptions
@@ -114,81 +117,5 @@ public sealed class RealInstancesTest
         }
 
         return text;
-    }
-
-    private sealed class FixedIndex(Dictionary<string, DocumentIndex> documents) : IGameIndexService
-    {
-        public GameIndex Current { get; } = GameIndex.Empty with
-        {
-            Documents = documents.ToImmutableDictionary(DocumentUris.Comparer)
-        };
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Nothing();
-        }
-
-        private sealed class Nothing : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
     }
 }

@@ -102,7 +102,7 @@ public sealed class PreviewReticleTest
             .With("HP_Gun", Tag("Type", "HARD_POINT_WEAPON_LASER"), Tag("Is_Targetable", "Yes"))
             .With("HP_Dummy", Tag("Type", "HARD_POINT_DUMMY_ART"), Tag("Is_Targetable", "No"));
 
-        var scene = new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        var scene = new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
 
         Assert.True(scene.Hardpoints.Single(h => h.Id == "HP_Gun").IsTargetable);

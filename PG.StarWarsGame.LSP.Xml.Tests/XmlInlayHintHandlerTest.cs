@@ -25,24 +25,24 @@ public sealed class XmlInlayHintHandlerTest
     private const string Uri = "file:///data/units.xml";
 
     // ReSharper disable once UnusedTupleComponentInReturnValue - the helpers return everything a test might need; some tests ignore a part
-    private static (XmlInlayHintHandler handler, FakeIndexService index) Build(
+    private static (XmlInlayHintHandler handler, FakeGameIndexService index) Build(
         string docText,
         ISchemaProvider? schema = null,
         ILocalisationIndex? localisation = null,
         ILspConfigurationProvider? config = null)
     {
-        var host = new FakeWorkspaceHost();
-        host.Set(Uri, docText);
+        var host = new FakeGameWorkspaceHost();
+        host.With(Uri, docText);
 
-        var index = new FakeIndexService();
+        var index = new FakeGameIndexService();
         if (localisation is not null)
-            index.Localisation = localisation;
+            index.Current = index.Current with { Localisation = localisation };
 
         var registry = new XmlInlayHintRegistry([new LocalisationKeySingleValueInlayHintProvider()]);
         return (new XmlInlayHintHandler(
             TestParseCache.For(host),
             index,
-            schema ?? new EmptySchemaProvider(),
+            schema ?? new SchemaProviderBuilder().Build(),
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
@@ -69,7 +69,7 @@ public sealed class XmlInlayHintHandlerTest
     public async Task LocKeyTag_WithKnownTranslation_ProducesHintOnSameLine()
     {
         const string xml = "<GameObjectType>\n  <Text_ID>TEXT_UNIT_NAME</Text_ID>\n</GameObjectType>";
-        var schema = new LocKeySchemaProvider("Text_ID");
+        var schema = LocKeySchema("Text_ID");
         var loc = new ValueLocalisationIndex("TEXT_UNIT_NAME", "X-Wing Fighter");
 
         var (handler, _) = Build(xml, schema, loc);
@@ -84,7 +84,7 @@ public sealed class XmlInlayHintHandlerTest
     public async Task LocKeyTag_AbsentFromIndex_ProducesMissingHint()
     {
         const string xml = "<GameObjectType>\n  <Text_ID>TEXT_MISSING</Text_ID>\n</GameObjectType>";
-        var schema = new LocKeySchemaProvider("Text_ID");
+        var schema = LocKeySchema("Text_ID");
         var loc = new ValueLocalisationIndex("TEXT_OTHER", "Something else");
 
         var (handler, _) = Build(xml, schema, loc);
@@ -113,7 +113,7 @@ public sealed class XmlInlayHintHandlerTest
             "  <Text_ID>TEXT_NAME</Text_ID>\n" +
             "  <Tooltip>TEXT_TIP</Tooltip>\n" +
             "</GameObjectType>";
-        var schema = new LocKeySchemaProvider("Text_ID", "Tooltip");
+        var schema = LocKeySchema("Text_ID", "Tooltip");
         var loc = new ValueLocalisationIndex(
             ("TEXT_NAME", "X-Wing Fighter"),
             ("TEXT_TIP", "A fast rebel craft"));
@@ -128,7 +128,7 @@ public sealed class XmlInlayHintHandlerTest
     public async Task EmptyTagValue_ProducesNoHint()
     {
         const string xml = "<GameObjectType>\n  <Text_ID></Text_ID>\n</GameObjectType>";
-        var schema = new LocKeySchemaProvider("Text_ID");
+        var schema = LocKeySchema("Text_ID");
         var loc = new ValueLocalisationIndex();
 
         var (handler, _) = Build(xml, schema, loc);
@@ -146,7 +146,7 @@ public sealed class XmlInlayHintHandlerTest
             "<GameObjectType>\n" +
             "  <Text_ID>TEXT_NAME</Text_ID>\n" + // line 1
             "</GameObjectType>";
-        var schema = new LocKeySchemaProvider("Text_ID");
+        var schema = LocKeySchema("Text_ID");
         var loc = new ValueLocalisationIndex("TEXT_NAME", "X-Wing Fighter");
         // Request range covers only line 0
         var range = new LspRange(new Position(0, 0), new Position(0, int.MaxValue));
@@ -163,11 +163,11 @@ public sealed class XmlInlayHintHandlerTest
     public async Task NonEaWFile_ReturnsNull()
     {
         const string xml = "<GameObjectType><Text_ID>TEXT_NAME</Text_ID></GameObjectType>";
-        var host = new FakeWorkspaceHost();
-        host.Set(Uri, xml);
-        var index = new FakeIndexService();
+        var host = new FakeGameWorkspaceHost();
+        host.With(Uri, xml);
+        var index = new FakeGameIndexService();
         var handler = new XmlInlayHintHandler(
-            TestParseCache.For(host), index, new EmptySchemaProvider(),
+            TestParseCache.For(host), index, new SchemaProviderBuilder().Build(),
             new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
@@ -183,11 +183,11 @@ public sealed class XmlInlayHintHandlerTest
         // Inlay hints are re-requested by clients on every scroll - with unchanged content the
         // second request must be a cache hit, not a re-parse.
         const string xml = "<GameObjectType><Text_ID>TEXT_NAME</Text_ID></GameObjectType>";
-        var host = new FakeWorkspaceHost();
-        host.Set(Uri, xml);
+        var host = new FakeGameWorkspaceHost();
+        host.With(Uri, xml);
         var cache = TestParseCache.For(host);
         var handler = new XmlInlayHintHandler(
-            cache, new FakeIndexService(), new EmptySchemaProvider(),
+            cache, new FakeGameIndexService(), new SchemaProviderBuilder().Build(),
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
@@ -203,168 +203,20 @@ public sealed class XmlInlayHintHandlerTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
+    /// <summary>A schema in which these tags, and only these, carry a localisation key.</summary>
+    private static FakeSchemaProvider LocKeySchema(params string[] locKeyTagNames)
     {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void Set(string uri, string text)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, 0);
-        }
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public ILocalisationIndex Localisation
-        {
-            set => Current = Current with { Localisation = value };
-        }
-
-        public GameIndex Current { get; private set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisp.Instance;
-        }
-
-        private sealed class NullDisp : IDisposable
-        {
-            public static readonly NullDisp Instance = new();
-
-            public void Dispose()
+        var builder = new SchemaProviderBuilder();
+        foreach (var name in locKeyTagNames)
+            builder.WithTag(new XmlTagDefinition
             {
-            }
-        }
+                Tag = name, ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.LocalisationKey
+            });
+        return builder.Build();
     }
 }
 
 // ── file-scoped helpers ──────────────────────────────────────────────────────
-
-file sealed class LocKeySchemaProvider : ISchemaProvider
-{
-    private readonly HashSet<string> _locKeyTags;
-
-    public LocKeySchemaProvider(params string[] locKeyTagNames)
-    {
-        _locKeyTags = new HashSet<string>(locKeyTagNames, StringComparer.OrdinalIgnoreCase);
-    }
-
-    public XmlTagDefinition? GetTag(string name)
-    {
-        if (!_locKeyTags.Contains(name)) return null;
-        return new XmlTagDefinition
-        {
-            Tag = name,
-            ValueType = XmlValueType.NameReference,
-            ReferenceKind = ReferenceKind.LocalisationKey
-        };
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-}
 
 file sealed class ValueLocalisationIndex : ILocalisationIndex
 {

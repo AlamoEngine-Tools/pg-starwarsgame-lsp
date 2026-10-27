@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
 public sealed class SingleValueTypeHandlerBaseTest
 {
     private static readonly DiagnosticsContext Ctx =
-        new(new StubSchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
+        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en");
 
     private static XmlTagValueFact Fact(XmlValueType valueType)
     {
@@ -58,45 +58,5 @@ public sealed class SingleValueTypeHandlerBaseTest
             Delegated = true;
             return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, "delegated")];
         }
-    }
-}
-
-file sealed class StubSchemaProvider : ISchemaProvider
-{
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
     }
 }

@@ -307,7 +307,7 @@ public sealed class PreviewTargetDefenceTest
     {
         // A `.alo` opened directly has no XML behind it, so there is nothing to be shot at.
         var scene = new PreviewSceneBuilder(new FakeGameIndexService(GameIndex.Empty),
-                new NullSchemaProvider(), new FakeVariantTagSource(), new FakeAssets("hull.alo"))
+                new SchemaProviderBuilder().Build(), new FakeVariantTagSource(), new FakeAssets("hull.alo"))
             .BuildForModel("hull.alo");
 
         Assert.Null(scene.Defence);
@@ -332,7 +332,7 @@ public sealed class PreviewTargetDefenceTest
         if (constants.Length > 0)
             tags = tags.With("GameConstants", constants);
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
     }
 
@@ -352,7 +352,7 @@ public sealed class PreviewTargetDefenceTest
         foreach (var hardpoint in hardpoints)
             tags = tags.With(hardpoint.Id, hardpoint.Tags);
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
     }
 

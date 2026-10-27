@@ -41,9 +41,9 @@ public sealed class XmlCompletionHandlerTest
             GameIndex? index = null)
     {
         var host = new FakeGameWorkspaceHost();
-        var schema = new FakeSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var proposals = new FakeProposalRegistry();
-        var indexService = new FakeIndexService(index);
+        var indexService = new FakeGameIndexService(index ?? GameIndex.Empty);
         var storyProposals = new StoryParamValueProposalProvider();
         var boneHelper = new BoneNameCompletionHelper(schema, new EmptyVariantTagSource());
         var fileTypeReg = registry ?? new FakeFileTypeRegistry();
@@ -152,9 +152,9 @@ public sealed class XmlCompletionHandlerTest
     public async Task Handle_TagNameContext_ReturnsTagsForType()
     {
         var (handler, host, schema, _) = Build();
-        schema.AddType(MakeType("Faction"));
-        schema.AddTagForType("Faction", MakeTag("Max_Speed"));
-        schema.AddTagForType("Faction", MakeTag("Display_Name"));
+        schema.Add(MakeType("Faction"));
+        schema.AddForType("Faction", MakeTag("Max_Speed"));
+        schema.AddForType("Faction", MakeTag("Display_Name"));
 
         host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <\n</Faction>", 1);
         // cursor on line 1 after '<'
@@ -169,9 +169,9 @@ public sealed class XmlCompletionHandlerTest
     public async Task Handle_TagNameContext_SingletonAlreadyPresent_ExcludedFromList()
     {
         var (handler, host, schema, _) = Build();
-        schema.AddType(MakeType("Faction"));
-        schema.AddTagForType("Faction", MakeTag("Max_Speed"));
-        schema.AddTagForType("Faction", MakeTag("Display_Name"));
+        schema.Add(MakeType("Faction"));
+        schema.AddForType("Faction", MakeTag("Max_Speed"));
+        schema.AddForType("Faction", MakeTag("Display_Name"));
 
         // Max_Speed already present
         host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <Max_Speed>500</Max_Speed>\n  <\n</Faction>", 1);
@@ -186,8 +186,8 @@ public sealed class XmlCompletionHandlerTest
     public async Task Handle_TagNameContext_MultipleAllowedAlreadyPresent_StillInList()
     {
         var (handler, host, schema, _) = Build();
-        schema.AddType(MakeType("Faction"));
-        schema.AddTagForType("Faction", MakeTag("SFXEvent_Attack", true));
+        schema.Add(MakeType("Faction"));
+        schema.AddForType("Faction", MakeTag("SFXEvent_Attack", true));
 
         // SFXEvent_Attack already present; still allowed again
         host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <SFXEvent_Attack>Sfx_A</SFXEvent_Attack>\n  <\n</Faction>",
@@ -214,9 +214,9 @@ public sealed class XmlCompletionHandlerTest
     public async Task Handle_TagNameContext_PartialPrefix_FiltersResults()
     {
         var (handler, host, schema, _) = Build();
-        schema.AddType(MakeType("Faction"));
-        schema.AddTagForType("Faction", MakeTag("SFXEvent_Attack"));
-        schema.AddTagForType("Faction", MakeTag("Max_Speed"));
+        schema.Add(MakeType("Faction"));
+        schema.AddForType("Faction", MakeTag("SFXEvent_Attack"));
+        schema.AddForType("Faction", MakeTag("Max_Speed"));
 
         host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <SFX\n</Faction>", 1);
         // cursor at col 6 (after '<SFX')
@@ -231,8 +231,8 @@ public sealed class XmlCompletionHandlerTest
     public async Task Handle_TagNameContext_InsertTextIsSnippet()
     {
         var (handler, host, schema, _) = Build();
-        schema.AddType(MakeType("Faction"));
-        schema.AddTagForType("Faction", MakeTag("Max_Speed"));
+        schema.Add(MakeType("Faction"));
+        schema.AddForType("Faction", MakeTag("Max_Speed"));
 
         host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <\n</Faction>", 1);
         var result = await handler.Handle(At(1, 3), CancellationToken.None);
@@ -247,9 +247,9 @@ public sealed class XmlCompletionHandlerTest
     public async Task Handle_TagNameContext_InsideAbilityElement_UnregisteredFile_ReturnsAbilityTags()
     {
         var (handler, host, schema, _) = Build();
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
-        schema.AddTagForType("LuckyShotAttackAbility", MakeTag("Applicable_Unit_Categories"));
-        schema.AddTagForType("LuckyShotAttackAbility", MakeTag("SFXEvent_Activate"));
+        schema.Add(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
+        schema.AddForType("LuckyShotAttackAbility", MakeTag("Applicable_Unit_Categories"));
+        schema.AddForType("LuckyShotAttackAbility", MakeTag("SFXEvent_Activate"));
 
         host.AddOrUpdate(TestUri.ToString(), AbilityXmlForCompletion, 1);
 
@@ -268,9 +268,9 @@ public sealed class XmlCompletionHandlerTest
         registry.RegisterFile("file:///test.xml", ImmutableArray.Create("GameObjectType"));
         var (handler, host, schema, _) = Build(registry);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
-        schema.AddTagForType("LuckyShotAttackAbility", MakeTag("Applicable_Unit_Categories"));
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
+        schema.AddForType("LuckyShotAttackAbility", MakeTag("Applicable_Unit_Categories"));
 
         host.AddOrUpdate(TestUri.ToString(), AbilityXmlForCompletion, 1);
 
@@ -289,8 +289,8 @@ public sealed class XmlCompletionHandlerTest
         registry.RegisterFile("file:///test.xml", ImmutableArray.Create("GameObjectType"));
         var (handler, host, schema, _) = Build(registry);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
-        schema.AddTagForType("GameObjectType", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.AddForType("GameObjectType", new XmlTagDefinition
         {
             Tag = "Unit_Abilities_Data",
             ValueType = XmlValueType.GuiActivatedAbilityDefinitionSubObjectList
@@ -322,8 +322,8 @@ public sealed class XmlCompletionHandlerTest
         registry.RegisterFile("file:///test.xml", ImmutableArray.Create("GameObjectType"));
         var (handler, host, schema, _) = Build(registry);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
-        schema.AddTagForType("GameObjectType", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.AddForType("GameObjectType", new XmlTagDefinition
         {
             Tag = "Unit_Abilities_Data",
             ValueType = XmlValueType.GuiActivatedAbilityDefinitionSubObjectList
@@ -351,15 +351,15 @@ public sealed class XmlCompletionHandlerTest
         registry.RegisterFile("file:///test.xml", ImmutableArray.Create("GameObjectType"));
         var (handler, host, schema, _) = Build(registry);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
-        schema.AddTagForType("GameObjectType", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.AddForType("GameObjectType", new XmlTagDefinition
         {
             Tag = "Abilities",
             ValueType = XmlValueType.AbilityDefinitionSubObjectList
         });
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "ForceCloakAbility", NameTag = "Name" });
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "ForceCloakAbility", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
 
         const string xml =
             "<GameObjectFiles>\n" +
@@ -391,7 +391,7 @@ public sealed class XmlCompletionHandlerTest
     {
         var (handler, host, schema, proposals) = Build();
         // Hardpoints is registered as a tag but NOT as a type (unregistered file-level wrapper)
-        schema.AddTagForType("SomeOtherType", MakeTag("Hardpoints"));
+        schema.AddForType("SomeOtherType", MakeTag("Hardpoints"));
         proposals.ProposalsToReturn = [new ValueProposal { Label = "HP_01" }];
 
         // Cursor inside the root <Hardpoints> body - must not offer value completions
@@ -405,9 +405,9 @@ public sealed class XmlCompletionHandlerTest
     public async Task Handle_ValueCompletion_EnclosingElementIsType_ReturnsEmpty()
     {
         var (handler, host, schema, proposals) = Build();
-        schema.AddType(MakeType("Faction"));
+        schema.Add(MakeType("Faction"));
         // Faction is also registered as a tag with the same name (name collision)
-        schema.AddTagForType("SomeOtherType", MakeTag("Faction"));
+        schema.AddForType("SomeOtherType", MakeTag("Faction"));
         proposals.ProposalsToReturn = [new ValueProposal { Label = "EMPIRE" }];
 
         // Cursor inside the type-container body - not inside a field tag
@@ -427,9 +427,9 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", MakeTag("Max_Speed"));
-        schema.AddTagForType("SpaceUnit", MakeTag("Armor_Type"));
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", MakeTag("Max_Speed"));
+        schema.AddForType("SpaceUnit", MakeTag("Armor_Type"));
 
         host.AddOrUpdate(TestUri.ToString(),
             "<GameObjectFiles>\n  <Fighter_Mk2>\n    <\n  </Fighter_Mk2>\n</GameObjectFiles>", 1);
@@ -449,8 +449,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("FactionType"));
         var (handler, host, schema, proposals) = Build(registry);
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "FactionType", NameTag = "Name" });
-        schema.AddTagForType("SomeType", MakeTag("Faction"));
+        schema.Add(new GameObjectTypeDefinition { TypeName = "FactionType", NameTag = "Name" });
+        schema.AddForType("SomeType", MakeTag("Faction"));
         proposals.ProposalsToReturn = [new ValueProposal { Label = "EMPIRE" }];
 
         host.AddOrUpdate(TestUri.ToString(),
@@ -469,8 +469,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryEventTypeWith(StoryEvent("STORY_ACCUMULATE", Param(0))));
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryEventTypeWith(StoryEvent("STORY_ACCUMULATE", Param(0))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -488,7 +488,7 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
+        schema.Add(MakeType("StoryParser"));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>NOT_A_REAL_EVENT</Event_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -504,7 +504,7 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
+        schema.Add(MakeType("StoryParser"));
         var xml = "<StoryParser>\n<Event>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -522,8 +522,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryRewardTypeWith(StoryReward("CREDITS", Param(0))));
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryRewardTypeWith(StoryReward("CREDITS", Param(0))));
         var xml =
             "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>CREDITS</Reward_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -546,8 +546,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Behavior", ValueType = XmlValueType.TypeReferenceList,
             ReferenceKind = ReferenceKind.HardcodedSet
@@ -572,8 +572,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryRewardTypeWith(StoryReward("LOCK_CONTROLS", Param(0, XmlValueType.Boolean))));
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryRewardTypeWith(StoryReward("LOCK_CONTROLS", Param(0, XmlValueType.Boolean))));
         var xml =
             "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>LOCK_CONTROLS</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -595,8 +595,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryEventTypeWith(StoryEvent("STORY_ACCUMULATE", Param(0))));
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryEventTypeWith(StoryEvent("STORY_ACCUMULATE", Param(0))));
         // Root is <StoryPlots>, not <StoryParser> - registry detection must still trigger story completions.
         // STORY_ACCUMULATE has 1 param, so Event_Param1 should appear (Event_Type is already present).
         var xml = "<StoryPlots>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryPlots>";
@@ -612,7 +612,7 @@ public sealed class XmlCompletionHandlerTest
     {
         // Root element named "StoryParser" but the file is not registered → no story completions.
         var (handler, host, schema, _) = Build();
-        schema.AddType(MakeType("StoryParser"));
+        schema.Add(MakeType("StoryParser"));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -629,8 +629,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryEventTypeWith(StoryEvent("MY_EVENT", Param(0), Param(1))));
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryEventTypeWith(StoryEvent("MY_EVENT", Param(0), Param(1))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>MY_EVENT</Event_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -648,9 +648,9 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
+        schema.Add(MakeType("StoryParser"));
         // StoryEvent with no params → Params = null → unconstrained
-        schema.AddEnum(StoryEventTypeWith(StoryEvent("UNCONSTRAINED_EVENT")));
+        schema.Add(StoryEventTypeWith(StoryEvent("UNCONSTRAINED_EVENT")));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>UNCONSTRAINED_EVENT</Event_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -667,8 +667,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryEventTypeWith(StoryEvent("MY_EVENT",
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryEventTypeWith(StoryEvent("MY_EVENT",
             Param(0, XmlValueType.DynamicEnumValue, FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN")))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>MY_EVENT</Event_Type>\n<Event_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -691,8 +691,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryEventTypeWith(
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryEventTypeWith(
             StoryEvent("TYPE_A", Param(0)),
             StoryEvent("TYPE_B", Param(0), Param(1), Param(2))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>TYPE_B</Event_Type>\n<\n</Event>\n</StoryParser>";
@@ -715,8 +715,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryEventTypeWith(
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryEventTypeWith(
             StoryEvent("TYPE_A", Param(0, XmlValueType.NameReference, refType: "Planet")),
             StoryEvent("TYPE_B",
                 Param(0, XmlValueType.DynamicEnumValue, FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN")))));
@@ -740,8 +740,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryRewardTypeWith(
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryRewardTypeWith(
             StoryReward("REWARD_A", Param(0, XmlValueType.Boolean)),
             StoryReward("REWARD_B",
                 Param(0, XmlValueType.DynamicEnumValue, FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN")))));
@@ -766,8 +766,8 @@ public sealed class XmlCompletionHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(MakeType("StoryParser"));
-        schema.AddEnum(StoryEventTypeWith(
+        schema.Add(MakeType("StoryParser"));
+        schema.Add(StoryEventTypeWith(
             StoryEvent("TYPE_A", Param(0), Param(1)),
             StoryEvent("TYPE_B",
                 Param(0, XmlValueType.DynamicEnumValue, FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN")))));
@@ -792,8 +792,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Max_Speed", ValueType = XmlValueType.Float
             // ReferenceKind = None (default) - no provider covers this
@@ -818,8 +818,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "SFXEvent_Attack", ValueType = XmlValueType.SFXEventReference,
             ReferenceKind = ReferenceKind.XmlObject,
@@ -842,8 +842,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Ship_Class", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.HardcodedSet
         });
@@ -865,8 +865,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Text_ID", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.LocalisationKey
         });
@@ -888,8 +888,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Is_Planet", ValueType = XmlValueType.Boolean
         });
@@ -910,8 +910,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Category", ValueType = XmlValueType.DynamicEnumValue, ReferenceKind = ReferenceKind.Enum,
             Enum = new EnumDefinition { Name = "CategoryEnum", Kind = EnumKind.SchemaFixed, Values = [] }
@@ -936,19 +936,19 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "UnitAbility" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "UnitAbility" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Unit_Abilities_Data", ValueType = XmlValueType.GuiActivatedAbilityDefinitionSubObjectList
         });
         // UnitAbility.Type = HardcodedSet (the correct def) - added first
-        schema.AddTagForType("UnitAbility", new XmlTagDefinition
+        schema.AddForType("UnitAbility", new XmlTagDefinition
         {
             Tag = "Type", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.HardcodedSet
         });
         // SpaceUnit.Type = XmlObject (the wrong def) - added last so flat GetTag returns this
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Type", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject
         });
@@ -971,20 +971,20 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("GameObjectType"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
-        schema.AddTagForType("GameObjectType", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
+        schema.AddForType("GameObjectType", new XmlTagDefinition
         {
             Tag = "Abilities", ValueType = XmlValueType.AbilityDefinitionSubObjectList
         });
         // LuckyShotAttackAbility.Applicable_Unit_Categories = Enum (the correct def) - added first
-        schema.AddTagForType("LuckyShotAttackAbility", new XmlTagDefinition
+        schema.AddForType("LuckyShotAttackAbility", new XmlTagDefinition
         {
             Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.DynamicEnumValue,
             ReferenceKind = ReferenceKind.Enum
         });
         // GameObjectType.Applicable_Unit_Categories = XmlObject (wrong def) - added last so flat lookup returns it
-        schema.AddTagForType("GameObjectType", new XmlTagDefinition
+        schema.AddForType("GameObjectType", new XmlTagDefinition
         {
             Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.XmlObject
@@ -1011,17 +1011,18 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        // SpaceUnit defines "Alliance" with no reference info (complex/tuple format)
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
-        {
-            Tag = "Alliance", ValueType = XmlValueType.FactionReference, ReferenceKind = ReferenceKind.None
-        });
-        // Another type also defines "Alliance" with XmlObject → added last so flat GetTag returns this
-        schema.AddTagForType("OtherType", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        // Another type defines "Alliance" with XmlObject - declared first, so the flat GetTag
+        // answers with this one, as the real index answers with the first declaration of a name.
+        schema.AddForType("OtherType", new XmlTagDefinition
         {
             Tag = "Alliance", ValueType = XmlValueType.FactionReference, ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
+        });
+        // SpaceUnit defines "Alliance" with no reference info (complex/tuple format)
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "Alliance", ValueType = XmlValueType.FactionReference, ReferenceKind = ReferenceKind.None
         });
 
         host.AddOrUpdate(TestUri.ToString(),
@@ -1043,16 +1044,16 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         // SpaceUnit.SFXEvent_Attack = XmlObject → SFXEvent (the correct def) - added first
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "SFXEvent_Attack", ValueType = XmlValueType.SFXEventReference,
             ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "SFXEvent" }
         });
         // OtherType.SFXEvent_Attack = XmlObject → GameObjectType (wrong def) - added last so flat lookup returns it
-        schema.AddTagForType("OtherType", new XmlTagDefinition
+        schema.AddForType("OtherType", new XmlTagDefinition
         {
             Tag = "SFXEvent_Attack", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
@@ -1076,8 +1077,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("Faction"));
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
-        schema.AddTagForType("Faction", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
+        schema.AddForType("Faction", new XmlTagDefinition
         {
             Tag = "Alignment", ValueType = XmlValueType.DynamicEnumValue, ReferenceKind = ReferenceKind.Enum,
             Enum = new EnumDefinition { Name = "AlignmentEnum", Kind = EnumKind.SchemaFixed, Values = [] }
@@ -1102,12 +1103,12 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, proposals) = Build(registry);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "HardPoint_SFX", ValueType = XmlValueType.HardPointSfxMap
         });
-        schema.AddEnum(new EnumDefinition
+        schema.Add(new EnumDefinition
         {
             Name = "HardPointType", Kind = EnumKind.SchemaFixed,
             Values = [new EnumValueDefinition { Name = "HARD_POINT_WEAPON_LASER" }]
@@ -1130,8 +1131,8 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "HardPoint_SFX", ValueType = XmlValueType.HardPointSfxMap
         });
@@ -1156,12 +1157,12 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, proposals) = Build(registry);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "HardPoint_SFX", ValueType = XmlValueType.HardPointSfxMap
         });
-        schema.AddEnum(new EnumDefinition
+        schema.Add(new EnumDefinition
         {
             Name = "HardPointType", Kind = EnumKind.SchemaFixed, Values = []
         });
@@ -1183,12 +1184,12 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
-        schema.AddTagForType("Faction", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
+        schema.AddForType("Faction", new XmlTagDefinition
         {
             Tag = "Ability_SFX", ValueType = XmlValueType.AbilitySfxMap
         });
-        schema.AddHardcodedSet(new HardcodedReferenceSet { Name = "AbilityType" });
+        schema.Add(new HardcodedReferenceSet { Name = "AbilityType" });
 
         host.AddOrUpdate(TestUri.ToString(),
             "<Root>\n<Faction Name=\"X\">\n<Ability_SFX></Ability_SFX>\n</Faction>\n</Root>", 1);
@@ -1207,8 +1208,8 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
-        schema.AddTagForType("GameObjectType", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.AddForType("GameObjectType", new XmlTagDefinition
         {
             Tag = "Spawn_Unit", ValueType = XmlValueType.UnitSpawnTable, MultipleAllowed = true
         });
@@ -1231,8 +1232,8 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
-        schema.AddTagForType("Faction", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
+        schema.AddForType("Faction", new XmlTagDefinition
         {
             Tag = "Music_Event_List_Ambient", ValueType = XmlValueType.TupleList, MultipleAllowed = true,
             Slots =
@@ -1269,8 +1270,8 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
-        schema.AddTagForType("Unit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
+        schema.AddForType("Unit", new XmlTagDefinition
         {
             Tag = "Tactical_Buildable_Objects_Multiplayer", ValueType = XmlValueType.ListMap, MultipleAllowed = true,
             Slots =
@@ -1311,13 +1312,13 @@ public sealed class XmlCompletionHandlerTest
 
         var (handler, host, schema, _) = Build(registry, index: index);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Space_Model_Name", ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.ModelFile
         });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Barrel_Bone_Name", ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.BoneName
@@ -1343,8 +1344,8 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry);
 
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Barrel_Bone_Name", ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.BoneName
@@ -1372,103 +1373,6 @@ public sealed class XmlCompletionHandlerTest
     }
 
     // ── fakes ───────────────────────────────────────────────────────────────
-
-    private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-    }
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, HardcodedReferenceSet> _hardcodedSets =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tags.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [.. _types.Values];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string name)
-        {
-            return _tagsByType.TryGetValue(name, out var list) ? list : [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            return _enums.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
-
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [.. _hardcodedSets.Values];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddType(GameObjectTypeDefinition type)
-        {
-            _types[type.TypeName] = type;
-        }
-
-        public void AddTagForType(string typeName, XmlTagDefinition tag)
-        {
-            _tags[tag.Tag] = tag;
-            if (!_tagsByType.TryGetValue(typeName, out var list))
-                _tagsByType[typeName] = list = [];
-            list.Add(tag);
-        }
-
-        public void AddEnum(EnumDefinition enumDef)
-        {
-            _enums[enumDef.Name] = enumDef;
-        }
-
-        public void AddHardcodedSet(HardcodedReferenceSet set)
-        {
-            _hardcodedSets[set.Name] = set;
-        }
-    }
 
     private sealed class FakeProposalRegistry : IXmlValueProposalRegistry
     {
@@ -1500,87 +1404,6 @@ public sealed class XmlCompletionHandlerTest
             LastTagDef = tag;
             LastPartialValue = partialValue;
             return [];
-        }
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public FakeIndexService(GameIndex? current = null)
-        {
-            Current = current ?? GameIndex.Empty;
-        }
-
-        public GameIndex Current { get; }
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
         }
     }
 

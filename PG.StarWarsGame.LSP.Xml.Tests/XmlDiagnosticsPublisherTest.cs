@@ -82,7 +82,7 @@ public sealed class XmlDiagnosticsPublisherTest
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
-        var effectiveSchema = schema ?? new FakeSchemaProvider();
+        var effectiveSchema = schema ?? new SchemaProviderBuilder().Build();
         var effectiveRegistry = registry ?? new FakeFileTypeRegistry();
 
         IXmlDiagnosticsHandler[] handlers =
@@ -161,7 +161,7 @@ public sealed class XmlDiagnosticsPublisherTest
                 XmlDiagnosticSeverity.Error)
         ]);
         var (publisher, published, _, workspaceHost) = BuildSubscribed(storyChainProblems: store);
-        workspaceHost.Set("file:///a.xml",
+        workspaceHost.With("file:///a.xml",
             "<Campaigns>\n<Campaign Name=\"T\">\n    <Rebel_Story_Name>Story_Plots_Gone.xml</Rebel_Story_Name>\n</Campaign>\n</Campaigns>");
 
         await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
@@ -184,7 +184,7 @@ public sealed class XmlDiagnosticsPublisherTest
                 XmlDiagnosticSeverity.Error)
         ]);
         var (publisher, published, _, workspaceHost) = BuildSubscribed(storyChainProblems: store);
-        workspaceHost.Set("file:///a.xml", "<Campaigns/>");
+        workspaceHost.With("file:///a.xml", "<Campaigns/>");
 
         await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
 
@@ -197,9 +197,9 @@ public sealed class XmlDiagnosticsPublisherTest
     public void IndexChanged_Fires_Publishes_For_Each_OpenDocument()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        workspaceHost.Set("file:///a.xml", "<Root/>");
+        workspaceHost.With("file:///a.xml", "<Root/>");
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         Assert.Single(published);
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
@@ -209,15 +209,15 @@ public sealed class XmlDiagnosticsPublisherTest
     public void IndexChanged_TwoOpenDocuments_PublishesTwice()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        workspaceHost.Set("file:///a.xml", "<Root/>");
-        workspaceHost.Set("file:///b.xml", "<Root/>");
+        workspaceHost.With("file:///a.xml", "<Root/>");
+        workspaceHost.With("file:///b.xml", "<Root/>");
 
         var index = IndexWithDoc("file:///a.xml") with
         {
             Documents = IndexWithDoc("file:///a.xml").Documents
                 .Add("file:///b.xml", new DocumentIndex("file:///b.xml", 1, [], []))
         };
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         Assert.Equal(2, published.Count);
     }
@@ -227,7 +227,7 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         var (_, published, indexService, _) = BuildSubscribed();
 
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         Assert.Empty(published);
     }
@@ -236,13 +236,13 @@ public sealed class XmlDiagnosticsPublisherTest
     public void IndexChanged_DocumentClosed_ClearsDiagnostics_For_That_Uri()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        workspaceHost.Set("file:///a.xml", "<Root/>");
+        workspaceHost.With("file:///a.xml", "<Root/>");
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
         published.Clear();
 
         workspaceHost.Remove("file:///a.xml");
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         var clear = Assert.Single(published);
         Assert.Equal("file:///a.xml", clear.Uri.ToString());
@@ -255,9 +255,9 @@ public sealed class XmlDiagnosticsPublisherTest
         // Lua files may be in the workspace host (opened via LuaTextDocumentSyncHandler).
         // The XML publisher must ignore them - they are handled by LuaDiagnosticsPublisher.
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        workspaceHost.Set("file:///script.lua", "function Definitions() end");
+        workspaceHost.With("file:///script.lua", "function Definitions() end");
 
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         Assert.Empty(published);
     }
@@ -266,14 +266,14 @@ public sealed class XmlDiagnosticsPublisherTest
     public void IndexChanged_OnlyPublishesForOpenFiles_NotForIndexOnlyEntries()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        workspaceHost.Set("file:///a.xml", "<Root/>");
+        workspaceHost.With("file:///a.xml", "<Root/>");
 
         var indexWithBoth = IndexWithDoc("file:///a.xml") with
         {
             Documents = IndexWithDoc("file:///a.xml").Documents
                 .Add("a.xml", new DocumentIndex("a.xml", 0, [], []))
         };
-        indexService.Fire(indexWithBoth);
+        indexService.Raise(indexWithBoth);
 
         Assert.Single(published);
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
@@ -283,9 +283,9 @@ public sealed class XmlDiagnosticsPublisherTest
     public void IndexChanged_ScannerFiresAfterOpen_StillPublishesForOpenFile()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        workspaceHost.Set("file:///a.xml", "<Root/>");
+        workspaceHost.With("file:///a.xml", "<Root/>");
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
         published.Clear();
 
         var scanIndex = GameIndex.Empty with
@@ -293,7 +293,7 @@ public sealed class XmlDiagnosticsPublisherTest
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add("a.xml", new DocumentIndex("a.xml", 0, [], []))
         };
-        indexService.Fire(scanIndex);
+        indexService.Raise(scanIndex);
 
         var pub = Assert.Single(published);
         Assert.Equal("file:///a.xml", pub.Uri.ToString());
@@ -306,9 +306,9 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         var registry = new FakeFileTypeRegistry();
         registry.Register("storyplots.xml", ImmutableArray.Create("StoryParser"));
-        var schema = new FakeSchemaProvider();
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
-        schema.AddEnum(new EnumDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new GameObjectTypeDefinition { TypeName = "StoryParser" });
+        schema.Add(new EnumDefinition
         {
             Name = "StoryRewardType", Kind = EnumKind.SchemaFixed,
             Values = [new EnumValueDefinition { Name = "ZOOM_IN", Params = [] }]
@@ -322,8 +322,8 @@ public sealed class XmlDiagnosticsPublisherTest
                            "<Reward_Param1>extra</Reward_Param1>" +
                            "</Event></StoryParser>";
 
-        workspaceHost.Set(uri, xml);
-        indexService.Fire(IndexWithDoc(uri));
+        workspaceHost.With(uri, xml);
+        indexService.Raise(IndexWithDoc(uri));
 
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
@@ -333,8 +333,8 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void OnIndexChanged_NonStoryParserDocument_EmitsNoStoryDiagnostics()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction" });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new GameObjectTypeDefinition { TypeName = "Faction" });
         var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
 
         const string uri = "file:///Factions.xml";
@@ -342,8 +342,8 @@ public sealed class XmlDiagnosticsPublisherTest
                            "<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
                            "</Faction>";
 
-        workspaceHost.Set(uri, xml);
-        indexService.Fire(IndexWithDoc(uri));
+        workspaceHost.With(uri, xml);
+        indexService.Raise(IndexWithDoc(uri));
 
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
@@ -356,9 +356,9 @@ public sealed class XmlDiagnosticsPublisherTest
         var registry = new FakeFileTypeRegistry();
         const string uri = "file:///StoryPlots.xml";
         registry.Register("storyplots.xml", ImmutableArray.Create("StoryParser"));
-        var schema = new FakeSchemaProvider();
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
-        schema.AddEnum(new EnumDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new GameObjectTypeDefinition { TypeName = "StoryParser" });
+        schema.Add(new EnumDefinition
         {
             Name = "StoryRewardType", Kind = EnumKind.SchemaFixed,
             Values = [new EnumValueDefinition { Name = "ZOOM_IN", Params = [] }]
@@ -371,8 +371,8 @@ public sealed class XmlDiagnosticsPublisherTest
                            "<Reward_Param1>extra</Reward_Param1>" +
                            "</Event></SomeContainer>";
 
-        workspaceHost.Set(uri, xml);
-        indexService.Fire(IndexWithDoc(uri));
+        workspaceHost.With(uri, xml);
+        indexService.Raise(IndexWithDoc(uri));
 
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
@@ -382,8 +382,8 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void OnIndexChanged_StoryParserRootElement_NotInRegistry_NoStoryDiagnostics()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new GameObjectTypeDefinition { TypeName = "StoryParser" });
         var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
 
         const string uri = "file:///StoryPlots.xml";
@@ -393,8 +393,8 @@ public sealed class XmlDiagnosticsPublisherTest
                            "<Reward_Param1>extra</Reward_Param1>" +
                            "</Event></StoryParser>";
 
-        workspaceHost.Set(uri, xml);
-        indexService.Fire(IndexWithDoc(uri));
+        workspaceHost.With(uri, xml);
+        indexService.Raise(IndexWithDoc(uri));
 
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
@@ -406,8 +406,8 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void OnIndexChanged_TagWithNotes_EmitsHintDiagnostic()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Old_Tag",
             ValueType = XmlValueType.Float,
@@ -422,8 +422,8 @@ public sealed class XmlDiagnosticsPublisherTest
         const string uri = "file:///test.xml";
         const string xml = "<Root><Old_Tag>500</Old_Tag></Root>";
 
-        workspaceHost.Set(uri, xml);
-        indexService.Fire(IndexWithDoc(uri));
+        workspaceHost.With(uri, xml);
+        indexService.Raise(IndexWithDoc(uri));
 
         var diags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(diags);
@@ -440,11 +440,11 @@ public sealed class XmlDiagnosticsPublisherTest
         // The index (from GameIndexService) stores canonical lowercase URIs. The publisher
         // must normalize before looking up in the index.
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        workspaceHost.Set("file:///A.xml", "<Unit><Name>UNIT_A</Name></Unit>");
-        workspaceHost.Set("file:///b.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+        workspaceHost.With("file:///A.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+        workspaceHost.With("file:///b.xml", "<Unit><Name>UNIT_A</Name></Unit>");
         var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///A.xml");
         Assert.NotNull(pub);
@@ -455,9 +455,9 @@ public sealed class XmlDiagnosticsPublisherTest
     public void Strictness_ReportsAStrictOnlyFindingAsAWarning()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed(withStructure: true);
-        workspaceHost.Set("file:///a.xml", StrayAmpersandDoc);
+        workspaceHost.With("file:///a.xml", StrayAmpersandDoc);
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         var d = Assert.Single(published.Last().Diagnostics,
             x => x.Code?.String == DiagnosticIds.XmlStrayAmpersand.ToString());
@@ -469,9 +469,9 @@ public sealed class XmlDiagnosticsPublisherTest
     public void Strictness_AFileTheGameDrops_IsAnError()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed(withStructure: true);
-        workspaceHost.Set("file:///a.xml", DroppedFileDoc);
+        workspaceHost.With("file:///a.xml", DroppedFileDoc);
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         var d = Assert.Single(published.Last().Diagnostics,
             x => x.Code?.String == DiagnosticIds.XmlEndTagMismatch.ToString());
@@ -484,9 +484,9 @@ public sealed class XmlDiagnosticsPublisherTest
         var (_, published, indexService, workspaceHost) = BuildSubscribed(withStructure: true);
         var doc = "<?xml version=\"1.0\"?>\n<Root>\n\t<!-- aetswg:suppress " + DiagnosticIds.XmlStrayAmpersand +
                   " -->\n\t<A>Tom & Jerry</A>\n</Root>";
-        workspaceHost.Set("file:///a.xml", doc);
+        workspaceHost.With("file:///a.xml", doc);
 
-        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        indexService.Raise(IndexWithDoc("file:///a.xml"));
 
         Assert.DoesNotContain(published.Last().Diagnostics,
             x => x.Code?.String == DiagnosticIds.XmlStrayAmpersand.ToString());
@@ -514,11 +514,11 @@ public sealed class XmlDiagnosticsPublisherTest
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         // Symbol is at line 1; suppression comment is at line 0.
         const string xml = "<!-- aetswg:suppress aetswg-010-0001 -->\n<Unit Name=\"Default\"/>";
-        workspaceHost.Set("file:///a.xml", xml);
-        workspaceHost.Set("file:///b.xml", "<Unit Name=\"Default\"/>");
+        workspaceHost.With("file:///a.xml", xml);
+        workspaceHost.With("file:///b.xml", "<Unit Name=\"Default\"/>");
         var index = IndexWithDuplicateAtLine("Default", "file:///a.xml", "file:///b.xml", 1);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///a.xml");
         Assert.NotNull(pub);
@@ -531,11 +531,11 @@ public sealed class XmlDiagnosticsPublisherTest
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         const string xmlA = "<!-- aetswg:suppress aetswg-010-0001 -->\n<Unit Name=\"Default\"/>";
         const string xmlB = "<Unit Name=\"Default\"/>";
-        workspaceHost.Set("file:///a.xml", xmlA);
-        workspaceHost.Set("file:///b.xml", xmlB);
+        workspaceHost.With("file:///a.xml", xmlA);
+        workspaceHost.With("file:///b.xml", xmlB);
         var index = IndexWithDuplicateAtLine("Default", "file:///a.xml", "file:///b.xml", 1);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         var pubB = published.FirstOrDefault(p => p.Uri.ToString() == "file:///b.xml");
         Assert.NotNull(pubB);
@@ -550,7 +550,7 @@ public sealed class XmlDiagnosticsPublisherTest
         var (_, published, indexService, _) = BuildSubscribed();
         var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         Assert.Empty(published);
     }
@@ -561,10 +561,10 @@ public sealed class XmlDiagnosticsPublisherTest
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
 
-        workspaceHost.Set("file:///a.xml", "<Unit><Name>UNIT_A</Name></Unit>");
-        workspaceHost.Set("file:///b.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+        workspaceHost.With("file:///a.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+        workspaceHost.With("file:///b.xml", "<Unit><Name>UNIT_A</Name></Unit>");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         Assert.Equal(2, published.Count);
         Assert.All(published, p => Assert.Contains(p.Diagnostics, d => d.Message.Contains("UNIT_A")));
@@ -576,7 +576,7 @@ public sealed class XmlDiagnosticsPublisherTest
         var (_, published, indexService, _) = BuildSubscribed();
         var index = IndexWithRef("file:///a.xml", "UNIT_MISSING");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         Assert.Empty(published);
     }
@@ -586,13 +586,13 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void ToLspDiagnostic_WhenHandlerReturnsSuggestedFix_EmbedsFix_In_DiagnosticData()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
         var (_, published, indexService, workspaceHost) =
             BuildSubscribedWithHandlers(schema, [new SuggestedFixStubHandler()]);
 
-        workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
-        indexService.Fire(IndexWithDoc("file:///test.xml"));
+        workspaceHost.With("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
+        indexService.Raise(IndexWithDoc("file:///test.xml"));
 
         var diags = published.Single().Diagnostics.ToList();
         var diag = Assert.Single(diags);
@@ -602,13 +602,13 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void ToLspDiagnostic_WhenHandlerReturnsNoFix_DiagnosticDataIsNull()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
         var (_, published, indexService, workspaceHost) =
             BuildSubscribedWithHandlers(schema, [new NoFixStubHandler()]);
 
-        workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
-        indexService.Fire(IndexWithDoc("file:///test.xml"));
+        workspaceHost.With("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
+        indexService.Raise(IndexWithDoc("file:///test.xml"));
 
         var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Null(diag.Data);
@@ -617,13 +617,13 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void ToLspDiagnostic_WhenHandlerReturnsUnnecessaryTag_SetsDiagnosticTag_And_RemovalData()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
         var (_, published, indexService, workspaceHost) =
             BuildSubscribedWithHandlers(schema, [new UnnecessaryRemovableStubHandler()]);
 
-        workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
-        indexService.Fire(IndexWithDoc("file:///test.xml"));
+        workspaceHost.With("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
+        indexService.Raise(IndexWithDoc("file:///test.xml"));
 
         var diag = Assert.Single(published.Single().Diagnostics);
         Assert.NotNull(diag.Tags);
@@ -634,13 +634,13 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void ToLspDiagnostic_WhenHandlerReturnsCreateLocKey_EmbedsCreateLocKey_In_DiagnosticData()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition { Tag = "TextId", ValueType = XmlValueType.NameReference });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition { Tag = "TextId", ValueType = XmlValueType.NameReference });
         var (_, published, indexService, workspaceHost) =
             BuildSubscribedWithHandlers(schema, [new CreateLocKeyStubHandler()]);
 
-        workspaceHost.Set("file:///test.xml", "<Root><TextId>TEXT_FOO</TextId></Root>");
-        indexService.Fire(IndexWithDoc("file:///test.xml"));
+        workspaceHost.With("file:///test.xml", "<Root><TextId>TEXT_FOO</TextId></Root>");
+        indexService.Raise(IndexWithDoc("file:///test.xml"));
 
         var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Equal("TEXT_FOO", diag.Data?["createLocKey"]?.Value<string>());
@@ -649,13 +649,13 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void ToLspDiagnostic_WhenHandlerReturnsBothFixAndCreateLocKey_BothEmbeddedInData()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition { Tag = "TextId", ValueType = XmlValueType.NameReference });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition { Tag = "TextId", ValueType = XmlValueType.NameReference });
         var (_, published, indexService, workspaceHost) =
             BuildSubscribedWithHandlers(schema, [new FixAndCreateLocKeyStubHandler()]);
 
-        workspaceHost.Set("file:///test.xml", "<Root><TextId>TEXT_FOO</TextId></Root>");
-        indexService.Fire(IndexWithDoc("file:///test.xml"));
+        workspaceHost.With("file:///test.xml", "<Root><TextId>TEXT_FOO</TextId></Root>");
+        indexService.Raise(IndexWithDoc("file:///test.xml"));
 
         var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Equal("suggested_fix", diag.Data?["fix"]?.Value<string>());
@@ -667,13 +667,13 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void ToLspDiagnostic_WhenResultOverridesEndPosition_ProducesCrossLineRange()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
         var (_, published, indexService, workspaceHost) =
             BuildSubscribedWithHandlers(schema, [new EndPositionOverrideStubHandler()]);
 
-        workspaceHost.Set("file:///test.xml", "<Root>\n<Priority>1.5</Priority>\n</Root>");
-        indexService.Fire(IndexWithDoc("file:///test.xml"));
+        workspaceHost.With("file:///test.xml", "<Root>\n<Priority>1.5</Priority>\n</Root>");
+        indexService.Raise(IndexWithDoc("file:///test.xml"));
 
         var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Equal(1, diag.Range.Start.Line);
@@ -696,17 +696,17 @@ public sealed class XmlDiagnosticsPublisherTest
             p => published.Add(p),
             indexService,
             workspaceHost,
-            new FakeSchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new XmlDiagnosticsHandlerRegistry([new PlainResultForSpanFactHandler()]),
             new SpanFactStubDocumentProducer(),
             new StubIndexFactProducerForSpan(),
-            new StoryFactProducer(new FakeSchemaProvider()),
+            new StoryFactProducer(new SchemaProviderBuilder().Build()),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             new FakeFileTypeRegistry(),
             fileHelper);
 
-        workspaceHost.Set("file:///test.xml", "irrelevant text");
-        indexService.Fire(IndexWithDoc("file:///test.xml"));
+        workspaceHost.With("file:///test.xml", "irrelevant text");
+        indexService.Raise(IndexWithDoc("file:///test.xml"));
 
         var diag = Assert.Single(published.Single().Diagnostics);
         Assert.Equal(2, diag.Range.Start.Line);
@@ -725,7 +725,7 @@ public sealed class XmlDiagnosticsPublisherTest
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
-        var schema = new FakeSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var registry = new FakeFileTypeRegistry();
         var fileHelper = new FileHelper(fs);
 
@@ -752,7 +752,7 @@ public sealed class XmlDiagnosticsPublisherTest
         var fs = new MockFileSystem();
         var (publisher, published, indexService, workspaceHost) = BuildSubscribedWithFs(fs);
         indexService.Current = IndexWithDoc(uri);
-        workspaceHost.Set(uri, "<Root/>");
+        workspaceHost.With(uri, "<Root/>");
 
         await publisher.RevalidateDocumentAsync(uri, CancellationToken.None);
 
@@ -846,8 +846,8 @@ public sealed class XmlDiagnosticsPublisherTest
         var (publisher, published, indexService, workspaceHost) = BuildSubscribedWithFs(fs);
 
         // First: simulate that this URI got diagnostics via index change
-        workspaceHost.Set(uri, "<Root/>");
-        indexService.Fire(IndexWithDoc(uri)); // records uri in _lastPublishedUris
+        workspaceHost.With(uri, "<Root/>");
+        indexService.Raise(IndexWithDoc(uri)); // records uri in _lastPublishedUris
         published.Clear();
 
         // Now remove it from the index - uri no longer indexed
@@ -958,144 +958,6 @@ public sealed class XmlDiagnosticsPublisherTest
 
     // ── fakes ────────────────────────────────────────────────────────────────
 
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tags.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [.. _types.Values];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            return _enums.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
-
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddTag(XmlTagDefinition tag)
-        {
-            _tags[tag.Tag] = tag;
-        }
-
-        public void AddType(GameObjectTypeDefinition type)
-        {
-            _types[type.TypeName] = type;
-        }
-
-        public void AddEnum(EnumDefinition enumDef)
-        {
-            _enums[enumDef.Name] = enumDef;
-        }
-    }
-
-    private sealed class FakeGameIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged;
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        public void Fire(GameIndex index)
-        {
-            IndexChanged?.Invoke(index);
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
     private sealed class FakeFileTypeRegistry : IFileTypeRegistry
     {
         private readonly Dictionary<string, ImmutableArray<string>> _map =
@@ -1121,33 +983,6 @@ public sealed class XmlDiagnosticsPublisherTest
         public void Register(string key, ImmutableArray<string> types)
         {
             _map["file:///" + key] = types;
-        }
-    }
-
-    private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            Set(uri, text, version);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void Set(string uri, string text, int version = 1)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version);
         }
     }
 }

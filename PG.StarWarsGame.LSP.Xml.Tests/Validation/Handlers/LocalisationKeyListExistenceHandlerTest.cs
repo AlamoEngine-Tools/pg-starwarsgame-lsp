@@ -30,7 +30,7 @@ public sealed class LocalisationKeyListExistenceHandlerTest
     private static DiagnosticsContext CtxWithKeys(params string[] keys)
     {
         var index = GameIndex.Empty with { Localisation = new ValueLocIndex(keys) };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
     }
 
     [Fact]

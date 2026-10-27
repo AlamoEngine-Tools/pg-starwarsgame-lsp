@@ -55,7 +55,7 @@ public sealed class GetEncyclopediaEntryIconTest
         config.Current = config.Current with { WorkspaceRoot = @"C:\mod" };
 
         var handler = new GetEncyclopediaEntryHandler(
-            new FakeGameIndexService(IndexWith(Sym())), new NullSchemaProvider(), source, config,
+            new FakeGameIndexService(IndexWith(Sym())), new SchemaProviderBuilder().Build(), source, config,
             new WorkspaceIconCatalog(config, icons));
 
         return await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
@@ -347,7 +347,7 @@ public sealed class GetEncyclopediaEntryIconTest
         config.Current = config.Current with { WorkspaceRoot = @"C:\mod" };
 
         var handler = new GetEncyclopediaEntryHandler(
-            new FakeGameIndexService(IndexWith(Sym(), component)), new NullSchemaProvider(),
+            new FakeGameIndexService(IndexWith(Sym(), component)), new SchemaProviderBuilder().Build(),
             source, config, new WorkspaceIconCatalog(config, icons));
 
         return await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);

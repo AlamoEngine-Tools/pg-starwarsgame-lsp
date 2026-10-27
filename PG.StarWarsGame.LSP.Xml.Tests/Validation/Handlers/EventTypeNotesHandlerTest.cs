@@ -15,7 +15,8 @@ public sealed class EventTypeNotesHandlerTest
     [Fact]
     public void Event_with_matching_locale_note_emits_hint()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml",
+            "en");
         var def = new EnumValueDefinition
         {
             Name = "MY_EVENT",
@@ -35,7 +36,8 @@ public sealed class EventTypeNotesHandlerTest
     [Fact]
     public void Event_with_different_locale_emits_no_diagnostics()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "de");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml",
+            "de");
         var def = new EnumValueDefinition
         {
             Name = "MY_EVENT",

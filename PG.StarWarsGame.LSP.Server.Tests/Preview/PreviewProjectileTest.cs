@@ -224,7 +224,7 @@ public sealed class PreviewProjectileTest
 
     private static PreviewSceneBuilder Builder(GameIndex index, FakeVariantTagSource tags)
     {
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets("hull.alo", "W_LASER_SMALL.ALO"));
     }
 }

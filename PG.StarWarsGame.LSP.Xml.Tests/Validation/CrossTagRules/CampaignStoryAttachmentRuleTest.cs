@@ -27,7 +27,7 @@ public sealed class CampaignStoryAttachmentRuleTest
     {
         return new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new NoFileTypeRegistry(),
             new XmlStructuralValidator(),
             [new CampaignStoryAttachmentRule()]);

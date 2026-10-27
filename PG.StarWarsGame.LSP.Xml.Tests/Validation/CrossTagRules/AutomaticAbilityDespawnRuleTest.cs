@@ -130,7 +130,7 @@ public sealed class AutomaticAbilityDespawnRuleTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             [new AutomaticAbilityDespawnRule()]);

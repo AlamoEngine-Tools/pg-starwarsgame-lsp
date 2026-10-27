@@ -23,8 +23,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         return new XmlDiagnosticsPublisher(
             _ => { },
-            new StubIndexService(),
-            new StubWorkspaceHost(),
+            new FakeGameIndexService(),
+            new FakeGameWorkspaceHost(),
             schema,
             new XmlDiagnosticsHandlerRegistry([]),
             new StubDocumentFactProducer(),
@@ -76,7 +76,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("Behavior"),
-            BehaviorModuleSet(Value("GenericTransport")));
+            BehaviorModuleSet(Value("GenericTransport"))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -94,7 +94,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("Behavior"),
-            BehaviorModuleSet(Value("GenericTransport"), Value("SlaveCraftBehavior")));
+            BehaviorModuleSet(Value("GenericTransport"), Value("SlaveCraftBehavior"))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -111,7 +111,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
         // Tag references "BehaviorModule" but schema has no such set
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("Behavior"),
-            []);
+            []).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -127,7 +127,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("Behavior"),
-            BehaviorModuleSet(Value("GenericTransport"), DeprecatedValue("OLD_MODULE")));
+            BehaviorModuleSet(Value("GenericTransport"), DeprecatedValue("OLD_MODULE"))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -146,7 +146,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("Behavior"),
-            BehaviorModuleSet(Value("GenericTransport"), DeprecatedValue("OLD_MODULE")));
+            BehaviorModuleSet(Value("GenericTransport"), DeprecatedValue("OLD_MODULE"))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -165,7 +165,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("SpaceBehavior", "space"),
-            BehaviorModuleSet(Value("SpaceFighter", "space"), Value("InfantryUnit", "land")));
+            BehaviorModuleSet(Value("SpaceFighter", "space"), Value("InfantryUnit", "land"))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -182,7 +182,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("SpaceBehavior", "space"),
-            BehaviorModuleSet(Value("GenericTransport" /* no groups - valid everywhere */)));
+            BehaviorModuleSet(Value("GenericTransport" /* no groups - valid everywhere */))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -198,7 +198,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("SpaceBehavior", "space"),
-            BehaviorModuleSet(Value("SpaceFighter", "space"), Value("InfantryUnit", "land")));
+            BehaviorModuleSet(Value("SpaceFighter", "space"), Value("InfantryUnit", "land"))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -216,7 +216,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("Behavior", "land", "space"),
-            BehaviorModuleSet(Value("LandUnit", "land"), Value("SpaceUnit", "space")));
+            BehaviorModuleSet(Value("LandUnit", "land"), Value("SpaceUnit", "space"))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -232,7 +232,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("LandBehavior", "land", "space"),
-            BehaviorModuleSet(Value("AirUnit", "air"), Value("LandUnit", "land")));
+            BehaviorModuleSet(Value("AirUnit", "air"), Value("LandUnit", "land"))).Build();
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -254,7 +254,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
         // for this file type, so no diagnostic is emitted for an invalid value.
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("Behavior"),
-            BehaviorModuleSet(Value("GenericTransport")));
+            BehaviorModuleSet(Value("GenericTransport"))).Build();
         var registry = new StubFileTypeRegistryWithTypes("file:///units.xml", ["CommandBarComponent"]);
         var publisher = BuildPublisher(schema, registry);
 
@@ -272,8 +272,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         return new XmlDiagnosticsPublisher(
             _ => { },
-            new StubIndexService(),
-            new StubWorkspaceHost(),
+            new FakeGameIndexService(),
+            new FakeGameWorkspaceHost(),
             schema,
             new XmlDiagnosticsHandlerRegistry([]),
             new StubDocumentFactProducer(),
@@ -285,7 +285,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     }
 }
 
-file sealed class StubHardcodedSchemaProvider : ISchemaProvider
+file sealed class StubHardcodedSchemaProvider
 {
     private readonly List<HardcodedReferenceSet> _hardcodedSets;
     private readonly Dictionary<string, XmlTagDefinition> _tags;
@@ -309,41 +309,14 @@ file sealed class StubHardcodedSchemaProvider : ISchemaProvider
             { [wiredTag.Tag] = wiredTag };
     }
 
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _hardcodedSets;
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string name)
+    public FakeSchemaProvider Build()
     {
-        return _tags.GetValueOrDefault(name);
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        var builder = new SchemaProviderBuilder();
+        foreach (var item in _hardcodedSets)
+            builder.WithHardcodedSet(item);
+        foreach (var item in _tags.Values)
+            builder.WithTag(item);
+        return builder.Build();
     }
 }
 
@@ -368,82 +341,6 @@ file sealed class StubStoryFactProducer : IStoryFactProducer
     public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
     {
         return [];
-    }
-}
-
-file sealed class StubIndexService : IGameIndexService
-{
-    public GameIndex Current => GameIndex.Empty;
-
-    public event Action<GameIndex>? IndexChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<ILocalisationIndex>? LocalisationChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<GameIndex>? DynamicEnumChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-    {
-        return Task.CompletedTask;
-    }
-
-    public void InjectDocument(DocumentIndex document)
-    {
-    }
-
-    public void RemoveDocument(string uri)
-    {
-    }
-
-    public void ApplyBaseline(BaselineIndex baseline)
-    {
-    }
-
-    public void ApplyLocalisation(ILocalisationIndex index)
-    {
-    }
-
-    public void ApplyAssetFiles(IAssetFileIndex index)
-    {
-    }
-
-    public void ApplyModelBones(
-        ImmutableDictionary<string, ImmutableArray<string>> bones)
-    {
-    }
-
-    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-    {
-    }
-
-    public void ApplyWorkspaceEnumValueDefinitions(
-        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-    {
-    }
-
-    public IDisposable BeginBulkUpdate()
-    {
-        return NullDisposable.Instance;
-    }
-
-    private sealed class NullDisposable : IDisposable
-    {
-        public static readonly NullDisposable Instance = new();
-
-        public void Dispose()
-        {
-        }
     }
 }
 
@@ -492,33 +389,4 @@ file sealed class StubFileTypeRegistryWithTypes : IFileTypeRegistry
 
     public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
         new Dictionary<string, ImmutableArray<string>>(_types);
-}
-
-file sealed class StubWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-        _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-    }
-
-    public void Remove(string uri)
-    {
-        _docs.Remove(uri);
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        if (_docs.TryGetValue(uri, out var d))
-        {
-            doc = d;
-            return true;
-        }
-
-        doc = default!;
-        return false;
-    }
-
-    public IEnumerable<TrackedDocument> All => _docs.Values;
 }

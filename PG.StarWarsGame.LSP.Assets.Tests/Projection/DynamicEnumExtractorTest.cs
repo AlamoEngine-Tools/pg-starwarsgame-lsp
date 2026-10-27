@@ -10,7 +10,7 @@ public sealed class DynamicEnumExtractorTest
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static readonly ISchemaProvider EmptySchema = new EnumSchemaFake();
+    private static readonly ISchemaProvider EmptySchema = new SchemaProviderBuilder().Build();
     // ── ParseEnumDefinitionFile ───────────────────────────────────────────────
 
     [Fact]
@@ -340,7 +340,10 @@ public sealed class DynamicEnumExtractorTest
 
     private static ISchemaProvider WithEnums(params EnumDefinition[] enums)
     {
-        return new EnumSchemaFake(enums);
+        var builder = new SchemaProviderBuilder();
+        foreach (var definition in enums)
+            builder.WithEnum(definition);
+        return builder.Build();
     }
 
     private static EnumDefinition DynEnum(string name, string sourceFile)
@@ -357,45 +360,5 @@ public sealed class DynamicEnumExtractorTest
     private static Func<string, string?> GameConstantsReader(string content)
     {
         return path => path.Contains("gameconstants", StringComparison.OrdinalIgnoreCase) ? content : null;
-    }
-}
-
-file sealed class EnumSchemaFake(params EnumDefinition[] enums) : ISchemaProvider
-{
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => enums;
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string tagName)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string enumName)
-    {
-        return null;
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        return null;
     }
 }

@@ -88,7 +88,7 @@ public sealed class DeathAnimationClipHandlerTest
                 ("Land_Model_Name", "NI_Mandalorian.alo"), ("Specific_Death_Anim_Type", "Choke_Die"))
             with
             {
-                Schema = new DeathTypeSchema()
+                Schema = DeathTypeSchema.Build()
             };
 
         Assert.Empty(Sut.Handle(Fact(), ctx));
@@ -101,7 +101,7 @@ public sealed class DeathAnimationClipHandlerTest
                 ("Land_Model_Name", "NI_Mandalorian.alo"), ("Specific_Death_Anim_Type", "Choke_Die"))
             with
             {
-                Schema = new DeathTypeSchema()
+                Schema = DeathTypeSchema.Build()
             };
 
         Assert.Contains("no death animation", Assert.Single(Sut.Handle(Fact(), ctx).ToList()).Message);
@@ -224,7 +224,7 @@ public sealed class DeathAnimationClipHandlerTest
 }
 
 /// <summary>The death type tag, typed with the animation types: Choke_Die filed apart from its name, as the engine files it.</summary>
-file sealed class DeathTypeSchema : ISchemaProvider
+file static class DeathTypeSchema
 {
     private static readonly XmlTagDefinition DeathType = new()
     {
@@ -240,40 +240,10 @@ file sealed class DeathTypeSchema : ISchemaProvider
         }
     };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return tagName.Equals(DeathType.Tag, StringComparison.OrdinalIgnoreCase) ? DeathType : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [DeathType];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [DeathType];
-    }
-
-    public EnumDefinition? GetEnum(string enumName)
-    {
-        return enumName == "AnimationType" ? DeathType.Enum : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [DeathType];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [DeathType.Enum!];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
+        return new SchemaProviderBuilder()
+            .WithTag(DeathType)
+            .Build();
     }
 }

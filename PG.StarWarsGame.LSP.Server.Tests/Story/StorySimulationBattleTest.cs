@@ -27,8 +27,8 @@ public sealed class StorySimulationBattleTest
     {
         var notified = new List<StorySimKey>();
         var service = new StorySimulationService(
-            new StoryBattleFixture.ModelService(), new StoryBattleFixture.IndexService(),
-            new StoryBattleFixture.Schema(), notified.Add);
+            new StoryBattleFixture.ModelService(), new FakeGameIndexService(),
+            StoryBattleFixture.Schema.Build(), notified.Add);
         return (service, notified);
     }
 

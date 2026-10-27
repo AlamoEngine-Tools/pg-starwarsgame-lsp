@@ -15,7 +15,7 @@ public sealed class StoryGraphBuilderTest
 
     // ── Fixture: schema slice with the edge-driving referenceTypes ───────────
 
-    private static ISchemaProvider Schema { get; } = new StubSchemaProvider(
+    private static ISchemaProvider Schema { get; } = new SchemaProviderBuilder().WithEnums(
         new EnumDefinition
         {
             Name = "StoryEventType",
@@ -37,7 +37,7 @@ public sealed class StoryGraphBuilderTest
                 Value("SET_FLAG", Param(0, "StoryFlag")),
                 Value("DISABLE_BRANCH", Param(0, "StoryBranch"))
             ]
-        });
+        }).Build();
 
     private static EnumValueDefinition Value(string name, params ParamDefinition[] parameters)
     {
@@ -544,45 +544,5 @@ public sealed class StoryGraphBuilderTest
 
         Assert.DoesNotContain(graph.Edges,
             e => e.Kind == StoryEdgeKind.TacticalEntry && e.ToId == EventId(UriB, "Reinforcements"));
-    }
-}
-
-file sealed class StubSchemaProvider(params EnumDefinition[] enums) : ISchemaProvider
-{
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => enums;
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string t)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string name)
-    {
-        return enums.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string t)
-    {
-        return null;
     }
 }

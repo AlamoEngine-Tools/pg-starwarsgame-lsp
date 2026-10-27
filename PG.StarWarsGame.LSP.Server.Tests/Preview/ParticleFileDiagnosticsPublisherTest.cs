@@ -86,7 +86,8 @@ public sealed class ParticleFileDiagnosticsPublisherTest
     {
         var index = GameIndex.Empty with { AssetFiles = assets };
         return new ParticleFileDiagnosticsPublisher(published.Add, new FakeGameIndexService(index),
-            new NoDocuments(), assets, new FileHelper(new MockFileSystem()), new FakeLspConfigurationProvider());
+            new FakeGameWorkspaceHost(), assets, new FileHelper(new MockFileSystem()),
+            new FakeLspConfigurationProvider());
     }
 
     private sealed class FakeAssets : IGameAssetResolver, IAssetFileIndex
@@ -138,25 +139,6 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         public void Replace(string path, byte[] bytes)
         {
             _files[path] = (bytes, _files[path].Packed);
-        }
-    }
-
-    private sealed class NoDocuments : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-        }
-
-        public void Remove(string uri)
-        {
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            doc = null!;
-            return false;
         }
     }
 

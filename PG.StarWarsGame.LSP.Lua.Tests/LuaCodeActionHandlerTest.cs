@@ -19,7 +19,7 @@ public sealed class LuaCodeActionHandlerTest
         ILspConfigurationProvider? config = null)
     {
         return new LuaCodeActionHandler(
-            host ?? new FakeWorkspaceHost(),
+            host ?? new FakeGameWorkspaceHost(),
             fileHelper ?? new FileHelper(new MockFileSystem()),
             config ?? new FakeLspConfigurationProvider());
     }
@@ -61,10 +61,10 @@ public sealed class LuaCodeActionHandlerTest
     // ── suppression quick fixes ──────────────────────────────────────────────
 
     // ReSharper disable once UnusedTupleComponentInReturnValue - the helper returns everything a test might need; some tests ignore a part
-    private static (LuaCodeActionHandler Sut, FakeWorkspaceHost Host) SutWithDocument(string text)
+    private static (LuaCodeActionHandler Sut, FakeGameWorkspaceHost Host) SutWithDocument(string text)
     {
-        var host = new FakeWorkspaceHost();
-        host.Set("file:///s.lua", text);
+        var host = new FakeGameWorkspaceHost();
+        host.With("file:///s.lua", text);
         return (MakeSut(host), host);
     }
 
@@ -380,8 +380,8 @@ public sealed class LuaCodeActionHandlerTest
     public async Task Handle_EngineUpvalueDiagnostic_OnlyOneCapturingFunction_ReturnsMoveLocalAction()
     {
         const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
-        var host = new FakeWorkspaceHost();
-        host.Set("file:///s.lua", docText);
+        var host = new FakeGameWorkspaceHost();
+        host.With("file:///s.lua", docText);
         var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
@@ -409,8 +409,8 @@ public sealed class LuaCodeActionHandlerTest
     public async Task Handle_EngineUpvalueDiagnostic_MoveAction_IsPreferred()
     {
         const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
-        var host = new FakeWorkspaceHost();
-        host.Set("file:///s.lua", docText);
+        var host = new FakeGameWorkspaceHost();
+        host.With("file:///s.lua", docText);
         var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
@@ -425,8 +425,8 @@ public sealed class LuaCodeActionHandlerTest
     {
         // local on line 0 → delete (0,0)-(1,0)
         const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
-        var host = new FakeWorkspaceHost();
-        host.Set("file:///s.lua", docText);
+        var host = new FakeGameWorkspaceHost();
+        host.With("file:///s.lua", docText);
         var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
@@ -445,8 +445,8 @@ public sealed class LuaCodeActionHandlerTest
     {
         // function on line 1 → body starts at line 2 → insert at (2,0)
         const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
-        var host = new FakeWorkspaceHost();
-        host.Set("file:///s.lua", docText);
+        var host = new FakeGameWorkspaceHost();
+        host.With("file:///s.lua", docText);
         var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
@@ -490,31 +490,4 @@ public sealed class LuaCodeActionHandlerTest
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = new(StringComparer.OrdinalIgnoreCase);
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void Set(string uri, string text)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, 1);
-        }
-    }
 }

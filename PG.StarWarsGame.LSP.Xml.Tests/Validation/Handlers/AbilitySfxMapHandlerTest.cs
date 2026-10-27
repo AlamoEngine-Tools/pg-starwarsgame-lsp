@@ -55,7 +55,8 @@ public sealed class AbilitySfxMapHandlerTest
             Name = "AbilityType",
             Values = names.Select(n => new HardcodedReferenceSetValue { Name = n }).ToList()
         };
-        return new DiagnosticsContext(new StubSchemaProvider([set]), GameIndex.Empty, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().WithHardcodedSet(set).Build(), GameIndex.Empty,
+            "file:///test.xml", "en");
     }
 
     [Theory]
@@ -103,7 +104,8 @@ public sealed class AbilitySfxMapHandlerTest
     [Fact]
     public void SfxEvent_ResolvedSymbol_ReturnsNoDiagnostics()
     {
-        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("SFX_Hunt"), "file:///test.xml",
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("SFX_Hunt"),
+            "file:///test.xml",
             "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, SFX_Hunt"), ctx).ToList();
         Assert.Empty(results);
@@ -112,7 +114,8 @@ public sealed class AbilitySfxMapHandlerTest
     [Fact]
     public void SfxEvent_UnresolvedSymbol_WithLoadedIndex_ReturnsError()
     {
-        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Other_SFX"), "file:///test.xml",
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Other_SFX"),
+            "file:///test.xml",
             "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, Missing_SFX"), ctx).ToList();
         var d = Assert.Single(results);
@@ -127,7 +130,7 @@ public sealed class AbilitySfxMapHandlerTest
     [Fact]
     public void SfxEvent_UnresolvedSymbol_HighlightsOnlyTheSfxToken()
     {
-        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Other_SFX"),
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Other_SFX"),
             "file:///test.xml", "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, Missing_SFX"), ctx).ToList();
 
@@ -152,7 +155,7 @@ public sealed class AbilitySfxMapHandlerTest
     [Fact]
     public void SfxEvent_UnresolvedSymbol_MultiLineValue_HighlightsTokenOnItsOwnLine()
     {
-        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Other_SFX"),
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Other_SFX"),
             "file:///test.xml", "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT,\n  Missing_SFX"), ctx).ToList();
 
@@ -173,49 +176,10 @@ public sealed class AbilitySfxMapHandlerTest
     [Fact]
     public void SfxEvent_EmptyName_IsAllowed()
     {
-        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Some_SFX"), "file:///test.xml",
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Some_SFX"),
+            "file:///test.xml",
             "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT,"), ctx).ToList();
         Assert.Empty(results);
-    }
-
-    private sealed class StubSchemaProvider(IReadOnlyList<HardcodedReferenceSet> sets) : ISchemaProvider
-    {
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => sets;
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
     }
 }

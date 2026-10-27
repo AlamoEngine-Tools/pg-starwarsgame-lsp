@@ -16,9 +16,9 @@ public sealed class ValidateStoryCommandBatchHandlerTest
         var fileHelper = FileHelperFor(fs);
         return new ValidateStoryCommandBatchHandler(
             new StubModelService(),
-            new StubIndexService(DefaultIndex()),
+            new FakeGameIndexService(DefaultIndex()),
             TextSource(fileHelper),
-            new StoryTestSchema(),
+            new SchemaProviderBuilder().Build(),
             fileHelper,
             Reload(),
             new MarkerCollector(marker),

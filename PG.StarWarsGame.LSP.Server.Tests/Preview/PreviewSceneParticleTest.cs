@@ -59,7 +59,7 @@ public sealed class PreviewSceneParticleTest
                 new VariantTag("Is_Destroyable", "Yes", "", 0),
                 new VariantTag("Damage_Particles", "HP_F-L_EmitDamage", "", 0));
 
-        var builder = new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        var builder = new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new DirectoryAssets(models!));
 
         return builder.BuildForObject("Generic_Star_Destroyer");

@@ -34,7 +34,7 @@ public sealed class EffectiveObjectResolverTest
 
     private static EffectiveObjectResolver Resolver(GameIndex index, FakeTagSource source, FakeSchema? schema = null)
     {
-        return new EffectiveObjectResolver(index, schema ?? new FakeSchema(), source);
+        return new EffectiveObjectResolver(index, (schema ?? new FakeSchema()).Build(), source);
     }
 
     private static EffectiveTag TagNamed(EffectiveObject o, string name)
@@ -562,47 +562,17 @@ public sealed class EffectiveObjectResolverTest
         }
     }
 
-    private sealed class FakeSchema : ISchemaProvider
+    /// <summary>The tag modes a test needs, built into the shared schema double.</summary>
+    private sealed class FakeSchema
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
 
-        public XmlTagDefinition? GetTag(string tagName)
+        public FakeSchemaProvider Build()
         {
-            return _tags.GetValueOrDefault(tagName);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
+            var builder = new SchemaProviderBuilder();
+            foreach (var tag in _tags.Values)
+                builder.WithTag(tag);
+            return builder.Build();
         }
 
         public FakeSchema WithMode(string tag, VariantMode mode)

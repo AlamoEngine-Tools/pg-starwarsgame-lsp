@@ -211,7 +211,7 @@ public sealed class PreviewWeaponTest
     private static PreviewSceneBuilder Builder(
         GameIndex index, FakeVariantTagSource tags, params string[] resolvableAssets)
     {
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             tags, new FakeAssets(resolvableAssets));
     }
 }

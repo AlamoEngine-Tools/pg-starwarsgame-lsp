@@ -152,7 +152,7 @@ public sealed class BoneModelInlayHintProviderHardpointTest
         var node = hapDoc.DocumentNode.SelectSingleNode(xpath)!;
         var tagDef = new XmlTagDefinition
             { Tag = node.Name, ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.BoneName };
-        var ctx = new InlayHintContext(HpUri, index, new EmptySchemaProvider(), hapDoc, node, tagDef,
+        var ctx = new InlayHintContext(HpUri, index, new SchemaProviderBuilder().Build(), hapDoc, node, tagDef,
             XmlUtility.GetLine(node), lineIndex: new LineOffsetIndex(xml));
         return new BoneModelInlayHintProvider(source).Handle(ctx).ToList();
     }
