@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;

@@ -4,10 +4,10 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 

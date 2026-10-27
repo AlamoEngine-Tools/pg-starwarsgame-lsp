@@ -9,7 +9,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
-/// <summary>Shared context passed to every <see cref="IXmlDiagnosticsHandler" /> invocation.</summary>
+/// <summary>Shared context passed to every XML diagnostics handler invocation.</summary>
 /// <param name="IconsAwaitingRepack">
 ///     Icon base names (no extension) that exist as raw source images but are absent from the
 ///     workspace's mega texture. Empty when the workspace ships no mega texture, since there is then

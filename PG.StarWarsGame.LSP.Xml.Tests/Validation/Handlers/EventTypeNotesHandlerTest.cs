@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
