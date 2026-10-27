@@ -126,14 +126,18 @@ public sealed class ServerConfiguratorRegistrationTest
     }
 
     /// <summary>
-    ///     The scene builder, which sits on top of the asset resolver and the game index.
+    ///     The scene builder, which sits on top of the asset resolver and the game index. One
+    ///     instance: it holds no index, every build captures a snapshot of its own.
     /// </summary>
     [Fact]
-    public void PreviewSceneBuilder_Resolves()
+    public void PreviewSceneBuilder_ResolvesAsOneInstance()
     {
         using var provider = BuildProviderWithHostStubs();
 
-        Assert.NotNull(provider.GetRequiredService<PreviewSceneBuilder>());
+        var builder = provider.GetRequiredService<PreviewSceneBuilder>();
+
+        Assert.NotNull(builder);
+        Assert.Same(builder, provider.GetRequiredService<PreviewSceneBuilder>());
     }
 
     /// <summary>

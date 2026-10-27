@@ -281,6 +281,11 @@
 
 ### Fixes
 
+- **A preview scene is built from one index snapshot** - the scene builder captured the game index once and
+  then went back to the live index for the hardpoint bones, the clips, the damage and reticle tables, the
+  projectile catalog and the faction palette; a re-index landing mid-build could mix two snapshots into one
+  scene. Every part of the scene now comes from the snapshot the build started with
+  ([#303](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/303))
 - **An empty repeated tag leaves the earlier value in place, as the game does** - the game maps nothing from an
   empty value or a value of exactly `TBD`, so a later empty occurrence clears nothing: the earlier value, or the
   one inherited from the variant base, stays. The effective object, the preview and the encyclopedia card follow

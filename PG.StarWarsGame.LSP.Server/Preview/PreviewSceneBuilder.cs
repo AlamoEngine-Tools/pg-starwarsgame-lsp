@@ -155,6 +155,11 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     public PreviewScene BuildForModel(string modelReference)
     {
+        return BuildForModel(indexService.Current, modelReference);
+    }
+
+    private PreviewScene BuildForModel(GameIndex index, string modelReference)
+    {
         var path = PreviewModelReference.ModelPath(modelReference);
         var location = assets.Locate(path);
         var resolved = location is not null;
@@ -195,12 +200,12 @@ public sealed class PreviewSceneBuilder(
             modelReference,
             [part],
             [],
-            Factions(new EffectiveObjectResolver(indexService.Current, schema, tagSource)),
+            Factions(index, new EffectiveObjectResolver(index, schema, tagSource)),
             problems,
             assets.Tiers,
             null,
             particles,
-            AnimationsFor(modelReference),
+            AnimationsFor(index, modelReference),
             resolved ? CamerasOf(modelReference, problems) : [])
         {
             SourceFile = SourceFileOf(location)
@@ -300,7 +305,7 @@ public sealed class PreviewSceneBuilder(
             if (clip is null || !clip.MatchesModel(index.ModelBones[key]))
                 continue;
 
-            var scene = BuildForModel(key);
+            var scene = BuildForModel(index, key);
             return scene with
             {
                 Subject = animation,
@@ -361,19 +366,19 @@ public sealed class PreviewSceneBuilder(
             effective.ValueOf("Should_Be_Destroyed_When_All_Hardpoints_Destroyed"));
 
         foreach (var hardpointId in HardpointIds(effective))
-            AddHardpoint(resolver, hull, hardpointId, diesWithHardpoints,
+            AddHardpoint(index, resolver, hull, hardpointId, diesWithHardpoints,
                 parts, hardpoints, weapons, problems);
 
         // The unit's own armament, for the 188 objects that carry a WEAPON behaviour instead of - or
         // as well as - hardpoints. Nine objects across the two trees have both.
-        if (UnitWeapon(effective, hull, problems) is { } unitWeapon)
+        if (UnitWeapon(index, effective, hull, problems) is { } unitWeapon)
             weapons.Add(unitWeapon);
 
-        var animationSource = ResolveAnimationOverride(effective, hull, problems);
+        var animationSource = ResolveAnimationOverride(index, effective, hull, problems);
 
         // Read once: the scene carries it and the check below compares against it.
         var stages = DamageStages(effective);
-        ReportUntaggedStages(effective.ObjectId, hull, stages, problems);
+        ReportUntaggedStages(index, effective.ObjectId, hull, stages, problems);
 
         if (hull is not null && !parts[0].Resolved)
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelNotFound, "error",
@@ -386,30 +391,30 @@ public sealed class PreviewSceneBuilder(
             .ToList();
 
         return new PreviewScene(PreviewSceneKind.Object, effective.ObjectId, parts, hardpoints,
-            Factions(resolver), problems, assets.Tiers, animationSource, particles,
+            Factions(index, resolver), problems, assets.Tiers, animationSource, particles,
             // The clips are named after the model whose skeleton they were authored against, which
             // is the OVERRIDE when a unit borrows another model's set.
-            AnimationsFor(animationSource ?? hull ?? string.Empty),
+            AnimationsFor(index, animationSource ?? hull ?? string.Empty),
             // The HULL's cameras only. A turret carries its own skeleton and could in principle
             // declare one, but it was aimed at the turret, and the subject here is the whole unit.
             hull is null ? [] : CamerasOf(hull, problems),
             effective.ValueOf("Type"),
             CategoryTokens(effective.ValueOf("CategoryMask")),
-            BreakoffProps(resolver, hardpoints, problems),
+            BreakoffProps(index, resolver, hardpoints, problems),
             weapons,
-            Reticles(hardpoints, problems),
+            Reticles(index, hardpoints, problems),
             Projectiles(resolver, weapons, problems),
             // NAMED from here on. The positional list is twenty arguments long and every optional
             // one is a list or a record, so inserting in the wrong slot type-checks against its
             // neighbour often enough to be dangerous - it did, once.
-            Defence(effective, hardpoints),
+            Defence(index, effective, hardpoints),
             Abilities(effective, particles,
-                AnimationsFor(animationSource ?? hull ?? string.Empty), problems,
+                AnimationsFor(index, animationSource ?? hull ?? string.Empty), problems,
                 icons, index.Localisation),
-            DeathClones(resolver, effective, problems),
+            DeathClones(index, resolver, effective, problems),
             SpinAway(effective),
             effective.ValueOf("Death_Explosions"),
-            ProjectileCatalog(),
+            ProjectileCatalog(index),
             // What it wears when no faction colour applies, which is most of the time - its own
             // colour first, and whose fallback to use when it declares none.
             Colour(effective, "No_Colorization_Color"),
@@ -442,13 +447,13 @@ public sealed class PreviewSceneBuilder(
     ///         wrong, and the warning would be about the index rather than about the file.
     ///     </para>
     /// </remarks>
-    private void ReportUntaggedStages(
+    private void ReportUntaggedStages(GameIndex index,
         string objectId, string? hull, IReadOnlyList<int> stages, List<PreviewProblem> problems)
     {
         if (hull is null || stages.Count == 0)
             return;
 
-        if (!indexService.Current.ModelBones.TryGetValue(ModelBoneKey.From(hull), out var names))
+        if (!index.ModelBones.TryGetValue(ModelBoneKey.From(hull), out var names))
             return;
 
         var missing = ModelLevelTag.StagesNotTagged(stages, ModelLevelTag.AltLevelsIn(names));
@@ -472,7 +477,7 @@ public sealed class PreviewSceneBuilder(
     ///     so the resolver already keeps every occurrence - and keeps a variant's base clones too,
     ///     which the schema calls out as deliberate.
     /// </remarks>
-    private List<PreviewDeathClone> DeathClones(
+    private List<PreviewDeathClone> DeathClones(GameIndex index,
         EffectiveObjectResolver resolver, EffectiveObject effective, List<PreviewProblem> problems)
     {
         // On the OBJECT, not on the row, so it is the same answer for every clone it names.
@@ -506,7 +511,7 @@ public sealed class PreviewSceneBuilder(
             // Its OWN model's clips and effects. Everything else on the wire describes the subject,
             // and a clone is a replacement for it rather than a piece of it.
             clones.Add(new PreviewDeathClone(Blank(row[0]), row[1], model, playsIdle,
-                model is null ? [] : AnimationsFor(model),
+                model is null ? [] : AnimationsFor(index, model),
                 model is null ? [] : ProxiesOf(model, row[1], [], problems),
                 // The clone's OWN scale, read off the resolved clone - variants included - through
                 // the same reader the subject's scale uses.
@@ -639,10 +644,10 @@ public sealed class PreviewSceneBuilder(
     ///     is the defensive half of the damage model and the only half that comes from the file.
     ///     Only the two armor COLUMNS this target uses are sent; see <see cref="PreviewTargetDefence" />.
     /// </remarks>
-    private PreviewTargetDefence Defence(
+    private PreviewTargetDefence Defence(GameIndex index,
         EffectiveObject effective, IReadOnlyList<PreviewHardpoint> hardpoints)
     {
-        var table = PreviewDamageTable.From(indexService.Current, tagSource);
+        var table = PreviewDamageTable.From(index, tagSource);
 
         var armor = effective.ValueOf("Armor_Type");
         var shieldArmor = effective.ValueOf("Shield_Armor_Type");
@@ -661,7 +666,7 @@ public sealed class PreviewSceneBuilder(
             destructible.Count == 0 ? null : destructible.Sum(h => h.Health ?? 0f),
             EngineBoolean.IsTrueUnlessDenied(
                 effective.ValueOf("Should_Be_Destroyed_When_All_Hardpoints_Destroyed")),
-            HullVsHardpointsConstraint(),
+            HullVsHardpointsConstraint(index),
             table.FactorsFor(armor),
             table.FactorsFor(shieldArmor),
             table.DamageTypes);
@@ -676,10 +681,10 @@ public sealed class PreviewSceneBuilder(
     ///     exactly, which is the opposite of the constant being absent. A value the engine could not
     ///     parse is treated the same as no value at all.
     /// </remarks>
-    private float HullVsHardpointsConstraint()
+    private float HullVsHardpointsConstraint(GameIndex index)
     {
         foreach (var value in RepeatedTagReader.Values(
-                     indexService.Current, tagSource, EncyclopediaTags.GameConstantsId,
+                     index, tagSource, EncyclopediaTags.GameConstantsId,
                      "Hull_Vs_Hard_Points_Health_Constraint"))
             if (EngineNumber.ReadFloat(value) is { } parsed)
                 return parsed;
@@ -708,21 +713,19 @@ public sealed class PreviewSceneBuilder(
             .Any(token => token.Equals("SHIELDED", StringComparison.OrdinalIgnoreCase));
     }
 
-    private List<string> ProjectileCatalog()
+    private List<string> ProjectileCatalog(GameIndex index)
     {
-        if (CatalogCache.TryGetValue(indexService.Current, out var cached))
+        if (CatalogCache.TryGetValue(index, out var cached))
             return cached;
 
-        var built = BuildProjectileCatalog();
-        CatalogCache.AddOrUpdate(indexService.Current, built);
+        var built = BuildProjectileCatalog(index);
+        CatalogCache.AddOrUpdate(index, built);
 
         return built;
     }
 
-    private List<string> BuildProjectileCatalog()
+    private List<string> BuildProjectileCatalog(GameIndex index)
     {
-        var index = indexService.Current;
-
         // By BEHAVIOUR, which the user pointed at and which measurement then settled outright: over
         // the eaw tree, `PROJECTILE` in a behaviour list appears on 0 non-projectiles, and following
         // `Variant_Of_Existing_Type` from the objects that declare it reaches 102 of 102. Exact,
@@ -868,7 +871,7 @@ public sealed class PreviewSceneBuilder(
     ///     <c>GetPreviewSceneHandler</c>, which is where the icon catalog lives - resolving them is
     ///     asynchronous and this builder is not.
     /// </remarks>
-    private PreviewReticles? Reticles(
+    private PreviewReticles? Reticles(GameIndex index,
         IReadOnlyList<PreviewHardpoint> hardpoints, List<PreviewProblem> problems)
     {
         var targetable = hardpoints
@@ -880,7 +883,7 @@ public sealed class PreviewSceneBuilder(
         if (targetable.Count == 0)
             return null;
 
-        var map = PreviewReticleMap.From(indexService.Current, tagSource);
+        var map = PreviewReticleMap.From(index, tagSource);
         var byType = new Dictionary<string, PreviewReticleStates>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var type in targetable)
@@ -902,7 +905,7 @@ public sealed class PreviewSceneBuilder(
     ///     is deduplicated rather than emitted per hardpoint, which would have the client instantiate
     ///     the same wreck twice.
     /// </remarks>
-    private List<PreviewBreakoffProp> BreakoffProps(
+    private List<PreviewBreakoffProp> BreakoffProps(GameIndex index,
         EffectiveObjectResolver resolver,
         IReadOnlyList<PreviewHardpoint> hardpoints,
         List<PreviewProblem> problems)
@@ -945,7 +948,7 @@ public sealed class PreviewSceneBuilder(
                 effective.BoolOf("Remove_Upon_Death"),
                 // Its OWN model's, like a death clone's - a burning piece of debris trails its own
                 // fire, and `Debris_Attached_Particle` is a second, separate effect the XML names.
-                modelRef is null ? [] : AnimationsFor(modelRef),
+                modelRef is null ? [] : AnimationsFor(index, modelRef),
                 modelRef is null ? [] : ProxiesOf(modelRef, id, [], problems)));
         }
 
@@ -991,9 +994,9 @@ public sealed class PreviewSceneBuilder(
     ///         Two of the Gargantuan's turrets were mounted on those bones and went with them.
     ///     </para>
     /// </remarks>
-    private IReadOnlyList<string> AnimationsFor(string modelReference)
+    private static IReadOnlyList<string> AnimationsFor(GameIndex index, string modelReference)
     {
-        return ModelAnimationClips.For(indexService.Current, PreviewModelReference.Normalise(modelReference));
+        return ModelAnimationClips.For(index, PreviewModelReference.Normalise(modelReference));
     }
 
     /// <summary>
@@ -1070,7 +1073,7 @@ public sealed class PreviewSceneBuilder(
     ///         is not settled, and nothing here claims it is.
     ///     </para>
     /// </remarks>
-    private string? ResolveAnimationOverride(
+    private string? ResolveAnimationOverride(GameIndex index,
         EffectiveObject effective, string? hull, List<PreviewProblem> problems)
     {
         var overrideModel = AnimationOverrideTags
@@ -1083,7 +1086,6 @@ public sealed class PreviewSceneBuilder(
         if (hull is null)
             return overrideModel;
 
-        var index = indexService.Current;
         var hullBones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(hull));
         var overrideBones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(overrideModel));
 
@@ -1106,7 +1108,7 @@ public sealed class PreviewSceneBuilder(
             : [];
     }
 
-    private void AddHardpoint(
+    private void AddHardpoint(GameIndex index,
         EffectiveObjectResolver resolver,
         string? hull,
         string hardpointId,
@@ -1175,7 +1177,7 @@ public sealed class PreviewSceneBuilder(
                     hardpointId));
         }
         else if (hull is not null &&
-                 !HardpointBoneModelResolver.ModelHasBone(indexService.Current, hull, attachBone))
+                 !HardpointBoneModelResolver.ModelHasBone(index, hull, attachBone))
         {
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointBoneMissing, "warning",
                 _messages.Format("PreviewScene_HardpointBoneMissing", hardpointId, attachBone, hull), hardpointId));
@@ -1228,10 +1230,10 @@ public sealed class PreviewSceneBuilder(
             // consistent about the case they write - so the preview must not be stricter.
             tooltipKey is null
                 ? null
-                : indexService.Current.Localisation.GetValue(tooltipKey),
+                : index.Localisation.GetValue(tooltipKey),
             Turret(effective)));
 
-        if (Weapon(effective, hardpointId) is { } weapon)
+        if (Weapon(index, effective, hardpointId) is { } weapon)
             weapons.Add(weapon);
     }
 
@@ -1268,14 +1270,14 @@ public sealed class PreviewSceneBuilder(
     ///         completion and validation on <c>Turret_Bone_Name</c> want the same knowledge.
     ///     </para>
     /// </remarks>
-    private PreviewWeapon? UnitWeapon(
+    private PreviewWeapon? UnitWeapon(GameIndex index,
         EffectiveObject effective, string? hull, List<PreviewProblem> problems)
     {
         if (!HasWeaponBehavior(effective))
             return null;
 
         var turret = UnitTurret(effective);
-        var bones = MuzzleBones(hull, turret);
+        var bones = MuzzleBones(index, hull, turret);
 
         // ReSharper disable once InvertIf - a guard, read as one; the weapon stays the last word.
         if (bones.Count == 0)
@@ -1303,7 +1305,7 @@ public sealed class PreviewSceneBuilder(
             null,
             UnitArcYawDegrees(effective),
             UnitArcPitchDegrees(effective),
-            Inaccuracy(effective.ObjectId),
+            Inaccuracy(index, effective.ObjectId),
             effective.IntOf("Projectile_Fire_Pulse_Count"),
             effective.FloatOf("Projectile_Fire_Pulse_Delay_Seconds"),
             effective.FloatOf("Projectile_Fire_Recharge_Seconds"),
@@ -1515,10 +1517,10 @@ public sealed class PreviewSceneBuilder(
     ///         conventions overlap on exactly that unit.
     ///     </para>
     /// </remarks>
-    private List<string> MuzzleBones(string? hull, PreviewTurret? turret)
+    private static List<string> MuzzleBones(GameIndex index, string? hull, PreviewTurret? turret)
     {
         if (string.IsNullOrEmpty(hull) ||
-            !indexService.Current.ModelBones.TryGetValue(ModelBoneKey.From(hull), out var names))
+            !index.ModelBones.TryGetValue(ModelBoneKey.From(hull), out var names))
             return [];
 
         var claimed = new[] { turret?.TurretBone, turret?.BarrelBone }
@@ -1646,7 +1648,7 @@ public sealed class PreviewSceneBuilder(
     ///     A shield generator or a docking bay is a hardpoint with no armament, so an absent weapon
     ///     is the normal case for roughly half of them, not a failure.
     /// </remarks>
-    private PreviewWeapon? Weapon(EffectiveObject effective, string hardpointId)
+    private PreviewWeapon? Weapon(GameIndex index, EffectiveObject effective, string hardpointId)
     {
         var bones = new[] { effective.ValueOf("Fire_Bone_A"), effective.ValueOf("Fire_Bone_B") }
             .Where(b => !string.IsNullOrEmpty(b))
@@ -1675,7 +1677,7 @@ public sealed class PreviewSceneBuilder(
             effective.FloatOf("Fire_Min_Range_Distance"),
             HardpointArcYawDegrees(effective),
             HardpointArcPitchDegrees(effective),
-            Inaccuracy(hardpointId),
+            Inaccuracy(index, hardpointId),
             effective.IntOf("Fire_Pulse_Count"),
             effective.FloatOf("Fire_Pulse_Delay_Seconds"),
             effective.FloatOf("Fire_Min_Recharge_Seconds") ??
@@ -1695,12 +1697,12 @@ public sealed class PreviewSceneBuilder(
     ///     a single <c>Number</c> before, which cannot parse <c>Fighter, 30.0</c> - so the field has
     ///     never once been non-null, on any of the 1017 rows the shipped tree declares.
     /// </remarks>
-    private List<PreviewInaccuracy> Inaccuracy(string objectId)
+    private List<PreviewInaccuracy> Inaccuracy(GameIndex index, string objectId)
     {
         var rows = new List<PreviewInaccuracy>();
 
         foreach (var row in RepeatedTagReader.Rows(
-                     indexService.Current, tagSource, objectId, "Fire_Inaccuracy_Distance", 2))
+                     index, tagSource, objectId, "Fire_Inaccuracy_Distance", 2))
         {
             // A row naming no category, or a distance that is not a number, is a broken row rather
             // than a zero - dropping it leaves the weapon with one fewer category, which is what the
@@ -1732,11 +1734,9 @@ public sealed class PreviewSceneBuilder(
     ///     faction's colours and compare two side by side, and shipping the whole set makes that a
     ///     local switch rather than a round trip each time.
     /// </remarks>
-    private List<PreviewFaction> Factions(EffectiveObjectResolver resolver)
+    private List<PreviewFaction> Factions(GameIndex index, EffectiveObjectResolver resolver)
     {
         var factions = new List<PreviewFaction>();
-
-        var index = indexService.Current;
 
         // Workspace first, then the baseline: a mod's own faction shadows a shipped one of the same
         // id, and DistinctBy keeps whichever it saw first.

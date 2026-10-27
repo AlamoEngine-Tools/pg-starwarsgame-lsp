@@ -514,10 +514,10 @@ public static class ServerConfigurator
                 services.AddSingleton<IModelTextureIndex>(sp =>
                     sp.GetRequiredService<ModelTextureIndex>());
 
-                // Assembles a unit from its XML. Transient rather than singleton: it reads the game
-                // index, which is replaced wholesale on every reindex, so a cached instance would
-                // answer from a stale snapshot.
-                services.AddTransient<PreviewSceneBuilder>();
+                // Assembles a unit from its XML. Holds no index: every build captures one snapshot
+                // and passes it down, so a re-index mid-build cannot mix two into one scene, and a
+                // single instance never answers from a stale one.
+                services.AddSingleton<PreviewSceneBuilder>();
                 services.AddSingleton<ShaderSourceResolver>();
 
                 services.AddHttpClient(nameof(HttpSchemaProvider));

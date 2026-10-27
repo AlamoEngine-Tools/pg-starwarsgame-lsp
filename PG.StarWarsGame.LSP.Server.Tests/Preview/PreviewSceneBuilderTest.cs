@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -130,6 +131,41 @@ public sealed class PreviewSceneBuilderTest
             Tag("Space_Model_Name", "hull.alo"), Tag("Icon_Name", "   "));
 
         Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").IconName);
+    }
+
+    [Fact]
+    public void BuildForObject_ReadsTheIndexSnapshotOnce()
+    {
+        // The index is replaced wholesale on every re-index. A build that goes back to the service
+        // for it would mix two snapshots into one scene: here the hull's bones are catalogued in the
+        // snapshot the build starts from and gone from the one a re-index would leave behind, so a
+        // second read turns a mounted turret into a "bone missing" warning.
+        var (index, tags) = Destroyer();
+        var service = new FakeGameIndexService(index, GameIndex.Empty);
+        var builder = new PreviewSceneBuilder(service, new NullSchemaProvider(), tags,
+            new FakeAssets("EV_StarDestroyer.ALO", "EV_StarDestroyer_HP00_L-F.alo"));
+
+        var scene = builder.BuildForObject("Generic_Star_Destroyer");
+
+        Assert.Equal(1, service.Reads);
+        Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewHardpointBoneMissing);
+        Assert.Single(scene.Parts, p => p.Origin == PreviewPartOrigin.Hardpoint);
+    }
+
+    [Fact]
+    public void BuildForModel_ReadsTheIndexSnapshotOnce()
+    {
+        // A bare model's scene still carries the faction palette and the model's clips, two reads
+        // of the index that used to be taken separately.
+        var index = Index([Sym("Rebel", "Faction")], new Dictionary<string, string[]> { ["hull.alo"] = ["Root"] });
+        var tags = new FakeVariantTagSource().With("Rebel", Tag("Color", "255, 0, 0, 255"));
+        var service = new FakeGameIndexService(index, GameIndex.Empty);
+        var builder = new PreviewSceneBuilder(service, new NullSchemaProvider(), tags, new FakeAssets("hull.alo"));
+
+        var scene = builder.BuildForModel("hull.alo");
+
+        Assert.Equal(1, service.Reads);
+        Assert.Single(scene.Factions, f => f.Name == "Rebel");
     }
 
     private static GameSymbol Sym(string id, string typeName, string? variantBaseId = null)
