@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
@@ -118,16 +117,20 @@ public sealed class PreviewSceneBuilder(
     ///     </para>
     /// </remarks>
     /// <summary>
-    ///     Cached per index, because finding the catalogue costs a parse of the whole workspace.
+    ///     The keys the builder derives things under, kept on the index snapshot (#311): the
+    ///     projectile catalogue, because finding it costs a parse of the whole workspace, and the
+    ///     factions, read once per snapshot rather than once per scene.
     /// </summary>
     /// <remarks>
     ///     <c>TryGetTags</c> parses a document the first time anything asks about an object in it,
     ///     so reading a behaviour off EVERY object pulls every XML file through the parser -
-    ///     measured at about 830ms on the eaw tree. Cached against the index instance, the cost is
+    ///     measured at about 830ms on the eaw tree. Derived from the index instance, the cost is
     ///     paid once rather than on every scene open. It should really move off the scene request
     ///     altogether and onto one the panel makes when the attacker section first opens.
     /// </remarks>
-    private static readonly ConditionalWeakTable<GameIndex, List<string>> CatalogCache = new();
+    private const string ProjectileCatalogKey = "projectileCatalog";
+
+    private const string FactionsKey = "previewFactions";
 
     private static readonly string[] BehaviorTags = ["SpaceBehavior", "LandBehavior"];
 
@@ -200,7 +203,7 @@ public sealed class PreviewSceneBuilder(
             modelReference,
             [part],
             [],
-            Factions(index, new EffectiveObjectResolver(index, schema, tagSource)),
+            Factions(index),
             problems,
             assets.Tiers,
             null,
@@ -391,7 +394,7 @@ public sealed class PreviewSceneBuilder(
             .ToList();
 
         return new PreviewScene(PreviewSceneKind.Object, effective.ObjectId, parts, hardpoints,
-            Factions(index, resolver), problems, assets.Tiers, animationSource, particles,
+            Factions(index), problems, assets.Tiers, animationSource, particles,
             // The clips are named after the model whose skeleton they were authored against, which
             // is the OVERRIDE when a unit borrows another model's set.
             AnimationsFor(index, animationSource ?? hull ?? string.Empty),
@@ -715,13 +718,7 @@ public sealed class PreviewSceneBuilder(
 
     private List<string> ProjectileCatalog(GameIndex index)
     {
-        if (CatalogCache.TryGetValue(index, out var cached))
-            return cached;
-
-        var built = BuildProjectileCatalog(index);
-        CatalogCache.AddOrUpdate(index, built);
-
-        return built;
+        return index.Derived(ProjectileCatalogKey, BuildProjectileCatalog);
     }
 
     private List<string> BuildProjectileCatalog(GameIndex index)
@@ -1733,7 +1730,13 @@ public sealed class PreviewSceneBuilder(
     ///     faction's colours and compare two side by side, and shipping the whole set makes that a
     ///     local switch rather than a round trip each time.
     /// </remarks>
-    private List<PreviewFaction> Factions(GameIndex index, EffectiveObjectResolver resolver)
+    /// <summary>The factions of a snapshot, resolved once per snapshot and shared by every scene built from it.</summary>
+    private List<PreviewFaction> Factions(GameIndex index)
+    {
+        return index.Derived(FactionsKey, i => BuildFactions(i, new EffectiveObjectResolver(i, schema, tagSource)));
+    }
+
+    private List<PreviewFaction> BuildFactions(GameIndex index, EffectiveObjectResolver resolver)
     {
         var factions = new List<PreviewFaction>();
 

@@ -364,7 +364,23 @@ public sealed class GetServerStatusHandlerTest
 
         var caches = (await Extended(recorder, LayeredIndex())).Extended!.Caches;
 
-        Assert.Equal(new ServerStatusCachesDto("Hit", 1, 1, 5, 2, 1, 2), caches);
+        Assert.Equal(new ServerStatusCachesDto("Hit", 1, 1, 5, 2, 1, 2, 0), caches);
+    }
+
+    /// <summary>
+    ///     What consumers derived from the index snapshot and keep beside it is a cache like the
+    ///     others, and the report counts it (#311).
+    /// </summary>
+    [Fact]
+    public async Task Extended_CountsWhatWasDerivedFromTheIndex()
+    {
+        var index = LayeredIndex();
+        index.Derived("symbolCatalog", _ => new object());
+        index.Derived("projectileCatalog", _ => new object());
+
+        var caches = (await Extended(HealthyRecorder(), index)).Extended!.Caches;
+
+        Assert.Equal(2, caches.DerivedCaches);
     }
 
     [Fact]

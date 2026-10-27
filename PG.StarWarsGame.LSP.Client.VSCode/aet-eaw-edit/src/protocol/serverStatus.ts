@@ -79,6 +79,8 @@ export interface ServerStatusExtended {
         filesParsed: number;
         boneLayersReused: number;
         boneLayers: number;
+        /** What consumers derived from the current index snapshot and keep beside it. */
+        derivedCaches: number;
     };
     /** Project symbols by type, most first. */
     symbolTypes: { typeName: string; count: number }[];

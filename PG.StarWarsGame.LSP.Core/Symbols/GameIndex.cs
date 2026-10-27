@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
@@ -31,6 +32,12 @@ public sealed record GameIndex(
     // does NOT copy them: a `with` mutation produces a copy that must recompute against its own
     // (possibly changed) dictionaries. -1 marks LeafLayerRank as not-yet-computed (ranks are >= 0).
     private ImmutableDictionary<string, ImmutableArray<GroupMembership>>? _allGroupMemberships;
+
+    // What consumers derive from this snapshot and keep beside it (#311): a symbol catalog, a bone
+    // resolver, a projectile list. Created on first use, never copied by `with`, so it dies with
+    // the snapshot - which is what a per-index cache means. Lazy per key, so parallel first callers
+    // run a factory once.
+    private ConcurrentDictionary<string, Lazy<object>>? _derived;
     private ImmutableHashSet<string>? _indexedTypeNames;
     private int _leafLayerRank = -1;
     private ImmutableDictionary<string, ImmutableArray<GameSymbol>>? _ownerScopedByBareName;
@@ -45,6 +52,7 @@ public sealed record GameIndex(
         _leafLayerRank = -1;
         _ownerScopedByBareName = null;
         _indexedTypeNames = null;
+        _derived = null;
         Baseline = original.Baseline;
         Documents = original.Documents;
         WorkspaceDefinitions = original.WorkspaceDefinitions;
@@ -60,6 +68,30 @@ public sealed record GameIndex(
         ModelProxies = original.ModelProxies;
         WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
         WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
+    }
+
+    /// <summary>How many things consumers have derived from this snapshot so far - the status report's number.</summary>
+    public int DerivedCount => _derived?.Count ?? 0;
+
+    /// <summary>
+    ///     The thing <paramref name="key" /> names, derived from this snapshot by
+    ///     <paramref name="factory" /> on the first call and kept beside it for every later one. A
+    ///     key names one kind of thing - the type the first caller asked for is the type every caller
+    ///     gets. A <c>with</c> copy starts with none, since it is a different snapshot.
+    /// </summary>
+    public T Derived<T>(string key, Func<GameIndex, T> factory) where T : class
+    {
+        var derived = _derived ?? Interlocked.CompareExchange(ref _derived,
+            new ConcurrentDictionary<string, Lazy<object>>(StringComparer.Ordinal), null) ?? _derived;
+        var lazy = derived.GetOrAdd(key,
+            _ => new Lazy<object>(() => factory(this), LazyThreadSafetyMode.ExecutionAndPublication));
+        return (T)lazy.Value;
+    }
+
+    /// <summary>Whether <paramref name="key" /> has been derived from this snapshot already - without deriving it.</summary>
+    public bool HasDerived(string key)
+    {
+        return _derived is { } derived && derived.TryGetValue(key, out var lazy) && lazy.IsValueCreated;
     }
 
     // WorkspaceDefinitions and WorkspaceReferences are keyed by game object Name, which

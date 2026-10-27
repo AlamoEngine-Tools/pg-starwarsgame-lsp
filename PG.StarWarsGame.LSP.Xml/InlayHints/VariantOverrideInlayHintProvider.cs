@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Runtime.CompilerServices;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Messages;
@@ -26,9 +25,9 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
     private const int MaxValueLength = 32;
 
     // Resolving an effective object walks and merges the whole base chain, and Handle runs per tag
-    // node - so without memoisation a variant with 50 tags would resolve 50 times. Keyed on the
-    // GameIndex instance so a re-index drops the whole table rather than serving stale merges.
-    private static readonly ConditionalWeakTable<GameIndex, Dictionary<string, EffectiveObject>> Cache = new();
+    // node - so without memoisation a variant with 50 tags would resolve 50 times. Derived from the
+    // GameIndex snapshot so a re-index drops the whole table rather than serving stale merges (#311).
+    private const string EffectiveObjectsKey = "inlayEffectiveObjects";
 
     private readonly IVariantTagSource _tagSource;
 
@@ -121,7 +120,7 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
 
     private EffectiveObject ResolveCached(InlayHintContext ctx, string objectId)
     {
-        var perIndex = Cache.GetOrCreateValue(ctx.Index);
+        var perIndex = ctx.Index.Derived(EffectiveObjectsKey, _ => new Dictionary<string, EffectiveObject>());
         lock (perIndex)
         {
             if (perIndex.TryGetValue(objectId, out var cached))

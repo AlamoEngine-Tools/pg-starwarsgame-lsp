@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Runtime.CompilerServices;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -21,8 +20,6 @@ public sealed class SymbolCatalog
 {
     private const string GameObjectType = "GameObjectType";
     private const int MostPerPage = 1000;
-
-    private static readonly ConditionalWeakTable<GameIndex, SymbolCatalog> s_built = new();
 
     private static readonly string[] s_textureExtensions = [".tga", ".dds"];
     private static readonly string[] s_audioExtensions = [".wav", ".mp3"];
@@ -55,7 +52,7 @@ public sealed class SymbolCatalog
     /// <summary>The catalog of an index, built on first use and kept as long as the index is.</summary>
     public static SymbolCatalog For(GameIndex index, ISchemaProvider schema)
     {
-        return s_built.GetValue(index, i => Build(i, schema.AllKinds, schema.AllEnums, schema));
+        return index.Derived("symbolCatalog", i => Build(i, schema.AllKinds, schema.AllEnums, schema));
     }
 
     /// <param name="index">The index the catalog is built from.</param>

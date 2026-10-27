@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Runtime.CompilerServices;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -42,8 +41,9 @@ public sealed class SymbolRelations(
     private static readonly string[] s_textureInterchange = [".tga", ".dds"];
 
     // Which objects name each asset: every object's tags, read once per index on the first request
-    // that needs it, never on open (about 830 ms on the EaW tree - measured in code comments).
-    private static readonly ConditionalWeakTable<GameIndex, Dictionary<string, SortedSet<string>>> s_users = new();
+    // that needs it, never on open (about 830 ms on the EaW tree - measured in code comments). Kept
+    // on the index snapshot under this key (#311).
+    private const string AssetUsersKey = "assetUsers";
 
     /// <summary>The relations an asset, a script or an enum opens into, by page.</summary>
     private static readonly Dictionary<string, string[]> s_assetRelations = new(StringComparer.Ordinal)
@@ -82,7 +82,7 @@ public sealed class SymbolRelations(
             // An enum, a type, a tag and a behaviour are the schema's, no file of their own.
             var file = IsSchema(page) ? null : fileOf?.Invoke(entry.Id);
             return new GetSymbolNodeResult(entry, (s_assetRelations.GetValueOrDefault(page) ?? [])
-                .Select(r => NeedsEveryObject(page, r) && !s_users.TryGetValue(index, out _)
+                .Select(r => NeedsEveryObject(page, r) && !index.HasDerived(AssetUsersKey)
                     ? new SymbolRelation(r, null, null)
                     : Counted(r, AssetRows(page, entry, r).Count, "none"))
                 .ToList())
@@ -297,7 +297,7 @@ public sealed class SymbolRelations(
 
     private IEnumerable<SymbolRow> Users(string asset)
     {
-        var users = s_users.GetValue(index, _ => AllUsers());
+        var users = index.Derived(AssetUsersKey, _ => AllUsers());
         return users.TryGetValue(asset, out var objects)
             ? objects.Select(o => catalog.FindObject(o) ?? Missing(o, null))
             : [];

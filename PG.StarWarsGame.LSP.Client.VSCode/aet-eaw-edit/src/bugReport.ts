@@ -178,7 +178,8 @@ export function formatExtendedStats(
         `- Caches: schema ${caches.schema}; ` +
             `index snapshots ${caches.snapshotLayers} of ${caches.snapshotLayers + caches.rebuiltLayers} layers, ` +
             `${caches.filesReused} files reused, ${caches.filesParsed} parsed; ` +
-            `bone catalog ${caches.boneLayersReused} of ${caches.boneLayers} layers`,
+            `bone catalog ${caches.boneLayersReused} of ${caches.boneLayers} layers; ` +
+            `${caches.derivedCaches} derived from the index`,
     );
 
     const memory = extended.memory;

@@ -57,7 +57,10 @@ public sealed record ServerStatusCachesDto(
     int FilesReused,
     int FilesParsed,
     int BoneLayersReused,
-    int BoneLayers);
+    int BoneLayers,
+    // What consumers have derived from the current index snapshot and keep beside it: the symbol
+    // catalog, the bone resolver, the projectile list and their kind (#311).
+    int DerivedCaches);
 
 public sealed record ServerStatusTypeCountDto(string TypeName, int Count);
 
@@ -315,7 +318,8 @@ public sealed class GetServerStatusHandler(
             snapshots?.FilesReused ?? 0,
             snapshots?.FilesParsed ?? 0,
             bones?.LayersReused ?? 0,
-            bones?.Layers ?? 0);
+            bones?.Layers ?? 0,
+            indexService.Current.DerivedCount);
     }
 
     /// <summary>The project's own symbols by type, most first; a symbol with no type by its kind.</summary>

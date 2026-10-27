@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Runtime.CompilerServices;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -35,9 +34,10 @@ internal sealed class BoneModelInlayHintProvider : IXmlInlayHintProvider
     // stays readable.
     private const int MaxModelsShown = 2;
 
-    // One resolver per index instance carries the attachment/model memoisation across every bone tag in a
-    // request; keyed on GameIndex so a re-index drops it rather than serving stale attachments.
-    private static readonly ConditionalWeakTable<GameIndex, HardpointBoneModelResolver> Resolvers = new();
+    // One resolver per index snapshot carries the attachment/model memoisation across every bone tag
+    // in a request; derived from the GameIndex so a re-index drops it rather than serving stale
+    // attachments (#311).
+    private const string ResolverKey = "hardpointBoneModelResolver";
 
     private readonly IVariantTagSource _tagSource;
 
@@ -84,7 +84,7 @@ internal sealed class BoneModelInlayHintProvider : IXmlInlayHintProvider
     // model walk otherwise - the same dispatch bone completion uses, so hint and completion agree.
     private IReadOnlyList<string> CandidateModelKeys(InlayHintContext ctx)
     {
-        return Resolvers.GetValue(ctx.Index, idx => new HardpointBoneModelResolver(idx, ctx.Schema, _tagSource))
+        return ctx.Index.Derived(ResolverKey, idx => new HardpointBoneModelResolver(idx, ctx.Schema, _tagSource))
             .ResolveModelKeysForBoneTag(ctx.Node);
     }
 
