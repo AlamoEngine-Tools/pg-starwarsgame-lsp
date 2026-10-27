@@ -3,16 +3,20 @@
 
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
-public sealed class XmlRenameHandler : IXmlRenameProvider
+public sealed class XmlRenameHandler : IRenameProvider
 {
     private readonly IEaWXmlContext _eaWXmlContext;
+    private readonly IFileHelper _fileHelper;
+    private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlRenameHandler> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
@@ -21,12 +25,34 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         IEaWXmlContext eaWXmlContext,
         IDocumentTextSource textSource,
         ISchemaProvider schema,
-        ILogger<XmlRenameHandler> logger)
+        ILogger<XmlRenameHandler> logger,
+        IFileHelper fileHelper,
+        IGameIndexService indexService)
     {
         _eaWXmlContext = eaWXmlContext;
         _textSource = textSource;
         _schema = schema;
         _logger = logger;
+        _fileHelper = fileHelper;
+        _indexService = indexService;
+    }
+
+    public bool Handles(string documentUri)
+    {
+        return documentUri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public Task<WorkspaceEdit?> RenameAsync(RenameParams request, CancellationToken ct)
+    {
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        return Task.FromResult(HandleRename(uri, request, _indexService.Current));
+    }
+
+    public Task<RangeOrPlaceholderRange?> PrepareAsync(PrepareRenameParams request, CancellationToken ct)
+    {
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        return Task.FromResult(HandlePrepare(uri, request.Position.Line, request.Position.Character,
+            _indexService.Current));
     }
 
     public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)

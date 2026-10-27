@@ -5,46 +5,41 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Lua;
-using PG.StarWarsGame.LSP.Xml;
 
 namespace PG.StarWarsGame.LSP.Server;
 
+/// <summary>
+///     The one hover handler the client sees. It hands the request to the first registered
+///     <see cref="IHoverProvider" /> that handles the document; it knows no language itself.
+/// </summary>
 public sealed class GameHoverHandler : HoverHandlerBase
 {
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<GameHoverHandler> _logger;
-    private readonly ILuaHoverProvider _lua;
-    private readonly IXmlHoverProvider _xml;
+    private readonly IReadOnlyList<IHoverProvider> _providers;
 
-    public GameHoverHandler(IXmlHoverProvider xml, ILuaHoverProvider lua, IFileHelper fileHelper,
+    public GameHoverHandler(IEnumerable<IHoverProvider> providers, IFileHelper fileHelper,
         ILogger<GameHoverHandler> logger)
     {
-        _xml = xml;
-        _lua = lua;
+        _providers = [.. providers];
         _fileHelper = fileHelper;
         _logger = logger;
     }
 
     public override Task<Hover?> Handle(HoverParams request, CancellationToken ct)
     {
-        _logger.LogDebug("Hover request received: {0}", request.TextDocument.Uri);
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
-        if (uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+        var provider = _providers.FirstOrDefault(p => p.Handles(uri));
+        if (provider is null)
         {
-            _logger.LogDebug("Routing to lua hover handlers.");
-            return _lua.Handle(request, ct);
+            _logger.LogWarning("No hover provider handles {Uri}", uri);
+            return Task.FromResult<Hover?>(null);
         }
 
-        if (uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogDebug("Routing to xml hover handlers.");
-            return _xml.Handle(request, ct);
-        }
-
-        _logger.LogWarning("Not supported hover handler URI: {0}", uri);
-        return Task.FromResult<Hover?>(null);
+        _logger.LogDebug("Hover request for {Uri} goes to {Provider}", uri, provider.GetType().Name);
+        return provider.HoverAsync(request, ct);
     }
 
     protected override HoverRegistrationOptions CreateRegistrationOptions(

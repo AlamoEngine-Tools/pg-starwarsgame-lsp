@@ -8,15 +8,15 @@ namespace PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 
 internal sealed class StandardValueCompletionStrategy : IXmlTagValueCompletionStrategy
 {
-    private readonly IXmlCompletionRegistry _completionRegistry;
-    private readonly IXmlValueProposalRegistry _proposals;
+    private readonly IReadOnlyList<IXmlCompletionProvider> _completion;
+    private readonly IReadOnlyList<IXmlValueProposalProvider> _proposals;
 
     public StandardValueCompletionStrategy(
-        IXmlValueProposalRegistry proposals,
-        IXmlCompletionRegistry completionRegistry)
+        IEnumerable<IXmlValueProposalProvider> proposals,
+        IEnumerable<IXmlCompletionProvider> completion)
     {
-        _proposals = proposals;
-        _completionRegistry = completionRegistry;
+        _proposals = [.. proposals];
+        _completion = [.. completion];
     }
 
     public IEnumerable<CompletionItem> Handle(TagValueCompletionContext ctx)
@@ -25,7 +25,7 @@ internal sealed class StandardValueCompletionStrategy : IXmlTagValueCompletionSt
         if (ctx.TagDef is null || ctx.TagDef.ReferenceKind == ReferenceKind.BoneName) return [];
 
         var proposals = _proposals.GetProposals(ctx.TagDef.ValueType, ctx.TagDef, ctx.PartialValue)
-            .Concat(_completionRegistry.GetProposals(ctx.TagDef, ctx.PartialValue, ctx.Index));
+            .Concat(_completion.GetProposals(ctx.TagDef, ctx.PartialValue, ctx.Index));
 
         return proposals.Select(p => new CompletionItem
         {

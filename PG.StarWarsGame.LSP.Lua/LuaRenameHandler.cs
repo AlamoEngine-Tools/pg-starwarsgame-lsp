@@ -7,6 +7,8 @@ using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Features;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -22,11 +24,15 @@ using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
-public sealed class LuaRenameHandler : ILuaRenameProvider
+public sealed class LuaRenameHandler : IRenameProvider
 {
+    private readonly ILuaAnalyzer _analyzer;
     private readonly IFileHelper _fileHelper;
+    private readonly IGameIndexService _indexService;
+    private readonly IProjectLayerMap _layers;
     private readonly ILogger<LuaRenameHandler> _logger;
     private readonly ILuaApiSchemaProvider _luaSchema;
+    private readonly IMessageCatalog _messages;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaSandboxProvider _sandbox;
     private readonly ISchemaProvider _schema;
@@ -36,7 +42,8 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
     // which are outside the Lua parse cache's world. The Lua schema claims the names the engine
     // binds, so the analyzer never renames them; the sandbox scopes a Lua global's rename to the
     // script's own state; the file helper decides whether the script's state machine library is
-    // the game's.
+    // the game's. What we do not claim (locals, fields) is the analyzer's to rename - within the
+    // script's own state, and within the project only, checked against the layers.
     public LuaRenameHandler(
         ILuaParseCache parseCache,
         IDocumentTextSource textSource,
@@ -44,7 +51,11 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         ILogger<LuaRenameHandler> logger,
         ILuaApiSchemaProvider luaSchema,
         ILuaSandboxProvider sandbox,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        IGameIndexService indexService,
+        ILuaAnalyzer analyzer,
+        IProjectLayerMap layers,
+        IMessageCatalog messages)
     {
         _parseCache = parseCache;
         _textSource = textSource;
@@ -53,6 +64,40 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         _luaSchema = luaSchema;
         _sandbox = sandbox;
         _fileHelper = fileHelper;
+        _indexService = indexService;
+        _analyzer = analyzer;
+        _layers = layers;
+        _messages = messages;
+    }
+
+    public bool Handles(string documentUri)
+    {
+        return documentUri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task<WorkspaceEdit?> RenameAsync(RenameParams request, CancellationToken ct)
+    {
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        var index = _indexService.Current;
+        if (Claims(uri, request.Position.Line, request.Position.Character, index))
+            return HandleRename(uri, request, index);
+
+        var edit = await _analyzer.RequestAsync<WorkspaceEdit>("textDocument/rename", request, ct);
+        if (edit is null) return null;
+        // Another script's state first: its file is no part of this rename, wherever it lives.
+        edit = LuaAnalyzerRename.KeepWithinState(edit, _sandbox.Current, uri);
+        LuaAnalyzerRename.EnsureWithinProject(edit, _layers, _messages);
+        return edit;
+    }
+
+    public async Task<RangeOrPlaceholderRange?> PrepareAsync(PrepareRenameParams request, CancellationToken ct)
+    {
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        var index = _indexService.Current;
+        var (line, character) = (request.Position.Line, request.Position.Character);
+        if (Claims(uri, line, character, index))
+            return HandlePrepare(uri, line, character, index);
+        return await _analyzer.RequestAsync<RangeOrPlaceholderRange>("textDocument/prepareRename", request, ct);
     }
 
     public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
@@ -179,6 +224,11 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         return FindXmlObjectStringRange(parsed.Tree, line, character, index);
     }
 
+    /// <summary>
+    ///     Whether the position names something this server renames - an XML object, a Lua global,
+    ///     a state name, an engine name - so its answer stands even when it is a refusal. Anything
+    ///     else (a local, a field) is the Lua analyzer's to rename.
+    /// </summary>
     public bool Claims(string uri, int line, int character, GameIndex index)
     {
         if (_parseCache.GetOrParse(uri) is { } stateParse &&

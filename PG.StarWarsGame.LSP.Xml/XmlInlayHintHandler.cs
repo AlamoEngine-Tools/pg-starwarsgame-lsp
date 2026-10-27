@@ -25,9 +25,10 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlInlayHintHandler> _logger;
     private readonly IXmlParseCache _parseCache;
-    private readonly IXmlInlayHintRegistry _registry;
+    private readonly IReadOnlyList<IXmlInlayHintProvider> _providers;
     private readonly ISchemaProvider _schema;
 
+    // Every provider answers every tag, in registration order.
     public XmlInlayHintHandler(
         IXmlParseCache parseCache,
         IGameIndexService indexService,
@@ -35,7 +36,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper,
         ILogger<XmlInlayHintHandler> logger,
-        IXmlInlayHintRegistry registry,
+        IEnumerable<IXmlInlayHintProvider> providers,
         IMessageCatalog messages)
     {
         _parseCache = parseCache;
@@ -44,7 +45,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
         _logger = logger;
-        _registry = registry;
+        _providers = [.. providers];
         _messages = messages;
     }
 
@@ -76,7 +77,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
 
             var ctx = new InlayHintContext(uri, index, _schema, hapDoc, node, tagDef, line,
                 LineEndCharacter(parsed, line), parsed.LineIndex) { Messages = _messages };
-            foreach (var hint in _registry.Dispatch(ctx))
+            foreach (var hint in _providers.SelectMany(p => p.Handle(ctx)))
             {
                 _logger.LogDebug("InlayHint at line {Line}", line);
                 hints.Add(hint);

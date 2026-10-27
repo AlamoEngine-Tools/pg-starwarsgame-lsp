@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -15,7 +16,7 @@ using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
-public sealed class XmlHoverHandler : IXmlHoverProvider
+public sealed class XmlHoverHandler : IHoverProvider
 {
     private readonly ILspConfigurationProvider _config;
     private readonly IEaWXmlContext _eaWXmlContext;
@@ -24,9 +25,10 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
     private readonly ILogger<XmlHoverHandler> _logger;
     private readonly IMessageCatalog _messages;
     private readonly IXmlParseCache _parseCache;
-    private readonly IXmlHoverStrategyRegistry _registry;
     private readonly ISchemaProvider _schema;
+    private readonly IReadOnlyList<IXmlHoverStrategy> _strategies;
 
+    // The strategies answer in registration order; the first with a hover wins.
     public XmlHoverHandler(
         IXmlParseCache parseCache,
         IGameIndexService indexService,
@@ -35,7 +37,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         ILogger<XmlHoverHandler> logger,
         IFileHelper fileHelper,
         IEaWXmlContext eaWXmlContext,
-        IXmlHoverStrategyRegistry registry,
+        IEnumerable<IXmlHoverStrategy> strategies,
         IMessageCatalog messages)
     {
         _parseCache = parseCache;
@@ -45,11 +47,16 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         _logger = logger;
         _fileHelper = fileHelper;
         _eaWXmlContext = eaWXmlContext;
-        _registry = registry;
+        _strategies = [.. strategies];
         _messages = messages;
     }
 
-    public Task<Hover?> Handle(HoverParams request, CancellationToken ct)
+    public bool Handles(string documentUri)
+    {
+        return documentUri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public Task<Hover?> HoverAsync(HoverParams request, CancellationToken ct)
     {
         _logger.LogDebug("Hover request at {Line}:{Character}",
             request.Position.Line, request.Position.Character);
@@ -86,7 +93,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         var ctx = new HoverContext(uri, index, _schema, hapDoc, rootNode!, node!, isOnTagName,
             lineIndex, charPos, locale, _messages);
 
-        var hover = _registry.Dispatch(ctx);
+        var hover = _strategies.Select(s => s.Handle(ctx)).FirstOrDefault(h => h is not null);
         if (hover is null)
             _logger.LogWarning(
                 "Hover request at {Line}:{Character} produced no result, because the tag could not be found.",

@@ -86,6 +86,7 @@ public sealed class LuaRenameHandlerTest
             host ?? new FakeGameWorkspaceHost(),
             new FileHelper(new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
+        var fileHelper = new FileHelper(new MockFileSystem());
         return new LuaRenameHandler(
             new LuaParseCache(textSource, 16, NullLogger<LuaParseCache>.Instance),
             textSource,
@@ -93,7 +94,11 @@ public sealed class LuaRenameHandlerTest
             NullLogger<LuaRenameHandler>.Instance,
             luaSchema ?? new LuaApiSchemaProvider([]),
             sandbox ?? FixedSandbox.Empty(),
-            new FileHelper(new MockFileSystem()));
+            fileHelper,
+            new FakeGameIndexService(),
+            new ScriptedLuaAnalyzer(),
+            new ProjectLayerMap(fileHelper),
+            TestCatalogues.English);
     }
 
     // ── Claims: what is ours to rename (#154) ────────────────────────────────

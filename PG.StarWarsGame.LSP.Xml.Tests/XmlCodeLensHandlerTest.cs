@@ -68,11 +68,11 @@ public sealed class XmlCodeLensHandlerTest
         IFileHelper? fileHelper = null, ILspConfigurationProvider? config = null)
     {
         var svc = new FakeGameIndexService { Current = index };
-        var registry = new XmlCodeLensRegistry([new ReferencesCodeLensProvider()]);
+        IXmlCodeLensProvider[] providers = [new ReferencesCodeLensProvider()];
         return new XmlCodeLensHandler(svc, NullLogger<XmlCodeLensHandler>.Instance,
             ctx ?? new AllowAllEaWContext(),
             fileHelper ?? new FileHelper(new MockFileSystem()),
-            registry, TestCatalogues.English);
+            providers, TestCatalogues.English);
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────

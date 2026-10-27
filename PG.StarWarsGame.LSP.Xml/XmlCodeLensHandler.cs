@@ -23,21 +23,22 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlCodeLensHandler> _logger;
-    private readonly IXmlCodeLensRegistry _registry;
+    private readonly IReadOnlyList<IXmlCodeLensProvider> _providers;
 
+    // Every provider may add one lens per symbol, in registration order.
     public XmlCodeLensHandler(
         IGameIndexService indexService,
         ILogger<XmlCodeLensHandler> logger,
         IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper,
-        IXmlCodeLensRegistry registry,
+        IEnumerable<IXmlCodeLensProvider> providers,
         IMessageCatalog messages)
     {
         _indexService = indexService;
         _logger = logger;
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
-        _registry = registry;
+        _providers = [.. providers];
         _messages = messages;
     }
 
@@ -61,7 +62,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
                 continue;
 
             var ctx = new CodeLensSymbolContext(symbol, fo, index) { Messages = _messages };
-            foreach (var lens in _registry.Dispatch(ctx))
+            foreach (var lens in _providers.Select(p => p.Handle(ctx)).OfType<LspCodeLens>())
             {
                 _logger.LogDebug("CodeLens: {Id} at line {Line}", symbol.Id, fo.Line);
                 lenses.Add(lens);

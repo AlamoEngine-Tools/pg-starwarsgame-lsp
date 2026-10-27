@@ -1,27 +1,24 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Localisation;
-using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Lua;
-using PG.StarWarsGame.LSP.Xml;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
+/// <summary>
+///     Prepare-rename routes as rename does (#312): to the first provider that handles the document,
+///     by no file extension of the handler's own.
+/// </summary>
 public sealed class GamePrepareRenameHandlerTest
 {
     private const string XmlUri = "file:///test.xml";
     private const string LuaUri = "file:///script.lua";
     private const string TxtUri = "file:///data.txt";
-
-    // ── helpers ────────────────────────────────────────────────────────────────
 
     private static PrepareRenameParams PrepareAt(string uri, int line = 0, int character = 0)
     {
@@ -32,96 +29,85 @@ public sealed class GamePrepareRenameHandlerTest
         };
     }
 
-    private static GamePrepareRenameHandler BuildHandler(IXmlRenameProvider? xmlProvider = null,
-        ILuaRenameProvider? luaProvider = null)
+    private static GamePrepareRenameHandler Build(params IRenameProvider[] providers)
     {
-        return new GamePrepareRenameHandler(
-            new FakeGameIndexService(),
-            xmlProvider ?? new NullXmlProvider(),
-            luaProvider ?? new NullLuaProvider(),
-            new FileHelper(new MockFileSystem()), new SilentLuaAnalyzer());
+        return new GamePrepareRenameHandler(providers, new FileHelper(new MockFileSystem()));
     }
 
-    // ── routing ────────────────────────────────────────────────────────────────
-
     [Fact]
-    public async Task Handle_UnknownFileType_ReturnsNull()
+    public async Task Handle_NoProviderHandlesTheDocument_AnswersNothing()
     {
-        var result = await BuildHandler().Handle(PrepareAt(TxtUri), CancellationToken.None);
+        var xml = new FakeProvider(".xml", new RangeOrPlaceholderRange(new Range()));
+
+        var result = await Build(xml).Handle(PrepareAt(TxtUri), CancellationToken.None);
+
         Assert.Null(result);
+        Assert.False(xml.WasCalled);
     }
 
     [Fact]
-    public async Task Handle_XmlFile_RoutesToXmlProvider()
+    public async Task Handle_AnXmlFile_ReachesTheXmlProvider()
     {
         var range = new RangeOrPlaceholderRange(new Range());
-        var result = await BuildHandler(new StubProvider(range))
+        var lua = new FakeProvider(".lua", new RangeOrPlaceholderRange(new Range()));
+
+        var result = await Build(new FakeProvider(".xml", range), lua)
             .Handle(PrepareAt(XmlUri), CancellationToken.None);
+
         Assert.Same(range, result);
+        Assert.False(lua.WasCalled);
     }
 
     [Fact]
-    public async Task Handle_LuaFile_RoutesToLuaProvider()
+    public async Task Handle_ALuaFile_ReachesTheLuaProvider()
     {
         var range = new RangeOrPlaceholderRange(new Range());
-        var result = await BuildHandler(luaProvider: new StubProvider(range))
+        var xml = new FakeProvider(".xml", new RangeOrPlaceholderRange(new Range()));
+
+        var result = await Build(xml, new FakeProvider(".lua", range))
             .Handle(PrepareAt(LuaUri), CancellationToken.None);
+
+        Assert.Same(range, result);
+        Assert.False(xml.WasCalled);
+    }
+
+    [Fact]
+    public async Task Handle_ATextFile_ReachesTheProviderThatHandlesIt()
+    {
+        var range = new RangeOrPlaceholderRange(new Range());
+
+        var result = await Build(new FakeProvider(".xml", null), new FakeProvider(".txt", range))
+            .Handle(PrepareAt(TxtUri), CancellationToken.None);
+
         Assert.Same(range, result);
     }
 
     [Fact]
-    public async Task Handle_XmlFile_XmlProviderReturnsNull_ReturnsNull()
+    public async Task Handle_TheProviderRefuses_AnswersNothing()
     {
-        var result = await BuildHandler(new NullXmlProvider())
-            .Handle(PrepareAt(XmlUri), CancellationToken.None);
+        var result = await Build(new FakeProvider(".xml", null)).Handle(PrepareAt(XmlUri), CancellationToken.None);
+
         Assert.Null(result);
     }
 
-    // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class NullXmlProvider : IXmlRenameProvider
+    private sealed class FakeProvider(string extension, RangeOrPlaceholderRange? range) : IRenameProvider
     {
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
+        public bool WasCalled { get; private set; }
+
+        public bool Handles(string documentUri)
         {
-            return null;
+            return documentUri.EndsWith(extension, StringComparison.OrdinalIgnoreCase);
         }
 
-        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        public Task<WorkspaceEdit?> RenameAsync(RenameParams request, CancellationToken ct)
         {
-            return null;
-        }
-    }
-
-    private sealed class NullLuaProvider : ILuaRenameProvider
-    {
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
-        {
-            return null;
+            throw new InvalidOperationException("prepare never renames");
         }
 
-        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        public Task<RangeOrPlaceholderRange?> PrepareAsync(PrepareRenameParams request, CancellationToken ct)
         {
-            return null;
-        }
-    }
-
-    private sealed class StubProvider : IXmlRenameProvider, ILuaRenameProvider
-    {
-        private readonly RangeOrPlaceholderRange _range;
-
-        public StubProvider(RangeOrPlaceholderRange range)
-        {
-            _range = range;
-        }
-
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
-        {
-            return null;
-        }
-
-        public RangeOrPlaceholderRange HandlePrepare(string uri, int line, int character, GameIndex index)
-        {
-            return _range;
+            WasCalled = true;
+            return Task.FromResult(range);
         }
     }
 }

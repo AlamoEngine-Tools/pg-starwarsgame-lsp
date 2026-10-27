@@ -13,12 +13,13 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
 {
     private readonly IMessageCatalog _messages;
     private readonly IReadOnlyList<IXmlCursorCodeActionProvider> _cursorProviders;
-    private readonly IXmlCodeActionRegistry _registry;
+    private readonly IReadOnlyList<IXmlCodeActionProvider> _providers;
 
-    public XmlCodeActionHandler(IXmlCodeActionRegistry registry, IMessageCatalog messages,
+    // Every provider answers every diagnostic, in registration order.
+    public XmlCodeActionHandler(IEnumerable<IXmlCodeActionProvider> providers, IMessageCatalog messages,
         IEnumerable<IXmlCursorCodeActionProvider> cursorProviders)
     {
-        _registry = registry;
+        _providers = [.. providers];
         _messages = messages;
         _cursorProviders = cursorProviders.ToList();
     }
@@ -27,8 +28,8 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
     {
         var uri = request.TextDocument.Uri;
         var actions = request.Context.Diagnostics
-            .SelectMany(d => _registry.Dispatch(new XmlCodeActionContext(uri, d)
-                { Messages = _messages }))
+            .Select(d => new XmlCodeActionContext(uri, d) { Messages = _messages })
+            .SelectMany(ctx => _providers.SelectMany(p => p.Handle(ctx)))
             .Concat(_cursorProviders.SelectMany(p => p.Handle(uri, request.Range.Start)))
             .ToList();
 

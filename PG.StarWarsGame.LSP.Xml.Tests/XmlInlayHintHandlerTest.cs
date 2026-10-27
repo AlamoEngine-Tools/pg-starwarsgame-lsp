@@ -29,7 +29,8 @@ public sealed class XmlInlayHintHandlerTest
         string docText,
         ISchemaProvider? schema = null,
         ILocalisationIndex? localisation = null,
-        ILspConfigurationProvider? config = null)
+        ILspConfigurationProvider? config = null,
+        IXmlInlayHintProvider[]? providers = null)
     {
         var host = new FakeGameWorkspaceHost();
         host.With(Uri, docText);
@@ -38,7 +39,6 @@ public sealed class XmlInlayHintHandlerTest
         if (localisation is not null)
             index.Current = index.Current with { Localisation = localisation };
 
-        var registry = new XmlInlayHintRegistry([new LocalisationKeySingleValueInlayHintProvider()]);
         return (new XmlInlayHintHandler(
             TestParseCache.For(host),
             index,
@@ -46,7 +46,7 @@ public sealed class XmlInlayHintHandlerTest
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            registry, TestCatalogues.English), index);
+            providers ?? [new LocalisationKeySingleValueInlayHintProvider()], TestCatalogues.English), index);
     }
 
     private static LspRange FullRange()
@@ -103,6 +103,22 @@ public sealed class XmlInlayHintHandlerTest
         var result = await handler.Handle(Params(), CancellationToken.None);
 
         Assert.Empty(result!);
+    }
+
+    /// <summary>Every provider answers every tag (#312): the hints of two providers both reach the client.</summary>
+    [Fact]
+    public async Task TwoProviders_BothHintsReachTheClient()
+    {
+        const string xml = "<GameObjectType>\n  <Text_ID>TEXT_UNIT_NAME</Text_ID>\n</GameObjectType>";
+        var loc = new ValueLocalisationIndex("TEXT_UNIT_NAME", "X-Wing Fighter");
+
+        var (handler, _) = Build(xml, LocKeySchema("Text_ID"), loc,
+            providers: [new LocalisationKeySingleValueInlayHintProvider(), new FixedHintProvider("= second")]);
+        var result = await handler.Handle(Params(), CancellationToken.None);
+
+        Assert.Equal(2, result!.Count());
+        Assert.Contains(result!, h => h.Label.String!.Contains("X-Wing Fighter"));
+        Assert.Contains(result!, h => h.Label.String == "= second");
     }
 
     [Fact]
@@ -171,7 +187,7 @@ public sealed class XmlInlayHintHandlerTest
             new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            new XmlInlayHintRegistry([]), TestCatalogues.English);
+            [], TestCatalogues.English);
 
         var result = await handler.Handle(Params(), CancellationToken.None);
         Assert.Null(result);
@@ -191,7 +207,7 @@ public sealed class XmlInlayHintHandlerTest
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            new XmlInlayHintRegistry([]), TestCatalogues.English);
+            [], TestCatalogues.English);
 
         _ = await handler.Handle(Params(), CancellationToken.None);
         _ = await handler.Handle(Params(), CancellationToken.None);
@@ -247,5 +263,14 @@ file sealed class ValueLocalisationIndex : ILocalisationIndex
     public string? GetValue(string key)
     {
         return _values.TryGetValue(key, out var v) ? v : null;
+    }
+}
+
+/// <summary>A provider that hints the same label on every tag it is asked about.</summary>
+file sealed class FixedHintProvider(string label) : IXmlInlayHintProvider
+{
+    public IEnumerable<InlayHint> Handle(InlayHintContext ctx)
+    {
+        return [new InlayHint { Position = new Position(ctx.Line, 0), Label = ((StringOrInlayHintLabelParts?)label)! }];
     }
 }

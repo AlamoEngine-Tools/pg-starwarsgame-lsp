@@ -21,6 +21,7 @@ using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -560,16 +561,16 @@ public static class ServerConfigurator
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<PreviewSceneChangeNotifier>>()));
 
-                // GameHoverHandler routes by extension to one of these providers. Registered as
-                // interfaces only so DryIoc does not see them as competing IHoverHandler
-                // registrations - see the router-vs-dual-registration note above .WithHandler<>().
-                services.AddSingleton<IXmlHoverProvider, XmlHoverHandler>();
-                services.AddSingleton<ILuaHoverProvider, LuaHoverHandler>();
+                // GameHoverHandler hands a request to the first of these that handles the document.
+                // Registered as the provider interface only so DryIoc does not see them as competing
+                // IHoverHandler registrations - see the router-vs-dual-registration note above
+                // .WithHandler<>().
+                services.AddSingleton<IHoverProvider, XmlHoverHandler>();
+                services.AddSingleton<IHoverProvider, LuaHoverHandler>();
 
-                // GameRenameHandler and GamePrepareRenameHandler route by extension to these
-                // providers. Same router pattern as hover, for the same reason.
-                services.AddSingleton<IXmlRenameProvider, XmlRenameHandler>();
-                services.AddSingleton<ILuaRenameProvider, LuaRenameHandler>();
+                // GameRenameHandler and GamePrepareRenameHandler route the same way. Same reason.
+                services.AddSingleton<IRenameProvider, XmlRenameHandler>();
+                services.AddSingleton<IRenameProvider, LuaRenameHandler>();
             })
             .OnInitialize(async (server, request, _) =>
             {

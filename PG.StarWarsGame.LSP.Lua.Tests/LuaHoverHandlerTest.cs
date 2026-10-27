@@ -60,7 +60,7 @@ public sealed class LuaHoverHandlerTest
     public async Task Handle_NonLuaFile_ReturnsNull()
     {
         var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]));
-        var result = await handler.Handle(HoverAt(0, 0, "file:///test.xml"), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 0, "file:///test.xml"), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -68,7 +68,7 @@ public sealed class LuaHoverHandlerTest
     public async Task Handle_NotInWorkspaceHost_ReturnsNull()
     {
         var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]));
-        var result = await handler.Handle(HoverAt(0, 0), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 0), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -86,7 +86,7 @@ public sealed class LuaHoverHandlerTest
         var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
         var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([EngineStub]), host, analyzer);
-        var result = await handler.Handle(HoverAt(0, character), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, character), CancellationToken.None);
         return result is null ? null : GetMarkdown(result);
     }
 
@@ -157,7 +157,7 @@ public sealed class LuaHoverHandlerTest
         host.AddOrUpdate(LuaUri, "RunMission()", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 5), CancellationToken.None);
 
         // A workspace function's card is the analyzer's (#155).
         Assert.Null(result);
@@ -180,7 +180,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
         var result = await BuildHandler(index, new LuaApiSchemaProvider([]), host)
-            .Handle(HoverAt(line, character), CancellationToken.None);
+            .HoverAsync(HoverAt(line, character), CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -206,7 +206,7 @@ public sealed class LuaHoverHandlerTest
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT_A\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(HoverAt(0, 21), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 21), CancellationToken.None);
 
         Assert.NotNull(result);
         var content = GetMarkdown(result);
@@ -232,7 +232,7 @@ public sealed class LuaHoverHandlerTest
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT_A\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(HoverAt(0, 21), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 21), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(0, result.Range!.Start.Line);
@@ -258,7 +258,7 @@ public sealed class LuaHoverHandlerTest
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT_VANILLA\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(HoverAt(0, 25), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 25), CancellationToken.None);
 
         Assert.NotNull(result);
         var content = GetMarkdown(result);
@@ -290,7 +290,7 @@ public sealed class LuaHoverHandlerTest
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
         // cursor inside "PGStateMachine" at col 12
-        var result = await handler.Handle(HoverAt(0, 12), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 12), CancellationToken.None);
 
         Assert.NotNull(result);
         var content = GetMarkdown(result);
@@ -310,7 +310,7 @@ public sealed class LuaHoverHandlerTest
         host.AddOrUpdate(LuaUri, "require(\"DefinitelyNotReal\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(HoverAt(0, 12), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 12), CancellationToken.None);
 
         Assert.NotNull(result);
         var content = GetMarkdown(result);
@@ -339,7 +339,7 @@ public sealed class LuaHoverHandlerTest
         host.AddOrUpdate(LuaUri, "Sleep(2)", 1);
 
         var handler = BuildHandler(GameIndex.Empty, schema, host);
-        var result = await handler.Handle(HoverAt(0, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 2), CancellationToken.None);
 
         Assert.NotNull(result);
         var content = GetMarkdown(result);
@@ -365,7 +365,7 @@ public sealed class LuaHoverHandlerTest
 
         var handler = BuildHandler(GameIndex.Empty, schema, host);
         // cursor on "Find_First_Object" at col 5
-        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 5), CancellationToken.None);
 
         Assert.NotNull(result);
         var content = GetMarkdown(result);
@@ -382,7 +382,7 @@ public sealed class LuaHoverHandlerTest
         var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
         var result = await BuildHandler(GameIndex.Empty, schema, host)
-            .Handle(HoverAt(line, character), CancellationToken.None);
+            .HoverAsync(HoverAt(line, character), CancellationToken.None);
         return result is null ? null : GetMarkdown(result);
     }
 
@@ -469,7 +469,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
         var result = await BuildHandler(index, new LuaApiSchemaProvider([]), host)
-            .Handle(HoverAt(line, character), CancellationToken.None);
+            .HoverAsync(HoverAt(line, character), CancellationToken.None);
         return result is null ? null : GetMarkdown(result);
     }
 
@@ -527,7 +527,7 @@ public sealed class LuaHoverHandlerTest
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT\")", 1);
 
         var handler = BuildHandler(GameIndex.Empty, schema, host);
-        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 5), CancellationToken.None);
 
         Assert.NotNull(result);
         var content = GetMarkdown(result);
@@ -545,7 +545,7 @@ public sealed class LuaHoverHandlerTest
 
         var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]), host);
         // cursor on "myVar"
-        var result = await handler.Handle(HoverAt(0, 8), CancellationToken.None);
+        var result = await handler.HoverAsync(HoverAt(0, 8), CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -572,7 +572,7 @@ public sealed class LuaHoverHandlerTest
             new LuaApiSchemaProvider([]), new ScriptedLuaAnalyzer(), ResxMessageCatalog.Server("en"));
 
         // Cursor inside "SomeModule" - require hover should produce a result from disk content
-        var result = await handler.Handle(
+        var result = await handler.HoverAsync(
             new HoverParams
             {
                 TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) },

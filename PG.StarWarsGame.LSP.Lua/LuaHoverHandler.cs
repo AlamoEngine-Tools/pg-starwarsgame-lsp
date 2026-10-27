@@ -5,6 +5,7 @@ using System.Text;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -17,7 +18,7 @@ using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
-public sealed class LuaHoverHandler : ILuaHoverProvider
+public sealed class LuaHoverHandler : IHoverProvider
 {
     private readonly ILuaAnalyzer _analyzer;
     private readonly IFileHelper _fileHelper;
@@ -43,7 +44,12 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         _analyzer = analyzer;
     }
 
-    public async Task<Hover?> Handle(HoverParams request, CancellationToken ct)
+    public bool Handles(string documentUri)
+    {
+        return documentUri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task<Hover?> HoverAsync(HoverParams request, CancellationToken ct)
     {
         var ours = await HandleOurs(request);
         if (!request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))

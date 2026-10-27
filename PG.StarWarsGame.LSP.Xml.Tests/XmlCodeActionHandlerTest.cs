@@ -16,11 +16,12 @@ public sealed class XmlCodeActionHandlerTest
     private static XmlCodeActionHandler MakeSut(IXmlFixCache? cache = null,
         IMessageCatalog? messages = null, IXmlCursorCodeActionProvider? cursor = null)
     {
-        var registry = new XmlCodeActionRegistry([
+        IXmlCodeActionProvider[] providers =
+        [
             new FixSuggestionCodeActionProvider(cache ?? new EmptyFixCache()),
             new CreateLocKeyCodeActionProvider()
-        ]);
-        return new XmlCodeActionHandler(registry, messages ?? TestCatalogues.English, cursor is null ? [] : [cursor]);
+        ];
+        return new XmlCodeActionHandler(providers, messages ?? TestCatalogues.English, cursor is null ? [] : [cursor]);
     }
 
     /// <summary>

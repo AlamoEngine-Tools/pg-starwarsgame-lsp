@@ -6,7 +6,7 @@ using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 
-namespace PG.StarWarsGame.LSP.Server;
+namespace PG.StarWarsGame.LSP.Lua;
 
 /// <summary>
 ///     What a rename the Lua analyzer computed may touch: the project's own scripts. The analyzer

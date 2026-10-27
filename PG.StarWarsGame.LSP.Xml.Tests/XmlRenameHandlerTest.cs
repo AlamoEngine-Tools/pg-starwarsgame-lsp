@@ -84,7 +84,9 @@ public sealed class XmlRenameHandlerTest
             ctx ?? new AllowAllContext(),
             textSource,
             schema ?? new SchemaProviderBuilder().Build(),
-            NullLogger<XmlRenameHandler>.Instance);
+            NullLogger<XmlRenameHandler>.Instance,
+            fileHelper ?? new FileHelper(new MockFileSystem()),
+            new FakeGameIndexService());
     }
 
     // ── HandleRename ──────────────────────────────────────────────────────────

@@ -45,16 +45,17 @@ public sealed class XmlHoverHandlerTest
         var schema = new SchemaProviderBuilder().Build();
         var config = new FakeConfigProvider();
         var fileTypeRegistry = registry ?? new FakeFileTypeRegistry();
-        var strategyRegistry = new XmlHoverStrategyRegistry([
+        IXmlHoverStrategy[] strategies =
+        [
             new ReferenceHoverStrategy(),
             new AssetHoverStrategy(),
             new TagNameHoverStrategy(fileTypeRegistry)
-        ]);
+        ];
         return (new XmlHoverHandler(TestParseCache.For(host), indexService ?? new FakeGameIndexService(), schema,
                 config,
                 NullLogger<XmlHoverHandler>.Instance,
                 new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
-                strategyRegistry, messages ?? TestCatalogues.English),
+                strategies, messages ?? TestCatalogues.English),
             host, schema, config);
     }
 
@@ -132,7 +133,7 @@ public sealed class XmlHoverHandlerTest
     public async Task Handle_BufferEmpty_ReturnsNull()
     {
         var (handler, _, _, _) = Build();
-        var result = await handler.Handle(At(0, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 1), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -142,7 +143,7 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, _, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Foo/>", 1);
 
-        var result = await handler.Handle(At(99, 0), CancellationToken.None);
+        var result = await handler.HoverAsync(At(99, 0), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -152,7 +153,7 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, _, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Max_Speed>500</Max_Speed>", 1);
         // cursor on "500" (position 11)
-        var result = await handler.Handle(At(0, 11), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 11), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -162,7 +163,7 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Max_Speed>500</Max_Speed>", 1);
 
-        var result = await handler.Handle(At(0, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 2), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -176,7 +177,7 @@ public sealed class XmlHoverHandlerTest
         schema.Add(MakeTag());
 
         // cursor on 'M' of Max_Speed (line 1, col 1)
-        var result = await handler.Handle(At(1, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 1), CancellationToken.None);
 
         Assert.NotNull(result);
         var md = result.Contents.MarkupContent!.Value;
@@ -191,7 +192,7 @@ public sealed class XmlHoverHandlerTest
         schema.Add(MakeTag());
 
         // "</Max_Speed>" starts at index 14; 'M' is at 16 (line 1)
-        var result = await handler.Handle(At(1, 16), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 16), CancellationToken.None);
 
         Assert.NotNull(result);
     }
@@ -203,7 +204,7 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Old_Tag/>\n</Root>", 1);
         schema.Add(MakeTag("Old_Tag", true));
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("deprecated", md, StringComparison.OrdinalIgnoreCase);
@@ -216,7 +217,7 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<New_Tag/>\n</Root>", 1);
         schema.Add(MakeTag("New_Tag", since: "FoC 1.0"));
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("FoC 1.0", md);
@@ -230,7 +231,7 @@ public sealed class XmlHoverHandlerTest
         schema.Add(MakeTag("Foo", descEn: "English", descDe: "Deutsch"));
         config.Locale = "de";
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("Deutsch", md);
@@ -248,7 +249,7 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
         schema.Add(MakeTag("Foo", descEn: null));
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         Assert.Contains("[HoverUtility_NoDescription]", result!.Contents.MarkupContent!.Value);
     }
@@ -261,7 +262,7 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
         schema.Add(MakeTag("Foo"));
 
-        var result = await handler.Handle(At(1, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 1), CancellationToken.None);
 
         Assert.NotNull(result?.Range);
         Assert.Equal(1, result.Range!.Start.Character);
@@ -277,7 +278,7 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
         schema.Add(MakeTag()); // ValueType = Float
 
-        var result = await handler.Handle(At(1, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 1), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("1.0f", md);
@@ -296,7 +297,7 @@ public sealed class XmlHoverHandlerTest
             ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
         });
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("Faction", md);
@@ -316,7 +317,7 @@ public sealed class XmlHoverHandlerTest
             Enum = new EnumDefinition { Name = "ArmorType", Kind = EnumKind.DynamicXml, Values = [] }
         });
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("ArmorType", md);
@@ -332,7 +333,7 @@ public sealed class XmlHoverHandlerTest
         // no type registered
 
         // Cursor on 'H' of <Hardpoints> (document root element)
-        var result = await handler.Handle(At(0, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 1), CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -356,7 +357,7 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(),
             "<GameObjectFiles>\n<Fighter_Mk2/>\n</GameObjectFiles>", 1);
         // cursor on 'F' of Fighter_Mk2 (line 1, col 2)
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         Assert.NotNull(result);
         var md = result.Contents.MarkupContent!.Value;
@@ -377,7 +378,7 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(),
             "<GameObjectFiles>\n<Fighter_Mk2>\n<Max_Speed/>\n</Fighter_Mk2>\n</GameObjectFiles>", 1);
         // cursor on 'M' of Max_Speed (line 2, col 1)
-        var result = await handler.Handle(At(2, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(2, 2), CancellationToken.None);
 
         Assert.NotNull(result);
         var md = result.Contents.MarkupContent!.Value;
@@ -399,7 +400,7 @@ public sealed class XmlHoverHandlerTest
             Description = new Dictionary<string, string> { ["en"] = "All game objects." }
         });
 
-        var result = await handler.Handle(At(0, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 2), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -422,7 +423,7 @@ public sealed class XmlHoverHandlerTest
             ]
         });
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("Never used in vanilla.", md);
@@ -436,7 +437,7 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed/>\n</Root>", 1);
         schema.Add(MakeTag());
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.DoesNotContain("**Note:**", md);
@@ -453,7 +454,7 @@ public sealed class XmlHoverHandlerTest
         schema.Add(MakeTag());
 
         // '5' of "500" is at col 11 on line 1
-        var result = await handler.Handle(At(1, 11), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 11), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -466,7 +467,7 @@ public sealed class XmlHoverHandlerTest
         schema.Add(MakeTag());
 
         // </Max_Speed> on line 3: '<' at 0, '/' at 1, 'M' at 2
-        var result = await handler.Handle(At(3, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(3, 2), CancellationToken.None);
         Assert.NotNull(result);
         Assert.Contains("Max_Speed", result.Contents.MarkupContent!.Value);
     }
@@ -489,7 +490,7 @@ public sealed class XmlHoverHandlerTest
         });
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>EMPIRE</Affiliation>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 14), CancellationToken.None);
 
         Assert.NotNull(result);
         var md = result.Contents.MarkupContent!.Value;
@@ -508,7 +509,7 @@ public sealed class XmlHoverHandlerTest
             { TypeName = "Faction", Description = new Dictionary<string, string>() });
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>EMPIRE</Affiliation>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 14), CancellationToken.None);
 
         Assert.Equal(1, result!.Range!.Start.Line);
         Assert.Equal(13, result.Range.Start.Character);
@@ -532,7 +533,7 @@ public sealed class XmlHoverHandlerTest
             { TypeName = "SpaceUnit", Description = new Dictionary<string, string>() });
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Units>Alpha Beta</Units>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 14), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains("Beta", result.Contents.MarkupContent!.Value);
@@ -568,7 +569,7 @@ public sealed class XmlHoverHandlerTest
             { TypeName = "TradeRouteLine", Description = new Dictionary<string, string>() });
         host.AddOrUpdate(uri, "<Root>\n<SFXEvent_Select>Null</SFXEvent_Select>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 19), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 19), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains("SFXEvent", result.Contents.MarkupContent!.Value);
@@ -583,7 +584,7 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, _, _) = Build(indexService: indexService);
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>MISSING_UNIT</Affiliation>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 14), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -611,7 +612,7 @@ public sealed class XmlHoverHandlerTest
         schema.Add(AbilityTypeDef("LuckyShotAttackAbility"));
 
         // Line 2: "<Lucky_Shot_Attack_Ability Name="Luke_Shot">" - cursor on 'L'
-        var result = await handler.Handle(At(2, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(2, 1), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains("LuckyShotAttackAbility", result.Contents.MarkupContent!.Value);
@@ -632,7 +633,7 @@ public sealed class XmlHoverHandlerTest
             });
 
         // Line 3: "<Applicable_Unit_Categories>..." - cursor on 'A'
-        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(3, 1), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains("Applicable_Unit_Categories", result.Contents.MarkupContent!.Value);
@@ -656,7 +657,7 @@ public sealed class XmlHoverHandlerTest
                 Description = new Dictionary<string, string> { ["en"] = "From ability schema" }
             });
 
-        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(3, 1), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains("Applicable_Unit_Categories", result.Contents.MarkupContent!.Value);
@@ -671,7 +672,7 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, _, _) = Build(ctx: new DenyAllEaWContext());
         host.AddOrUpdate(TestUri.ToString(), "<Root><Foo/></Root>", 1);
 
-        var result = await handler.Handle(At(0, 7), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 7), CancellationToken.None);
 
         Assert.Null(result);
     }
