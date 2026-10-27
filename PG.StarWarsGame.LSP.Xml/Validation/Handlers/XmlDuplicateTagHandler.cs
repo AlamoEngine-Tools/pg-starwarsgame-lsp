@@ -14,15 +14,15 @@ public sealed class XmlDuplicateTagHandler : XmlDiagnosticsHandler<XmlDuplicateT
     {
         var othersText = ctx.Messages.Format("XmlDuplicateTag_OtherLines", string.Join(", ", fact.OtherLines));
 
-        // Warning, not Error: the game loads the object top to bottom and the LAST occurrence
-        // wins, so duplicates technically work - they are just misleading style. Earlier
-        // occurrences are dead values and get greyed out (Unnecessary); every occurrence offers
-        // the "remove earlier duplicates" quick fix.
+        // Warning, not Error: the game loads the object top to bottom and the last occurrence
+        // with a value wins, so duplicates technically work - they are just misleading style. The
+        // other occurrences are dead values and get greyed out (Unnecessary); every occurrence
+        // offers the "remove the duplicates the game ignores" quick fix.
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                 ctx.Messages.Format("XmlDuplicateTag_DuplicateTagOnlyOneOccurrence", fact.Tag.Tag, othersText),
-                Tags: fact.IsLastOccurrence ? null : [XmlDiagnosticTag.Unnecessary],
+                Tags: fact.IsEffectiveOccurrence ? null : [XmlDiagnosticTag.Unnecessary],
                 OfferRemoveEarlierDuplicates: true)
         ];
     }

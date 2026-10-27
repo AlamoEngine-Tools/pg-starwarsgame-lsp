@@ -100,6 +100,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
         // occurrences. The merge outcome is a property of the object, not of each occurrence -
         // reporting it once keeps the Problems panel readable.
         var reportedMerges = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var reportedEmpties = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var child in objectNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
         {
@@ -116,6 +117,23 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
             if (mode == VariantMode.Ignored)
             {
                 facts.Add(new VariantIgnoredOverrideFact(documentUri, line, col, len, name));
+                continue;
+            }
+
+            // An empty value, or exactly TBD, never reaches the game's field mapper, so a variant
+            // writing only that for a tag keeps the base's value instead of clearing it - and the
+            // author is told. Once per tag, and only when no occurrence in this object has a value:
+            // an empty repeat beside a valued one is the document rule's finding, with the line.
+            if (XmlUtility.WritesNoValue(child))
+            {
+                if (baseValues.TryGetValue(child.Name, out var inherited) &&
+                    !HasValuedOccurrence(objectNode, child.Name) && reportedEmpties.Add(child.Name))
+                {
+                    var (endLine, endCol) = XmlUtility.GetElementEndPosition(child, text);
+                    facts.Add(new XmlEmptyRepeatedTagFact(documentUri, line, col, len, name, inherited, null,
+                        endLine, endCol));
+                }
+
                 continue;
             }
 
@@ -140,6 +158,14 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
                 facts.Add(new VariantRedundantOverrideFact(documentUri, line, col, len, name, endLine, endCol));
             }
         }
+    }
+
+    private static bool HasValuedOccurrence(HtmlNode objectNode, string tagName)
+    {
+        return objectNode.ChildNodes.Any(n =>
+            n.NodeType == HtmlNodeType.Element &&
+            n.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase) &&
+            !XmlUtility.WritesNoValue(n));
     }
 
     private static IReadOnlyDictionary<string, string> BaseValues(EffectiveObjectResolver resolver, string? baseId)

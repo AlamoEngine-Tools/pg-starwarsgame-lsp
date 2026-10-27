@@ -213,6 +213,24 @@ public sealed class GetEncyclopediaEntryIconTest
         Assert.Null(ability.Icon);
     }
 
+    /// <summary>
+    ///     Three shipped objects name their icon and then repeat the tag empty - Han_Solo among them.
+    ///     The game's field mapper skips an empty value, so the game shows the icon; the card does too.
+    /// </summary>
+    [Fact]
+    public async Task Handle_EmptyRepeatOfIconName_KeepsTheIcon()
+    {
+        var result = await Run(
+            new StubIconCatalogProvider(CatalogWith("i_button_han_solo.tga")),
+            Tag("Encyclopedia_Text", "TEXT_A"),
+            Tag("Icon_Name", "i_button_han_solo.tga"),
+            Tag("Icon_Name", ""));
+
+        Assert.NotNull(result.Icon);
+        Assert.Equal("i_button_han_solo.tga", result.Icon.Name);
+        Assert.Equal(nameof(IconSource.Baseline), result.Icon.Source);
+    }
+
     [Fact]
     public async Task Handle_ObjectWithoutIconName_ReturnsNoIcon()
     {

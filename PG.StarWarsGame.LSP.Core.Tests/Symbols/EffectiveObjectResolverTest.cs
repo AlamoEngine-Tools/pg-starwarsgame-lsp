@@ -437,6 +437,112 @@ public sealed class EffectiveObjectResolverTest
         Assert.Contains(result.Tags, t => t.TagName == "Max_Health");
     }
 
+    // ── a value the game never maps ──────────────────────────────────────────
+
+    /// <summary>
+    ///     Measured: the game's shared field mapper returns before converting an empty value, so the
+    ///     field keeps what the earlier occurrence set. Han_Solo writes its icon and then an empty
+    ///     Icon_Name, and the game shows the icon - so the effective object does too.
+    /// </summary>
+    [Fact]
+    public void Resolve_EmptyRepeat_KeepsTheEarlierValue()
+    {
+        var index = WorkspaceIndex(Sym("OBJ"));
+        var source = new FakeTagSource().With("OBJ",
+            Tag("Icon_Name", "i_button_han_solo.tga"), Tag("Icon_Name", ""));
+
+        var result = Resolver(index, source).Resolve("OBJ");
+
+        Assert.Equal("i_button_han_solo.tga", TagNamed(result, "Icon_Name").Value);
+    }
+
+    /// <summary>The object parser withholds a value of exactly TBD before it reaches the mapper.</summary>
+    [Fact]
+    public void Resolve_TbdRepeat_IsWithheldLikeAnEmptyValue()
+    {
+        var index = WorkspaceIndex(Sym("OBJ"));
+        var source = new FakeTagSource().With("OBJ",
+            Tag("Icon_Name", "i_button_han_solo.tga"), Tag("Icon_Name", "TBD"));
+
+        var result = Resolver(index, source).Resolve("OBJ");
+
+        Assert.Equal("i_button_han_solo.tga", TagNamed(result, "Icon_Name").Value);
+    }
+
+    [Fact]
+    public void Resolve_Variant_EmptyTag_KeepsTheBaseValue()
+    {
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Icon_Name", "base.tga"))
+            .With("V", Tag("Icon_Name", ""));
+
+        var result = Resolver(index, source).Resolve("V");
+
+        var tag = TagNamed(result, "Icon_Name");
+        Assert.Equal("base.tga", tag.Value);
+        Assert.Equal(VariantProvenance.Inherited, tag.Provenance);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("TBD")]
+    public void Resolve_WithheldValue_WithNoEarlierValue_IsNoTag(string written)
+    {
+        var index = WorkspaceIndex(Sym("OBJ"));
+        var source = new FakeTagSource().With("OBJ", Tag("Icon_Name", written), Tag("Max_Health", "100"));
+
+        var result = Resolver(index, source).Resolve("OBJ");
+
+        Assert.DoesNotContain(result.Tags, t => t.TagName == "Icon_Name");
+        Assert.Equal("100", TagNamed(result, "Max_Health").Value);
+    }
+
+    [Fact]
+    public void Resolve_EmptyRepeat_OfAnAdditiveTag_AddsNoOccurrence()
+    {
+        var index = WorkspaceIndex(Sym("OBJ"));
+        var source = new FakeTagSource().With("OBJ",
+            Tag("Death_Clone", "Damage_Fire, A_Fire_Clone"), Tag("Death_Clone", ""));
+        var schema = new FakeSchema().WithMode("Death_Clone", VariantMode.Merge).WithMultiple("Death_Clone");
+
+        var result = Resolver(index, source, schema).Resolve("OBJ");
+
+        Assert.Equal("Damage_Fire, A_Fire_Clone", TagNamed(result, "Death_Clone").Value);
+    }
+
+    [Fact]
+    public void Resolve_EmptyRepeat_OfAMergeTag_LeavesTheUnionAlone()
+    {
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Tags", "A"))
+            .With("V", Tag("Tags", "C"), Tag("Tags", ""));
+        var schema = new FakeSchema().WithMode("Tags", VariantMode.Merge);
+
+        var result = Resolver(index, source, schema).Resolve("V");
+
+        Assert.Equal("A, C", TagNamed(result, "Tags").Value);
+    }
+
+    /// <summary>
+    ///     A sub-object list carries its content in child elements and no text value; the engine
+    ///     reads it another way, so the measured skip does not apply and the list stays.
+    /// </summary>
+    [Fact]
+    public void Resolve_ContainerWithoutTextValue_IsKept()
+    {
+        const string fragment =
+            "<Unit_Abilities_Data><Unit_Ability><Type>DEFEND</Type></Unit_Ability></Unit_Abilities_Data>";
+        var index = WorkspaceIndex(Sym("OBJ"));
+        var source = new FakeTagSource().With("OBJ", new VariantTag("Unit_Abilities_Data", "", fragment, 0));
+
+        var result = Resolver(index, source).Resolve("OBJ");
+
+        Assert.Equal(fragment, TagNamed(result, "Unit_Abilities_Data").Fragment);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeTagSource : IVariantTagSource

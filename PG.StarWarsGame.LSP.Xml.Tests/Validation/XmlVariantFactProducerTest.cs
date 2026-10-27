@@ -154,6 +154,43 @@ public sealed class XmlVariantFactProducerTest
         Assert.Contains(facts, f => f is VariantRedundantOverrideFact { TagName: "Max_Health" });
     }
 
+    /// <summary>
+    ///     A variant's empty tag does not clear the base's value: the game's field mapper returns
+    ///     before converting an empty value, so the inherited one stays - and the author is told.
+    /// </summary>
+    [Fact]
+    public void Produce_EmptyTagOnVariant_ReportsThatTheInheritedValueStays()
+    {
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Icon_Name></Icon_Name></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+        var source =
+            new FakeTagSource().With("B",
+                new VariantTag("Icon_Name", "base.tga", "<Icon_Name>base.tga</Icon_Name>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        var fact = Assert.Single(facts.OfType<XmlEmptyRepeatedTagFact>());
+        Assert.Equal("Icon_Name", fact.TagName);
+        Assert.Equal("base.tga", fact.KeptValue);
+        Assert.Null(fact.KeptLine);
+        Assert.Empty(facts.OfType<VariantRedundantOverrideFact>());
+    }
+
+    [Fact]
+    public void Produce_EmptyTagOnVariant_WithNoBaseValue_ReportsNothing()
+    {
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Icon_Name></Icon_Name></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+        var source =
+            new FakeTagSource().With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        Assert.Empty(facts.OfType<XmlEmptyRepeatedTagFact>());
+    }
+
     [Fact]
     public void Produce_RedundantOverride_FactCarriesElementEndPosition()
     {

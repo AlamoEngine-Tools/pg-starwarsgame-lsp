@@ -462,6 +462,13 @@ public static class DiagnosticIds
     /// </remarks>
     public static readonly DiagnosticId UnregisteredXmlFile = new(DiagnosticGroup.Structure, 17);
 
+    /// <summary>
+    ///     A tag occurrence the game maps no value from - empty, or exactly <c>TBD</c> - where an
+    ///     earlier occurrence or the variant base already supplies one. That value stays; an author
+    ///     who meant to clear it has not.
+    /// </summary>
+    public static readonly DiagnosticId XmlEmptyRepeatedTag = new(DiagnosticGroup.Structure, 18);
+
     // ── CrossTag ──
     public static readonly DiagnosticId DamageNonzero = new(DiagnosticGroup.CrossTag, 1);
     public static readonly DiagnosticId DisallowedOrOperator = new(DiagnosticGroup.CrossTag, 2);

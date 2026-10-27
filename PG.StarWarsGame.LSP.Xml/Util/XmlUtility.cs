@@ -31,6 +31,16 @@ public static class XmlUtility
     }
 
     /// <summary>
+    ///     Whether this occurrence writes no field in the game: a plain tag - no element children -
+    ///     whose value is empty or exactly TBD. See <see cref="EngineTagValue" />.
+    /// </summary>
+    public static bool WritesNoValue(HtmlNode node)
+    {
+        return EngineTagValue.IsWithheld(node.InnerText) &&
+               !node.ChildNodes.Any(child => child.NodeType == HtmlNodeType.Element);
+    }
+
+    /// <summary>
     ///     0-based line the node's markup ends on - the same line as <see cref="GetLine" /> for a
     ///     single-line element, the closing tag's line for one spanning several. HAP exposes no end
     ///     position, so it is derived from the newline count of the node's own markup.

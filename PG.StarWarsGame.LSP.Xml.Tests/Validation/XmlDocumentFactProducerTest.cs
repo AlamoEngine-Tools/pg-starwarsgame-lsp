@@ -140,9 +140,96 @@ public sealed class XmlDocumentFactProducerTest
         var dups = facts.OfType<XmlDuplicateTagFact>().OrderBy(d => d.Line).ToList();
 
         Assert.Equal(3, dups.Count);
-        Assert.False(dups[0].IsLastOccurrence);
-        Assert.False(dups[1].IsLastOccurrence);
-        Assert.True(dups[2].IsLastOccurrence);
+        Assert.False(dups[0].IsEffectiveOccurrence);
+        Assert.False(dups[1].IsEffectiveOccurrence);
+        Assert.True(dups[2].IsEffectiveOccurrence);
+    }
+
+    // ── an empty repeat does nothing ──────────────────────────────────────────
+
+    /// <summary>
+    ///     Measured: the game's field mapper returns before converting an empty value, so an empty
+    ///     later occurrence changes nothing and the earlier value stays. The author who meant to
+    ///     clear it is told; the valued occurrence is the one the game keeps.
+    /// </summary>
+    [Fact]
+    public void Empty_repeat_of_a_singleton_is_reported_as_doing_nothing()
+    {
+        //  line 0: <Root>
+        //  line 1: <Max_Speed>1.0</Max_Speed>
+        //  line 2: <Max_Speed></Max_Speed>
+        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed></Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        var empty = Assert.Single(facts.OfType<XmlEmptyRepeatedTagFact>());
+        Assert.Equal(2, empty.Line);
+        Assert.Equal("Max_Speed", empty.TagName, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("1.0", empty.KeptValue);
+        Assert.Equal(2, empty.KeptLine); // 1-based, as the duplicate fact reports lines
+        Assert.Equal(2, empty.EndLine);
+        Assert.Equal("<Max_Speed></Max_Speed>".Length, empty.EndColumn);
+    }
+
+    [Fact]
+    public void Empty_repeat_leaves_the_valued_occurrence_as_the_effective_duplicate()
+    {
+        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed />\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        // The empty one is reported as a no-op, not as a duplicate; the valued one is a duplicate
+        // only in the sense that the tag appears twice, and it is the one the game reads.
+        var dup = Assert.Single(facts.OfType<XmlDuplicateTagFact>());
+        Assert.Equal(1, dup.Line);
+        Assert.True(dup.IsEffectiveOccurrence);
+        Assert.Equal("1.0", Assert.Single(facts.OfType<XmlTagValueFact>()).RawValue);
+    }
+
+    [Fact]
+    public void Tbd_repeat_is_withheld_like_an_empty_one()
+    {
+        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed>TBD</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        Assert.Equal("1.0", Assert.Single(facts.OfType<XmlEmptyRepeatedTagFact>()).KeptValue);
+        Assert.Equal("1.0", Assert.Single(facts.OfType<XmlTagValueFact>()).RawValue);
+    }
+
+    [Fact]
+    public void Valued_repeat_after_an_empty_one_is_the_effective_occurrence()
+    {
+        //  line 1: 1.0   line 2: empty   line 3: 2.0
+        const string xml =
+            "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed></Max_Speed>\n<Max_Speed>2.0</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        var empty = Assert.Single(facts.OfType<XmlEmptyRepeatedTagFact>());
+        Assert.Equal(2, empty.Line);
+        Assert.Equal("1.0", empty.KeptValue);
+        var dups = facts.OfType<XmlDuplicateTagFact>().OrderBy(d => d.Line).ToList();
+        Assert.Equal([1, 3], dups.Select(d => d.Line));
+        Assert.Equal([false, true], dups.Select(d => d.IsEffectiveOccurrence));
+        Assert.Equal("2.0", Assert.Single(facts.OfType<XmlTagValueFact>()).RawValue);
+    }
+
+    /// <summary>With nothing before it to keep, an empty first occurrence is a plain duplicate.</summary>
+    [Fact]
+    public void Empty_first_occurrence_is_a_plain_duplicate()
+    {
+        const string xml = "<Root>\n<Max_Speed></Max_Speed>\n<Max_Speed>1.0</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        Assert.Empty(facts.OfType<XmlEmptyRepeatedTagFact>());
+        var dups = facts.OfType<XmlDuplicateTagFact>().OrderBy(d => d.Line).ToList();
+        Assert.Equal([false, true], dups.Select(d => d.IsEffectiveOccurrence));
+    }
+
+    [Fact]
+    public void Valued_repeat_is_not_reported_as_an_empty_one()
+    {
+        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed>2.0</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        Assert.Empty(facts.OfType<XmlEmptyRepeatedTagFact>());
     }
 
     [Fact]

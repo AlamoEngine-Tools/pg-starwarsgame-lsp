@@ -1691,7 +1691,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>{0} references</value>
   </data>
   <data name="RemoveEarlierDuplicatesAction_Remove" xml:space="preserve">
-    <value>Remove the earlier duplicates of '{0}' ({1}) - the game keeps the last occurrence</value>
+    <value>Remove the duplicates of '{0}' the game ignores ({1}) - it keeps the last one with a value</value>
   </data>
   <data name="RemoveRedundantOverrideAction_RemoveRedundantOverride" xml:space="preserve">
     <value>Remove redundant override '{0}'</value>
@@ -2819,10 +2819,16 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>member</value>
   </data>
   <data name="XmlDuplicateTag_DuplicateTagOnlyOneOccurrence" xml:space="preserve">
-    <value>Duplicate tag '{0}': Only one occurrence is used per object - the game keeps the LAST one.{1}</value>
+    <value>Duplicate tag '{0}': Only one occurrence is used per object - the game keeps the last one with a value.{1}</value>
   </data>
   <data name="XmlDuplicateTag_OtherLines" xml:space="preserve">
     <value> Line numbers of the other occurrences - {0}.</value>
+  </data>
+  <data name="XmlEmptyRepeatedTag_EarlierValueStays" xml:space="preserve">
+    <value>Repeated &lt;{0}&gt; sets nothing: The game ignores an empty or TBD value, so '{1}' from line {2} stays</value>
+  </data>
+  <data name="XmlEmptyRepeatedTag_InheritedValueStays" xml:space="preserve">
+    <value>&lt;{0}&gt; sets nothing: The game ignores an empty or TBD value, so the inherited '{1}' stays</value>
   </data>
   <data name="XmlFormatter_NotWellFormed" xml:space="preserve">
     <value>Formatting refused: Not well-formed XML at line {0}, column {1}</value>

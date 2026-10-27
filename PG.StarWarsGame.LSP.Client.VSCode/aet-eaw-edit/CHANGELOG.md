@@ -281,6 +281,13 @@
 
 ### Fixes
 
+- **An empty repeated tag leaves the earlier value in place, as the game does** - the game maps nothing from an
+  empty value or a value of exactly `TBD`, so a later empty occurrence clears nothing: the earlier value, or the
+  one inherited from the variant base, stays. The effective object, the preview and the encyclopedia card follow
+  it, so the three shipped objects that repeat `Icon_Name` empty show their icon again. The empty occurrence is
+  reported as setting nothing, naming the value that stays; the duplicate-tag warning and its quick fix keep the
+  last occurrence with a value rather than the last one written
+  ([#290](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/290))
 - **A repeated or untrimmed tag reads the same everywhere** - the preview, the encyclopedia and the validation
   rules read a tag through one set of accessors on the effective object: the last occurrence, trimmed, an empty
   element as no value, and a number or a flag read as the game reads it. A `Scale_Factor` written `2.5f` draws

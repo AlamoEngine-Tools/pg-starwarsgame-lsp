@@ -321,7 +321,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // hardpoint's unit-mode rows apply only for the owner's first two abilities.
         // 157 -> 158: LuaScriptReferenceHandler (#133). A game object's Lua_Script is checked against
         // the file the game's Lua search path would load.
-        const int expectedHandlerCount = 158;
+        // 158 -> 159: XmlEmptyRepeatedTagHandler (#290). An empty repeat of a tag sets nothing in the
+        // game, so the earlier or inherited value stays - and the author is told.
+        const int expectedHandlerCount = 159;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

@@ -464,21 +464,32 @@ public sealed class XmlDocumentFactProducer(
                     .Select(n => n.Line)
                     .ToList();
                 var openLen = XmlUtility.GetOpeningTagLength(child);
-                var isLast = ReferenceEquals(child, group[^1]);
                 // Whole-element span so the Unnecessary grey-out covers the entire dead node.
                 var (endLine, endCol) = XmlUtility.GetElementEndPosition(child, text);
-                facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines,
-                    isLast, endLine, endCol));
+
+                // The occurrence the game keeps is the last one WITH A VALUE: its field mapper
+                // returns before converting an empty value (and its parser withholds TBD), so an
+                // empty later occurrence changes nothing. Such an occurrence is reported as setting
+                // nothing when there is an earlier value it fails to clear; with nothing before it
+                // to keep, it is a plain duplicate like any other.
+                var isEffective = ReferenceEquals(child, EffectiveOccurrence(group));
+                var kept = XmlUtility.WritesNoValue(child) ? LastValuedBefore(group, child) : null;
+                if (kept is not null)
+                    facts.Add(new XmlEmptyRepeatedTagFact(documentUri, line0, col0, openLen, tagDef.Tag,
+                        kept.InnerText.Trim(), kept.Line, endLine, endCol));
+                else
+                    facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines,
+                        isEffective, endLine, endCol));
 
                 // The duplicate is a complaint about WHERE the value sits and says nothing about
                 // whether it is valid, so the value still has to be checked - otherwise a
                 // duplicated tag silently escapes every value rule and the second, unrelated error
                 // only surfaces once the duplicate is fixed.
                 //
-                // Only the last occurrence, because that is the one the engine reads: reporting a
-                // bad enum on a line the game never looks at would be a complaint about dead text,
-                // and those lines are already greyed out as Unnecessary.
-                if (isLast)
+                // Only the occurrence the engine reads: reporting a bad enum on a line the game
+                // never looks at would be a complaint about dead text, and those lines are already
+                // greyed out as Unnecessary.
+                if (isEffective)
                 {
                     var duplicateValue = child.InnerText.Trim();
                     if (!string.IsNullOrEmpty(duplicateValue))
@@ -571,6 +582,34 @@ public sealed class XmlDocumentFactProducer(
                 return false;
 
         return hasElementChildren;
+    }
+
+    /// <summary>
+    ///     The occurrence of a repeated singleton the game keeps: the last one whose value it maps,
+    ///     or the last one outright when none has a value.
+    /// </summary>
+    private static HtmlNode EffectiveOccurrence(List<HtmlNode> group)
+    {
+        for (var i = group.Count - 1; i >= 0; i--)
+            if (!XmlUtility.WritesNoValue(group[i]))
+                return group[i];
+
+        return group[^1];
+    }
+
+    /// <summary>The valued occurrence an empty one fails to clear, or null when nothing before it has a value.</summary>
+    private static HtmlNode? LastValuedBefore(List<HtmlNode> group, HtmlNode child)
+    {
+        HtmlNode? last = null;
+        foreach (var occurrence in group)
+        {
+            if (ReferenceEquals(occurrence, child))
+                return last;
+            if (!XmlUtility.WritesNoValue(occurrence))
+                last = occurrence;
+        }
+
+        return last;
     }
 
     /// <summary>

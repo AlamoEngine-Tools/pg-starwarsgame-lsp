@@ -23,7 +23,8 @@ public sealed class XmlDuplicateTagHandlerTest
         Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
         Assert.Contains("Max_Speed", d.Message);
         Assert.Contains("4", d.Message);
-        Assert.Contains("LAST", d.Message);
+        // The last one WITH A VALUE: an empty later occurrence changes nothing in the game.
+        Assert.Contains("last one with a value", d.Message);
     }
 
     [Fact]

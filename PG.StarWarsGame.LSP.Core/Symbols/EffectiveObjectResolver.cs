@@ -49,6 +49,14 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
                 if (schemaTag?.SemanticType == TagSemanticType.VariantParent)
                     continue; // the variant-declaration tag is metadata, not part of the effective object
 
+                // The game's field mapper returns before converting an empty value, and its parser
+                // withholds a value of exactly TBD: neither writes the field, so the earlier
+                // occurrence - or the inherited value - stays. Han_Solo names its icon and then
+                // repeats Icon_Name empty, and the game shows the icon; so does this. A sub-object
+                // list has no text value and is read another way, so it is not touched.
+                if (EngineTagValue.WritesNothing(tag.Value, tag.Fragment))
+                    continue;
+
                 var mode = schemaTag?.VariantMode ?? VariantMode.Replace;
 
                 // An additive tag that may appear several times (Death_Clone and friends) is a list

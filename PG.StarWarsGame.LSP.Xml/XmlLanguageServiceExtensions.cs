@@ -135,8 +135,9 @@ public static class XmlLanguageServiceExtensions
         // XmlUnregisteredFileFact handler (nothing reaches this file)
         services.AddSingleton<IXmlDiagnosticsHandler, UnregisteredXmlFileHandler>();
 
-        // XmlDuplicateTagFact + XmlNotesFact handlers (document-level)
+        // XmlDuplicateTagFact + XmlEmptyRepeatedTagFact + XmlNotesFact handlers (document-level)
         services.AddSingleton<IXmlDiagnosticsHandler, XmlDuplicateTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, XmlEmptyRepeatedTagHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, XmlNotesHandler>();
 
         // XmlSymbolFact + XmlReferenceFact handlers (index-level)

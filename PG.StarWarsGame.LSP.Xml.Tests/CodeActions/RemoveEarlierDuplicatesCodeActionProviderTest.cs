@@ -87,6 +87,40 @@ public sealed class RemoveEarlierDuplicatesCodeActionProviderTest
         Assert.Equal(2, edits.Count);
         Assert.DoesNotContain(edits, e => e.Range.Start.Line == 5); // the winner stays
     }
+
+    //  line 0: <Units>
+    //  line 1:   <Unit Name="A">
+    //  line 2:     <Icon_Name>first.tga</Icon_Name>
+    //  line 3:     <Icon_Name>winner.tga</Icon_Name>
+    //  line 4:     <Icon_Name />
+    //  line 5:   </Unit>
+    //  line 6: </Units>
+    private const string XmlWithEmptyLast = """
+                                            <Units>
+                                              <Unit Name="A">
+                                                <Icon_Name>first.tga</Icon_Name>
+                                                <Icon_Name>winner.tga</Icon_Name>
+                                                <Icon_Name />
+                                              </Unit>
+                                            </Units>
+                                            """;
+
+    /// <summary>
+    ///     The game keeps the last occurrence WITH A VALUE - an empty one changes nothing - so the
+    ///     fix keeps that one and removes the rest, the empty tail included. Removing everything
+    ///     before the last occurrence would delete the value the game shows and leave the no-op.
+    /// </summary>
+    [Fact]
+    public void An_empty_last_occurrence_is_removed_and_the_last_valued_one_stays()
+    {
+        var action = Assert.Single(BuildProvider(XmlWithEmptyLast).Handle(MakeCtx(4, true)));
+
+        var edits = action.CodeAction!.Edit!.Changes!.Values.First().ToList();
+        Assert.Equal(2, edits.Count);
+        Assert.Contains(edits, e => e.Range.Start == new Position(2, 0) && e.Range.End == new Position(3, 0));
+        Assert.Contains(edits, e => e.Range.Start == new Position(4, 0) && e.Range.End == new Position(5, 0));
+        Assert.DoesNotContain(edits, e => e.Range.Start.Line == 3); // the winner stays
+    }
 }
 
 file sealed class FakeDuplicatesWorkspaceHost : IGameWorkspaceHost
