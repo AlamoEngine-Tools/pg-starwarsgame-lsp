@@ -149,7 +149,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             {
                 var resCtx = new TagResolutionContext(
                     containingAbilityType!, XmlUtility.GetDepth(enclosingValueNode!), enclosingValueNode!);
-                tagDef = XmlTagResolver.Resolve(_schema, enclosingTag, resCtx);
+                tagDef = XmlObjectTagResolver.Resolve(_schema, enclosingTag, resCtx);
             }
             else if (!fileTypes.IsEmpty)
             {

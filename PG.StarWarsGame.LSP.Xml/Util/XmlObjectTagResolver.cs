@@ -6,14 +6,13 @@ using PG.StarWarsGame.LSP.Core.Schema;
 namespace PG.StarWarsGame.LSP.Xml.Util;
 
 /// <summary>
-///     Generic tag resolver: walks the ancestor-type chain innermost-first, then falls back to
-///     the global flat schema lookup. Handles singletons, type-container instances, and ability
-///     sub-types uniformly. Type-specific resolvers (e.g. GameObjectTagResolver) can be added
-///     to the <see cref="XmlTagResolver" /> dispatch table when needed.
+///     The tag resolver: walks the ancestor-type chain innermost-first, then falls back to the
+///     global flat schema lookup. Handles singletons, type-container instances, and ability
+///     sub-types uniformly.
 /// </summary>
-internal sealed class XmlObjectTagResolver : ITagResolver
+internal static class XmlObjectTagResolver
 {
-    public XmlTagDefinition? Resolve(ISchemaProvider schema, string tagName, TagResolutionContext? context)
+    public static XmlTagDefinition? Resolve(ISchemaProvider schema, string tagName, TagResolutionContext? context)
     {
         for (var ctx = context; ctx is not null; ctx = ctx.Parent)
         {

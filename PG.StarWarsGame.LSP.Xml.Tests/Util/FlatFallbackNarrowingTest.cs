@@ -78,14 +78,14 @@ public sealed class FlatFallbackNarrowingTest
         var parent = new TagResolutionContext("GalacticSabotageAbility", 0, HtmlNode());
         var child = new TagResolutionContext("SomeSubObject", 1, HtmlNode(), parent);
 
-        var resolved = XmlTagResolver.Resolve(NarrowedSchema.Build(), Tag, child);
+        var resolved = XmlObjectTagResolver.Resolve(NarrowedSchema.Build(), Tag, child);
 
         Assert.Equal(["GROUND_ACTIVATED"], resolved!.AllowedValues);
     }
 
     private static XmlTagDefinition? Resolve(string typeName)
     {
-        return XmlTagResolver.Resolve(NarrowedSchema.Build(), Tag,
+        return XmlObjectTagResolver.Resolve(NarrowedSchema.Build(), Tag,
             new TagResolutionContext(typeName, 0, HtmlNode()));
     }
 

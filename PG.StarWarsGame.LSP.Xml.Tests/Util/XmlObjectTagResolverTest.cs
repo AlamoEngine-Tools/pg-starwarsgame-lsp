@@ -26,7 +26,7 @@ public sealed class XmlObjectTagResolverTest
         var parentContext = new TagResolutionContext("GameObjectType", 1, DummyNode);
         var innerContext = new TagResolutionContext("LuckyShotAttackAbility", 3, DummyNode, parentContext);
 
-        var result = new XmlObjectTagResolver().Resolve(schema, "Text_ID", innerContext);
+        var result = XmlObjectTagResolver.Resolve(schema, "Text_ID", innerContext);
 
         Assert.NotNull(result);
         Assert.Equal(XmlValueType.NameReferenceList, result.ValueType);
@@ -38,7 +38,7 @@ public sealed class XmlObjectTagResolverTest
         var schema = TwoTypeSchemaProvider.Build();
         var context = new TagResolutionContext("SFXEvent", 1, DummyNode);
 
-        var result = new XmlObjectTagResolver().Resolve(schema, "Text_ID", context);
+        var result = XmlObjectTagResolver.Resolve(schema, "Text_ID", context);
 
         Assert.NotNull(result);
         Assert.Equal(XmlValueType.NameReferenceList, result.ValueType);
@@ -49,7 +49,7 @@ public sealed class XmlObjectTagResolverTest
     {
         var schema = TwoTypeSchemaProvider.Build();
 
-        var result = new XmlObjectTagResolver().Resolve(schema, "Text_ID", null);
+        var result = XmlObjectTagResolver.Resolve(schema, "Text_ID", null);
 
         Assert.NotNull(result);
         Assert.Equal(XmlValueType.NameReference, result.ValueType);

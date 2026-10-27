@@ -563,7 +563,7 @@ public sealed class XmlDocumentFactProducer(
 
     private XmlTagDefinition? ResolveTag(string name, TagResolutionContext? context)
     {
-        return XmlTagResolver.Resolve(schema, name, context);
+        return XmlObjectTagResolver.Resolve(schema, name, context);
     }
 
     /// <summary>

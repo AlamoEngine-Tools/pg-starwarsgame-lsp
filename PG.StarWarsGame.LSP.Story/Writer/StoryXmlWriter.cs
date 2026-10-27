@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Text;
 using System.Text;
 using PG.StarWarsGame.LSP.Story.Model;
 
@@ -29,7 +30,7 @@ public static class StoryXmlWriter
         string text, StoryThread thread, string name, string? eventType, string? rewardType,
         IReadOnlyList<(string Tag, string Value)>? extraTags = null)
     {
-        var eol = DetectEol(text);
+        var eol = LineEndings.Detect(text);
         var lastEvent = thread.Events.LastOrDefault();
         var indent = lastEvent is not null
             ? IndentAt(text, lastEvent.Range.StartLine, lastEvent.Range.StartColumn)
@@ -200,7 +201,7 @@ public static class StoryXmlWriter
         var lastGroup = storyEvent.PrereqGroups.LastOrDefault();
         if (lastGroup is not null)
         {
-            var eol = DetectEol(text);
+            var eol = LineEndings.Detect(text);
             var indent = IndentAt(text, lastGroup.Range.StartLine, LineIndentLength(text, lastGroup.Range.StartLine));
             return
             [
@@ -264,7 +265,7 @@ public static class StoryXmlWriter
 
     private static StoryTextEdit InsertTagLine(string text, StoryEvent storyEvent, string tagName, string value)
     {
-        var eol = DetectEol(text);
+        var eol = LineEndings.Detect(text);
         var (anchorLine, indent) = InsertionPoint(text, storyEvent, tagName);
         return Insert(anchorLine + 1, 0, indent + "<" + tagName + ">" + Escape(value) + "</" + tagName + ">" + eol);
     }
@@ -342,11 +343,6 @@ public static class StoryXmlWriter
     private static StoryTextEdit DeleteLines(int startLine, int endLine)
     {
         return new StoryTextEdit(new StorySourceRange(startLine, 0, endLine + 1, 0), "");
-    }
-
-    private static string DetectEol(string text)
-    {
-        return text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
     }
 
     /// <summary>The raw leading text of the line up to the given column (preserves tabs/spaces).</summary>

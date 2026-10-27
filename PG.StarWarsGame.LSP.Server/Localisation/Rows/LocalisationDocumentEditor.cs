@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Text;
 using System.Globalization;
 using System.Text;
 using System.Xml;
@@ -379,7 +380,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             if (ApplyXmlCommand(commands[i], rows, ns) is { } error)
                 return LocalisationEditResult.Fail(i, error);
 
-        var lineEnding = DetectLineEnding(text);
+        var lineEnding = LineEndings.Detect(text);
         var declaration = document.Declaration is { } d ? d + lineEnding : string.Empty;
         var body = Serialise(document.Root);
 
@@ -499,11 +500,6 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             default:
                 return _messages.Format("LocEditor_UnsupportedCommandXML", command.Kind);
         }
-    }
-
-    private static string DetectLineEnding(string text)
-    {
-        return text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
     }
 
     // ── line-oriented formats ────────────────────────────────────────────────

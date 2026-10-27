@@ -54,7 +54,7 @@ internal sealed class TagNameHoverStrategy : IXmlHoverStrategy
                 return HoverUtility.BuildTypeHover(typeDef, ctx.Node, ctx.Locale, ctx.Messages);
 
             var resCtx = new TagResolutionContext(typeDef.TypeName, XmlUtility.GetDepth(ctx.Node), ctx.Node);
-            var typedTagDef = XmlTagResolver.Resolve(ctx.Schema, ctx.Node.Name, resCtx);
+            var typedTagDef = XmlObjectTagResolver.Resolve(ctx.Schema, ctx.Node.Name, resCtx);
 
             if (typedTagDef is not null)
                 return HoverUtility.BuildTagHover(typeDef, typedTagDef, ctx.Node, ctx.Locale, ctx.Messages);

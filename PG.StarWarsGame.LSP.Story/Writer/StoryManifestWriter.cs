@@ -3,6 +3,7 @@
 
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Text;
 using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Story.Model;
 
@@ -23,7 +24,7 @@ public static class StoryManifestWriter
     public static IReadOnlyList<StoryTextEdit> AddEntry(string text, string tagName, string value)
     {
         var document = ParsedXmlDocument.Parse(text);
-        var eol = DetectEol(text);
+        var eol = LineEndings.Detect(text);
         var entries = Entries(document, null);
         var root = RootElement(document);
         if (root is null) return [];
@@ -75,7 +76,7 @@ public static class StoryManifestWriter
         return
         [
             new StoryTextEdit(new StorySourceRange(line, 0, line + lineCount + 1, 0),
-                indent + "<" + toTag + ">" + inner + "</" + toTag + ">" + DetectEol(text))
+                indent + "<" + toTag + ">" + inner + "</" + toTag + ">" + LineEndings.Detect(text))
         ];
     }
 
@@ -118,7 +119,7 @@ public static class StoryManifestWriter
             : "<" + StoryNameTagSyntax.GenericTag + ">" + faction + ", " + manifestFile +
               "</" + StoryNameTagSyntax.GenericTag + ">";
 
-        return [Insert(anchorLine + 1, 0, indent + newTag + DetectEol(text))];
+        return [Insert(anchorLine + 1, 0, indent + newTag + LineEndings.Detect(text))];
     }
 
     /// <summary>
@@ -157,7 +158,7 @@ public static class StoryManifestWriter
                 pairs.Where((_, i) => i != index).Select(p => p.Faction + ", " + p.PlotFile));
             var rebuilt = LeadingWhitespace(text, line) +
                           "<" + StoryNameTagSyntax.GenericTag + ">" + remaining +
-                          "</" + StoryNameTagSyntax.GenericTag + ">" + DetectEol(text);
+                          "</" + StoryNameTagSyntax.GenericTag + ">" + LineEndings.Detect(text);
             return [new StoryTextEdit(range, rebuilt)];
         }
 
@@ -228,10 +229,5 @@ public static class StoryManifestWriter
     private static StoryTextEdit Insert(int line, int column, string newText)
     {
         return new StoryTextEdit(new StorySourceRange(line, column, line, column), newText);
-    }
-
-    private static string DetectEol(string text)
-    {
-        return text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
     }
 }

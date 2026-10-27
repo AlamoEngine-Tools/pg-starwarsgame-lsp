@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Messages;
+using PG.StarWarsGame.LSP.Core.Text;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -63,7 +64,7 @@ public static class XmlGameReader
 
         public List<XmlStructureError> Tolerances { get; } = [];
 
-        private string Eol => s.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        private string Eol => LineEndings.Detect(s);
 
         public XmlStructureError? Run()
         {

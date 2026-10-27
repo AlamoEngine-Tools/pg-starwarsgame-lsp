@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Text;
 using System.Globalization;
 using System.Text;
 using System.Xml.Linq;
@@ -100,11 +101,6 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     }
 
     /// <summary>The file's own line ending, so writing it back does not silently normalise it.</summary>
-    private static string DetectLineEnding(string text)
-    {
-        return text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-    }
-
     // ── CSV ──────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -114,7 +110,7 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     /// </summary>
     private static LocDocument ReadCsv(string text)
     {
-        var lineEnding = DetectLineEnding(text);
+        var lineEnding = LineEndings.Detect(text);
 
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
@@ -154,7 +150,7 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
 
     private static LocDocument ReadXml(string text)
     {
-        var lineEnding = DetectLineEnding(text);
+        var lineEnding = LineEndings.Detect(text);
         var document = XDocument.Parse(text, LoadOptions.PreserveWhitespace);
         var ns = XNamespace.Get(XmlNs);
 
@@ -204,7 +200,7 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     /// </summary>
     private LocDocument ReadProperties(string text, string? fileName)
     {
-        var lineEnding = DetectLineEnding(text);
+        var lineEnding = LineEndings.Detect(text);
 
         // A .properties file holds one language and cannot name it inside, so it comes from the file
         // name. Without a name to go on - Read called with text alone - the workspace's configured
