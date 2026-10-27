@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Util;
 
@@ -38,7 +39,8 @@ public sealed class ContentHasherTest
         // hashes computed elsewhere — both sides must use ContentHasher.
         const string text = "<GameObjectFiles><Unit Name=\"X\"/></GameObjectFiles>";
         var svc = new GameIndexService(new FileHelper(new MockFileSystem()), [new StubParser()],
-            NullLogger<GameIndexService>.Instance);
+            NullLogger<GameIndexService>.Instance, new ProjectLayerMap(new FileHelper(new MockFileSystem())),
+            DistinctObjectNameHash.Instance);
 
         await svc.UpdateDocumentAsync("file:///f.xml", text, 1, TestContext.Current.CancellationToken);
 

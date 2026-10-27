@@ -90,7 +90,7 @@ public sealed class WorkspaceSettingsStore : IWorkspaceSettingsStore
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger<WorkspaceSettingsStore> logger,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
         _store = new SidecarStore<WorkspaceSettings>(
             "settings/workspace.settings.json", WorkspaceSettingsDocument.TypeName,

@@ -58,23 +58,7 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
         Assert.Empty(diagnostics);
     }
 
-    // The control: identical input, no tag source, so no resolver reaches the context. If this ever
-    // starts reporting, the handler has stopped honouring "cannot tell" and is guessing instead.
-    [Fact]
-    public void Without_a_tag_source_the_pass_stays_silent()
-    {
-        var diagnostics = Collect(
-            "<Factions><Faction Name=\"Rebel\">" +
-            "<Standalone_Space_Maps_Special_Weapon_A>Ground_Barracks</Standalone_Space_Maps_Special_Weapon_A>" +
-            "</Faction></Factions>",
-            "SELECTABLE",
-            false);
-
-        Assert.Empty(diagnostics);
-    }
-
-    private static IReadOnlyList<Diagnostic> Collect(
-        string xml, string behaviourOfWeapon, bool wireTagSource = true)
+    private static IReadOnlyList<Diagnostic> Collect(string xml, string behaviourOfWeapon)
     {
         var schema = WeaponSchemaProvider.Build();
         var fileHelper = new FileHelper(new MockFileSystem());
@@ -89,8 +73,8 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
 
         var tagSource = new StubTagSource("Ground_Barracks", "LandBehavior", behaviourOfWeapon);
 
-        var publisher = new XmlDiagnosticsPublisher(
-            _ => { },
+        var publisher = XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(),
             new FakeGameIndexService(),
             new FakeGameWorkspaceHost(),
             schema,
@@ -102,7 +86,7 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             new ObjSrcFileTypeRegistry(),
             fileHelper,
-            variantTagSource: wireTagSource ? tagSource : null);
+            variantTagSource: tagSource);
 
         return publisher.Collect(FactionUri, xml, index);
     }

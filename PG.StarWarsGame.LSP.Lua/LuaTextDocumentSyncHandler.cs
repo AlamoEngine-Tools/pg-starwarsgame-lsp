@@ -15,19 +15,19 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
-    private readonly ILuaAnalyzer? _analyzer;
+    private readonly ILuaAnalyzer _analyzer;
     private readonly IFileHelper _fileHelper;
     private readonly IStartupGate _gate;
     private readonly IGameIndexService _indexService;
     private readonly IGameWorkspaceHost _workspaceHost;
 
+    // The analyzer sidecar mirrors the open documents; when none runs, the mirror goes nowhere.
     public LuaTextDocumentSyncHandler(
         IGameWorkspaceHost workspaceHost,
         IGameIndexService indexService,
         IFileHelper fileHelper,
         IStartupGate gate,
-        // Optional: the analyzer sidecar mirrors the open documents when it is wired (production).
-        ILuaAnalyzer? analyzer = null)
+        ILuaAnalyzer analyzer)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
@@ -50,7 +50,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
             // Open (not Update): client versions restart at 1 per open session, while the didClose
             // re-index below preserves the committed version - the open starts a new version epoch.
             await _indexService.OpenDocumentAsync(uri, text, version, token);
-            _analyzer?.DidOpen(uri, text, version);
+            _analyzer.DidOpen(uri, text, version);
         }, ct);
         return Unit.Value;
     }
@@ -66,7 +66,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         {
             _workspaceHost.AddOrUpdate(uri, text, version);
             await _indexService.UpdateDocumentAsync(uri, text, version, token);
-            _analyzer?.DidChange(uri, text, version);
+            _analyzer.DidChange(uri, text, version);
         }, ct);
         return Unit.Value;
     }
@@ -79,7 +79,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         await _gate.RunOrBufferAsync(async token =>
         {
             _workspaceHost.Remove(uri);
-            _analyzer?.DidClose(uri);
+            _analyzer.DidClose(uri);
 
             var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
             if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))

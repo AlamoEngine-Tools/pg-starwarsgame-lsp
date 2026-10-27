@@ -97,14 +97,14 @@ public sealed class StorySimulationService(
     IGameIndexService indexService,
     ISchemaProvider schema,
     Action<StorySimKey> notifyChanged,
-    IStoryWorldSymbols? symbols = null,
-    IMessageCatalog? messages = null) : IStorySimulationService
+    IStoryWorldSymbols symbols,
+    IMessageCatalog messages) : IStorySimulationService
 {
     private const int LogTail = 200;
     private const string Won = "won";
     private const string Lost = "lost";
     private readonly object _gate = new();
-    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
+    private readonly IMessageCatalog _messages = messages;
     private readonly Dictionary<StorySimKey, Session> _sessions = new();
 
     public (StorySimStateDto? State, string? Error) Start(StorySimKey key, StorySimOptions? options = null)

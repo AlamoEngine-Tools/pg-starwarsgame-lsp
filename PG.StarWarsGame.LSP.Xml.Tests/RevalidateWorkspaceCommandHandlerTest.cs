@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Xml.Commands;
 
@@ -12,7 +13,8 @@ public sealed class RevalidateWorkspaceCommandHandlerTest
     public async Task Handle_CallsPublisherRevalidateWorkspace()
     {
         var fake = new FakeRepublisher();
-        var handler = new RevalidateWorkspaceCommandHandler([fake]);
+        var handler =
+            new RevalidateWorkspaceCommandHandler([fake], NullLogger<RevalidateWorkspaceCommandHandler>.Instance);
 
         await handler.ExecuteAsync(CancellationToken.None);
 
@@ -26,7 +28,8 @@ public sealed class RevalidateWorkspaceCommandHandlerTest
     public async Task Handle_RefreshesEveryLanguage()
     {
         var fakes = new List<FakeRepublisher> { new(), new(), new() };
-        var handler = new RevalidateWorkspaceCommandHandler(fakes);
+        var handler =
+            new RevalidateWorkspaceCommandHandler(fakes, NullLogger<RevalidateWorkspaceCommandHandler>.Instance);
 
         await handler.ExecuteAsync(CancellationToken.None);
 
@@ -38,7 +41,8 @@ public sealed class RevalidateWorkspaceCommandHandlerTest
     public async Task Handle_OneRepublisherThrowing_StillRefreshesTheRest()
     {
         var fakes = new List<FakeRepublisher> { new() { Throw = true }, new(), new() };
-        var handler = new RevalidateWorkspaceCommandHandler(fakes);
+        var handler =
+            new RevalidateWorkspaceCommandHandler(fakes, NullLogger<RevalidateWorkspaceCommandHandler>.Instance);
 
         await handler.ExecuteAsync(CancellationToken.None);
 

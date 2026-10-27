@@ -44,7 +44,7 @@ public sealed class StorySimulationServiceTest
         var notified = new List<StorySimKey>();
         var service = new StorySimulationService(
             new StubModelService(), new FakeGameIndexService(IndexWithLuaSymbol()),
-            SimEnumSchema.Build(), notified.Add);
+            SimEnumSchema.Build(), notified.Add, new AnyWorldSymbols(), ResxMessageCatalog.Server("en"));
         return (service, notified);
     }
 

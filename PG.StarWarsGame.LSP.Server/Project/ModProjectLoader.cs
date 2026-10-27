@@ -52,18 +52,13 @@ public sealed class ModProjectLoader
         ILogger<ModProjectLoader> logger,
         IPgprojMigrationSink migrationSink,
         IReadOnlyList<IDocumentMigration> migrations,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _fileHelper = fileHelper;
         _logger = logger;
         _migrationSink = migrationSink;
         _migrations = migrations;
-    }
-
-    public ModProjectLoader(IFileHelper fileHelper, ILogger<ModProjectLoader> logger)
-        : this(fileHelper, logger, new NullPgprojMigrationSink(), PgprojMigrations.All)
-    {
     }
 
     public ModProjectFile Load(string path)

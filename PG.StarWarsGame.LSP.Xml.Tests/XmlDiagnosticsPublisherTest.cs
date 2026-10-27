@@ -105,8 +105,8 @@ public sealed class XmlDiagnosticsPublisherTest
         if (withStructure) handlers = [.. handlers, new XmlStructureHandler()];
 
         var fileHelper = new FileHelper(new MockFileSystem());
-        var publisher = new XmlDiagnosticsPublisher(
-            p => published.Add(p),
+        var publisher = XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(published),
             indexService,
             workspaceHost,
             effectiveSchema,
@@ -133,8 +133,8 @@ public sealed class XmlDiagnosticsPublisherTest
         var workspaceHost = new FakeGameWorkspaceHost();
         var registry = new FakeFileTypeRegistry();
         var fileHelper = new FileHelper(new MockFileSystem());
-        var publisher = new XmlDiagnosticsPublisher(
-            p => published.Add(p),
+        var publisher = XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(published),
             indexService,
             workspaceHost,
             schema,
@@ -692,8 +692,8 @@ public sealed class XmlDiagnosticsPublisherTest
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
         var fileHelper = new FileHelper(new MockFileSystem());
-        _ = new XmlDiagnosticsPublisher(
-            p => published.Add(p),
+        _ = XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(published),
             indexService,
             workspaceHost,
             new SchemaProviderBuilder().Build(),
@@ -730,8 +730,8 @@ public sealed class XmlDiagnosticsPublisherTest
         var fileHelper = new FileHelper(fs);
 
         IXmlDiagnosticsHandler[] handlers = [];
-        var publisher = new XmlDiagnosticsPublisher(
-            p => published.Add(p),
+        var publisher = XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(published),
             indexService,
             workspaceHost,
             schema,

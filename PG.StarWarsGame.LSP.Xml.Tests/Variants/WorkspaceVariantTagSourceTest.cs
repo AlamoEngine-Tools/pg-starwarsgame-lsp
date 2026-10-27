@@ -61,7 +61,9 @@ public sealed class WorkspaceVariantTagSourceTest
         var indexService = new FakeGameIndexService();
         var textSource = new DocumentTextSource(host, new FileHelper(fs),
             NullLogger<DocumentTextSource>.Instance);
-        var source = new WorkspaceVariantTagSource(new XmlParseCache(textSource, 16), indexService);
+        var source =
+            new WorkspaceVariantTagSource(new XmlParseCache(textSource, 16, NullLogger<XmlParseCache>.Instance),
+                indexService);
         return (source, indexService, host, fs);
     }
 

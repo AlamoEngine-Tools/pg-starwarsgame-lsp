@@ -409,8 +409,8 @@ public sealed class SchemaBootstrapperTest
             NullLogger<SchemaBootstrapper>.Instance,
             NullLogger<LocalFileSchemaProvider>.Instance,
             NullLogger<HttpSchemaProvider>.Instance,
-            recorder,
-            stubs);
+            recorder ?? new ServerStatusRecorder(),
+            stubs ?? new LuaStubLocation());
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

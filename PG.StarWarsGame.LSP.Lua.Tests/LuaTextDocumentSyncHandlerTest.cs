@@ -35,7 +35,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
 #pragma warning disable VSTHRD002
         gate.OpenAsync().GetAwaiter().GetResult();
 #pragma warning restore VSTHRD002
-        return (new LuaTextDocumentSyncHandler(host, index, fileHelper, gate), host, index);
+        return (new LuaTextDocumentSyncHandler(host, index, fileHelper, gate, new RecordingLuaAnalyzer()), host, index);
     }
 
     // ── analyzer mirror ──────────────────────────────────────────────────────

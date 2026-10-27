@@ -2,11 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
-using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -51,7 +48,7 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
     private HashSet<string> _published = [];
 
     public ParticleFileDiagnosticsPublisher(
-        ILanguageServerFacade server,
+        IDiagnosticsSink sink,
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         IGameAssetResolver assets,
@@ -59,29 +56,15 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
         ILspConfigurationProvider config,
         IGlobalSuppressionStore globalSuppressions,
         IProjectLayerMap layerMap,
+        ServerOptions options,
         ILogger<ParticleFileDiagnosticsPublisher> logger)
-        : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost, assets,
-            fileHelper, config, globalSuppressions, layerMap, logger)
-    {
-    }
-
-    internal ParticleFileDiagnosticsPublisher(
-        Action<PublishDiagnosticsParams> publish,
-        IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
-        IGameAssetResolver assets,
-        IFileHelper fileHelper,
-        ILspConfigurationProvider config,
-        IGlobalSuppressionStore? globalSuppressions = null,
-        IProjectLayerMap? layerMap = null,
-        ILogger? logger = null)
-        : base(publish, indexService, workspaceHost, 0, logger, globalSuppressions, layerMap)
+        : base(sink, indexService, workspaceHost, options, logger, globalSuppressions, layerMap)
     {
         _indexService = indexService;
         _assets = assets;
         _fileHelper = fileHelper;
         _config = config;
-        _logger = logger ?? NullLogger.Instance;
+        _logger = logger;
     }
 
     protected override string FileExtension => ".alo";

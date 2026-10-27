@@ -4,9 +4,11 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -26,19 +28,25 @@ public sealed class DialogDiagnosticsPublisherTest
         FakeGameWorkspaceHost Host,
         FakeGameIndexService IndexService) Build(FakeDialogScope? scope = null)
     {
-        var published = new List<PublishDiagnosticsParams>();
+        var sink = new RecordingDiagnosticsSink();
         var host = new FakeGameWorkspaceHost();
         var indexService = new FakeGameIndexService();
         var fileHelper = new FileHelper(new MockFileSystem());
         var publisher = new DialogDiagnosticsPublisher(
-            p => published.Add(p),
+            sink,
             indexService,
             host,
             scope ?? new FakeDialogScope(),
             new DialogFactProducer(new SchemaProviderBuilder().Build()),
             new DialogDiagnosticsHandlerRegistry([new UnknownDialogCommandHandler()]),
-            fileHelper);
-        return (publisher, published, host, indexService);
+            fileHelper,
+            new DocumentTextSource(host, fileHelper, NullLogger<DocumentTextSource>.Instance),
+            NullLogger<DialogDiagnosticsPublisher>.Instance,
+            new ProjectLayerMap(fileHelper),
+            TestServerOptions.Immediate,
+            new FakeGlobalSuppressionStore(),
+            ResxMessageCatalog.Server("en"));
+        return (publisher, sink.Published, host, indexService);
     }
 
     [Fact]

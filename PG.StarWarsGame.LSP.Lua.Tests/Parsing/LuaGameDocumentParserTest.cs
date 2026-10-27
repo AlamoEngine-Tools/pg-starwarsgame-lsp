@@ -173,7 +173,8 @@ public sealed class LuaGameDocumentParserTest
 
     private static LuaGameDocumentParser Build()
     {
-        return new LuaGameDocumentParser(BuildSchema(), new FileHelper(new MockFileSystem()));
+        return new LuaGameDocumentParser(BuildSchema(), new FileHelper(new MockFileSystem()),
+            TestLuaParseCache.For(new FakeGameWorkspaceHost()));
     }
 
     // ── CanParse ─────────────────────────────────────────────────────────────

@@ -39,8 +39,8 @@ public sealed class LuaDefinitionHandlerTest
             TestLuaParseCache.For(host ?? new FakeGameWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             NullLogger<LuaDefinitionHandler>.Instance,
-            analyzer,
-            sandbox);
+            analyzer ?? new ScriptedLuaAnalyzer(),
+            sandbox ?? FixedSandbox.Empty());
     }
 
     // ── ours, else the analyzer's (#154) ─────────────────────────────────────
@@ -458,7 +458,7 @@ public sealed class LuaDefinitionHandlerTest
             new FakeGameIndexService { Current = index },
             TestLuaParseCache.For(new FakeGameWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
-            NullLogger<LuaDefinitionHandler>.Instance);
+            NullLogger<LuaDefinitionHandler>.Instance, new ScriptedLuaAnalyzer(), FixedSandbox.Empty());
 
         var result = await handler.Handle(
             new DefinitionParams

@@ -286,7 +286,7 @@ public sealed class StorySimulatorTest
         var model = new StoryCampaignModel("GC", "Rebel", [threadA, threadB],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ThreadBUri },
             new StoryGraphBuilder(schema).Build([threadA, threadB]));
-        return (new StorySimulator(model, schema), model);
+        return (new StorySimulator(model, schema, new AnyWorldSymbols()), model);
     }
 
     private static string NodeId(StoryCampaignModel model, string eventName)
@@ -427,7 +427,7 @@ public sealed class StorySimulatorTest
         var model = new StoryCampaignModel("GC", "Rebel", [thread],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             new StoryGraphBuilder(schema).Build([thread])) { Seed = Seed };
-        return (new StorySimulator(model, schema, symbols), model);
+        return (new StorySimulator(model, schema, symbols ?? new AnyWorldSymbols()), model);
     }
 
     [Fact]
@@ -611,7 +611,7 @@ public sealed class StorySimulatorTest
         var model = new StoryCampaignModel("GC", "Rebel", [thread],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             new StoryGraphBuilder(schema).Build([thread], null, [Machine])) { LuaMachines = [Machine] };
-        return (new StorySimulator(model, schema), model);
+        return (new StorySimulator(model, schema, new AnyWorldSymbols()), model);
     }
 
     private static string StateId(string state)
@@ -727,7 +727,7 @@ public sealed class StorySimulatorTest
         var model = new StoryCampaignModel("GC", "Rebel", [thread],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             new StoryGraphBuilder(schema).Build([thread]));
-        return (new StorySimulator(model, schema), model);
+        return (new StorySimulator(model, schema, new AnyWorldSymbols()), model);
     }
 
     [Fact]

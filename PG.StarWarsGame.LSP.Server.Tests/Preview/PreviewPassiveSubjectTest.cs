@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -197,7 +198,7 @@ public sealed class PreviewPassiveSubjectTest
             .With("Debris", Tag("Space_Model_Name", "Ev_stardestroyer_dead.alo"));
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-                tags, new PreviewSceneParticleTest.DirectoryAssets(models!))
+                tags, new PreviewSceneParticleTest.DirectoryAssets(models!), ResxMessageCatalog.Server("en"))
             .BuildForObject("Ship");
     }
 
@@ -217,7 +218,7 @@ public sealed class PreviewPassiveSubjectTest
         var tags = extra(new FakeVariantTagSource().With("Ship", shipTags));
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("Ev_stardestroyer.alo")).BuildForObject("Ship");
+            tags, new FakeAssets("Ev_stardestroyer.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Ship");
     }
 
     private static GameSymbol Sym(string id, string typeName)

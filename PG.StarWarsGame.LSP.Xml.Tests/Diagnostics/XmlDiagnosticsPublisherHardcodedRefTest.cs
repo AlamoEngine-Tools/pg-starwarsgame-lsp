@@ -21,8 +21,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
 {
     private static XmlDiagnosticsPublisher BuildPublisher(ISchemaProvider schema)
     {
-        return new XmlDiagnosticsPublisher(
-            _ => { },
+        return XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(),
             new FakeGameIndexService(),
             new FakeGameWorkspaceHost(),
             schema,
@@ -270,8 +270,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
 
     private static XmlDiagnosticsPublisher BuildPublisher(ISchemaProvider schema, IFileTypeRegistry registry)
     {
-        return new XmlDiagnosticsPublisher(
-            _ => { },
+        return XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(),
             new FakeGameIndexService(),
             new FakeGameWorkspaceHost(),
             schema,

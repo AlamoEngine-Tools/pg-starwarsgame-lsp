@@ -13,19 +13,19 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
 {
-    private readonly ILuaAnalyzer? _analyzer;
+    private readonly ILuaAnalyzer _analyzer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILuaRenameProvider _luaProvider;
     private readonly IXmlRenameProvider _xmlProvider;
 
+    // As for rename: what we do not claim, the analyzer prepares.
     public GamePrepareRenameHandler(
         IGameIndexService indexService,
         IXmlRenameProvider xmlProvider,
         ILuaRenameProvider luaProvider,
         IFileHelper fileHelper,
-        // Optional, as for rename: what we do not claim, the analyzer prepares.
-        ILuaAnalyzer? analyzer = null)
+        ILuaAnalyzer analyzer)
     {
         _indexService = indexService;
         _xmlProvider = xmlProvider;
@@ -45,7 +45,7 @@ public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        if (_analyzer is null || _luaProvider.Claims(uri, line, character, index))
+        if (_luaProvider.Claims(uri, line, character, index))
             return _luaProvider.HandlePrepare(uri, line, character, index);
         return await _analyzer.RequestAsync<RangeOrPlaceholderRange>("textDocument/prepareRename", request, ct);
     }

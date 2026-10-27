@@ -18,23 +18,23 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaHoverHandler : ILuaHoverProvider
 {
-    private readonly ILuaAnalyzer? _analyzer;
+    private readonly ILuaAnalyzer _analyzer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly IMessageCatalog _messages;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
+    // The analyzer's card follows ours; when none runs, it answers nothing and ours stands alone.
     public LuaHoverHandler(
         IGameIndexService indexService,
         ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
-        // Optional: with the analyzer running, its card follows ours.
-        ILuaAnalyzer? analyzer = null,
-        IMessageCatalog? messages = null)
+        ILuaAnalyzer analyzer,
+        IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _indexService = indexService;
         _parseCache = parseCache;
         _fileHelper = fileHelper;
@@ -45,8 +45,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
     public async Task<Hover?> Handle(HoverParams request, CancellationToken ct)
     {
         var ours = await HandleOurs(request);
-        if (_analyzer is null ||
-            !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+        if (!request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
         var theirs = await _analyzer.RequestAsync<Hover>("textDocument/hover", request, ct);
         return LuaAnalyzerAnswers.MergeHover(ours, theirs);

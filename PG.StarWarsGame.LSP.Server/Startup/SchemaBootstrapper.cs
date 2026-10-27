@@ -45,10 +45,10 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     private readonly SchemaLocationResolver _locations;
     private readonly ILogger<SchemaBootstrapper> _logger;
     private readonly LuaApiSchemaProxy _luaProxy;
-    private readonly LuaStubLocation? _luaStubs;
+    private readonly LuaStubLocation _luaStubs;
     private readonly IUserNotifier _notifier;
     private readonly SchemaProviderProxy _proxy;
-    private readonly ServerStatusRecorder? _status;
+    private readonly ServerStatusRecorder _status;
 
     public SchemaBootstrapper(
         ILspConfigurationProvider config,
@@ -63,9 +63,9 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         ILogger<SchemaBootstrapper> logger,
         ILogger<LocalFileSchemaProvider> localLogger,
         ILogger<HttpSchemaProvider> httpLogger,
-        ServerStatusRecorder? status = null,
-        // Optional: the Lua analyzer reads the stubs from the directory recorded here.
-        LuaStubLocation? luaStubs = null)
+        ServerStatusRecorder status,
+        // The Lua analyzer reads the stubs from the directory recorded here.
+        LuaStubLocation luaStubs)
     {
         _status = status;
         _luaStubs = luaStubs;
@@ -122,7 +122,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
 
         // Recorded here because this is the last place the real provider is reachable: the proxy
         // hides it, and its version check goes with it.
-        _status?.RecordSchema(
+        _status.RecordSchema(
             StatusSource(location),
             (realProvider as IVersionedSchemaProvider)?.LastVersionCheck,
             (realProvider as HttpSchemaProvider)?.LastLoadFromCache);
@@ -292,7 +292,6 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     // Where the analyzer finds the stubs, and which of them stand in for a script library.
     private void RecordStubs(string directory, IReadOnlyList<string> files, string? manifest)
     {
-        if (_luaStubs is null) return;
         var libraries = manifest is null
             ? null
             : JsonSerializer.Deserialize<LuaStubManifest>(manifest, LuaManifestJsonOptions)?.Libraries;

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -103,7 +104,7 @@ public sealed class PreviewReticleTest
             .With("HP_Dummy", Tag("Type", "HARD_POINT_DUMMY_ART"), Tag("Is_Targetable", "No"));
 
         var scene = new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
+            tags, new FakeAssets("hull.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Ship");
 
         Assert.True(scene.Hardpoints.Single(h => h.Id == "HP_Gun").IsTargetable);
         Assert.False(scene.Hardpoints.Single(h => h.Id == "HP_Dummy").IsTargetable);

@@ -32,17 +32,17 @@ public sealed class IconPackLoader
     private readonly BaselineLocationResolver _locations;
     private readonly ICrossProcessLock _lock;
     private readonly ILogger<IconPackLoader> _logger;
-    private readonly ServerStatusRecorder? _status;
+    private readonly ServerStatusRecorder _status;
 
     public IconPackLoader(HttpClient httpClient, BaselineLocationResolver locations, IFileHelper fileHelper,
-        ILogger<IconPackLoader> logger, ServerStatusRecorder? status = null, ICrossProcessLock? processLock = null)
+        ILogger<IconPackLoader> logger, ServerStatusRecorder status, ICrossProcessLock processLock)
     {
         _httpClient = httpClient;
         _locations = locations;
         _fileHelper = fileHelper;
         _logger = logger;
         _status = status;
-        _lock = processLock ?? new NullCrossProcessLock();
+        _lock = processLock;
     }
 
     private string CacheDir => _fileHelper.FileSystem.Path.Combine(
@@ -58,7 +58,7 @@ public sealed class IconPackLoader
             _ => Task.FromResult((IconPack.Empty, StatusAssetSource.Empty))
         });
 
-        _status?.RecordIconPack(source);
+        _status.RecordIconPack(source);
         return pack;
     }
 

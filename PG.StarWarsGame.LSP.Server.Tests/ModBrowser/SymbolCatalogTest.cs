@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
@@ -79,7 +79,7 @@ public sealed class SymbolCatalogTest
 
     private static SymbolCatalog Catalog()
     {
-        return SymbolCatalog.Build(Index(), Kinds, []);
+        return SymbolCatalog.Build(Index(), Kinds, [], new SchemaProviderBuilder().Build());
     }
 
     private static GetSymbolPageResult Page(string page, string? query = null, int offset = 0, int limit = 200,
@@ -192,7 +192,8 @@ public sealed class SymbolCatalogTest
                  })
             documents = documents.Add(scripts + path,
                 new DocumentIndex(scripts + path, 1, [], [], LayerRank: 1, LayerName: "Mod"));
-        var catalog = SymbolCatalog.Build(Index() with { Documents = documents }, Kinds, []);
+        var catalog = SymbolCatalog.Build(Index() with { Documents = documents }, Kinds, [],
+            new SchemaProviderBuilder().Build());
 
         var outline = catalog.Outline(SymbolOutlines.Scripts).ToDictionary(p => p.Page, p => p.Count);
 

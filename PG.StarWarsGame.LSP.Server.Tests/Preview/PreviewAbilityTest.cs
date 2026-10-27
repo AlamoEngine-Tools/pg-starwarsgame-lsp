@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -203,7 +204,7 @@ public sealed class PreviewAbilityTest
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             new FakeVariantTagSource().With("Ship", shipTags),
-            new FakeAssets("hull.alo")).BuildForObject("Ship");
+            new FakeAssets("hull.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Ship");
     }
 
     private static VariantTag Tag(string name, string value, string? fragment = null)

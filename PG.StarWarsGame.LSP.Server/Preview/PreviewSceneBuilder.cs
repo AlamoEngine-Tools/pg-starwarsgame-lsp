@@ -42,7 +42,7 @@ public sealed class PreviewSceneBuilder(
     ISchemaProvider schema,
     IVariantTagSource tagSource,
     IGameAssetResolver assets,
-    IMessageCatalog? messages = null)
+    IMessageCatalog messages)
 {
     private const string HardPointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
@@ -137,7 +137,7 @@ public sealed class PreviewSceneBuilder(
         "Fire_When_In_Normal_Attack_Mode", "Fire_When_In_Defend_Mode"
     ];
 
-    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
+    private readonly IMessageCatalog _messages = messages;
 
     /// <summary>
     ///     A scene for a single <c>.alo</c>, opened directly - a model or a particle system.

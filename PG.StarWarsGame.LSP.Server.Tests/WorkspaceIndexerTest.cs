@@ -130,7 +130,7 @@ public sealed class WorkspaceIndexerTest
             megReader ?? NoMegEntries.Instance,
             new MegArchiveLoadOrder(fh),
             boneCache ?? new NullModelBoneCatalogCache(),
-            NullLogger<WorkspaceIndexer>.Instance);
+            NullLogger<WorkspaceIndexer>.Instance, new LuaApiSchemaProvider([]));
         return (indexer, ctx);
     }
 

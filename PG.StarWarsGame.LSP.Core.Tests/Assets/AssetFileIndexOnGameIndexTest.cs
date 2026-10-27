@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Assets;
 
@@ -55,7 +56,8 @@ public sealed class AssetFileIndexOnGameIndexTest
     private static IGameIndexService BuildService()
     {
         return new GameIndexService(new FileHelper(new MockFileSystem()), [],
-            NullLogger<GameIndexService>.Instance);
+            NullLogger<GameIndexService>.Instance, new ProjectLayerMap(new FileHelper(new MockFileSystem())),
+            DistinctObjectNameHash.Instance);
     }
 }
 

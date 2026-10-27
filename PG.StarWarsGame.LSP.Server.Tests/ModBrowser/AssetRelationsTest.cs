@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
@@ -96,7 +96,8 @@ public sealed class AssetRelationsTest
         // The model carries two effects; one names a particle system no layer ships.
         // The mod's model and its script are files on disk; its idle clip is listed but not found, and
         // everything else ships packed with the game.
-        return new SymbolRelations(index, Schema(), _tags, SymbolCatalog.Build(index, [], [s_animationType]),
+        return new SymbolRelations(index, Schema(), _tags,
+            SymbolCatalog.Build(index, [], [s_animationType], new SchemaProviderBuilder().Build()),
             path => path.EndsWith("ev_tie.alo", StringComparison.OrdinalIgnoreCase)
                 ? ["P_Smoke_ALT2", "P_Missing_LOD0"]
                 : [],

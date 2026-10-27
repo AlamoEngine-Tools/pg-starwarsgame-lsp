@@ -3,13 +3,13 @@
 
 using PG.StarWarsGame.LSP.Core.Symbols;
 
-namespace PG.StarWarsGame.LSP.Xml.Tests.Fakes;
+namespace PG.StarWarsGame.LSP.Testing;
 
 /// <summary>
 ///     A name hash that a test can make collide on demand: names listed in the table get their
 ///     number, every other name its own. The default instance makes no two names collide.
 /// </summary>
-internal sealed class DistinctObjectNameHash(params (string Name, uint Hash)[] table) : IObjectNameHash
+public sealed class DistinctObjectNameHash(params (string Name, uint Hash)[] table) : IObjectNameHash
 {
     public static readonly DistinctObjectNameHash Instance = new();
 

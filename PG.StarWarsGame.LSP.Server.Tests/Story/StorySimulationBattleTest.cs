@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Story.Sim;
 
@@ -28,7 +29,7 @@ public sealed class StorySimulationBattleTest
         var notified = new List<StorySimKey>();
         var service = new StorySimulationService(
             new StoryBattleFixture.ModelService(), new FakeGameIndexService(),
-            StoryBattleFixture.Schema.Build(), notified.Add);
+            StoryBattleFixture.Schema.Build(), notified.Add, new AnyWorldSymbols(), ResxMessageCatalog.Server("en"));
         return (service, notified);
     }
 

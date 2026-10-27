@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using System.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -85,9 +86,11 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         FakeAssets assets)
     {
         var index = GameIndex.Empty with { AssetFiles = assets };
-        return new ParticleFileDiagnosticsPublisher(published.Add, new FakeGameIndexService(index),
-            new FakeGameWorkspaceHost(), assets, new FileHelper(new MockFileSystem()),
-            new FakeLspConfigurationProvider());
+        var fileHelper = new FileHelper(new MockFileSystem());
+        return new ParticleFileDiagnosticsPublisher(new RecordingDiagnosticsSink(published),
+            new FakeGameIndexService(index), new FakeGameWorkspaceHost(), assets, fileHelper,
+            new FakeLspConfigurationProvider(), new FakeGlobalSuppressionStore(), new ProjectLayerMap(fileHelper),
+            TestServerOptions.Immediate, NullLogger<ParticleFileDiagnosticsPublisher>.Instance);
     }
 
     private sealed class FakeAssets : IGameAssetResolver, IAssetFileIndex

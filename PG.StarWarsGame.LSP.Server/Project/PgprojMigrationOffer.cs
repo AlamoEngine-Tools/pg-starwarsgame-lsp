@@ -28,7 +28,7 @@ public sealed class PgprojMigrationOffer(
     IPgprojMigrationPrompt prompt,
     IUserNotifier notifier,
     ILogger<PgprojMigrationOffer> logger,
-    IMessageCatalog? messages = null)
+    IMessageCatalog messages)
     : IPgprojMigrationSink, IPgprojMigrationOffer
 {
     private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
@@ -36,7 +36,7 @@ public sealed class PgprojMigrationOffer(
     /// <summary>Projects already asked about, so a reload does not ask again.</summary>
     private readonly ConcurrentDictionary<string, byte> _asked = new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
+    private readonly IMessageCatalog _messages = messages;
 
     private readonly ConcurrentQueue<Pending> _pending = new();
 

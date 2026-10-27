@@ -3,10 +3,13 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Assets.Icons;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Icons;
+using PG.StarWarsGame.LSP.Server.Tests.Assets;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Encyclopedia;
 
@@ -46,17 +49,27 @@ public sealed class GetEncyclopediaEntryIconTest
             baselineNames.ToDictionary(n => n, _ => Png, StringComparer.OrdinalIgnoreCase));
     }
 
+    private static FakeLspConfigurationProvider ModConfig()
+    {
+        var config = new FakeLspConfigurationProvider();
+        config.Current = config.Current with { WorkspaceRoot = @"C:\mod" };
+        return config;
+    }
+
+    private static Task<GetEncyclopediaEntryResult> Run(IIconCatalogProvider icons, params VariantTag[] tags)
+    {
+        var config = ModConfig();
+        return Run(config, new WorkspaceIconCatalog(config, icons, new StubProjects(null)), tags);
+    }
+
     private static async Task<GetEncyclopediaEntryResult> Run(
-        IIconCatalogProvider? icons, params VariantTag[] tags)
+        ILspConfigurationProvider config, IWorkspaceIconCatalog catalog, params VariantTag[] tags)
     {
         var source = new FakeVariantTagSource().With(ObjectId, tags);
 
-        var config = new FakeLspConfigurationProvider();
-        config.Current = config.Current with { WorkspaceRoot = @"C:\mod" };
-
         var handler = new GetEncyclopediaEntryHandler(
             new FakeGameIndexService(IndexWith(Sym())), new SchemaProviderBuilder().Build(), source, config,
-            new WorkspaceIconCatalog(config, icons));
+            catalog, new NoShipNames(), new StubProjects(null), new MockFileSystem());
 
         return await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
     }
@@ -204,10 +217,12 @@ public sealed class GetEncyclopediaEntryIconTest
             second => Assert.NotNull(second.Icon));
     }
 
+    // No catalog at all - a workspace whose project is still loading, or whose atlas cannot be read.
     [Fact]
-    public async Task Handle_WithoutIconServices_AbilitiesStillListedWithoutIcons()
+    public async Task Handle_WithoutAnIconCatalog_AbilitiesStillListedWithoutIcons()
     {
-        var result = await Run(null, Tag("Encyclopedia_Text", "TEXT_A"), Abilities("BERSERKER"));
+        var result = await Run(ModConfig(), new NoWorkspaceIcons(), Tag("Encyclopedia_Text", "TEXT_A"),
+            Abilities("BERSERKER"));
 
         var ability = Assert.Single(result.Abilities);
         Assert.Null(ability.Icon);
@@ -260,11 +275,12 @@ public sealed class GetEncyclopediaEntryIconTest
             result.Icon.DataUri);
     }
 
-    // Icon services are optional, so a server built without them still answers with text.
+    // No catalog at all still answers with text.
     [Fact]
-    public async Task Handle_WithoutIconServices_StillReturnsTheEntry()
+    public async Task Handle_WithoutAnIconCatalog_StillReturnsTheEntry()
     {
-        var result = await Run(null, Tag("Encyclopedia_Text", "TEXT_A"), Tag("Icon_Name", "I_X.TGA"));
+        var result = await Run(ModConfig(), new NoWorkspaceIcons(), Tag("Encyclopedia_Text", "TEXT_A"),
+            Tag("Icon_Name", "I_X.TGA"));
 
         Assert.True(result.Found);
         Assert.Null(result.Icon);
@@ -333,7 +349,7 @@ public sealed class GetEncyclopediaEntryIconTest
     ///     layout resolver sees a mod's overridden card.
     /// </summary>
     private static async Task<GetEncyclopediaEntryResult> RunWithComponent(
-        IIconCatalogProvider? icons, string componentId, VariantTag[] componentTags,
+        IIconCatalogProvider icons, string componentId, VariantTag[] componentTags,
         params VariantTag[] objectTags)
     {
         var component = new GameSymbol(componentId, GameSymbolKind.XmlObject, "CommandBarComponent",
@@ -348,7 +364,8 @@ public sealed class GetEncyclopediaEntryIconTest
 
         var handler = new GetEncyclopediaEntryHandler(
             new FakeGameIndexService(IndexWith(Sym(), component)), new SchemaProviderBuilder().Build(),
-            source, config, new WorkspaceIconCatalog(config, icons));
+            source, config, new WorkspaceIconCatalog(config, icons, new StubProjects(null)), new NoShipNames(),
+            new StubProjects(null), new MockFileSystem());
 
         return await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
     }

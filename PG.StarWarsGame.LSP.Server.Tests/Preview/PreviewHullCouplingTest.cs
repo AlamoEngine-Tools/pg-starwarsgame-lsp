@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -103,7 +104,7 @@ public sealed class PreviewHullCouplingTest
             tags = tags.With("GameConstants", constants);
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
+            tags, new FakeAssets("hull.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Ship");
     }
 
     private static PreviewScene Ship(
@@ -123,7 +124,7 @@ public sealed class PreviewHullCouplingTest
             tags = tags.With(hardpoint.Id, hardpoint.Tags);
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
+            tags, new FakeAssets("hull.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Ship");
     }
 
     private static GameSymbol Sym(string id, string typeName)

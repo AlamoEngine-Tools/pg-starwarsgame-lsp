@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -31,7 +32,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
         var index = new FakeGameIndexService();
         var fileHelper = new FileHelper(fs ?? new MockFileSystem());
         return (new XmlTextDocumentSyncHandler(host, index, fileHelper,
-                ctx ?? new AllowAllEaWContext(), gate ?? OpenGate()),
+                ctx ?? new AllowAllEaWContext(), gate ?? OpenGate(), NullLogger<XmlTextDocumentSyncHandler>.Instance),
             host, index);
     }
 

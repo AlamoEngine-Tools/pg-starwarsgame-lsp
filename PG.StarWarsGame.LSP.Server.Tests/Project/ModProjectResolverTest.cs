@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -67,7 +68,8 @@ public sealed class ModProjectResolverTest
                             """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [path] = new(json) });
         var fileHelper = new FileHelper(fs);
-        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
+        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance,
+            new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var resolver = new ModProjectResolver(fileHelper, loader,
             new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
             NullLogger<ModProjectResolver>.Instance);
@@ -95,7 +97,8 @@ public sealed class ModProjectResolverTest
         var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [path] = new(json) });
         fs.AddDirectory(Path.Combine(dir, "Data", "XML"));
         var fileHelper = new FileHelper(fs);
-        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
+        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance,
+            new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var resolver = new ModProjectResolver(fileHelper, loader,
             new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
             NullLogger<ModProjectResolver>.Instance);
@@ -413,7 +416,8 @@ public sealed class ModProjectResolverTest
     private static (ModProjectResolver Resolver, ModProjectFile Root) Build(MockFileSystem fs)
     {
         var fileHelper = new FileHelper(fs);
-        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
+        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance,
+            new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var graph = new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance);
         var resolver = new ModProjectResolver(
             fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance);

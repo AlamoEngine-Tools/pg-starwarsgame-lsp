@@ -159,9 +159,8 @@ public sealed class GetStoryPlotsHandler(
 public sealed class GetStoryGraphHandler(
     IStoryModelService modelService,
     ILspConfigurationProvider config,
-    // Optional so the minimal test setups can omit it; production always wires it. Without it
-    // every node reports editable, which is exactly right for a workspace with no layers.
-    IModProjectReloadService? reloadService = null)
+    // The layers decide which nodes are read-only: a dependency's are, the project's own are not.
+    IModProjectReloadService reloadService)
     : IJsonRpcRequestHandler<GetStoryGraphParams, GetStoryGraphResult>
 {
     public Task<GetStoryGraphResult> Handle(GetStoryGraphParams request, CancellationToken ct)
@@ -174,7 +173,7 @@ public sealed class GetStoryGraphHandler(
         return Task.FromResult(StoryGraphProjection.Project(
             model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
             request.PlotState, request.ReachableDirection, request.Scope,
-            uri => DependencyOwnership.ReadOnlyOwner(reloadService?.LastWorkspaceConfig, uri)));
+            uri => DependencyOwnership.ReadOnlyOwner(reloadService.LastWorkspaceConfig, uri)));
     }
 }
 

@@ -60,6 +60,7 @@ using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Server.Workspace;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
+using PG.StarWarsGame.LSP.Story.Sim;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
@@ -262,6 +263,8 @@ public static class ServerConfigurator
 
                 services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
                 services.AddSingleton<IDocumentTextSource, DocumentTextSource>();
+                // Where every diagnostics publisher sends: the editor. The one seam a test replaces.
+                services.AddSingleton<IDiagnosticsSink, LanguageServerDiagnosticsSink>();
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
@@ -294,6 +297,9 @@ public static class ServerConfigurator
                     .AddSingleton<IGlobalSuppressionStore,
                         GlobalSuppressionStore>();
                 services.AddSingleton<IWorkspaceSettingsStore, WorkspaceSettingsStore>();
+                // What the simulator's world may name: the index's symbols. A factory only for the
+                // delegate that tells the client a session moved on.
+                services.AddSingleton<IStoryWorldSymbols, IndexWorldSymbols>();
                 services.AddSingleton<IStorySimulationService>(sp => new StorySimulationService(
                     sp.GetRequiredService<IStoryModelService>(),
                     sp.GetRequiredService<IGameIndexService>(),
@@ -301,8 +307,7 @@ public static class ServerConfigurator
                     key => sp.GetRequiredService<ILanguageServerFacade>()
                         .SendNotification("aet/storySimChanged",
                             new StorySimChangedParams(key.Campaign, key.Faction, key.Scope)),
-                    new IndexWorldSymbols(sp.GetRequiredService<IGameIndexService>(),
-                        sp.GetRequiredService<ISchemaProvider>()),
+                    sp.GetRequiredService<IStoryWorldSymbols>(),
                     sp.GetRequiredService<IMessageCatalog>()));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
@@ -338,9 +343,8 @@ public static class ServerConfigurator
                 services.AddSingleton<WorkspaceIndexer>();
                 services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 
-                // Built explicitly rather than by convention: the chain and the sink are what make
-                // a project migrate on read, and a container that silently picked the shorter
-                // constructor would migrate nothing while every test still passed.
+                // A factory only for the migration chain, which is a value and not a service; the
+                // loader has one constructor, so the sink and the chain cannot be skipped.
                 services.AddSingleton<ModProjectLoader>(sp => new ModProjectLoader(
                     sp.GetRequiredService<IFileHelper>(),
                     sp.GetRequiredService<ILogger<ModProjectLoader>>(),
@@ -362,13 +366,9 @@ public static class ServerConfigurator
                 services.AddSingleton<LuaStubLocation>();
                 // The annotations this server knows, inserted above the functions in the text the
                 // analyzer reads - an open script's and every file of a script's require tree.
-                services.AddSingleton(sp => new LuaGeneratedTexts(
-                    [
-                        new StubOverrideAnnotations(sp.GetRequiredService<ILuaApiSchemaProvider>()),
-                        new StateHandlerAnnotations(sp.GetRequiredService<IGameIndexService>(),
-                            sp.GetRequiredService<ILuaParseCache>(), sp.GetRequiredService<IFileHelper>())
-                    ],
-                    sp.GetRequiredService<IFileHelper>()));
+                services.AddSingleton<ILuaAnnotationSource, StubOverrideAnnotations>();
+                services.AddSingleton<ILuaAnnotationSource, StateHandlerAnnotations>();
+                services.AddSingleton<LuaGeneratedTexts>();
                 services.AddSingleton(sp =>
                 {
                     var command = ResolveLuaAnalyzer(sp) ?? "";

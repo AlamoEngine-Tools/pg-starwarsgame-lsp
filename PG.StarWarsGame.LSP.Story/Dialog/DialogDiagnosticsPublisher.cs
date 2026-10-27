@@ -2,11 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
-using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
@@ -45,8 +42,12 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
     private readonly IStoryDialogScope _scope;
     private readonly IDocumentTextSource _textSource;
 
+    // Every dependency is REQUIRED and there is one constructor: an optional parameter is the one
+    // shape the container is free to skip without a word, and a second constructor is the one it
+    // falls back to. The layer map names the project in every diagnostic's source; the text source
+    // is the shared one, not a private second copy (#305).
     public DialogDiagnosticsPublisher(
-        ILanguageServerFacade server,
+        IDiagnosticsSink sink,
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         IStoryDialogScope scope,
@@ -55,43 +56,19 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         IFileHelper fileHelper,
         IDocumentTextSource textSource,
         ILogger<DialogDiagnosticsPublisher> logger,
-        // REQUIRED: the layer map names the project in every diagnostic's source, and an optional
-        // dependency is the one shape the container is free to skip without a word.
         IProjectLayerMap layerMap,
-        ServerOptions? options = null,
-        IGlobalSuppressionStore? globalSuppressions = null,
-        IMessageCatalog? messages = null)
-        : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost, scope,
-            factProducer, registry, fileHelper, textSource,
-            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds, logger,
-            globalSuppressions, layerMap, messages)
-    {
-    }
-
-    internal DialogDiagnosticsPublisher(
-        Action<PublishDiagnosticsParams> publish,
-        IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
-        IStoryDialogScope scope,
-        DialogFactProducer factProducer,
-        DialogDiagnosticsHandlerRegistry registry,
-        IFileHelper fileHelper,
-        IDocumentTextSource? textSource = null,
-        int debounceMs = 0,
-        ILogger<DialogDiagnosticsPublisher>? logger = null,
-        IGlobalSuppressionStore? globalSuppressions = null,
-        IProjectLayerMap? layerMap = null,
-        IMessageCatalog? messages = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions, layerMap)
+        ServerOptions options,
+        IGlobalSuppressionStore globalSuppressions,
+        IMessageCatalog messages)
+        : base(sink, indexService, workspaceHost, options, logger, globalSuppressions, layerMap)
     {
         _indexService = indexService;
         _scope = scope;
         _factProducer = factProducer;
         _registry = registry;
         _fileHelper = fileHelper;
-        _messages = messages ?? ResxMessageCatalog.Server("en");
-        _textSource = textSource ?? new DocumentTextSource(workspaceHost, fileHelper,
-            NullLogger<DocumentTextSource>.Instance);
+        _messages = messages;
+        _textSource = textSource;
     }
 
     protected override string FileExtension => ".txt";

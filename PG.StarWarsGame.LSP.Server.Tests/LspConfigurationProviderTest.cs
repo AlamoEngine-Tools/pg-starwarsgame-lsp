@@ -100,7 +100,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_Null_UsesDefaults()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(null);
 
         Assert.Null(provider.Current.GamePath);
@@ -112,7 +113,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithWorkspaceRoot_PopulatesWorkspaceRoot()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = "/mod/eaw" }));
         Assert.Equal("/mod/eaw", provider.Current.WorkspaceRoot);
     }
@@ -124,7 +126,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithProjectPath_PopulatesProjectPath()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = "/mod/eaw", projectPath = "/mod/eaw/eaw.pgproj" }));
         Assert.Equal("/mod/eaw/eaw.pgproj", provider.Current.ProjectPath);
     }
@@ -132,7 +135,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithoutProjectPath_LeavesItNull()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = "/mod/eaw" }));
         Assert.Null(provider.Current.ProjectPath);
     }
@@ -141,8 +145,10 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_ProjectFileOffered_IsKept_AndDefaultsToFalse()
     {
-        var offered = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        var plain = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var offered = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
+        var plain = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
 
         offered.LoadFrom(Json(new { workspaceRoot = "/mod/eaw", projectFileOffered = true }));
         plain.LoadFrom(Json(new { workspaceRoot = "/mod/eaw" }));
@@ -154,7 +160,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithGamePath_Extracted()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { baseGamePath = "/game" }));
         Assert.Equal("/game", provider.Current.GamePath);
     }
@@ -162,7 +169,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithLocale_Extracted()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { locale = "de" }));
         Assert.Equal("de", provider.Current.Locale);
     }
@@ -170,7 +178,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithSchemaUrl_OverridesDefault()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { schemaUrl = "http://my-schema/" }));
         Assert.Equal("http://my-schema/", provider.Current.SchemaSource.Url);
     }
@@ -178,7 +187,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithSchemaLocalPath_SetsLocalType()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { schemaLocalPath = "/path/to/schema" }));
         Assert.Equal(SchemaSourceType.Local, provider.Current.SchemaSource.Type);
         Assert.Equal("/path/to/schema", provider.Current.SchemaSource.LocalPath);
@@ -187,7 +197,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithBaselineLocalPath_SetsLocalType()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { baselineLocalPath = "/baselines/eaw.json" }));
         Assert.Equal(BaselineSourceType.Local, provider.Current.BaselineSource.Type);
         Assert.Equal("/baselines/eaw.json", provider.Current.BaselineSource.LocalPath);
@@ -200,7 +211,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
         // project that is not a mode, it is a broken setup: every cross-reference diagnostic would
         // report objects the game defines as missing. The value is gone from the settings enum, so a
         // stale one falls through to the ordinary precedence rather than being honoured.
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { baselineType = "None" }));
         Assert.Equal(BaselineSourceType.Http, provider.Current.BaselineSource.Type);
     }
@@ -208,7 +220,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_WithBaselineTypeNoneAndLocalPath_StillPrefersTheLocalPath()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { baselineType = "None", baselineLocalPath = "/baselines/eaw.aet" }));
         Assert.Equal(BaselineSourceType.Local, provider.Current.BaselineSource.Type);
         Assert.Equal("/baselines/eaw.aet", provider.Current.BaselineSource.LocalPath);
@@ -220,7 +233,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
         // Simulate OmniSharp delivering initializationOptions as a Newtonsoft JToken.
         // JToken.ToString() returns the raw JSON string, so our fallback path handles it.
         var fakeToken = new FakeJsonToken("""{"baselineLocalPath":"/baselines/eaw.aet","schemaLocalPath":"/schema"}""");
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(fakeToken);
         Assert.Equal(BaselineSourceType.Local, provider.Current.BaselineSource.Type);
         Assert.Equal(SchemaSourceType.Local, provider.Current.SchemaSource.Type);
@@ -236,7 +250,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
             Path.Combine(_tempDir, ".pg-lsp.json"),
             JsonSerializer.Serialize(config));
 
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
 
         Assert.Equal("/from-file", provider.Current.GamePath);
@@ -259,7 +274,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
             Path.Combine(_tempDir, ".pg-lsp.json"),
             JsonSerializer.Serialize(config));
 
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
 
         Assert.Equal("Xml", provider.Current.Localisation.ResourceType);
@@ -270,7 +286,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_ConfigFileMissing_UsesDefaults()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         var ex = Record.Exception(() =>
             provider.LoadFrom(Json(new { workspaceRoot = Path.Combine(_tempDir, "no-such-dir") })));
 
@@ -283,7 +300,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     {
         File.WriteAllText(Path.Combine(_tempDir, ".pg-lsp.json"), "{ not valid json }}}");
 
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         var ex = Record.Exception(() => provider.LoadFrom(Json(new { workspaceRoot = _tempDir })));
 
         Assert.Null(ex);
@@ -298,7 +316,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
             Path.Combine(_tempDir, ".pg-lsp.json"),
             JsonSerializer.Serialize(new { GamePath = "file-value" }));
 
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = _tempDir, baseGamePath = "overlay-value" }));
 
         Assert.Equal("overlay-value", provider.Current.GamePath);
@@ -311,7 +330,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
             Path.Combine(_tempDir, ".pg-lsp.json"),
             JsonSerializer.Serialize(new { Locale = "de" }));
 
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         // No locale in init options → overlay defaults to "en" → should not override file's "de"
         provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
 
@@ -328,7 +348,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_DiagnosticsNode_IsRead()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { diagnostics = new { workspaceOnStartup = true } }));
 
         Assert.True(provider.Current.Diagnostics.WorkspaceOnStartup);
@@ -337,7 +358,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_NoDiagnosticsNode_WorkspaceSweepIsOff()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { locale = "en" }));
 
         Assert.False(provider.Current.Diagnostics.WorkspaceOnStartup);
@@ -346,7 +368,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_DiagnosticsNodeFalse_StaysOff()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { diagnostics = new { workspaceOnStartup = false } }));
 
         Assert.False(provider.Current.Diagnostics.WorkspaceOnStartup);
@@ -357,7 +380,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_NoFeaturesNode_BothFlagsDefaultTrue()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { locale = "en" }));
 
         Assert.True(provider.Current.Features.StoryEditing);
@@ -367,7 +391,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_StoryEditingDisabled_ParsesFromCamelCaseNode()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { features = new { storyEditing = false } }));
 
         Assert.False(provider.Current.Features.StoryEditing);
@@ -378,7 +403,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_StorySimulatorDisabled_ParsesFromCamelCaseNode()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { features = new { storySimulator = false } }));
 
         Assert.False(provider.Current.Features.StorySimulator);
@@ -389,7 +415,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     public void LoadFrom_FeaturesViaNonJsonElementToken_Parse()
     {
         var fakeToken = new FakeJsonToken("""{"features":{"storySimulator":false}}""");
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(fakeToken);
 
         Assert.False(provider.Current.Features.StorySimulator);
@@ -399,7 +426,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void LoadFrom_MalformedFeaturesNode_UsesDefaultsWithoutThrowing()
     {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         var ex = Record.Exception(() =>
             provider.LoadFrom(Json(new { features = new { storyEditing = "not-a-bool" } })));
 
@@ -418,7 +446,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
             Path.Combine(_tempDir, ".pg-lsp.json"),
             """{"Features":{"StorySimulator":false}}""");
 
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new
         {
             workspaceRoot = _tempDir,
@@ -436,7 +465,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
             Path.Combine(_tempDir, ".pg-lsp.json"),
             """{"Features":{"StoryEditing":false}}""");
 
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
 
         Assert.False(provider.Current.Features.StoryEditing);
@@ -453,7 +483,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
         {
             [Path.Combine(MockRoot, ".pg-lsp.json")] = new(configJson)
         });
-        var provider = new LspConfigurationProvider(fs, NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(fs, NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = MockRoot }));
 
         Assert.Equal("/mock-path", provider.Current.GamePath);
@@ -464,7 +495,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
     public void LoadConfigFile_FileAbsentInMock_UsesDefaults()
     {
         var fs = new MockFileSystem();
-        var provider = new LspConfigurationProvider(fs, NullLogger<LspConfigurationProvider>.Instance);
+        var provider = new LspConfigurationProvider(fs, NullLogger<LspConfigurationProvider>.Instance,
+            new FakeInstalls(null, null));
         provider.LoadFrom(Json(new { workspaceRoot = MockRoot }));
 
         Assert.Null(provider.Current.GamePath);

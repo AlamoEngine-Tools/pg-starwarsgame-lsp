@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Parsing;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Parsing;
 
@@ -19,7 +20,8 @@ public sealed class XmlStorySymbolCollectionTest
     {
         var registry = new StubRegistry(typedAsStoryParser ? ["StoryParser"] : []);
         var parser = new XmlGameDocumentParser(new FileHelper(new MockFileSystem()),
-            StoryEnumSchemaProvider.Build(), registry, NullLogger<XmlGameDocumentParser>.Instance);
+            StoryEnumSchemaProvider.Build(), registry, NullLogger<XmlGameDocumentParser>.Instance,
+            TestParseCache.For(new FakeGameWorkspaceHost()), new AllowAllEaWContext());
         return await parser.ParseAsync(Uri, xml, 1, CancellationToken.None);
     }
 

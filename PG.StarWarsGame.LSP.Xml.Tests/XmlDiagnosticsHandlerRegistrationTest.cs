@@ -348,13 +348,13 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         var registered = services.Any(d => d.ServiceType == typeof(IVariantTagSource));
         Assert.True(registered, "IVariantTagSource must be registered for cross-object rules to run.");
 
-        // The publisher itself cannot be resolved here - it needs ILanguageServerFacade, which the
-        // server supplies - so this guards the two halves that CAN be checked without it: the
-        // service is registered, and the constructor still asks for it. Whether the container
-        // actually fills the optional parameter is a runtime property of the live graph; the
-        // publisher exposes HasObjectSource for that, and the E2E run is what exercises it.
+        // The publisher itself is resolved from the server's container in the Server tests
+        // (ServiceGraphResolutionTest); this guards the two halves that live in this project: the
+        // service is registered, and the one constructor asks for it without a default, so the
+        // container cannot skip it.
         var ctor = Assert.Single(typeof(XmlDiagnosticsPublisher).GetConstructors());
-        Assert.Contains(ctor.GetParameters(), p => p.ParameterType == typeof(IVariantTagSource));
+        var parameter = Assert.Single(ctor.GetParameters(), p => p.ParameterType == typeof(IVariantTagSource));
+        Assert.False(parameter.HasDefaultValue);
     }
 
     [Fact]

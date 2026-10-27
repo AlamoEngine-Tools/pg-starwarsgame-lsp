@@ -281,6 +281,12 @@
 
 ### Fixes
 
+- **A server service left out of the wiring stops the server at startup** - every dependency of every
+  server service is required and comes from the container; the two shorter constructors the container
+  could fall back to are gone. A registration left out used to switch the feature off without a word, or
+  build a private second copy of a shared service; now the server stops with the service's name, and a
+  test resolves the whole graph and constructs every handler the way the editor does
+  ([#305](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/305))
 - **A preview scene is built from one index snapshot** - the scene builder captured the game index once and
   then went back to the live index for the hardpoint bones, the clips, the damage and reticle tables, the
   projectile catalog and the faction palette; a re-index landing mid-build could mix two snapshots into one

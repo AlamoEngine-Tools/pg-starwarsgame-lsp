@@ -16,16 +16,15 @@ namespace PG.StarWarsGame.LSP.Lua.Parsing;
 public sealed class LuaGameDocumentParser : IGameDocumentParser
 {
     private readonly IFileHelper _fileHelper;
-    private readonly ILuaParseCache? _parseCache;
+    private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
-    // parseCache is optional so minimal test setups can omit it; production wires the shared
-    // cache so the indexing parse seeds it - the diagnostics publish and the first request after
-    // an edit then reuse this parse instead of re-parsing.
+    // The parse cache is the shared one, so the indexing parse seeds it: the diagnostics publish
+    // and the first request after an edit reuse this parse instead of re-parsing.
     public LuaGameDocumentParser(
         ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper,
-        ILuaParseCache? parseCache = null)
+        ILuaParseCache parseCache)
     {
         _schemaProvider = schemaProvider;
         _fileHelper = fileHelper;
@@ -41,7 +40,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         string documentUri, string text, int version, CancellationToken ct)
     {
         var canonicalUri = _fileHelper.NormalizeUri(documentUri);
-        var parsed = _parseCache?.GetOrParse(canonicalUri, text) ?? ParsedLuaDocument.Parse(text, canonicalUri);
+        var parsed = _parseCache.GetOrParse(canonicalUri, text);
         var tree = parsed.Tree;
         var root = tree.GetRoot(ct);
 

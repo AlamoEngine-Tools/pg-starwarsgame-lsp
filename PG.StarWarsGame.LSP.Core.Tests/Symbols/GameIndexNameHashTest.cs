@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 
@@ -29,7 +30,7 @@ public sealed class GameIndexNameHashTest
     private static GameIndexService Build(IObjectNameHash hash)
     {
         return new GameIndexService(new FileHelper(new MockFileSystem()), [], NullLogger<GameIndexService>.Instance,
-            nameHash: hash);
+            new ProjectLayerMap(new FileHelper(new MockFileSystem())), hash);
     }
 
     [Fact]
@@ -119,17 +120,6 @@ public sealed class GameIndexNameHashTest
             Object("ALPHA", "file:///b.xml")));
 
         Assert.Empty(svc.Current.SharingNameHash(alpha, 7));
-    }
-
-    [Fact]
-    public void WithoutAHash_TheTableStaysEmpty()
-    {
-        // Minimal setups that pass none - the check then finds nothing rather than failing.
-        var svc = new GameIndexService(new FileHelper(new MockFileSystem()), [], NullLogger<GameIndexService>.Instance);
-        var alpha = Object("Alpha", "file:///a.xml");
-        svc.InjectDocument(Doc("file:///a.xml", 1, alpha));
-
-        Assert.True(svc.Current.WorkspaceNameHashes.IsEmpty);
     }
 
     /// <summary>Hashes by a table, so a test can make any two names collide, and counts its calls.</summary>

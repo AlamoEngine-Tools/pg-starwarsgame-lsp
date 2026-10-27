@@ -98,7 +98,7 @@ public sealed class GetPreviewSceneHandler(
     PreviewSceneBuilder builder,
     IGameAssetResolver assets,
     ILspConfigurationProvider config,
-    IWorkspaceIconCatalog? icons = null)
+    IWorkspaceIconCatalog icons)
     : IJsonRpcRequestHandler<GetPreviewSceneParams, GetPreviewSceneResult>
 {
     public async Task<GetPreviewSceneResult> Handle(
@@ -108,7 +108,7 @@ public sealed class GetPreviewSceneHandler(
         {
             // Only an object has ability rows to put icons on, so only this path pays for the
             // catalog - opening a bare .alo or an .ala never touches it.
-            var catalog = icons is null ? null : await icons.GetAsync(cancellationToken);
+            var catalog = await icons.GetAsync(cancellationToken);
             return new GetPreviewSceneResult(
                 WithReticleIcons(builder.BuildForObject(request.ObjectId, catalog)));
         }

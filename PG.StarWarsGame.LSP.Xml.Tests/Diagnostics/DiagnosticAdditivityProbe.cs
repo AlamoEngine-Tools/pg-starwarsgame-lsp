@@ -95,8 +95,8 @@ public sealed class DiagnosticAdditivityProbe
         var fileHelper = new FileHelper(new MockFileSystem());
         index = GameIndex.Empty;
 
-        return new XmlDiagnosticsPublisher(
-            _ => { },
+        return XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(),
             new FakeGameIndexService(),
             host,
             schema,

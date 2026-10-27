@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -44,7 +45,8 @@ public sealed class LuaHoverHandlerTest
             TestLuaParseCache.For(host ?? new FakeGameWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             schema,
-            analyzer);
+            analyzer ?? new ScriptedLuaAnalyzer(),
+            ResxMessageCatalog.Server("en"));
     }
 
     private static string GetMarkdown(Hover hover)
@@ -567,7 +569,7 @@ public sealed class LuaHoverHandlerTest
             new FakeGameIndexService { Current = GameIndex.Empty },
             TestLuaParseCache.For(new FakeGameWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
-            new LuaApiSchemaProvider([]));
+            new LuaApiSchemaProvider([]), new ScriptedLuaAnalyzer(), ResxMessageCatalog.Server("en"));
 
         // Cursor inside "SomeModule" - require hover should produce a result from disk content
         var result = await handler.Handle(

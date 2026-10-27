@@ -102,7 +102,6 @@ public sealed partial class StorySimulator
 
     private string? UnknownName(StoryWorldChange change)
     {
-        if (_symbols is null) return null;
         if (change.Planet is { } planet && !_symbols.Exists(StoryWorldSymbolKind.Planet, planet)) return planet;
         if (change.UnitType is { } type && !_symbols.Exists(StoryWorldSymbolKind.UnitType, type)) return type;
         if (change.Faction is { } faction && !_symbols.Exists(StoryWorldSymbolKind.Faction, faction)) return faction;

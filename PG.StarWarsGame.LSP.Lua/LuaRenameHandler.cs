@@ -24,27 +24,27 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaRenameHandler : ILuaRenameProvider
 {
+    private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaRenameHandler> _logger;
-    private readonly ILuaApiSchemaProvider? _luaSchema;
+    private readonly ILuaApiSchemaProvider _luaSchema;
     private readonly ILuaParseCache _parseCache;
-    private readonly ILuaSandboxProvider? _sandbox;
-    private readonly IFileHelper? _fileHelper;
+    private readonly ILuaSandboxProvider _sandbox;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
 
     // textSource stays alongside the parse cache: XmlObjectRenameBuilder edits XML documents,
-    // which are outside the Lua parse cache's world.
+    // which are outside the Lua parse cache's world. The Lua schema claims the names the engine
+    // binds, so the analyzer never renames them; the sandbox scopes a Lua global's rename to the
+    // script's own state; the file helper decides whether the script's state machine library is
+    // the game's.
     public LuaRenameHandler(
         ILuaParseCache parseCache,
         IDocumentTextSource textSource,
         ISchemaProvider schema,
         ILogger<LuaRenameHandler> logger,
-        // Optional: names the engine binds are claimed too, so the analyzer never renames them.
-        ILuaApiSchemaProvider? luaSchema = null,
-        // Optional: a Lua global is renamed within the script's own state, an XML object everywhere.
-        ILuaSandboxProvider? sandbox = null,
-        // Optional: state names are renamed where the script's state machine library is the game's.
-        IFileHelper? fileHelper = null)
+        ILuaApiSchemaProvider luaSchema,
+        ILuaSandboxProvider sandbox,
+        IFileHelper fileHelper)
     {
         _parseCache = parseCache;
         _textSource = textSource;
@@ -94,8 +94,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
     {
         var machine = LuaStateMachine.Read(tree.GetRoot());
         if (machine.IsEmpty || machine.At(line, character) is not { Kind: LuaStateHitKind.STATE_NAME } hit) return null;
-        if (_fileHelper is null ||
-            !LuaStateMachineContract.For(uri, index.Documents, _parseCache, _fileHelper).StateMachine) return null;
+        if (!LuaStateMachineContract.For(uri, index.Documents, _parseCache, _fileHelper).StateMachine) return null;
         var storyEvent = machine.Registrations.Any(r => r.Name == hit.State &&
                                                         r.Source == LuaStateSource.STORY_MODE_EVENTS);
         return (hit, storyEvent ? null : machine);
@@ -123,14 +122,13 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
 
     private bool IsEngineEntryPoint(string name)
     {
-        return _luaSchema?.GetEntryPoint(name) is { Caller: LuaEntryPointCaller.ENGINE };
+        return _luaSchema.GetEntryPoint(name) is { Caller: LuaEntryPointCaller.ENGINE };
     }
 
     // The files a rename of <id> from <uri> may edit (#249): the script's state, joined with every
     // state holding a shared file that names <id>.
-    private Func<string, bool>? InScope(string uri, string id, GameIndex index)
+    private Func<string, bool> InScope(string uri, string id, GameIndex index)
     {
-        if (_sandbox is null) return null;
         var definitions = index.WorkspaceDefinitions.TryGetValue(id, out var defs)
             ? defs.Select(s => s.Origin).OfType<FileOrigin>().Select(o => o.Uri)
             : [];
@@ -197,7 +195,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         if (FindLuaGlobalAtCursor(tree, line, character, index) is not null) return true;
 
         // An engine name: the game binds it, and renaming it breaks every script that calls it.
-        return _luaSchema is not null && tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>()
+        return tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>()
             .Any(id => LocationContainsPosition(id.GetLocation(), line, character) &&
                        _luaSchema.DeclaredGlobalNames.Contains(id.Name));
     }

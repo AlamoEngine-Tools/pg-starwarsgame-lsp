@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Server.Story;
+using PG.StarWarsGame.LSP.Server.Tests.Assets;
 using PG.StarWarsGame.LSP.Story.Graph;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
@@ -16,7 +17,8 @@ public sealed class StoryGraphProjectionScopeTest
 {
     private static GetStoryGraphHandler Handler()
     {
-        return new GetStoryGraphHandler(new StoryBattleFixture.ModelService(), new FakeLspConfigurationProvider());
+        return new GetStoryGraphHandler(new StoryBattleFixture.ModelService(), new FakeLspConfigurationProvider(),
+            new StubProjects(null));
     }
 
     [Fact]

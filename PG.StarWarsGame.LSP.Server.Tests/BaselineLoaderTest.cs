@@ -364,7 +364,8 @@ public sealed class BaselineLoaderTest
             new SchemaReleaseResolver(client, NullLogger<SchemaReleaseResolver>.Instance),
             NullLogger<BaselineLocationResolver>.Instance);
         return new BaselineLoader(client, locations, new FileHelper(fs),
-            logger ?? NullLogger<BaselineLoader>.Instance, recorder);
+            logger ?? NullLogger<BaselineLoader>.Instance, recorder ?? new ServerStatusRecorder(),
+            new NullCrossProcessLock());
     }
 
     // ── the official source is the newest release ────────────────────────────

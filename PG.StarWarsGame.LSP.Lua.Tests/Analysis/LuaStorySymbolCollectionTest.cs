@@ -17,7 +17,7 @@ public sealed class LuaStorySymbolCollectionTest
     {
         var parser = new LuaGameDocumentParser(
             new LuaApiSchemaProvider(apiSchema is null ? [] : [apiSchema]),
-            new FileHelper(new MockFileSystem()));
+            new FileHelper(new MockFileSystem()), TestLuaParseCache.For(new FakeGameWorkspaceHost()));
         return await parser.ParseAsync(Uri, lua, 1, CancellationToken.None);
     }
 

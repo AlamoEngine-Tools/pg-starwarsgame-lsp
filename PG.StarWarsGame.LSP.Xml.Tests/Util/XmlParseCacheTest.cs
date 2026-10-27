@@ -21,7 +21,7 @@ public sealed class XmlParseCacheTest
         var host = new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance);
         var textSource = new DocumentTextSource(host, new FileHelper(fs ?? new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
-        return (new XmlParseCache(textSource, capacity), host);
+        return (new XmlParseCache(textSource, capacity, NullLogger<XmlParseCache>.Instance), host);
     }
 
     // ── (uri, text) overload - caller already holds the text ────────────────

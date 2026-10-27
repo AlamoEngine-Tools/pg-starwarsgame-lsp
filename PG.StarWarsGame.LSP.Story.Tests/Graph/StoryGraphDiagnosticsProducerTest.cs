@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -30,7 +31,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
 
     private static IReadOnlyList<StoryGraphDiagnostic> Produce(StoryCampaignModel model, string uri = UriA)
     {
-        return new StoryGraphDiagnosticsProducer(Schema).Produce(model, uri);
+        return new StoryGraphDiagnosticsProducer(Schema, ResxMessageCatalog.Server("en")).Produce(model, uri);
     }
 
     // A listener the game never reaches is a warning on its name: the file is valid, the event is dead.

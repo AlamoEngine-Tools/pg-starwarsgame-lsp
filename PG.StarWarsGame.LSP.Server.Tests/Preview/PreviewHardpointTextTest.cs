@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -100,7 +101,7 @@ public sealed class PreviewHardpointTextTest
             .With("HP_Comm", [.. hardpointTags]);
 
         var scene = new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("frigate.alo")).BuildForObject("Frigate");
+            tags, new FakeAssets("frigate.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Frigate");
 
         return Assert.Single(scene.Hardpoints);
     }

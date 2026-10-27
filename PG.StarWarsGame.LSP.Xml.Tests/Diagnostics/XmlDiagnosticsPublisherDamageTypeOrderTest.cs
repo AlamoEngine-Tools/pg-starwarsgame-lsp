@@ -30,8 +30,8 @@ public sealed class XmlDiagnosticsPublisherDamageTypeOrderTest
 
     private static XmlDiagnosticsPublisher BuildPublisher()
     {
-        return new XmlDiagnosticsPublisher(
-            _ => { },
+        return XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(),
             new FakeGameIndexService(),
             new FakeGameWorkspaceHost(),
             new SchemaProviderBuilder().Build(),

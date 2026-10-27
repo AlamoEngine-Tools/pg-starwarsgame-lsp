@@ -56,9 +56,9 @@ public sealed class GameRenameHandlerTest
             luaProvider ?? new NullLuaProvider(),
             new FileHelper(new MockFileSystem()),
             config ?? new FakeLspConfigurationProvider(),
-            analyzer,
-            layers,
-            sandbox);
+            analyzer ?? new SilentLuaAnalyzer(),
+            layers ?? new ProjectLayerMap(new FileHelper(new MockFileSystem())),
+            sandbox ?? new EmptySandbox());
     }
 
     private static ProjectLayerMap Layers()

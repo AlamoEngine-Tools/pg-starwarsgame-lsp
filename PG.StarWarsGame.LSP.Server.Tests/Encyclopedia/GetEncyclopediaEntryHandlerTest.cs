@@ -6,6 +6,8 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
+using PG.StarWarsGame.LSP.Server.Tests.Assets;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Encyclopedia;
 
@@ -54,7 +56,8 @@ public sealed class GetEncyclopediaEntryHandlerTest
     {
         return new GetEncyclopediaEntryHandler(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             source,
-            config ?? new FakeLspConfigurationProvider());
+            config ?? new FakeLspConfigurationProvider(),
+            new NoWorkspaceIcons(), new NoShipNames(), new StubProjects(null), new MockFileSystem());
     }
 
     private static VariantTag Tag(string name, string value)

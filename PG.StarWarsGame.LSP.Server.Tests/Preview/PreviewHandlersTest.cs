@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -31,7 +32,7 @@ public sealed class PreviewHandlersTest
         };
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            new FakeVariantTagSource(), assets);
+            new FakeVariantTagSource(), assets, ResxMessageCatalog.Server("en"));
     }
 
     // ── the scene endpoint ────────────────────────────────────────────────────
@@ -40,7 +41,7 @@ public sealed class PreviewHandlersTest
     public async Task GetPreviewScene_WithNeitherSubject_SaysSoRatherThanFailing()
     {
         var assets = new StubAssets();
-        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config());
+        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config(), new NoWorkspaceIcons());
 
         var result = await handler.Handle(new GetPreviewSceneParams(), CancellationToken.None);
 
@@ -52,7 +53,7 @@ public sealed class PreviewHandlersTest
     {
         // The custom editor sends a file:/// URI; the XML sends a bare name. Both mean one model.
         var assets = new StubAssets().With("Data/Art/Models/Ev_stardestroyer.alo", [1, 2, 3]);
-        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config());
+        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config(), new NoWorkspaceIcons());
 
         var result = await handler.Handle(
             new GetPreviewSceneParams

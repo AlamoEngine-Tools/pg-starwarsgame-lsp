@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -60,7 +61,7 @@ public sealed class PreviewSceneParticleTest
                 new VariantTag("Damage_Particles", "HP_F-L_EmitDamage", "", 0));
 
         var builder = new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new DirectoryAssets(models!));
+            tags, new DirectoryAssets(models!), ResxMessageCatalog.Server("en"));
 
         return builder.BuildForObject("Generic_Star_Destroyer");
     }

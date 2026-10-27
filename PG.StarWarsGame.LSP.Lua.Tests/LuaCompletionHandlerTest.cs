@@ -49,7 +49,7 @@ public sealed class LuaCompletionHandlerTest
             new FileHelper(new MockFileSystem()),
             schema,
             NullLogger<LuaCompletionHandler>.Instance,
-            analyzer);
+            analyzer ?? new ScriptedLuaAnalyzer());
     }
 
     // Set_Next_State takes a registered state's name (#252).
@@ -425,7 +425,7 @@ public sealed class LuaCompletionHandlerTest
             TestLuaParseCache.For(new FakeGameWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
             schema,
-            NullLogger<LuaCompletionHandler>.Instance);
+            NullLogger<LuaCompletionHandler>.Instance, new ScriptedLuaAnalyzer());
 
         var result = await handler.Handle(
             new CompletionParams

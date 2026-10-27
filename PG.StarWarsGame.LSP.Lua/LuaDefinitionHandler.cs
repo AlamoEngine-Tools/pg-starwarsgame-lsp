@@ -18,22 +18,23 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 {
-    private readonly ILuaAnalyzer? _analyzer;
+    private readonly ILuaAnalyzer _analyzer;
 
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaDefinitionHandler> _logger;
     private readonly ILuaParseCache _parseCache;
-    private readonly ILuaSandboxProvider? _sandbox;
+    private readonly ILuaSandboxProvider _sandbox;
 
+    // The analyzer answers where we have nothing; the sandbox keeps its answer to the requesting
+    // script's own state, as the game runs one per script (#249).
     public LuaDefinitionHandler(
         IGameIndexService indexService,
         ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILogger<LuaDefinitionHandler> logger,
-        // Optional: with the analyzer running, it answers where we have nothing.
-        ILuaAnalyzer? analyzer = null,
-        ILuaSandboxProvider? sandbox = null)
+        ILuaAnalyzer analyzer,
+        ILuaSandboxProvider sandbox)
     {
         _indexService = indexService;
         _parseCache = parseCache;
@@ -47,11 +48,10 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     {
         var ours = await HandleOurs(request);
         if (ours is not null && ours.Any()) return ours;
-        if (_analyzer is null ||
-            !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+        if (!request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
         var theirs = await _analyzer.RequestAsync<LocationOrLocationLinks>("textDocument/definition", request, ct);
-        if (theirs is null || _sandbox is null) return theirs ?? ours;
+        if (theirs is null) return ours;
 
         // Only what the requesting script's own state holds: the game runs one per script (#249).
         var current = _sandbox.Current;
@@ -152,7 +152,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     // an XML object's - is the game's, reachable from every state.
     private IReadOnlyList<GameSymbol> ResolveInStates(GameIndex index, string id, string uri)
     {
-        if (_sandbox is null || !index.WorkspaceDefinitions.TryGetValue(id, out var definitions))
+        if (!index.WorkspaceDefinitions.TryGetValue(id, out var definitions))
             return index.Resolve(id) is { } resolved ? [resolved] : [];
         var current = _sandbox.Current;
         var states = current.StatesHolding(uri);

@@ -59,11 +59,10 @@ public sealed class LuaParseCache : ILuaParseCache, ICacheStatisticsSource
     private readonly ParsedDocumentCache<ParsedLuaDocument> _cache;
     private readonly IDocumentTextSource _textSource;
 
-    public LuaParseCache(IDocumentTextSource textSource, int capacity,
-        ILogger<LuaParseCache>? logger = null)
+    public LuaParseCache(IDocumentTextSource textSource, int capacity, ILogger<LuaParseCache> logger)
     {
         _textSource = textSource;
-        _cache = new ParsedDocumentCache<ParsedLuaDocument>(capacity, "Lua", logger);
+        _cache = new ParsedDocumentCache<ParsedLuaDocument>(capacity, logger, "Lua");
     }
 
     public (long Hits, long Misses, long Evictions) Statistics => _cache.Statistics;

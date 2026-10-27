@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -225,6 +226,6 @@ public sealed class PreviewProjectileTest
     private static PreviewSceneBuilder Builder(GameIndex index, FakeVariantTagSource tags)
     {
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("hull.alo", "W_LASER_SMALL.ALO"));
+            tags, new FakeAssets("hull.alo", "W_LASER_SMALL.ALO"), ResxMessageCatalog.Server("en"));
     }
 }

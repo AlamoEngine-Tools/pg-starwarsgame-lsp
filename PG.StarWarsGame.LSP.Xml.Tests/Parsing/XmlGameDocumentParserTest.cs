@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Parsing;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Parsing;
 
@@ -21,7 +22,8 @@ public sealed class XmlGameDocumentParserTest
         return new XmlGameDocumentParser(new FileHelper(new MockFileSystem()),
             schema ?? new SchemaProviderBuilder().Build(),
             registry ?? new FakeFileTypeRegistry(),
-            NullLogger<XmlGameDocumentParser>.Instance);
+            NullLogger<XmlGameDocumentParser>.Instance, TestParseCache.For(new FakeGameWorkspaceHost()),
+            new AllowAllEaWContext());
     }
 
     private static GameObjectTypeDefinition Type(string name, string? nameTag = "Name")

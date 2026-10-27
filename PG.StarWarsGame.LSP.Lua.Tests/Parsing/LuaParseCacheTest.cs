@@ -20,7 +20,7 @@ public sealed class LuaParseCacheTest
         var host = new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance);
         var textSource = new DocumentTextSource(host, new FileHelper(fs ?? new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
-        return (new LuaParseCache(textSource, capacity), host);
+        return (new LuaParseCache(textSource, capacity, NullLogger<LuaParseCache>.Instance), host);
     }
 
     [Fact]

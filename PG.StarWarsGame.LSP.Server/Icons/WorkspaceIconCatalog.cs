@@ -38,16 +38,13 @@ public interface IWorkspaceIconCatalog
 /// </remarks>
 public sealed class WorkspaceIconCatalog(
     ILspConfigurationProvider config,
-    IIconCatalogProvider? icons = null,
-    IModProjectReloadService? projects = null) : IWorkspaceIconCatalog
+    IIconCatalogProvider icons,
+    IModProjectReloadService projects) : IWorkspaceIconCatalog
 {
     /// <inheritdoc />
     public async Task<IconCatalog?> GetAsync(CancellationToken ct)
     {
-        if (icons is null)
-            return null;
-
-        var layers = IconLayersOf(projects?.LastWorkspaceConfig);
+        var layers = IconLayersOf(projects.LastWorkspaceConfig);
         if (layers.Count == 0)
         {
             // "No layers" means two different things, and answering the wrong one is how the first
@@ -59,10 +56,10 @@ public sealed class WorkspaceIconCatalog(
             // flight looks identical from here, and falling back then answers from the base game
             // while the project holding the real art is still being read. Nothing is served until
             // it is known which case this is; the next request gets the real catalog.
-            if (projects is { HasLoadedProjects: false })
+            if (!projects.HasLoadedProjects)
                 return null;
 
-            var root = projects?.LastWorkspaceRoots?.FirstOrDefault() ?? config.Current.WorkspaceRoot;
+            var root = projects.LastWorkspaceRoots?.FirstOrDefault() ?? config.Current.WorkspaceRoot;
             if (string.IsNullOrEmpty(root))
                 return null;
             layers = [new IconLayer(root, IconProjectSettings.Default)];

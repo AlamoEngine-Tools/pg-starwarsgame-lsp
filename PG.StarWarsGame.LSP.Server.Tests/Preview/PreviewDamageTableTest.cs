@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -307,7 +308,8 @@ public sealed class PreviewTargetDefenceTest
     {
         // A `.alo` opened directly has no XML behind it, so there is nothing to be shot at.
         var scene = new PreviewSceneBuilder(new FakeGameIndexService(GameIndex.Empty),
-                new SchemaProviderBuilder().Build(), new FakeVariantTagSource(), new FakeAssets("hull.alo"))
+                new SchemaProviderBuilder().Build(), new FakeVariantTagSource(), new FakeAssets("hull.alo"),
+                ResxMessageCatalog.Server("en"))
             .BuildForModel("hull.alo");
 
         Assert.Null(scene.Defence);
@@ -333,7 +335,7 @@ public sealed class PreviewTargetDefenceTest
             tags = tags.With("GameConstants", constants);
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
+            tags, new FakeAssets("hull.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Ship");
     }
 
     private static PreviewScene Ship(
@@ -353,7 +355,7 @@ public sealed class PreviewTargetDefenceTest
             tags = tags.With(hardpoint.Id, hardpoint.Tags);
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
+            tags, new FakeAssets("hull.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Ship");
     }
 
     private static GameSymbol Sym(string id, string typeName)

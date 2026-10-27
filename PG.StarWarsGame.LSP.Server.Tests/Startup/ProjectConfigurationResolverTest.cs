@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -31,14 +32,15 @@ public sealed class ProjectConfigurationResolverTest
         ServerStatusRecorder? status = null, LspConfiguration? configuration = null)
     {
         var fileHelper = new FileHelper(fs);
-        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
+        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance,
+            new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var graph = new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance);
         var resolver = new ModProjectResolver(fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance);
         var detector = new ModProjectDetector(fileHelper, NullLogger<ModProjectDetector>.Instance);
         notifier = new RecordingUserNotifier();
         return new ProjectConfigurationResolver(detector, loader, resolver, notifier,
-            NullLogger<ProjectConfigurationResolver>.Instance, status,
-            configuration is null ? null : new FakeLspConfigurationProvider { Current = configuration });
+            NullLogger<ProjectConfigurationResolver>.Instance, status ?? new ServerStatusRecorder(),
+            new FakeLspConfigurationProvider { Current = configuration ?? new LspConfiguration() });
     }
 
     // ── what the bug report is told ──────────────────────────────────────────

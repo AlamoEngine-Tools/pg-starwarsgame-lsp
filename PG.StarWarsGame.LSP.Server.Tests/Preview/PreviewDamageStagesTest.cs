@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -232,7 +233,7 @@ public sealed class PreviewDamageStagesTest
         var tags = new FakeVariantTagSource().With("Bunker", [.. declared]);
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets("bunker.alo")).BuildForObject("Bunker");
+            tags, new FakeAssets("bunker.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Bunker");
     }
 
     private static VariantTag Tag(string name, string value)

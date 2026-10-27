@@ -20,6 +20,6 @@ internal static class TestParseCache
         return new XmlParseCache(
             new DocumentTextSource(host, fileHelper ?? new FileHelper(new MockFileSystem()),
                 NullLogger<DocumentTextSource>.Instance),
-            capacity);
+            capacity, NullLogger<XmlParseCache>.Instance);
     }
 }

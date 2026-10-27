@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Symbols;
@@ -21,7 +22,8 @@ public sealed class DefinitionLocatorTest
 {
     private static DefinitionLocator LocatorFor(GameIndex index)
     {
-        return new DefinitionLocator(new FakeGameIndexService(index), TypedSchemaProvider());
+        return new DefinitionLocator(new FakeGameIndexService(index), TypedSchemaProvider(),
+            ResxMessageCatalog.Server("en"));
     }
 
     private static GameIndex IndexWith(params (string Id, string TypeName)[] symbols)

@@ -3,9 +3,11 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Localisation;
@@ -568,7 +570,10 @@ public sealed class DiagnosticsPublisherBaseTest
             IReadOnlyList<SuppressionRange>? ranges = null,
             IGlobalSuppressionStore? globalSuppressions = null,
             IProjectLayerMap? layerMap = null)
-            : base(publish, indexService, workspaceHost, debounceMs, null, globalSuppressions, layerMap)
+            : base(new DelegateSink(publish), indexService, workspaceHost,
+                ServerOptions.Default with { DiagnosticsDebounce = TimeSpan.FromMilliseconds(debounceMs) },
+                NullLogger.Instance, globalSuppressions ?? new FakeGlobalSuppressionStore(),
+                layerMap ?? new ProjectLayerMap(new FileHelper(new MockFileSystem())))
         {
             FileExtension = extension;
             DiagnosticsEnabled = enabled;
@@ -596,27 +601,12 @@ public sealed class DiagnosticsPublisherBaseTest
         }
     }
 
-    private sealed class FakeGlobalSuppressionStore : IGlobalSuppressionStore
+    /// <summary>The tests hand the base a delegate, as the publishers once did; the sink carries it.</summary>
+    private sealed class DelegateSink(Action<PublishDiagnosticsParams> publish) : IDiagnosticsSink
     {
-        private readonly List<SuppressionMatcher> _matchers;
-
-        public FakeGlobalSuppressionStore(IReadOnlyList<SuppressionMatcher> matchers)
+        public void Publish(PublishDiagnosticsParams diagnostics)
         {
-            _matchers = [.. matchers];
-        }
-
-        public IReadOnlyList<SuppressionMatcher> GetAll()
-        {
-            return _matchers;
-        }
-
-        public void Add(SuppressionMatcher matcher, string? reason = null)
-        {
-            _matchers.Add(matcher);
-        }
-
-        public void Remove(SuppressionMatcher matcher)
-        {
+            publish(diagnostics);
         }
     }
 
@@ -629,7 +619,9 @@ public sealed class DiagnosticsPublisherBaseTest
             IGameIndexService indexService,
             IGameWorkspaceHost workspaceHost,
             string throwingUri)
-            : base(publish, indexService, workspaceHost, 0)
+            : base(new DelegateSink(publish), indexService, workspaceHost, TestServerOptions.Immediate,
+                NullLogger.Instance, new FakeGlobalSuppressionStore(),
+                new ProjectLayerMap(new FileHelper(new MockFileSystem())))
         {
             _throwingUri = throwingUri;
         }

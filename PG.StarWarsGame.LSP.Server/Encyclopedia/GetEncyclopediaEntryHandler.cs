@@ -42,7 +42,7 @@ public sealed class GetEncyclopediaEntryHandler
     // Resolving the workspace root and asking for its catalog is shared with the XML diagnostics
     // and the model preview - see WorkspaceIconCatalog, which is also where the bug lived that had
     // this asking DI for a concrete type nothing registers.
-    private readonly IWorkspaceIconCatalog? _catalog;
+    private readonly IWorkspaceIconCatalog _catalog;
     private readonly ILspConfigurationProvider _config;
 
     // Only to ask whether a project ships the conventional mega texture, which decides whether its
@@ -53,18 +53,18 @@ public sealed class GetEncyclopediaEntryHandler
     // Still needed for the ship-name catalog, which resolves its own root. The INTERFACE, not the
     // concrete service: only `IModProjectReloadService` is registered, so asking for the class
     // handed this a permanent null and every project-configured path silently fell back.
-    private readonly IModProjectReloadService? _projects;
+    private readonly IModProjectReloadService _projects;
     private readonly ISchemaProvider _schema;
 
-    private readonly IShipNameCatalogProvider? _shipNames;
+    private readonly IShipNameCatalogProvider _shipNames;
     private readonly IVariantTagSource _tagSource;
 
     public GetEncyclopediaEntryHandler(IGameIndexService indexService, ISchemaProvider schema,
         IVariantTagSource tagSource, ILspConfigurationProvider config,
-        IWorkspaceIconCatalog? catalog = null,
-        IShipNameCatalogProvider? shipNames = null,
-        IModProjectReloadService? projects = null,
-        IFileSystem? fileSystem = null)
+        IWorkspaceIconCatalog catalog,
+        IShipNameCatalogProvider shipNames,
+        IModProjectReloadService projects,
+        IFileSystem fileSystem)
     {
         _indexService = indexService;
         _schema = schema;
@@ -73,7 +73,7 @@ public sealed class GetEncyclopediaEntryHandler
         _catalog = catalog;
         _shipNames = shipNames;
         _projects = projects;
-        _fileSystem = fileSystem ?? new FileSystem();
+        _fileSystem = fileSystem;
     }
 
     public async Task<GetEncyclopediaEntryResult> Handle(GetEncyclopediaEntryParams request,
@@ -131,7 +131,7 @@ public sealed class GetEncyclopediaEntryHandler
             ResolveIcon(catalog, effective),
             ResolveChrome(catalog, layout),
             shipNames,
-            IconSourceGap.ProjectsWithoutIconSources(_projects?.LastWorkspaceConfig, _fileSystem),
+            IconSourceGap.ProjectsWithoutIconSources(_projects.LastWorkspaceConfig, _fileSystem),
             buildCost,
             new EncyclopediaRowBudget(
                 EncyclopediaRowBudgets.Name(layout.Header.WrapChars, buildCost is > 0),
@@ -149,10 +149,7 @@ public sealed class GetEncyclopediaEntryHandler
     /// </remarks>
     private EncyclopediaShipNames? ResolveShipNames(EffectiveObjectResolver resolver, string objectId)
     {
-        if (_shipNames is null)
-            return null;
-
-        var root = _projects?.LastWorkspaceRoots?.FirstOrDefault() ?? _config.Current.WorkspaceRoot;
+        var root = _projects.LastWorkspaceRoots?.FirstOrDefault() ?? _config.Current.WorkspaceRoot;
         if (string.IsNullOrEmpty(root))
             return null;
 
@@ -189,9 +186,7 @@ public sealed class GetEncyclopediaEntryHandler
     /// </summary>
     private Task<IconCatalog?> GetCatalogAsync(CancellationToken ct)
     {
-        // Spelled as a branch rather than `_catalog?.GetAsync(ct) ?? ...`: inside a null-conditional
-        // the call reads as an unobserved awaitable (VSTHRD110) even though it is returned.
-        return _catalog is null ? Task.FromResult<IconCatalog?>(null) : _catalog.GetAsync(ct);
+        return _catalog.GetAsync(ct);
     }
 
     private static EncyclopediaIcon? ResolveIcon(IconCatalog? catalog, EffectiveObject effective)

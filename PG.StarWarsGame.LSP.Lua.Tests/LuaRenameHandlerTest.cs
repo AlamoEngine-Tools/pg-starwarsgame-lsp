@@ -87,12 +87,12 @@ public sealed class LuaRenameHandlerTest
             new FileHelper(new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
         return new LuaRenameHandler(
-            new LuaParseCache(textSource, 16),
+            new LuaParseCache(textSource, 16, NullLogger<LuaParseCache>.Instance),
             textSource,
             schema ?? new SchemaProviderBuilder().Build(),
             NullLogger<LuaRenameHandler>.Instance,
-            luaSchema,
-            sandbox,
+            luaSchema ?? new LuaApiSchemaProvider([]),
+            sandbox ?? FixedSandbox.Empty(),
             new FileHelper(new MockFileSystem()));
     }
 

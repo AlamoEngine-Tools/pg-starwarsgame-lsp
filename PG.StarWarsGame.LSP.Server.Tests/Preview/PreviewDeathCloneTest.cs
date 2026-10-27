@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -169,7 +170,7 @@ public sealed class PreviewDeathCloneTest
         var tags = extra(new FakeVariantTagSource().With("Ship", shipTags));
 
         return new PreviewSceneBuilder(new FakeGameIndexService(index), DeathCloneSchema(),
-            tags, new FakeAssets("hull.alo")).BuildForObject("Ship");
+            tags, new FakeAssets("hull.alo"), ResxMessageCatalog.Server("en")).BuildForObject("Ship");
     }
 
     private static GameSymbol Sym(string id, string typeName)

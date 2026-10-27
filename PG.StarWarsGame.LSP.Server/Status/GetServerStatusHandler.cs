@@ -153,8 +153,8 @@ public sealed class GetServerStatusHandler(
     IGameIndexService indexService,
     IModProjectReloadService projects,
     IFileHelper fileHelper,
-    IWorkspaceIndexer? indexer = null,
-    IEnumerable<ICacheStatisticsSource>? caches = null)
+    IWorkspaceIndexer indexer,
+    IEnumerable<ICacheStatisticsSource> caches)
     : IJsonRpcRequestHandler<GetServerStatusParams, ServerStatusDto>
 {
     public Task<ServerStatusDto> Handle(GetServerStatusParams request, CancellationToken cancellationToken)
@@ -232,7 +232,7 @@ public sealed class GetServerStatusHandler(
                 g.Key, g.Count(), g.Sum(d => d.Symbols.Length), g.Sum(d => d.References.Length)))
             .ToList();
 
-        var cacheEntries = (caches ?? [])
+        var cacheEntries = caches
             .Select(c => c.Snapshot())
             .Select(s => new ServerStatusCacheEntryDto(
                 s.Name, s.Entries, s.ApproximateBytes, s.Hits, s.Misses, s.Evictions))
@@ -298,8 +298,8 @@ public sealed class GetServerStatusHandler(
 
     private ServerStatusCachesDto Caches()
     {
-        var snapshots = indexer?.LastIndexCache;
-        var bones = indexer?.LastBoneCatalog;
+        var snapshots = indexer.LastIndexCache;
+        var bones = indexer.LastBoneCatalog;
         var schema = recorder.SchemaFromCache switch
         {
             true => "Hit",

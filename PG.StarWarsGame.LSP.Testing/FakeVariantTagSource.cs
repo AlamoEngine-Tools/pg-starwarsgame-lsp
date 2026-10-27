@@ -3,13 +3,14 @@
 
 using PG.StarWarsGame.LSP.Core.Symbols;
 
-namespace PG.StarWarsGame.LSP.Server.Tests;
+namespace PG.StarWarsGame.LSP.Testing;
 
 /// <summary>
 ///     Hands out the direct child tags of an object from an in-memory map, standing in for the
 ///     parsed-document tag source. Ids match case-insensitively, the way the real index addresses them.
+///     Empty, it knows no object: every cross-object rule then finds nothing to say.
 /// </summary>
-internal sealed class FakeVariantTagSource : IVariantTagSource
+public sealed class FakeVariantTagSource : IVariantTagSource
 {
     private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
         new(StringComparer.OrdinalIgnoreCase);

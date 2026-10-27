@@ -736,7 +736,8 @@ public sealed class LocalisationLoaderTest
         services.AddSingleton<ILspConfigurationProvider>(new StubConfigProvider(config));
         services.AddSingleton<IGameIndexService>(sp =>
             new GameIndexService(sp.GetRequiredService<IFileHelper>(), [],
-                NullLogger<GameIndexService>.Instance));
+                NullLogger<GameIndexService>.Instance, new ProjectLayerMap(new FileHelper(new MockFileSystem())),
+                DistinctObjectNameHash.Instance));
         services.AddSingleton<ILogger<LocalisationLoader>>(NullLogger<LocalisationLoader>.Instance);
         services.AddSingleton<LocalisationProjectRegistry>();
         services.AddSingleton<ILocalisationProjectRegistry>(sp => sp.GetRequiredService<LocalisationProjectRegistry>());

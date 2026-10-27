@@ -61,9 +61,9 @@ public sealed class SymbolCatalog
     /// <param name="index">The index the catalog is built from.</param>
     /// <param name="kinds">The object kinds the schema defines.</param>
     /// <param name="enums">The enums the schema defines.</param>
-    /// <param name="schema">The schema whose types and tags the Schema outline lists; none lists none.</param>
+    /// <param name="schema">The schema whose types and tags the Schema outline lists.</param>
     public static SymbolCatalog Build(GameIndex index, IReadOnlyList<ObjectKindDefinition> kinds,
-        IReadOnlyList<EnumDefinition> enums, ISchemaProvider? schema = null)
+        IReadOnlyList<EnumDefinition> enums, ISchemaProvider schema)
     {
         var pages = new Dictionary<string, List<SymbolRow>>(StringComparer.Ordinal);
 
@@ -100,7 +100,7 @@ public sealed class SymbolCatalog
             .ToList();
         // The schema's types, each tag of each type - a tag by its type and name, as a tag name means
         // something else on another type - and the behaviours.
-        var types = schema?.AllObjectTypes ?? [];
+        var types = schema.AllObjectTypes;
         pages["schemaTypes"] = types
             .Select(t => new SymbolRow(t.TypeName, t.TypeName, null, [], "game", null, [], "schemaTypes"))
             .ToList();

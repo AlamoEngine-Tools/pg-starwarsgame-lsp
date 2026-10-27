@@ -4,7 +4,9 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Icons;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -15,6 +17,7 @@ using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Status;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Project;
 
@@ -22,6 +25,45 @@ public sealed class ModProjectReloadServiceTest
 {
     private static readonly WorkspaceConfiguration SampleConfig =
         new(["/ws/data/xml"], ["/ws/data/scripts"], [], ["/ws/data/art", "/ws/data/audio"], null);
+
+    /// <summary>
+    ///     The service over the collaborators a test names; the rest are recording doubles that
+    ///     nothing asserts on, since every dependency is required (#305).
+    /// </summary>
+    private static ModProjectReloadService Create(
+        IProjectConfigurationResolver resolver,
+        IWorkspaceIndexer indexer,
+        ILocalisationLoader localisation,
+        IProjectLayerMap layerMap,
+        IGameIndexService index,
+        IUserNotifier notifier,
+        ILogger<ModProjectReloadService> logger,
+        IClientRefreshNotifier? refresh = null,
+        IIconCatalogProvider? icons = null,
+        ServerStatusRecorder? status = null,
+        IHeapTrimmer? heapTrimmer = null,
+        ILuaAnalyzerStarter? luaAnalyzer = null)
+    {
+        var fileHelper = new FileHelper(new MockFileSystem());
+        return new ModProjectReloadService(
+            resolver, indexer, localisation, layerMap, index, notifier, logger,
+            refresh ?? new RecordingClientRefreshNotifier(),
+            new PgprojMigrationOffer(fileHelper, new DecliningPrompt(), notifier,
+                NullLogger<PgprojMigrationOffer>.Instance, ResxMessageCatalog.Server("en")),
+            icons ?? new CountingIconCatalogProvider(),
+            status ?? new ServerStatusRecorder(),
+            heapTrimmer ?? new RecordingHeapTrimmer(),
+            luaAnalyzer ?? new RecordingAnalyzerStarter(),
+            ResxMessageCatalog.Server("en"));
+    }
+
+    private sealed class DecliningPrompt : IPgprojMigrationPrompt
+    {
+        public Task<bool> ProposeAsync(PgprojMigrationProposal proposal, CancellationToken ct)
+        {
+            return Task.FromResult(false);
+        }
+    }
 
     private static (ModProjectReloadService Service, RecordingIndexer Indexer, ListLogger Logger) Build(
         WorkspaceConfiguration? resolved, IIconCatalogProvider? icons = null)
@@ -40,7 +82,7 @@ public sealed class ModProjectReloadServiceTest
         var indexer = new RecordingIndexer();
         var logger = new ListLogger();
         var notifier = new RecordingUserNotifier();
-        var service = new ModProjectReloadService(
+        var service = Create(
             new FakeResolver(resolved), indexer, new NullLocalisationLoader(),
             new RecordingLayerMap(), new FakeGameIndexService(IndexWithBaseline(baselineLoaded)),
             notifier, logger, icons: icons, status: status);
@@ -71,7 +113,7 @@ public sealed class ModProjectReloadServiceTest
     public async Task LoadAsync_AfterASuccessfulLoad_TrimsTheHeapOnce()
     {
         var trimmer = new RecordingHeapTrimmer();
-        var service = new ModProjectReloadService(
+        var service = Create(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
             new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(),
             heapTrimmer: trimmer);
@@ -85,7 +127,7 @@ public sealed class ModProjectReloadServiceTest
     public async Task LoadAsync_HandsTheLayersToTheLuaAnalyzer()
     {
         var analyzer = new RecordingAnalyzerStarter();
-        var service = new ModProjectReloadService(
+        var service = Create(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
             new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(),
             luaAnalyzer: analyzer);
@@ -99,7 +141,7 @@ public sealed class ModProjectReloadServiceTest
     public async Task ReloadAsync_TrimsTheHeapAgain()
     {
         var trimmer = new RecordingHeapTrimmer();
-        var service = new ModProjectReloadService(
+        var service = Create(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
             new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(),
             heapTrimmer: trimmer);
@@ -115,11 +157,11 @@ public sealed class ModProjectReloadServiceTest
     {
         var trimmer = new RecordingHeapTrimmer();
         // No project file at all, and a project refused for want of a baseline: neither parsed anything.
-        var noProject = new ModProjectReloadService(
+        var noProject = Create(
             new FakeResolver(null), new RecordingIndexer(), new NullLocalisationLoader(),
             new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(),
             heapTrimmer: trimmer);
-        var refused = new ModProjectReloadService(
+        var refused = Create(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
             new RecordingLayerMap(), new FakeGameIndexService(IndexWithBaseline(false)),
             new RecordingUserNotifier(), new ListLogger(), heapTrimmer: trimmer);
@@ -251,7 +293,7 @@ public sealed class ModProjectReloadServiceTest
     {
         var localisation = new RecordingLocalisationLoader();
         var indexer = new RecordingIndexer();
-        var service = new ModProjectReloadService(
+        var service = Create(
             new FakeResolver(SampleConfig), indexer, localisation, new RecordingLayerMap(), LoadedIndex(),
             new RecordingUserNotifier(), new ListLogger());
         await service.LoadAsync(["/ws"], CancellationToken.None);
@@ -274,7 +316,7 @@ public sealed class ModProjectReloadServiceTest
         // document edit, so unless the server pushes a refresh the client keeps rendering the stale
         // set until something else makes it re-request - e.g. opening another file.
         var refresh = new RecordingClientRefreshNotifier();
-        var service = new ModProjectReloadService(
+        var service = Create(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new RecordingLocalisationLoader(),
             new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(), refresh);
         await service.LoadAsync(["/ws"], CancellationToken.None);
@@ -289,7 +331,7 @@ public sealed class ModProjectReloadServiceTest
     public async Task ReloadLocalisationAsync_BeforeLoadAsync_DoesNotRefreshClient()
     {
         var refresh = new RecordingClientRefreshNotifier();
-        var service = new ModProjectReloadService(
+        var service = Create(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new RecordingLocalisationLoader(),
             new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(), refresh);
 
@@ -309,7 +351,7 @@ public sealed class ModProjectReloadServiceTest
             new(1, "Root", ["/ws/data/xml"], [], [], [], null)
         };
         var config = SampleConfig with { Layers = layers };
-        var service = new ModProjectReloadService(
+        var service = Create(
             new FakeResolver(config), indexer, new NullLocalisationLoader(), layerMap, LoadedIndex(),
             new RecordingUserNotifier(), new ListLogger());
 

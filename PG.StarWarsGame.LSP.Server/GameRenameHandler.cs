@@ -17,26 +17,26 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class GameRenameHandler : RenameHandlerBase
 {
-    private readonly ILuaAnalyzer? _analyzer;
+    private readonly ILuaAnalyzer _analyzer;
     private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
-    private readonly IProjectLayerMap? _layers;
+    private readonly IProjectLayerMap _layers;
     private readonly ILuaRenameProvider _luaProvider;
-    private readonly ILuaSandboxProvider? _sandbox;
+    private readonly ILuaSandboxProvider _sandbox;
     private readonly IXmlRenameProvider _xmlProvider;
 
+    // What we do not claim (locals, fields) is the analyzer's to rename - within the script's own
+    // state, and within the project only, checked against the layers.
     public GameRenameHandler(
         IGameIndexService indexService,
         IXmlRenameProvider xmlProvider,
         ILuaRenameProvider luaProvider,
         IFileHelper fileHelper,
         ILspConfigurationProvider config,
-        // Optional: with the analyzer running, what we do not claim (locals, fields) is its to
-        // rename - within the project only, checked against the layers.
-        ILuaAnalyzer? analyzer = null,
-        IProjectLayerMap? layers = null,
-        ILuaSandboxProvider? sandbox = null)
+        ILuaAnalyzer analyzer,
+        IProjectLayerMap layers,
+        ILuaSandboxProvider sandbox)
     {
         _sandbox = sandbox;
         _indexService = indexService;
@@ -58,13 +58,13 @@ public sealed class GameRenameHandler : RenameHandlerBase
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        if (_analyzer is null || _luaProvider.Claims(uri, request.Position.Line, request.Position.Character, index))
+        if (_luaProvider.Claims(uri, request.Position.Line, request.Position.Character, index))
             return _luaProvider.HandleRename(uri, request, index);
 
         var edit = await _analyzer.RequestAsync<WorkspaceEdit>("textDocument/rename", request, ct);
         if (edit is null) return null;
         // Another script's state first: its file is no part of this rename, wherever it lives.
-        if (_sandbox is not null) edit = LuaAnalyzerRename.KeepWithinState(edit, _sandbox.Current, uri);
+        edit = LuaAnalyzerRename.KeepWithinState(edit, _sandbox.Current, uri);
         LuaAnalyzerRename.EnsureWithinProject(edit, _layers, new ConfiguredMessageCatalog(_config));
         return edit;
     }

@@ -14,6 +14,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -70,7 +71,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             NoMegEntries.Instance,
             new MegArchiveLoadOrder(fileHelper),
             new NullModelBoneCatalogCache(),
-            NullLogger<WorkspaceIndexer>.Instance);
+            NullLogger<WorkspaceIndexer>.Instance, new LuaApiSchemaProvider([]));
         return new GameDidChangeWatchedFilesHandler(
             idx,
             host ?? new FakeGameWorkspaceHost(),

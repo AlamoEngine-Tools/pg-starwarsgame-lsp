@@ -4,10 +4,7 @@
 using System.Collections.Concurrent;
 using Loretta.CodeAnalysis;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
-using OmniSharp.Extensions.LanguageServer.Protocol.Document;
-using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
@@ -32,21 +29,26 @@ namespace PG.StarWarsGame.LSP.Lua.Diagnostics;
 
 public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 {
-    private readonly ILuaAnalyzer? _analyzer;
+    private readonly ILuaAnalyzer _analyzer;
 
     // The analyzer's latest findings per document, already mapped to this server's ids.
     private readonly ConcurrentDictionary<string, IReadOnlyList<LspDiagnostic>> _analyzerFindings =
         new(DocumentUris.Comparer);
 
-    private readonly ILspConfigurationProvider? _configProvider;
+    private readonly ILspConfigurationProvider _configProvider;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaDiagnosticsPublisher> _logger;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
     private readonly IGameWorkspaceHost _workspaceHost;
 
+    // Every dependency is REQUIRED and there is one constructor: an optional parameter is the one
+    // shape the container is free to skip without a word, and a second constructor is the one it
+    // falls back to. The layer map names the project in every diagnostic's source; the analyzer's
+    // findings are folded into ours (#153); the parse cache is the shared one, not a private
+    // second copy that splits the statistics (#305).
     public LuaDiagnosticsPublisher(
-        ILanguageServerFacade server,
+        IDiagnosticsSink sink,
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         IFileHelper fileHelper,
@@ -54,44 +56,20 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILogger<LuaDiagnosticsPublisher> logger,
         ILuaParseCache parseCache,
         ILspConfigurationProvider configProvider,
-        // REQUIRED: the layer map names the project in every diagnostic's source, and an optional
-        // dependency is the one shape the container is free to skip without a word.
         IProjectLayerMap layerMap,
-        ServerOptions? options = null,
-        IGlobalSuppressionStore? globalSuppressions = null,
-        ILuaAnalyzer? analyzer = null)
-        : this(p => server.TextDocument.PublishDiagnostics(p),
-            indexService, workspaceHost, fileHelper, schemaProvider, logger,
-            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            parseCache, configProvider, globalSuppressions, layerMap, analyzer)
-    {
-    }
-
-    internal LuaDiagnosticsPublisher(
-        Action<LspPublishParams> publish,
-        IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
-        IFileHelper fileHelper,
-        ILuaApiSchemaProvider schemaProvider,
-        ILogger<LuaDiagnosticsPublisher> logger,
-        int debounceMs = 0,
-        ILuaParseCache? parseCache = null,
-        ILspConfigurationProvider? configProvider = null,
-        IGlobalSuppressionStore? globalSuppressions = null,
-        IProjectLayerMap? layerMap = null,
-        ILuaAnalyzer? analyzer = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions, layerMap)
+        ServerOptions options,
+        IGlobalSuppressionStore globalSuppressions,
+        ILuaAnalyzer analyzer)
+        : base(sink, indexService, workspaceHost, options, logger, globalSuppressions, layerMap)
     {
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
         _logger = logger;
         _configProvider = configProvider;
-        _parseCache = parseCache ?? new LuaParseCache(
-            new DocumentTextSource(workspaceHost, fileHelper, NullLogger<DocumentTextSource>.Instance),
-            ServerOptions.Default.ParseCacheCapacity);
+        _parseCache = parseCache;
         _analyzer = analyzer;
         _workspaceHost = workspaceHost;
-        if (analyzer is not null) analyzer.DiagnosticsPublished += OnAnalyzerPublished;
+        analyzer.DiagnosticsPublished += OnAnalyzerPublished;
     }
 
     protected override string FileExtension => ".lua";
@@ -128,7 +106,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
     protected override void PublishForDocument(string uri, string text, GameIndex index)
     {
         var diagnostics = new List<LspDiagnostic>();
-        var messages = ResxMessageCatalog.Server(_configProvider?.Current.Locale ?? "en");
+        var messages = ResxMessageCatalog.Server(_configProvider.Current.Locale);
 
         // One parse shared by the syntax-error pass and all three analyzers (previously four
         // separate parses of the same text) - and via the cache, with indexing and every request

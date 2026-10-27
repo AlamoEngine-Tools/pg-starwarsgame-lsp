@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -143,7 +144,7 @@ public sealed class PreviewSceneBuilderTest
         var (index, tags) = Destroyer();
         var service = new FakeGameIndexService(index, GameIndex.Empty);
         var builder = new PreviewSceneBuilder(service, new SchemaProviderBuilder().Build(), tags,
-            new FakeAssets("EV_StarDestroyer.ALO", "EV_StarDestroyer_HP00_L-F.alo"));
+            new FakeAssets("EV_StarDestroyer.ALO", "EV_StarDestroyer_HP00_L-F.alo"), ResxMessageCatalog.Server("en"));
 
         var scene = builder.BuildForObject("Generic_Star_Destroyer");
 
@@ -161,7 +162,7 @@ public sealed class PreviewSceneBuilderTest
         var tags = new FakeVariantTagSource().With("Rebel", Tag("Color", "255, 0, 0, 255"));
         var service = new FakeGameIndexService(index, GameIndex.Empty);
         var builder = new PreviewSceneBuilder(service, new SchemaProviderBuilder().Build(), tags,
-            new FakeAssets("hull.alo"));
+            new FakeAssets("hull.alo"), ResxMessageCatalog.Server("en"));
 
         var scene = builder.BuildForModel("hull.alo");
 
@@ -196,7 +197,7 @@ public sealed class PreviewSceneBuilderTest
         GameIndex index, FakeVariantTagSource tags, FakeAssets assets)
     {
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, assets);
+            tags, assets, ResxMessageCatalog.Server("en"));
     }
 
     private static GameIndex Index(

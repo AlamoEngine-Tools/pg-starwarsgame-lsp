@@ -51,7 +51,8 @@ public sealed class NewModProjectCommandHandlerTest
         const string pgprojPath = "/mods/mymod/My_Mod.pgproj";
         Assert.True(fs.File.Exists(pgprojPath));
 
-        var loader = new ModProjectLoader(new FileHelper(fs), new ListLogger<ModProjectLoader>());
+        var loader = new ModProjectLoader(new FileHelper(fs), new ListLogger<ModProjectLoader>(),
+            new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var model = loader.Load(pgprojPath);
         Assert.Equal("My Mod", model.Modinfo!.Name);
         Assert.Equal(new[] { "data/xml" }, model.Directories.Xml);
@@ -154,7 +155,8 @@ public sealed class NewModProjectCommandHandlerTest
         const string pgprojPath = "/mods/mymod/My_Awesome_Mod.pgproj";
         Assert.True(fs.File.Exists(pgprojPath));
 
-        var loader = new ModProjectLoader(new FileHelper(fs), new ListLogger<ModProjectLoader>());
+        var loader = new ModProjectLoader(new FileHelper(fs), new ListLogger<ModProjectLoader>(),
+            new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var model = loader.Load(pgprojPath);
         Assert.Equal("My Awesome Mod!", model.Modinfo!.Name);
     }

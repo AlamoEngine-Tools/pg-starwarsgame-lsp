@@ -107,7 +107,7 @@ public sealed class SchemaOutlineTest
         var schema = Schema();
         var catalog = SymbolCatalog.Build(index, [s_spaceUnit], [s_damage, s_weather], schema);
         var relations = new SymbolRelations(index, schema, new NoTags(), catalog);
-        return (catalog, relations, new SymbolPreviews(index, relations, null!, null!, null!, schema: schema));
+        return (catalog, relations, new SymbolPreviews(index, relations, null!, null!, null!, _ => null, schema));
     }
 
     private sealed class NoTags : IVariantTagSource

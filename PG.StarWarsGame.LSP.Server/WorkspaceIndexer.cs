@@ -44,7 +44,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<WorkspaceIndexer> _logger;
-    private readonly ILuaApiSchemaProvider? _luaSchema;
+    private readonly ILuaApiSchemaProvider _luaSchema;
     private readonly IMegEntryReader _megEntries;
     private readonly MegArchiveLoadOrder _megLoadOrder;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
@@ -60,8 +60,9 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         MegArchiveLoadOrder megLoadOrder,
         IModelBoneCatalogCache boneCache,
         ILogger<WorkspaceIndexer> logger,
-        // Optional so minimal setups can omit it; production injects the loaded stubs.
-        ILuaApiSchemaProvider? luaSchema = null)
+        // The loaded stubs: their fingerprint is part of the index cache's, so an index built under
+        // other stubs is not replayed.
+        ILuaApiSchemaProvider luaSchema)
     {
         _boneCache = boneCache;
         _fileHelper = fileHelper;
@@ -657,7 +658,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         // The Lua stubs decide which string arguments a script's index records as references.
         // Measured: an index cached under the released stubs (---@xmlref, no longer read) held no
         // Lua reference at all, and a server on the current stubs replayed it.
-        if (_luaSchema?.Fingerprint is { Length: > 0 } luaFingerprint)
+        if (_luaSchema.Fingerprint is { Length: > 0 } luaFingerprint)
             schemaFingerprint += ";lua:" + luaFingerprint;
 
         // (pgprojPath → overallHash), used to skip a redundant re-save of an unchanged snapshot.

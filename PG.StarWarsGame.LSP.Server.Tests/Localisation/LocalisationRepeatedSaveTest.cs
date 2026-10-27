@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -44,6 +45,7 @@ public sealed class LocalisationRepeatedSaveTest
         services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
+        services.AddSingleton<IMessageCatalog>(ResxMessageCatalog.Server("en"));
         var sp2 = services.BuildServiceProvider();
         return (sp2.GetRequiredService<ILocalisationDocumentEditor>(),
             sp2.GetRequiredService<ILocalisationRowReader>());

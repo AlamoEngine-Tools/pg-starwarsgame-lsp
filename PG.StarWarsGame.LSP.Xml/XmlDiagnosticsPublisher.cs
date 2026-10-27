@@ -5,12 +5,9 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
-using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
@@ -53,11 +50,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     ];
 
     private static readonly char[] DamageTypeTokenSeparators = [' ', '\t', '\r', '\n', ','];
-    private readonly ILspConfigurationProvider? _configProvider;
-
-    // Null in the test convenience constructors, like the hardpoint producer beside it. The
-    // damage-stage diagnostic then simply never fires.
-    private readonly IXmlDamageStageFactProducer? _damageStageProducer;
+    private readonly ILspConfigurationProvider _configProvider;
+    private readonly IXmlDamageStageFactProducer _damageStageProducer;
     private readonly IXmlDocumentFactProducer _documentProducer;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
@@ -65,40 +59,37 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly ConcurrentDictionary<string, Dictionary<(int Line, int Char), string>> _fixCache = new();
 
     private readonly IXmlDiagnosticsHandlerRegistry _handlerRegistry;
-    private readonly IXmlHardpointFactProducer? _hardpointProducer;
-
-    // Null wherever nothing can open a mega texture - the test constructors, and any host without
-    // the asset layer. Texture references then resolve against files alone, exactly as before.
-    private readonly IIconNameIndex? _iconNames;
-
-    // Null in the test convenience constructors and whenever no workspace icon catalog exists;
-    // the icon-repack diagnostic then simply never fires.
-    private readonly IIconRepackStatusProvider? _iconRepack;
+    private readonly IXmlHardpointFactProducer _hardpointProducer;
+    private readonly IIconNameIndex _iconNames;
+    private readonly IIconRepackStatusProvider _iconRepack;
     private readonly IXmlIndexFactProducer _indexProducer;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
-
-    // Null wherever nothing can parse an .alo - the test constructors, and any host without the
-    // asset layer. The model-texture diagnostic then simply never fires, which is the right answer:
-    // the Xml project cannot open a binary asset on its own.
-    private readonly IModelTextureIndex? _modelTextures;
+    private readonly IModelTextureIndex _modelTextures;
     private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
-    private readonly IXmlLayerShadowFactProducer? _shadowProducer;
-    private readonly IStoryChainProblemStore? _storyChainProblems;
-    private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
+    private readonly IXmlLayerShadowFactProducer _shadowProducer;
+    private readonly IStoryChainProblemStore _storyChainProblems;
+    private readonly IStoryGraphDiagnosticsSource _storyGraphDiagnostics;
     private readonly IStoryFactProducer _storyProducer;
     private readonly IDocumentTextSource _textSource;
-    private readonly IXmlVariantFactProducer? _variantProducer;
+    private readonly IXmlVariantFactProducer _variantProducer;
 
     /// <summary>
     ///     The workspace half of variant resolution. Held rather than a finished resolver because a
     ///     resolver is bound to one <see cref="GameIndex" />, and the index changes between runs.
     /// </summary>
-    private readonly IVariantTagSource? _variantTagSource;
+    private readonly IVariantTagSource _variantTagSource;
 
+    // Every dependency is REQUIRED, deliberately, and there is one constructor. An optional
+    // parameter was the one shape the container was free to skip, and skipping it is silent: the
+    // tag source gone, every cross-object rule reports nothing forever; the suppression store gone,
+    // a globally suppressed diagnostic keeps publishing (MEASURED 2026-10-04, through a second
+    // constructor that never forwarded it); the layer map gone, every source tag reads bare. The
+    // graph now either supplies each of them or fails at startup, where the registration test and
+    // the server launch both see it (#305).
     public XmlDiagnosticsPublisher(
-        ILanguageServerFacade server,
+        IDiagnosticsSink sink,
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
@@ -118,60 +109,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryGraphDiagnosticsSource storyGraphDiagnostics,
         IXmlHardpointFactProducer hardpointProducer,
         IXmlDamageStageFactProducer damageStageProducer,
-        // REQUIRED, deliberately. As an optional parameter this was the one dependency the
-        // container was free to skip, and skipping it is silent: every cross-object rule would
-        // return nothing forever and every test would still pass. Required means the graph either
-        // supplies it or fails at startup, where the smoke test sees it.
         IVariantTagSource variantTagSource,
-        // REQUIRED for the same reason. MEASURED 2026-10-04: this constructor never forwarded the
-        // global suppression store at all, so a globally suppressed XML diagnostic kept publishing
-        // while every unit test, built on the internal constructor, passed. The layer map is what
-        // names the project in every diagnostic's source; skipped, the tag silently reads bare.
         IGlobalSuppressionStore globalSuppressions,
         IProjectLayerMap layerMap,
-        ServerOptions? options = null,
-        IIconRepackStatusProvider? iconRepack = null,
-        IModelTextureIndex? modelTextures = null,
-        IIconNameIndex? iconNames = null)
-        : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
-            schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
-            fileTypeRegistry, fileHelper,
-            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
-            storyGraphDiagnostics, hardpointProducer, damageStageProducer, globalSuppressions, iconRepack,
-            modelTextures, iconNames, variantTagSource, layerMap)
-    {
-    }
-
-    internal XmlDiagnosticsPublisher(
-        Action<PublishDiagnosticsParams> publish,
-        IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
-        ISchemaProvider schema,
-        IXmlDiagnosticsHandlerRegistry handlerRegistry,
-        IXmlDocumentFactProducer documentProducer,
-        IXmlIndexFactProducer indexProducer,
-        IStoryFactProducer storyProducer,
-        ILogger<XmlDiagnosticsPublisher> logger,
-        IFileTypeRegistry fileTypeRegistry,
-        IFileHelper fileHelper,
-        int debounceMs = 0,
-        IXmlVariantFactProducer? variantProducer = null,
-        IXmlLayerShadowFactProducer? shadowProducer = null,
-        IDocumentTextSource? textSource = null,
-        IXmlParseCache? parseCache = null,
-        ILspConfigurationProvider? configProvider = null,
-        IStoryChainProblemStore? storyChainProblems = null,
-        IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null,
-        IXmlHardpointFactProducer? hardpointProducer = null,
-        IXmlDamageStageFactProducer? damageStageProducer = null,
-        IGlobalSuppressionStore? globalSuppressions = null,
-        IIconRepackStatusProvider? iconRepack = null,
-        IModelTextureIndex? modelTextures = null,
-        IIconNameIndex? iconNames = null,
-        IVariantTagSource? variantTagSource = null,
-        IProjectLayerMap? layerMap = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions, layerMap)
+        ServerOptions options,
+        IIconRepackStatusProvider iconRepack,
+        IModelTextureIndex modelTextures,
+        IIconNameIndex iconNames)
+        : base(sink, indexService, workspaceHost, options, logger, globalSuppressions, layerMap)
     {
         _iconRepack = iconRepack;
         _modelTextures = modelTextures;
@@ -181,9 +126,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         _damageStageProducer = damageStageProducer;
         _configProvider = configProvider;
         _indexService = indexService;
-        _textSource = textSource ?? new DocumentTextSource(workspaceHost, fileHelper,
-            NullLogger<DocumentTextSource>.Instance);
-        _parseCache = parseCache ?? new XmlParseCache(_textSource, ServerOptions.Default.ParseCacheCapacity);
+        _textSource = textSource;
+        _parseCache = parseCache;
         _schema = schema;
         _handlerRegistry = handlerRegistry;
         _documentProducer = documentProducer;
@@ -198,22 +142,10 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         _storyGraphDiagnostics = storyGraphDiagnostics;
     }
 
-    /// <summary>
-    ///     Whether cross-object rules can run at all.
-    /// </summary>
-    /// <remarks>
-    ///     The tag source arrives through an OPTIONAL constructor parameter, so a container that
-    ///     declines to fill it produces a publisher that works in every respect except that every
-    ///     cross-object diagnostic silently reports nothing - and no unit test would notice, because
-    ///     they supply the dependency by hand. Exposed so a registration test can assert the live
-    ///     graph actually wired it.
-    /// </remarks>
-    internal bool HasObjectSource => _variantTagSource is not null;
-
     protected override string FileExtension => ".xml";
 
     /// <summary>The server's texts in the configured locale.</summary>
-    private IMessageCatalog Messages => ResxMessageCatalog.Server(_configProvider?.Current.Locale ?? "en");
+    private IMessageCatalog Messages => ResxMessageCatalog.Server(_configProvider.Current.Locale);
 
     /// <summary>Documents with a fix-token map; never pruned, so a workspace sweep fills it for every file.</summary>
     public CacheStatistics Snapshot()
@@ -229,17 +161,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     {
         var canonicalUri = _fileHelper.NormalizeUri(uri);
         // Built per run and bound to THIS index, so a cross-object rule sees the same workspace
-        // state as every other check in the pass. Absent only when no tag source was supplied,
-        // which is the case in narrow unit fixtures rather than in the server.
-        var objects = _variantTagSource is null
-            ? null
-            : new EffectiveObjectResolver(index, _schema, _variantTagSource);
+        // state as every other check in the pass.
+        var objects = new EffectiveObjectResolver(index, _schema, _variantTagSource);
 
         // The configured locale picks the server's own texts and the schema's notes alike. It was a
         // fixed "en" here, so neither ever reached a diagnostic in another language.
-        var locale = _configProvider?.Current.Locale ?? "en";
+        var locale = _configProvider.Current.Locale;
         var ctx = new DiagnosticsContext(_schema, index, canonicalUri, locale,
-            _iconRepack?.IconsAwaitingRepack, _modelTextures, _iconNames, objects)
+            _iconRepack.IconsAwaitingRepack, _modelTextures, _iconNames, objects)
         {
             Messages = ResxMessageCatalog.Server(locale)
         };
@@ -267,14 +196,10 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var facts = new List<XmlFact>();
         Phase("document", () => facts.AddRange(_documentProducer.Produce(parsed, uri)));
         Phase("index", () => facts.AddRange(_indexProducer.Produce(canonicalUri, index)));
-        if (_variantProducer is not null)
-            Phase("variant", () => facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index)));
-        if (_shadowProducer is not null)
-            Phase("shadow", () => facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index)));
-        if (_hardpointProducer is not null)
-            Phase("hardpoint", () => facts.AddRange(_hardpointProducer.Produce(canonicalUri, parsed, index)));
-        if (_damageStageProducer is not null)
-            Phase("damageStage", () => facts.AddRange(_damageStageProducer.Produce(canonicalUri, parsed, index)));
+        Phase("variant", () => facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index)));
+        Phase("shadow", () => facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index)));
+        Phase("hardpoint", () => facts.AddRange(_hardpointProducer.Produce(canonicalUri, parsed, index)));
+        Phase("damageStage", () => facts.AddRange(_damageStageProducer.Produce(canonicalUri, parsed, index)));
         if (IsStoryParserDocument(uri))
             Phase("story", () => facts.AddRange(_storyProducer.Produce(parsed, uri)));
 
@@ -291,13 +216,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         Phase("hardcodedRefs", () => allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index)));
         Phase("damageTypeOrder", () => allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed)));
 
-        if (_storyChainProblems is not null)
-            Phase("storyChain",
-                () => allDiags.AddRange(
-                    _storyChainProblems.GetForDocument(canonicalUri)
-                        .Select(p => ToLspDiagnostic(p, ctx.Messages))));
+        Phase("storyChain",
+            () => allDiags.AddRange(
+                _storyChainProblems.GetForDocument(canonicalUri)
+                    .Select(p => ToLspDiagnostic(p, ctx.Messages))));
 
-        if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
+        if (IsStoryParserDocument(uri))
             Phase("storyGraph",
                 () => allDiags.AddRange(
                     _storyGraphDiagnostics.GetForDocument(canonicalUri).Select(ToLspDiagnostic)));

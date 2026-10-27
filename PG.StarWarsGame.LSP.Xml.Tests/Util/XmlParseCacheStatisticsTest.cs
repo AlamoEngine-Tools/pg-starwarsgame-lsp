@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -12,7 +13,7 @@ public sealed class XmlParseCacheStatisticsTest
     [Fact]
     public void Snapshot_ReportsEntriesAndCountersUnderAStableName()
     {
-        var cache = new XmlParseCache(new NoText(), 16);
+        var cache = new XmlParseCache(new NoText(), 16, NullLogger<XmlParseCache>.Instance);
         cache.GetOrParse("file:///a.xml", "<A/>");
         cache.GetOrParse("file:///a.xml", "<A/>");
         cache.GetOrParse("file:///b.xml", "<B/>");

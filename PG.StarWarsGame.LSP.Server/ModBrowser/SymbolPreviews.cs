@@ -37,8 +37,8 @@ public sealed class SymbolPreviews(
     IDocumentTextSource texts,
     IXmlDiagnosticsCollector diagnostics,
     IFileSystem files,
-    Func<string, int?>? bonesOf = null,
-    ISchemaProvider? schema = null,
+    Func<string, int?> bonesOf,
+    ISchemaProvider schema,
     string locale = "en")
 {
     private const string GameObjects = "xml:GameObjectType";
@@ -157,7 +157,7 @@ public sealed class SymbolPreviews(
     /// <summary>A schema type: its header and its documentation on top, its tags under them.</summary>
     private string SchemaType(Layout layout, string page, SymbolRow entry, GetSymbolNodeResult node)
     {
-        var type = schema?.AllObjectTypes.FirstOrDefault(t => t.TypeName == entry.Id);
+        var type = schema.AllObjectTypes.FirstOrDefault(t => t.TypeName == entry.Id);
         layout.Grid(6, 4);
         layout.Put(Header(entry, node), 0, 0, 2, 2);
         layout.Put(Documentation(
@@ -175,7 +175,7 @@ public sealed class SymbolPreviews(
     {
         var slash = entry.Id.IndexOf('/');
         var typeName = entry.Id[..slash];
-        var tag = schema?.GetTagsForType(typeName).FirstOrDefault(t => t.Tag == entry.Name);
+        var tag = schema.GetTagsForType(typeName).FirstOrDefault(t => t.Tag == entry.Name);
         List<PreviewProperty> properties = [];
         if (tag is not null)
         {
@@ -208,7 +208,7 @@ public sealed class SymbolPreviews(
     /// </summary>
     private string Enum(Layout layout, string page, SymbolRow entry, GetSymbolNodeResult node)
     {
-        var definition = schema?.AllEnums.FirstOrDefault(e => e.Name == entry.Id);
+        var definition = schema.AllEnums.FirstOrDefault(e => e.Name == entry.Id);
         List<PreviewProperty> properties = [];
         if (definition is not null)
         {
@@ -241,7 +241,7 @@ public sealed class SymbolPreviews(
     /// <summary>A behaviour: what decides it, and the game objects that have it.</summary>
     private string Behaviour(Layout layout, string page, SymbolRow entry, GetSymbolNodeResult node)
     {
-        var kind = schema?.AllKinds.FirstOrDefault(k =>
+        var kind = schema.AllKinds.FirstOrDefault(k =>
             string.Equals(k.Kind, entry.Id, StringComparison.OrdinalIgnoreCase));
         List<PreviewProperty> properties = [];
         if (kind is not null)
@@ -324,7 +324,7 @@ public sealed class SymbolPreviews(
             return node.Relations.FirstOrDefault(r => r.Relation == relation)?.Count ?? 0;
         }
 
-        List<PreviewFact> facts = bonesOf?.Invoke(entry.Id) is { } bones ? [new PreviewFact("bones", bones)] : [];
+        List<PreviewFact> facts = bonesOf(entry.Id) is { } bones ? [new PreviewFact("bones", bones)] : [];
         facts.AddRange(
         [
             new PreviewFact("textures", Counted("textures")),

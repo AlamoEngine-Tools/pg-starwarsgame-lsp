@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -47,7 +48,7 @@ public sealed class GlobalSuppressionStoreTest
         var fs = new MockFileSystem(files);
         var store = new GlobalSuppressionStore(
             new StubReloadService(WorkspaceConfiguration.Empty with { Layers = layers }),
-            new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance, notifier);
+            new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance, notifier, ResxMessageCatalog.Server("en"));
         return (store, fs);
     }
 
@@ -70,7 +71,7 @@ public sealed class GlobalSuppressionStoreTest
         var setup = ProjectSetup.Named(name);
         var fs = setup.Disk();
         var store = new GlobalSuppressionStore(new StubReloadService(setup.Configuration()), new FileHelper(fs),
-            NullLogger<GlobalSuppressionStore>.Instance, new RecordingUserNotifier());
+            NullLogger<GlobalSuppressionStore>.Instance, new RecordingUserNotifier(), ResxMessageCatalog.Server("en"));
 
         store.Add(SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), "intentional in this mod");
 
@@ -140,7 +141,8 @@ public sealed class GlobalSuppressionStoreTest
             {
                 Layers = [new ProjectLayer(1, "Mod", [], [], [], [], null, PgprojPath.Replace('\\', '/'))]
             }),
-            new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance);
+            new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance, new RecordingUserNotifier(),
+            ResxMessageCatalog.Server("en"));
 
         Assert.Equal(
             [CommentInsideValue, SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], reread.GetAll());

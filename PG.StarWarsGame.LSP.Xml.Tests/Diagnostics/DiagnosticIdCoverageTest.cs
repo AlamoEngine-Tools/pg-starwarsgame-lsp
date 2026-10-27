@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
 
@@ -19,6 +20,8 @@ public sealed class DiagnosticIdCoverageTest
     {
         var services = new ServiceCollection();
         services.AddXmlLanguageServices();
+        // The one handler dependency the server supplies rather than the Xml project.
+        services.AddSingleton<IStoryDialogScope>(new FakeStoryDialogScope());
         return services.BuildServiceProvider().GetServices<IXmlDiagnosticsHandler>().ToList();
     }
 

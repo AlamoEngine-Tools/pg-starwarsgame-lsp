@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
@@ -185,7 +185,7 @@ public sealed class SymbolPreviewsTest
         };
         var schema = Schema();
         var tags = new Tags();
-        var catalog = SymbolCatalog.Build(index, [], []);
+        var catalog = SymbolCatalog.Build(index, [], [], new SchemaProviderBuilder().Build());
         // The model's proxies name the engine effect and one no file holds.
         // The model and the script are files of the project on disk; the engine effect ships packed.
         var relations = new SymbolRelations(index, schema, tags, catalog,
@@ -198,7 +198,7 @@ public sealed class SymbolPreviewsTest
             });
         // The model file's own skeleton: three bones.
         return new SymbolPreviews(index, relations, new Texts(), new Diagnostics(), Disk(),
-            id => id == Model ? 3 : null);
+            id => id == Model ? 3 : null, new SchemaProviderBuilder().Build());
     }
 
     private const string ModelFile = @"C:\work\mod\Data\Art\Models\EV_StarDestroyer.alo";

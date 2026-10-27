@@ -3,7 +3,6 @@
 
 using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.Files.MTD.Services;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Project;
@@ -30,14 +29,14 @@ public static class IconCatalogLoader
     /// <param name="rootPath">Project root that <paramref name="settings" />' paths are relative to.</param>
     /// <param name="settings">The project's icon configuration.</param>
     /// <param name="baseline">Icons baked into the baseline sidecar; may be empty.</param>
-    /// <param name="logger">Optional; receives one line per layer that could not be read.</param>
+    /// <param name="logger">Receives one line per layer that could not be read.</param>
     public static IconCatalog Load(
         IFileSystem fileSystem,
         IMtdService mtdFileService,
         string rootPath,
         IconProjectSettings settings,
         IconPack baseline,
-        ILogger? logger = null)
+        ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(settings);
         return Load(fileSystem, mtdFileService, [new IconLayer(rootPath, settings)], baseline, logger);
@@ -64,14 +63,13 @@ public static class IconCatalogLoader
         IMtdService mtdFileService,
         IReadOnlyList<IconLayer> layers,
         IconPack baseline,
-        ILogger? logger = null)
+        ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(mtdFileService);
         ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(baseline);
-
-        logger ??= NullLogger.Instance;
+        ArgumentNullException.ThrowIfNull(logger);
 
         // First atlas found wins; the rest are not opened at all.
         var workspace = layers

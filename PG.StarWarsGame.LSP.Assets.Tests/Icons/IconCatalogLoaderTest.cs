@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Project;
@@ -52,7 +53,7 @@ public sealed class IconCatalogLoaderTest
     private static IconCatalog Load(MockFileSystem fileSystem, IconPack baseline)
     {
         return IconCatalogLoader.Load(
-            fileSystem, MegaTextureFixture.CreateMtdService(fileSystem), Root, Settings, baseline);
+            fileSystem, MegaTextureFixture.CreateMtdService(fileSystem), Root, Settings, baseline, NullLogger.Instance);
     }
 
     // ── Layers ────────────────────────────────────────────────────────────────

@@ -70,8 +70,8 @@ public sealed class StorySimulatorScopeTest
     {
         var model = Model();
 
-        var galactic = new StorySimulator(model, Schema);
-        var battle = new StorySimulator(model, Schema, null, M2Key);
+        var galactic = new StorySimulator(model, Schema, new AnyWorldSymbols());
+        var battle = new StorySimulator(model, Schema, new AnyWorldSymbols(), M2Key);
 
         var galacticIds = galactic.GetLifecycles(galactic.Start()).Keys.Order(StringComparer.Ordinal).ToList();
         var battleIds = battle.GetLifecycles(battle.Start()).Keys.Order(StringComparer.Ordinal).ToList();
@@ -93,13 +93,13 @@ public sealed class StorySimulatorScopeTest
         var model = Model();
 
         // Galactic: Win waits behind E, which links M2 in - so it is M2's outcome listener.
-        var galactic = new StorySimulator(model, Schema);
+        var galactic = new StorySimulator(model, Schema, new AnyWorldSymbols());
         var win = Assert.Single(galactic.GetInterventions(galactic.Start()), i => i.EventName == "Win");
         Assert.Equal("tactical", win.Kind);
         Assert.Equal(M2Key, win.BattleKey);
 
         // Inside the battle every outcome listener is the battle's own.
-        var battle = new StorySimulator(model, Schema, null, M2Key);
+        var battle = new StorySimulator(model, Schema, new AnyWorldSymbols(), M2Key);
         var snapshot = battle.SatisfyTrigger(battle.Start(), Id(Battle, "Ambush"));
         var battleWin = Assert.Single(battle.GetInterventions(snapshot), i => i.EventName == "BattleWin");
         Assert.Equal(M2Key, battleWin.BattleKey);
@@ -109,7 +109,7 @@ public sealed class StorySimulatorScopeTest
     public void Start_SeedsFlagsAndWorld_BeforeTheFirstPoll()
     {
         var model = Model();
-        var galactic = new StorySimulator(model, Schema);
+        var galactic = new StorySimulator(model, Schema, new AnyWorldSymbols());
         var world = StoryWorld.Empty.WithPlanetOwner("Kuat", "Empire");
 
         // STORY_FLAG's default compare is "equal to 0", and an unset flag never fires: the reader

@@ -60,7 +60,8 @@ public sealed class GetServerStatusHandlerTest
             new FakeLspConfigurationProvider { Current = configuration ?? new LspConfiguration() },
             new FakeGameIndexService(index),
             new RootsOnly(roots ?? []),
-            new FileHelper(fileSystem ?? new MockFileSystem()));
+            new FileHelper(fileSystem ?? new MockFileSystem()),
+            new StatsOnly(new IndexCacheStats(0, 0, 0, 0), new BoneCatalogStats(0, 0)), []);
         return handler.Handle(new GetServerStatusParams(), CancellationToken.None);
     }
 
@@ -222,7 +223,7 @@ public sealed class GetServerStatusHandlerTest
             new RootsOnly([], config),
             new FileHelper(new MockFileSystem()),
             indexer ?? new StatsOnly(new IndexCacheStats(1, 1, 5, 2), new BoneCatalogStats(1, 2)),
-            caches);
+            caches ?? []);
         return handler.Handle(new GetServerStatusParams { Extended = true }, CancellationToken.None);
     }
 

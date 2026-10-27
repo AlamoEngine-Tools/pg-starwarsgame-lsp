@@ -33,7 +33,8 @@ public sealed class ReferenceValidationPipelineTest
             new FileHelper(new MockFileSystem()),
             schema,
             new PipelineFakeFileTypeRegistry(),
-            NullLogger<XmlGameDocumentParser>.Instance);
+            NullLogger<XmlGameDocumentParser>.Instance, TestParseCache.For(new FakeGameWorkspaceHost()),
+            new AllowAllEaWContext());
     }
 
     private static GameIndex BuildIndex(DocumentIndex doc, params (string id, string typeName)[] symbols)

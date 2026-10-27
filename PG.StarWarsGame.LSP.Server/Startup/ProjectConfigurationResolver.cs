@@ -18,24 +18,23 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 /// </summary>
 public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
 {
-    private readonly ILspConfigurationProvider? _config;
+    private readonly ILspConfigurationProvider _config;
     private readonly IModProjectDetector _detector;
     private readonly ModProjectLoader _loader;
     private readonly ILogger<ProjectConfigurationResolver> _logger;
     private readonly IUserNotifier _notifier;
     private readonly ModProjectResolver _resolver;
-    private readonly ServerStatusRecorder? _status;
+    private readonly ServerStatusRecorder _status;
 
+    // The configuration carries the project file the client named, if it named one.
     public ProjectConfigurationResolver(
         IModProjectDetector detector,
         ModProjectLoader loader,
         ModProjectResolver resolver,
         IUserNotifier notifier,
         ILogger<ProjectConfigurationResolver> logger,
-        ServerStatusRecorder? status = null,
-        // Optional so the minimal test setups can omit it; production wires it. Carries the
-        // project file the client named, if it named one.
-        ILspConfigurationProvider? config = null)
+        ServerStatusRecorder status,
+        ILspConfigurationProvider config)
     {
         _status = status;
         _config = config;
@@ -46,9 +45,8 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         _logger = logger;
     }
 
-    /// <summary>The server's texts in the configured locale, English for a setup without one.</summary>
-    private IMessageCatalog Messages =>
-        _config is null ? ResxMessageCatalog.Server("en") : new ConfiguredMessageCatalog(_config);
+    /// <summary>The server's texts in the configured locale.</summary>
+    private IMessageCatalog Messages => new ConfiguredMessageCatalog(_config);
 
     public WorkspaceConfiguration? Resolve(IReadOnlyList<string> roots)
     {
@@ -59,13 +57,13 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         // are covered by the same catch - ModProjectDetector.TryFind can throw just like the loader.
         // The client named the project (one server per open project): load exactly that, and do
         // not treat its siblings as "other project files" - the client knows about them already.
-        var named = _config?.Current.ProjectPath;
+        var named = _config.Current.ProjectPath;
         if (!string.IsNullOrWhiteSpace(named))
         {
             if (!_resolver.FileHelper.FileSystem.File.Exists(named))
             {
                 _logger.LogError("The project file named by the client does not exist: '{Path}'", named);
-                _status?.RecordProject(false, ProjectProblem.Missing);
+                _status.RecordProject(false, ProjectProblem.Missing);
                 _notifier.ShowError(
                     Messages.Format("ProjectConfig_ProjectFileDoesNotExist", named));
                 return null;
@@ -84,7 +82,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
                     // Several project files under one root is an ordinary layout now - a mod and
                     // the library it extends - but only one is served by this server. Say which,
                     // and how many are not, rather than refusing the whole folder as before.
-                    _status?.RecordOtherProjectFiles(others.Count);
+                    _status.RecordOtherProjectFiles(others.Count);
                     _notifier.ShowWarning(
                         Messages.Format("ProjectConfig_LoadedOtherProjectFileS",
                             _resolver.FileHelper.FileSystem.Path.GetFileName(pgprojPath), others.Count));
@@ -97,7 +95,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         {
             // Every failure here is a project that was found: TryFind returns false rather than
             // throwing when there is none, and throws only for more than one.
-            _status?.RecordProject(true,
+            _status.RecordProject(true,
                 ex is ModProjectLoadException load ? load.Problem : ProjectProblem.Invalid);
 
             _logger.LogError(ex,
@@ -122,12 +120,12 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         {
             var file = _loader.Load(pgprojPath);
             var resolved = _resolver.Resolve(pgprojPath, file);
-            _status?.RecordProject(true, ProjectProblem.None);
+            _status.RecordProject(true, ProjectProblem.None);
             return resolved;
         }
         catch (Exception ex)
         {
-            _status?.RecordProject(true,
+            _status.RecordProject(true,
                 ex is ModProjectLoadException load ? load.Problem : ProjectProblem.Invalid);
             _logger.LogError(ex,
                 "Failed to resolve mod project configuration under [{Roots}]; no directories will be indexed.",
@@ -146,9 +144,9 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         // one. That used to be a log line nobody reads, which left the editor looking like it worked
         // and simply knew nothing.
         _logger.LogWarning("No .pgproj found under [{Roots}]; nothing to index.", string.Join(", ", roots));
-        _status?.RecordProject(false, ProjectProblem.Missing);
+        _status.RecordProject(false, ProjectProblem.Missing);
         // The client is offering to write one: that offer is the message, and this would only repeat it.
-        if (_config?.Current.ProjectFileOffered == true) return null;
+        if (_config.Current.ProjectFileOffered) return null;
         _notifier.ShowError(
             Messages.Format("ProjectConfig_NoPgprojFileWasFound", string.Join(", ", roots)));
         return null;

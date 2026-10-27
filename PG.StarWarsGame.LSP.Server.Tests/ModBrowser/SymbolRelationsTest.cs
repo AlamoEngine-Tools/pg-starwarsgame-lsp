@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
@@ -144,7 +144,8 @@ public sealed class SymbolRelationsTest
             ["Coruscant"] = [("Encyclopedia_Text", "TEXT_CORUSCANT")]
         });
         var schema = Schema();
-        return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []));
+        return new SymbolRelations(index, schema, tags,
+            SymbolCatalog.Build(index, [], [], new SchemaProviderBuilder().Build()));
     }
 
     private static Dictionary<string, SymbolRelation> RelationsOf(string id)

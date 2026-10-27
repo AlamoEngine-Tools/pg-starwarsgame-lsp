@@ -22,7 +22,7 @@ public sealed class SidecarStoreTest
         Assert.True(TypeVersion.TryParse(currentVersion, out var current));
         return new SidecarStore<TestDocument>(
             "test-document.json", TypeName, current, migrations, new FixedLocator(path),
-            new FileHelper(fs), NullLogger.Instance, () => new TestDocument());
+            new FileHelper(fs), NullLogger.Instance, () => new TestDocument(), ResxMessageCatalog.Server("en"));
     }
 
     private static MockFileSystem WithFile(string contents)

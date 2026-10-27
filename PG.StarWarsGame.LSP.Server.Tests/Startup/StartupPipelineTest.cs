@@ -28,10 +28,10 @@ public sealed class StartupPipelineTest
             new RecordingProgress(log),
             new RecordingNotifier(log),
             NullLogger<StartupPipeline>.Instance,
-            migrationOffer,
-            republishers,
+            migrationOffer ?? new RecordingMigrationOffer(log),
+            republishers ?? [],
             new StubConfigurationProvider(workspaceDiagnosticsOnStartup),
-            status);
+            status ?? new ServerStatusRecorder());
     }
 
     // ── what the bug report is told ──────────────────────────────────────────
@@ -162,7 +162,11 @@ public sealed class StartupPipelineTest
             gate,
             new RecordingProgress(log),
             new RecordingNotifier(log),
-            NullLogger<StartupPipeline>.Instance);
+            NullLogger<StartupPipeline>.Instance,
+            new RecordingMigrationOffer(log),
+            [],
+            new StubConfigurationProvider(false),
+            new ServerStatusRecorder());
 
         var pipelineTask = pipeline.RunAsync(["/ws"], CancellationToken.None);
         var timeout = Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);

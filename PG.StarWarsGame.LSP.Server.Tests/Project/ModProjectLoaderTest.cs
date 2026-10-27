@@ -992,7 +992,8 @@ public sealed class ModProjectLoaderTest
         });
         logger = new ListLogger();
         return new ModProjectLoader(
-            new FileHelper(fs), logger, new NullPgprojMigrationSink(), PgprojMigrations.All);
+            new FileHelper(fs), logger, new NullPgprojMigrationSink(), PgprojMigrations.All,
+            ResxMessageCatalog.Server("en"));
     }
 
     /// <summary>A loader with a chain and a sink, for the migrate-on-read tests.</summary>
@@ -1005,7 +1006,8 @@ public sealed class ModProjectLoaderTest
             [ProjectPath] = new(json)
         });
         return new ModProjectLoader(
-            new FileHelper(fs), new ListLogger(), sink ?? new NullPgprojMigrationSink(), migrations);
+            new FileHelper(fs), new ListLogger(), sink ?? new NullPgprojMigrationSink(), migrations,
+            ResxMessageCatalog.Server("en"));
     }
 
     /// <summary>A fixture step: version 0.9.0 called the project's name something else.</summary>

@@ -148,16 +148,16 @@ public sealed partial class StorySimulator
     private readonly Dictionary<string, List<List<string>>> _prereqLinesById;
     private readonly Dictionary<(string Type, int Position), string> _rewardParamTypes;
     private readonly List<string> _startupNotes = [];
-    private readonly IStoryWorldSymbols? _symbols;
+    private readonly IStoryWorldSymbols _symbols;
 
     /// <summary>
     ///     <paramref name="symbols" /> answers whether a planet, unit type or faction the author
-    ///     names exists in the game; null skips the check (tests, static callers).
+    ///     names exists in the game; a caller with no index to ask hands in one that says yes.
     ///     <paramref name="scope" /> is the battle this simulator runs, or null for the galactic
     ///     story: the game freezes the galaxy while a battle plays and a battle's plot files only
     ///     ever run there, so a session arms one scope's events and never the other's.
     /// </summary>
-    public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols? symbols = null,
+    public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols symbols,
         string? scope = null, StorySimOptions? options = null, IMessageCatalog? messages = null)
     {
         _model = model;

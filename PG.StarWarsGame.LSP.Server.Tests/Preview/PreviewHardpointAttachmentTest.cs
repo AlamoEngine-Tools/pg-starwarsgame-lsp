@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -165,7 +166,7 @@ public sealed class PreviewHardpointAttachmentTest
         GameIndex index, FakeVariantTagSource tags, params string[] resolvableAssets)
     {
         return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
-            tags, new FakeAssets(resolvableAssets));
+            tags, new FakeAssets(resolvableAssets), ResxMessageCatalog.Server("en"));
     }
 
     private static GameSymbol Sym(string id, string typeName)

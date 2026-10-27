@@ -39,7 +39,7 @@ public sealed class GamePrepareRenameHandlerTest
             new FakeGameIndexService(),
             xmlProvider ?? new NullXmlProvider(),
             luaProvider ?? new NullLuaProvider(),
-            new FileHelper(new MockFileSystem()));
+            new FileHelper(new MockFileSystem()), new SilentLuaAnalyzer());
     }
 
     // ── routing ────────────────────────────────────────────────────────────────

@@ -46,7 +46,8 @@ public sealed class GameIndexServiceTest
     private static IGameIndexService Build(params IGameDocumentParser[] parsers)
     {
         return new GameIndexService(new FileHelper(new MockFileSystem()), parsers,
-            NullLogger<GameIndexService>.Instance);
+            NullLogger<GameIndexService>.Instance, new ProjectLayerMap(new FileHelper(new MockFileSystem())),
+            DistinctObjectNameHash.Instance);
     }
 
     // ── ApplyBaseline ────────────────────────────────────────────────────────
@@ -428,7 +429,8 @@ public sealed class GameIndexServiceTest
         // Second parse of same URI: FakeParser still returns OLD_UNIT but with version 2;
         // swap the parser to return NEW_UNIT
         var svc2 = new GameIndexService(new FileHelper(new MockFileSystem()),
-            [new FakeParser(Doc("", 0, [updated]))], NullLogger<GameIndexService>.Instance);
+            [new FakeParser(Doc("", 0, [updated]))], NullLogger<GameIndexService>.Instance,
+            new ProjectLayerMap(new FileHelper(new MockFileSystem())), DistinctObjectNameHash.Instance);
         // Apply the first document manually then update
         await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, TestContext.Current.CancellationToken);
@@ -449,7 +451,8 @@ public sealed class GameIndexServiceTest
         Assert.True(svc.Current.WorkspaceReferences.ContainsKey("OLD_TARGET"));
 
         var svc2 = new GameIndexService(new FileHelper(new MockFileSystem()),
-            [new FakeParser(Doc("", 0, refs: [newRef]))], NullLogger<GameIndexService>.Instance);
+            [new FakeParser(Doc("", 0, refs: [newRef]))], NullLogger<GameIndexService>.Instance,
+            new ProjectLayerMap(new FileHelper(new MockFileSystem())), DistinctObjectNameHash.Instance);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, TestContext.Current.CancellationToken);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, TestContext.Current.CancellationToken);
 
@@ -575,7 +578,8 @@ public sealed class GameIndexServiceTest
         await svcA.UpdateDocumentAsync("file:///a.xml", "", 1, TestContext.Current.CancellationToken);
 
         var svcB = new GameIndexService(new FileHelper(new MockFileSystem()),
-            [new FakeParser(Doc("", 0, [symB]))], NullLogger<GameIndexService>.Instance);
+            [new FakeParser(Doc("", 0, [symB]))], NullLogger<GameIndexService>.Instance,
+            new ProjectLayerMap(new FileHelper(new MockFileSystem())), DistinctObjectNameHash.Instance);
         await svcB.UpdateDocumentAsync("file:///a.xml", "", 1, TestContext.Current.CancellationToken);
         await svcB.UpdateDocumentAsync("file:///b.xml", "", 1, TestContext.Current.CancellationToken);
 
@@ -627,7 +631,8 @@ public sealed class GameIndexServiceTest
     {
         var layerMap = new StubLayerMap(uri => uri.Contains("/rev/", StringComparison.Ordinal) ? 1 : 0);
         var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
-            [new PerUriParser("UNIT_A")], NullLogger<GameIndexService>.Instance, layerMap);
+            [new PerUriParser("UNIT_A")], NullLogger<GameIndexService>.Instance, layerMap,
+            DistinctObjectNameHash.Instance);
 
         await svc.UpdateDocumentAsync("file:///core/u.xml", "<X/>", 1, TestContext.Current.CancellationToken);
         await svc.UpdateDocumentAsync("file:///rev/u.xml", "<X/>", 1, TestContext.Current.CancellationToken);
@@ -652,7 +657,7 @@ public sealed class GameIndexServiceTest
         var layerMap = new ProjectLayerMap(fileHelper);
         layerMap.SetLayers(setup.Layers);
         var svc = new GameIndexService(fileHelper, [new PerUriParser("UNIT_A")], NullLogger<GameIndexService>.Instance,
-            layerMap);
+            layerMap, DistinctObjectNameHash.Instance);
 
         foreach (var layer in setup.Layers)
             await svc.UpdateDocumentAsync(setup.Uri(layer.Rank, "Xml/Units.xml"), "<X/>", 1,
@@ -678,7 +683,8 @@ public sealed class GameIndexServiceTest
         // map is authoritative.
         var layerMap = new StubLayerMap(_ => 3, _ => "Leaf");
         var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
-            [new FakeParser(Doc("", 0))], NullLogger<GameIndexService>.Instance, layerMap);
+            [new FakeParser(Doc("", 0))], NullLogger<GameIndexService>.Instance, layerMap,
+            DistinctObjectNameHash.Instance);
 
         svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 1, LayerName = "Stale" });
 
@@ -691,7 +697,8 @@ public sealed class GameIndexServiceTest
     {
         var layerMap = new StubLayerMap(_ => 3, _ => "Leaf");
         var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
-            [new FakeParser(Doc("", 0))], NullLogger<GameIndexService>.Instance, layerMap);
+            [new FakeParser(Doc("", 0))], NullLogger<GameIndexService>.Instance, layerMap,
+            DistinctObjectNameHash.Instance);
 
         using (svc.BeginBulkUpdate())
         {
@@ -700,18 +707,6 @@ public sealed class GameIndexServiceTest
 
         Assert.Equal(3, svc.Current.Documents["file:///f.xml"].LayerRank);
         Assert.Equal("Leaf", svc.Current.Documents["file:///f.xml"].LayerName);
-    }
-
-    [Fact]
-    public void InjectDocument_WithoutLayerMap_PreservesSerializedRank()
-    {
-        // Minimal setups (tests) have no layer map - the snapshot's own stamp stays authoritative.
-        var svc = Build(new FakeParser(Doc("", 0)));
-
-        svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 2, LayerName = "FromSnapshot" });
-
-        Assert.Equal(2, svc.Current.Documents["file:///f.xml"].LayerRank);
-        Assert.Equal("FromSnapshot", svc.Current.Documents["file:///f.xml"].LayerName);
     }
 
     // ── BeginBulkUpdate ──────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -35,19 +36,29 @@ public sealed class LuaDiagnosticsPublisherTest
             ILuaApiSchemaProvider? schema = null,
             ILspConfigurationProvider? config = null)
     {
-        var published = new List<PublishDiagnosticsParams>();
+        var sink = new RecordingDiagnosticsSink();
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
         var fileHelper = new FileHelper(new MockFileSystem());
-        var publisher = new LuaDiagnosticsPublisher(
-            p => published.Add(p),
-            indexService,
-            workspaceHost,
-            fileHelper,
-            schema ?? new LuaApiSchemaProvider([]),
-            NullLogger<LuaDiagnosticsPublisher>.Instance,
-            configProvider: config);
-        return (publisher, published, indexService, workspaceHost);
+        var publisher = Publisher(sink, indexService, workspaceHost, fileHelper,
+            schema ?? new LuaApiSchemaProvider([]), NullLogger<LuaDiagnosticsPublisher>.Instance,
+            TestLuaParseCache.For(workspaceHost, fileHelper), config ?? new FakeLspConfigurationProvider(),
+            new FakeAnalyzer());
+        return (publisher, sink.Published, indexService, workspaceHost);
+    }
+
+    /// <summary>
+    ///     The publisher over the test's own collaborators; the rest are the quietest doubles there
+    ///     are - no suppressions, no layers, no debounce - since every dependency is required (#305).
+    /// </summary>
+    private static LuaDiagnosticsPublisher Publisher(
+        IDiagnosticsSink sink, IGameIndexService indexService, IGameWorkspaceHost workspaceHost,
+        IFileHelper fileHelper, ILuaApiSchemaProvider schema, ILogger<LuaDiagnosticsPublisher> logger,
+        ILuaParseCache parseCache, ILspConfigurationProvider config, ILuaAnalyzer analyzer)
+    {
+        return new LuaDiagnosticsPublisher(sink, indexService, workspaceHost, fileHelper, schema, logger,
+            parseCache, config, new ProjectLayerMap(fileHelper), TestServerOptions.Immediate,
+            new FakeGlobalSuppressionStore(), analyzer);
     }
 
     // ── the analyzer's findings, folded in (#153) ───────────────────────────
@@ -56,14 +67,15 @@ public sealed class LuaDiagnosticsPublisherTest
         FakeGameIndexService index) BuildWithAnalyzer(bool running = true,
             ILogger<LuaDiagnosticsPublisher>? logger = null, ILuaApiSchemaProvider? schema = null)
     {
-        var published = new List<PublishDiagnosticsParams>();
+        var sink = new RecordingDiagnosticsSink();
         var index = new FakeGameIndexService();
         var host = new FakeGameWorkspaceHost();
+        var fileHelper = new FileHelper(new MockFileSystem());
         var analyzer = new FakeAnalyzer { IsRunning = running };
-        _ = new LuaDiagnosticsPublisher(p => published.Add(p), index, host, new FileHelper(new MockFileSystem()),
-            schema ?? new LuaApiSchemaProvider([]), logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance,
-            analyzer: analyzer);
-        return (published, host, analyzer, index);
+        _ = Publisher(sink, index, host, fileHelper, schema ?? new LuaApiSchemaProvider([]),
+            logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance, TestLuaParseCache.For(host, fileHelper),
+            new FakeLspConfigurationProvider(), analyzer);
+        return (sink.Published, host, analyzer, index);
     }
 
     private static Diagnostic AnalyzerFinding(string rule, int line = 0)
@@ -362,19 +374,15 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         // One publish = one parse shared by the syntax-error pass and all three analyzers
         // (previously four separate parses); a second publish of unchanged content is a cache hit.
-        var published = new List<PublishDiagnosticsParams>();
+        var sink = new RecordingDiagnosticsSink();
+        var published = sink.Published;
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
         var fileHelper = new FileHelper(new MockFileSystem());
         var cache = TestLuaParseCache.For(workspaceHost, fileHelper);
-        _ = new LuaDiagnosticsPublisher(
-            p => published.Add(p),
-            indexService,
-            workspaceHost,
-            fileHelper,
-            new LuaApiSchemaProvider([]),
-            NullLogger<LuaDiagnosticsPublisher>.Instance,
-            parseCache: cache);
+        _ = Publisher(sink, indexService, workspaceHost, fileHelper, new LuaApiSchemaProvider([]),
+            NullLogger<LuaDiagnosticsPublisher>.Instance, cache, new FakeLspConfigurationProvider(),
+            new FakeAnalyzer());
         workspaceHost.With(LuaUri, "function Foo() end");
 
         indexService.Raise(GameIndex.Empty);

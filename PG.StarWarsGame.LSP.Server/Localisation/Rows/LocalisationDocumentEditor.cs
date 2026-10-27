@@ -31,9 +31,9 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         IDatService datFileService,
         ICrc32HashingService hashing,
         IFileHelper fileHelper,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _reader = reader;
         _datFileService = datFileService;
         _hashing = hashing;

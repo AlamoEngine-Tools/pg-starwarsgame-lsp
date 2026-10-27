@@ -10,11 +10,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     Cross-checks from a story event into the story-dialog language: a <c>Story_Dialog</c>
 ///     name must resolve to a script under the pgproj storyDialog directories (registry-scoped —
 ///     filename conventions play no part), and a <c>Story_Chapter</c> must exist in that script.
-///     Inactive while the dialog language is off or no storyDialog directories are declared. The
-///     scope is optional because it is implemented server-side - an Xml-only composition (tests,
-///     other hosts) has none, and the handler is then inert.
+///     Inactive while the dialog language is off or no storyDialog directories are declared, which
+///     is what the scope answers.
 /// </summary>
-public sealed class StoryDialogReferenceHandler(IStoryDialogScope? scope = null)
+public sealed class StoryDialogReferenceHandler(IStoryDialogScope scope)
     : XmlDiagnosticsHandler<StoryDialogRefFact>
 {
     /// <inheritdoc />
@@ -22,7 +21,7 @@ public sealed class StoryDialogReferenceHandler(IStoryDialogScope? scope = null)
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(StoryDialogRefFact fact, DiagnosticsContext ctx)
     {
-        if (scope is not { Enabled: true }) yield break;
+        if (!scope.Enabled) yield break;
 
         var resolved = scope.ResolveDialogFile(fact.DialogName);
         if (resolved is null)

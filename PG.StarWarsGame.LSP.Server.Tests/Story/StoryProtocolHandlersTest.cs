@@ -7,11 +7,13 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Symbols;
+using PG.StarWarsGame.LSP.Server.Tests.Assets;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -171,7 +173,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ReturnsNodesWithLifecycleAndEdges()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -189,7 +191,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_Scope_GalacticIsTheDefault_UnknownBattleIsEmpty()
     {
-        var handler = new GetStoryGraphHandler(Models(), Config());
+        var handler = new GetStoryGraphHandler(Models(), Config(), new StubProjects(null));
         var galactic = await handler.Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
         var explicitGalactic =
             await handler.Handle(new GetStoryGraphParams("GC", "Rebel", Scope: ""), CancellationToken.None);
@@ -215,7 +217,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_NameFilter_KeepsMatchingEventsOnly()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", "sta"), CancellationToken.None);
 
         Assert.Equal(["Start"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
@@ -224,7 +226,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_BranchFilter_KeepsBranchMembers()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
 
         Assert.Equal(["Next"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
@@ -236,7 +238,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ReportsEveryBranch_EvenTheOnesTheFilterHid()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
 
         // Act1 is all that survives as a NODE...
@@ -248,7 +250,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ReportsEveryBranch_EvenWhenAPlotStateFilterHidesAThread()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Active"),
                 CancellationToken.None);
 
@@ -260,7 +262,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ReportsEveryThread_SoANewEventCanTargetAHiddenOne()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
 
         Assert.NotNull(result.Threads);
@@ -271,7 +273,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ThreadFacet_ListsPlotFilesOnly_NeverAScript()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         // The script state is in the graph, so its uri would leak in if the facet read every node -
@@ -288,7 +290,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_PlotStateActive_DropsTheSuspendedThreadsEvents()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Active"),
                 CancellationToken.None);
 
@@ -300,7 +302,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_PlotStateSuspended_KeepsOnlyTheSuspendedThreadsEvents()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Suspended"),
                 CancellationToken.None);
 
@@ -312,7 +314,7 @@ public sealed class StoryProtocolHandlersTest
     {
         // The default is every plot the faction's manifest registers, in either state - a suspended
         // plot is part of the chain, waiting for something to resume it.
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
@@ -323,7 +325,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_PlotStateIsReadHoweverItIsCased()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "suspended"),
                 CancellationToken.None);
 
@@ -335,7 +337,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var startId = $"{ThreadUri}#start";
 
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: startId), CancellationToken.None);
 
         var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
@@ -353,7 +355,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var nextId = $"{ThreadUri}#next";
 
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: "Upstream"),
                 CancellationToken.None);
 
@@ -369,10 +371,10 @@ public sealed class StoryProtocolHandlersTest
     {
         var nextId = $"{ThreadUri}#next";
 
-        var both = await new GetStoryGraphHandler(Models(), Config())
+        var both = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: "Both"),
                 CancellationToken.None);
-        var downstream = await new GetStoryGraphHandler(Models(), Config())
+        var downstream = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId), CancellationToken.None);
 
         Assert.Contains("Start", both.Nodes.Select(n => n.Label));
@@ -387,7 +389,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var nextId = $"{ThreadUri}#next";
 
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: direction),
                 CancellationToken.None);
 
@@ -400,7 +402,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var startId = $"{ThreadUri}#start";
 
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: startId, ReachableDirection: null),
                 CancellationToken.None);
 
@@ -412,7 +414,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_DirectionWithoutAnEvent_FiltersNothing()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableDirection: "Upstream"), CancellationToken.None);
 
         var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
@@ -425,7 +427,7 @@ public sealed class StoryProtocolHandlersTest
     {
         // The graph fetch must be self-sufficient for the node body (no per-node detail round
         // trip needed) - same fields aet/getStoryNodeDetail already projects for "Next".
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         var next = Assert.Single(result.Nodes, n => n.Label == "Next");
@@ -439,7 +441,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_UnknownCampaign_ReturnsError()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), Config(), new StubProjects(null))
             .Handle(new GetStoryGraphParams("Nope", "Rebel"), CancellationToken.None);
 
         Assert.Contains("Nope", result.Error);
@@ -704,7 +706,7 @@ public sealed class StoryProtocolHandlersTest
     private static ResolveStoryReferenceHandler ResolveHandler(FakeGameIndexService index)
     {
         return new ResolveStoryReferenceHandler(
-            new DefinitionLocator(index, ProtocolSchemaProvider.Build()));
+            new DefinitionLocator(index, ProtocolSchemaProvider.Build(), ResxMessageCatalog.Server("en")));
     }
 
     [Fact]

@@ -39,21 +39,21 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
     private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
 
-    private readonly IEaWXmlContext? _eaWXmlContext;
+    private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlGameDocumentParser> _logger;
-    private readonly IXmlParseCache? _parseCache;
+    private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
 
-    // parseCache is optional so minimal test setups can omit it; production wires the shared
-    // cache so the indexing parse seeds it - the diagnostics publish and the first hover/inlay
-    // request after an edit then reuse this parse instead of re-parsing. eaWXmlContext is optional
-    // too; without it a doc's xml-relative path is unknown, so workspace-file symbols are skipped.
+    // The parse cache is the shared one, so the indexing parse seeds it: the diagnostics publish
+    // and the first hover or inlay request after an edit reuse this parse instead of re-parsing.
+    // The EaW context is what turns a document URI into its xml-relative path, which the
+    // workspace-file symbols are keyed by.
     public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
         IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger,
-        IXmlParseCache? parseCache = null,
-        IEaWXmlContext? eaWXmlContext = null)
+        IXmlParseCache parseCache,
+        IEaWXmlContext eaWXmlContext)
     {
         _fileHelper = fileHelper;
         _schema = schema;
@@ -72,7 +72,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         string documentUri, string text, int version, CancellationToken ct)
     {
         var canonicalUri = _fileHelper.NormalizeUri(documentUri);
-        var parsed = _parseCache?.GetOrParse(canonicalUri, text) ?? ParsedXmlDocument.Parse(text);
+        var parsed = _parseCache.GetOrParse(canonicalUri, text);
         var doc = parsed.Html;
 
         var registeredTypes = _fileTypeRegistry.GetTypesForFile(canonicalUri);
@@ -104,8 +104,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private List<GameSymbol> CollectWorkspaceFileSymbols(
         string documentUri, ImmutableArray<string> registeredTypes)
     {
-        if (_eaWXmlContext is null) return [];
-
         var fileType = WorkspaceFileTypes.FirstOrDefault(t =>
             registeredTypes.Contains(t, StringComparer.OrdinalIgnoreCase));
         if (fileType is null) return [];

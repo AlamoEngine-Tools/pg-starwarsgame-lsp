@@ -39,11 +39,11 @@ internal static class LuaAnalyzerRename
         };
     }
 
-    public static void EnsureWithinProject(WorkspaceEdit edit, IProjectLayerMap? layers,
+    public static void EnsureWithinProject(WorkspaceEdit edit, IProjectLayerMap layers,
         IMessageCatalog? messages = null)
     {
         messages ??= ResxMessageCatalog.Server("en");
-        if (layers is null || layers.Layers.Count == 0) return;
+        if (layers.Layers.Count == 0) return;
         var leaf = layers.Layers.Max(l => l.Rank);
         var roots = layers.Layers.Where(l => l.Rank == leaf)
             .SelectMany(l => l.ScriptRoots)
