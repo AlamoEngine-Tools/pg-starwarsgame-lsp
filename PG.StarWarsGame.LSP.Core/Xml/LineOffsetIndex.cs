@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-namespace PG.StarWarsGame.LSP.Xml.Util;
+namespace PG.StarWarsGame.LSP.Core.Xml;
 
 /// <summary>
 ///     Precomputed offset→(line, column) lookup over a document text. Building the index walks the

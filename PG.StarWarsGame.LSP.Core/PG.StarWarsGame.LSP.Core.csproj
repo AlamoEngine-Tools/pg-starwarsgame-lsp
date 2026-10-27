@@ -5,6 +5,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="HtmlAgilityPack"/>
         <PackageReference Include="MessagePack"/>
         <PackageReference Include="Semver"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>

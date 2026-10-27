@@ -187,6 +187,33 @@ public sealed class WorkspaceIndexerTest
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
+    /// <summary>
+    ///     A registry may name a file in the attribute form, <c>&lt;File filename="..."/&gt;</c>; the
+    ///     baseline builder read it, the indexer did not, and a file typed in one place and not the
+    ///     other was validated with no rules at all. One reader for both now (#308).
+    /// </summary>
+    [Fact]
+    public void PreScanMetafiles_TakesTheFilenameAttributeForm()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var metafilePath = Path.Combine(xmlDir, "gameobjectfiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new(@"<Game_Object_Files><File filename=""DATA\XML\HARDPOINTS.XML""/></Game_Object_Files>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new SchemaProviderBuilder().WithMetafiles(
+                new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]))
+            .Build();
+        var (indexer, _) = Build(fs, new FakeGameIndexService(), registry, schema);
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
+
+        var expectedKey = new FileHelper(fs).PathToFileUri(Path.Combine(xmlDir, "hardpoints.xml"));
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
+    }
+
     [Fact]
     public void PreScanMetafiles_SubdirEntry_RegistersUnderEveryXmlRoot_PreservingSubdir()
     {

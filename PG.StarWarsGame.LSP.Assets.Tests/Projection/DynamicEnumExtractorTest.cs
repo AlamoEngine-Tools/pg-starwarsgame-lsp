@@ -224,6 +224,37 @@ public sealed class DynamicEnumExtractorTest
         Assert.Equal<IEnumerable<string>>(["EXPLOSIVE", "ENERGY", "GRENADE"], dyn["DamageType"]);
     }
 
+    /// <summary>
+    ///     The game's reader matches an element name in any case, so a registry's <c>$Damage_Types</c>
+    ///     finds a <c>&lt;DAMAGE_TYPES&gt;</c> written in capitals, the way some shipped files write theirs.
+    /// </summary>
+    [Fact]
+    public void Extract_DollarFormat_FindsTheElementWhateverItsCase()
+    {
+        var schema = WithEnums(DynEnum("DamageType", "data/xml/gameconstants.xml$Damage_Types"));
+        const string xml = "<GameConstants><DAMAGE_TYPES>EXPLOSIVE ENERGY</DAMAGE_TYPES></GameConstants>";
+
+        var (dyn, _) = DynamicEnumExtractor.Extract(schema, GameConstantsReader(xml));
+
+        Assert.Equal<IEnumerable<string>>(["EXPLOSIVE", "ENERGY"], dyn["DamageType"]);
+    }
+
+    /// <summary>
+    ///     A stray ampersand elsewhere in the file is a warning for its author and nothing more to the
+    ///     game's reader (#198); a strict parser rejects the whole file and the enum loses its values.
+    /// </summary>
+    [Fact]
+    public void Extract_DollarFormat_AStrayAmpersandElsewhere_DoesNotLoseTheFile()
+    {
+        var schema = WithEnums(DynEnum("DamageType", "data/xml/gameconstants.xml$Damage_Types"));
+        const string xml =
+            "<GameConstants><Title>Tom & Jerry</Title><Damage_Types>EXPLOSIVE</Damage_Types></GameConstants>";
+
+        var (dyn, _) = DynamicEnumExtractor.Extract(schema, GameConstantsReader(xml));
+
+        Assert.Equal<IEnumerable<string>>(["EXPLOSIVE"], dyn["DamageType"]);
+    }
+
     [Fact]
     public void Extract_DollarFormat_WithBoundaryComment_PopulatesHardcoded()
     {

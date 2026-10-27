@@ -3,7 +3,6 @@
 
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Models;
@@ -15,6 +14,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -925,25 +925,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             return;
         }
 
-        XDocument xdoc;
-        try
-        {
-            xdoc = XDocument.Parse(xmlContent);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not parse metafile '{Path}'", metafilePath);
-            return;
-        }
-
         var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
         var types = def.Types.ToImmutableArray();
-        foreach (var elem in xdoc.Descendants()
-                     .Where(e => e.Name.LocalName.Equals("File", StringComparison.OrdinalIgnoreCase)))
+        foreach (var filename in MetafileReader.ReadFileList(xmlContent))
         {
-            var filename = elem.Value.Trim();
-            if (string.IsNullOrEmpty(filename)) continue;
-
             // Metafile entries are paths relative to the XML directory, but may be a bare filename,
             // include subdirectories ("Units\Foo.xml"), or be fully qualified ("Data\XML\Foo.xml").
             // Normalise to an xml-dir-relative path (subdirectories PRESERVED) and resolve it against

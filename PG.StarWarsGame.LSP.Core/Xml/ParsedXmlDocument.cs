@@ -3,7 +3,7 @@
 
 using HtmlAgilityPack;
 
-namespace PG.StarWarsGame.LSP.Xml.Util;
+namespace PG.StarWarsGame.LSP.Core.Xml;
 
 /// <summary>
 ///     A document text with its HtmlAgilityPack parse and derived lookup structures, produced once

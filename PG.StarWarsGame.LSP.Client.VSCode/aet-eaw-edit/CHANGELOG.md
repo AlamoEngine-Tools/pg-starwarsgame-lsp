@@ -281,6 +281,12 @@
 
 ### Fixes
 
+- **A game file a strict XML parser rejects keeps its facts** - the readers behind the dynamic enum values,
+  the group memberships and the object kinds used a strict parser and dropped a whole file over a stray
+  ampersand the game reads past; they now parse the way every other XML path does, and find an element
+  written in another case. The workspace indexer also reads a registry entry written as
+  `<File filename="..."/>`, the form the baseline builder always read, so such a file is validated with
+  its type's rules instead of none ([#308](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/308))
 - **A server service left out of the wiring stops the server at startup** - every dependency of every
   server service is required and comes from the container; the two shorter constructors the container
   could fall back to are gone. A registration left out used to switch the feature off without a word, or

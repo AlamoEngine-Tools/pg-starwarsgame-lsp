@@ -3,7 +3,7 @@
 
 using HtmlAgilityPack;
 
-namespace PG.StarWarsGame.LSP.Xml.Util;
+namespace PG.StarWarsGame.LSP.Core.Xml;
 
 /// <summary>One element's source spans, as (offset, length) into the document text.</summary>
 public sealed class XmlElementSpan

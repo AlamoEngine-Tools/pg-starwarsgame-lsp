@@ -25,6 +25,7 @@ using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Story.Discovery;
 // Aliased: BaselineTag would otherwise read ambiguously beside the engine's own XML tag types.
@@ -459,25 +460,15 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
                     try
                     {
                         var xmlContent = await new StreamReader(stream).ReadToEndAsync();
-                        var xdoc = XDocument.Parse(xmlContent);
-                        foreach (var elem in xdoc.Descendants()
-                                     .Where(e => e.Name.LocalName.Equals("File", StringComparison.OrdinalIgnoreCase)))
+                        foreach (var filename in MetafileReader.ReadFileList(xmlContent))
                         {
-                            var filename = elem.Value.Trim();
-                            if (string.IsNullOrEmpty(filename))
-                                filename = elem.Attributes()
-                                    .FirstOrDefault(a =>
-                                        a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
-                            if (!string.IsNullOrEmpty(filename))
-                            {
-                                var normalizedPath = filename.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
-                                fileTypeMapBuilder[normalizedPath] = [.. def.Types];
-                            }
+                            var normalizedPath = filename.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+                            fileTypeMapBuilder[normalizedPath] = [.. def.Types];
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine($"Warning: Failed to parse metafile '{def.Path}': {ex.Message}");
+                        Console.Error.WriteLine($"Warning: Failed to read metafile '{def.Path}': {ex.Message}");
                     }
             }
             else

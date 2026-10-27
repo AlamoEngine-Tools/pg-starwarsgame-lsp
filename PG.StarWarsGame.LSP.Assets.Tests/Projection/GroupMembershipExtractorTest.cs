@@ -116,6 +116,26 @@ public sealed class GroupMembershipExtractorTest
         Assert.All(members, m => Assert.Equal("SFXEvent", m.MemberTypeName));
     }
 
+    // The game's reader takes a file a strict parser rejects: a stray ampersand is a warning for the
+    // author (#198), never a reason to lose the file's groups.
+    [Fact]
+    public void Extract_AFileAStrictParserRejects_IsStillRead()
+    {
+        const string xml = """
+                           <SFXEvents>
+                               <SFXEvent Name="AT_AT_Run">
+                                   <Text>Tom & Jerry</Text>
+                                   <Overlap_Test>Unit_AT_AT</Overlap_Test>
+                               </SFXEvent>
+                           </SFXEvents>
+                           """;
+
+        var result = GroupMembershipExtractor.Extract([("AT_AT_Run", "sfxevents.xml")], _ => xml, OverlapTestSchema);
+
+        var members = Assert.Contains("Unit_AT_AT", (IDictionary<string, ImmutableArray<GroupMembership>>)result);
+        Assert.Equal("Unit_AT_AT", Assert.Single(members).GroupKey);
+    }
+
     [Fact]
     public void Extract_SfxEventsWithDifferentOverlapTests_FormSeparateGroups()
     {

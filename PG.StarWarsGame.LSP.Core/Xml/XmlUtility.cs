@@ -1,11 +1,11 @@
-﻿// // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 
-namespace PG.StarWarsGame.LSP.Xml.Util;
+namespace PG.StarWarsGame.LSP.Core.Xml;
 
 public static class XmlUtility
 {

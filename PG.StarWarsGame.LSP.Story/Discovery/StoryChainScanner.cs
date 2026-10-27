@@ -5,7 +5,7 @@ using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Story.Discovery;
 
@@ -53,13 +53,8 @@ public sealed class StoryChainScanner
 
         var campaignFiles = new List<string>();
         var campaignSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var doc = XmlUtility.CreateHtmlDocument(registry.Content);
-        foreach (var fileNode in doc.DocumentNode.Descendants()
-                     .Where(n => n.NodeType == HtmlNodeType.Element &&
-                                 n.Name.Equals("File", StringComparison.OrdinalIgnoreCase)))
+        foreach (var value in MetafileReader.ReadFileList(registry.Content))
         {
-            var value = fileNode.InnerText.Trim();
-            if (value.Length == 0) continue;
             var rel = ToXmlRelativePath(value);
             if (campaignSeen.Add(rel)) campaignFiles.Add(rel);
         }
