@@ -29,18 +29,19 @@ public sealed class PreviewStoryGraphHandler(
     ISchemaProvider schema,
     IFileHelper fileHelper,
     IModProjectReloadService reloadService,
-    ILspConfigurationProvider config)
+    ILspConfigurationProvider config,
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<PreviewStoryGraphParams, GetStoryGraphResult>
 {
     public Task<GetStoryGraphResult> Handle(PreviewStoryGraphParams request, CancellationToken ct)
     {
-        if (StoryEditingFeature.Rejection(config) is { } rejection)
+        if (StoryEditingFeature.Rejection(config, messages) is { } rejection)
             return Task.FromResult(new GetStoryGraphResult([], [], rejection));
 
         var baseModel = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (baseModel is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
+                messages.Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         // No staged commands → identical to the committed graph.
         if (request.Commands.Count == 0)
@@ -50,14 +51,14 @@ public sealed class PreviewStoryGraphHandler(
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService, NullLogger.Instance,
-            new ConfiguredMessageCatalog(config));
+            messages);
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, error) = executor.Compose(
             baseModel, request.Commands.Select(c => c.ToParams(request.Campaign, request.Faction)).ToList(), texts);
         if (error is not null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_ChangeCanTBeStaged", (failedIndex ?? 0) + 1,
+                messages.Format("StoryHandlers_ChangeCanTBeStaged", (failedIndex ?? 0) + 1,
                     request.Commands.Count, error)));
 
         // Re-assemble the campaign over the composed working copy. The chain (campaign → manifest →
@@ -67,7 +68,7 @@ public sealed class PreviewStoryGraphHandler(
             .Assemble(request.Campaign, request.Faction, modelService.GetChainResult(), ReadThread);
         if (previewModel is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignCouldNotBeAssembled",
+                messages.Format("StoryHandlers_CampaignCouldNotBeAssembled",
                     request.Campaign)));
 
         return Task.FromResult(StoryGraphProjection.Project(

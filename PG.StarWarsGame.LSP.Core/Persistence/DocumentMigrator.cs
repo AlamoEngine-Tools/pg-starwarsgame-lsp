@@ -33,9 +33,8 @@ public static class DocumentMigrator
         TypeVersion from,
         TypeVersion current,
         IReadOnlyList<IDocumentMigration> migrations,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var notices = new List<string>();
         var version = from;
         var guard = 0;

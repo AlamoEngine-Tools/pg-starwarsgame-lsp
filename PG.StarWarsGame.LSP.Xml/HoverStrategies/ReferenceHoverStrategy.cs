@@ -51,7 +51,7 @@ internal sealed class ReferenceHoverStrategy : IXmlHoverStrategy
             dependencyLayerName = originDoc.LayerName ?? string.Empty;
 
         var displayId = ReferenceResolutionEvaluator.StripOwnerPrefix(symbol.Id);
-        return HoverUtility.BuildReferenceHover(typeDef, displayId, reference, ctx.Locale, symbol.Origin,
-            dependencyLayerName);
+        return HoverUtility.BuildReferenceHover(typeDef, displayId, reference, ctx.Locale, ctx.Messages,
+            symbol.Origin, dependencyLayerName);
     }
 }

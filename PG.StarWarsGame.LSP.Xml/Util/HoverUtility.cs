@@ -18,7 +18,8 @@ internal static class HoverUtility
     private static readonly HashSet<SchemaNoteKind> SummarisedOnTheStatusLine =
         [SchemaNoteKind.Since, SchemaNoteKind.Deprecated];
 
-    public static string Resolve(IReadOnlyDictionary<string, string> descriptions, string locale)
+    public static string Resolve(IReadOnlyDictionary<string, string> descriptions, string locale,
+        IMessageCatalog messages)
     {
         if (descriptions.TryGetValue(locale, out var text))
             return text;
@@ -27,18 +28,18 @@ internal static class HoverUtility
             descriptions.TryGetValue("en", out text))
             return text;
 
-        return ResxMessageCatalog.Server(locale).Format("HoverUtility_NoDescription");
+        return messages.Format("HoverUtility_NoDescription");
     }
 
-    public static Hover BuildTypeHover(GameObjectTypeDefinition type, HtmlNode node, string locale)
+    public static Hover BuildTypeHover(GameObjectTypeDefinition type, HtmlNode node, string locale,
+        IMessageCatalog messages)
     {
-        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
         sb.Append($"### `{type.TypeName}::{node.Name}`");
         var id = XmlUtility.GetXmlObjectId(type, node);
         if (!string.IsNullOrWhiteSpace(id)) sb.Append($" *\"{id}\"*");
         sb.AppendLine();
-        sb.Append(Resolve(type.Description, locale));
+        sb.Append(Resolve(type.Description, locale, messages));
         AppendNotes(sb, type.Notes, locale, messages);
         return new Hover
         {
@@ -51,15 +52,14 @@ internal static class HoverUtility
         };
     }
 
-    public static Hover BuildTagHover(XmlTagDefinition tag, HtmlNode node, string locale)
+    public static Hover BuildTagHover(XmlTagDefinition tag, HtmlNode node, string locale, IMessageCatalog messages)
     {
-        return BuildTagHover(null, tag, node, locale);
+        return BuildTagHover(null, tag, node, locale, messages);
     }
 
     public static Hover BuildTagHover(GameObjectTypeDefinition? type, XmlTagDefinition tag, HtmlNode node,
-        string locale)
+        string locale, IMessageCatalog messages)
     {
-        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
 
         if (type is null)
@@ -89,7 +89,7 @@ internal static class HoverUtility
         }
 
         sb.AppendLine();
-        sb.Append(Resolve(tag.Description, locale));
+        sb.Append(Resolve(tag.Description, locale, messages));
 
         var hint = ValueTypeHint.Build(tag, messages);
         if (hint is not null)
@@ -115,13 +115,12 @@ internal static class HoverUtility
 
     public static Hover BuildReferenceHover(
         GameObjectTypeDefinition type, string symbolId, GameReference reference, string locale,
-        SymbolOrigin? origin = null, string? dependencyLayerName = null)
+        IMessageCatalog messages, SymbolOrigin? origin = null, string? dependencyLayerName = null)
     {
-        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
         sb.Append($"### `{type.TypeName}`");
         sb.AppendLine($" *`\"{symbolId}\"`*");
-        sb.Append(Resolve(type.Description, locale));
+        sb.Append(Resolve(type.Description, locale, messages));
         AppendNotes(sb, type.Notes, locale, messages);
         if (origin is MegArchiveOrigin meg)
             AppendPackedOrigin(sb, meg, messages);
@@ -142,9 +141,8 @@ internal static class HoverUtility
 
     public static Hover? BuildAssetReferenceHover(
         XmlTagDefinition tag, string rawValue, IAssetFileIndex assetFiles, int line, int col, int length,
-        string locale = "en")
+        IMessageCatalog messages)
     {
-        var messages = ResxMessageCatalog.Server(locale);
         var value = rawValue.Replace('\\', '/').Trim();
         if (string.IsNullOrEmpty(value)) return null;
 

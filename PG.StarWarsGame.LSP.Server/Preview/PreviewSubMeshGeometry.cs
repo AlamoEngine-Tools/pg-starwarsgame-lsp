@@ -55,9 +55,8 @@ public sealed record PreviewSubMeshGeometry(
     /// </exception>
     public static PreviewSubMeshGeometry From(
         string model, AlamoModelContent content, int meshIndex, int subMeshIndex, string table,
-        int offset, int count, IMessageCatalog? messages = null)
+        int offset, int count, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         if (meshIndex < 0 || meshIndex >= content.Meshes.Count)
             throw new ArgumentOutOfRangeException(nameof(meshIndex),
                 messages.Format("PreviewSubMesh_NoSuchMesh", model, content.Meshes.Count, meshIndex));

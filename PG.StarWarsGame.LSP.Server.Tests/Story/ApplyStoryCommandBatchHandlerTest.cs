@@ -28,7 +28,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
             Reload(),
             applier,
             Config(storyEditing),
-            NullLogger<ApplyStoryCommandBatchHandler>.Instance);
+            NullLogger<ApplyStoryCommandBatchHandler>.Instance, TestCatalogues.English);
     }
 
     private static ApplyStoryCommandBatchParams Batch(params StoryCommandDto[] commands)

@@ -45,7 +45,7 @@ public sealed class KeyedCommandTranslatorTest
     private static IReadOnlyList<LocEditCommandDto> Translate(
         LocDocument document, params LocKeyedCommandDto[] commands)
     {
-        var result = KeyedCommandTranslator.Translate(document, commands, Hashing());
+        var result = KeyedCommandTranslator.Translate(document, commands, Hashing(), TestCatalogues.English);
         Assert.True(result.Success, result.Error);
         return result.Commands!;
     }
@@ -74,7 +74,7 @@ public sealed class KeyedCommandTranslatorTest
     public void SetValue_OnAKeyTheFileDoesNotHave_FailsNamingIt()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [SetValue("TEXT_MISSING", "x")], Hashing());
+            Document("TEXT_A"), [SetValue("TEXT_MISSING", "x")], Hashing(), TestCatalogues.English);
 
         Assert.False(result.Success);
         Assert.Equal(0, result.FailedIndex);
@@ -90,7 +90,8 @@ public sealed class KeyedCommandTranslatorTest
     public void SetValue_OnADuplicateKey_FailsNamingBothRows()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A", "TEXT_DUP", "TEXT_B", "TEXT_DUP"), [SetValue("TEXT_DUP", "x")], Hashing());
+            Document("TEXT_A", "TEXT_DUP", "TEXT_B", "TEXT_DUP"), [SetValue("TEXT_DUP", "x")], Hashing(),
+            TestCatalogues.English);
 
         Assert.False(result.Success);
         Assert.Contains("TEXT_DUP", result.Error);
@@ -128,7 +129,8 @@ public sealed class KeyedCommandTranslatorTest
     public void AddEntry_WithAKeyTheFileAlreadyHas_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "TEXT_A", Values: [])], Hashing());
+            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "TEXT_A", Values: [])], Hashing(),
+            TestCatalogues.English);
 
         Assert.False(result.Success);
         Assert.Contains("TEXT_A", result.Error);
@@ -148,7 +150,8 @@ public sealed class KeyedCommandTranslatorTest
     public void AddEntry_DifferingOnlyInCase_IsAllowed()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "text_a", Values: [])], Hashing());
+            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "text_a", Values: [])], Hashing(),
+            TestCatalogues.English);
 
         Assert.True(result.Success, result.Error);
         Assert.Equal(["TEXT_A", "text_a"], result.ResultingKeys);
@@ -164,7 +167,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var result = KeyedCommandTranslator.Translate(
             Document("TEXT_Ä"), [new LocKeyedCommandDto("addEntry", "TEXT_Ö", Values: [])],
-            Hashing());
+            Hashing(), TestCatalogues.English);
 
         Assert.False(result.Success);
     }
@@ -177,7 +180,8 @@ public sealed class KeyedCommandTranslatorTest
     public void AddEntry_WithABlankKey_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "   ", Values: [])], Hashing());
+            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "   ", Values: [])], Hashing(),
+            TestCatalogues.English);
 
         Assert.False(result.Success);
     }
@@ -186,7 +190,7 @@ public sealed class KeyedCommandTranslatorTest
     public void RenameKey_ToABlankKey_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("renameKey", "TEXT_A", "")], Hashing());
+            Document("TEXT_A"), [new LocKeyedCommandDto("renameKey", "TEXT_A", "")], Hashing(), TestCatalogues.English);
 
         Assert.False(result.Success);
     }
@@ -247,7 +251,8 @@ public sealed class KeyedCommandTranslatorTest
     {
         var result = KeyedCommandTranslator.Translate(
             Document("TEXT_A", "TEXT_B"),
-            [new LocKeyedCommandDto("deleteEntry", "TEXT_A"), SetValue("TEXT_A", "x")], Hashing());
+            [new LocKeyedCommandDto("deleteEntry", "TEXT_A"), SetValue("TEXT_A", "x")], Hashing(),
+            TestCatalogues.English);
 
         Assert.False(result.Success);
         Assert.Equal(1, result.FailedIndex);
@@ -287,7 +292,7 @@ public sealed class KeyedCommandTranslatorTest
             [
                 new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_RENAMED"),
                 SetValue("TEXT_B", "x")
-            ], Hashing());
+            ], Hashing(), TestCatalogues.English);
 
         Assert.False(result.Success);
         Assert.Equal(1, result.FailedIndex);
@@ -298,7 +303,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var result = KeyedCommandTranslator.Translate(
             Document("TEXT_A", "TEXT_B"),
-            [new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_A")], Hashing());
+            [new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_A")], Hashing(), TestCatalogues.English);
 
         Assert.False(result.Success);
         Assert.Contains("TEXT_A", result.Error);
@@ -321,7 +326,7 @@ public sealed class KeyedCommandTranslatorTest
     public void UnknownKind_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("moveRow", "TEXT_A")], Hashing());
+            Document("TEXT_A"), [new LocKeyedCommandDto("moveRow", "TEXT_A")], Hashing(), TestCatalogues.English);
 
         Assert.False(result.Success);
         Assert.Contains("moveRow", result.Error);
@@ -335,7 +340,8 @@ public sealed class KeyedCommandTranslatorTest
     public void FailedBatch_ProducesNoCommandsAtAll()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [SetValue("TEXT_A", "fine"), SetValue("TEXT_MISSING", "bad")], Hashing());
+            Document("TEXT_A"), [SetValue("TEXT_A", "fine"), SetValue("TEXT_MISSING", "bad")], Hashing(),
+            TestCatalogues.English);
 
         Assert.False(result.Success);
         Assert.Null(result.Commands);
@@ -355,7 +361,7 @@ public sealed class KeyedCommandTranslatorTest
                 new LocKeyedCommandDto("deleteEntry", "TEXT_A"),
                 new LocKeyedCommandDto("addEntry", "TEXT_NEW", Values: []),
                 new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_B2")
-            ], Hashing());
+            ], Hashing(), TestCatalogues.English);
 
         Assert.True(result.Success, result.Error);
         Assert.Equal(["TEXT_B2", "TEXT_NEW"], result.ResultingKeys);

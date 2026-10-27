@@ -39,10 +39,11 @@ public record DiagnosticsContext(
     IEffectiveObjectSource? Objects = null)
 {
     /// <summary>
-    ///     The server's own texts in <see cref="Locale" />. English unless the pipeline says otherwise -
-    ///     which keeps a handler test that builds its own context reading the texts it always read.
+    ///     The server's own texts: the one injected catalogue, which every handler formats through.
+    ///     Required, so no context speaks a language the setting does not control (#306);
+    ///     <see cref="Locale" /> picks the schema's per-locale texts, which do not pass through it.
     /// </summary>
-    public IMessageCatalog Messages { get; init; } = ResxMessageCatalog.Server("en");
+    public required IMessageCatalog Messages { get; init; }
 }
 
 /// <summary>

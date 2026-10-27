@@ -23,7 +23,8 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 public sealed class ReferenceValidationPipelineTest
 {
     private static readonly DiagnosticsContext EmptyCtx = new(
-        new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en");
+            new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en")
+        { Messages = TestCatalogues.English };
 
     // ── helpers ──────────────────────────────────────────────────────────────
 

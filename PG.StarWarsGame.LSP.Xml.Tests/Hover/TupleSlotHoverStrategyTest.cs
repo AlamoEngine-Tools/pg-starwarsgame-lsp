@@ -63,7 +63,7 @@ public sealed class TupleSlotHoverStrategyTest
                 ["data/art/models/ei_trooper.alo", "data/art/textures/i_unit.tga"])
         };
         var ctx = new HoverContext("file:///units.xml", index, schema, doc, root!,
-            node ?? new HtmlDocument().DocumentNode, false, 1, character, "en");
+            node ?? new HtmlDocument().DocumentNode, false, 1, character, "en", TestCatalogues.English);
 
         return new TupleSlotHoverStrategy().Handle(ctx)?.Contents.MarkupContent?.Value;
     }

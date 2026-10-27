@@ -30,7 +30,7 @@ public sealed class GetLaunchLayersHandlerTest
 
     private static GetLaunchLayersHandler Handler(ProjectLayerMap layers, ILspConfigurationProvider? config = null)
     {
-        return new GetLaunchLayersHandler(layers, config ?? new FakeLspConfigurationProvider());
+        return new GetLaunchLayersHandler(layers, TestCatalogues.English);
     }
 
     [Fact]

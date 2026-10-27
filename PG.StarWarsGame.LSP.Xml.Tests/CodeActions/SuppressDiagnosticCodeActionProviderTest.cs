@@ -48,7 +48,7 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
             Message = "asset missing",
             Code = code is null ? (DiagnosticCode?)null : new DiagnosticCode(code)
         };
-        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
     }
 
     private static IReadOnlyList<CodeAction> Actions(string? code, int line = 2)

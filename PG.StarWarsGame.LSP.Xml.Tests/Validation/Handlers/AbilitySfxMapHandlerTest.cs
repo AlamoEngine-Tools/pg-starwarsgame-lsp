@@ -56,7 +56,7 @@ public sealed class AbilitySfxMapHandlerTest
             Values = names.Select(n => new HardcodedReferenceSetValue { Name = n }).ToList()
         };
         return new DiagnosticsContext(new SchemaProviderBuilder().WithHardcodedSet(set).Build(), GameIndex.Empty,
-            "file:///test.xml", "en");
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
     }
 
     [Theory]
@@ -106,7 +106,7 @@ public sealed class AbilitySfxMapHandlerTest
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("SFX_Hunt"),
             "file:///test.xml",
-            "en");
+            "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, SFX_Hunt"), ctx).ToList();
         Assert.Empty(results);
     }
@@ -116,7 +116,7 @@ public sealed class AbilitySfxMapHandlerTest
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Other_SFX"),
             "file:///test.xml",
-            "en");
+            "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, Missing_SFX"), ctx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
@@ -131,7 +131,7 @@ public sealed class AbilitySfxMapHandlerTest
     public void SfxEvent_UnresolvedSymbol_HighlightsOnlyTheSfxToken()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Other_SFX"),
-            "file:///test.xml", "en");
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, Missing_SFX"), ctx).ToList();
 
         var d = Assert.Single(results);
@@ -156,7 +156,7 @@ public sealed class AbilitySfxMapHandlerTest
     public void SfxEvent_UnresolvedSymbol_MultiLineValue_HighlightsTokenOnItsOwnLine()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Other_SFX"),
-            "file:///test.xml", "en");
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT,\n  Missing_SFX"), ctx).ToList();
 
         var d = Assert.Single(results);
@@ -178,7 +178,7 @@ public sealed class AbilitySfxMapHandlerTest
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Some_SFX"),
             "file:///test.xml",
-            "en");
+            "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT,"), ctx).ToList();
         Assert.Empty(results);
     }

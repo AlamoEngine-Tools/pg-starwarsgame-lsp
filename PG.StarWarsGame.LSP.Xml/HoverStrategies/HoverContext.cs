@@ -3,6 +3,7 @@
 
 using JetBrains.Annotations;
 using HtmlAgilityPack;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -21,7 +22,8 @@ public sealed class HoverContext : XmlDocumentHandlerContextBase
         bool isOnTagName,
         int line,
         int character,
-        string locale)
+        string locale,
+        IMessageCatalog messages)
         : base(documentUri, index, schema, hapDoc)
     {
         RootNode = rootNode;
@@ -30,6 +32,7 @@ public sealed class HoverContext : XmlDocumentHandlerContextBase
         Line = line;
         Character = character;
         Locale = locale;
+        Messages = messages;
     }
 
     public HtmlNode RootNode { get; }
@@ -37,5 +40,10 @@ public sealed class HoverContext : XmlDocumentHandlerContextBase
     public bool IsOnTagName { get; }
     public int Line { get; }
     public int Character { get; }
+
+    /// <summary>The locale the schema's descriptions and notes are read in.</summary>
     public string Locale { get; }
+
+    /// <summary>The server's own texts: the one injected catalogue (#306).</summary>
+    public IMessageCatalog Messages { get; }
 }

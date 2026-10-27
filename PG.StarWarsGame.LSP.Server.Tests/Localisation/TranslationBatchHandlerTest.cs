@@ -288,10 +288,10 @@ public sealed class TranslationBatchHandlerTest
         return (
             new ApplyTranslationBatchHandler(
                 editor, reload, helper,
-                NullLogger<ApplyTranslationBatchHandler>.Instance, configuration,
+                NullLogger<ApplyTranslationBatchHandler>.Instance, TestCatalogues.English,
                 new LocalisationWriteLedger(helper), layers ?? new ProjectLayerMap(helper)),
             new ValidateTranslationBatchHandler(
-                editor, helper, sp.GetRequiredService<ICrc32HashingService>(), configuration),
+                editor, helper, sp.GetRequiredService<ICrc32HashingService>(), TestCatalogues.English),
             reload);
     }
 

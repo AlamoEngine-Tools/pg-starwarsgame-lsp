@@ -23,7 +23,8 @@ public sealed class VariantInlayHintProviderTest
     private static InlayHintContext Ctx(HtmlNode node, XmlTagDefinition tagDef, GameIndex index, ISchemaProvider schema)
     {
         var hapDoc = XmlUtility.CreateHtmlDocument(Text);
-        return new InlayHintContext("file:///u.xml", index, schema, hapDoc, node, tagDef, XmlUtility.GetLine(node));
+        return new InlayHintContext("file:///u.xml", index, schema, hapDoc, node, tagDef, XmlUtility.GetLine(node))
+            { Messages = TestCatalogues.English };
     }
 
     [Fact]

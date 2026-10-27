@@ -72,7 +72,7 @@ public sealed class XmlCodeLensHandlerTest
         return new XmlCodeLensHandler(svc, NullLogger<XmlCodeLensHandler>.Instance,
             ctx ?? new AllowAllEaWContext(),
             fileHelper ?? new FileHelper(new MockFileSystem()),
-            registry, config ?? new FakeLspConfigurationProvider());
+            registry, TestCatalogues.English);
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────

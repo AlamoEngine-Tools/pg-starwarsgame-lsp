@@ -46,7 +46,7 @@ public sealed class VariantOverrideInlayHintProviderTest
         var line = XmlUtility.GetLine(node);
         var lineEnd = text.Split('\n')[line].TrimEnd('\r').Length;
         var ctx = new InlayHintContext("file:///u.xml", index, provider, hapDoc, node, tagDef,
-            line, lineEnd);
+            line, lineEnd) { Messages = TestCatalogues.English };
 
         return new VariantOverrideInlayHintProvider(source).Handle(ctx).ToList();
     }

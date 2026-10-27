@@ -40,7 +40,8 @@ public sealed class PreviewAbilityTextTest
     {
         var loca = new FakeLocalisation(("TEXT_TOOLTIP_ABILITY_DEFEND_NAME", "Boost Shield Power"));
 
-        var filled = PreviewAbilityText.Fill(Ability("DEFEND"), null, null, null, loca, []);
+        var filled =
+            PreviewAbilityText.Fill(Ability("DEFEND"), null, null, null, loca, [], null, TestCatalogues.English);
 
         Assert.Equal("Boost Shield Power", filled.Name);
     }
@@ -53,7 +54,7 @@ public sealed class PreviewAbilityTextTest
             ("TEXT_TOOLTIP_BOSSK_SWAP", "Swap Weapon"));
 
         var filled = PreviewAbilityText.Fill(
-            Ability("DEFEND"), "TEXT_TOOLTIP_BOSSK_SWAP", null, null, loca, []);
+            Ability("DEFEND"), "TEXT_TOOLTIP_BOSSK_SWAP", null, null, loca, [], null, TestCatalogues.English);
 
         Assert.Equal("Swap Weapon", filled.Name);
     }
@@ -67,7 +68,7 @@ public sealed class PreviewAbilityTextTest
         var loca = new FakeLocalisation(("TEXT_TOOLTIP_ABILITY_DEFEND_NAME", "Boost Shield Power"));
 
         var filled = PreviewAbilityText.Fill(
-            Ability("DEFEND"), "TEXT_MOD_FORGOT_THIS", null, null, loca, []);
+            Ability("DEFEND"), "TEXT_MOD_FORGOT_THIS", null, null, loca, [], null, TestCatalogues.English);
 
         Assert.Null(filled.Name);
     }
@@ -78,7 +79,8 @@ public sealed class PreviewAbilityTextTest
         var loca = new FakeLocalisation(
             ("TEXT_TOOLTIP_ABILITY_DEFEND_DESCRIPTION", "Boost shield regeneration."));
 
-        var filled = PreviewAbilityText.Fill(Ability("DEFEND"), null, null, null, loca, []);
+        var filled =
+            PreviewAbilityText.Fill(Ability("DEFEND"), null, null, null, loca, [], null, TestCatalogues.English);
 
         Assert.Equal("Boost shield regeneration.", filled.Description);
     }
@@ -86,7 +88,8 @@ public sealed class PreviewAbilityTextTest
     [Fact]
     public void NoLocalisationAtAll_LeavesTheRowUnnamedRatherThanThrowing()
     {
-        var filled = PreviewAbilityText.Fill(Ability("DEFEND"), null, null, null, null, []);
+        var filled =
+            PreviewAbilityText.Fill(Ability("DEFEND"), null, null, null, null, [], null, TestCatalogues.English);
 
         Assert.Null(filled.Name);
         Assert.Null(filled.Description);
@@ -98,7 +101,8 @@ public sealed class PreviewAbilityTextTest
     public void Icon_UsesTheSharedResolver()
     {
         var filled = PreviewAbilityText.Fill(
-            Ability("ROCKET_ATTACK"), null, null, CatalogWith("I_SA_ROCKET_ATTACK.TGA"), null, []);
+            Ability("ROCKET_ATTACK"), null, null, CatalogWith("I_SA_ROCKET_ATTACK.TGA"), null, [], null,
+            TestCatalogues.English);
 
         Assert.NotNull(filled.IconDataUri);
         Assert.StartsWith("data:image/png;base64,", filled.IconDataUri);
@@ -111,7 +115,8 @@ public sealed class PreviewAbilityTextTest
         var problems = new List<PreviewProblem>();
 
         var filled = PreviewAbilityText.Fill(
-            Ability("SUPER_LASER"), null, null, CatalogWith("I_SA_ROCKET_ATTACK.TGA"), null, problems);
+            Ability("SUPER_LASER"), null, null, CatalogWith("I_SA_ROCKET_ATTACK.TGA"), null, problems, null,
+            TestCatalogues.English);
 
         Assert.Null(filled.IconDataUri);
         Assert.Empty(problems);
@@ -127,7 +132,7 @@ public sealed class PreviewAbilityTextTest
 
         var filled = PreviewAbilityText.Fill(
             Ability("ROCKET_ATTACK"), null, "I_SA_NOT_DRAWN.TGA",
-            CatalogWith("I_SA_ROCKET_ATTACK.TGA"), null, problems);
+            CatalogWith("I_SA_ROCKET_ATTACK.TGA"), null, problems, null, TestCatalogues.English);
 
         Assert.NotNull(filled.IconDataUri);
         var problem = Assert.Single(problems);
@@ -137,7 +142,8 @@ public sealed class PreviewAbilityTextTest
     [Fact]
     public void NoCatalog_LeavesTheIconEmpty()
     {
-        var filled = PreviewAbilityText.Fill(Ability("ROCKET_ATTACK"), null, null, null, null, []);
+        var filled = PreviewAbilityText.Fill(Ability("ROCKET_ATTACK"), null, null, null, null, [], null,
+            TestCatalogues.English);
 
         Assert.Null(filled.IconDataUri);
     }

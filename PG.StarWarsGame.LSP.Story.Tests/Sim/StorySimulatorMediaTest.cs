@@ -96,7 +96,7 @@ public sealed class StorySimulatorMediaTest
     [Fact]
     public void Multimedia_OwesTheSpeechDone_WhichFiresOnTheNextTick()
     {
-        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols(), TestCatalogues.English);
 
         var start = sim.Start();
         Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, start, "Welcome"));
@@ -113,7 +113,8 @@ public sealed class StorySimulatorMediaTest
     [Fact]
     public void MediaNotAssumedToComplete_LeavesTheSpeechDoneToTheAuthor_ForGood()
     {
-        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols(), options: new StorySimOptions(false));
+        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols(), TestCatalogues.English,
+            options: new StorySimOptions(false));
 
         var start = sim.Start();
         Assert.Contains(sim.GetInterventions(start), i => i.EventName == "WelcomeDone");
@@ -130,7 +131,8 @@ public sealed class StorySimulatorMediaTest
     [Fact]
     public void MediaAssumption_TurnedOnMidRun_OwesThePlayingSpeech_FromTheNextTick()
     {
-        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols(), options: new StorySimOptions(false));
+        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols(), TestCatalogues.English,
+            options: new StorySimOptions(false));
         var start = sim.Start();
         Assert.Contains(sim.GetInterventions(start), i => i.EventName == "WelcomeDone");
 
@@ -144,7 +146,7 @@ public sealed class StorySimulatorMediaTest
     [Fact]
     public void MediaAssumption_TurnedOffMidRun_LeavesThePlayingSpeechToTheAuthor()
     {
-        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols(), TestCatalogues.English);
 
         var off = sim.SetAssumeMediaCompletes(sim.Start(), false);
         var later = sim.Tick(off, 600);
@@ -157,7 +159,7 @@ public sealed class StorySimulatorMediaTest
     [Fact]
     public void SpeechDoneNothingStarts_IsADecisionWithNoGate_AndNeverFiresOnItsOwn()
     {
-        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols(), TestCatalogues.English);
 
         var start = sim.Start();
         var orphan = Assert.Single(sim.GetInterventions(start), i => i.EventName == "Orphan");
@@ -173,7 +175,7 @@ public sealed class StorySimulatorMediaTest
     [Fact]
     public void ASecondSpeech_EndsTheOnePlaying_AndFiresItsListenerBeforeItStarts()
     {
-        var sim = new StorySimulator(Model(TwoSpeechesText), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(TwoSpeechesText), Schema, new AnyWorldSymbols(), TestCatalogues.English);
 
         var start = sim.Start();
 
@@ -191,7 +193,7 @@ public sealed class StorySimulatorMediaTest
     public void ASecondSpeech_EndsTheOnePlaying_EvenWhenMediaIsLeftToTheAuthor()
     {
         var sim = new StorySimulator(Model(TwoSpeechesText), Schema,
-            new AnyWorldSymbols(), options: new StorySimOptions(false));
+            new AnyWorldSymbols(), TestCatalogues.English, options: new StorySimOptions(false));
 
         var start = sim.Start();
 
@@ -206,7 +208,7 @@ public sealed class StorySimulatorMediaTest
     [Fact]
     public void BattleOutcome_MakesTheOtherOutcomesListenerMoot_EndsEverySpeech_ThenRaisesBattleEndClosed()
     {
-        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(), Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var start = sim.Start();
         Assert.Contains(sim.GetInterventions(start), i => i.EventName == "Lost" && i.BattleKey == M2Key);
         Assert.NotEmpty(start.Runtime.PendingCompletions);

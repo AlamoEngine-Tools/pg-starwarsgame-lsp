@@ -132,7 +132,7 @@ public sealed class SetLocalisationProjectFormatHandlerTest
             reload,
             writer,
             NullLogger<SetLocalisationProjectFormatHandler>.Instance,
-            config ?? new FakeLspConfigurationProvider());
+            TestCatalogues.English);
 
         return (handler, reload, writer);
     }

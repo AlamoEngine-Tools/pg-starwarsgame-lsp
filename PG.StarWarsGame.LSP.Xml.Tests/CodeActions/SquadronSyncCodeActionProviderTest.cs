@@ -68,7 +68,7 @@ public sealed class SquadronSyncCodeActionProviderTest
             Message = "test",
             Data = data
         };
-        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class SquadronSyncCodeActionProviderTest
             Range = new LspRange(new Position(1, 0), new Position(1, 8)),
             Message = "unrelated"
         };
-        var ctx = new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        var ctx = new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
         Assert.Empty(provider.Handle(ctx));
     }
 

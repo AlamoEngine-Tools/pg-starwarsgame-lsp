@@ -58,7 +58,7 @@ public sealed class PreviewModelCodeActionProviderTest
                 ["data/art/models/ei_trooper.alo", "data/art/models/ei_snow.alo", "data/art/models/ei_sand.alo"])
         };
         return new PreviewModelCodeActionProvider(TestParseCache.For(host, fileHelper), ModelTagSchema.Build(),
-            new FakeGameIndexService(index), fileHelper, new FakeLspConfigurationProvider());
+            new FakeGameIndexService(index), fileHelper, TestCatalogues.English);
     }
 
     private static List<CodeAction> At(int line, int character)

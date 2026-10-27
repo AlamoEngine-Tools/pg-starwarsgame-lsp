@@ -31,12 +31,13 @@ public sealed class ExecuteStoryCommandHandler(
     IModProjectReloadService reloadService,
     IWorkspaceEditApplier applier,
     ILspConfigurationProvider config,
-    ILogger<ExecuteStoryCommandHandler> logger)
+    ILogger<ExecuteStoryCommandHandler> logger,
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<ExecuteStoryCommandParams, ExecuteStoryCommandResult>
 {
     public Task<ExecuteStoryCommandResult> Handle(ExecuteStoryCommandParams request, CancellationToken ct)
     {
-        if (StoryEditingFeature.Rejection(config) is { } rejection)
+        if (StoryEditingFeature.Rejection(config, messages) is { } rejection)
             return Task.FromResult(Error(rejection));
 
         // A referenced project is read-only. The client hides the affordances; this refuses
@@ -44,16 +45,16 @@ public sealed class ExecuteStoryCommandHandler(
         // being that the refusal arrives instead of the work, not after it.
         if (DependencyOwnership.Rejection(reloadService.LastWorkspaceConfig, request.ThreadUri)
             is { } notOurs)
-            return Task.FromResult(Error(new ConfiguredMessageCatalog(config).Format(notOurs)));
+            return Task.FromResult(Error(messages.Format(notOurs)));
 
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(Error(
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
+                messages.Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService, logger,
-            new ConfiguredMessageCatalog(config));
+            messages);
         var (produced, error) = executor.Produce(request, model, new WorkingTextSet(textSource));
         if (error is not null)
             return Task.FromResult(Error(error));

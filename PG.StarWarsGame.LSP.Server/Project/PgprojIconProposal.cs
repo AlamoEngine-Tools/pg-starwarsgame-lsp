@@ -46,11 +46,10 @@ public static class PgprojIconProposal
     /// <param name="document">The migrated project tree, modified in place when a node is added.</param>
     /// <param name="projectDirectory">The directory holding the <c>.pgproj</c>.</param>
     /// <param name="fs">Filesystem the project lives on.</param>
-    /// <param name="messages">The catalogue the returned text comes from; English when null.</param>
+    /// <param name="messages">The catalogue the returned text comes from.</param>
     public static string? TryPropose(JsonObject document, string projectDirectory, IFileSystem fs,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(fs);
 

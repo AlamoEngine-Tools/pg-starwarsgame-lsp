@@ -39,7 +39,7 @@ public sealed class ReferencesCodeLensProviderTest
     private static CodeLensSymbolContext MakeCtx(GameSymbol symbol, GameIndex index)
     {
         var origin = (FileOrigin)symbol.Origin;
-        return new CodeLensSymbolContext(symbol, origin, index);
+        return new CodeLensSymbolContext(symbol, origin, index) { Messages = TestCatalogues.English };
     }
 
     [Fact]

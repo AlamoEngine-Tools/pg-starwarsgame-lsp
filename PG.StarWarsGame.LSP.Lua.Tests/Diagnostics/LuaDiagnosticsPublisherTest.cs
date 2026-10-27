@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -34,7 +34,7 @@ public sealed class LuaDiagnosticsPublisherTest
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) Build(
             ILuaApiSchemaProvider? schema = null,
-            ILspConfigurationProvider? config = null)
+            IMessageCatalog? messages = null)
     {
         var sink = new RecordingDiagnosticsSink();
         var indexService = new FakeGameIndexService();
@@ -42,7 +42,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var fileHelper = new FileHelper(new MockFileSystem());
         var publisher = Publisher(sink, indexService, workspaceHost, fileHelper,
             schema ?? new LuaApiSchemaProvider([]), NullLogger<LuaDiagnosticsPublisher>.Instance,
-            TestLuaParseCache.For(workspaceHost, fileHelper), config ?? new FakeLspConfigurationProvider(),
+            TestLuaParseCache.For(workspaceHost, fileHelper), messages ?? TestCatalogues.English,
             new FakeAnalyzer());
         return (publisher, sink.Published, indexService, workspaceHost);
     }
@@ -54,10 +54,10 @@ public sealed class LuaDiagnosticsPublisherTest
     private static LuaDiagnosticsPublisher Publisher(
         IDiagnosticsSink sink, IGameIndexService indexService, IGameWorkspaceHost workspaceHost,
         IFileHelper fileHelper, ILuaApiSchemaProvider schema, ILogger<LuaDiagnosticsPublisher> logger,
-        ILuaParseCache parseCache, ILspConfigurationProvider config, ILuaAnalyzer analyzer)
+        ILuaParseCache parseCache, IMessageCatalog messages, ILuaAnalyzer analyzer)
     {
         return new LuaDiagnosticsPublisher(sink, indexService, workspaceHost, fileHelper, schema, logger,
-            parseCache, config, new ProjectLayerMap(fileHelper), TestServerOptions.Immediate,
+            parseCache, messages, new ProjectLayerMap(fileHelper), TestServerOptions.Immediate,
             new FakeGlobalSuppressionStore(), analyzer);
     }
 
@@ -74,7 +74,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var analyzer = new FakeAnalyzer { IsRunning = running };
         _ = Publisher(sink, index, host, fileHelper, schema ?? new LuaApiSchemaProvider([]),
             logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance, TestLuaParseCache.For(host, fileHelper),
-            new FakeLspConfigurationProvider(), analyzer);
+            TestCatalogues.English, analyzer);
         return (sink.Published, host, analyzer, index);
     }
 
@@ -381,7 +381,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var fileHelper = new FileHelper(new MockFileSystem());
         var cache = TestLuaParseCache.For(workspaceHost, fileHelper);
         _ = Publisher(sink, indexService, workspaceHost, fileHelper, new LuaApiSchemaProvider([]),
-            NullLogger<LuaDiagnosticsPublisher>.Instance, cache, new FakeLspConfigurationProvider(),
+            NullLogger<LuaDiagnosticsPublisher>.Instance, cache, TestCatalogues.English,
             new FakeAnalyzer());
         workspaceHost.With(LuaUri, "function Foo() end");
 

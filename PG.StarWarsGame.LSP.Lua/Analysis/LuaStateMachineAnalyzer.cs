@@ -104,9 +104,8 @@ internal static class LuaStateMachineAnalyzer
         { "OnEnter", "OnUpdate", "OnExit" };
 
     public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree,
-        LuaStateMachineContract contract, IMessageCatalog? messages = null)
+        LuaStateMachineContract contract, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         // A library's machine runs in the scripts that require it; the file alone cannot be judged.
         if (!contract.StateMachine || LuaFileClassifier.IsLibraryUri(documentUri)) return [];
         var machine = LuaStateMachine.Read(tree.GetRoot());

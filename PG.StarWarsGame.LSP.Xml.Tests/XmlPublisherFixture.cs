@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -40,7 +41,8 @@ internal static class XmlPublisherFixture
         IFileHelper fileHelper,
         ILspConfigurationProvider? configProvider = null,
         IStoryChainProblemStore? storyChainProblems = null,
-        IVariantTagSource? variantTagSource = null)
+        IVariantTagSource? variantTagSource = null,
+        IMessageCatalog? messages = null)
     {
         var tagSource = variantTagSource ?? new FakeVariantTagSource();
         var textSource = new DocumentTextSource(workspaceHost, fileHelper, NullLogger<DocumentTextSource>.Instance);
@@ -71,6 +73,7 @@ internal static class XmlPublisherFixture
             TestServerOptions.Immediate,
             new FakeIconRepackStatusProvider(),
             new FakeModelTextureIndex(),
-            new FakeIconNameIndex());
+            new FakeIconNameIndex(),
+            messages ?? TestCatalogues.English);
     }
 }

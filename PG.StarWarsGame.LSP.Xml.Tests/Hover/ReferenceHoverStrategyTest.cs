@@ -28,7 +28,7 @@ public sealed class ReferenceHoverStrategyTest
         XmlUtility.TryFindNode(hapDoc, 0, out var node);
         return new HoverContext(DocUri, index, schema ?? new SchemaProviderBuilder().Build(),
             hapDoc, rootNode!, node ?? new HtmlDocument().DocumentNode,
-            isOnTagName, line, character, locale);
+            isOnTagName, line, character, locale, TestCatalogues.English);
     }
 
     private static GameReference Ref(int line, int col, int len)

@@ -28,7 +28,7 @@ public sealed class GetEffectiveObjectHandlerTest
     {
         return new GetEffectiveObjectHandler(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
             source,
-            config ?? new FakeLspConfigurationProvider());
+            TestCatalogues.English);
     }
 
     [Fact]

@@ -20,7 +20,7 @@ public sealed class XmlInlayHintRegistryTest
         var tagDef = new XmlTagDefinition { Tag = "Name", ValueType = XmlValueType.Boolean };
         return new InlayHintContext("file:///test.xml", GameIndex.Empty, new SchemaProviderBuilder().Build(), hapDoc,
             node,
-            tagDef, 0);
+            tagDef, 0) { Messages = TestCatalogues.English };
     }
 
     [Fact]

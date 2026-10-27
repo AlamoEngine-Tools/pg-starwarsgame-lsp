@@ -124,7 +124,7 @@ public sealed class EngineRepairEditTest
         };
 
         var action = Assert.Single(new EngineRepairCodeActionProvider()
-            .Handle(new XmlCodeActionContext(TestUri, d))).CodeAction!;
+            .Handle(new XmlCodeActionContext(TestUri, d) { Messages = TestCatalogues.English })).CodeAction!;
 
         Assert.Equal("Apply the engine's own correction: swap the two times", action.Title);
         Assert.Equal(CodeActionKind.QuickFix, action.Kind);
@@ -141,7 +141,8 @@ public sealed class EngineRepairEditTest
     {
         var d = new Diagnostic { Range = new LspRange(new Position(0, 0), new Position(0, 4)) };
 
-        Assert.Empty(new EngineRepairCodeActionProvider().Handle(new XmlCodeActionContext(TestUri, d)));
+        Assert.Empty(new EngineRepairCodeActionProvider().Handle(new XmlCodeActionContext(TestUri, d)
+            { Messages = TestCatalogues.English }));
     }
 
     /// <summary>

@@ -62,7 +62,7 @@ public sealed class PreviewSubMeshGeometryTest
     [Fact]
     public void Vertices_ComeBackAsAPageWithTheTotalBesideThem()
     {
-        var page = PreviewSubMeshGeometry.From("m", Model(), 0, 0, "vertices", 2, 3);
+        var page = PreviewSubMeshGeometry.From("m", Model(), 0, 0, "vertices", 2, 3, TestCatalogues.English);
 
         Assert.Equal(8, page.TotalVertices);
         Assert.Equal(3, page.Vertices.Count);
@@ -76,7 +76,8 @@ public sealed class PreviewSubMeshGeometryTest
     [Fact]
     public void Vertices_CarryEveryChannelTheFormatCanHold()
     {
-        var vertex = PreviewSubMeshGeometry.From("m", Model(), 0, 0, "vertices", 0, 1).Vertices[0];
+        var vertex = PreviewSubMeshGeometry.From("m", Model(), 0, 0, "vertices", 0, 1, TestCatalogues.English)
+            .Vertices[0];
 
         Assert.Equal([0f, 0f, 1f], vertex.Normal);
         Assert.Equal([0f, 0.5f], vertex.TexCoord0);
@@ -92,7 +93,7 @@ public sealed class PreviewSubMeshGeometryTest
     public void APageAskingBeyondTheEnd_ComesBackEmptyRatherThanThrowing()
     {
         // The panel can ask for a page that a reload has since made out of range.
-        var page = PreviewSubMeshGeometry.From("m", Model(4), 0, 0, "vertices", 99, 10);
+        var page = PreviewSubMeshGeometry.From("m", Model(4), 0, 0, "vertices", 99, 10, TestCatalogues.English);
 
         Assert.Empty(page.Vertices);
         Assert.Equal(4, page.TotalVertices);
@@ -102,7 +103,7 @@ public sealed class PreviewSubMeshGeometryTest
     public void APageIsCapped_SoOneRequestCannotAskForEverything()
     {
         var page = PreviewSubMeshGeometry.From("m", Model(5000), 0, 0, "vertices", 0,
-            100_000);
+            100_000, TestCatalogues.English);
 
         Assert.Equal(PreviewSubMeshGeometry.MaxPage, page.Vertices.Count);
     }
@@ -110,7 +111,7 @@ public sealed class PreviewSubMeshGeometryTest
     [Fact]
     public void Faces_ComeBackAsTriplesOfVertexIndices()
     {
-        var page = PreviewSubMeshGeometry.From("m", Model(faces: 2), 0, 0, "faces", 0, 10);
+        var page = PreviewSubMeshGeometry.From("m", Model(faces: 2), 0, 0, "faces", 0, 10, TestCatalogues.English);
 
         Assert.Equal(2, page.TotalFaces);
         Assert.Equal(0, page.Faces[0].Index);
@@ -122,7 +123,7 @@ public sealed class PreviewSubMeshGeometryTest
     public void OnlyTheAskedForTable_IsFilled()
     {
         // A vertex page carrying every face as well would defeat the point of paging at all.
-        var vertices = PreviewSubMeshGeometry.From("m", Model(), 0, 0, "vertices", 0, 4);
+        var vertices = PreviewSubMeshGeometry.From("m", Model(), 0, 0, "vertices", 0, 4, TestCatalogues.English);
 
         Assert.NotEmpty(vertices.Vertices);
         Assert.Empty(vertices.Faces);
@@ -134,7 +135,7 @@ public sealed class PreviewSubMeshGeometryTest
         // This is the whole point of the table: a vertex names slot 1, and only the sub-mesh's own
         // skin list says which bone of the model that actually is.
         var page = PreviewSubMeshGeometry.From(
-            "m", Model(skinBones: [1, 0]), 0, 0, "boneMapping", 0, 10);
+            "m", Model(skinBones: [1, 0]), 0, 0, "boneMapping", 0, 10, TestCatalogues.English);
 
         Assert.Equal(2, page.BoneMapping.Count);
         Assert.Equal(0, page.BoneMapping[0].Slot);
@@ -149,7 +150,7 @@ public sealed class PreviewSubMeshGeometryTest
         // A mod's exporter can write anything; a panel that dies on it is worse than one that says
         // the slot points nowhere.
         var page = PreviewSubMeshGeometry.From(
-            "m", Model(skinBones: [42]), 0, 0, "boneMapping", 0, 10);
+            "m", Model(skinBones: [42]), 0, 0, "boneMapping", 0, 10, TestCatalogues.English);
 
         Assert.Equal(42, page.BoneMapping[0].BoneIndex);
         Assert.Contains("no such bone", page.BoneMapping[0].Name, StringComparison.OrdinalIgnoreCase);
@@ -160,7 +161,7 @@ public sealed class PreviewSubMeshGeometryTest
     {
         var missing =
             Assert.Throws<ArgumentOutOfRangeException>(() =>
-                PreviewSubMeshGeometry.From("m", Model(), 0, 7, "vertices", 0, 10));
+                PreviewSubMeshGeometry.From("m", Model(), 0, 7, "vertices", 0, 10, TestCatalogues.English));
 
         Assert.Contains("subMeshIndex", missing.Message, StringComparison.OrdinalIgnoreCase);
     }

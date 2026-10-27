@@ -30,7 +30,8 @@ public sealed class VariantCodeLensProviderTest
 
     private static CodeLensSymbolContext Ctx(GameSymbol symbol, GameIndex index)
     {
-        return new CodeLensSymbolContext(symbol, (FileOrigin)symbol.Origin, index);
+        return new CodeLensSymbolContext(symbol, (FileOrigin)symbol.Origin, index)
+            { Messages = TestCatalogues.English };
     }
 
     [Fact]

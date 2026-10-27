@@ -40,9 +40,8 @@ internal static class LuaAnalyzerRename
     }
 
     public static void EnsureWithinProject(WorkspaceEdit edit, IProjectLayerMap layers,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         if (layers.Layers.Count == 0) return;
         var leaf = layers.Layers.Max(l => l.Rank);
         var roots = layers.Layers.Where(l => l.Rank == leaf)

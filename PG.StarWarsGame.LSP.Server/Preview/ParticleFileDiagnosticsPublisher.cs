@@ -41,7 +41,7 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
     private const string ModelFolder = "data/art/models/";
 
     private readonly IGameAssetResolver _assets;
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger _logger;
@@ -53,7 +53,7 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
         IGameWorkspaceHost workspaceHost,
         IGameAssetResolver assets,
         IFileHelper fileHelper,
-        ILspConfigurationProvider config,
+        IMessageCatalog messages,
         IGlobalSuppressionStore globalSuppressions,
         IProjectLayerMap layerMap,
         ServerOptions options,
@@ -63,7 +63,7 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
         _indexService = indexService;
         _assets = assets;
         _fileHelper = fileHelper;
-        _config = config;
+        _messages = messages;
         _logger = logger;
     }
 
@@ -131,7 +131,7 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
             problems =
             [
                 new PreviewProblem(DiagnosticIds.PreviewModelUnreadable, "error",
-                    new ConfiguredMessageCatalog(_config).Format("ParticleFile_MalformedParticleFile", e.Message))
+                    _messages.Format("ParticleFile_MalformedParticleFile", e.Message))
             ];
         }
 

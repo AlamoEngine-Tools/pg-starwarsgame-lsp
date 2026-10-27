@@ -10,7 +10,8 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
 public sealed class SingleValueTypeHandlerBaseTest
 {
     private static readonly DiagnosticsContext Ctx =
-        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en");
+        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
     private static XmlTagValueFact Fact(XmlValueType valueType)
     {

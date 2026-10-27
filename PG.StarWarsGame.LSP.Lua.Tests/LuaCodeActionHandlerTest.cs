@@ -21,7 +21,7 @@ public sealed class LuaCodeActionHandlerTest
         return new LuaCodeActionHandler(
             host ?? new FakeGameWorkspaceHost(),
             fileHelper ?? new FileHelper(new MockFileSystem()),
-            config ?? new FakeLspConfigurationProvider());
+            TestCatalogues.English);
     }
 
     private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)

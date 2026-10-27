@@ -26,7 +26,7 @@ public sealed class XmlNotesHandlerTest
     public void Tag_with_matching_locale_note_emits_hint()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml",
-            "en");
+            "en") { Messages = TestCatalogues.English };
         var fact = new XmlNotesFact("file:///test.xml", 1, 0, 0, TagWithNote("en", "Max speed of the unit"));
         var results = Sut.Handle(fact, ctx).ToList();
         var d = Assert.Single(results);
@@ -38,7 +38,7 @@ public sealed class XmlNotesHandlerTest
     public void Tag_with_different_locale_returns_no_diagnostics()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml",
-            "de");
+            "de") { Messages = TestCatalogues.English };
         var fact = new XmlNotesFact("file:///test.xml", 1, 0, 0, TagWithNote("en", "Max speed of the unit"));
         var results = Sut.Handle(fact, ctx).ToList();
         Assert.Empty(results);
@@ -48,7 +48,7 @@ public sealed class XmlNotesHandlerTest
     public void Tag_with_no_notes_returns_no_diagnostics()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml",
-            "en");
+            "en") { Messages = TestCatalogues.English };
         var tag = new XmlTagDefinition { Tag = "Speed", ValueType = XmlValueType.Float };
         var fact = new XmlNotesFact("file:///test.xml", 1, 0, 0, tag);
         var results = Sut.Handle(fact, ctx).ToList();

@@ -17,9 +17,8 @@ namespace PG.StarWarsGame.LSP.Server.Debug;
 public static class RunnableModLayout
 {
     /// <summary>Returns the mod path, or null and the reason the layer cannot be launched as is.</summary>
-    public static (string? ModPath, string? Reason) Judge(ProjectLayer layer, IMessageCatalog? messages = null)
+    public static (string? ModPath, string? Reason) Judge(ProjectLayer layer, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         ArgumentNullException.ThrowIfNull(layer);
         var projectDirectory = ProjectDirectoryOf(layer);
         if (projectDirectory is null)

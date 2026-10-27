@@ -25,6 +25,6 @@ internal sealed class AssetHoverStrategy : IXmlHoverStrategy
             return null;
 
         return HoverUtility.BuildAssetReferenceHover(
-            tagDef, value, ctx.Index.AssetFiles, ctx.Line, ctx.Character, value.Length, ctx.Locale);
+            tagDef, value, ctx.Index.AssetFiles, ctx.Line, ctx.Character, value.Length, ctx.Messages);
     }
 }

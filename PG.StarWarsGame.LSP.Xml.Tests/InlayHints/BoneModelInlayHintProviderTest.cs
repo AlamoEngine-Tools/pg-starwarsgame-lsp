@@ -23,7 +23,7 @@ public sealed class BoneModelInlayHintProviderTest
                      ?? new XmlTagDefinition { Tag = node.Name, ValueType = XmlValueType.NameReference };
         var line = XmlUtility.GetLine(node);
         return new InlayHintContext("file:///t.xml", index, provider, hapDoc, node, tagDef, line,
-            lineIndex: new LineOffsetIndex(xml));
+            lineIndex: new LineOffsetIndex(xml)) { Messages = TestCatalogues.English };
     }
 
     private static GameIndex IndexWithBones(params (string Key, string[] Bones)[] entries)

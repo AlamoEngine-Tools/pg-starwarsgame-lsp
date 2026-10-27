@@ -49,7 +49,7 @@ public sealed class PgprojIconProposalTest
 
     private static string? Propose(JsonObject document, MockFileSystem fs)
     {
-        return PgprojIconProposal.TryPropose(document, ProjectDir, fs);
+        return PgprojIconProposal.TryPropose(document, ProjectDir, fs, TestCatalogues.English);
     }
 
     [Fact]

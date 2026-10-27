@@ -546,7 +546,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             writer,
             NullLogger<ImportLocalisationProjectCommandHandler>.Instance,
             lspConfig ?? new FakeLspConfigurationProvider(),
-            notifier);
+            notifier, TestCatalogues.English);
 
         return (handler, reload, writer, notifier);
     }

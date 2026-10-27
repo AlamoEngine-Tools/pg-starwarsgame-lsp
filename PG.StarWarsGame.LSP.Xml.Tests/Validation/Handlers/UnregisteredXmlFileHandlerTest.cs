@@ -21,7 +21,8 @@ public sealed class UnregisteredXmlFileHandlerTest
     private static readonly UnregisteredXmlFileHandler Sut = new();
 
     private static readonly DiagnosticsContext Ctx =
-        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///data/xml/Orphan.xml", "en");
+        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///data/xml/Orphan.xml", "en")
+            { Messages = TestCatalogues.English };
 
     private static XmlUnregisteredFileFact Fact(string fileName = "Orphan.xml")
     {

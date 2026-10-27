@@ -8,9 +8,8 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 internal static class ValueTypeHint
 {
-    public static string? Build(XmlTagDefinition tag, IMessageCatalog? messages = null)
+    public static string? Build(XmlTagDefinition tag, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         return tag.ValueType switch
         {
             XmlValueType.Float =>

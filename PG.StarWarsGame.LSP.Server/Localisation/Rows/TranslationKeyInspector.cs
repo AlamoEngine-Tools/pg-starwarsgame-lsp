@@ -46,9 +46,8 @@ public static class TranslationKeyInspector
     ///     </para>
     /// </remarks>
     public static IReadOnlyList<LocTranslationProblemDto> Inspect(
-        IReadOnlyList<string> keys, ICrc32HashingService hashing, IMessageCatalog? messages = null)
+        IReadOnlyList<string> keys, ICrc32HashingService hashing, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var problems = new List<LocTranslationProblemDto>();
 
         // Keyed by the engine's own identity for an entry. Case-insensitive lookup is tracked

@@ -46,7 +46,7 @@ public sealed class XmlInlayHintHandlerTest
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            registry, config ?? new FakeLspConfigurationProvider()), index);
+            registry, TestCatalogues.English), index);
     }
 
     private static LspRange FullRange()
@@ -171,7 +171,7 @@ public sealed class XmlInlayHintHandlerTest
             new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            new XmlInlayHintRegistry([]), new FakeLspConfigurationProvider());
+            new XmlInlayHintRegistry([]), TestCatalogues.English);
 
         var result = await handler.Handle(Params(), CancellationToken.None);
         Assert.Null(result);
@@ -191,7 +191,7 @@ public sealed class XmlInlayHintHandlerTest
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            new XmlInlayHintRegistry([]), new FakeLspConfigurationProvider());
+            new XmlInlayHintRegistry([]), TestCatalogues.English);
 
         _ = await handler.Handle(Params(), CancellationToken.None);
         _ = await handler.Handle(Params(), CancellationToken.None);

@@ -56,7 +56,7 @@ public sealed class PreviewProblemIdTest
     public void ThePreviewGroup_IsNamedForAReader()
     {
         Assert.False(string.IsNullOrWhiteSpace(
-            DiagnosticGroups.NameOf(DiagnosticGroup.Preview)));
+            DiagnosticGroups.NameOf(DiagnosticGroup.Preview, TestCatalogues.English)));
     }
 
     /// <summary>

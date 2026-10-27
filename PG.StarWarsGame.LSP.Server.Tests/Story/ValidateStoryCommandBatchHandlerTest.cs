@@ -22,7 +22,7 @@ public sealed class ValidateStoryCommandBatchHandlerTest
             fileHelper,
             Reload(),
             new MarkerCollector(marker),
-            Config(storyEditing));
+            TestCatalogues.English);
     }
 
     private static ValidateStoryCommandBatchParams Batch(params StoryCommandDto[] commands)

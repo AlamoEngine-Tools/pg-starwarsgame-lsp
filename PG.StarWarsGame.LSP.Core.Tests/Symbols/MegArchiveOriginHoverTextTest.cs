@@ -11,7 +11,7 @@ public sealed class MegArchiveOriginHoverTextTest
     public void Describe_ContainsArchiveFileNameNotFullPath()
     {
         var origin = new MegArchiveOrigin(@"C:\game\FoC_Art.meg", "DATA/ART/TEXTURES/FOO.TGA", null, null);
-        var text = MegArchiveOriginHoverText.Describe(origin);
+        var text = MegArchiveOriginHoverText.Describe(origin, TestCatalogues.English);
         Assert.Contains("FoC_Art.meg", text);
         Assert.DoesNotContain(@"C:\game\", text);
     }
@@ -20,7 +20,7 @@ public sealed class MegArchiveOriginHoverTextTest
     public void Describe_ContainsInternalPath()
     {
         var origin = new MegArchiveOrigin(@"C:\game\FoC_Art.meg", "DATA/ART/TEXTURES/FOO.TGA", null, null);
-        var text = MegArchiveOriginHoverText.Describe(origin);
+        var text = MegArchiveOriginHoverText.Describe(origin, TestCatalogues.English);
         Assert.Contains("DATA/ART/TEXTURES/FOO.TGA", text);
     }
 
@@ -28,7 +28,7 @@ public sealed class MegArchiveOriginHoverTextTest
     public void Describe_BadgesThePackedAssetInAscii()
     {
         var origin = new MegArchiveOrigin(@"C:\game\FoC_Art.meg", "DATA/ART/TEXTURES/FOO.TGA", null, null);
-        var text = MegArchiveOriginHoverText.Describe(origin);
+        var text = MegArchiveOriginHoverText.Describe(origin, TestCatalogues.English);
 
         // The badge used to be an emoji, which is what the name of this test used to say. Every
         // string a reader sees is ASCII now, so the word carries it - the check that keeps it that
@@ -41,7 +41,7 @@ public sealed class MegArchiveOriginHoverTextTest
     public void Describe_MentionsReadOnly()
     {
         var origin = new MegArchiveOrigin("data.meg", "units.xml", null, null);
-        var text = MegArchiveOriginHoverText.Describe(origin);
+        var text = MegArchiveOriginHoverText.Describe(origin, TestCatalogues.English);
         Assert.Contains("read-only", text, StringComparison.OrdinalIgnoreCase);
     }
 }

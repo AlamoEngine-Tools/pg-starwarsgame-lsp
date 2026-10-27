@@ -149,7 +149,7 @@ public sealed class CrossModTierClassificationTest
         var index = BuildIndex(docs);
 
         var diagnostics = LuaGlobalScopeAnalyzer.Analyze(
-            RootScriptUri, rootText, index, s_emptySchema, s_fileHelper);
+            RootScriptUri, rootText, index, s_emptySchema, s_fileHelper, TestCatalogues.English);
 
         Assert.Contains(diagnostics, d =>
             d.Severity == DiagnosticSeverity.Warning &&
@@ -172,7 +172,7 @@ public sealed class CrossModTierClassificationTest
         var index = BuildIndex(docs);
 
         var diagnostics = LuaGlobalScopeAnalyzer.Analyze(
-            RootScriptUri, rootText, index, s_emptySchema, s_fileHelper);
+            RootScriptUri, rootText, index, s_emptySchema, s_fileHelper, TestCatalogues.English);
 
         Assert.DoesNotContain(diagnostics, d => d.Message.Contains("Base_Plan"));
     }
@@ -193,7 +193,7 @@ public sealed class CrossModTierClassificationTest
         var index = BuildIndex(docs);
 
         var diagnostics = LuaGlobalScopeAnalyzer.Analyze(
-            RootScriptUri, rootText, index, s_emptySchema, s_fileHelper);
+            RootScriptUri, rootText, index, s_emptySchema, s_fileHelper, TestCatalogues.English);
 
         // No override warning - the dep-mod's standalone file is not in the shared URI set
         Assert.DoesNotContain(diagnostics, d =>

@@ -4,7 +4,6 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -24,7 +23,7 @@ internal sealed class XmlFormattingRequest(
     IEaWXmlContext context,
     IFileHelper fileHelper,
     IUserNotifier notifier,
-    ILspConfigurationProvider config)
+    IMessageCatalog messages)
 {
     public TextEditContainer? Format(TextDocumentIdentifier document, FormattingOptions options, LspRange? range)
     {
@@ -40,7 +39,7 @@ internal sealed class XmlFormattingRequest(
         var result = XmlFormatter.Format(doc, unit, offsets);
         if (result.Refusal is { } why)
         {
-            notifier.ShowWarning(new ConfiguredMessageCatalog(config).Format(why));
+            notifier.ShowWarning(messages.Format(why));
             return null;
         }
 
@@ -62,9 +61,9 @@ public sealed class XmlDocumentFormattingHandler : DocumentFormattingHandlerBase
     private readonly XmlFormattingRequest _request;
 
     public XmlDocumentFormattingHandler(IXmlParseCache parseCache, IEaWXmlContext context, IFileHelper fileHelper,
-        IUserNotifier notifier, ILspConfigurationProvider config)
+        IUserNotifier notifier, IMessageCatalog messages)
     {
-        _request = new XmlFormattingRequest(parseCache, context, fileHelper, notifier, config);
+        _request = new XmlFormattingRequest(parseCache, context, fileHelper, notifier, messages);
     }
 
     public override Task<TextEditContainer?> Handle(DocumentFormattingParams request, CancellationToken ct)
@@ -84,9 +83,9 @@ public sealed class XmlDocumentRangeFormattingHandler : DocumentRangeFormattingH
     private readonly XmlFormattingRequest _request;
 
     public XmlDocumentRangeFormattingHandler(IXmlParseCache parseCache, IEaWXmlContext context,
-        IFileHelper fileHelper, IUserNotifier notifier, ILspConfigurationProvider config)
+        IFileHelper fileHelper, IUserNotifier notifier, IMessageCatalog messages)
     {
-        _request = new XmlFormattingRequest(parseCache, context, fileHelper, notifier, config);
+        _request = new XmlFormattingRequest(parseCache, context, fileHelper, notifier, messages);
     }
 
     public override Task<TextEditContainer> Handle(DocumentRangeFormattingParams request, CancellationToken ct)

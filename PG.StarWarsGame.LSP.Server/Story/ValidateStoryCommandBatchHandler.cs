@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.JsonRpc;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -32,7 +31,7 @@ public sealed class ValidateStoryCommandBatchHandler(
     IFileHelper fileHelper,
     IModProjectReloadService reloadService,
     IXmlDiagnosticsCollector collector,
-    ILspConfigurationProvider config)
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<ValidateStoryCommandBatchParams, GetStoryDiagnosticsResult>
 {
     public Task<GetStoryDiagnosticsResult> Handle(
@@ -46,18 +45,18 @@ public sealed class ValidateStoryCommandBatchHandler(
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
+                messages.Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService,
-            NullLogger.Instance, new ConfiguredMessageCatalog(config));
+            NullLogger.Instance, messages);
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, composeError) = executor.Compose(
             model, request.Commands.Select(c => c.ToParams(request.Campaign, request.Faction)).ToList(), texts);
         if (composeError is not null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_ChangeCanTBeStaged", (failedIndex ?? 0) + 1,
+                messages.Format("StoryHandlers_ChangeCanTBeStaged", (failedIndex ?? 0) + 1,
                     request.Commands.Count, composeError)));
 
         // Validate every thread the campaign knows about (reading its staged text where present),

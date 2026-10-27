@@ -35,7 +35,7 @@ public sealed class AssetHoverStrategyTest
                 { AssetFiles = assetFiles };
         return new HoverContext(DocUri, index, schema,
             hapDoc, rootNode!, node ?? new HtmlDocument().DocumentNode,
-            false, line, character, "en");
+            false, line, character, "en", TestCatalogues.English);
     }
 
     private static FakeSchemaProvider SchemaWithTag(
@@ -64,7 +64,7 @@ public sealed class AssetHoverStrategyTest
         XmlUtility.TryFindNode(hapDoc, 0, out var node);
         var ctx = new HoverContext(DocUri, GameIndex.Empty, new SchemaProviderBuilder().Build(),
             hapDoc, rootNode!, node ?? new HtmlDocument().DocumentNode,
-            true, 0, 1, "en");
+            true, 0, 1, "en", TestCatalogues.English);
         Assert.Null(new AssetHoverStrategy().Handle(ctx));
     }
 

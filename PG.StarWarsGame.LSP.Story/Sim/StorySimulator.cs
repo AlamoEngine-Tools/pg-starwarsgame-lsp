@@ -158,10 +158,10 @@ public sealed partial class StorySimulator
     ///     ever run there, so a session arms one scope's events and never the other's.
     /// </summary>
     public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols symbols,
-        string? scope = null, StorySimOptions? options = null, IMessageCatalog? messages = null)
+        IMessageCatalog messages, string? scope = null, StorySimOptions? options = null)
     {
         _model = model;
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _symbols = symbols;
         Options = options ?? StorySimOptions.Default;
         Scope = StoryGraphScoper.IsGalactic(scope) ? null : StoryGraphScoper.BattleKey(scope!);

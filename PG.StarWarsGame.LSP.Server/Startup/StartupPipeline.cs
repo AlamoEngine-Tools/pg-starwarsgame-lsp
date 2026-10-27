@@ -27,6 +27,7 @@ public sealed class StartupPipeline
 {
     private readonly IBaselineBootstrapper _baseline;
     private readonly ILspConfigurationProvider _configProvider;
+    private readonly IMessageCatalog _messages;
     private readonly IStartupGate _gate;
     private readonly ILogger<StartupPipeline> _logger;
     private readonly IPgprojMigrationOffer _migrationOffer;
@@ -48,10 +49,12 @@ public sealed class StartupPipeline
         IPgprojMigrationOffer migrationOffer,
         IEnumerable<IDiagnosticsRepublisher> republishers,
         ILspConfigurationProvider configProvider,
-        ServerStatusRecorder status)
+        ServerStatusRecorder status,
+        IMessageCatalog messages)
     {
         _status = status;
         _configProvider = configProvider;
+        _messages = messages;
         _republishers = republishers.ToList();
         _migrationOffer = migrationOffer;
         _schema = schema;
@@ -63,21 +66,18 @@ public sealed class StartupPipeline
         _logger = logger;
     }
 
-    /// <summary>The server's texts in the configured locale.</summary>
-    private IMessageCatalog Messages => new ConfiguredMessageCatalog(_configProvider);
-
     public async Task RunAsync(IReadOnlyList<string> scanRoots, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
         var failed = false;
         try
         {
-            _progress.Report(Messages.Format("StartupPipeline_LoadingSchemaBaseline"), 5);
+            _progress.Report(_messages.Format("StartupPipeline_LoadingSchemaBaseline"), 5);
             await Task.WhenAll(
                 _schema.LoadAsync(ct),
                 _baseline.LoadAsync(ct));
 
-            _progress.Report(Messages.Format("StartupPipeline_IndexingWorkspace"), 30);
+            _progress.Report(_messages.Format("StartupPipeline_IndexingWorkspace"), 30);
             await _reloadService.LoadAsync(scanRoots, ct);
         }
         catch (Exception ex)

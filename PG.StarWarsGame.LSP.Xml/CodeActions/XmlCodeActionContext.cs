@@ -18,6 +18,6 @@ public sealed class XmlCodeActionContext
     public DocumentUri DocumentUri { get; }
     public Diagnostic Diagnostic { get; }
 
-    /// <summary>The server's texts in the configured locale; English when nothing set it.</summary>
-    public IMessageCatalog Messages { get; init; } = ResxMessageCatalog.Server("en");
+    /// <summary>The server's texts: the one injected catalogue (#306).</summary>
+    public required IMessageCatalog Messages { get; init; }
 }

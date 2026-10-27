@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -19,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -36,7 +35,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         IFileHelper fileHelper,
         ILogger<XmlInlayHintHandler> logger,
         IXmlInlayHintRegistry registry,
-        ILspConfigurationProvider config)
+        IMessageCatalog messages)
     {
         _parseCache = parseCache;
         _indexService = indexService;
@@ -45,7 +44,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         _fileHelper = fileHelper;
         _logger = logger;
         _registry = registry;
-        _config = config;
+        _messages = messages;
     }
 
     public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
@@ -75,7 +74,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
                 continue;
 
             var ctx = new InlayHintContext(uri, index, _schema, hapDoc, node, tagDef, line,
-                LineEndCharacter(parsed, line), parsed.LineIndex) { Messages = new ConfiguredMessageCatalog(_config) };
+                LineEndCharacter(parsed, line), parsed.LineIndex) { Messages = _messages };
             foreach (var hint in _registry.Dispatch(ctx))
             {
                 _logger.LogDebug("InlayHint at line {Line}", line);

@@ -36,15 +36,12 @@ public static class ReferenceResolutionEvaluator
     ///     for a predicate resting on facts the index does not hold, the reference goes unjudged:
     ///     an error on data we cannot read is the one outcome the author cannot act on.
     /// </param>
-    /// <param name="messages">The catalogue the message is taken from; English when null.</param>
+    /// <param name="messages">The catalogue the message is taken from.</param>
     public static (XmlDiagnosticSeverity Severity, string Message, DiagnosticId Id)? Evaluate(
-        string targetId, string? expectedTypeName, GameSymbol? resolved,
+        string targetId, string? expectedTypeName, GameSymbol? resolved, IMessageCatalog messages,
         IReadOnlySet<string>? indexedTypeNames = null,
-        ObjectKindDefinition? expectedKind = null, GameIndex? index = null, IMessageCatalog? messages = null)
+        ObjectKindDefinition? expectedKind = null, GameIndex? index = null)
     {
-        // The caller's catalogue, in the configured locale; English for a caller without one.
-        messages ??= ResxMessageCatalog.Server("en");
-
         // Scoped ability IDs are stored as "OWNER$name"; show only the bare name to the user.
         var displayId = StripOwnerPrefix(targetId);
 

@@ -23,7 +23,7 @@ public sealed class EffectiveObjectXmlRendererTest
     public void Render_WrapsTagsInTypedElementWithName()
     {
         var xml = EffectiveObjectXmlRenderer.Render(
-            Object(Tag("Max_Health", "100", VariantProvenance.Inherited, "B")));
+            Object(Tag("Max_Health", "100", VariantProvenance.Inherited, "B")), TestCatalogues.English);
 
         Assert.Contains("<SpaceUnit Name=\"V\">", xml);
         Assert.Contains("</SpaceUnit>", xml);
@@ -34,7 +34,7 @@ public sealed class EffectiveObjectXmlRendererTest
     public void Render_AnnotatesInheritedTagWithSourceObject()
     {
         var xml = EffectiveObjectXmlRenderer.Render(
-            Object(Tag("Max_Health", "100", VariantProvenance.Inherited, "B")));
+            Object(Tag("Max_Health", "100", VariantProvenance.Inherited, "B")), TestCatalogues.English);
 
         Assert.Contains("inherited from B", xml);
     }
@@ -45,7 +45,7 @@ public sealed class EffectiveObjectXmlRendererTest
         var xml = EffectiveObjectXmlRenderer.Render(Object(
             Tag("A", "1", VariantProvenance.Overridden, "V"),
             Tag("B", "2", VariantProvenance.Added, "V"),
-            Tag("C", "3", VariantProvenance.Merged, "V")));
+            Tag("C", "3", VariantProvenance.Merged, "V")), TestCatalogues.English);
 
         Assert.Contains("overrides base", xml);
         Assert.Contains("added by variant", xml);
@@ -58,7 +58,7 @@ public sealed class EffectiveObjectXmlRendererTest
     public void Render_OverriddenTag_ShowsTheValueItReplaced()
     {
         var xml = EffectiveObjectXmlRenderer.Render(Object(
-            TagWithBase("Tech_Level", "0", VariantProvenance.Overridden, "V", "99")));
+            TagWithBase("Tech_Level", "0", VariantProvenance.Overridden, "V", "99")), TestCatalogues.English);
 
         Assert.Contains("overrides base - was 99", xml);
     }
@@ -68,7 +68,7 @@ public sealed class EffectiveObjectXmlRendererTest
     {
         var xml = EffectiveObjectXmlRenderer.Render(Object(
             TagWithBase("Death_Clone", "Base_Clone, Hero_Clone", VariantProvenance.Merged, "V",
-                "Base_Clone")));
+                "Base_Clone")), TestCatalogues.English);
 
         Assert.Contains("base contributes Base_Clone", xml);
     }
@@ -78,7 +78,8 @@ public sealed class EffectiveObjectXmlRendererTest
     {
         // A raw multi-line value would run past the "-->" and corrupt every following line.
         var xml = EffectiveObjectXmlRenderer.Render(Object(
-            TagWithBase("List", "x", VariantProvenance.Overridden, "V", "a,\n    b,\r\n    c")));
+                TagWithBase("List", "x", VariantProvenance.Overridden, "V", "a,\n    b,\r\n    c")),
+            TestCatalogues.English);
 
         var note = xml.Split('\n').First(l => l.Contains("overrides base"));
         Assert.Contains("a, b, c", note);
@@ -92,7 +93,7 @@ public sealed class EffectiveObjectXmlRendererTest
         // leave the replaced value visible nowhere (the inline marker is deliberately short).
         var longValue = string.Join(", ", Enumerable.Range(0, 40).Select(i => $"Entry_{i}"));
         var xml = EffectiveObjectXmlRenderer.Render(Object(
-            TagWithBase("List", "x", VariantProvenance.Overridden, "V", longValue)));
+            TagWithBase("List", "x", VariantProvenance.Overridden, "V", longValue)), TestCatalogues.English);
 
         Assert.Contains(longValue, xml);
         Assert.DoesNotContain("…", xml);
@@ -103,7 +104,7 @@ public sealed class EffectiveObjectXmlRendererTest
     {
         // "--" is illegal inside an XML comment and would close it early.
         var xml = EffectiveObjectXmlRenderer.Render(Object(
-            TagWithBase("Flag", "on", VariantProvenance.Overridden, "V", "a--b")));
+            TagWithBase("Flag", "on", VariantProvenance.Overridden, "V", "a--b")), TestCatalogues.English);
 
         var note = xml.Split('\n').First(l => l.Contains("overrides base"));
         Assert.DoesNotContain("a--b", note);
@@ -114,7 +115,7 @@ public sealed class EffectiveObjectXmlRendererTest
     public void Render_AddedTag_ShowsNoReplacedValue()
     {
         var xml = EffectiveObjectXmlRenderer.Render(Object(
-            Tag("Shield", "50", VariantProvenance.Added, "V")));
+            Tag("Shield", "50", VariantProvenance.Added, "V")), TestCatalogues.English);
 
         Assert.Contains("added by variant", xml);
         Assert.DoesNotContain("was ", xml);
@@ -130,7 +131,7 @@ public sealed class EffectiveObjectXmlRendererTest
     public void Render_IncludesVariantChainComment()
     {
         var xml = EffectiveObjectXmlRenderer.Render(
-            Object(Tag("X", "1", VariantProvenance.Inherited, "B")));
+            Object(Tag("X", "1", VariantProvenance.Inherited, "B")), TestCatalogues.English);
 
         Assert.Contains("V -> B", xml);
     }
@@ -141,7 +142,7 @@ public sealed class EffectiveObjectXmlRendererTest
         var obj = new EffectiveObject("A", "SpaceUnit", true, true, "A",
             ["A"], ImmutableArray<EffectiveTag>.Empty);
 
-        var xml = EffectiveObjectXmlRenderer.Render(obj);
+        var xml = EffectiveObjectXmlRenderer.Render(obj, TestCatalogues.English);
 
         Assert.Contains("cyclic", xml, StringComparison.OrdinalIgnoreCase);
     }
@@ -154,7 +155,7 @@ public sealed class EffectiveObjectXmlRendererTest
         var obj = new EffectiveObject("V", "SpaceUnit", true, false, null,
             ["V", "B"], [tag]);
 
-        var xml = EffectiveObjectXmlRenderer.Render(obj);
+        var xml = EffectiveObjectXmlRenderer.Render(obj, TestCatalogues.English);
 
         Assert.Contains("<Inner>x</Inner>", xml);
     }

@@ -39,7 +39,7 @@ public static class PreviewAbilityText
     /// <param name="alternateDescriptionKey">
     ///     The instance's <c>Alternate_Description_Text</c>, if any.
     /// </param>
-    /// <param name="messages">The catalogue the problem texts come from; English when null.</param>
+    /// <param name="messages">The catalogue the problem texts come from.</param>
     public static PreviewAbility Fill(
         PreviewAbility ability,
         string? alternateNameKey,
@@ -47,10 +47,9 @@ public static class PreviewAbilityText
         IconCatalog? icons,
         ILocalisationIndex? localisation,
         IList<PreviewProblem> problems,
-        string? alternateDescriptionKey = null,
-        IMessageCatalog? messages = null)
+        string? alternateDescriptionKey,
+        IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         ArgumentNullException.ThrowIfNull(ability);
         ArgumentNullException.ThrowIfNull(problems);
 

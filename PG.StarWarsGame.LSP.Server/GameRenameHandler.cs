@@ -4,7 +4,6 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -18,7 +17,7 @@ namespace PG.StarWarsGame.LSP.Server;
 public sealed class GameRenameHandler : RenameHandlerBase
 {
     private readonly ILuaAnalyzer _analyzer;
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly IProjectLayerMap _layers;
@@ -33,7 +32,7 @@ public sealed class GameRenameHandler : RenameHandlerBase
         IXmlRenameProvider xmlProvider,
         ILuaRenameProvider luaProvider,
         IFileHelper fileHelper,
-        ILspConfigurationProvider config,
+        IMessageCatalog messages,
         ILuaAnalyzer analyzer,
         IProjectLayerMap layers,
         ILuaSandboxProvider sandbox)
@@ -43,7 +42,7 @@ public sealed class GameRenameHandler : RenameHandlerBase
         _xmlProvider = xmlProvider;
         _luaProvider = luaProvider;
         _fileHelper = fileHelper;
-        _config = config;
+        _messages = messages;
         _analyzer = analyzer;
         _layers = layers;
     }
@@ -65,7 +64,7 @@ public sealed class GameRenameHandler : RenameHandlerBase
         if (edit is null) return null;
         // Another script's state first: its file is no part of this rename, wherever it lives.
         edit = LuaAnalyzerRename.KeepWithinState(edit, _sandbox.Current, uri);
-        LuaAnalyzerRename.EnsureWithinProject(edit, _layers, new ConfiguredMessageCatalog(_config));
+        LuaAnalyzerRename.EnsureWithinProject(edit, _layers, _messages);
         return edit;
     }
 

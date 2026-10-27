@@ -5,7 +5,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Messages;
@@ -31,7 +30,7 @@ namespace PG.StarWarsGame.LSP.Story.Dialog;
 /// </summary>
 public sealed class DialogCodeActionHandler : CodeActionHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IFileHelper _fileHelper;
     private readonly IStoryDialogScope _scope;
     private readonly IDocumentTextSource _textSource;
@@ -40,12 +39,12 @@ public sealed class DialogCodeActionHandler : CodeActionHandlerBase
         IStoryDialogScope scope,
         IFileHelper fileHelper,
         IDocumentTextSource textSource,
-        ILspConfigurationProvider config)
+        IMessageCatalog messages)
     {
         _scope = scope;
         _fileHelper = fileHelper;
         _textSource = textSource;
-        _config = config;
+        _messages = messages;
     }
 
     public override Task<CommandOrCodeActionContainer?> Handle(
@@ -92,7 +91,7 @@ public sealed class DialogCodeActionHandler : CodeActionHandlerBase
         DocumentUri documentUri, Diagnostic diagnostic, StoryDialogDocument document, string[] lines)
     {
         DiagnosticId.TryParse(diagnostic.Code?.String, out var id);
-        var messages = new ConfiguredMessageCatalog(_config);
+        var messages = _messages;
 
         var line = diagnostic.Range.Start.Line;
         var points = new List<SuppressionInsertionPoint> { new(SuppressionScope.Node, line) };

@@ -34,9 +34,8 @@ internal static class LuaCallFormAnalyzer
     private const string Unknown = "any";
 
     public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree,
-        ILuaApiSchemaProvider stubs, IMessageCatalog? messages = null)
+        ILuaApiSchemaProvider stubs, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
         HashSet<string>? bound = null;

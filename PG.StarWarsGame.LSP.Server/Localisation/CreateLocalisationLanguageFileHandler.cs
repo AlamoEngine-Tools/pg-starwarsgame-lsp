@@ -8,7 +8,6 @@ using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -29,7 +28,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class CreateLocalisationLanguageFileHandler
     : IJsonRpcRequestHandler<CreateLocalisationLanguageFileParams, CreateLocalisationLanguageFileResult>
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly ILocalisationFormatConverter _converter;
     private readonly IDatTranslationExporter _datExporter;
     private readonly IDatService _datFileService;
@@ -53,7 +52,7 @@ public sealed class CreateLocalisationLanguageFileHandler
         ILocalisationProjectRegistry projectRegistry,
         IModProjectReloadService reloadService,
         ILogger<CreateLocalisationLanguageFileHandler> logger,
-        ILspConfigurationProvider config,
+        IMessageCatalog messages,
         IProjectLayerMap layers)
     {
         _rowReader = rowReader;
@@ -66,7 +65,7 @@ public sealed class CreateLocalisationLanguageFileHandler
         _projectRegistry = projectRegistry;
         _reloadService = reloadService;
         _logger = logger;
-        _config = config;
+        _messages = messages;
         _layers = layers;
     }
 
@@ -74,32 +73,32 @@ public sealed class CreateLocalisationLanguageFileHandler
         CreateLocalisationLanguageFileParams request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_NoLocalisationFileWasGiven"));
+            return Fail(_messages.Format("LocCreateLanguage_NoLocalisationFileWasGiven"));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(request.ProjectFilePath))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_DoesNotExist",
+            return Fail(_messages.Format("LocCreateLanguage_DoesNotExist",
                 request.ProjectFilePath));
 
         // The new language file is written beside the source, so a dependency's source would put a
         // file into the dependency's own directory (#276).
         if (LocalisationLayerGuard.ReadOnlyObjection(
-                _layers, _fileHelper, request.ProjectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
+                _layers, _fileHelper, request.ProjectFilePath, _messages) is { } readOnly)
             return Fail(readOnly);
 
         // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
         if (!_langService.TryGetByIdentifier(request.Language ?? string.Empty, out var language))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_NotLanguageThisGameSupports",
+            return Fail(_messages.Format("LocCreateLanguage_NotLanguageThisGameSupports",
                 request.Language));
 
         var extension = fs.Path.GetExtension(request.ProjectFilePath).ToLowerInvariant();
         if (!LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(extension))
             return Fail(
-                new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_FilesHoldEveryLanguageOne", extension));
+                _messages.Format("LocCreateLanguage_FilesHoldEveryLanguageOne", extension));
 
         var targetPath = SiblingPath(request.ProjectFilePath, extension, language.LanguageIdentifier);
         if (fs.File.Exists(targetPath))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_AlreadyPart",
+            return Fail(_messages.Format("LocCreateLanguage_AlreadyPart",
                 fs.Path.GetFileName(targetPath)));
 
         LocDocument source;
@@ -111,7 +110,7 @@ public sealed class CreateLocalisationLanguageFileHandler
         {
             _logger.LogWarning(ex, "aet/createLocalisationLanguageFile: could not read '{Path}'.",
                 request.ProjectFilePath);
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_CouldNotRead",
+            return Fail(_messages.Format("LocCreateLanguage_CouldNotRead",
                 request.ProjectFilePath, ex.Message));
         }
 
@@ -127,7 +126,7 @@ public sealed class CreateLocalisationLanguageFileHandler
             db.SetTranslation(row.Key, language, string.Empty);
 
         if (!await WriteAsync(db, extension, targetPath, language, ct))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_CouldNotWrite", targetPath));
+            return Fail(_messages.Format("LocCreateLanguage_CouldNotWrite", targetPath));
 
         _logger.LogInformation(
             "aet/createLocalisationLanguageFile: created '{Target}' with {Count} key(s) from '{Source}'.",

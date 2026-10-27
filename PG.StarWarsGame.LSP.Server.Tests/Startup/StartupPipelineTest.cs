@@ -31,7 +31,7 @@ public sealed class StartupPipelineTest
             migrationOffer ?? new RecordingMigrationOffer(log),
             republishers ?? [],
             new StubConfigurationProvider(workspaceDiagnosticsOnStartup),
-            status ?? new ServerStatusRecorder());
+            status ?? new ServerStatusRecorder(), TestCatalogues.English);
     }
 
     // ── what the bug report is told ──────────────────────────────────────────
@@ -166,7 +166,7 @@ public sealed class StartupPipelineTest
             new RecordingMigrationOffer(log),
             [],
             new StubConfigurationProvider(false),
-            new ServerStatusRecorder());
+            new ServerStatusRecorder(), TestCatalogues.English);
 
         var pipelineTask = pipeline.RunAsync(["/ws"], CancellationToken.None);
         var timeout = Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);

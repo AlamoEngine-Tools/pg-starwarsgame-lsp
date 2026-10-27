@@ -14,10 +14,10 @@ public static class StorySimFeature
 {
     public const string DisabledKey = "StorySimFeature_Disabled";
 
-    public static string? Rejection(ILspConfigurationProvider config)
+    public static string? Rejection(ILspConfigurationProvider config, IMessageCatalog messages)
     {
         if (!config.Current.Features.StorySimulator)
-            return new ConfiguredMessageCatalog(config).Format(DisabledKey);
+            return messages.Format(DisabledKey);
         return null;
     }
 }

@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -20,6 +21,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlHoverHandler> _logger;
+    private readonly IMessageCatalog _messages;
     private readonly IXmlParseCache _parseCache;
     private readonly IXmlHoverStrategyRegistry _registry;
     private readonly ISchemaProvider _schema;
@@ -32,7 +34,8 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         ILogger<XmlHoverHandler> logger,
         IFileHelper fileHelper,
         IEaWXmlContext eaWXmlContext,
-        IXmlHoverStrategyRegistry registry)
+        IXmlHoverStrategyRegistry registry,
+        IMessageCatalog messages)
     {
         _parseCache = parseCache;
         _indexService = indexService;
@@ -42,6 +45,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         _fileHelper = fileHelper;
         _eaWXmlContext = eaWXmlContext;
         _registry = registry;
+        _messages = messages;
     }
 
     public Task<Hover?> Handle(HoverParams request, CancellationToken ct)
@@ -79,7 +83,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         var index = _indexService.Current;
 
         var ctx = new HoverContext(uri, index, _schema, hapDoc, rootNode!, node!, isOnTagName,
-            lineIndex, charPos, locale);
+            lineIndex, charPos, locale, _messages);
 
         var hover = _registry.Dispatch(ctx);
         if (hover is null)

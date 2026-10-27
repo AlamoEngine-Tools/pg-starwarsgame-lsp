@@ -38,9 +38,8 @@ public static class KeyedCommandTranslator
     /// </summary>
     public static KeyedTranslationResult Translate(
         LocDocument document, IReadOnlyList<LocKeyedCommandDto> commands,
-        ICrc32HashingService hashing, IMessageCatalog? messages = null)
+        ICrc32HashingService hashing, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         // The working key list mirrors what the document will look like as each command lands. Only
         // the keys are tracked, because position is the only thing that has to be derived.
         var keys = document.Rows.Select(row => row.Key).ToList();

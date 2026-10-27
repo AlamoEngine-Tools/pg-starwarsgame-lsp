@@ -22,7 +22,8 @@ public sealed class StoryParamValueNotesHandlerTest
     private static readonly StoryParamValueNotesHandler Sut = new();
 
     private static readonly DiagnosticsContext Ctx =
-        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en");
+        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
     private static StoryParamFact Param(string value, params SchemaNote[] notesOnValue)
     {

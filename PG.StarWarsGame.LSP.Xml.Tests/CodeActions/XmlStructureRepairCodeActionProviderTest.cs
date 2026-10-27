@@ -42,7 +42,7 @@ public sealed class XmlStructureRepairCodeActionProviderTest
             Code = id.ToString(),
             Range = new LspRange(new Position(line, startCol), new Position(line, endCol)),
             Message = "m"
-        });
+        }) { Messages = TestCatalogues.English };
     }
 
     private static IReadOnlyList<CodeAction> Actions(XmlStructureRepairCodeActionProvider p, XmlCodeActionContext ctx)

@@ -23,7 +23,7 @@ internal static class LuaImportAnalyzer
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, string text, IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
         return Analyze(documentUri, LuaSyntaxTree.ParseText(text, s_parseOptions), documents, fileHelper,
             messages);
@@ -31,9 +31,8 @@ internal static class LuaImportAnalyzer
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, SyntaxTree tree, IReadOnlyDictionary<string, DocumentIndex> documents,
-        IFileHelper fileHelper, IMessageCatalog? messages = null)
+        IFileHelper fileHelper, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 

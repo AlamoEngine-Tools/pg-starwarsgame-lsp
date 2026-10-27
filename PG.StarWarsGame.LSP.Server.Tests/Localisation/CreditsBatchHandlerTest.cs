@@ -245,9 +245,9 @@ public sealed class CreditsBatchHandlerTest
         return (
             new ApplyCreditsBatchHandler(
                 editor, reload, helper,
-                NullLogger<ApplyCreditsBatchHandler>.Instance, configuration,
+                NullLogger<ApplyCreditsBatchHandler>.Instance, TestCatalogues.English,
                 new LocalisationWriteLedger(helper), layers ?? new ProjectLayerMap(helper)),
-            new ValidateCreditsBatchHandler(editor, helper, configuration),
+            new ValidateCreditsBatchHandler(editor, helper, TestCatalogues.English),
             reload);
     }
 

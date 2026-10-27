@@ -13,9 +13,8 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 /// </summary>
 public static class EffectiveObjectXmlRenderer
 {
-    public static string Render(EffectiveObject obj, IMessageCatalog? messages = null)
+    public static string Render(EffectiveObject obj, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var element = obj.TypeName ?? "GameObject";
         var sb = new StringBuilder();
 

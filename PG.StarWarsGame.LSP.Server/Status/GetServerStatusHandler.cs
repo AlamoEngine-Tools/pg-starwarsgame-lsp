@@ -154,7 +154,8 @@ public sealed class GetServerStatusHandler(
     IModProjectReloadService projects,
     IFileHelper fileHelper,
     IWorkspaceIndexer indexer,
-    IEnumerable<ICacheStatisticsSource> caches)
+    IEnumerable<ICacheStatisticsSource> caches,
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<GetServerStatusParams, ServerStatusDto>
 {
     public Task<ServerStatusDto> Handle(GetServerStatusParams request, CancellationToken cancellationToken)
@@ -374,7 +375,7 @@ public sealed class GetServerStatusHandler(
         var warnings = new List<string>();
 
         if (check is null)
-            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_SchemaNotLoaded"));
+            warnings.Add(messages.Format("ServerStatus_SchemaNotLoaded"));
         else if (!check.CanLoad)
             warnings.Add($"Schema: {check.Compatibility}");
 
@@ -391,10 +392,10 @@ public sealed class GetServerStatusHandler(
         // that indexed nothing, and a catalog with no models in it.
         if (recorder.IndexState == StatusIndexState.Complete && problem == ProjectProblem.None
                                                              && files.ProjectFiles == 0)
-            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_ProjectFiles"));
+            warnings.Add(messages.Format("ServerStatus_ProjectFiles"));
 
         if (!index.AssetFiles.GetByExtension(".alo").Any())
-            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_AssetCatalogNoModels"));
+            warnings.Add(messages.Format("ServerStatus_AssetCatalogNoModels"));
 
         return warnings;
     }

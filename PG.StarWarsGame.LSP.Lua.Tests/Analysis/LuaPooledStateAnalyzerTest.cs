@@ -23,7 +23,7 @@ public sealed class LuaPooledStateAnalyzerTest
         string uri = ScriptUri)
     {
         var tree = LuaSyntaxTree.ParseText(text, new LuaParseOptions(LuaSyntaxOptions.Lua51));
-        return LuaPooledStateAnalyzer.Analyze(uri, tree, state ?? Pooled);
+        return LuaPooledStateAnalyzer.Analyze(uri, tree, state ?? Pooled, TestCatalogues.English);
     }
 
     private static IReadOnlyList<Diagnostic> Of(string text, DiagnosticId id, LuaPooledState? state = null)

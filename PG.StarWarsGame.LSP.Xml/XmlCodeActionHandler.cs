@@ -4,7 +4,6 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 
@@ -12,15 +11,15 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCodeActionHandler : CodeActionHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IReadOnlyList<IXmlCursorCodeActionProvider> _cursorProviders;
     private readonly IXmlCodeActionRegistry _registry;
 
-    public XmlCodeActionHandler(IXmlCodeActionRegistry registry, ILspConfigurationProvider config,
+    public XmlCodeActionHandler(IXmlCodeActionRegistry registry, IMessageCatalog messages,
         IEnumerable<IXmlCursorCodeActionProvider> cursorProviders)
     {
         _registry = registry;
-        _config = config;
+        _messages = messages;
         _cursorProviders = cursorProviders.ToList();
     }
 
@@ -29,7 +28,7 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
         var uri = request.TextDocument.Uri;
         var actions = request.Context.Diagnostics
             .SelectMany(d => _registry.Dispatch(new XmlCodeActionContext(uri, d)
-                { Messages = new ConfiguredMessageCatalog(_config) }))
+                { Messages = _messages }))
             .Concat(_cursorProviders.SelectMany(p => p.Handle(uri, request.Range.Start)))
             .ToList();
 

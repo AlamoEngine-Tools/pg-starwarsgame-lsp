@@ -36,7 +36,7 @@ public sealed class PlanetModeExclusionListHandlerTest
                 .Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase)
                 .Add("AutoresolveExclusionMode", [.. modes])
         };
-        return new DiagnosticsContext(schema, index, "file:///test.xml", "en");
+        return new DiagnosticsContext(schema, index, "file:///test.xml", "en") { Messages = TestCatalogues.English };
     }
 
     [Theory]

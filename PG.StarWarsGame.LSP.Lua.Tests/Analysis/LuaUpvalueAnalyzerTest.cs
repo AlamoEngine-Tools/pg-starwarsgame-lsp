@@ -11,7 +11,7 @@ public sealed class LuaUpvalueAnalyzerTest
 {
     private static IReadOnlyList<Diagnostic> Analyze(string text, string? uri = null)
     {
-        return LuaUpvalueAnalyzer.Analyze(text, uri);
+        return LuaUpvalueAnalyzer.Analyze(text, uri, TestCatalogues.English);
     }
 
     // ── no-warning baseline ───────────────────────────────────────────────────

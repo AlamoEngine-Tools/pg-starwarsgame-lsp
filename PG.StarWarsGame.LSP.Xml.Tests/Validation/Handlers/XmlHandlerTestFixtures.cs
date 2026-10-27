@@ -13,7 +13,7 @@ internal static class XmlHandlerTestFixtures
         new SchemaProviderBuilder().Build(),
         GameIndex.Empty,
         "file:///test.xml",
-        "en");
+        "en") { Messages = TestCatalogues.English };
 
     public static XmlTagDefinition MakeTag(
         string name,

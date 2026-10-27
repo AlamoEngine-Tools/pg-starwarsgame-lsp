@@ -51,7 +51,7 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
             Message = "redundant",
             Data = data
         };
-        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
     }
 
     [Fact]

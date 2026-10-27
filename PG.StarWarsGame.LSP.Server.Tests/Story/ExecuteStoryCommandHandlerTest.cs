@@ -91,7 +91,7 @@ public sealed class ExecuteStoryCommandHandlerTest
             }),
             applier,
             config,
-            NullLogger<ExecuteStoryCommandHandler>.Instance);
+            NullLogger<ExecuteStoryCommandHandler>.Instance, TestCatalogues.English);
     }
 
     private static GameIndex DefaultIndex()

@@ -813,9 +813,8 @@ public sealed class PreviewSceneBuilder(
         EffectiveObjectResolver resolver,
         IEnumerable<string> ids,
         List<PreviewProblem> problems,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var projectiles = new List<PreviewProjectile>();
 

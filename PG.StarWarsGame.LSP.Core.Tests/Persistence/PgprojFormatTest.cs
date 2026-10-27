@@ -16,7 +16,7 @@ public sealed class PgprojFormatTest
     [Fact]
     public void Check_Absent_Loads()
     {
-        var check = PgprojFormat.Check(null);
+        var check = PgprojFormat.Check(null, null, TestCatalogues.English);
 
         Assert.True(check.CanLoad);
         Assert.Null(check.Message);
@@ -25,7 +25,7 @@ public sealed class PgprojFormatTest
     [Fact]
     public void Check_CurrentVersion_Loads()
     {
-        Assert.True(PgprojFormat.Check(PgprojFormat.Current.ToString()).CanLoad);
+        Assert.True(PgprojFormat.Check(PgprojFormat.Current.ToString(), null, TestCatalogues.English).CanLoad);
     }
 
     // The project file identifies itself the way every other document does - Scout's two fields,
@@ -41,7 +41,7 @@ public sealed class PgprojFormatTest
     [Fact]
     public void Check_ForeignTypeName_IsRefused()
     {
-        var check = PgprojFormat.Check(PgprojFormat.Current.ToString(), "aetswg.SomethingElse");
+        var check = PgprojFormat.Check(PgprojFormat.Current.ToString(), "aetswg.SomethingElse", TestCatalogues.English);
 
         Assert.False(check.CanLoad);
         Assert.NotNull(check.Message);
@@ -50,7 +50,8 @@ public sealed class PgprojFormatTest
     [Fact]
     public void Check_MatchingTypeName_Loads()
     {
-        Assert.True(PgprojFormat.Check(PgprojFormat.Current.ToString(), PgprojFormat.TypeName).CanLoad);
+        Assert.True(PgprojFormat.Check(PgprojFormat.Current.ToString(), PgprojFormat.TypeName, TestCatalogues.English)
+            .CanLoad);
     }
 
     // ── refusing the future ──────────────────────────────────────────────────
@@ -61,7 +62,7 @@ public sealed class PgprojFormatTest
     [Fact]
     public void Check_NewerMajor_IsRefusedAndSaysWhatToDo()
     {
-        var check = PgprojFormat.Check("aetswg-2.0.0");
+        var check = PgprojFormat.Check("aetswg-2.0.0", null, TestCatalogues.English);
 
         Assert.False(check.CanLoad);
         Assert.NotNull(check.Message);
@@ -76,7 +77,7 @@ public sealed class PgprojFormatTest
     [InlineData("aetswg-1.0.1")]
     public void Check_AnyHigherVersion_IsRefused(string declared)
     {
-        Assert.False(PgprojFormat.Check(declared).CanLoad);
+        Assert.False(PgprojFormat.Check(declared, null, TestCatalogues.English).CanLoad);
     }
 
     // ── damage ───────────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ public sealed class PgprojFormatTest
     [InlineData("   ")]
     public void Check_Unreadable_IsRefusedWithAMessageNamingTheValue(string declared)
     {
-        var check = PgprojFormat.Check(declared);
+        var check = PgprojFormat.Check(declared, null, TestCatalogues.English);
 
         Assert.False(check.CanLoad);
         Assert.NotNull(check.Message);

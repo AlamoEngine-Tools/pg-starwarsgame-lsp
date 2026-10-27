@@ -40,11 +40,11 @@ internal sealed class TupleSlotHoverStrategy : IXmlHoverStrategy
 
             return item.Slot?.ReferenceKind switch
             {
-                ReferenceKind.Enum => EnumHover(item, ctx.Locale, line, column),
+                ReferenceKind.Enum => EnumHover(item, ctx.Locale, ctx.Messages, line, column),
                 ReferenceKind.ModelFile or ReferenceKind.TextureFile or ReferenceKind.AudioFile
                     or ReferenceKind.MapFile => HoverUtility.BuildAssetReferenceHover(
                         tagDef with { ReferenceKind = item.Slot.ReferenceKind }, item.Text, ctx.Index.AssetFiles,
-                        line, column, item.Text.Length, ctx.Locale),
+                        line, column, item.Text.Length, ctx.Messages),
                 _ => null
             };
         }
@@ -52,12 +52,12 @@ internal sealed class TupleSlotHoverStrategy : IXmlHoverStrategy
         return null;
     }
 
-    private static Hover EnumHover(TupleItem item, string locale, int line, int column)
+    private static Hover EnumHover(TupleItem item, string locale, IMessageCatalog messages, int line, int column)
     {
         var slot = item.Slot!;
         var lines = new List<string>
         {
-            $"**{slot.Label}** - `{slot.Enum?.Name ?? ResxMessageCatalog.Server(locale).Format("TupleSlotHover_Enum")}`"
+            $"**{slot.Label}** - `{slot.Enum?.Name ?? messages.Format("TupleSlotHover_Enum")}`"
         };
 
         var value = slot.Enum?.Values.FirstOrDefault(v => v.Name.Equals(item.Text, StringComparison.OrdinalIgnoreCase));

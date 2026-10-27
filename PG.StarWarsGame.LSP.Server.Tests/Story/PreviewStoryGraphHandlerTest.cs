@@ -20,7 +20,7 @@ public sealed class PreviewStoryGraphHandlerTest
             new SchemaProviderBuilder().Build(),
             fileHelper,
             Reload(),
-            Config(storyEditing));
+            Config(storyEditing), TestCatalogues.English);
     }
 
     private static PreviewStoryGraphParams Preview(params StoryCommandDto[] commands)

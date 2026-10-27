@@ -50,20 +50,20 @@ internal sealed class TagNameHoverStrategy : IXmlHoverStrategy
             // otherwise match a same-named global tag (e.g. FactionReference) and produce the
             // wrong content.
             if (ctx.Node.Name.Equals(typeDef.TypeName, StringComparison.OrdinalIgnoreCase))
-                return HoverUtility.BuildTypeHover(typeDef, ctx.Node, ctx.Locale);
+                return HoverUtility.BuildTypeHover(typeDef, ctx.Node, ctx.Locale, ctx.Messages);
 
             var resCtx = new TagResolutionContext(typeDef.TypeName, XmlUtility.GetDepth(ctx.Node), ctx.Node);
             var typedTagDef = XmlTagResolver.Resolve(ctx.Schema, ctx.Node.Name, resCtx);
 
             if (typedTagDef is not null)
-                return HoverUtility.BuildTagHover(typeDef, typedTagDef, ctx.Node, ctx.Locale);
+                return HoverUtility.BuildTagHover(typeDef, typedTagDef, ctx.Node, ctx.Locale, ctx.Messages);
 
-            return HoverUtility.BuildTypeHover(typeDef, ctx.Node, ctx.Locale);
+            return HoverUtility.BuildTypeHover(typeDef, ctx.Node, ctx.Locale, ctx.Messages);
         }
 
         var tagDef = ctx.Schema.GetTag(ctx.Node.Name);
         return tagDef is not null
-            ? HoverUtility.BuildTagHover(tagDef, ctx.Node, ctx.Locale)
+            ? HoverUtility.BuildTagHover(tagDef, ctx.Node, ctx.Locale, ctx.Messages)
             : null;
     }
 

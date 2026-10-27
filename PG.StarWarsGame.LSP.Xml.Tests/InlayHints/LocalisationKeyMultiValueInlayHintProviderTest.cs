@@ -30,7 +30,7 @@ public sealed class LocalisationKeyMultiValueInlayHintProviderTest
             : GameIndex.Empty;
 
         return new InlayHintContext("file:///test.xml", index, new SchemaProviderBuilder().Build(), hapDoc, node,
-            tagDef, 0);
+            tagDef, 0) { Messages = TestCatalogues.English };
     }
 
     [Fact]

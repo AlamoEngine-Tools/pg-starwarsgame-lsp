@@ -22,10 +22,10 @@ public static class StoryEditingFeature
 {
     public const string DisabledKey = "StoryEditingFeature_Disabled";
 
-    public static string? Rejection(ILspConfigurationProvider config)
+    public static string? Rejection(ILspConfigurationProvider config, IMessageCatalog messages)
     {
         if (!config.Current.Features.StoryEditing)
-            return new ConfiguredMessageCatalog(config).Format(DisabledKey);
+            return messages.Format(DisabledKey);
         return null;
     }
 }

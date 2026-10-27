@@ -6,7 +6,6 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -19,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCodeLensHandler : CodeLensHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -32,14 +31,14 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
         IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper,
         IXmlCodeLensRegistry registry,
-        ILspConfigurationProvider config)
+        IMessageCatalog messages)
     {
         _indexService = indexService;
         _logger = logger;
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
         _registry = registry;
-        _config = config;
+        _messages = messages;
     }
 
     public override Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken ct)
@@ -61,7 +60,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
             if (symbol.Origin is not FileOrigin fo)
                 continue;
 
-            var ctx = new CodeLensSymbolContext(symbol, fo, index) { Messages = new ConfiguredMessageCatalog(_config) };
+            var ctx = new CodeLensSymbolContext(symbol, fo, index) { Messages = _messages };
             foreach (var lens in _registry.Dispatch(ctx))
             {
                 _logger.LogDebug("CodeLens: {Id} at line {Line}", symbol.Id, fo.Line);
@@ -83,7 +82,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
     // counting its uses: references to enum:<Enum>/<Value>, as the parser records them and rename edits them.
     private IEnumerable<LspCodeLens> EnumValueLenses(string uri, GameIndex index)
     {
-        var messages = new ConfiguredMessageCatalog(_config);
+        var messages = _messages;
         foreach (var (enumName, values) in index.WorkspaceEnumValueDefinitions)
         foreach (var (value, origin) in values)
         {
@@ -114,7 +113,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
                 .ToList();
             if (targets.Count == 0) continue;
 
-            var messages = new ConfiguredMessageCatalog(_config);
+            var messages = _messages;
             var member = gm.Membership.MemberTypeName ?? messages.Format("XmlCodeLens_Member");
             var title = messages.Format("XmlCodeLens_GroupMembers", member, targets.Count);
 

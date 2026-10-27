@@ -17,7 +17,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         new SchemaProviderBuilder().Build(),
         GameIndex.Empty,
         "file:///test.xml",
-        "en");
+        "en") { Messages = TestCatalogues.English };
 
     // ── empty registry ───────────────────────────────────────────────────────
 

@@ -40,7 +40,8 @@ public sealed class ProjectConfigurationResolverTest
         notifier = new RecordingUserNotifier();
         return new ProjectConfigurationResolver(detector, loader, resolver, notifier,
             NullLogger<ProjectConfigurationResolver>.Instance, status ?? new ServerStatusRecorder(),
-            new FakeLspConfigurationProvider { Current = configuration ?? new LspConfiguration() });
+            new FakeLspConfigurationProvider { Current = configuration ?? new LspConfiguration() },
+            TestCatalogues.English);
     }
 
     // ── what the bug report is told ──────────────────────────────────────────

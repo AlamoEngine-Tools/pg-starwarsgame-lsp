@@ -30,7 +30,7 @@ public sealed class DialogCodeActionHandlerTest
             new StubScope(inScope),
             new FileHelper(new MockFileSystem()),
             new StubTextSource(Uri, text),
-            new FakeLspConfigurationProvider());
+            TestCatalogues.English);
     }
 
     private static CodeActionParams Request(int line, string? code)

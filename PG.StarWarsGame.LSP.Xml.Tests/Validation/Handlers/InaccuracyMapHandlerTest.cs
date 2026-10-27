@@ -52,7 +52,7 @@ public sealed class InaccuracyMapHandlerTest
                 .Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase)
                 .Add("GameObjectCategoryType", [.. workspaceValues])
         };
-        return new DiagnosticsContext(schema, index, "file:///test.xml", "en");
+        return new DiagnosticsContext(schema, index, "file:///test.xml", "en") { Messages = TestCatalogues.English };
     }
 
     [Fact]

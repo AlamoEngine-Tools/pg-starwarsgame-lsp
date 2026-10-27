@@ -251,7 +251,8 @@ public sealed class DynamicEnumValueHandlerTest
                 StringComparer.OrdinalIgnoreCase,
                 [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("MY_CUSTOM_TRACK"))])
         };
-        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "MY_CUSTOM_TRACK"), ctx).ToList();
         Assert.Empty(results);
@@ -275,7 +276,8 @@ public sealed class DynamicEnumValueHandlerTest
                 StringComparer.OrdinalIgnoreCase,
                 [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("MY_CUSTOM_TRACK"))])
         };
-        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "GENERIC_TRACK"), ctx).ToList();
         Assert.Empty(results);
@@ -299,7 +301,8 @@ public sealed class DynamicEnumValueHandlerTest
                 StringComparer.OrdinalIgnoreCase,
                 [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("MY_CUSTOM_TRACK"))])
         };
-        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "TOTALLY_UNKNOWN"), ctx).ToList();
         var d = Assert.Single(results);
@@ -324,7 +327,8 @@ public sealed class DynamicEnumValueHandlerTest
                     [KeyValuePair.Create(enumName, ImmutableArray.Create(values))])
             }
         };
-        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
     }
 
     private static EnumDefinition SchemaFixed(string name, bool isBitfield, params string[] values)

@@ -64,9 +64,8 @@ public static class CreditsCoverageInspector
         return orphaned;
     }
 
-    public static string Message(string language, string label, IMessageCatalog? messages = null)
+    public static string Message(string language, string label, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         return messages.Format("CreditsCoverage_EmptyHeading", language, label);
     }
 

@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.JsonRpc;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -158,7 +157,7 @@ public sealed class GetStoryPlotsHandler(
 
 public sealed class GetStoryGraphHandler(
     IStoryModelService modelService,
-    ILspConfigurationProvider config,
+    IMessageCatalog messages,
     // The layers decide which nodes are read-only: a dependency's are, the project's own are not.
     IModProjectReloadService reloadService)
     : IJsonRpcRequestHandler<GetStoryGraphParams, GetStoryGraphResult>
@@ -168,7 +167,7 @@ public sealed class GetStoryGraphHandler(
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
+                messages.Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         return Task.FromResult(StoryGraphProjection.Project(
             model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
@@ -177,7 +176,7 @@ public sealed class GetStoryGraphHandler(
     }
 }
 
-public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, ILspConfigurationProvider config)
+public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, IMessageCatalog messages)
     : IJsonRpcRequestHandler<GetStoryNodeDetailParams, GetStoryNodeDetailResult>
 {
     public Task<GetStoryNodeDetailResult> Handle(GetStoryNodeDetailParams request, CancellationToken ct)
@@ -187,7 +186,7 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
             n.Kind == StoryNodeKind.Event && n.Id == request.NodeId);
         if (node?.Event is not { } storyEvent)
             return Task.FromResult(new GetStoryNodeDetailResult(null,
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_NodeWasNotFoundCampaign", request.NodeId,
+                messages.Format("StoryHandlers_NodeWasNotFoundCampaign", request.NodeId,
                     request.Campaign)));
 
         return Task.FromResult(new GetStoryNodeDetailResult(new StoryNodeDetailDto(
@@ -387,7 +386,7 @@ public sealed class GetStoryDiagnosticsHandler(
     IGameIndexService indexService,
     IXmlDiagnosticsCollector collector,
     IDocumentTextSource textSource,
-    ILspConfigurationProvider config)
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<GetStoryDiagnosticsParams, GetStoryDiagnosticsResult>
 {
     public Task<GetStoryDiagnosticsResult> Handle(GetStoryDiagnosticsParams request, CancellationToken ct)
@@ -395,7 +394,7 @@ public sealed class GetStoryDiagnosticsHandler(
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
+                messages.Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         // Graph node per event INSTANCE (reference identity - duplicate names get distinct
         // disambiguated node ids, and StoryEvent's record equality would conflate them).

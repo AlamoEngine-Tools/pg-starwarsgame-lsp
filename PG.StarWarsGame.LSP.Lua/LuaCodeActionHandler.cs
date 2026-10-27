@@ -6,7 +6,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Messages;
@@ -19,16 +18,16 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaCodeActionHandler : CodeActionHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IFileHelper _fileHelper;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public LuaCodeActionHandler(IGameWorkspaceHost workspaceHost, IFileHelper fileHelper,
-        ILspConfigurationProvider config)
+        IMessageCatalog messages)
     {
         _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
-        _config = config;
+        _messages = messages;
     }
 
     public override Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken ct)
@@ -74,10 +73,10 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
 
         if (id == DiagnosticIds.LuaRedundantRequire)
             yield return BuildDeleteLineAction(docUri, d,
-                new ConfiguredMessageCatalog(_config).Format("LuaCodeAction_RemoveRedundantRequire"));
+                _messages.Format("LuaCodeAction_RemoveRedundantRequire"));
         else if (id == DiagnosticIds.LuaDuplicateRequire)
             yield return BuildDeleteLineAction(docUri, d,
-                new ConfiguredMessageCatalog(_config).Format("LuaCodeAction_RemoveDuplicateRequire"));
+                _messages.Format("LuaCodeAction_RemoveDuplicateRequire"));
         else if (id == DiagnosticIds.LuaEngineUpvalue)
             foreach (var a in BuildUpvalueActions(docUri, d, allDiagnostics))
                 yield return a;
@@ -101,12 +100,12 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
         if (EnclosingFunctionLine(doc.Text, line) is { } functionLine)
             points.Add(new SuppressionInsertionPoint(
                 SuppressionScope.Object, functionLine + 1,
-                new ConfiguredMessageCatalog(_config).Format("LuaCodeAction_FunctionTarget")));
+                _messages.Format("LuaCodeAction_FunctionTarget")));
 
         points.Add(new SuppressionInsertionPoint(SuppressionScope.File, 0));
 
         return SuppressionCodeActionBuilder.Build(
-            docUri, d, id, SuppressionCommentFormat.Lua, lines, points, new ConfiguredMessageCatalog(_config));
+            docUri, d, id, SuppressionCommentFormat.Lua, lines, points, _messages);
     }
 
     /// <summary>
@@ -176,7 +175,7 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
 
         return new CommandOrCodeAction(new CodeAction
         {
-            Title = new ConfiguredMessageCatalog(_config).Format("LuaCodeAction_SuppressUpvalueOk"),
+            Title = _messages.Format("LuaCodeAction_SuppressUpvalueOk"),
             Kind = CodeActionKind.QuickFix,
             Diagnostics = new Container<Diagnostic>(d),
             IsPreferred = false,
@@ -209,7 +208,7 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
 
         return new CommandOrCodeAction(new CodeAction
         {
-            Title = new ConfiguredMessageCatalog(_config).Format("LuaCodeAction_MoveLocalInsideFunction"),
+            Title = _messages.Format("LuaCodeAction_MoveLocalInsideFunction"),
             Kind = CodeActionKind.QuickFix,
             Diagnostics = new Container<Diagnostic>(d),
             IsPreferred = true,

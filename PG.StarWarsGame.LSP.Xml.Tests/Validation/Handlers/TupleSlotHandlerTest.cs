@@ -48,7 +48,8 @@ public sealed class TupleSlotHandlerTest
     private static DiagnosticsContext WithModels(params string[] paths)
     {
         var index = GameIndex.Empty with { AssetFiles = MergedAssetFileIndex.Merge([], paths) };
-        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///units.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///units.xml", "en")
+            { Messages = TestCatalogues.English };
     }
 
     // ── enum items ───────────────────────────────────────────────────────────

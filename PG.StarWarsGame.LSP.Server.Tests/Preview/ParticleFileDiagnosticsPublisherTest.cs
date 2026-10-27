@@ -89,7 +89,7 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         var fileHelper = new FileHelper(new MockFileSystem());
         return new ParticleFileDiagnosticsPublisher(new RecordingDiagnosticsSink(published),
             new FakeGameIndexService(index), new FakeGameWorkspaceHost(), assets, fileHelper,
-            new FakeLspConfigurationProvider(), new FakeGlobalSuppressionStore(), new ProjectLayerMap(fileHelper),
+            TestCatalogues.English, new FakeGlobalSuppressionStore(), new ProjectLayerMap(fileHelper),
             TestServerOptions.Immediate, NullLogger<ParticleFileDiagnosticsPublisher>.Instance);
     }
 

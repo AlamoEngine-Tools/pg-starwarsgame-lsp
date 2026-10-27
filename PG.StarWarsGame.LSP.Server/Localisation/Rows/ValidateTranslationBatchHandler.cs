@@ -3,7 +3,6 @@
 
 using OmniSharp.Extensions.JsonRpc;
 using PG.Commons.Hashing;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 
@@ -21,7 +20,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 public sealed class ValidateTranslationBatchHandler
     : IJsonRpcRequestHandler<ValidateTranslationBatchParams, ValidateTranslationBatchResult>
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly ILocalisationDocumentEditor _editor;
     private readonly IFileHelper _fileHelper;
     private readonly ICrc32HashingService _hashing;
@@ -30,12 +29,12 @@ public sealed class ValidateTranslationBatchHandler
         ILocalisationDocumentEditor editor,
         IFileHelper fileHelper,
         ICrc32HashingService hashing,
-        ILspConfigurationProvider config)
+        IMessageCatalog messages)
     {
         _editor = editor;
         _fileHelper = fileHelper;
         _hashing = hashing;
-        _config = config;
+        _messages = messages;
     }
 
     public Task<ValidateTranslationBatchResult> Handle(
@@ -46,7 +45,7 @@ public sealed class ValidateTranslationBatchHandler
             || !fs.File.Exists(request.ProjectFilePath))
             return Task.FromResult(new ValidateTranslationBatchResult(
                 [],
-                new ConfiguredMessageCatalog(_config).Format("LocValidateTranslation_FileNotFound",
+                _messages.Format("LocValidateTranslation_FileNotFound",
                     request.ProjectFilePath)));
 
         KeyedTranslationResult translated;
@@ -57,7 +56,7 @@ public sealed class ValidateTranslationBatchHandler
         catch (Exception ex)
         {
             return Task.FromResult(new ValidateTranslationBatchResult(
-                [], new ConfiguredMessageCatalog(_config).Format("LocValidateTranslation_FailedReadFile", ex.Message)));
+                [], _messages.Format("LocValidateTranslation_FailedReadFile", ex.Message)));
         }
 
         // An addressing failure is about one staged change, not about an entry, so it is reported
@@ -66,11 +65,11 @@ public sealed class ValidateTranslationBatchHandler
             return Task.FromResult(new ValidateTranslationBatchResult(
             [
                 new LocTranslationProblemDto(null, null, LocProblemSeverity.Error,
-                    new ConfiguredMessageCatalog(_config).Format("LocValidateTranslation_Change",
+                    _messages.Format("LocValidateTranslation_Change",
                         (translated.FailedIndex ?? 0) + 1, translated.Error))
             ]));
 
-        var problems = TranslationKeyInspector.Inspect(translated.ResultingKeys ?? [], _hashing).ToList();
+        var problems = TranslationKeyInspector.Inspect(translated.ResultingKeys ?? [], _hashing, _messages).ToList();
 
         // A language left half-filled is not a key problem, so it is checked from the resulting
         // rows rather than from the key list.
@@ -80,7 +79,7 @@ public sealed class ValidateTranslationBatchHandler
             foreach (var (language, empty, total) in
                      LanguageCoverageInspector.Inspect(rows, languages))
                 problems.Add(new LocTranslationProblemDto(null, language, LocProblemSeverity.Warning,
-                    LanguageCoverageInspector.Message(language, empty, total, new ConfiguredMessageCatalog(_config))));
+                    LanguageCoverageInspector.Message(language, empty, total, _messages)));
 
         return Task.FromResult(new ValidateTranslationBatchResult(problems));
     }

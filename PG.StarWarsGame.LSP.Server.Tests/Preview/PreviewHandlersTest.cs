@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
@@ -18,11 +17,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </summary>
 public sealed class PreviewHandlersTest
 {
-    private static ILspConfigurationProvider Config()
-    {
-        return new StubConfig(new LspConfiguration());
-    }
-
     private static PreviewSceneBuilder Builder(StubAssets assets, params GameSymbol[] symbols)
     {
         var index = GameIndex.Empty with
@@ -41,7 +35,8 @@ public sealed class PreviewHandlersTest
     public async Task GetPreviewScene_WithNeitherSubject_SaysSoRatherThanFailing()
     {
         var assets = new StubAssets();
-        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config(), new NoWorkspaceIcons());
+        var handler =
+            new GetPreviewSceneHandler(Builder(assets), assets, TestCatalogues.English, new NoWorkspaceIcons());
 
         var result = await handler.Handle(new GetPreviewSceneParams(), CancellationToken.None);
 
@@ -53,7 +48,8 @@ public sealed class PreviewHandlersTest
     {
         // The custom editor sends a file:/// URI; the XML sends a bare name. Both mean one model.
         var assets = new StubAssets().With("Data/Art/Models/Ev_stardestroyer.alo", [1, 2, 3]);
-        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config(), new NoWorkspaceIcons());
+        var handler =
+            new GetPreviewSceneHandler(Builder(assets), assets, TestCatalogues.English, new NoWorkspaceIcons());
 
         var result = await handler.Handle(
             new GetPreviewSceneParams
@@ -124,7 +120,7 @@ public sealed class PreviewHandlersTest
     public async Task GetModelGlb_ForAMissingModel_ExplainsWhyRatherThanReturningNothing()
     {
         var assets = new StubAssets();
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "nope.alo" }, CancellationToken.None);
@@ -139,7 +135,7 @@ public sealed class PreviewHandlersTest
         // The reader is strict by design; its message names the chunk that did not add up, which is
         // far more use than a bare failure.
         var assets = new StubAssets().With("Data/Art/Models/junk.alo", [9, 9, 9, 9, 9, 9, 9, 9]);
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "junk.alo" }, CancellationToken.None);
@@ -156,7 +152,7 @@ public sealed class PreviewHandlersTest
             Assert.Skip("No extracted game tree found.");
 
         var assets = new StubAssets().With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model));
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "Ev_stardestroyer.alo" }, CancellationToken.None);
@@ -196,7 +192,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -229,7 +225,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Nb_basepad.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -264,7 +260,7 @@ public sealed class PreviewHandlersTest
             .With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
         var logger = new ListLogger<GetModelGlbHandler>();
-        var handler = new GetModelGlbHandler(assets, Config(), logger);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, logger);
 
         await handler.Handle(
             new GetModelGlbParams
@@ -305,7 +301,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Ub_turretmst50.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ub_turretmst50_idle00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -328,7 +324,7 @@ public sealed class PreviewHandlersTest
         // client picks its decoder from the reported format, so reporting the request would be wrong.
         var assets = new StubAssets()
             .With("Data/Art/Textures/Ai_rancor.dds", [1, 2, 3, 4], "Data/Art/Textures/Ai_rancor.dds");
-        var handler = new GetModelTextureHandler(assets, Config());
+        var handler = new GetModelTextureHandler(assets, TestCatalogues.English);
 
         var result = await handler.Handle(
             new GetModelTextureParams { Name = "Ai_rancor.tga" }, CancellationToken.None);
@@ -340,7 +336,7 @@ public sealed class PreviewHandlersTest
     [Fact]
     public async Task GetModelTexture_ForAMissingTexture_ExplainsWhy()
     {
-        var handler = new GetModelTextureHandler(new StubAssets(), Config());
+        var handler = new GetModelTextureHandler(new StubAssets(), TestCatalogues.English);
 
         var result = await handler.Handle(
             new GetModelTextureParams { Name = "nope.tga" }, CancellationToken.None);
@@ -585,7 +581,7 @@ public sealed class PreviewHandlersTest
         };
 
         return new GetProjectileHandler(
-            Config(), new FakeGameIndexService(index), new SchemaProviderBuilder().Build(), tags);
+            TestCatalogues.English, new FakeGameIndexService(index), new SchemaProviderBuilder().Build(), tags);
     }
 
     private static GetParticleSystemHandler Particles(
@@ -598,7 +594,7 @@ public sealed class PreviewHandlersTest
         };
 
         return new GetParticleSystemHandler(
-            assets, Config(), new FakeGameIndexService(index), new SchemaProviderBuilder().Build(), tags);
+            assets, TestCatalogues.English, new FakeGameIndexService(index), new SchemaProviderBuilder().Build(), tags);
     }
 
     private static VariantTag Tag(string name, string value)
@@ -634,15 +630,6 @@ public sealed class PreviewHandlersTest
             Func<TState, Exception?, string> formatter)
         {
             _messages.Add(formatter(state, exception));
-        }
-    }
-
-    private sealed class StubConfig(LspConfiguration current) : ILspConfigurationProvider
-    {
-        public LspConfiguration Current { get; } = current;
-
-        public void LoadFrom(object? initializationOptions)
-        {
         }
     }
 

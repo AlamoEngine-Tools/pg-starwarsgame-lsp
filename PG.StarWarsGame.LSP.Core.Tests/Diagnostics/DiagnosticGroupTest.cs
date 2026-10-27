@@ -19,7 +19,7 @@ public sealed class DiagnosticGroupTest
     public void TheGroupsAddedFor050_KeepTheirNumbersAndNames(DiagnosticGroup group, int number, string name)
     {
         Assert.Equal(number, (int)group);
-        Assert.Equal(name, DiagnosticGroups.NameOf(group));
+        Assert.Equal(name, DiagnosticGroups.NameOf(group, TestCatalogues.English));
     }
 
     [Fact]

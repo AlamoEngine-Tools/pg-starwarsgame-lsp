@@ -3,7 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
-using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -26,10 +26,10 @@ public sealed class ApplyCreditsBatchHandler
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger<ApplyCreditsBatchHandler> logger,
-        ILspConfigurationProvider config,
+        IMessageCatalog messages,
         ILocalisationWriteLedger writeLedger,
         IProjectLayerMap layers)
-        : base(reloadService, fileHelper, logger, config, writeLedger, layers)
+        : base(reloadService, fileHelper, logger, messages, writeLedger, layers)
     {
         _editor = editor;
     }

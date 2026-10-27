@@ -16,7 +16,7 @@ public sealed class LuaPlanAnalyzerTest
     private static IReadOnlyList<Diagnostic> Analyze(string text, string uri = PlanUri)
     {
         var tree = LuaSyntaxTree.ParseText(text, new LuaParseOptions(LuaSyntaxOptions.Lua51));
-        return LuaPlanAnalyzer.Analyze(uri, tree);
+        return LuaPlanAnalyzer.Analyze(uri, tree, TestCatalogues.English);
     }
 
     [Fact]

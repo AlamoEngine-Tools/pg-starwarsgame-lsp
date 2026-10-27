@@ -65,6 +65,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly IXmlIndexFactProducer _indexProducer;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
+    private readonly IMessageCatalog _messages;
     private readonly IModelTextureIndex _modelTextures;
     private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
@@ -115,12 +116,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         ServerOptions options,
         IIconRepackStatusProvider iconRepack,
         IModelTextureIndex modelTextures,
-        IIconNameIndex iconNames)
+        IIconNameIndex iconNames,
+        IMessageCatalog messages)
         : base(sink, indexService, workspaceHost, options, logger, globalSuppressions, layerMap)
     {
         _iconRepack = iconRepack;
         _modelTextures = modelTextures;
         _iconNames = iconNames;
+        _messages = messages;
         _variantTagSource = variantTagSource;
         _hardpointProducer = hardpointProducer;
         _damageStageProducer = damageStageProducer;
@@ -144,9 +147,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     protected override string FileExtension => ".xml";
 
-    /// <summary>The server's texts in the configured locale.</summary>
-    private IMessageCatalog Messages => ResxMessageCatalog.Server(_configProvider.Current.Locale);
-
     /// <summary>Documents with a fix-token map; never pruned, so a workspace sweep fills it for every file.</summary>
     public CacheStatistics Snapshot()
     {
@@ -164,13 +164,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         // state as every other check in the pass.
         var objects = new EffectiveObjectResolver(index, _schema, _variantTagSource);
 
-        // The configured locale picks the server's own texts and the schema's notes alike. It was a
-        // fixed "en" here, so neither ever reached a diagnostic in another language.
-        var locale = _configProvider.Current.Locale;
-        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, locale,
+        // The configured locale picks the schema's notes; the server's own texts come from the one
+        // injected catalogue, which reads the same setting.
+        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, _configProvider.Current.Locale,
             _iconRepack.IconsAwaitingRepack, _modelTextures, _iconNames, objects)
         {
-            Messages = ResxMessageCatalog.Server(locale)
+            Messages = _messages
         };
 
         // One parse shared by every producer - and via the parse cache, shared with the indexing
@@ -477,7 +476,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
-                    Message = Messages.Format("DamageTypes_TooShort", tokens.Count, RequiredDamageTypeTail.Length),
+                    Message = _messages.Format("DamageTypes_TooShort", tokens.Count, RequiredDamageTypeTail.Length),
                     Range = SafeRange(line, col, len),
                     Source = AppProperties.LspServerId,
                     Code = DiagnosticIds.DamageTypesIncomplete.ToString()
@@ -496,7 +495,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             diagnostics.Add(new Diagnostic
             {
                 Severity = DiagnosticSeverity.Error,
-                Message = Messages.Format("DamageTypes_OutOfOrder", tail[i].Token, RequiredDamageTypeTail[i],
+                Message = _messages.Format("DamageTypes_OutOfOrder", tail[i].Token, RequiredDamageTypeTail[i],
                     RequiredDamageTypeTail.Length),
                 Range = SafeRange(line, col, tail[i].Token.Length),
                 Source = AppProperties.LspServerId,
@@ -572,7 +571,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
-                    Message = Messages.Format("HardcodedSet_Unknown", token, tagDef.HardcodedSet?.Name),
+                    Message = _messages.Format("HardcodedSet_Unknown", token, tagDef.HardcodedSet?.Name),
                     Range = SafeRange(line0, col0, len0),
                     Source = AppProperties.LspServerId,
                     Code = DiagnosticIds.UnknownHardcodedSetValue.ToString()
@@ -586,7 +585,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Warning,
-                    Message = Messages.Format("HardcodedSet_Deprecated", token),
+                    Message = _messages.Format("HardcodedSet_Deprecated", token),
                     Range = SafeRange(line0, col0, len0),
                     Source = AppProperties.LspServerId,
                     Code = DiagnosticIds.DeprecatedHardcodedSetValue.ToString()

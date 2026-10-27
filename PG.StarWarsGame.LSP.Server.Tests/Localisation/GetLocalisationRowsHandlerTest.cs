@@ -246,6 +246,6 @@ public sealed class GetLocalisationRowsHandlerTest
             registry ?? new LocalisationProjectRegistry(),
             new FileHelper(fs),
             NullLogger<GetLocalisationRowsHandler>.Instance,
-            config ?? new FakeLspConfigurationProvider());
+            TestCatalogues.English);
     }
 }

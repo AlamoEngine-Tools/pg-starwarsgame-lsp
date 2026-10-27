@@ -17,7 +17,7 @@ public sealed class StoryGraphProjectionScopeTest
 {
     private static GetStoryGraphHandler Handler()
     {
-        return new GetStoryGraphHandler(new StoryBattleFixture.ModelService(), new FakeLspConfigurationProvider(),
+        return new GetStoryGraphHandler(new StoryBattleFixture.ModelService(), TestCatalogues.English,
             new StubProjects(null));
     }
 

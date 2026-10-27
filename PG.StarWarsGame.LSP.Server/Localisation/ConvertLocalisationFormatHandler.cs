@@ -35,6 +35,7 @@ public sealed class ConvertLocalisationFormatHandler
     : IJsonRpcRequestHandler<ConvertLocalisationFormatParams, ConvertLocalisationFormatResult>
 {
     private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly ILocalisationFormatConverter _converter;
     private readonly ICsvTranslationImporter _csvImporter;
     private readonly IDatService _datFileService;
@@ -65,7 +66,8 @@ public sealed class ConvertLocalisationFormatHandler
         IModProjectFileWriter fileWriter,
         ILogger<ConvertLocalisationFormatHandler> logger,
         ILspConfigurationProvider config,
-        IProjectLayerMap layers)
+        IProjectLayerMap layers,
+        IMessageCatalog messages)
     {
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
@@ -81,6 +83,7 @@ public sealed class ConvertLocalisationFormatHandler
         _fileWriter = fileWriter;
         _logger = logger;
         _config = config;
+        _messages = messages;
         _layers = layers;
     }
 
@@ -88,33 +91,33 @@ public sealed class ConvertLocalisationFormatHandler
         ConvertLocalisationFormatParams request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_NoLocalisationFileWasGiven"));
+            return Fail(_messages.Format("LocConvert_NoLocalisationFileWasGiven"));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(request.ProjectFilePath))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertDoesNotExist",
+            return Fail(_messages.Format("LocConvert_CannotConvertDoesNotExist",
                 request.ProjectFilePath));
 
         // A conversion writes the new files beside the source and rewrites the project file's
         // format, both of which are the dependency's to decide when the source is its file (#276).
         if (LocalisationLayerGuard.ReadOnlyObjection(
-                _layers, _fileHelper, request.ProjectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
+                _layers, _fileHelper, request.ProjectFilePath, _messages) is { } readOnly)
             return Fail(readOnly);
 
         // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
         var targetFormat = request.TargetFormat ?? string.Empty;
         if (string.Equals(targetFormat, "dat", StringComparison.OrdinalIgnoreCase))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_DatNotATarget"));
+            return Fail(_messages.Format("LocConvert_DatNotATarget"));
 
         var targetExtension = _converter.ExtensionFor(targetFormat);
         if (targetExtension is null)
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_NotFormatCanBeWritten",
+            return Fail(_messages.Format("LocConvert_NotFormatCanBeWritten",
                 request.TargetFormat));
 
         var sourceExtension = fs.Path.GetExtension(request.ProjectFilePath).ToLowerInvariant();
         if (string.Equals(sourceExtension, targetExtension, StringComparison.OrdinalIgnoreCase))
             return Fail(
-                new ConfiguredMessageCatalog(_config).Format("LocConvert_AlreadyFormat", request.ProjectFilePath));
+                _messages.Format("LocConvert_AlreadyFormat", request.ProjectFilePath));
 
         // A single-language target gets one file per language in the source. Writing one file would
         // mean picking a language and dropping the others, which is exactly the silent data loss this
@@ -140,17 +143,17 @@ public sealed class ConvertLocalisationFormatHandler
             : [fs.Path.ChangeExtension(request.ProjectFilePath, targetExtension)];
 
         if (targets.Count == 0)
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertHoldsNoTranslations",
+            return Fail(_messages.Format("LocConvert_CannotConvertHoldsNoTranslations",
                 request.ProjectFilePath));
 
         // Checked before anything is written, so a collision cannot leave half a fan-out on disk.
         foreach (var existing in targets.Where(fs.File.Exists))
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_TargetExists", existing));
+            return Fail(_messages.Format("LocConvert_TargetExists", existing));
 
         foreach (var target in targets)
             if (!await _converter.WriteAsync(db, targetFormat, target, ct))
                 return Fail(
-                    new ConfiguredMessageCatalog(_config).Format("LocConvert_NotFormatCanBeWritten",
+                    _messages.Format("LocConvert_NotFormatCanBeWritten",
                         request.TargetFormat));
 
         _logger.LogInformation(
@@ -202,7 +205,7 @@ public sealed class ConvertLocalisationFormatHandler
             if (extension == ".dat")
             {
                 if (!LocalisationFileNameLanguageResolver.TryResolve(path, _langService, out var language))
-                    return new ConfiguredMessageCatalog(_config).Format("LocConvert_DatLanguageUnknown", path);
+                    return _messages.Format("LocConvert_DatLanguageUnknown", path);
 
                 using var datFile = _datFileService.LoadFile(path);
                 _datImporter.Import(datFile.Content, language!, db);
@@ -230,14 +233,14 @@ public sealed class ConvertLocalisationFormatHandler
 
                     return null;
                 default:
-                    return new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertNotLocalisationFormat",
+                    return _messages.Format("LocConvert_CannotConvertNotLocalisationFormat",
                         path, extension);
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "aet/convertLocalisationFormat: failed to read '{Path}'.", path);
-            return new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertCouldNotBe", path, ex.Message);
+            return _messages.Format("LocConvert_CannotConvertCouldNotBe", path, ex.Message);
         }
     }
 

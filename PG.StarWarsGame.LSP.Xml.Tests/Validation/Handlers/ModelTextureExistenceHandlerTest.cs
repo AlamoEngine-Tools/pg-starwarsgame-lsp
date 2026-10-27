@@ -32,7 +32,7 @@ public sealed class ModelTextureExistenceHandlerTest
     {
         var index = GameIndex.Empty with { AssetFiles = new MergedAssetFileIndex(paths) };
         return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en",
-            ModelTextures: textures);
+            ModelTextures: textures) { Messages = TestCatalogues.English };
     }
 
     [Fact]

@@ -62,7 +62,8 @@ public sealed class UnitSpawnProbabilityTableHandlerTest
         var index = new GameIndex(BaselineIndex.Empty,
             ImmutableDictionary<string, DocumentIndex>.Empty, defs,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
         // fact position (0,0); the bogus name sits on the SECOND line of the value.
         const string value = "\n  Rebel_Survivors_Small, 1.0\n  Missing_Unit, 1.0\n";
@@ -131,7 +132,7 @@ public sealed class UnitSpawnProbabilityTableHandlerTest
     public void Known_unit_names_return_no_diagnostics()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithObjects("X_Wing", "TIE_Fighter"),
-            "file:///test.xml", "en");
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "X_Wing, 0.5, TIE_Fighter, 0.3"), ctx).ToList();
         Assert.Empty(results);
     }
@@ -140,7 +141,7 @@ public sealed class UnitSpawnProbabilityTableHandlerTest
     public void Unknown_unit_name_returns_error()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithObjects("X_Wing"),
-            "file:///test.xml", "en");
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "X_Wing, 0.5, Missing_Unit, 0.3"), ctx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
@@ -151,7 +152,7 @@ public sealed class UnitSpawnProbabilityTableHandlerTest
     public void Multiple_unknown_names_return_one_error_each()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithObjects("X_Wing"),
-            "file:///test.xml", "en");
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Unknown_A, 0.5, Unknown_B, 0.3"), ctx).ToList();
         Assert.Equal(2, results.Count);
         Assert.All(results, d => Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity));
@@ -169,7 +170,7 @@ public sealed class UnitSpawnProbabilityTableHandlerTest
     public void Name_lookup_is_case_insensitive()
     {
         var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithObjects("X_Wing"),
-            "file:///test.xml", "en");
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "x_wing, 0.5"), ctx).ToList();
         Assert.Empty(results);
     }

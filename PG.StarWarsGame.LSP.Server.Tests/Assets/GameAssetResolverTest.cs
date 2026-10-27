@@ -203,7 +203,7 @@ public sealed class GameAssetResolverTest
         Assert.Equal(1, tiers.WorkspaceRootCount);
         Assert.False(tiers.HasBaseGamePath);
         Assert.False(tiers.HasExpansionPath);
-        Assert.Contains("baseGameDirectory", tiers.Explain(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("baseGameDirectory", tiers.Explain(TestCatalogues.English), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

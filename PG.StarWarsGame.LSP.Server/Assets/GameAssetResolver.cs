@@ -54,9 +54,8 @@ public sealed record GameAssetTiers(
     public bool CanResolveShippedAssets => HasBaseGamePath || HasExpansionPath;
 
     /// <summary>A sentence naming what is missing, for the preview to show verbatim.</summary>
-    public string Explain(IMessageCatalog? messages = null)
+    public string Explain(IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         if (!CanResolveShippedAssets)
             return messages.Format("AssetTiers_WorkspaceOnly");
 

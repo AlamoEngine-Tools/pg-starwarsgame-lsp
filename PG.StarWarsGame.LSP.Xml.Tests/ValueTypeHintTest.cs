@@ -45,13 +45,13 @@ public sealed class ValueTypeHintTest
             ]
         };
 
-        Assert.Equal("**Format:** `Terrain, Model` pairs", ValueTypeHint.Build(tag));
+        Assert.Equal("**Format:** `Terrain, Model` pairs", ValueTypeHint.Build(tag, TestCatalogues.English));
     }
 
     [Fact]
     public void TupleList_WithoutSlots_ClaimsNothingAboutTheItems()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.TupleList));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.TupleList), TestCatalogues.English);
 
         Assert.Equal("**Format:** comma-separated pairs", hint);
     }
@@ -65,7 +65,8 @@ public sealed class ValueTypeHintTest
             Slots = [new TupleSlotDefinition { Label = "Animation" }, new TupleSlotDefinition { Label = "Unit" }]
         };
 
-        Assert.Equal("**Format:** `Animation` keys, each followed by `Unit` items", ValueTypeHint.Build(tag));
+        Assert.Equal("**Format:** `Animation` keys, each followed by `Unit` items",
+            ValueTypeHint.Build(tag, TestCatalogues.English));
     }
 
     // ── scalar types ────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void Float_ContainsSuffixExample()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.Float));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.Float), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("1.0f", hint);
     }
@@ -81,7 +82,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NormalizedFloat_HintContainsRange()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NormalizedFloat));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NormalizedFloat), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("0.0", hint);
         Assert.Contains("1.0", hint);
@@ -90,7 +91,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void Boolean_ContainsTrueAndZero()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.Boolean));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.Boolean), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("True", hint);
         Assert.Contains("0", hint);
@@ -99,7 +100,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void SfxCount_ContainsUnlimited()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.SfxCount));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.SfxCount), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("-1", hint);
         Assert.Contains("unlimited", hint, StringComparison.OrdinalIgnoreCase);
@@ -108,7 +109,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void SfxPercentage_ContainsRange()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.SfxPercentage));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.SfxPercentage), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("0", hint);
         Assert.Contains("100", hint);
@@ -117,7 +118,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void UvSlotIndex_ContainsRange()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.UvSlotIndex));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.UvSlotIndex), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("0", hint);
         Assert.Contains("3", hint);
@@ -126,7 +127,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void ShaderVersionHex_ContainsExample()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.ShaderVersionHex));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.ShaderVersionHex), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("0x0200", hint);
     }
@@ -134,7 +135,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void VendorIdHex_ContainsExample()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.VendorIdHex));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.VendorIdHex), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("0x10DE", hint);
     }
@@ -144,7 +145,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void FloatVector2_ContainsXY()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector2));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector2), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("X, Y", hint);
     }
@@ -152,7 +153,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void FloatVector3_ContainsXYZ()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector3));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector3), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("X, Y, Z", hint);
     }
@@ -160,7 +161,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void FloatVector4_ContainsXYZW()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector4));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector4), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("X, Y, Z, W", hint);
     }
@@ -168,7 +169,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void RGBA_ContainsByteRange()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.RGBA));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.RGBA), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("255", hint);
     }
@@ -178,7 +179,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void IntList_MentionsSeparators()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.IntList));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.IntList), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("comma or space", hint, StringComparison.OrdinalIgnoreCase);
     }
@@ -186,7 +187,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void FloatList_MentionsSuffixAndSeparators()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatList));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatList), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("1.0f", hint);
     }
@@ -197,7 +198,7 @@ public sealed class ValueTypeHintTest
     public void NameReference_XmlObject_WithReferenceType_ContainsTypeName()
     {
         var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference,
-            ReferenceKind.XmlObject, "Faction"));
+            ReferenceKind.XmlObject, "Faction"), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("Faction", hint);
         Assert.DoesNotContain("space-separated", hint);
@@ -206,7 +207,8 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NameReference_XmlObject_NoReferenceType_Generic()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.XmlObject));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.XmlObject),
+            TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("XML object", hint, StringComparison.OrdinalIgnoreCase);
     }
@@ -214,7 +216,8 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NameReference_ModelFile_ContainsAlo()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.ModelFile));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.ModelFile),
+            TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains(".alo", hint);
     }
@@ -222,7 +225,8 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NameReference_TextureFile_ContainsTga()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.TextureFile));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.TextureFile),
+            TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains(".tga", hint);
     }
@@ -230,7 +234,8 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NameReference_AudioFile_MentionsAudio()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.AudioFile));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.AudioFile),
+            TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("audio", hint, StringComparison.OrdinalIgnoreCase);
     }
@@ -238,7 +243,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NameReference_BoneName_MentionsBone()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.BoneName));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.BoneName), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("bone", hint, StringComparison.OrdinalIgnoreCase);
     }
@@ -246,7 +251,8 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NameReference_LocalisationKey_ContainsTEXT()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.LocalisationKey));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.LocalisationKey),
+            TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("TEXT_xxx", hint);
     }
@@ -255,7 +261,7 @@ public sealed class ValueTypeHintTest
     public void NameReference_Enum_WithEnumName_ContainsEnumName()
     {
         var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference,
-            ReferenceKind.Enum, enumName: "ArmorType"));
+            ReferenceKind.Enum, enumName: "ArmorType"), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("ArmorType", hint);
     }
@@ -263,14 +269,14 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NameReference_None_ReturnsNull()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference), TestCatalogues.English);
         Assert.Null(hint);
     }
 
     [Fact]
     public void NameReference_Unknown_ReturnsNull()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.Unknown));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.Unknown), TestCatalogues.English);
         Assert.Null(hint);
     }
 
@@ -280,7 +286,7 @@ public sealed class ValueTypeHintTest
     public void NameReferenceList_XmlObject_WithReferenceType_ContainsSpaceSeparatedAndTypeName()
     {
         var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReferenceList,
-            ReferenceKind.XmlObject, "SFXEvent"));
+            ReferenceKind.XmlObject, "SFXEvent"), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("space-separated", hint, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("SFXEvent", hint);
@@ -289,7 +295,8 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void NameReferenceList_ModelFile_MentionsList()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReferenceList, ReferenceKind.ModelFile));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReferenceList, ReferenceKind.ModelFile),
+            TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains(".alo", hint);
         Assert.Contains("space-separated", hint, StringComparison.OrdinalIgnoreCase);
@@ -300,7 +307,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void SFXEventReference_MentionsSFXEvent()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.SFXEventReference));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.SFXEventReference), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("SFXEvent", hint);
     }
@@ -308,7 +315,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void SpeechEventReference_MentionsSpeechEvent()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.SpeechEventReference));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.SpeechEventReference), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("SpeechEvent", hint);
     }
@@ -316,7 +323,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void MusicEventReference_MentionsMusicEvent()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.MusicEventReference));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.MusicEventReference), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("MusicEvent", hint);
     }
@@ -324,7 +331,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void TypeReference_MentionsGameObjectType()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.TypeReference));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.TypeReference), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("game object type", hint, StringComparison.OrdinalIgnoreCase);
     }
@@ -335,7 +342,7 @@ public sealed class ValueTypeHintTest
     public void DynamicEnumValue_WithEnumName_ContainsEnumName()
     {
         var hint = ValueTypeHint.Build(Tag(XmlValueType.DynamicEnumValue,
-            enumName: "GameObjectCategoryType"));
+            enumName: "GameObjectCategoryType"), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("GameObjectCategoryType", hint);
     }
@@ -343,7 +350,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void DynamicEnumValue_NoEnumName_ReturnsFallback()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.DynamicEnumValue));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.DynamicEnumValue), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("enum", hint, StringComparison.OrdinalIgnoreCase);
     }
@@ -351,7 +358,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void ShipClassType_MentionsShipClasses()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.ShipClassType));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.ShipClassType), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("Corvette", hint);
     }
@@ -361,7 +368,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void UnitSpawnTable_ContainsUnlimited()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.UnitSpawnTable));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.UnitSpawnTable), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("-1", hint);
         Assert.Contains("unlimited", hint, StringComparison.OrdinalIgnoreCase);
@@ -370,7 +377,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void HardPointSfxMap_MentionsEmptyName()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.HardPointSfxMap));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.HardPointSfxMap), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("empty", hint, StringComparison.OrdinalIgnoreCase);
     }
@@ -378,7 +385,7 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void AbilityModFlag_MentionsBooleanValues()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.AbilityModFlag));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.AbilityModFlag), TestCatalogues.English);
         Assert.NotNull(hint);
         Assert.Contains("True", hint);
         Assert.Contains("False", hint);
@@ -389,14 +396,14 @@ public sealed class ValueTypeHintTest
     [Fact]
     public void FloatVector3List_ReturnsNull()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector3List));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector3List), TestCatalogues.English);
         Assert.Null(hint);
     }
 
     [Fact]
     public void AudioParamInt_ReturnsNull()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.AudioParamInt));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.AudioParamInt), TestCatalogues.English);
         Assert.Null(hint);
     }
 }

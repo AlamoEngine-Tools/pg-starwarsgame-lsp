@@ -105,9 +105,8 @@ public enum DiagnosticGroup
 /// <summary>Display names for <see cref="DiagnosticGroup" />, shown in suppression UI and hovers.</summary>
 public static class DiagnosticGroups
 {
-    public static string NameOf(DiagnosticGroup group, IMessageCatalog? messages = null)
+    public static string NameOf(DiagnosticGroup group, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         return group switch
         {
             DiagnosticGroup.References => messages.Format("DiagnosticGroup_References"),

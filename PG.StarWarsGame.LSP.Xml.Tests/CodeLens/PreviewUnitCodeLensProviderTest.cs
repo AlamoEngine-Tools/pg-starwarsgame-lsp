@@ -37,7 +37,8 @@ public sealed class PreviewUnitCodeLensProviderTest
 
     private static CodeLensSymbolContext Ctx(GameSymbol symbol, GameIndex index)
     {
-        return new CodeLensSymbolContext(symbol, (FileOrigin)symbol.Origin, index);
+        return new CodeLensSymbolContext(symbol, (FileOrigin)symbol.Origin, index)
+            { Messages = TestCatalogues.English };
     }
 
     private static VariantTag Tag(string name, string value)

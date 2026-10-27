@@ -59,9 +59,8 @@ public static class LanguageCoverageInspector
     }
 
     /// <summary>The warning text, phrased once so both editors say the same thing.</summary>
-    public static string Message(string language, int empty, int total, IMessageCatalog? messages = null)
+    public static string Message(string language, int empty, int total, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         return messages.Format("LanguageCoverage_Missing", language, empty, total);
     }
 

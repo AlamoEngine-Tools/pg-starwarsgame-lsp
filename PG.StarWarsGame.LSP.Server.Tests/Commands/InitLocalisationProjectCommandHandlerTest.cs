@@ -412,7 +412,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
             seedWriter,
             NullLogger<InitLocalisationProjectCommandHandler>.Instance,
             lspConfig ?? new FakeLspConfigurationProvider(),
-            notifier);
+            notifier, TestCatalogues.English);
 
         return (handler, mockFs, reload, writer, notifier);
     }

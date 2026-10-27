@@ -24,7 +24,7 @@ public sealed class TagNameHoverStrategyTest
         XmlUtility.TryFindNode(hapDoc, nodeLine, out var node);
         var ctx = new HoverContext(DocUri, GameIndex.Empty, schema,
             hapDoc, rootNode!, node ?? rootNode!,
-            isOnTagName, nodeLine, 1, "en");
+            isOnTagName, nodeLine, 1, "en", TestCatalogues.English);
         return (ctx, schema);
     }
 

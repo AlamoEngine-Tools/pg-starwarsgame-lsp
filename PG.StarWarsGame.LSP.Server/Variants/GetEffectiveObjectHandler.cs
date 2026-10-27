@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.JsonRpc;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -16,18 +15,18 @@ namespace PG.StarWarsGame.LSP.Server.Variants;
 public sealed class GetEffectiveObjectHandler
     : IJsonRpcRequestHandler<GetEffectiveObjectParams, GetEffectiveObjectResult>
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IGameIndexService _indexService;
     private readonly ISchemaProvider _schema;
     private readonly IVariantTagSource _tagSource;
 
     public GetEffectiveObjectHandler(IGameIndexService indexService, ISchemaProvider schema,
-        IVariantTagSource tagSource, ILspConfigurationProvider config)
+        IVariantTagSource tagSource, IMessageCatalog messages)
     {
         _indexService = indexService;
         _schema = schema;
         _tagSource = tagSource;
-        _config = config;
+        _messages = messages;
     }
 
     public Task<GetEffectiveObjectResult> Handle(GetEffectiveObjectParams request,
@@ -44,7 +43,7 @@ public sealed class GetEffectiveObjectHandler
             effective.Cyclic,
             effective.CycleObjectId,
             effective.Chain,
-            EffectiveObjectXmlRenderer.Render(effective, new ConfiguredMessageCatalog(_config)),
+            EffectiveObjectXmlRenderer.Render(effective, _messages),
             effective.TypeName));
     }
 }

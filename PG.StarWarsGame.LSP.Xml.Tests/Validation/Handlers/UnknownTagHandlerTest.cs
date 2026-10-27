@@ -22,7 +22,8 @@ public sealed class UnknownTagHandlerTest
     private static readonly UnknownTagHandler Sut = new();
 
     private static readonly DiagnosticsContext Ctx =
-        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en");
+        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
     private static XmlUnknownTagFact Fact(string? suggestion)
     {

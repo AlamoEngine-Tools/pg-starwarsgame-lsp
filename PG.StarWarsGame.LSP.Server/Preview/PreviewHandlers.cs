@@ -6,7 +6,6 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -32,7 +31,7 @@ namespace PG.StarWarsGame.LSP.Server.Preview;
 ///     </para>
 /// </remarks>
 public sealed class GetProjectileHandler(
-    ILspConfigurationProvider config,
+    IMessageCatalog messages,
     IGameIndexService indexService,
     ISchemaProvider schema,
     IVariantTagSource tagSource)
@@ -44,18 +43,18 @@ public sealed class GetProjectileHandler(
         var id = request.Name.Trim();
         if (id.Length == 0)
             return Task.FromResult(new GetProjectileResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoProjectileWasNamed")));
+                messages.Format("PreviewHandlers_NoProjectileWasNamed")));
 
         // The problems the builder would have raised are collected and dropped: this is a request
         // for ONE projectile and the caller wants an answer about it, not a scene's problem list.
         var problems = new List<PreviewProblem>();
         var resolver = new EffectiveObjectResolver(indexService.Current, schema, tagSource);
-        var found = PreviewSceneBuilder.ProjectilesFor(resolver, [id], problems, new ConfiguredMessageCatalog(config))
+        var found = PreviewSceneBuilder.ProjectilesFor(resolver, [id], problems, messages)
             .FirstOrDefault();
 
         return Task.FromResult(found is null
             ? new GetProjectileResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ProjectileNotDefinedThisProject", id))
+                messages.Format("PreviewHandlers_ProjectileNotDefinedThisProject", id))
             : new GetProjectileResult(found));
     }
 }
@@ -97,7 +96,7 @@ public sealed class ListModelsHandler(IGameIndexService indexService)
 public sealed class GetPreviewSceneHandler(
     PreviewSceneBuilder builder,
     IGameAssetResolver assets,
-    ILspConfigurationProvider config,
+    IMessageCatalog messages,
     IWorkspaceIconCatalog icons)
     : IJsonRpcRequestHandler<GetPreviewSceneParams, GetPreviewSceneResult>
 {
@@ -121,7 +120,7 @@ public sealed class GetPreviewSceneHandler(
                 builder.BuildForModel(PreviewModelReference.Normalise(request.ModelReference)));
 
         return new GetPreviewSceneResult(PreviewScene.NotFound(
-            string.Empty, new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoObjectModelAnimationWas"),
+            string.Empty, messages.Format("PreviewHandlers_NoObjectModelAnimationWas"),
             assets.Tiers));
     }
 
@@ -156,7 +155,7 @@ public sealed class GetPreviewSceneHandler(
 /// <summary>Serves one model as a glTF binary.</summary>
 public sealed class GetModelGlbHandler(
     IGameAssetResolver assets,
-    ILspConfigurationProvider config,
+    IMessageCatalog messages,
     ILogger<GetModelGlbHandler> logger)
     : IJsonRpcRequestHandler<GetModelGlbParams, GetModelGlbResult>
 {
@@ -165,13 +164,13 @@ public sealed class GetModelGlbHandler(
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
             return Task.FromResult(new GetModelGlbResult(null, [],
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoModelWasNamed")));
+                messages.Format("PreviewHandlers_NoModelWasNamed")));
 
         var bytes = assets.Read(PreviewModelReference.ModelPath(reference));
         if (bytes is null)
             return Task.FromResult(new GetModelGlbResult(null, [],
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelWasNotFound", reference,
-                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
+                messages.Format("PreviewHandlers_ModelWasNotFound", reference,
+                    assets.Tiers.Explain(messages))));
 
         try
         {
@@ -187,13 +186,13 @@ public sealed class GetModelGlbHandler(
             // The reader is strict on purpose; a refusal names the chunk that did not add up, which is
             // far more use to the author than a half-drawn model would be.
             return Task.FromResult(new GetModelGlbResult(null, [],
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
+                messages.Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "Unexpected failure exporting {Model}", reference);
             return Task.FromResult(new GetModelGlbResult(null, [],
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeExported", reference,
+                messages.Format("PreviewHandlers_CouldNotBeExported", reference,
                     e.Message)));
         }
     }
@@ -280,7 +279,7 @@ public sealed class GetModelGlbHandler(
 /// </remarks>
 public sealed class GetModelDetailHandler(
     IGameAssetResolver assets,
-    ILspConfigurationProvider config,
+    IMessageCatalog messages,
     ILogger<GetModelDetailHandler> logger)
     : IJsonRpcRequestHandler<GetModelDetailParams, GetModelDetailResult>
 {
@@ -290,13 +289,13 @@ public sealed class GetModelDetailHandler(
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
             return Task.FromResult(new GetModelDetailResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoModelWasNamed")));
+                messages.Format("PreviewHandlers_NoModelWasNamed")));
 
         var bytes = assets.Read(PreviewModelReference.ModelPath(reference));
         if (bytes is null)
             return Task.FromResult(new GetModelDetailResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelWasNotFound", reference,
-                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
+                messages.Format("PreviewHandlers_ModelWasNotFound", reference,
+                    assets.Tiers.Explain(messages))));
 
         try
         {
@@ -309,13 +308,13 @@ public sealed class GetModelDetailHandler(
         catch (AloFormatException e)
         {
             return Task.FromResult(new GetModelDetailResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
+                messages.Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "Unexpected failure reading detail for {Model}", reference);
             return Task.FromResult(new GetModelDetailResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeInspected", reference,
+                messages.Format("PreviewHandlers_CouldNotBeInspected", reference,
                     e.Message)));
         }
     }
@@ -329,7 +328,7 @@ public sealed class GetModelDetailHandler(
 /// </remarks>
 public sealed class GetSubMeshGeometryHandler(
     IGameAssetResolver assets,
-    ILspConfigurationProvider config,
+    IMessageCatalog messages,
     ILogger<GetSubMeshGeometryHandler> logger)
     : IJsonRpcRequestHandler<GetSubMeshGeometryParams, GetSubMeshGeometryResult>
 {
@@ -339,13 +338,13 @@ public sealed class GetSubMeshGeometryHandler(
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
             return Task.FromResult(new GetSubMeshGeometryResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoModelWasNamed")));
+                messages.Format("PreviewHandlers_NoModelWasNamed")));
 
         var bytes = assets.Read(PreviewModelReference.ModelPath(reference));
         if (bytes is null)
             return Task.FromResult(new GetSubMeshGeometryResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelWasNotFound", reference,
-                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
+                messages.Format("PreviewHandlers_ModelWasNotFound", reference,
+                    assets.Tiers.Explain(messages))));
 
         try
         {
@@ -353,7 +352,7 @@ public sealed class GetSubMeshGeometryHandler(
 
             return Task.FromResult(new GetSubMeshGeometryResult(PreviewSubMeshGeometry.From(
                 reference, model, request.MeshIndex, request.SubMeshIndex, request.Table,
-                request.Offset, request.Count, new ConfiguredMessageCatalog(config))));
+                request.Offset, request.Count, messages)));
         }
         catch (ArgumentOutOfRangeException e)
         {
@@ -364,13 +363,13 @@ public sealed class GetSubMeshGeometryHandler(
         catch (AloFormatException e)
         {
             return Task.FromResult(new GetSubMeshGeometryResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
+                messages.Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "Unexpected failure reading geometry for {Model}", reference);
             return Task.FromResult(new GetSubMeshGeometryResult(null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeInspected", reference,
+                messages.Format("PreviewHandlers_CouldNotBeInspected", reference,
                     e.Message)));
         }
     }
@@ -379,7 +378,7 @@ public sealed class GetSubMeshGeometryHandler(
 /// <summary>Serves one texture's bytes, undecoded.</summary>
 public sealed class GetModelTextureHandler(
     IGameAssetResolver assets,
-    ILspConfigurationProvider config)
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<GetModelTextureParams, GetModelTextureResult>
 {
     /// <summary>Textures live here, and a shader parameter names one without any path.</summary>
@@ -391,20 +390,20 @@ public sealed class GetModelTextureHandler(
         var name = request.Name.Trim();
         if (string.IsNullOrEmpty(name))
             return Task.FromResult(new GetModelTextureResult(null, null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoTextureWasNamed")));
+                messages.Format("PreviewHandlers_NoTextureWasNamed")));
 
         // Locate before reading so the ACTUAL extension is reported: a .tga reference routinely
         // resolves to a .dds, and the client picks its decoder from what it is given.
         var location = assets.Locate(TextureDirectory + name);
         if (location is null)
             return Task.FromResult(new GetModelTextureResult(null, null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_TextureWasNotFound", name,
-                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
+                messages.Format("PreviewHandlers_TextureWasNotFound", name,
+                    assets.Tiers.Explain(messages))));
 
         var bytes = assets.Read(TextureDirectory + name);
         if (bytes is null)
             return Task.FromResult(new GetModelTextureResult(null, null,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_TextureResolvedButCouldNot", name)));
+                messages.Format("PreviewHandlers_TextureResolvedButCouldNot", name)));
 
         var format = Path.GetExtension(location.ResolvedPath).TrimStart('.').ToLowerInvariant();
         return Task.FromResult(new GetModelTextureResult(format, Convert.ToBase64String(bytes)));
@@ -443,7 +442,7 @@ public sealed class GetShaderSourceHandler(ShaderSourceResolver shaders)
 /// </remarks>
 public sealed class GetParticleSystemHandler(
     IGameAssetResolver assets,
-    ILspConfigurationProvider config,
+    IMessageCatalog messages,
     IGameIndexService indexService,
     ISchemaProvider schema,
     IVariantTagSource tagSource)
@@ -466,7 +465,7 @@ public sealed class GetParticleSystemHandler(
         if (string.IsNullOrEmpty(name))
             return Task.FromResult(
                 new GetParticleSystemResult(null,
-                    Error: new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoParticleSystemWasNamed")));
+                    Error: messages.Format("PreviewHandlers_NoParticleSystemWasNamed")));
 
         var scale = ScaleFactorOf(owner);
 
@@ -477,8 +476,8 @@ public sealed class GetParticleSystemHandler(
         var bytes = assets.Read(PreviewModelReference.ModelPath(name));
         if (bytes is null)
             return Task.FromResult(new GetParticleSystemResult(null, scale,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ParticleSystemWasNotFound", name,
-                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
+                messages.Format("PreviewHandlers_ParticleSystemWasNotFound", name,
+                    assets.Tiers.Explain(messages))));
 
         try
         {
@@ -491,7 +490,7 @@ public sealed class GetParticleSystemHandler(
         catch (AloFormatException e)
         {
             return Task.FromResult(new GetParticleSystemResult(null, scale,
-                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeRead", name, e.Message)));
+                messages.Format("PreviewHandlers_CouldNotBeRead", name, e.Message)));
         }
     }
 

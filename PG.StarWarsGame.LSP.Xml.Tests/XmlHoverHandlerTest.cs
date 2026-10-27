@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -37,7 +38,8 @@ public sealed class XmlHoverHandlerTest
     private static (XmlHoverHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
         FakeConfigProvider config) Build(FakeFileTypeRegistry? registry = null,
             FakeGameIndexService? indexService = null,
-            IEaWXmlContext? ctx = null)
+            IEaWXmlContext? ctx = null,
+            IMessageCatalog? messages = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new SchemaProviderBuilder().Build();
@@ -52,7 +54,7 @@ public sealed class XmlHoverHandlerTest
                 config,
                 NullLogger<XmlHoverHandler>.Instance,
                 new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
-                strategyRegistry),
+                strategyRegistry, messages ?? TestCatalogues.English),
             host, schema, config);
     }
 
@@ -233,6 +235,22 @@ public sealed class XmlHoverHandlerTest
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("Deutsch", md);
         Assert.DoesNotContain("English", md);
+    }
+
+    /// <summary>
+    ///     The server's own words in a hover come from the ONE injected catalogue (#306), never from one
+    ///     the hover builds for the locale: a tag without a description says so in the catalogue's voice.
+    /// </summary>
+    [Fact]
+    public async Task Handle_TheHoverSpeaksTheInjectedCatalogue()
+    {
+        var (handler, host, schema, _) = Build(messages: new MarkerMessageCatalog());
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
+        schema.Add(MakeTag("Foo", descEn: null));
+
+        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+
+        Assert.Contains("[HoverUtility_NoDescription]", result!.Contents.MarkupContent!.Value);
     }
 
     [Fact]

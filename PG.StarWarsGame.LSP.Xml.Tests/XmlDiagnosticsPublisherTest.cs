@@ -77,7 +77,8 @@ public sealed class XmlDiagnosticsPublisherTest
             FakeFileTypeRegistry? registry = null,
             ILspConfigurationProvider? config = null,
             IStoryChainProblemStore? storyChainProblems = null,
-            bool withStructure = false)
+            bool withStructure = false,
+            IMessageCatalog? messages = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -118,7 +119,8 @@ public sealed class XmlDiagnosticsPublisherTest
             effectiveRegistry,
             fileHelper,
             configProvider: config,
-            storyChainProblems: storyChainProblems);
+            storyChainProblems: storyChainProblems,
+            messages: messages);
         return (publisher, published, indexService, workspaceHost);
     }
 
@@ -568,6 +570,23 @@ public sealed class XmlDiagnosticsPublisherTest
 
         Assert.Equal(2, published.Count);
         Assert.All(published, p => Assert.Contains(p.Diagnostics, d => d.Message.Contains("UNIT_A")));
+    }
+
+    /// <summary>
+    ///     A diagnostic's text comes from the ONE injected catalogue (#306): the context a handler gets
+    ///     carries the publisher's catalogue, not one built from the locale per run.
+    /// </summary>
+    [Fact]
+    public void OnIndexChanged_TheDiagnosticsSpeakTheInjectedCatalogue()
+    {
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(messages: new MarkerMessageCatalog());
+        var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
+        workspaceHost.With("file:///a.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+
+        indexService.Raise(index);
+
+        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
+        Assert.Equal("[DuplicateSymbol_DuplicateSymbolAlsoDefinedIn]", diagnostic.Message);
     }
 
     [Fact]

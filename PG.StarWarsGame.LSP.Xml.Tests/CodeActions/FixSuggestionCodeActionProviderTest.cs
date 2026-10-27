@@ -16,7 +16,7 @@ public sealed class FixSuggestionCodeActionProviderTest
 
     private static XmlCodeActionContext Ctx(Diagnostic d)
     {
-        return new XmlCodeActionContext(TestUri, d);
+        return new XmlCodeActionContext(TestUri, d) { Messages = TestCatalogues.English };
     }
 
     [Fact]

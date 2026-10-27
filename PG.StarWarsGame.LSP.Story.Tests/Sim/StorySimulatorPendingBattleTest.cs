@@ -103,7 +103,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void LinkTactical_MakesItsBattlePending_AndHoldsGameplayTime()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
 
         var start = sim.Start();
 
@@ -131,7 +131,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void WhilePending_TheStoryIsStillServiced_FlagPollsFire()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var start = sim.Start();
 
         var polled = sim.Tick(sim.SetFlag(start, "F", 1));
@@ -146,7 +146,8 @@ public sealed class StorySimulatorPendingBattleTest
         var auto =
             "<Event Name=\"AutoBegin\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Link</Prereq>" +
             "<Reward_Type>FORCE_CLICK_GUI</Reward_Type><Reward_Param1>choice_button_left</Reward_Param1></Event>";
-        var sim = new StorySimulator(Model(GalaxyText(between: auto)), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText(between: auto)), Schema, new AnyWorldSymbols(),
+            TestCatalogues.English);
 
         var start = sim.Start();
 
@@ -165,7 +166,8 @@ public sealed class StorySimulatorPendingBattleTest
         var auto =
             "<Event Name=\"AutoBegin\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Link</Prereq>" +
             "<Reward_Type>FORCE_CLICK_GUI</Reward_Type><Reward_Param1>CHOICE_BUTTON_RIGHT</Reward_Param1></Event>";
-        var sim = new StorySimulator(Model(GalaxyText(between: auto)), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText(between: auto)), Schema, new AnyWorldSymbols(),
+            TestCatalogues.English);
 
         var start = sim.Start();
 
@@ -178,7 +180,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void TheAuthorsClick_OnTheFightButton_TakesTheChoice_AndRaisesTheClickEvent()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var start = sim.Start();
 
         var chosen = sim.ApplyWorldChange(start, Click("choice_button_left"));
@@ -191,7 +193,7 @@ public sealed class StorySimulatorPendingBattleTest
     public void PendingPanelOff_StartsTheBattleAtOnce()
     {
         var sim = new StorySimulator(Model(GalaxyText("<Reward_Param13>0</Reward_Param13>")), Schema,
-            new AnyWorldSymbols());
+            new AnyWorldSymbols(), TestCatalogues.English);
 
         var start = sim.Start();
 
@@ -202,7 +204,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void ResolveBattleOutcome_ClearsThePendingBattle_AndGameplayTimeRunsAgain()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var start = sim.Tick(sim.Start(), 5);
 
         var resolved = sim.ResolveBattleOutcome(start,
@@ -219,7 +221,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void TheLossListenerBehindTheSummary_BelongsToTheBattle_AndGoesMootOnceItIsWon()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var start = sim.Start();
         Assert.Equal(M2Key, sim.BattleOf(Id("Lost")));
 
@@ -238,7 +240,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void TheLossListenerBehindTheSummary_MissesTheLoss_AsItDoesInTheGame()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
 
         var resolved = sim.ResolveBattleOutcome(sim.Start(),
             new StoryWorldChange(StoryWorldChangeKind.BattleLost) { BattleKey = M2Key });
@@ -250,7 +252,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void LinkedAgainAfterAnOutcome_IsANewAttempt()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var lost = sim.ResolveBattleOutcome(sim.Start(),
             new StoryWorldChange(StoryWorldChangeKind.BattleLost) { BattleKey = M2Key });
         Assert.Equal("lost", lost.Runtime.World.BattleOutcomes[M2Key]);
@@ -268,7 +270,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void AGenericTheGameNeverRaises_IsNoDecision_AnEngineRaisedOneIs()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
 
         var start = sim.Start();
 
@@ -288,7 +290,8 @@ public sealed class StorySimulatorPendingBattleTest
             "<Event Name=\"Dialog\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Returned</Prereq>" +
             "<Reward_Type>TUTORIAL_DIALOG</Reward_Type><Reward_Param1>TEXT_DONE</Reward_Param1></Event>" +
             "<Event Name=\"Continue\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>Continue_Tutorial</Event_Param1></Event>";
-        var sim = new StorySimulator(Model(GalaxyText(between: dialog)), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText(between: dialog)), Schema, new AnyWorldSymbols(),
+            TestCatalogues.English);
         var start = sim.Start();
 
         Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, start, "Continue"));
@@ -312,7 +315,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void AFlagListenerWhoseConditionHolds_IsClockWork_NotAWait()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var start = sim.Start();
         var idle = sim.GetClockPending(start);
 
@@ -329,7 +332,7 @@ public sealed class StorySimulatorPendingBattleTest
     [Fact]
     public void RuledOut_IsNoDecision_UntilReconsidered_AndClearsWhenItFires()
     {
-        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText()), Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var start = sim.Start();
         Assert.Contains(sim.GetInterventions(start), i => i.EventName == "Zoomed");
 
@@ -355,7 +358,8 @@ public sealed class StorySimulatorPendingBattleTest
         var second =
             "<Event Name=\"Link2\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Link</Prereq>" +
             "<Reward_Type>LINK_TACTICAL</Reward_Type><Reward_Param1>" + M5 + "</Reward_Param1></Event>";
-        var sim = new StorySimulator(Model(GalaxyText(between: second)), Schema, new AnyWorldSymbols());
+        var sim = new StorySimulator(Model(GalaxyText(between: second)), Schema, new AnyWorldSymbols(),
+            TestCatalogues.English);
 
         var start = sim.Start();
 

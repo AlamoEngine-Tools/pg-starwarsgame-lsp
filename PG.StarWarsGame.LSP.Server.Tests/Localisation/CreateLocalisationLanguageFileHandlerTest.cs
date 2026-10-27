@@ -183,7 +183,7 @@ public sealed class CreateLocalisationLanguageFileHandlerTest
             registry,
             new NoopReloadService(),
             NullLogger<CreateLocalisationLanguageFileHandler>.Instance,
-            new FakeLspConfigurationProvider(),
+            TestCatalogues.English,
             Layers(new FileHelper(fs), dependencyOwnsTheSource));
 
         return (handler, fs);

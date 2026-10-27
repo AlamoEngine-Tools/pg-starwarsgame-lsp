@@ -39,9 +39,8 @@ public sealed class XmlFormattingHandlersTest
         var cache = new OneDocumentCache(text);
         var context = new FixedEaWContext(eaw);
         var files = new FileHelper(new MockFileSystem());
-        var config = new FakeLspConfigurationProvider();
-        return (new XmlDocumentFormattingHandler(cache, context, files, _notifier, config),
-            new XmlDocumentRangeFormattingHandler(cache, context, files, _notifier, config));
+        return (new XmlDocumentFormattingHandler(cache, context, files, _notifier, TestCatalogues.English),
+            new XmlDocumentRangeFormattingHandler(cache, context, files, _notifier, TestCatalogues.English));
     }
 
     [Fact]

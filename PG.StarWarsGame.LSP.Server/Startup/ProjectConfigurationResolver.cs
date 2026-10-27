@@ -19,6 +19,7 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
 {
     private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IModProjectDetector _detector;
     private readonly ModProjectLoader _loader;
     private readonly ILogger<ProjectConfigurationResolver> _logger;
@@ -34,19 +35,18 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         IUserNotifier notifier,
         ILogger<ProjectConfigurationResolver> logger,
         ServerStatusRecorder status,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        IMessageCatalog messages)
     {
         _status = status;
         _config = config;
+        _messages = messages;
         _detector = detector;
         _loader = loader;
         _resolver = resolver;
         _notifier = notifier;
         _logger = logger;
     }
-
-    /// <summary>The server's texts in the configured locale.</summary>
-    private IMessageCatalog Messages => new ConfiguredMessageCatalog(_config);
 
     public WorkspaceConfiguration? Resolve(IReadOnlyList<string> roots)
     {
@@ -65,7 +65,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
                 _logger.LogError("The project file named by the client does not exist: '{Path}'", named);
                 _status.RecordProject(false, ProjectProblem.Missing);
                 _notifier.ShowError(
-                    Messages.Format("ProjectConfig_ProjectFileDoesNotExist", named));
+                    _messages.Format("ProjectConfig_ProjectFileDoesNotExist", named));
                 return null;
             }
 
@@ -84,7 +84,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
                     // and how many are not, rather than refusing the whole folder as before.
                     _status.RecordOtherProjectFiles(others.Count);
                     _notifier.ShowWarning(
-                        Messages.Format("ProjectConfig_LoadedOtherProjectFileS",
+                        _messages.Format("ProjectConfig_LoadedOtherProjectFileS",
                             _resolver.FileHelper.FileSystem.Path.GetFileName(pgprojPath), others.Count));
                 }
 
@@ -106,7 +106,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
             // failing silently. ModProjectLoadException already carries a user-facing message.
             var message = ex is ModProjectLoadException
                 ? ex.Message
-                : Messages.Format("ProjectConfig_CouldNotLoadModProject", ex.Message);
+                : _messages.Format("ProjectConfig_CouldNotLoadModProject", ex.Message);
             _notifier.ShowError(message);
             return null;
         }
@@ -132,7 +132,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
                 string.Join(", ", roots));
             _notifier.ShowError(ex is ModProjectLoadException
                 ? ex.Message
-                : Messages.Format("ProjectConfig_CouldNotLoadModProject", ex.Message));
+                : _messages.Format("ProjectConfig_CouldNotLoadModProject", ex.Message));
             return null;
         }
     }
@@ -148,7 +148,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         // The client is offering to write one: that offer is the message, and this would only repeat it.
         if (_config.Current.ProjectFileOffered) return null;
         _notifier.ShowError(
-            Messages.Format("ProjectConfig_NoPgprojFileWasFound", string.Join(", ", roots)));
+            _messages.Format("ProjectConfig_NoPgprojFileWasFound", string.Join(", ", roots)));
         return null;
     }
 }

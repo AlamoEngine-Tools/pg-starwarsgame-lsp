@@ -309,7 +309,7 @@ public sealed class StorySimulationServiceTest
         var (service, _) = BuildService();
         var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags { StorySimulator = false });
 
-        var result = await new StorySimStartHandler(service, config)
+        var result = await new StorySimStartHandler(service, config, TestCatalogues.English)
             .Handle(new StorySimStartParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Equal(ResxMessageCatalog.Server("en").Format(StorySimFeature.DisabledKey), result.Error);
@@ -324,7 +324,7 @@ public sealed class StorySimulationServiceTest
         var (service, _) = BuildService();
         var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags());
 
-        var started = await new StorySimStartHandler(service, config)
+        var started = await new StorySimStartHandler(service, config, TestCatalogues.English)
             .Handle(new StorySimStartParams("GC", "Rebel") { AssumeMediaCompletes = null }, CancellationToken.None);
 
         Assert.True(started.State!.AssumeMediaCompletes);
@@ -336,11 +336,11 @@ public sealed class StorySimulationServiceTest
         var (service, _) = BuildService();
         var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags());
 
-        var started = await new StorySimStartHandler(service, config)
+        var started = await new StorySimStartHandler(service, config, TestCatalogues.English)
             .Handle(new StorySimStartParams("GC", "Rebel"), CancellationToken.None);
-        var advanced = await new StorySimAdvanceClockHandler(service, config)
+        var advanced = await new StorySimAdvanceClockHandler(service, config, TestCatalogues.English)
             .Handle(new StorySimAdvanceClockParams("GC", "Rebel", 5), CancellationToken.None);
-        var ticked = await new StorySimTickHandler(service, config)
+        var ticked = await new StorySimTickHandler(service, config, TestCatalogues.English)
             .Handle(new StorySimTickParams("GC", "Rebel", 1, advanced.State!.TotalSteps), CancellationToken.None);
 
         Assert.Null(started.Error);

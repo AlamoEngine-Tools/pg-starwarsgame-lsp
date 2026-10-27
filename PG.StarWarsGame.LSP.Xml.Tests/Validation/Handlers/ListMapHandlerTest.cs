@@ -67,7 +67,8 @@ public sealed class ListMapHandlerTest
 
     private static DiagnosticsContext Ctx(GameIndex? index = null)
     {
-        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index ?? Game, "file:///units.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index ?? Game, "file:///units.xml", "en")
+            { Messages = TestCatalogues.English };
     }
 
     // Items laid out on one line, ten columns apart, so a diagnostic's column names its item.

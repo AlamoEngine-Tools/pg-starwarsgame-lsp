@@ -37,6 +37,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     private static readonly JsonSerializerOptions LuaManifestJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly SchemaHttpCache _cache;
     private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IFileHelper _fileHelper;
     private readonly IFileSystem _fileSystem;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -65,11 +66,13 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         ILogger<HttpSchemaProvider> httpLogger,
         ServerStatusRecorder status,
         // The Lua analyzer reads the stubs from the directory recorded here.
-        LuaStubLocation luaStubs)
+        LuaStubLocation luaStubs,
+        IMessageCatalog messages)
     {
         _status = status;
         _luaStubs = luaStubs;
         _config = config;
+        _messages = messages;
         _proxy = proxy;
         _luaProxy = luaProxy;
         _fileSystem = fileSystem;
@@ -166,7 +169,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     {
         if (provider.AllTags.Count > 0) return;
 
-        var message = new ConfiguredMessageCatalog(_config).Format("SchemaBootstrapper_NoSchemaPointAetEaw", localPath);
+        var message = _messages.Format("SchemaBootstrapper_NoSchemaPointAetEaw", localPath);
         _logger.LogError("{Message}", message);
         _notifier.ShowError(message);
     }

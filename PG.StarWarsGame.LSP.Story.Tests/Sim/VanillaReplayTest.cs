@@ -75,7 +75,7 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
 
         void ReplayScope(string? scope)
         {
-            var sim = new StorySimulator(model, schema, new AnyWorldSymbols(), scope);
+            var sim = new StorySimulator(model, schema, new AnyWorldSymbols(), TestCatalogues.English, scope);
             var snapshot = sim.Start();
             var commands = 0;
             var idleAdvances = 0;

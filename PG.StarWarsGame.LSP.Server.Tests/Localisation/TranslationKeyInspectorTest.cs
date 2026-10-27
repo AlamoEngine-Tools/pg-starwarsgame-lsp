@@ -31,7 +31,7 @@ public sealed class TranslationKeyInspectorTest
 
     private static IReadOnlyList<LocTranslationProblemDto> Inspect(params string[] keys)
     {
-        return TranslationKeyInspector.Inspect(keys, Hashing());
+        return TranslationKeyInspector.Inspect(keys, Hashing(), TestCatalogues.English);
     }
 
     /// <summary>

@@ -35,6 +35,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
     public const string CommandName = "aet-eaw-edit.lsp.importLocalisationProject";
     private readonly ILspConfigurationProvider _config;
 
+    private readonly IMessageCatalog _messages;
     private readonly ICsvTranslationImporter _csvImporter;
     private readonly IDatService _datFileService;
     private readonly IDatTranslationImporter _datImporter;
@@ -63,7 +64,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         IModProjectFileWriter fileWriter,
         ILogger<ImportLocalisationProjectCommandHandler> logger,
         ILspConfigurationProvider config,
-        IUserNotifier notifier)
+        IUserNotifier notifier,
+        IMessageCatalog messages)
     {
         _notifier = notifier;
         _csvImporter = csvImporter;
@@ -79,13 +81,14 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         _fileWriter = fileWriter;
         _logger = logger;
         _config = config;
+        _messages = messages;
     }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
         if (request.Arguments?.FirstOrDefault() is not JObject args)
         {
-            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesCommand"));
+            Fail(_messages.Format("LocImport_CannotImportLocalisationFilesCommand"));
             return Unit.Value;
         }
 
@@ -97,7 +100,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         if (string.IsNullOrWhiteSpace(sourceFormat) || string.IsNullOrWhiteSpace(sourceDirectory) ||
             string.IsNullOrWhiteSpace(targetFormat))
         {
-            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesSource"));
+            Fail(_messages.Format("LocImport_CannotImportLocalisationFilesSource"));
             return Unit.Value;
         }
 
@@ -105,14 +108,14 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             .OrderByDescending(l => l.Rank).FirstOrDefault();
         if (rootLayer?.ProjectPath is not { } pgprojPath)
         {
-            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesNo"));
+            Fail(_messages.Format("LocImport_CannotImportLocalisationFilesNo"));
             return Unit.Value;
         }
 
         var fs = _fileHelper.FileSystem;
         if (!fs.Directory.Exists(sourceDirectory))
         {
-            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesFolder",
+            Fail(_messages.Format("LocImport_CannotImportLocalisationFilesFolder",
                 sourceDirectory));
             return Unit.Value;
         }
@@ -126,7 +129,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             .ToList();
         if (sourceFiles.Count == 0)
         {
-            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_NothingImportNoFilesWere", sourceExt,
+            Fail(_messages.Format("LocImport_NothingImportNoFilesWere", sourceExt,
                 sourceDirectory));
             return Unit.Value;
         }
@@ -142,20 +145,20 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             var relative = fs.Path.GetRelativePath(pgprojDir, sourceDirectory);
             if (fs.Path.IsPathRooted(relative))
             {
-                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesDifferent",
+                Fail(_messages.Format("LocImport_CannotImportLocalisationFilesDifferent",
                     sourceDirectory));
                 return Unit.Value;
             }
 
             relativeDirectory = relative.Replace('\\', '/').ToLowerInvariant();
-            outcome = new ConfiguredMessageCatalog(_config).Format(
+            outcome = _messages.Format(
                 "LocImport_LocalisationProjectImportedRegisteredFile", sourceFiles.Count, sourceExt, relativeDirectory);
         }
         else
         {
             if (string.IsNullOrWhiteSpace(targetDirectory))
             {
-                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotConvertNoTargetFolder", sourceFormat,
+                Fail(_messages.Format("LocImport_CannotConvertNoTargetFolder", sourceFormat,
                     targetFormat));
                 return Unit.Value;
             }
@@ -166,7 +169,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                     .Configured(_langService, _config.Current.Localisation).LanguageIdentifier);
             if (targetFileName is null)
             {
-                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesNot",
+                Fail(_messages.Format("LocImport_CannotImportLocalisationFilesNot",
                     targetFormat));
                 return Unit.Value;
             }
@@ -175,7 +178,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             var targetPath = fs.Path.Combine(absoluteTargetDir, targetFileName);
             if (fs.File.Exists(targetPath))
             {
-                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_NothingWasImportedAlreadyExists",
+                Fail(_messages.Format("LocImport_NothingWasImportedAlreadyExists",
                     targetPath));
                 return Unit.Value;
             }
@@ -192,13 +195,13 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                     skipped++;
 
             if (skipped > 0)
-                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_FileSCouldNotBe", skipped,
+                Fail(_messages.Format("LocImport_FileSCouldNotBe", skipped,
                     sourceFiles.Count, sourceDirectory));
 
             var writtenPath = await _seedWriter.WriteAsync(merged, targetFormat, absoluteTargetDir, ct);
             if (writtenPath is null)
             {
-                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesNot",
+                Fail(_messages.Format("LocImport_CannotImportLocalisationFilesNot",
                     targetFormat));
                 return Unit.Value;
             }
@@ -208,7 +211,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                 sourceFiles.Count, sourceFormat, writtenPath);
 
             relativeDirectory = targetDirectory;
-            outcome = new ConfiguredMessageCatalog(_config).Format("LocImport_LocalisationProjectImportedConvertedFile",
+            outcome = _messages.Format("LocImport_LocalisationProjectImportedConvertedFile",
                 sourceFiles.Count - skipped, sourceFormat, writtenPath);
         }
 
