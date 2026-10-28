@@ -16,9 +16,23 @@ namespace PG.StarWarsGame.LSP.Server.Preview.Sections;
 ///     damage stages and their thresholds, the death clones and the spin-away, and the notice for a
 ///     stage the hull's model tags nothing for (#314). A death clone's proxies are the parts section's.
 /// </summary>
-public sealed class DamageSectionBuilder(IVariantTagSource tagSource, IGameAssetResolver assets, IMessageCatalog messages)
+public sealed class DamageSectionBuilder(
+    IVariantTagSource tagSource,
+    IGameAssetResolver assets,
+    IMessageCatalog messages)
 {
     private readonly PartsSectionBuilder _parts = new(assets, tagSource, messages);
+
+    /// <summary>
+    ///     Whether losing every hardpoint destroys the object: on unless the object denies it, as the
+    ///     engine reads <c>Should_Be_Destroyed_When_All_Hardpoints_Destroyed</c>.
+    /// </summary>
+    public static bool DiesWithHardpoints(EffectiveObject effective)
+    {
+        return EngineBoolean.IsTrueUnlessDenied(
+            effective.ValueOf("Should_Be_Destroyed_When_All_Hardpoints_Destroyed"));
+    }
+
     /// <summary>What both shipped corpora write, and what the engine falls back to.</summary>
     private const float DefaultHullVsHardpointsConstraint = 0.2f;
 
@@ -50,8 +64,7 @@ public sealed class DamageSectionBuilder(IVariantTagSource tagSource, IGameAsset
             effective.FloatOf("Tactical_Health"),
             effective.FloatOf("Energy_Capacity"),
             destructible.Count == 0 ? null : destructible.Sum(h => h.Health ?? 0f),
-            EngineBoolean.IsTrueUnlessDenied(
-                effective.ValueOf("Should_Be_Destroyed_When_All_Hardpoints_Destroyed")),
+            DiesWithHardpoints(effective),
             HullVsHardpointsConstraint(index),
             table.FactorsFor(armor),
             table.FactorsFor(shieldArmor),

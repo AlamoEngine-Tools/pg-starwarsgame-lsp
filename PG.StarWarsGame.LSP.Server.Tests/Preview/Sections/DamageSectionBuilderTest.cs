@@ -66,6 +66,21 @@ public sealed class DamageSectionBuilderTest
     }
 
     [Fact]
+    public void DiesWithHardpoints_IsOn_UnlessTheObjectDeniesIt()
+    {
+        var tags = new FakeVariantTagSource()
+            .With("Silent", Tag("Max_Speed", "4"))
+            .With("Denies", Tag("Should_Be_Destroyed_When_All_Hardpoints_Destroyed", "No"))
+            .With("Says", Tag("Should_Be_Destroyed_When_All_Hardpoints_Destroyed", "Yes"));
+        var (_, resolver) = Setup(tags, Sym("Silent", "SpaceUnit"), Sym("Denies", "SpaceUnit"),
+            Sym("Says", "SpaceUnit"));
+
+        Assert.True(DamageSectionBuilder.DiesWithHardpoints(resolver.Resolve("Silent")));
+        Assert.False(DamageSectionBuilder.DiesWithHardpoints(resolver.Resolve("Denies")));
+        Assert.True(DamageSectionBuilder.DiesWithHardpoints(resolver.Resolve("Says")));
+    }
+
+    [Fact]
     public void SpinAway_ReadsTheFourTags_WithTheEnginesDefaults()
     {
         var tags = new FakeVariantTagSource()
@@ -74,7 +89,8 @@ public sealed class DamageSectionBuilderTest
             .With("Still", Tag("Max_Speed", "4"));
         var (_, resolver) = Setup(tags, Sym("Spins", "SpaceUnit"), Sym("Still", "SpaceUnit"));
 
-        Assert.Equal(new PreviewSpinAway(2.0f, 0.5f, "Big_Boom", 4f), DamageSectionBuilder.SpinAway(resolver.Resolve("Spins")));
+        Assert.Equal(new PreviewSpinAway(2.0f, 0.5f, "Big_Boom", 4f),
+            DamageSectionBuilder.SpinAway(resolver.Resolve("Spins")));
         Assert.Null(DamageSectionBuilder.SpinAway(resolver.Resolve("Still")));
     }
 
@@ -111,7 +127,8 @@ public sealed class DamageSectionBuilderTest
     public void DeathClones_ResolveTheRow_WithItsModelIdleAndScale()
     {
         var tags = new FakeVariantTagSource()
-            .With("Ship", Tag("Death_Clone", "Damage_Normal, Ship_Death_Clone"), Tag("Should_Death_Clone_Play_Idle", "Yes"))
+            .With("Ship", Tag("Death_Clone", "Damage_Normal, Ship_Death_Clone"),
+                Tag("Should_Death_Clone_Play_Idle", "Yes"))
             .With("Ship_Death_Clone", Tag("Space_Model_Name", "ship_death.alo"), Tag("Scale_Factor", "2"));
         var (index, resolver) = Setup(tags, Sym("Ship", "SpaceUnit"), Sym("Ship_Death_Clone", "SpaceUnit"));
         var problems = new List<PreviewProblem>();

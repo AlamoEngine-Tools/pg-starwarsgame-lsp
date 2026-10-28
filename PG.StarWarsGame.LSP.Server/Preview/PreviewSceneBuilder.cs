@@ -44,7 +44,6 @@ public sealed class PreviewSceneBuilder(
     IGameAssetResolver assets,
     IMessageCatalog messages)
 {
-
     private readonly IMessageCatalog _messages = messages;
     private readonly FactionSectionBuilder _factions = new(schema, tagSource);
     private readonly ReticleSectionBuilder _reticles = new(tagSource, messages);
@@ -121,10 +120,8 @@ public sealed class PreviewSceneBuilder(
             parts.Add(new PreviewPart("hull", hull, null, null, PreviewPartOrigin.Hull, null,
                 assets.Locate(PreviewModelReference.ModelPath(hull)) is not null));
 
-        // Whether the hardpoints are a route to this object's death at all. Read once here rather
-        // than per hardpoint: it is the owner's tag, not theirs.
-        var diesWithHardpoints = EngineBoolean.IsTrueUnlessDenied(
-            effective.ValueOf("Should_Be_Destroyed_When_All_Hardpoints_Destroyed"));
+        // Read once here rather than per hardpoint: it is the owner's tag, not theirs.
+        var diesWithHardpoints = DamageSectionBuilder.DiesWithHardpoints(effective);
 
         foreach (var hardpointId in PartsSectionBuilder.HardpointIds(effective))
             _parts.AddHardpoint(index, resolver, hull, hardpointId, diesWithHardpoints,
@@ -191,5 +188,4 @@ public sealed class PreviewSceneBuilder(
     // ── factions ──────────────────────────────────────────────────────────────
 
     // ── tag reading ───────────────────────────────────────────────────────────
-
 }

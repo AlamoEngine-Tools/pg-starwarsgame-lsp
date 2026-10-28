@@ -30,9 +30,11 @@ public sealed class PreviewTagReaderTest
     [Fact]
     public void Colour_ReadsFourChannels_AndDefaultsAlphaToOpaque()
     {
-        Assert.Equal(new PreviewRgba(75, 75, 75, 255), PreviewTagReader.Colour(Object(("Color", "75, 75, 75, 255")), "Color"));
+        Assert.Equal(new PreviewRgba(75, 75, 75, 255),
+            PreviewTagReader.Colour(Object(("Color", "75, 75, 75, 255")), "Color"));
         Assert.Equal(new PreviewRgba(1, 2, 3, 255), PreviewTagReader.Colour(Object(("Color", "1 2 3")), "Color"));
-        Assert.Equal(new PreviewRgba(255, 0, 0, 255), PreviewTagReader.Colour(Object(("Color", "300, -4, 0")), "Color"));
+        Assert.Equal(new PreviewRgba(255, 0, 0, 255),
+            PreviewTagReader.Colour(Object(("Color", "300, -4, 0")), "Color"));
     }
 
     [Fact]

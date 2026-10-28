@@ -16,7 +16,6 @@ namespace PG.StarWarsGame.LSP.Server.Preview.Sections;
 /// </summary>
 public sealed class WeaponSectionBuilder(IVariantTagSource tagSource, IMessageCatalog messages)
 {
-
     private static readonly string[] BehaviorTags = ["SpaceBehavior", "LandBehavior"];
 
     private static readonly string[] FireModeTags =

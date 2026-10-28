@@ -102,7 +102,8 @@ public sealed class WeaponSectionBuilderTest
     {
         var (index, hardpoint, tags) = Setup([
             ("Type", "HARD_POINT_WEAPON_LASER"), ("Fire_Bone_A", "FP_00"), ("Fire_Bone_B", "FP_01"),
-            ("Randomize_Between_Fire_Bones", "Yes"), ("Fire_Projectile_Type", "Proj_Red"), ("Fire_Range_Distance", "1000")
+            ("Randomize_Between_Fire_Bones", "Yes"), ("Fire_Projectile_Type", "Proj_Red"),
+            ("Fire_Range_Distance", "1000")
         ]);
 
         var weapon = Builder(tags).Weapon(index, hardpoint, "HP_Laser");
@@ -128,7 +129,9 @@ public sealed class WeaponSectionBuilderTest
     [Fact]
     public void Turret_ReadsTheHardpointsBones_WithTheHardpointDefaults()
     {
-        var (_, hardpoint, _) = Setup([("Is_Turret", "Yes"), ("Turret_Bone_Name", "TURRET_00"), ("Barrel_Bone_Name", "BARREL_00")]);
+        var (_, hardpoint, _) = Setup([
+            ("Is_Turret", "Yes"), ("Turret_Bone_Name", "TURRET_00"), ("Barrel_Bone_Name", "BARREL_00")
+        ]);
 
         var turret = PreviewFireArcs.Turret(hardpoint);
 

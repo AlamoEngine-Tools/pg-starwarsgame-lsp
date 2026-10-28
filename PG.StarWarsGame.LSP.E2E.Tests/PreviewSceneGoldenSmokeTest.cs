@@ -130,7 +130,8 @@ public sealed class PreviewSceneGoldenSmokeTest(LspServerFixture fixture) : ICla
             shown++;
         }
 
-        if (e.Length != a.Length) report.Append("  ").Append(e.Length).Append(" lines recorded, ").Append(a.Length).Append(" in the scene\n");
+        if (e.Length != a.Length)
+            report.Append("  ").Append(e.Length).Append(" lines recorded, ").Append(a.Length).Append(" in the scene\n");
         return report.ToString();
     }
 }

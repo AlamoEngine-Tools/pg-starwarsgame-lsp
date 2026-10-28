@@ -18,10 +18,14 @@ namespace PG.StarWarsGame.LSP.Server.Preview.Sections;
 ///     the object scene reads for its hull too (#314).
 /// </summary>
 public sealed class ModelSceneBuilder(
-    IGameAssetResolver assets, ISchemaProvider schema, IVariantTagSource tagSource, IMessageCatalog messages)
+    IGameAssetResolver assets,
+    ISchemaProvider schema,
+    IVariantTagSource tagSource,
+    IMessageCatalog messages)
 {
     private readonly FactionSectionBuilder _factions = new(schema, tagSource);
     private readonly PartsSectionBuilder _parts = new(assets, tagSource, messages);
+
     public PreviewScene BuildForModel(GameIndex index, string modelReference)
     {
         var path = PreviewModelReference.ModelPath(modelReference);

@@ -17,12 +17,16 @@ namespace PG.StarWarsGame.LSP.Server.Preview.Sections;
 ///     model, bone, weapon and problems, the breakoff props the hardpoints shed, and the particle
 ///     proxies a part's model carries (#314). The hardpoint's weapon reading is the weapon section's.
 /// </summary>
-public sealed class PartsSectionBuilder(IGameAssetResolver assets, IVariantTagSource tagSource, IMessageCatalog messages)
+public sealed class PartsSectionBuilder(
+    IGameAssetResolver assets,
+    IVariantTagSource tagSource,
+    IMessageCatalog messages)
 {
     private const string HardPointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
     private const string AttachmentBoneTag = "Attachment_Bone";
     private readonly WeaponSectionBuilder _weapons = new(tagSource, messages);
+
     public static List<string> HardpointIds(EffectiveObject effective)
     {
         return effective.ValueOf(HardPointsTag) is { } raw
