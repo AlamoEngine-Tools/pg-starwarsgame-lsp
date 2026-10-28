@@ -309,7 +309,7 @@ public sealed class StoryChainScanner
     // References come in two forms: xml-dir-relative ("Story_Plots_X.xml") or game-root-relative
     // ("DATA\XML\CAMPAIGNS_X.XML"). Shared with StoryGraphBuilder's tactical-node keying so a
     // manifest reference correlates to the same node regardless of which event's raw text it
-    // came from (mirrors WorkspaceIndexer.ToXmlRelativePath).
+    // came from (mirrors MetafileRegistrar.ToXmlRelativePath).
     private static string ToXmlRelativePath(string reference)
     {
         return StoryReferenceTypes.NormalizeRelativePath(reference);

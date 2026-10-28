@@ -291,7 +291,7 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
             // A mod and its dependencies may each ship the campaign registry, but the engine
             // resolves the name to one file: the highest layer's copy shadows the rest rather than
             // extending them. Scan(string) reads through the resolver, which searches xml roots
-            // highest-rank-first - the same rule WorkspaceIndexer.ScanStoryChain applies, so the
+            // highest-rank-first - the same rule MetafileRegistrar.ScanStoryChain applies, so the
             // set of campaigns typed there and modelled here stays identical.
             var scan = new StoryChainScanner(resolver).Scan(def.Path);
             if (!ReferenceEquals(scan, StoryChainScanResult.Empty))

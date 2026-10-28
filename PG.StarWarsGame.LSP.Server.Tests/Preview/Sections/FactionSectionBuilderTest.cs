@@ -71,7 +71,8 @@ public sealed class FactionSectionBuilderTest
             .With(unit, Tag("Tactical_Health", "5"))
             .With(faction, Tag("Color", "153, 21, 223"));
 
-        var sarlacc = Assert.Single(new FactionSectionBuilder(new SchemaProviderBuilder().Build(), tags).Factions(index));
+        var sarlacc =
+            Assert.Single(new FactionSectionBuilder(new SchemaProviderBuilder().Build(), tags).Factions(index));
 
         Assert.Equal(new PreviewRgba(153, 21, 223, 255), sarlacc.Color);
     }

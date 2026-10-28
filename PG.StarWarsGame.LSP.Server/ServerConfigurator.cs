@@ -346,6 +346,9 @@ public static class ServerConfigurator
                 services.AddSingleton<ParseableFiles>();
                 services.AddSingleton<IndexFingerprints>();
                 services.AddSingleton<DocumentIndexer>();
+                services.AddSingleton<AssetCatalogBuilder>();
+                services.AddSingleton<ModelCatalogBuilder>();
+                services.AddSingleton<DynamicEnumCatalogBuilder>();
                 services.AddSingleton<WorkspaceIndexer>();
                 services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 

@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Indexing;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -128,7 +129,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 // A loose asset file re-globs the asset catalog from the last-scanned roots - on a
                 // delete too, because the catalog is what says a file exists. A script is also a
                 // document, so it goes on to be indexed or removed; every other asset stops here.
-                if (path is not null && WorkspaceIndexer.IsAssetFile(path))
+                if (path is not null && AssetCatalogBuilder.IsAssetFile(path))
                 {
                     assetsChanged = true;
                     if (DocumentLanguages.LanguageIdOf(path) != DocumentLanguages.Lua)
@@ -193,7 +194,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             await _reloadService.ReloadLocalisationAsync(ct);
     }
 
-    // Matches by filename only, same as WorkspaceIndexer.ApplyDynamicEnumCatalog's file search —
+    // Matches by filename only, same as DynamicEnumCatalogBuilder.Apply's file search —
     // the schema's SourceFile carries an optional "$Element" anchor that isn't part of the path.
     private HashSet<string> BuildDynamicEnumSourceFileNames()
     {

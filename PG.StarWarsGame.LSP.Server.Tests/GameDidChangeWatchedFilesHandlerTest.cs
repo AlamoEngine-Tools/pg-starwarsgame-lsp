@@ -62,19 +62,19 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var registry = new FileTypeRegistry();
         var context = new EaWXmlContext(fileHelper);
         var indexer = new WorkspaceIndexer(
-            fileHelper,
             idx,
-            schemaProvider,
             new MetafileRegistrar(fileHelper, registry, schemaProvider, context, new StoryChainProblemStore(),
                 NullLogger<MetafileRegistrar>.Instance),
-            new DocumentIndexer(fileHelper, idx, new NullProjectIndexCache(), new ParseableFiles(fileHelper, [], context),
+            new DocumentIndexer(fileHelper, idx, new NullProjectIndexCache(),
+                new ParseableFiles(fileHelper, [], context),
                 new IndexFingerprints(schemaProvider, new LuaApiSchemaProvider([]), registry, fileHelper),
                 NullLogger<DocumentIndexer>.Instance),
-            new FakeLspConfigurationProvider(),
-            NoMegEntries.Instance,
-            new MegArchiveLoadOrder(fileHelper),
-            new NullModelBoneCatalogCache(),
-            NullLogger<WorkspaceIndexer>.Instance);
+            new AssetCatalogBuilder(fileHelper, idx, new FakeLspConfigurationProvider(), NoMegEntries.Instance,
+                new MegArchiveLoadOrder(fileHelper), NullLogger<AssetCatalogBuilder>.Instance),
+            new ModelCatalogBuilder(fileHelper, idx, new NullModelBoneCatalogCache(),
+                NullLogger<ModelCatalogBuilder>.Instance),
+            new DynamicEnumCatalogBuilder(fileHelper, idx, schemaProvider,
+                NullLogger<DynamicEnumCatalogBuilder>.Instance));
         return new GameDidChangeWatchedFilesHandler(
             idx,
             host ?? new FakeGameWorkspaceHost(),

@@ -59,7 +59,7 @@ public sealed class DocumentIndexer
     {
         var files = _files.Collect(config.XmlDirectories, config.ScriptRoots);
         if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (flat scan)", files.Count);
+            _logger.LogInformation("Document indexer: {Count} parseable file(s) found (flat scan)", files.Count);
 
         var indexed = 0;
         var options = new ParallelOptions
@@ -79,7 +79,7 @@ public sealed class DocumentIndexer
         // No layers means no snapshots: everything was parsed.
         LastIndexCache = new IndexCacheStats(0, 0, 0, indexed);
         if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
+            _logger.LogInformation("Document indexer: bulk-index complete, {Indexed} file(s)", indexed);
         return indexed;
     }
 
@@ -95,7 +95,7 @@ public sealed class DocumentIndexer
 
         var totalFiles = layerFileLists.Sum(l => l.Files.Count);
         if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (layered scan)", totalFiles);
+            _logger.LogInformation("Document indexer: {Count} parseable file(s) found (layered scan)", totalFiles);
 
         var indexed = 0;
         var reused = 0;
@@ -276,7 +276,7 @@ public sealed class DocumentIndexer
         }
 
         if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
+            _logger.LogInformation("Document indexer: bulk-index complete, {Indexed} file(s)", indexed);
         return indexed;
     }
 

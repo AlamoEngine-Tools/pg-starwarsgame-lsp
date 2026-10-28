@@ -138,7 +138,8 @@ public sealed class MetafileRegistrarTest
         var (registrar, _) = Build(fs, registry, schema);
 
         // config.XmlDirectories spans both projects (dependency first, root last).
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot], BaselineIndex.Empty);
+        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot],
+            BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         var coreKey = fh.PathToFileUri(Path.Combine(coreXml, "Units", "Death_Clones.xml"));
@@ -168,7 +169,8 @@ public sealed class MetafileRegistrarTest
             .Build();
         var (registrar, _) = Build(fs, registry, schema);
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot], BaselineIndex.Empty);
+        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot],
+            BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         var coreKey = fh.PathToFileUri(Path.Combine(coreXml, "HardPoints", "HP_Weapons.xml"));
@@ -198,7 +200,8 @@ public sealed class MetafileRegistrarTest
             .Build();
         var (registrar, _) = Build(fs, registry, schema);
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot], BaselineIndex.Empty);
+        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot],
+            BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         Assert.Equal(["GameObjectType"],
@@ -359,7 +362,8 @@ public sealed class MetafileRegistrarTest
         var (registrar, _) = Build(fs, registry,
             new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [Root("rev")], BaselineIndex.Empty);
+        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [Root("rev")],
+            BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         Assert.Equal(["StoryPlotManifest"],
@@ -401,7 +405,8 @@ public sealed class MetafileRegistrarTest
         var (registrar, _) = Build(fs, registry,
             new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot], BaselineIndex.Empty);
+        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot],
+            BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         Assert.Equal(["StoryPlotManifest"],

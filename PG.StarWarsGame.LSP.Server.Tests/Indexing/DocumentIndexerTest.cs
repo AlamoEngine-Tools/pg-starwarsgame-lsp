@@ -635,7 +635,8 @@ public sealed class DocumentIndexerTest
         async Task<FakeGameIndexService> StartAsync(WorkspaceConfiguration config, params string[] roots)
         {
             var svc = new FakeGameIndexService();
-            var (indexer, registrar) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(), cache,
+            var (indexer, registrar) = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().Build(),
+                cache,
                 new FakeParser());
             registrar.Register(config, roots, svc.Current.Baseline);
             await indexer.IndexAsync(config, CancellationToken.None);
@@ -1049,7 +1050,8 @@ public sealed class DocumentIndexerTest
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var registry = new FileTypeRegistry();
-        var (indexer, registrar) = Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache, new FakeParser());
+        var (indexer, registrar) =
+            Build(fs, svc, registry, new SchemaProviderBuilder().Build(), cache, new FakeParser());
         registrar.Register(config, [root], svc.Current.Baseline);
         StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
@@ -1091,7 +1093,6 @@ public sealed class DocumentIndexerTest
     }
 
     /// <summary>An archive whose entry table is whatever the test says it is.</summary>
-
     private sealed class FakeParser : IGameDocumentParser
     {
         private readonly string _ext;
