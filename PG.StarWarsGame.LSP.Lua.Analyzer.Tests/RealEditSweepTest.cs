@@ -91,19 +91,27 @@ public sealed partial class RealEditSweepTest
         await Task.Delay(1500, TestContext.Current.CancellationToken);
 
         var silent = new List<string>();
+        var latencies = new List<double>();
         foreach (var quote in ClosingQuotes(original))
         {
             var broken = original.Remove(quote, 1);
             foreach (var (text, what) in new[] { (broken, "broken"), (original, "mended") })
             {
                 var before = reports.Count;
+                var sent = clock.Elapsed;
                 analyzer.DidChange(script, text, ++version);
                 await UntilAsync(() => reports.Count > before, TimeSpan.FromSeconds(4));
                 if (reports.Count == before)
                     silent.Add($"{what} at line {original[..quote].Count(c => c == '\n') + 1} (v{version})");
+                else
+                    latencies.Add((reports.Skip(before).First().At - sent).TotalMilliseconds);
             }
         }
 
+        latencies.Sort();
+        TestContext.Current.TestOutputHelper?.WriteLine(
+            $"edit -> report, ms: min {latencies.FirstOrDefault():F0}, median " +
+            $"{(latencies.Count == 0 ? 0 : latencies[latencies.Count / 2]):F0}, max {latencies.LastOrDefault():F0}");
         Assert.True(silent.Count == 0, "edits with no report within 4 s: " + string.Join("; ", silent));
 
         // ReSharper disable once DisposeOnUsingVariable - stopped before the directory goes; the using covers the failure path
