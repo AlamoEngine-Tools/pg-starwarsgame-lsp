@@ -26,9 +26,8 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis;
 /// </summary>
 internal static class LuaVersionSyntaxAnalyzer
 {
-    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree, IMessageCatalog? messages = null)
+    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var diagnostics = new List<LspDiagnostic>();
         var root = tree.GetRoot();
         foreach (var node in root.DescendantNodes())

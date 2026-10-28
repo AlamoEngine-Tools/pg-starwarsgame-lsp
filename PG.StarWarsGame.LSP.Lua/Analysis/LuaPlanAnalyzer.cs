@@ -29,9 +29,8 @@ internal static class LuaPlanAnalyzer
     private const string ThreadSuffix = "_Thread";
 
     public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         // A library's Definitions runs inside the plan that requires it, where the thread
         // function lives; the library file alone cannot be judged.
         if (LuaFileClassifier.IsLibraryUri(documentUri)) return [];

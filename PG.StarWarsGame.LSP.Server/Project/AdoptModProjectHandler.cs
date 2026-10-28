@@ -8,6 +8,7 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
@@ -30,6 +31,13 @@ public sealed class AdoptModProjectHandler(IFileHelper fileHelper, IMessageCatal
 {
     private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 
+    // The folders under Data the game reads; a mod holds at least one of them. The client's offer
+    // takes a folder by the same rule (modLayout.ts), so a folder it offers is one this writes.
+    private static readonly string[] ModDataFolders = ["XML", "Scripts", "Art", "Audio", "Text"];
+
+    // The executables the game runs from; the folder holding one is the game, not a mod.
+    private static readonly string[] GameExecutables = ["sweaw.exe", "swfoc.exe", "starwarsg.exe", "starwarsi.exe"];
+
     private static readonly JsonDocumentOptions ReadOptions = new()
     {
         CommentHandling = JsonCommentHandling.Skip,
@@ -44,22 +52,26 @@ public sealed class AdoptModProjectHandler(IFileHelper fileHelper, IMessageCatal
         if (fs.Directory.Exists(root) && fs.Directory.GetFiles(root, "*.pgproj").FirstOrDefault() is { } existing)
             return Task.FromResult(Refused(messages.Format("AdoptModProject_ProjectExists", existing)));
 
+        if (IsGame(root))
+            return Task.FromResult(Refused(messages.Format("AdoptModProject_GameFolder", root)));
+
         var data = Child(root, "Data");
-        var xml = data is null ? null : Child(data, "XML");
-        if (data is null || xml is null)
+        var modinfo = fs.Path.Combine(root, "modinfo.json");
+        if (!HoldsModData(data) && !fs.File.Exists(modinfo))
             return Task.FromResult(Refused(messages.Format("AdoptModProject_NotAMod", root)));
 
-        var name = ModinfoName(fs.Path.Combine(root, "modinfo.json")) ?? fs.Path.GetFileName(root.TrimEnd('/', '\\'));
-        var directories = new JsonObject { ["xml"] = Relative(root, xml) };
-        if (Child(data, "Scripts") is { } scripts)
+        var name = ModinfoName(modinfo) ?? fs.Path.GetFileName(root.TrimEnd('/', '\\'));
+        var directories = new JsonObject();
+        if (data is not null && Child(data, "XML") is { } xml) directories["xml"] = Relative(root, xml);
+        if (data is not null && Child(data, "Scripts") is { } scripts)
         {
             directories["scripts"] = Relative(root, scripts);
             if (Child(scripts, "Story") is { } story && fs.Directory.GetFiles(story, "*.txt").Length > 0)
                 directories["storyDialog"] = Relative(root, story);
         }
 
-        if (Child(data, "Art") is { } art) directories["art"] = Relative(root, art);
-        if (Child(data, "Audio") is { } audio) directories["audio"] = Relative(root, audio);
+        if (data is not null && Child(data, "Art") is { } art) directories["art"] = Relative(root, art);
+        if (data is not null && Child(data, "Audio") is { } audio) directories["audio"] = Relative(root, audio);
 
         // A project we write says what it is and which format it is in, first.
         var project = new JsonObject
@@ -69,7 +81,7 @@ public sealed class AdoptModProjectHandler(IFileHelper fileHelper, IMessageCatal
             ["name"] = name,
             ["directories"] = directories
         };
-        if (Child(data, "Text") is { } text && TextFormat(text) is { } type)
+        if (data is not null && Child(data, "Text") is { } text && TextFormat(text) is { } type)
             project["localisation"] = new JsonObject
                 { ["type"] = type, ["directory"] = Relative(root, text)[0]!.GetValue<string>() };
         project["projectReferences"] = new JsonArray();
@@ -84,6 +96,22 @@ public sealed class AdoptModProjectHandler(IFileHelper fileHelper, IMessageCatal
         return new AdoptModProjectResult(null, error);
     }
 
+    // Whether a Data folder holds one of the game's folders or a MEG archive.
+    private bool HoldsModData(string? data)
+    {
+        if (data is null) return false;
+        var fs = fileHelper.FileSystem;
+        return ModDataFolders.Any(f => Child(data, f) is not null)
+               || fs.Directory.GetFiles(data).Any(f => f.EndsWith(".meg", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool IsGame(string root)
+    {
+        var fs = fileHelper.FileSystem;
+        return fs.Directory.Exists(root) && fs.Directory.GetFiles(root)
+            .Any(f => GameExecutables.Contains(fs.Path.GetFileName(f), StringComparer.OrdinalIgnoreCase));
+    }
+
     // A subdirectory by name in any case, as the game reads it, spelled as it is on disk.
     private string? Child(string parent, string name)
     {
@@ -95,7 +123,7 @@ public sealed class AdoptModProjectHandler(IFileHelper fileHelper, IMessageCatal
 
     private JsonArray Relative(string root, string directory)
     {
-        return [fileHelper.FileSystem.Path.GetRelativePath(root, directory).Replace('\\', '/')];
+        return [GamePaths.Forward(fileHelper.FileSystem.Path.GetRelativePath(root, directory))];
     }
 
     // The csv is what a mod compiles its dat from, so with both the csv is the source.

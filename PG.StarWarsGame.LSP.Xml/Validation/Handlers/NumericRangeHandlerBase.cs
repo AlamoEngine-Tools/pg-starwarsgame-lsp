@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -70,7 +71,7 @@ public abstract class NumericRangeHandlerBase : XmlDiagnosticsHandler<XmlTagValu
     {
         // A value that is not a number belongs to the type handler; a range check has nothing to
         // say about it, and complaining twice about one mistake helps nobody.
-        if (!LenientFloatParser.TryParse(fact.RawValue.Trim(), out var value))
+        if (!EngineNumber.TryParseFloat(fact.RawValue.Trim(), out var value))
             return [];
 
         var belowMinimum = Minimum is { } min && (MinimumInclusive ? value < min : value <= min);

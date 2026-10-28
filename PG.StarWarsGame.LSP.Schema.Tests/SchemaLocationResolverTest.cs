@@ -50,7 +50,8 @@ public sealed class SchemaLocationResolverTest
     {
         var (resolver, fake) = Build(_ => ReleasesResponse("v2.1.0"), EmptyCache());
 
-        var location = await resolver.ResolveAsync(Repository, "https://example.test/schema/eaw/");
+        var location = await resolver.ResolveAsync(Repository, "https://example.test/schema/eaw/",
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(new SchemaLocation("https://example.test/schema/eaw/", null, SchemaOrigin.Explicit), location);
         Assert.Empty(fake.Requests);
@@ -61,7 +62,7 @@ public sealed class SchemaLocationResolverTest
     {
         var (resolver, _) = Build(_ => ReleasesResponse("v2.1.0", "v2.2.0"), EmptyCache());
 
-        var location = await resolver.ResolveAsync(Repository, null);
+        var location = await resolver.ResolveAsync(Repository, null, TestContext.Current.CancellationToken);
 
         Assert.Equal(new SchemaLocation(
             "https://raw.githubusercontent.com/AlamoEngine-Tools/eaw-schema/refs/tags/v2.2.0/eaw/",
@@ -73,7 +74,7 @@ public sealed class SchemaLocationResolverTest
     {
         var (resolver, _) = Build(_ => new HttpResponseMessage(HttpStatusCode.Forbidden), CacheWithTag("v2.1.0"));
 
-        var location = await resolver.ResolveAsync(Repository, null);
+        var location = await resolver.ResolveAsync(Repository, null, TestContext.Current.CancellationToken);
 
         Assert.Equal(new SchemaLocation(
             "https://raw.githubusercontent.com/AlamoEngine-Tools/eaw-schema/refs/tags/v2.1.0/eaw/",
@@ -87,7 +88,7 @@ public sealed class SchemaLocationResolverTest
     {
         var (resolver, _) = Build(_ => ReleasesResponse(), EmptyCache());
 
-        var location = await resolver.ResolveAsync(Repository, null);
+        var location = await resolver.ResolveAsync(Repository, null, TestContext.Current.CancellationToken);
 
         Assert.Equal(new SchemaLocation(
             "https://raw.githubusercontent.com/AlamoEngine-Tools/eaw-schema/refs/heads/main/eaw/",
@@ -99,7 +100,7 @@ public sealed class SchemaLocationResolverTest
     {
         var (resolver, _) = Build(_ => ReleasesResponse("v2.1.0"), EmptyCache());
 
-        var location = await resolver.ResolveAsync(Repository, "  ");
+        var location = await resolver.ResolveAsync(Repository, "  ", TestContext.Current.CancellationToken);
 
         Assert.Equal(SchemaOrigin.Release, location.Origin);
     }

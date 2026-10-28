@@ -17,9 +17,8 @@ namespace PG.StarWarsGame.LSP.Server.Debug;
 public static class RunnableModLayout
 {
     /// <summary>Returns the mod path, or null and the reason the layer cannot be launched as is.</summary>
-    public static (string? ModPath, string? Reason) Judge(ProjectLayer layer, IMessageCatalog? messages = null)
+    public static (string? ModPath, string? Reason) Judge(ProjectLayer layer, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         ArgumentNullException.ThrowIfNull(layer);
         var projectDirectory = ProjectDirectoryOf(layer);
         if (projectDirectory is null)
@@ -43,7 +42,7 @@ public static class RunnableModLayout
         ArgumentNullException.ThrowIfNull(layer);
         if (string.IsNullOrEmpty(layer.ProjectPath))
             return null;
-        var normalized = layer.ProjectPath.Replace('\\', '/');
+        var normalized = GamePaths.Forward(layer.ProjectPath);
         var cut = normalized.LastIndexOf('/');
         return cut < 0 ? null : normalized[..cut];
     }
@@ -55,6 +54,6 @@ public static class RunnableModLayout
             .Concat(layer.TextRoots)
             .Concat(layer.AssetRoots)
             .Concat(layer.StoryDialogRoots)
-            .Select(d => d.Replace('\\', '/').TrimEnd('/'));
+            .Select(d => GamePaths.Forward(d).TrimEnd('/'));
     }
 }

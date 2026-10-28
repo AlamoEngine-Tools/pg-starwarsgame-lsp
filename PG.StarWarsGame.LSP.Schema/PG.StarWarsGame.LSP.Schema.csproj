@@ -8,7 +8,6 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
         <PackageReference Include="Semver"/>
-        <PackageReference Include="Serilog.Sinks.Console"/>
         <PackageReference Include="System.IO.Abstractions"/>
         <PackageReference Include="YamlDotNet"/>
     </ItemGroup>

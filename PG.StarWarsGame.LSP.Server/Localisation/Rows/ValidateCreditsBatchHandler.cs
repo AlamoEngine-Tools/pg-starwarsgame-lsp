@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.JsonRpc;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -21,18 +21,18 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 public sealed class ValidateCreditsBatchHandler
     : IJsonRpcRequestHandler<ValidateCreditsBatchParams, ValidateCreditsBatchResult>
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly ILocalisationDocumentEditor _editor;
     private readonly IFileHelper _fileHelper;
 
     public ValidateCreditsBatchHandler(
         ILocalisationDocumentEditor editor,
         IFileHelper fileHelper,
-        ILspConfigurationProvider config)
+        IMessageCatalog messages)
     {
         _editor = editor;
         _fileHelper = fileHelper;
-        _config = config;
+        _messages = messages;
     }
 
     public Task<ValidateCreditsBatchResult> Handle(
@@ -43,7 +43,7 @@ public sealed class ValidateCreditsBatchHandler
             || !fs.File.Exists(request.ProjectFilePath))
             return Task.FromResult(new ValidateCreditsBatchResult(
                 [],
-                new ConfiguredMessageCatalog(_config).Format("LocValidateCredits_FileNotFound",
+                _messages.Format("LocValidateCredits_FileNotFound",
                     request.ProjectFilePath)));
 
         LocalisationEditResult composed;
@@ -54,7 +54,7 @@ public sealed class ValidateCreditsBatchHandler
         catch (Exception ex)
         {
             return Task.FromResult(new ValidateCreditsBatchResult(
-                [], new ConfiguredMessageCatalog(_config).Format("LocValidateCredits_FailedReadFile", ex.Message)));
+                [], _messages.Format("LocValidateCredits_FailedReadFile", ex.Message)));
         }
 
         // An addressing failure is about one staged change, not about a row, so it is reported
@@ -67,7 +67,7 @@ public sealed class ValidateCreditsBatchHandler
             return Task.FromResult(new ValidateCreditsBatchResult(
             [
                 new LocProblemDto(null, null, LocProblemSeverity.Error,
-                    new ConfiguredMessageCatalog(_config).Format("LocValidateCredits_Change",
+                    _messages.Format("LocValidateCredits_Change",
                         (composed.FailedIndex ?? 0) + 1, composed.Error))
             ]));
 
@@ -87,7 +87,7 @@ public sealed class ValidateCreditsBatchHandler
             foreach (var (language, index, label) in
                      CreditsCoverageInspector.Inspect(rows, languages))
                 problems.Add(new LocProblemDto(index, language, LocProblemSeverity.Info,
-                    CreditsCoverageInspector.Message(language, label, new ConfiguredMessageCatalog(_config))));
+                    CreditsCoverageInspector.Message(language, label, _messages)));
 
         return Task.FromResult(new ValidateCreditsBatchResult(problems));
     }

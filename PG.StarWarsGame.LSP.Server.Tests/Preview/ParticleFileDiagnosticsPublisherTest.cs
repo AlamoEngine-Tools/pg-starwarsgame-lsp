@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using System.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -85,8 +86,11 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         FakeAssets assets)
     {
         var index = GameIndex.Empty with { AssetFiles = assets };
-        return new ParticleFileDiagnosticsPublisher(published.Add, new FakeGameIndexService(index),
-            new NoDocuments(), assets, new FileHelper(new MockFileSystem()), new FakeLspConfigurationProvider());
+        var fileHelper = new FileHelper(new MockFileSystem());
+        return new ParticleFileDiagnosticsPublisher(new RecordingDiagnosticsSink(published),
+            new FakeGameIndexService(index), new FakeGameWorkspaceHost(), assets, fileHelper,
+            TestCatalogues.English, new FakeGlobalSuppressionStore(), new ProjectLayerMap(fileHelper),
+            TestServerOptions.Immediate, NullLogger<ParticleFileDiagnosticsPublisher>.Instance);
     }
 
     private sealed class FakeAssets : IGameAssetResolver, IAssetFileIndex
@@ -138,25 +142,6 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         public void Replace(string path, byte[] bytes)
         {
             _files[path] = (bytes, _files[path].Packed);
-        }
-    }
-
-    private sealed class NoDocuments : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-        }
-
-        public void Remove(string uri)
-        {
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            doc = null!;
-            return false;
         }
     }
 

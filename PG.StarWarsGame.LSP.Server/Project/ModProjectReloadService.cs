@@ -6,6 +6,7 @@ using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Lua.Analyzer;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
@@ -24,25 +25,27 @@ public sealed class ModProjectReloadService : IModProjectReloadService
 {
     private readonly IHeapTrimmer _heapTrimmer;
 
-    private readonly IIconCatalogProvider? _icons;
+    private readonly IIconCatalogProvider _icons;
     private readonly IGameIndexService _index;
     private readonly IWorkspaceIndexer _indexer;
     private readonly IProjectLayerMap _layerMap;
     private readonly ILocalisationLoader _localisation;
     private readonly ILogger<ModProjectReloadService> _logger;
-    private readonly ILuaAnalyzerStarter? _luaAnalyzer;
+    private readonly ILuaAnalyzerStarter _luaAnalyzer;
     private readonly IMessageCatalog _messages;
-    private readonly PgprojMigrationOffer? _migrationOffer;
+    private readonly PgprojMigrationOffer _migrationOffer;
     private readonly IUserNotifier _notifier;
-    private readonly IClientRefreshNotifier? _refresh;
+    private readonly IClientRefreshNotifier _refresh;
     private readonly IProjectConfigurationResolver _resolver;
-    private readonly ServerStatusRecorder? _status;
+    private readonly ServerStatusRecorder _status;
     private List<string>? _lastRoots;
 
-    // refresh is optional so the many minimal test setups can omit it; production always wires it.
-    // index and notifier are NOT optional: they are what the baseline gate below reads and speaks
-    // through, and an optional parameter is the one shape the container can silently skip - the gate
-    // would then never fire and nothing would say so.
+    // Every dependency is REQUIRED: an optional parameter is the one shape the container can
+    // silently skip. The index and the notifier are what the baseline gate below reads and speaks
+    // through; without the icon provider a catalog built before the projects resolved - by any
+    // preview restored while the window was opening - answers with baseline icons for the whole
+    // session; without the trimmer the bulk parse's fragmentation stays for the session (MEASURED:
+    // about 200 MB); the analyzer is started, or restarted, with every project load (#305).
     public ModProjectReloadService(
         IProjectConfigurationResolver resolver,
         IWorkspaceIndexer indexer,
@@ -51,24 +54,17 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         IGameIndexService index,
         IUserNotifier notifier,
         ILogger<ModProjectReloadService> logger,
-        IClientRefreshNotifier? refresh = null,
-        PgprojMigrationOffer? migrationOffer = null,
-        // Optional for the same reason as refresh: the minimal test setups omit it. Production
-        // wires it, and without it a catalog built before the projects resolved - by any preview
-        // restored while the window was opening - answers with baseline icons for the whole
-        // session, because nothing else ever drops it.
-        IIconCatalogProvider? icons = null,
-        ServerStatusRecorder? status = null,
-        // Optional for the same reason again. Production wires the compacting trimmer; without it
-        // the bulk parse's fragmentation stays for the session (MEASURED: about 200 MB).
-        IHeapTrimmer? heapTrimmer = null,
-        // Optional like the rest: started (or restarted) with every project load in production.
-        ILuaAnalyzerStarter? luaAnalyzer = null,
-        IMessageCatalog? messages = null)
+        IClientRefreshNotifier refresh,
+        PgprojMigrationOffer migrationOffer,
+        IIconCatalogProvider icons,
+        ServerStatusRecorder status,
+        IHeapTrimmer heapTrimmer,
+        ILuaAnalyzerStarter luaAnalyzer,
+        IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _status = status;
-        _heapTrimmer = heapTrimmer ?? new NullHeapTrimmer();
+        _heapTrimmer = heapTrimmer;
         _luaAnalyzer = luaAnalyzer;
         _resolver = resolver;
         _indexer = indexer;
@@ -125,7 +121,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // After the reload rather than inside the load: the question is the same one startup asks,
         // and it must not hold the index path open while the user reads a diff. A reload has no
         // gate in front of it, so this is simply the first moment the workspace is settled again.
-        if (_migrationOffer is not null) await _migrationOffer.OfferPendingAsync(ct);
+        await _migrationOffer.OfferPendingAsync(ct);
     }
 
     public async Task ReloadLocalisationAsync(CancellationToken ct)
@@ -150,7 +146,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // Loca-key inlay hints and code lenses were computed against the previous translation data
         // and nothing about the open documents changed, so the client has no reason to re-request
         // them on its own (#45). Ask it to.
-        _refresh?.RefreshDerivedState();
+        _refresh.RefreshDerivedState();
     }
 
     private async Task LoadCoreAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
@@ -171,7 +167,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         if (_index.Current.Baseline.Symbols.IsEmpty)
         {
             _logger.LogError("No baseline is loaded; refusing to index '{Roots}'.", string.Join(", ", roots));
-            _status?.RecordProject(true, ProjectProblem.BaselineRefused);
+            _status.RecordProject(true, ProjectProblem.BaselineRefused);
             _notifier.ShowError(
                 _messages.Format("ModProjectReload_ShippedGameBaselineCouldNot"));
             return;
@@ -183,12 +179,12 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // running - was built from the fallback workspace root with no layers at all and would
         // answer with baseline icons for the rest of the session. Dropping it here is what makes
         // the workspace's own icons appear once the projects are known.
-        _icons?.Invalidate();
+        _icons.Invalidate();
         // Publish layer precedence before indexing so each document is stamped with its rank
         // (indexing itself stays parallel - correctness comes from the rank, not insertion order).
         _layerMap.SetLayers(config.Layers);
         // Started beside the indexing, not before it: the analyzer reads the files itself.
-        if (_luaAnalyzer is not null) _ = StartLuaAnalyzerAsync(config.Layers);
+        _ = StartLuaAnalyzerAsync(config.Layers);
         _indexer.PreScanMetafiles(config, roots);
         await _indexer.IndexDocumentsAsync(config, ct);
         _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories);

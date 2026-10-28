@@ -8,6 +8,85 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 
 public sealed class GameIndexTest
 {
+    // ── one id, several types ───────────────────────────────────────────────
+    //
+    // A metafile types every file it lists, and each type is an id space of its own: the shipped
+    // game defines a Sarlacc faction (FactionFiles) and a Sarlacc indigenous unit (GameObjectFiles).
+
+    private static readonly GameSymbol SarlaccFaction = new("Sarlacc", GameSymbolKind.XmlObject, "Faction",
+        new FileOrigin("file:///factions.xml", 1682, 1), null);
+
+    private static readonly GameSymbol SarlaccUnit = new("Sarlacc", GameSymbolKind.XmlObject, "GameObjectType",
+        new FileOrigin("file:///groundindigenous.xml", 3513, 1), null);
+
+    [Fact]
+    public void ResolveOfType_ReturnsTheDefinitionInThatTypesIdSpace_OrNothing()
+    {
+        var index = WithWorkspace(SarlaccUnit, SarlaccFaction);
+
+        Assert.Same(SarlaccFaction, index.ResolveOfType("Sarlacc", "Faction"));
+        Assert.Same(SarlaccUnit, index.ResolveOfType("Sarlacc", "gameobjecttype"));
+        Assert.Null(index.ResolveOfType("Sarlacc", "HardPoint"));
+    }
+
+    [Fact]
+    public void ResolveOfType_FallsBackToTheBaseline_OnlyWithinTheSameType()
+    {
+        var shipped = Symbol("Shipped_Unit", "GameObjectType");
+        var index = WithBoth([shipped], []);
+
+        Assert.Same(shipped, index.ResolveOfType("Shipped_Unit", "GameObjectType"));
+        Assert.Null(index.ResolveOfType("Shipped_Unit", "SFXEvent"));
+    }
+
+    /// <summary>
+    ///     A lookup by id alone across two types on one layer used to answer with whichever
+    ///     definition the parallel scan inserted first, so the answer changed from start to start.
+    /// </summary>
+    [Fact]
+    public void Resolve_ByIdAlone_AcrossTypesOnOneLayer_DoesNotDependOnInsertionOrder()
+    {
+        var oneOrder = WithWorkspace(SarlaccUnit, SarlaccFaction);
+        var otherOrder = WithWorkspace(SarlaccFaction, SarlaccUnit);
+
+        Assert.Same(oneOrder.Resolve("Sarlacc"), otherOrder.Resolve("Sarlacc"));
+    }
+
+    [Fact]
+    public void DefinitionsOf_AType_AreThatTypesOnly()
+    {
+        var index = WithWorkspace(SarlaccUnit, SarlaccFaction);
+
+        Assert.Equal([SarlaccFaction], index.DefinitionsOf("Sarlacc", "Faction"));
+        Assert.Equal([SarlaccUnit], index.DefinitionsOf("Sarlacc", "GameObjectType"));
+        Assert.Equal(2, index.DefinitionsOf("Sarlacc", null).Count());
+    }
+
+    /// <summary>
+    ///     A reference typed by its tag belongs to that type; one whose tag names no type means
+    ///     whatever its id resolves to. Renaming or listing the faction must not take the unit's.
+    /// </summary>
+    [Fact]
+    public void ReferencesTo_AType_AreTheReferencesThatMeanThatTypesObject()
+    {
+        var toFaction = new GameReference("Sarlacc", GameSymbolKind.XmlObject, "Faction", "file:///c.xml", 1, 1, 7);
+        var toUnit = new GameReference("Sarlacc", GameSymbolKind.XmlObject, "GameObjectType", "file:///u.xml", 2, 1, 7);
+        var tank = Symbol("Tank", "GameObjectType");
+        var untypedToTank = new GameReference("Tank", GameSymbolKind.XmlObject, null, "file:///s.lua", 3, 1, 4);
+        var index = WithWorkspace(SarlaccUnit, SarlaccFaction, tank) with
+        {
+            WorkspaceReferences = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                .Add("Sarlacc", [toFaction, toUnit])
+                .Add("Tank", [untypedToTank])
+        };
+
+        Assert.Equal([toFaction], index.ReferencesTo("Sarlacc", "Faction"));
+        Assert.Equal([toUnit], index.ReferencesTo("Sarlacc", "GameObjectType"));
+        Assert.Equal(2, index.ReferencesTo("Sarlacc", null).Count());
+        Assert.Equal([untypedToTank], index.ReferencesTo("Tank", "GameObjectType"));
+        Assert.Empty(index.ReferencesTo("Tank", "Faction"));
+    }
+
     // ── owner-agnostic resolution ───────────────────────────────────────────
 
     [Fact]
@@ -19,7 +98,7 @@ public sealed class GameIndexTest
         var resolved = index.ResolveOwnerAgnostic("Tyber_Zann_Black_Market");
 
         Assert.NotNull(resolved);
-        Assert.Equal("Tyber_Zann$Tyber_Zann_Black_Market", resolved!.Id);
+        Assert.Equal("Tyber_Zann$Tyber_Zann_Black_Market", resolved.Id);
     }
 
     [Fact]
@@ -42,7 +121,7 @@ public sealed class GameIndexTest
         var resolved = index.ResolveOwnerAgnostic("Shared_Ability");
 
         Assert.NotNull(resolved);
-        Assert.EndsWith("$Shared_Ability", resolved!.Id);
+        Assert.EndsWith("$Shared_Ability", resolved.Id);
     }
 
     [Fact]
@@ -65,7 +144,7 @@ public sealed class GameIndexTest
         var resolved = index.ResolveOwnerAgnostic("Stock_Ability");
 
         Assert.NotNull(resolved);
-        Assert.Equal("Stock_Unit$Stock_Ability", resolved!.Id);
+        Assert.Equal("Stock_Unit$Stock_Ability", resolved.Id);
     }
 
     [Fact]
@@ -286,7 +365,7 @@ public sealed class GameIndexTest
         var result = index.ResolveWithShadow("UNIT_A");
 
         Assert.NotNull(result);
-        Assert.Equal(rev, result!.Value.Winner);
+        Assert.Equal(rev, result.Value.Winner);
         Assert.Equal(core, result.Value.Shadowed);
     }
 

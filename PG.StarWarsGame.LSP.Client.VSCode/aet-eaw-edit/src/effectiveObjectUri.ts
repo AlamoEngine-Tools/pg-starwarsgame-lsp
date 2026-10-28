@@ -15,6 +15,11 @@ export interface EffectiveObjectRef {
     readonly objectId: string;
     /** Empty for a document opened before the project travelled in the URI. */
     readonly projectKey: string;
+    /**
+     * The object's type - every type is an id space of its own, so one name may be two objects.
+     * Empty when it is not known, for an older document or one asked for by name.
+     */
+    readonly typeName: string;
 }
 
 /** The URI query for one object of one project. */
@@ -22,6 +27,7 @@ export function effectiveObjectQuery(ref: EffectiveObjectRef): string {
     return new URLSearchParams({
         object: ref.objectId,
         project: ref.projectKey,
+        type: ref.typeName,
     }).toString();
 }
 
@@ -33,8 +39,12 @@ export function parseEffectiveObjectQuery(query: string): EffectiveObjectRef {
     const params = new URLSearchParams(query);
     const objectId = params.get("object");
     return objectId === null
-        ? { objectId: query, projectKey: "" }
-        : { objectId, projectKey: params.get("project") ?? "" };
+        ? { objectId: query, projectKey: "", typeName: "" }
+        : {
+              objectId,
+              projectKey: params.get("project") ?? "",
+              typeName: params.get("type") ?? "",
+          };
 }
 
 /**

@@ -25,4 +25,23 @@ public interface IEffectiveObjectSource
     ///     behaviour" from "no such object" rather than reporting both as the same fault.
     /// </summary>
     EffectiveObject Resolve(string objectId);
+
+    /// <summary>
+    ///     The merged object named <paramref name="objectId" /> in the id space of
+    ///     <paramref name="typeName" />. Every type is an id space of its own, so a caller that
+    ///     knows what it is asking for - a unit, a hardpoint - asks here.
+    /// </summary>
+    EffectiveObject Resolve(string objectId, string typeName);
+}
+
+public static class EffectiveObjectSources
+{
+    /// <summary>
+    ///     The object in the id space of <paramref name="typeName" />, or by id alone when the caller
+    ///     has no type - a tag the schema gives no reference type.
+    /// </summary>
+    public static EffectiveObject ResolveIn(this IEffectiveObjectSource source, string objectId, string? typeName)
+    {
+        return typeName is null ? source.Resolve(objectId) : source.Resolve(objectId, typeName);
+    }
 }

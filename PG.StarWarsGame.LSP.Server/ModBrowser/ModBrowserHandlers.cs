@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -120,9 +120,6 @@ internal static class EntryFiles
 /// </summary>
 internal static class ModelProxies
 {
-    private static readonly ConditionalWeakTable<GameIndex, ConcurrentDictionary<string, ModelRead>>
-        s_read = new();
-
     public static Func<string, IReadOnlyList<string>> For(GameIndex index, IGameAssetResolver assets)
     {
         var read = Reads(index, assets);
@@ -143,7 +140,7 @@ internal static class ModelProxies
 
     private static Func<string, ModelRead> Reads(GameIndex index, IGameAssetResolver assets)
     {
-        var read = s_read.GetValue(index, _ => new ConcurrentDictionary<string, ModelRead>(
+        var read = index.Derived("modelReads", _ => new ConcurrentDictionary<string, ModelRead>(
             StringComparer.OrdinalIgnoreCase));
         return path => read.GetOrAdd(path, p => Read(assets.Read(p)));
     }

@@ -26,10 +26,11 @@ public sealed class LuaAnalyzerHandlersTest
         var theirs = new LocationContainer(new Location { Uri = Lua.Uri, Range = new Range(3, 1, 3, 4) });
         var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/references", theirs);
 
-        var result = await new LuaReferencesHandler(analyzer).Handle(new ReferenceParams
-        {
-            TextDocument = Lua, Position = new Position(0, 0), Context = new ReferenceContext()
-        }, CancellationToken.None);
+        var result = await new LuaReferencesHandler(analyzer, FixedSandbox.Empty(), new LuaStubLocation()).Handle(
+            new ReferenceParams
+            {
+                TextDocument = Lua, Position = new Position(0, 0), Context = new ReferenceContext()
+            }, CancellationToken.None);
 
         Assert.Equal(3, Assert.Single(result!).Range.Start.Line);
     }
@@ -65,11 +66,13 @@ public sealed class LuaAnalyzerHandlersTest
         var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/references",
             new LocationContainer(At(Interdictor, 44), At(Vader, 70), At(StateMachine, 172)));
 
-        var result = await new LuaReferencesHandler(analyzer, TwoObjectScripts()).Handle(new ReferenceParams
-        {
-            TextDocument = new TextDocumentIdentifier(DocumentUri.From(Interdictor)), Position = new Position(44, 12),
-            Context = new ReferenceContext { IncludeDeclaration = true }
-        }, CancellationToken.None);
+        var result = await new LuaReferencesHandler(analyzer, TwoObjectScripts(), new LuaStubLocation()).Handle(
+            new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier(DocumentUri.From(Interdictor)),
+                Position = new Position(44, 12),
+                Context = new ReferenceContext { IncludeDeclaration = true }
+            }, CancellationToken.None);
 
         Assert.Equal([Interdictor, StateMachine], result!.Select(l => l.Uri.ToString()));
     }
@@ -91,7 +94,7 @@ public sealed class LuaAnalyzerHandlersTest
         };
         var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", resolved);
 
-        var result = await new LuaCodeLensHandler(analyzer, TwoObjectScripts())
+        var result = await new LuaCodeLensHandler(analyzer, TwoObjectScripts(), new LuaStubLocation())
             .Handle(new CodeLens { Range = new Range(44, 9, 44, 20) }, CancellationToken.None);
 
         Assert.Equal("2 usages", result.Command!.Title);
@@ -208,7 +211,7 @@ public sealed class LuaAnalyzerHandlersTest
         var theirs = new CodeLensContainer(new CodeLens { Range = new Range(2, 0, 2, 0) });
         var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/codeLens", theirs);
 
-        var result = await new LuaCodeLensHandler(analyzer)
+        var result = await new LuaCodeLensHandler(analyzer, FixedSandbox.Empty(), new LuaStubLocation())
             .Handle(new CodeLensParams { TextDocument = Lua }, CancellationToken.None);
 
         Assert.Equal(2, Assert.Single(result!).Range.Start.Line);
@@ -221,7 +224,7 @@ public sealed class LuaAnalyzerHandlersTest
         var resolved = new CodeLens { Range = new Range(2, 0, 2, 0), Command = new Command { Title = "3 usages" } };
         var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", resolved);
 
-        var result = await new LuaCodeLensHandler(analyzer)
+        var result = await new LuaCodeLensHandler(analyzer, FixedSandbox.Empty(), new LuaStubLocation())
             .Handle(new CodeLens { Range = new Range(2, 0, 2, 0) }, CancellationToken.None);
 
         Assert.Equal("3 usages", result.Command!.Title);
@@ -238,7 +241,8 @@ public sealed class LuaAnalyzerHandlersTest
             Data = JObject.Parse("""{"DeclId":"373|15","$$__handler_id__$$":"8f41a571"}""")
         };
 
-        await new LuaCodeLensHandler(analyzer).Handle(lens, CancellationToken.None);
+        await new LuaCodeLensHandler(analyzer, FixedSandbox.Empty(), new LuaStubLocation()).Handle(lens,
+            CancellationToken.None);
 
         var sent = (CodeLens)Assert.Single(analyzer.Requests).Parameters;
         Assert.Equal("""{"DeclId":"373|15"}""", sent.Data!.ToString(Formatting.None));
@@ -262,7 +266,7 @@ public sealed class LuaAnalyzerHandlersTest
         };
         var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", resolved);
 
-        var result = await new LuaCodeLensHandler(analyzer)
+        var result = await new LuaCodeLensHandler(analyzer, FixedSandbox.Empty(), new LuaStubLocation())
             .Handle(new CodeLens { Range = new Range(2, 0, 2, 0) }, CancellationToken.None);
 
         Assert.Equal("aet-eaw-edit.lsp.showReferences", result.Command!.Name);
@@ -274,7 +278,9 @@ public sealed class LuaAnalyzerHandlersTest
     {
         var lens = new CodeLens { Range = new Range(2, 0, 2, 0) };
 
-        var result = await new LuaCodeLensHandler(new ScriptedLuaAnalyzer()).Handle(lens, CancellationToken.None);
+        var result =
+            await new LuaCodeLensHandler(new ScriptedLuaAnalyzer(), FixedSandbox.Empty(), new LuaStubLocation()).Handle(
+                lens, CancellationToken.None);
 
         Assert.Same(lens, result);
     }

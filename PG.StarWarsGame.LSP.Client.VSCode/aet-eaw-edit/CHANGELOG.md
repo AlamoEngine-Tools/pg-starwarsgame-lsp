@@ -7,21 +7,20 @@
 - **Localisable texts** - every user-facing string moves into one catalogue per runtime, the start of
   translations and the one place the text rules are checked
   ([#274](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/274))
-  - The extension manifest's 178 texts - command titles, setting descriptions, enum labels, view names,
+  - The extension manifest's texts - command titles, setting descriptions, enum labels, view names,
     debugger labels - come from `package.nls.json`; `npm run lint` fails on a text written into
     `package.json` itself or a key the catalogue does not carry
-  - The extension host's 180 texts - notifications and their buttons, prompts, quick picks, progress, tree
+  - The extension host's texts - notifications and their buttons, prompts, quick picks, progress, tree
     items and panel titles - go through `vscode.l10n.t` into `l10n/bundle.l10n.json`; the lint fails on a
     text written in place or a bundle that no longer matches the code. Six texts in second person were
     reworded on the way, and plural messages are whole sentences
-  - The webviews' 650 texts - the model preview, story graph, localisation editor, encyclopedia and credits
+  - The webviews' texts - the model preview, story graph, localisation editor, encyclopedia and credits
     - come from the same bundle, which the host hands every page; text interrupted by values is one
     message with placeholders. The page's language follows VS Code's display language. Curly quotes in one
     message became straight ones, and texts in second person were reworded
-  - The server's own texts come from one catalogue, `ServerMessages.resx`, in the language
-    `aet-eaw-edit.lsp.locale` names, English where no translation exists; values in a message keep the
-    form the XML holds - `0.5`, never `0,5`. A test ties every key the code asks for to the catalogue
-    and back
+  - The server's own texts come from one catalogue, `ServerMessages.resx`; English is the only language it holds so
+    far; values in a message keep the form the XML holds - `0.5`, never `0,5`. A test ties every key the code asks
+    for to the catalogue and back
   - The XML diagnostics read the configured locale; it was fixed to English, so neither the server's
     texts nor the schema's per-language notes ever reached a diagnostic in another language
   - The XML structure findings, the cross-tag rules, every message fragment and every engine-repair
@@ -131,11 +130,11 @@
     per game, `SpawnList` handed a callback or a flag it never takes
   - The analyzer's other type rules stay off. Counted over vanilla with every script in a state of its own (FoC
     2692 findings, EaW 1062), they describe the stubs or the analyzer's inference, not the scripts
-  - Stubs: `GlobalValue` and `ThreadValue` are called and carry `Get`, `Set` and `Reset`; `Script` and
-    `FreeStore` carry their members (`Script.Debug_Should_Issue_Event_Alert` was an unknown field); `Find_All_Objects_Of_Type`
-    takes a player as any filter; `Reinforce_Unit` takes three arguments; animation names match without regard
-    to case; `collectgarbage` takes its limit; the libraries' optional parameters and returns as their source
-    has them
+  - Stubs: `GlobalValue` and `ThreadValue` are called and carry `Get` and `Set`, `ThreadValue` `Reset` as well;
+    `Script` and `FreeStore` carry their members (`Script.Debug_Should_Issue_Event_Alert` was an unknown field);
+    `Find_All_Objects_Of_Type` takes a player as any filter; `Reinforce_Unit` takes three arguments; animation names
+    match without regard to case; `collectgarbage` takes its limit; the libraries' optional parameters and returns
+    as their source has them
 - **Engine types in a script's own definition of an engine function** - its parameters and return value typed
   from the engine's documentation, in the definition and at its calls
   ([#251](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/251))
@@ -279,12 +278,65 @@
     model, a file revealed in the file manager and the name copied; an unavailable one disabled with the reason
   - A planet offers no encyclopedia card anywhere, its popup being a preview of its own
   - The Preview Model picker lists models only, without particle systems
-  - Flag `aet-eaw-edit.features.tools.modBrowser`, on by default
 
 ### Fixes
 
+- **One name in two types is two objects** - the metafile that lists a file types it, and every type is an
+  id space of its own: the shipped game has a Sarlacc faction and a Sarlacc unit, and SFX and speech events
+  of one name. Where an id alone was looked up, whichever definition the index listed first answered, and
+  that changed from start to start. Find references, rename, go to definition, the references and
+  overrides lenses, the model preview, the encyclopedia, the effective-object view and the hardpoint and
+  variant checks now each work in the type they are about, and a variant's base is looked up in the
+  variant's own type. The Mod Browser lists both objects, one on each type's page; it listed one. A tag
+  that names an object kind looks its value up among game objects
+- **A faction keeps its colours in the model preview when a unit shares its name** - the shipped game names
+  a faction and an indigenous unit Sarlacc, and the preview read whichever of the two the index listed first,
+  which changed from start to start, and on some starts the Sarlacc swatch had no colours at
+  all. A faction now reads its own definition
+  ([#314](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/314))
+- **A game file a strict XML parser rejects keeps its facts** - the readers behind the dynamic enum values,
+  the group memberships and the object kinds used a strict parser and dropped a whole file over a stray
+  ampersand the game reads past; they now parse the way every other XML path does, and find an element
+  written in another case. The workspace indexer also reads a registry entry written as
+  `<File filename="..."/>`, the form the baseline builder always read, so such a file is validated with
+  its type's rules instead of none ([#308](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/308))
+- **A server service left out of the wiring stops the server at startup** - every dependency of every
+  server service is required and comes from the container; the two shorter constructors the container
+  could fall back to are gone. A registration left out used to switch the feature off without a word, or
+  build a private second copy of a shared service; now the server stops with the service's name, and a
+  test resolves the whole graph and constructs every handler the way the editor does
+  ([#305](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/305))
+- **A preview scene is built from one index snapshot** - the scene builder captured the game index once and
+  then went back to the live index for the hardpoint bones, the clips, the damage and reticle tables, the
+  projectile catalog and the faction palette; a re-index landing mid-build could mix two snapshots into one
+  scene. Every part of the scene now comes from the snapshot the build started with
+  ([#303](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/303))
+- **An empty repeated tag leaves the earlier value in place, as the game does** - the game maps nothing from an
+  empty value or a value of exactly `TBD`, so a later empty occurrence clears nothing: the earlier value, or the
+  one inherited from the variant base, stays. The effective object, the preview and the encyclopedia card follow
+  it, so the three shipped objects that repeat `Icon_Name` empty show their icon again. The empty occurrence is
+  reported as setting nothing, naming the value that stays; the duplicate-tag warning and its quick fix keep the
+  last occurrence with a value rather than the last one written
+  ([#290](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/290))
+- **A repeated or untrimmed tag reads the same everywhere** - the preview, the encyclopedia and the validation
+  rules read a tag through one set of accessors on the effective object: the last occurrence, trimmed, an empty
+  element as no value, and a number or a flag read as the game reads it. A `Scale_Factor` written `2.5f` draws
+  at 2.5 where the preview drew it at 1.0
+  ([#301](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/301))
+- **Numbers are read the way the game reads them** - one parser serves every validator, rule and the preview.
+  The preview and the comparison rules take the number at the front of a value as the game does, so `2.0ff` and
+  `2.0 f` read 2.0 where the preview dropped the spin time to its default; a validator accepts a number with at
+  most one `f` suffix, so `0.5ff` under a normalised float is reported where one validator let it pass
+  ([#302](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/302))
+- **Preview project settings per project** - the weapon bench, the faction and its colour are kept per project
+  file, not per window; two mods open together no longer share one set, which the move out of the global
+  settings had set out to end ([#276](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/276))
+- **Preview state per project and subject** - the camera, selection and damage state a preview keeps for a
+  subject are filed under its project as well, so two projects holding an object of one name no longer hand
+  each other their state ([#276](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/276))
 - **New Mod Project in an existing mod** - leaves the mod's `modinfo.json`, dependencies included, as it was; only a
-  folder without one gets a new one ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+  folder without one gets a new one; a folder that already has the project file is refused with its path, where
+  "created" was reported ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
@@ -360,7 +412,11 @@
   no longer appears on the registry itself; it still appears on a file nothing names
   ([#269](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/269))
 - **Shader note on particle systems** - "No shader sources are reachable" is shown only for a scene that asked for
-  an effect; a particle system asks for none and opened with a note about shaders it never needed
+  an effect under the Game renderer; a particle system opened with the note about shaders it was not drawing with
+- **Renderer switch on a particle file** - the Effects section withheld its Renderer control from a particle file,
+  although its emitters are drawn through the engine's own effects under Game; the control is offered there, and
+  its Game tooltip counts the emitters an effect reaches along with the sub-meshes
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
 - **Loading cover on a particle file** - a particle system opened on its own is a scene with one part, asked
   for as a particle system rather than as geometry; the cover counted geometry alone and stayed over the field
   for the full idle deadline, hiding the first eight seconds of any effect opened this way
@@ -427,6 +483,8 @@
 - **New, Lua_Script** - `Assets16` to `Assets20` (`aetswg-004-0016` to `aetswg-004-0020`: missing, backslash,
   `..`, extension, outside GameObject)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
+- **Retired** - `Symbols3` (`aetswg-010-0003`), one name defined in two types: every lookup names its type now,
+  so that is two objects, as it is to the game, and nothing to warn about; the number is never reused
 
 ### Breaking changes
 

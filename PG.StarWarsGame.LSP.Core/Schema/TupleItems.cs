@@ -74,9 +74,8 @@ public static class TupleItems
     }
 
     /// <summary>The value's shape in words, for hover and diagnostics: <c>`Terrain, Model` pairs</c>.</summary>
-    public static string Describe(XmlTagDefinition tag, IMessageCatalog? messages = null)
+    public static string Describe(XmlTagDefinition tag, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         if (tag.Slots.Count == 0) return messages.Format("TupleItems_CommaSeparatedPairs");
 
         if (tag.ValueType == XmlValueType.ListMap && tag.Slots.Count == 2)

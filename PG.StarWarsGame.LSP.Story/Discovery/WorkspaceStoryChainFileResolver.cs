@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Story.Discovery;
 
@@ -44,9 +45,9 @@ public sealed class WorkspaceStoryChainFileResolver(
 
     public bool IsKnownToBaseline(string xmlRelativePath)
     {
-        // Baseline keys are normalized game paths as listed in the shipped registry files —
+        // Baseline keys are normalized game paths as listed in the shipped registry files -
         // either xml-dir-relative or with the full data/xml prefix.
-        var normalized = xmlRelativePath.Replace('\\', '/').ToLowerInvariant();
+        var normalized = GamePaths.Key(xmlRelativePath);
         return baseline.FileTypeMap.ContainsKey(normalized)
                || baseline.FileTypeMap.ContainsKey("data/xml/" + normalized);
     }

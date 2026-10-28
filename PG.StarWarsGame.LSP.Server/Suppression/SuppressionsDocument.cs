@@ -66,6 +66,8 @@ public static class SuppressionsDocument
     /// </summary>
     private sealed class AddDefaultOffEntries : IDocumentMigration
     {
+        // The interface member returns the outer constant it is named after; hiding it is the point.
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         public string TypeName => SuppressionsDocument.TypeName;
         public TypeVersion From => TypeVersion.Of("aetswg", 1);
         public TypeVersion To => Version;
@@ -88,13 +90,15 @@ public static class SuppressionsDocument
 
     /// <summary>
     ///     Version zero was the bare array this file shipped as. Wrapping it is the whole migration
-    ///     - no entry changes - and it is what gives the file somewhere to say what it is.
+    ///     - no entry changes - and it is what gives the file somewhere to say what it is. It ends at
+    ///     version 1, the shape it produces, so the file goes on to gain the default-off entries.
     /// </summary>
     private sealed class AdoptBareArray : IDocumentMigration
     {
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         public string TypeName => SuppressionsDocument.TypeName;
         public TypeVersion From => TypeVersion.Zero("aetswg");
-        public TypeVersion To => Version;
+        public TypeVersion To => TypeVersion.Of("aetswg", 1);
 
         // Nothing for the user to do: the file keeps every suppression it had, at the same ids.
         public CatalogueText? UserNotice => null;

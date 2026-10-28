@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
@@ -412,7 +413,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
             seedWriter,
             NullLogger<InitLocalisationProjectCommandHandler>.Instance,
             lspConfig ?? new FakeLspConfigurationProvider(),
-            notifier);
+            notifier, TestCatalogues.English);
 
         return (handler, mockFs, reload, writer, notifier);
     }
@@ -423,7 +424,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         public bool FullyReloaded { get; private set; }
         public IReadOnlyList<string>? LastAssetRoots => null;
         public WorkspaceConfiguration? LastWorkspaceConfig { get; init; }
-        public IReadOnlyList<string>? LastWorkspaceRoots { get; init; }
+        public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
         {

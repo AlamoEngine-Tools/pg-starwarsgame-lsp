@@ -1,9 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Schema.Yaml.YamlType;
 
 /// <summary>YAML deserialization model for a single object-type entry.</summary>
+[PublicAPI]
 internal sealed class YamlTypeEntry
 {
     public string TypeName { get; set; } = string.Empty;

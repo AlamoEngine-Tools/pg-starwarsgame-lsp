@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Compression;
 using MessagePack;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Caching;
 
@@ -71,7 +72,7 @@ public static class ProjectIndexSerializer
     public static DocumentIndex FromEntry(ProjectFileEntry entry, string absoluteUri)
     {
         var d = entry.Document;
-        var suffix = "/" + entry.RelativePath.Replace('\\', '/').TrimStart('/');
+        var suffix = "/" + GamePaths.Normalize(entry.RelativePath);
 
         string Here(string uri)
         {

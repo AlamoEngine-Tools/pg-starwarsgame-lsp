@@ -43,7 +43,7 @@ public sealed record ProjectLayer(
         {
             if (ProjectPath is not { } path) return null;
 
-            var normalized = path.Replace('\\', '/').TrimEnd('/');
+            var normalized = GamePaths.Forward(path).TrimEnd('/');
             var slash = normalized.LastIndexOf('/');
             return slash > 0 ? normalized[..slash] : null;
         }

@@ -50,6 +50,9 @@ public enum XmlValueType
 
     /// <summary>UV texture channel index (expected range 0–3).</summary>
     UvSlotIndex = 21,
+
+    // Canonical spelling of the schema's type code; this enum is never renamed (CLAUDE.md).
+    // ReSharper disable once InconsistentNaming
     RGBA = 22,
 
     /// <summary>
@@ -80,6 +83,8 @@ public enum XmlValueType
     GameObjectTypeReferenceList = 30,
 
     /// <summary>A reference to an SFXEvent by name.</summary>
+    // Canonical spelling of the schema's type code; this enum is never renamed (CLAUDE.md).
+    // ReSharper disable once InconsistentNaming
     SFXEventReference = 31,
 
     /// <summary>A reference to a SpeechEvent by name.</summary>
@@ -195,6 +200,8 @@ public enum XmlValueType
     DamageToArmorMod = 62,
 
     /// <summary>Audio 3D provider name string (quoted DirectSound3D provider name, e.g., "EAX").</summary>
+    // Canonical spelling of the schema's type code; this enum is never renamed (CLAUDE.md).
+    // ReSharper disable once InconsistentNaming
     Audio3dProviderName = 63,
     LocalisationToTextureMap = 64,
     HardPointTypeToTextureMap = 65,

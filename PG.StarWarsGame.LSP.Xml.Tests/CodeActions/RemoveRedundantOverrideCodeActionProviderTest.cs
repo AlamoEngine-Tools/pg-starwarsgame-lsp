@@ -37,7 +37,7 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
 
     private static RemoveRedundantOverrideCodeActionProvider BuildProvider(string xml)
     {
-        var host = new FakeRemoveOverrideWorkspaceHost(Uri, xml);
+        var host = new FakeGameWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new RemoveRedundantOverrideCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper);
     }
@@ -51,7 +51,7 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
             Message = "redundant",
             Data = data
         };
-        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
     }
 
     [Fact]
@@ -84,33 +84,5 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
         // Removes from the start of the redundant line (5) to the start of the next line (6).
         Assert.Equal(new Position(5, 0), edit.Range.Start);
         Assert.Equal(new Position(6, 0), edit.Range.End);
-    }
-}
-
-file sealed class FakeRemoveOverrideWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly string _normalizedUri;
-    private readonly string _text;
-
-    public FakeRemoveOverrideWorkspaceHost(string uri, string text)
-    {
-        _normalizedUri = uri;
-        _text = text;
-    }
-
-    public IEnumerable<TrackedDocument> All => [new(_normalizedUri, _text, 1)];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string uri)
-    {
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(_normalizedUri, _text, 1);
-        return true;
     }
 }

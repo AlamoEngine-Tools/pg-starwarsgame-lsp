@@ -4,7 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -30,7 +30,7 @@ public sealed class UnitSpawnProbabilityTableHandler : CommaSeparatedPairHandler
             var (name, nameOffset) = tokens[i];
             var (prob, probOffset) = tokens[i + 1];
 
-            if (!LenientFloatParser.TryParse(prob, out var probability) ||
+            if (!EngineNumber.TryParseFloat(prob, out var probability) ||
                 probability < 0.0f || probability > 1.0f)
             {
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

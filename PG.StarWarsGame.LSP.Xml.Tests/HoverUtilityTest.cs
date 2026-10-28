@@ -15,27 +15,27 @@ public sealed class HoverUtilityTest
     public void Resolve_ExactLocaleMatch_ReturnsIt()
     {
         var desc = new Dictionary<string, string> { ["de"] = "Deutsch", ["en"] = "English" };
-        Assert.Equal("Deutsch", HoverUtility.Resolve(desc, "de"));
+        Assert.Equal("Deutsch", HoverUtility.Resolve(desc, "de", TestCatalogues.English));
     }
 
     [Fact]
     public void Resolve_LocaleIsEn_ReturnsEn()
     {
         var desc = new Dictionary<string, string> { ["en"] = "English" };
-        Assert.Equal("English", HoverUtility.Resolve(desc, "en"));
+        Assert.Equal("English", HoverUtility.Resolve(desc, "en", TestCatalogues.English));
     }
 
     [Fact]
     public void Resolve_LocaleMissing_FallsBackToEn()
     {
         var desc = new Dictionary<string, string> { ["en"] = "English" };
-        Assert.Equal("English", HoverUtility.Resolve(desc, "fr"));
+        Assert.Equal("English", HoverUtility.Resolve(desc, "fr", TestCatalogues.English));
     }
 
     [Fact]
     public void Resolve_NoDescriptions_ReturnsPrHintMessage()
     {
-        var result = HoverUtility.Resolve(new Dictionary<string, string>(), "en");
+        var result = HoverUtility.Resolve(new Dictionary<string, string>(), "en", TestCatalogues.English);
         // Should mention contributing / PR
         Assert.Contains("PR", result, StringComparison.OrdinalIgnoreCase);
     }
@@ -44,7 +44,7 @@ public sealed class HoverUtilityTest
     public void Resolve_NeitherLocaleNorEn_ReturnsPrHintMessage()
     {
         var desc = new Dictionary<string, string> { ["ja"] = "日本語" };
-        var result = HoverUtility.Resolve(desc, "fr");
+        var result = HoverUtility.Resolve(desc, "fr", TestCatalogues.English);
         Assert.Contains("PR", result, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -53,7 +53,7 @@ public sealed class HoverUtilityTest
     {
         // "EN" key should still match the "en" fallback path
         var desc = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["en"] = "English" };
-        Assert.Equal("English", HoverUtility.Resolve(desc, "fr"));
+        Assert.Equal("English", HoverUtility.Resolve(desc, "fr", TestCatalogues.English));
     }
 
     // ── BuildReferenceHover ───────────────────────────────────────────────────
@@ -76,7 +76,7 @@ public sealed class HoverUtilityTest
     public void BuildReferenceHover_ContainsTypeNameAndSymbolId()
     {
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en");
+            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", TestCatalogues.English);
         var md = hover.Contents.MarkupContent!.Value;
         Assert.Contains("SpaceUnit", md);
         Assert.Contains("Fighter_Mk2", md);
@@ -86,7 +86,8 @@ public sealed class HoverUtilityTest
     public void BuildReferenceHover_ContainsTypeDescription()
     {
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("Faction", "A playable faction."), "EMPIRE", MakeRef("EMPIRE", 0, 13, 6), "en");
+            MakeType("Faction", "A playable faction."), "EMPIRE", MakeRef("EMPIRE", 0, 13, 6), "en",
+            TestCatalogues.English);
         Assert.Contains("A playable faction.", hover.Contents.MarkupContent!.Value);
     }
 
@@ -94,7 +95,7 @@ public sealed class HoverUtilityTest
     public void BuildReferenceHover_RangeCoversReferenceToken()
     {
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en");
+            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", TestCatalogues.English);
         Assert.Equal(2, hover.Range!.Start.Line);
         Assert.Equal(14, hover.Range.Start.Character);
         Assert.Equal(2, hover.Range.End.Line);
@@ -105,7 +106,7 @@ public sealed class HoverUtilityTest
     public void BuildReferenceHover_IsMarkdown()
     {
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("SpaceUnit"), "X_Wing", MakeRef("X_Wing", 0, 0, 6), "en");
+            MakeType("SpaceUnit"), "X_Wing", MakeRef("X_Wing", 0, 0, 6), "en", TestCatalogues.English);
         Assert.Equal(MarkupKind.Markdown,
             hover.Contents.MarkupContent!.Kind);
     }
@@ -117,7 +118,8 @@ public sealed class HoverUtilityTest
     {
         var origin = new MegArchiveOrigin(@"C:\game\FoC_Art.meg", "DATA/ART/TEXTURES/FOO.TGA", null, null);
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", origin);
+            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", TestCatalogues.English,
+            origin);
         var md = hover.Contents.MarkupContent!.Value;
         Assert.Contains("FoC_Art.meg", md);
         Assert.Contains("DATA/ART/TEXTURES/FOO.TGA", md);
@@ -128,7 +130,7 @@ public sealed class HoverUtilityTest
     public void BuildReferenceHover_NullOrigin_NoPackedSection()
     {
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en");
+            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", TestCatalogues.English);
         var md = hover.Contents.MarkupContent!.Value;
         Assert.DoesNotContain("📦", md);
     }
@@ -138,7 +140,8 @@ public sealed class HoverUtilityTest
     {
         var origin = new FileOrigin("file:///game/data/foo.xml", 10, 5);
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", origin);
+            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", TestCatalogues.English,
+            origin);
         var md = hover.Contents.MarkupContent!.Value;
         Assert.DoesNotContain("📦", md);
     }
@@ -150,7 +153,8 @@ public sealed class HoverUtilityTest
         // source is packaged base-game data, just like a packed binary asset.
         var origin = new FileOrigin(@"DATA\XML\SFXEVENTSUNITSGROUND.XML", 0, 0);
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", origin);
+            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", TestCatalogues.English,
+            origin);
         var md = hover.Contents.MarkupContent!.Value;
         Assert.Contains("Packed in", md);
         Assert.Contains("base game", md);
@@ -183,10 +187,10 @@ public sealed class HoverUtilityTest
         // same way instead of showing nothing.
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.tga",
-            Loose("data/art/textures/foo.dds"), 0, 0, 7);
+            Loose("data/art/textures/foo.dds"), 0, 0, 7, TestCatalogues.English);
 
         Assert.NotNull(hover);
-        var md = hover!.Contents.MarkupContent!.Value;
+        var md = hover.Contents.MarkupContent!.Value;
         Assert.Contains("data/art/textures/foo.dds", md);
     }
 
@@ -195,10 +199,10 @@ public sealed class HoverUtilityTest
     {
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.dds",
-            Loose("data/art/textures/foo.tga"), 0, 0, 7);
+            Loose("data/art/textures/foo.tga"), 0, 0, 7, TestCatalogues.English);
 
         Assert.NotNull(hover);
-        Assert.Contains("data/art/textures/foo.tga", hover!.Contents.MarkupContent!.Value);
+        Assert.Contains("data/art/textures/foo.tga", hover.Contents.MarkupContent!.Value);
     }
 
     [Fact]
@@ -206,7 +210,7 @@ public sealed class HoverUtilityTest
     {
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.tga",
-            Packed("data/art/textures/foo.tga"), 5, 10, 7);
+            Packed("data/art/textures/foo.tga"), 5, 10, 7, TestCatalogues.English);
         var md = hover!.Contents.MarkupContent!.Value;
         Assert.Contains("data/art/textures/foo.tga", md);
         Assert.Contains("Packed - ", md);
@@ -217,7 +221,7 @@ public sealed class HoverUtilityTest
     {
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.tga",
-            Loose("data/art/textures/foo.tga"), 0, 0, 7);
+            Loose("data/art/textures/foo.tga"), 0, 0, 7, TestCatalogues.English);
         var md = hover!.Contents.MarkupContent!.Value;
         Assert.Contains("data/art/textures/foo.tga", md);
         Assert.DoesNotContain("📦", md);
@@ -228,7 +232,7 @@ public sealed class HoverUtilityTest
     {
         var result = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "missing.tga",
-            MergedAssetFileIndex.Merge([], []), 0, 0, 11);
+            MergedAssetFileIndex.Merge([], []), 0, 0, 11, TestCatalogues.English);
         Assert.Null(result);
     }
 
@@ -237,7 +241,7 @@ public sealed class HoverUtilityTest
     {
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.tga",
-            Loose("data/art/textures/foo.tga"), 3, 12, 7);
+            Loose("data/art/textures/foo.tga"), 3, 12, 7, TestCatalogues.English);
         Assert.Equal(3, hover!.Range!.Start.Line);
         Assert.Equal(12, hover.Range.Start.Character);
         Assert.Equal(3, hover.Range.End.Line);
@@ -249,7 +253,7 @@ public sealed class HoverUtilityTest
     {
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.tga",
-            Loose("data/art/textures/foo.tga"), 0, 0, 7);
+            Loose("data/art/textures/foo.tga"), 0, 0, 7, TestCatalogues.English);
         Assert.Contains("Texture", hover!.Contents.MarkupContent!.Value);
     }
 
@@ -258,7 +262,7 @@ public sealed class HoverUtilityTest
     {
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.ModelFile), "unit.alo",
-            Loose("data/art/models/unit.alo"), 0, 0, 8);
+            Loose("data/art/models/unit.alo"), 0, 0, 8, TestCatalogues.English);
         Assert.Contains("Model", hover!.Contents.MarkupContent!.Value);
     }
 
@@ -267,7 +271,7 @@ public sealed class HoverUtilityTest
     {
         var index = Loose("data/art/textures/foo.tga", "data/art/textures/patch/foo.tga");
         var hover = HoverUtility.BuildAssetReferenceHover(
-            AssetTag(ReferenceKind.TextureFile), "foo.tga", index, 0, 0, 7);
+            AssetTag(ReferenceKind.TextureFile), "foo.tga", index, 0, 0, 7, TestCatalogues.English);
         var md = hover!.Contents.MarkupContent!.Value;
         Assert.Contains("data/art/textures/foo.tga", md);
         Assert.Contains("data/art/textures/patch/foo.tga", md);

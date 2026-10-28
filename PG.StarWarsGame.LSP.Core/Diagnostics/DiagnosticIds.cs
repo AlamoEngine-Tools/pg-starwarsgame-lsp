@@ -462,6 +462,13 @@ public static class DiagnosticIds
     /// </remarks>
     public static readonly DiagnosticId UnregisteredXmlFile = new(DiagnosticGroup.Structure, 17);
 
+    /// <summary>
+    ///     A tag occurrence the game maps no value from - empty, or exactly <c>TBD</c> - where an
+    ///     earlier occurrence or the variant base already supplies one. That value stays; an author
+    ///     who meant to clear it has not.
+    /// </summary>
+    public static readonly DiagnosticId XmlEmptyRepeatedTag = new(DiagnosticGroup.Structure, 18);
+
     // ── CrossTag ──
     public static readonly DiagnosticId DamageNonzero = new(DiagnosticGroup.CrossTag, 1);
     public static readonly DiagnosticId DisallowedOrOperator = new(DiagnosticGroup.CrossTag, 2);
@@ -684,7 +691,18 @@ public static class DiagnosticIds
     // ── Symbols ──
     public static readonly DiagnosticId DuplicateSymbol = new(DiagnosticGroup.Symbols, 1);
     public static readonly DiagnosticId CrossLayerShadow = new(DiagnosticGroup.Symbols, 2);
+
+    /// <summary>
+    ///     RETIRED in 0.5.0 - never reuse the number. It warned that an id defined in two types was
+    ///     resolved by layer rank where no type was asked for. Every type is an id space of its own -
+    ///     the metafile that lists a file types it - and every lookup now names the type it means, so
+    ///     a faction and a unit of one name are two objects, as they are to the game, and nothing to
+    ///     warn about. A suppression naming this id now silences nothing.
+    /// </summary>
+    [Obsolete(
+        "Deprecated since 0.5.0: no longer emitted. Every type is an id space of its own. Never reuse the number.")]
     public static readonly DiagnosticId CrossTypeShadow = new(DiagnosticGroup.Symbols, 3);
+
     public static readonly DiagnosticId UnnamedObject = new(DiagnosticGroup.Symbols, 4);
 
     /// <summary>

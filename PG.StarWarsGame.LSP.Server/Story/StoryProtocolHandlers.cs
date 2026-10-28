@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.JsonRpc;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -158,10 +157,9 @@ public sealed class GetStoryPlotsHandler(
 
 public sealed class GetStoryGraphHandler(
     IStoryModelService modelService,
-    ILspConfigurationProvider config,
-    // Optional so the minimal test setups can omit it; production always wires it. Without it
-    // every node reports editable, which is exactly right for a workspace with no layers.
-    IModProjectReloadService? reloadService = null)
+    IMessageCatalog messages,
+    // The layers decide which nodes are read-only: a dependency's are, the project's own are not.
+    IModProjectReloadService reloadService)
     : IJsonRpcRequestHandler<GetStoryGraphParams, GetStoryGraphResult>
 {
     public Task<GetStoryGraphResult> Handle(GetStoryGraphParams request, CancellationToken ct)
@@ -169,16 +167,16 @@ public sealed class GetStoryGraphHandler(
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
+                messages.Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         return Task.FromResult(StoryGraphProjection.Project(
             model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
             request.PlotState, request.ReachableDirection, request.Scope,
-            uri => DependencyOwnership.ReadOnlyOwner(reloadService?.LastWorkspaceConfig, uri)));
+            uri => DependencyOwnership.ReadOnlyOwner(reloadService.LastWorkspaceConfig, uri)));
     }
 }
 
-public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, ILspConfigurationProvider config)
+public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, IMessageCatalog messages)
     : IJsonRpcRequestHandler<GetStoryNodeDetailParams, GetStoryNodeDetailResult>
 {
     public Task<GetStoryNodeDetailResult> Handle(GetStoryNodeDetailParams request, CancellationToken ct)
@@ -188,7 +186,7 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
             n.Kind == StoryNodeKind.Event && n.Id == request.NodeId);
         if (node?.Event is not { } storyEvent)
             return Task.FromResult(new GetStoryNodeDetailResult(null,
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_NodeWasNotFoundCampaign", request.NodeId,
+                messages.Format("StoryHandlers_NodeWasNotFoundCampaign", request.NodeId,
                     request.Campaign)));
 
         return Task.FromResult(new GetStoryNodeDetailResult(new StoryNodeDetailDto(
@@ -314,7 +312,7 @@ public sealed class GetStoryParamOptionsHandler(
             return Task.FromResult(new GetStoryParamOptionsResult([]));
 
         var query = request.Query?.Trim() ?? string.Empty;
-        var limit = request.Limit is int l and > 0 ? l : DefaultLimit;
+        var limit = request.Limit is { } l and > 0 ? l : DefaultLimit;
 
         // Story-scoped names resolve campaign-wide - the campaign model gives a far tighter
         // candidate set than the index (which mixes every campaign's names together).
@@ -388,7 +386,7 @@ public sealed class GetStoryDiagnosticsHandler(
     IGameIndexService indexService,
     IXmlDiagnosticsCollector collector,
     IDocumentTextSource textSource,
-    ILspConfigurationProvider config)
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<GetStoryDiagnosticsParams, GetStoryDiagnosticsResult>
 {
     public Task<GetStoryDiagnosticsResult> Handle(GetStoryDiagnosticsParams request, CancellationToken ct)
@@ -396,7 +394,7 @@ public sealed class GetStoryDiagnosticsHandler(
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
-                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
+                messages.Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         // Graph node per event INSTANCE (reference identity - duplicate names get distinct
         // disambiguated node ids, and StoryEvent's record equality would conflate them).

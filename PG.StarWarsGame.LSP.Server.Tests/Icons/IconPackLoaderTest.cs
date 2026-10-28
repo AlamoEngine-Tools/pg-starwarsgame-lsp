@@ -44,7 +44,7 @@ public sealed class IconPackLoaderTest
             new SchemaReleaseResolver(client, NullLogger<SchemaReleaseResolver>.Instance),
             NullLogger<BaselineLocationResolver>.Instance);
         return new IconPackLoader(client, locations, new FileHelper(fs),
-            NullLogger<IconPackLoader>.Instance, recorder);
+            NullLogger<IconPackLoader>.Instance, recorder, new NullCrossProcessLock());
     }
 
     [Fact]

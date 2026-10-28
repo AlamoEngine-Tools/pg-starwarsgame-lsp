@@ -18,7 +18,7 @@ public sealed partial class FloatVector2Handler : SingleValueTypeHandlerBase
     {
         var trimmed = fact.RawValue.Trim();
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
-        if (parts.Length != 2 || parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
+        if (parts.Length != 2 || parts.Any(p => !EngineNumber.TryParseFloat(p, out _)))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

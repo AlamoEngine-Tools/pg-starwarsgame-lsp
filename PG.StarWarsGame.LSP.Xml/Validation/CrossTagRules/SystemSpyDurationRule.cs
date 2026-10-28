@@ -1,10 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
@@ -55,9 +54,7 @@ public sealed class SystemSpyDurationRule : IXmlCrossTagRule
         var raw = durationNode.InnerText.Trim();
 
         // A duration that is not a number never reaches the comparison; the type handler reports it.
-        if (!double.TryParse(raw.TrimEnd('f', 'F'), NumberStyles.Float, CultureInfo.InvariantCulture,
-                out var duration))
-            return [];
+        if (EngineNumber.ReadDouble(raw) is not { } duration) return [];
 
         var (requirement, repair) = style.ToLowerInvariant() switch
         {

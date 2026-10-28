@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using MediatR;
@@ -31,19 +32,24 @@ public sealed record GetServerStatusParams : IRequest<ServerStatusDto>
 }
 
 /// <param name="Layers">Project layers indexed, the root included.</param>
+[PublicAPI]
 public sealed record ServerStatusDependenciesDto(int Direct, int Total, int Depth, int Unresolved, int Layers);
 
 /// <param name="ProjectFiles">Indexed documents in the root project's own layer.</param>
 /// <param name="DependencyFiles">Indexed documents in every other layer.</param>
+[PublicAPI]
 public sealed record ServerStatusFilesDto(int ProjectFiles, int DependencyFiles, int XmlFiles, int LuaFiles);
 
 /// <param name="Baseline">Symbols the shipped-game baseline supplies.</param>
+[PublicAPI]
 public sealed record ServerStatusSymbolsDto(int Xml, int Lua, int Baseline, int LocalisationKeys);
 
 /// <param name="BaseGame">How many of <paramref name="Total" /> come from the shipped game alone.</param>
+[PublicAPI]
 public sealed record ServerStatusAssetCountDto(string Extension, int Total, int BaseGame);
 
 /// <param name="Schema">Hit, Rebuilt or NotUsed (a local schema has no cache).</param>
+[PublicAPI]
 public sealed record ServerStatusCachesDto(
     string Schema,
     int SnapshotLayers,
@@ -51,11 +57,15 @@ public sealed record ServerStatusCachesDto(
     int FilesReused,
     int FilesParsed,
     int BoneLayersReused,
-    int BoneLayers);
+    int BoneLayers,
+    // What consumers have derived from the current index snapshot and keep beside it: the symbol
+    // catalog, the bone resolver, the projectile list and their kind (#311).
+    int DerivedCaches);
 
 public sealed record ServerStatusTypeCountDto(string TypeName, int Count);
 
 /// <summary>What the index holds for one layer, by RANK - never by name; this is pasted into public issues.</summary>
+[PublicAPI]
 public sealed record ServerStatusLayerDto(int Rank, int Documents, int Symbols, int References);
 
 /// <summary>One in-memory cache's self-description; nulls where the cache does not count that.</summary>
@@ -75,6 +85,7 @@ public sealed record ServerStatusCacheEntryDto(
 /// </summary>
 /// <param name="FragmentedBytes">Free space inside the managed heap the GC has not compacted.</param>
 /// <param name="LargeObjectHeapBytes">Objects over 85 KB - file buffers, big arrays - which are compacted only on demand.</param>
+[PublicAPI]
 public sealed record ServerStatusMemoryDto(
     long HeapBytes,
     long CommittedBytes,
@@ -101,6 +112,7 @@ public sealed record ServerStatusExtendedDto(
 /// <param name="Version">The schema's declared version, or null when it declares none.</param>
 /// <param name="Compatibility">The version check's verdict, or <c>NotChecked</c>.</param>
 /// <param name="Source">Release, CachedRelease, Branch, CustomUrl, Local or NotLoaded.</param>
+[PublicAPI]
 public sealed record ServerStatusSchemaDto(string? Version, string Compatibility, string Source);
 
 /// <param name="Source">Network, Cache, Local, Empty or NotLoaded.</param>
@@ -111,6 +123,7 @@ public sealed record ServerStatusIconPackDto(string Source, bool Official);
 
 /// <param name="ProjectProblem">A <see cref="Project.ProjectProblem" /> name, or null when valid.</param>
 /// <param name="OtherProjectFiles">Project files under the root besides the one loaded; a count, never names.</param>
+[PublicAPI]
 public sealed record ServerStatusWorkspaceDto(
     bool ProjectDetected,
     bool ProjectValid,
@@ -124,6 +137,7 @@ public sealed record ServerStatusIndexDto(string State);
 /// <summary>Result of <c>aet/getServerStatus</c>: outcomes only, never a path or a name.</summary>
 /// <param name="ServerVersion">The full informational version, commit included.</param>
 /// <param name="Warnings">Anything empty or failed that should not be, one line each.</param>
+[PublicAPI]
 public sealed record ServerStatusDto(
     string ServerVersion,
     string Runtime,
@@ -142,8 +156,9 @@ public sealed class GetServerStatusHandler(
     IGameIndexService indexService,
     IModProjectReloadService projects,
     IFileHelper fileHelper,
-    IWorkspaceIndexer? indexer = null,
-    IEnumerable<ICacheStatisticsSource>? caches = null)
+    IWorkspaceIndexer indexer,
+    IEnumerable<ICacheStatisticsSource> caches,
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<GetServerStatusParams, ServerStatusDto>
 {
     public Task<ServerStatusDto> Handle(GetServerStatusParams request, CancellationToken cancellationToken)
@@ -221,7 +236,7 @@ public sealed class GetServerStatusHandler(
                 g.Key, g.Count(), g.Sum(d => d.Symbols.Length), g.Sum(d => d.References.Length)))
             .ToList();
 
-        var cacheEntries = (caches ?? [])
+        var cacheEntries = caches
             .Select(c => c.Snapshot())
             .Select(s => new ServerStatusCacheEntryDto(
                 s.Name, s.Entries, s.ApproximateBytes, s.Hits, s.Misses, s.Evictions))
@@ -263,7 +278,7 @@ public sealed class GetServerStatusHandler(
     /// </summary>
     private static ServerStatusSymbolsDto Symbols(GameIndex index)
     {
-        var documents = index.Documents.Values;
+        var documents = index.Documents.Values.ToArray();
         return new ServerStatusSymbolsDto(
             documents.Where(d => IsLanguage(d, ".xml")).Sum(d => d.Symbols.Length),
             documents.Where(d => IsLanguage(d, ".lua")).Sum(d => d.Symbols.Length),
@@ -287,8 +302,8 @@ public sealed class GetServerStatusHandler(
 
     private ServerStatusCachesDto Caches()
     {
-        var snapshots = indexer?.LastIndexCache;
-        var bones = indexer?.LastBoneCatalog;
+        var snapshots = indexer.LastIndexCache;
+        var bones = indexer.LastBoneCatalog;
         var schema = recorder.SchemaFromCache switch
         {
             true => "Hit",
@@ -303,7 +318,8 @@ public sealed class GetServerStatusHandler(
             snapshots?.FilesReused ?? 0,
             snapshots?.FilesParsed ?? 0,
             bones?.LayersReused ?? 0,
-            bones?.Layers ?? 0);
+            bones?.Layers ?? 0,
+            indexService.Current.DerivedCount);
     }
 
     /// <summary>The project's own symbols by type, most first; a symbol with no type by its kind.</summary>
@@ -363,7 +379,7 @@ public sealed class GetServerStatusHandler(
         var warnings = new List<string>();
 
         if (check is null)
-            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_SchemaNotLoaded"));
+            warnings.Add(messages.Format("ServerStatus_SchemaNotLoaded"));
         else if (!check.CanLoad)
             warnings.Add($"Schema: {check.Compatibility}");
 
@@ -380,10 +396,10 @@ public sealed class GetServerStatusHandler(
         // that indexed nothing, and a catalog with no models in it.
         if (recorder.IndexState == StatusIndexState.Complete && problem == ProjectProblem.None
                                                              && files.ProjectFiles == 0)
-            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_ProjectFiles"));
+            warnings.Add(messages.Format("ServerStatus_ProjectFiles"));
 
         if (!index.AssetFiles.GetByExtension(".alo").Any())
-            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_AssetCatalogNoModels"));
+            warnings.Add(messages.Format("ServerStatus_AssetCatalogNoModels"));
 
         return warnings;
     }

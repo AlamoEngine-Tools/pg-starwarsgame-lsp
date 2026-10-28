@@ -2,10 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Localisation.Rows;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -32,7 +33,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 /// <typeparam name="TResult">The endpoint's own result record.</typeparam>
 public abstract class ApplyLocalisationBatchHandlerBase<TCommand, TResult>
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IFileHelper _fileHelper;
     private readonly IProjectLayerMap _layers;
     private readonly ILogger _logger;
@@ -43,14 +44,14 @@ public abstract class ApplyLocalisationBatchHandlerBase<TCommand, TResult>
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger logger,
-        ILspConfigurationProvider config,
+        IMessageCatalog messages,
         ILocalisationWriteLedger writeLedger,
         IProjectLayerMap layers)
     {
         _reloadService = reloadService;
         _fileHelper = fileHelper;
         _logger = logger;
-        _config = config;
+        _messages = messages;
         _writeLedger = writeLedger;
         _layers = layers;
     }
@@ -80,23 +81,23 @@ public abstract class ApplyLocalisationBatchHandlerBase<TCommand, TResult>
     {
         if (string.IsNullOrWhiteSpace(projectFilePath))
             return Failed(null,
-                new ConfiguredMessageCatalog(_config).Format("LocApplyBatch_NoProjectFilePathProvided"));
+                _messages.Format("LocApplyBatch_NoProjectFilePathProvided"));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(projectFilePath))
             return Failed(null,
-                new ConfiguredMessageCatalog(_config).Format("LocApplyBatch_FileNotFound", projectFilePath));
+                _messages.Format("LocApplyBatch_FileNotFound", projectFilePath));
 
         // Before anything is composed: a dependency's file is listed beside the project's own so
         // the grid can show what the layers below say, not so the project can rewrite it (#276).
         if (LocalisationLayerGuard.ReadOnlyObjection(
-                _layers, _fileHelper, projectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
+                _layers, _fileHelper, projectFilePath, _messages) is { } readOnly)
             return Failed(null, readOnly);
 
         // Checked once for the whole batch, before anything is composed: the batch is atomic, so
         // there is no point discovering a stale file halfway through.
         if (await LocalisationConcurrencyGuard.CheckAsync(
-                fs, projectFilePath, expectedContentHash, ct, new ConfiguredMessageCatalog(_config)) is { } stale)
+                fs, projectFilePath, expectedContentHash, ct, _messages) is { } stale)
             return Failed(null, stale.Error!);
 
         if (commands.Count == 0)
@@ -114,7 +115,7 @@ public abstract class ApplyLocalisationBatchHandlerBase<TCommand, TResult>
         {
             _logger.LogWarning(ex, "Could not write {FileKind} '{Path}'.", FileKind, projectFilePath);
             return Failed(null,
-                new ConfiguredMessageCatalog(_config).Format("LocApplyBatch_CouldNotWriteFile", ex.Message));
+                _messages.Format("LocApplyBatch_CouldNotWriteFile", ex.Message));
         }
 
         if (!result.Success)

@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Text;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
@@ -49,17 +49,11 @@ internal static class TagInsertionFactory
 
         // A one-line object stays on one line: breaking it would reformat markup the author chose.
         var newText = inner.Contains('\n')
-            ? LineEnding(inner) + ChildIndent(inner) + element
+            ? LineEndings.Detect(inner) + ChildIndent(inner) + element
             : element;
 
         var (line, column) = lineIndex.GetPosition(offset);
         return new XmlDiagnosticEdit(line, column, 0, newText);
-    }
-
-    /// <summary>The line ending this object is already written with.</summary>
-    private static string LineEnding(string inner)
-    {
-        return inner.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
     }
 
     /// <summary>

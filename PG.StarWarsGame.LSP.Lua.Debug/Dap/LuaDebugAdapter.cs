@@ -300,6 +300,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
         var session = RequireSession();
         var scriptId = session.SuspendedScriptId ?? session.ContextScriptId
             ?? throw new LuaDebugAdapterException(Messages.Format("LuaDebugAdapter_SelectScriptStopOneBefore"));
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract - a DAP payload; the library's annotation is not the wire's contract
         var expression = args.Expression?.Trim() ?? string.Empty;
 
         if (args.Context is { } context && context.Equals(EvaluateArgumentsContext.Repl))
@@ -328,6 +329,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
     {
         ArgumentNullException.ThrowIfNull(args);
         var requested = args.Breakpoints?.ToList() ?? [];
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract - a DAP payload; the library's annotation is not the wire's contract
         var path = args.Source?.Path;
         if (string.IsNullOrEmpty(path))
             return Unverified(requested, Messages.Format("LuaDebugAdapter_SourceHasNoFilePath"));

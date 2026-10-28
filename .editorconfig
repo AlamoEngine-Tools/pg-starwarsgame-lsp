@@ -59,6 +59,17 @@ dotnet_style_qualification_for_event = false:suggestion
 # (Directory.Build.props), so a style rule raised to warning here would start failing builds over
 # formatting - which is not what warnings-as-errors was turned on for.
 
+# Naming rules measured against the tree: private static readonly fields carry the s_ prefix in
+# about 45 places (none use PascalCase), and the Lua enums spell their members UPPER_CASE on
+# purpose (the house convention for enum members; see the schema enums). Both styles are accepted so
+# neither convention is reported against the other.
+resharper_csharp_naming_rule.private_static_readonly = s_ + aaBb, AaBb
+resharper_csharp_naming_rule.enum_member = AaBb, AA_BB
+
+# A test's Assert.All lambda uses its parameter only in assertions; that is the pattern, not a smell.
+[PG.StarWarsGame.LSP.*.Tests/**.cs]
+resharper_parameter_only_used_for_precondition_check_local_highlighting = none
+
 [*.{ts,tsx,js,mjs}]
 indent_size = 4
 

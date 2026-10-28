@@ -4,7 +4,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using Loretta.CodeAnalysis.Lua;
-using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Text;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Generated;
@@ -47,7 +47,7 @@ public sealed class LuaGeneratedTexts(IEnumerable<ILuaAnnotationSource> sources,
         }
 
         _maps[key] = new LuaLineMap(insertions);
-        var eol = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        var eol = LineEndings.Detect(text);
         var byLine = insertions.GroupBy(i => i.BeforeLine).ToDictionary(g => g.Key, g => g.SelectMany(i => i.Lines));
         var source = LuaSyntaxTree.ParseText(text, s_parseOptions).GetText();
         var generated = new StringBuilder(text.Length + insertions.Count * 64);

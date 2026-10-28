@@ -2,10 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
@@ -30,7 +29,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             """<X><SpecialStructure Name="PALACE"><Land_Model_Name>Models\UB_PALACE.ALO</Land_Model_Name>""" +
             """<HardPoints>HP_A, HP_B</HardPoints></SpecialStructure></X>""";
 
-        var schema = new ModelSchema("Land_Model_Name");
+        var schema = ModelSchema("Land_Model_Name");
         var source = new HardpointTagSource()
             .With("PALACE", new VariantTag("Land_Model_Name", @"Models\UB_PALACE.ALO", "", 0))
             .With("HP_A", new VariantTag("Attachment_Bone", "HP_Bone_A", "", 0))
@@ -40,7 +39,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         var bones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("ub_palace.alo", ["HP_Bone_A", "HP_Bone_B", "Root"]);
 
-        var facts = Produce(text, schema, source, bones, Sym("PALACE", "SpecialStructure"));
+        var facts = Produce(text, schema, source, bones, Sym("PALACE", "GameObjectType"));
 
         Assert.DoesNotContain(facts, f => f is HardpointModelBonesUnavailableFact);
         Assert.DoesNotContain(facts, f => f is HardpointBoneNotOnModelFact);
@@ -54,7 +53,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             """<X><SpecialStructure Name="PALACE"><Land_Model_Name>UB_PALACE.ALO</Land_Model_Name>""" +
             """<HardPoints>HP_A</HardPoints></SpecialStructure></X>""";
 
-        var schema = new ModelSchema("Land_Model_Name");
+        var schema = ModelSchema("Land_Model_Name");
         var source = new HardpointTagSource()
             .With("PALACE", new VariantTag("Land_Model_Name", "UB_PALACE.ALO", "", 0))
             .With("HP_A", new VariantTag("Attachment_Bone", "Nonexistent_Bone", "", 0));
@@ -62,7 +61,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         var bones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("ub_palace.alo", ["HP_Bone_A", "Root"]);
 
-        var facts = Produce(text, schema, source, bones, Sym("PALACE", "SpecialStructure"));
+        var facts = Produce(text, schema, source, bones, Sym("PALACE", "GameObjectType"));
 
         Assert.Contains(facts, f => f is HardpointBoneNotOnModelFact { BoneName: "Nonexistent_Bone" });
     }
@@ -79,7 +78,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             """<X><HardPoint Name="HP_A"><Attachment_Bone>HP_Bone</Attachment_Bone>""" +
             """<Damage_Decal>HP_Blast</Damage_Decal></HardPoint></X>""";
 
-        var schema = new ModelSchema("Land_Model_Name");
+        var schema = ModelSchema("Land_Model_Name");
         var source = new HardpointTagSource()
             .With("PALACE", new VariantTag("Land_Model_Name", "UB_PALACE.ALO", "", 0),
                 new VariantTag("HardPoints", "HP_A", "", 0))
@@ -90,7 +89,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("ub_palace.alo", ["HP_Bone", "Root"]); // HP_Blast is absent
 
         var hpSym = Sym("HP_A", "HardPoint");
-        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(objUri, 0, 0), null);
 
         var hpDoc = new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty);
@@ -126,7 +125,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             """<X><HardPoint Name="HP_A"><Model_To_Attach>weapon.alo</Model_To_Attach>""" +
             """<Attachment_Bone>HP_Bone</Attachment_Bone><Collision_Mesh>HP_Coll</Collision_Mesh></HardPoint></X>""";
 
-        var schema = new ModelSchema("Land_Model_Name");
+        var schema = ModelSchema("Land_Model_Name");
         var source = new HardpointTagSource()
             .With("PALACE", new VariantTag("Land_Model_Name", "hull.alo", "", 0),
                 new VariantTag("HardPoints", "HP_A", "", 0))
@@ -152,7 +151,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             """<X><HardPoint Name="HP_A"><Model_To_Attach>weapon.alo</Model_To_Attach>""" +
             """<Collision_Mesh>HP_Typo_Coll</Collision_Mesh></HardPoint></X>""";
 
-        var schema = new ModelSchema("Land_Model_Name");
+        var schema = ModelSchema("Land_Model_Name");
         var source = new HardpointTagSource()
             .With("PALACE", new VariantTag("Land_Model_Name", "hull.alo", "", 0),
                 new VariantTag("HardPoints", "HP_A", "", 0))
@@ -180,7 +179,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             """<Collision_Mesh>Bad_Coll</Collision_Mesh><Damage_Decal>Bad_Blast</Damage_Decal>""" +
             """<Damage_Particles>Good_Emit</Damage_Particles></HardPoint></X>""";
 
-        var schema = new ModelSchema("Land_Model_Name");
+        var schema = ModelSchema("Land_Model_Name");
         var source = new HardpointTagSource()
             .With("PALACE", new VariantTag("Land_Model_Name", "UB_PALACE.ALO", "", 0),
                 new VariantTag("HardPoints", "HP_A", "", 0));
@@ -189,7 +188,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("ub_palace.alo", ["Good_Bone", "Good_Emit", "Root"]); // Bad_Coll and Bad_Blast absent
 
         var hpSym = Sym("HP_A", "HardPoint");
-        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(objUri, 0, 0), null);
         var hpDoc = new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty);
         var objDoc = new DocumentIndex(objUri, 1, [objSym], ImmutableArray<GameReference>.Empty);
@@ -223,7 +222,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             """<Galactic_Model_Name>i_ub_01_station.alo</Galactic_Model_Name>""" +
             """<HardPoints>HP_A</HardPoints></SpaceUnit></X>""";
 
-        var schema = new ModelSchema("Space_Model_Name", "Galactic_Model_Name");
+        var schema = ModelSchema("Space_Model_Name", "Galactic_Model_Name");
         var source = new HardpointTagSource()
             .With("STATION", new VariantTag("Space_Model_Name", "UB_01_STATION.ALO", "", 0),
                 new VariantTag("Galactic_Model_Name", "i_ub_01_station.alo", "", 0))
@@ -233,7 +232,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("ub_01_station.alo", ["HP01_COM_Bone", "Root"]) // tactical model HAS the bone (mixed case)
             .Add("i_ub_01_station.alo", ["Root"]); // galactic model lacks it
 
-        var facts = Produce(text, schema, source, bones, Sym("STATION", "SpaceUnit"));
+        var facts = Produce(text, schema, source, bones, Sym("STATION", "GameObjectType"));
 
         Assert.DoesNotContain(facts, f => f is HardpointBoneNotOnModelFact);
     }
@@ -245,7 +244,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         const string hpText =
             "<X><HardPoint Name=\"HP_A\"><Damage_Decal>HP_Blast</Damage_Decal></HardPoint></X>";
 
-        var schema = new ModelSchema("Land_Model_Name");
+        var schema = ModelSchema("Land_Model_Name");
         var source = new HardpointTagSource()
             .With("PALACE", new VariantTag("Land_Model_Name", "UB_PALACE.ALO", "", 0),
                 new VariantTag("HardPoints", "HP_A", "", 0));
@@ -253,7 +252,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("ub_palace.alo", ["Root"]);
 
         var hpSym = Sym("HP_A", "HardPoint");
-        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(objUri, 0, 0), null);
         var index = GameIndex.Empty with
         {
@@ -281,7 +280,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
     {
         const string objUri = "file:///object.xml";
         var hpSym = Sym("HP_A", "HardPoint");
-        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(objUri, 0, 0), null);
 
         var index = GameIndex.Empty with
@@ -313,7 +312,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
     public void HardpointFileOpen_TruncatedCollisionMesh_SuggestsTheOneMeshTheModelHas()
     {
         var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
-            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
             GargantuanBones("HP_turret_front_00_COLLISION"));
 
         var fact = Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>());
@@ -330,7 +329,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
     public void HardpointFileOpen_Fact_KeepsTheTagNameAsWritten()
     {
         var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
-            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
             GargantuanBones("HP_turret_front_00_COLLISION"));
 
         Assert.Equal("Collision_Mesh", Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>()).TagName);
@@ -348,9 +347,9 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             """<X><UniqueUnit Name="PALACE"><Space_Model_Name>rv_gargantuan.alo</Space_Model_Name>""" +
             """<HardPoints>HP_A</HardPoints></UniqueUnit></X>""";
 
-        var facts = Produce(text, new ModelSchema("Space_Model_Name"),
+        var facts = Produce(text, ModelSchema("Space_Model_Name"),
             GargantuanSource("HP_turret_front_00_COL"), GargantuanBones("HP_turret_front_00_COLLISION"),
-            Sym("PALACE", "UniqueUnit"));
+            Sym("PALACE", "GameObjectType"));
 
         var fact = Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>());
         Assert.Null(fact.SuggestedName);
@@ -361,7 +360,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
     public void HardpointFileOpen_AmbiguousPrefix_OffersNoSuggestion()
     {
         var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
-            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
             GargantuanBones("HP_turret_front_00_COLLISION", "HP_turret_front_00_COLLISION_B"));
 
         Assert.Null(Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>()).SuggestedName);
@@ -388,7 +387,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("rv_gargantuan.alo", ["HP_Blast", "Root"])
             .Add("hp_turret_front_00.alo", ["Root"]);
 
-        var fact = Assert.Single(HardpointFileOpen(hpText, new ModelSchema("Space_Model_Name"), source, bones)
+        var fact = Assert.Single(HardpointFileOpen(hpText, ModelSchema("Space_Model_Name"), source, bones)
             .OfType<HardpointBoneNotOnModelFact>());
         Assert.Null(fact.SuggestedName);
     }
@@ -425,6 +424,13 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         var docIndex = new DocumentIndex(Uri, 1, docSymbols, ImmutableArray<GameReference>.Empty);
         var defs = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
             StringComparer.OrdinalIgnoreCase);
+        // Every hardpoint the text mounts is defined too, in a hardpoint file of its own: a real index
+        // holds one, and a hardpoint is looked up in HardPointDataFiles' id space.
+        foreach (var hardpoint in MountedHardpoints(text).Where(h => !defs.ContainsKey(h)))
+            defs = defs.Add(hardpoint, [
+                new GameSymbol(hardpoint, GameSymbolKind.XmlObject, GameTypeNames.HardPoint,
+                    new FileOrigin("file:///hardpoints.xml", 0, 0), null)
+            ]);
         var index = GameIndex.Empty with
         {
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty.Add(Uri, docIndex),
@@ -434,6 +440,14 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         return new XmlHardpointFactProducer(schema, source)
             .Produce(Uri, ParsedXmlDocument.Parse(text), index);
+    }
+
+    private static IEnumerable<string> MountedHardpoints(string text)
+    {
+        var html = ParsedXmlDocument.Parse(text).Html;
+        return html.DocumentNode.Descendants("hardpoints")
+            .SelectMany(n =>
+                n.InnerText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static GameSymbol Sym(string id, string typeName)
@@ -458,51 +472,15 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         }
     }
 
-    private sealed class ModelSchema(params string[] modelTags) : ISchemaProvider
+    /// <summary>A schema in which these tags, and only these, name a model file.</summary>
+    private static FakeSchemaProvider ModelSchema(params string[] modelTags)
     {
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return modelTags.Contains(tagName, StringComparer.OrdinalIgnoreCase)
-                ? new XmlTagDefinition
-                {
-                    Tag = tagName, ValueType = XmlValueType.NameReference,
-                    ReferenceKind = ReferenceKind.ModelFile
-                }
-                : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
+        var builder = new SchemaProviderBuilder();
+        foreach (var tag in modelTags)
+            builder.WithTag(new XmlTagDefinition
+            {
+                Tag = tag, ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.ModelFile
+            });
+        return builder.Build();
     }
 }

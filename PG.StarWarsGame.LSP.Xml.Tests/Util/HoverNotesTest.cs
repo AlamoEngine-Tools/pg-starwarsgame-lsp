@@ -29,7 +29,7 @@ public sealed class HoverNotesTest
         };
         var node = HtmlNode.CreateNode("<Tactical_Health>100</Tactical_Health>");
 
-        return HoverUtility.BuildTagHover(tag, node, "en").Contents.MarkupContent!.Value;
+        return HoverUtility.BuildTagHover(tag, node, "en", TestCatalogues.English).Contents.MarkupContent!.Value;
     }
 
     private static SchemaNote Note(SchemaNoteKind kind, string? en = null, string? value = null)
@@ -100,7 +100,7 @@ public sealed class HoverNotesTest
         };
         var node = HtmlNode.CreateNode("<Speed>1</Speed>");
 
-        var hover = HoverUtility.BuildTagHover(tag, node, "de").Contents.MarkupContent!.Value;
+        var hover = HoverUtility.BuildTagHover(tag, node, "de", TestCatalogues.English).Contents.MarkupContent!.Value;
 
         Assert.Contains("Only in space.", hover, StringComparison.Ordinal);
     }
@@ -143,7 +143,7 @@ public sealed class HoverNotesTest
         };
         var node = HtmlNode.CreateNode("<SpaceUnit Name=\"X\"></SpaceUnit>");
 
-        var hover = HoverUtility.BuildTypeHover(type, node, "en").Contents.MarkupContent!.Value;
+        var hover = HoverUtility.BuildTypeHover(type, node, "en", TestCatalogues.English).Contents.MarkupContent!.Value;
 
         Assert.Contains("> **Deprecated:**", hover, StringComparison.Ordinal);
     }

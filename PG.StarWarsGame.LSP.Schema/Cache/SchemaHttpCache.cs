@@ -224,10 +224,6 @@ public sealed class SchemaHttpCache
         }
     }
 
-    /// <summary>
-    ///     Returns <c>true</c> and sets <paramref name="content" /> when the file at
-    ///     <paramref name="relativePath" /> exists in the cache directory.
-    /// </summary>
     /// <summary>Where <paramref name="relativePath" /> is kept on disk, whether or not it is cached yet.</summary>
     public string PathOf(string relativePath)
     {

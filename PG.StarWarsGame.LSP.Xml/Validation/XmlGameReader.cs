@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
+using PG.StarWarsGame.LSP.Core.Text;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -64,7 +64,7 @@ public static class XmlGameReader
 
         public List<XmlStructureError> Tolerances { get; } = [];
 
-        private string Eol => s.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        private string Eol => LineEndings.Detect(s);
 
         public XmlStructureError? Run()
         {
@@ -89,8 +89,8 @@ public static class XmlGameReader
                 var at = s.Length > 0 && s[0] == (char)0xFEFF ? 1 : 0;
                 throw new Fail(XmlStrictnessCategory.MissingDeclaration, Math.Max(0, pos), 1,
                     new CatalogueText("XmlGameReader_NoXMLDeclarationGameRequires"),
-                    Single(new CatalogueText("XmlGameReader_InsertXMLDeclaration"), at, 0,
-                        "<?xml version=\"1.0\"?>" + Eol));
+                    MisplacedDeclaration(at) ?? Single(new CatalogueText("XmlGameReader_InsertXMLDeclaration"), at,
+                        0, "<?xml version=\"1.0\"?>" + Eol));
             }
 
             pos = s.IndexOf('>', pos);
@@ -332,6 +332,23 @@ public static class XmlGameReader
         private static XmlRepair Single(CatalogueText title, int start, int length, string newText)
         {
             return new XmlRepair(title, [new XmlTextEdit(start, length, newText)]);
+        }
+
+        // A declaration behind a comment or other text: moved to the top rather than joined by a
+        // second one, which standard XML would reject. It goes with its line ending.
+        private XmlRepair? MisplacedDeclaration(int at)
+        {
+            var start = s.IndexOf("<?xml", StringComparison.OrdinalIgnoreCase);
+            if (start < 0) return null;
+            var end = s.IndexOf("?>", start, StringComparison.Ordinal);
+            if (end < 0) return null;
+            end += 2;
+            var declaration = s[start..end];
+            var cut = end;
+            if (cut < s.Length && s[cut] == '\r') cut++;
+            if (cut < s.Length && s[cut] == '\n') cut++;
+            return new XmlRepair(new CatalogueText("XmlGameReader_MoveXMLDeclaration"),
+                [new XmlTextEdit(at, 0, declaration + Eol), new XmlTextEdit(start, cut - start, string.Empty)]);
         }
 
         private void ReadAttribute(ref int pos, string element)

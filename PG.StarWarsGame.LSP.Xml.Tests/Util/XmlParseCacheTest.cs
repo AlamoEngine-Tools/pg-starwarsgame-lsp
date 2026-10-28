@@ -6,6 +6,7 @@ using HtmlAgilityPack;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Util;
@@ -21,7 +22,7 @@ public sealed class XmlParseCacheTest
         var host = new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance);
         var textSource = new DocumentTextSource(host, new FileHelper(fs ?? new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
-        return (new XmlParseCache(textSource, capacity), host);
+        return (new XmlParseCache(textSource, capacity, NullLogger<XmlParseCache>.Instance), host);
     }
 
     // ── (uri, text) overload - caller already holds the text ────────────────
@@ -60,7 +61,7 @@ public sealed class XmlParseCacheTest
         var parsed = cache.GetOrParse(Uri);
 
         Assert.NotNull(parsed);
-        Assert.Equal("<Buffer/>", parsed!.Text);
+        Assert.Equal("<Buffer/>", parsed.Text);
         Assert.Same(parsed, cache.GetOrParse(Uri));
     }
 
@@ -74,7 +75,7 @@ public sealed class XmlParseCacheTest
         var parsed = cache.GetOrParse(Uri);
 
         Assert.NotNull(parsed);
-        Assert.Equal("<Disk/>", parsed!.Text);
+        Assert.Equal("<Disk/>", parsed.Text);
     }
 
     [Fact]

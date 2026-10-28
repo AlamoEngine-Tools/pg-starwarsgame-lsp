@@ -6,6 +6,7 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -17,11 +18,19 @@ public sealed class XmlDocumentFactProducer(
     IFileTypeRegistry fileTypeRegistry,
     IXmlStructuralValidator structuralValidator,
     IEnumerable<IXmlCrossTagRule>? crossTagRules = null)
-    : IXmlDocumentFactProducer
+    : IXmlFactProducer
 {
     private readonly IReadOnlyList<IXmlCrossTagRule> _crossTagRules = crossTagRules?.ToList() ?? [];
 
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+    public string Name => "document";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
+    /// <summary>Reads the document alone; the index plays no part in what one file says about itself.</summary>
+    public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         var facts = new List<XmlFact>();
 
@@ -84,7 +93,7 @@ public sealed class XmlDocumentFactProducer(
         }
 
         if (isTypeContainerLevel)
-            CollectUnnamedObjects(doc, facts, lineIndex, documentUri);
+            CollectUnnamedObjects(doc, facts, documentUri);
 
         // Collect notes hints for every element in the document
         foreach (var node in doc.DocumentNode.Descendants()
@@ -246,8 +255,7 @@ public sealed class XmlDocumentFactProducer(
             documentUri, XmlUtility.GetLine(rootNode), rootNode.LinePosition + 1, rootNode.Name.Length, fileName));
     }
 
-    private void CollectUnnamedObjects(
-        HtmlDocument doc, List<XmlFact> facts, LineOffsetIndex lineIndex, string documentUri)
+    private void CollectUnnamedObjects(HtmlDocument doc, List<XmlFact> facts, string documentUri)
     {
         var typeDef = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri))
             .Select(t => schema.GetObjectType(t))
@@ -348,6 +356,10 @@ public sealed class XmlDocumentFactProducer(
         }
     }
 
+    /// <param name="node">The element being walked.</param>
+    /// <param name="state">The walk's facts and the document they are about.</param>
+    /// <param name="context">The tag resolution context of the enclosing type, or null above the type level.</param>
+    /// <param name="isTypeContainerLevel">Whether <paramref name="node" /> is the file's root, whose children are the objects.</param>
     /// <param name="isObjectLevel">
     ///     Whether <paramref name="node" /> is an OBJECT element, so its direct element children are
     ///     tags and can be judged against the tag vocabulary. False everywhere below that: the
@@ -461,21 +473,32 @@ public sealed class XmlDocumentFactProducer(
                     .Select(n => n.Line)
                     .ToList();
                 var openLen = XmlUtility.GetOpeningTagLength(child);
-                var isLast = ReferenceEquals(child, group[^1]);
                 // Whole-element span so the Unnecessary grey-out covers the entire dead node.
                 var (endLine, endCol) = XmlUtility.GetElementEndPosition(child, text);
-                facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines,
-                    isLast, endLine, endCol));
+
+                // The occurrence the game keeps is the last one WITH A VALUE: its field mapper
+                // returns before converting an empty value (and its parser withholds TBD), so an
+                // empty later occurrence changes nothing. Such an occurrence is reported as setting
+                // nothing when there is an earlier value it fails to clear; with nothing before it
+                // to keep, it is a plain duplicate like any other.
+                var isEffective = ReferenceEquals(child, EffectiveOccurrence(group));
+                var kept = XmlUtility.WritesNoValue(child) ? LastValuedBefore(group, child) : null;
+                if (kept is not null)
+                    facts.Add(new XmlEmptyRepeatedTagFact(documentUri, line0, col0, openLen, tagDef.Tag,
+                        kept.InnerText.Trim(), kept.Line, endLine, endCol));
+                else
+                    facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines,
+                        isEffective, endLine, endCol));
 
                 // The duplicate is a complaint about WHERE the value sits and says nothing about
                 // whether it is valid, so the value still has to be checked - otherwise a
                 // duplicated tag silently escapes every value rule and the second, unrelated error
                 // only surfaces once the duplicate is fixed.
                 //
-                // Only the last occurrence, because that is the one the engine reads: reporting a
-                // bad enum on a line the game never looks at would be a complaint about dead text,
-                // and those lines are already greyed out as Unnecessary.
-                if (isLast)
+                // Only the occurrence the engine reads: reporting a bad enum on a line the game
+                // never looks at would be a complaint about dead text, and those lines are already
+                // greyed out as Unnecessary.
+                if (isEffective)
                 {
                     var duplicateValue = child.InnerText.Trim();
                     if (!string.IsNullOrEmpty(duplicateValue))
@@ -540,7 +563,7 @@ public sealed class XmlDocumentFactProducer(
 
     private XmlTagDefinition? ResolveTag(string name, TagResolutionContext? context)
     {
-        return XmlTagResolver.Resolve(schema, name, context);
+        return XmlObjectTagResolver.Resolve(schema, name, context);
     }
 
     /// <summary>
@@ -568,6 +591,34 @@ public sealed class XmlDocumentFactProducer(
                 return false;
 
         return hasElementChildren;
+    }
+
+    /// <summary>
+    ///     The occurrence of a repeated singleton the game keeps: the last one whose value it maps,
+    ///     or the last one outright when none has a value.
+    /// </summary>
+    private static HtmlNode EffectiveOccurrence(List<HtmlNode> group)
+    {
+        for (var i = group.Count - 1; i >= 0; i--)
+            if (!XmlUtility.WritesNoValue(group[i]))
+                return group[i];
+
+        return group[^1];
+    }
+
+    /// <summary>The valued occurrence an empty one fails to clear, or null when nothing before it has a value.</summary>
+    private static HtmlNode? LastValuedBefore(List<HtmlNode> group, HtmlNode child)
+    {
+        HtmlNode? last = null;
+        foreach (var occurrence in group)
+        {
+            if (ReferenceEquals(occurrence, child))
+                return last;
+            if (!XmlUtility.WritesNoValue(occurrence))
+                last = occurrence;
+        }
+
+        return last;
     }
 
     /// <summary>

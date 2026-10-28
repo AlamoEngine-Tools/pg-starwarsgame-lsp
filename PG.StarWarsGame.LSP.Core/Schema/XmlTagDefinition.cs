@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Symbols;
+
 namespace PG.StarWarsGame.LSP.Core.Schema;
 
 public record XmlTagDefinition
@@ -17,7 +19,7 @@ public record XmlTagDefinition
     /// <summary>
     ///     The raw <c>referenceType</c> string from the schema. For <see cref="ReferenceKind.WorkspaceFile" />
     ///     this names the target file-type (e.g. <c>StoryPlotManifest</c>, <c>StoryParser</c>,
-    ///     <c>LuaScript</c>) used to build the <see cref="WorkspaceFileKey" />. Null when unset.
+    ///     <c>LuaScript</c>) used to build the <see cref="Symbols.WorkspaceFileKey" />. Null when unset.
     /// </summary>
     public string? ReferenceTypeName { get; init; }
 
@@ -38,6 +40,13 @@ public record XmlTagDefinition
     ///     name either way, which is what the story graph keys its edges on.
     /// </remarks>
     public ObjectKindDefinition? Kind { get; init; }
+
+    /// <summary>
+    ///     The type whose id space this tag's object reference is looked up in: the referenced type,
+    ///     or <see cref="GameTypeNames.GameObjectType" /> for a kind, which is a predicate over game
+    ///     objects. Null when the tag references no object type.
+    /// </summary>
+    public string? TargetTypeName => ObjectType?.TypeName ?? (Kind is not null ? GameTypeNames.GameObjectType : null);
 
     /// <summary>
     ///     Optional semantic refinement of the base <see cref="ValueType" />.

@@ -30,12 +30,14 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
                                </Units>
                                """;
 
-    private static SuppressDiagnosticCodeActionProvider BuildProvider()
+    private static SuppressDiagnosticCodeActionProvider BuildProvider(string xml = Xml)
     {
-        var host = new FakeSuppressionWorkspaceHost(Uri, Xml);
+        var host = new FakeGameWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new SuppressDiagnosticCodeActionProvider(
-            TestParseCache.For(host, fileHelper), fileHelper, new UnitObjectSchema());
+            TestParseCache.For(host, fileHelper), fileHelper,
+            new SchemaProviderBuilder()
+                .WithObjectType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" }).Build());
     }
 
     private static XmlCodeActionContext Ctx(string? code, int line = 2)
@@ -46,7 +48,7 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
             Message = "asset missing",
             Code = code is null ? (DiagnosticCode?)null : new DiagnosticCode(code)
         };
-        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
     }
 
     private static IReadOnlyList<CodeAction> Actions(string? code, int line = 2)
@@ -93,6 +95,32 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
     public void NoSuppressionIsMarkedPreferred()
     {
         Assert.DoesNotContain(Actions("aetswg-004-0001"), a => a.IsPreferred);
+    }
+
+    // A comment above the XML declaration is a file the game drops: a line directive for a finding
+    // on the declaration turned a warning into that error. The file-scoped one, inside the root,
+    // still silences it.
+    [Fact]
+    public void AFindingOnTheDeclaration_IsOfferedNoLineScope_ButTheFileScope()
+    {
+        const string declared = "<?xml version=\"1.0\"?>\n<Units>\n  <Unit Name=\"A\"/>\n</Units>";
+
+        var titles = BuildProvider(declared).Handle(Ctx("aetswg-015-0001", 0))
+            .Select(a => a.CodeAction!.Title).Where(t => t.StartsWith("Suppress")).ToList();
+
+        Assert.DoesNotContain(titles, t => t.Contains("this line"));
+        Assert.Contains(titles, t => t.Contains("this file"));
+    }
+
+    [Fact]
+    public void AFindingBelowTheDeclaration_KeepsItsLineScope()
+    {
+        const string declared = "<?xml version=\"1.0\"?>\n<Units>\n  <Unit Name=\"A\"/>\n</Units>";
+
+        var titles = BuildProvider(declared).Handle(Ctx("aetswg-004-0001"))
+            .Select(a => a.CodeAction!.Title).ToList();
+
+        Assert.Contains(titles, t => t.Contains("this line"));
     }
 
     [Fact]
@@ -148,76 +176,5 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
 
         Assert.Equal(3, titles.Count);
         Assert.DoesNotContain(titles, t => t.Contains("<Unit>"));
-    }
-
-    /// <summary>Schema where only &lt;Unit&gt; is an object type.</summary>
-    private sealed class UnitObjectSchema : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return typeName.Equals("Unit", StringComparison.OrdinalIgnoreCase)
-                ? new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" }
-                : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-    }
-}
-
-file sealed class FakeSuppressionWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly string _text;
-    private readonly string _uri;
-
-    public FakeSuppressionWorkspaceHost(string uri, string text)
-    {
-        _uri = uri;
-        _text = text;
-    }
-
-    public IEnumerable<TrackedDocument> All => [new(_uri, _text, 1)];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string uri)
-    {
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(_uri, _text, 1);
-        return true;
     }
 }

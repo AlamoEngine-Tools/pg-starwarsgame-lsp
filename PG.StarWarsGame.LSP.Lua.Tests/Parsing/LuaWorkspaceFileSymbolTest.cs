@@ -21,7 +21,7 @@ public sealed class LuaWorkspaceFileSymbolTest
     {
         var parser = new LuaGameDocumentParser(
             new LuaApiSchemaProvider([]),
-            new FileHelper(new MockFileSystem()));
+            new FileHelper(new MockFileSystem()), TestLuaParseCache.For(new FakeGameWorkspaceHost()));
 
         var index = await parser.ParseAsync(
             "file:///ws/data/scripts/story/Story_Rebel_Act_III.lua",

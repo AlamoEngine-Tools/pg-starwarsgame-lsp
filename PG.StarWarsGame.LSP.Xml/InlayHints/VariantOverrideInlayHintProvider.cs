@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Runtime.CompilerServices;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Messages;
@@ -26,9 +25,9 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
     private const int MaxValueLength = 32;
 
     // Resolving an effective object walks and merges the whole base chain, and Handle runs per tag
-    // node - so without memoisation a variant with 50 tags would resolve 50 times. Keyed on the
-    // GameIndex instance so a re-index drops the whole table rather than serving stale merges.
-    private static readonly ConditionalWeakTable<GameIndex, Dictionary<string, EffectiveObject>> Cache = new();
+    // node - so without memoisation a variant with 50 tags would resolve 50 times. Derived from the
+    // GameIndex snapshot so a re-index drops the whole table rather than serving stale merges (#311).
+    private const string EffectiveObjectsKey = "inlayEffectiveObjects";
 
     private readonly IVariantTagSource _tagSource;
 
@@ -54,14 +53,10 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
             return [];
 
         var effective = ResolveCached(ctx, objectId);
-        if (effective is null || !effective.Found || effective.Cyclic)
+        if (!effective.Found || effective.Cyclic)
             return [];
 
-        // A repeatable additive tag contributes one entry per occurrence - the base's inherited ones
-        // first - so match on the displacing entry rather than simply the first with this name.
-        var tag = effective.Tags.FirstOrDefault(t =>
-            t.TagName.Equals(ctx.Node.Name, StringComparison.OrdinalIgnoreCase)
-            && t.Provenance is VariantProvenance.Overridden or VariantProvenance.Merged);
+        var tag = effective.DisplacingTag(ctx.Node.Name);
 
         if (tag is null)
             return [];
@@ -123,20 +118,24 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
         return collapsed.Length <= MaxValueLength ? collapsed : collapsed[..MaxValueLength] + "...";
     }
 
-    private EffectiveObject? ResolveCached(InlayHintContext ctx, string objectId)
+    private EffectiveObject ResolveCached(InlayHintContext ctx, string objectId)
     {
-        var perIndex = Cache.GetOrCreateValue(ctx.Index);
+        // Keyed by type as well: one id may name objects of several types.
+        var here = ctx.DefinitionHere(objectId);
+        var key = here?.TypeName is { } type ? objectId + "|" + type : objectId;
+        var perIndex = ctx.Index.Derived(EffectiveObjectsKey, _ => new Dictionary<string, EffectiveObject>());
         lock (perIndex)
         {
-            if (perIndex.TryGetValue(objectId, out var cached))
+            if (perIndex.TryGetValue(key, out var cached))
                 return cached;
         }
 
-        var resolved = new EffectiveObjectResolver(ctx.Index, ctx.Schema, _tagSource).Resolve(objectId);
+        var resolver = new EffectiveObjectResolver(ctx.Index, ctx.Schema, _tagSource);
+        var resolved = here is not null ? resolver.Resolve(here) : resolver.Resolve(objectId);
 
         lock (perIndex)
         {
-            perIndex[objectId] = resolved;
+            perIndex[key] = resolved;
         }
 
         return resolved;

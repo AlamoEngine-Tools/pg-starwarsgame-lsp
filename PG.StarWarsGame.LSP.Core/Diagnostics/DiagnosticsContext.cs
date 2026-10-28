@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -8,7 +9,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
-/// <summary>Shared context passed to every <see cref="IXmlDiagnosticsHandler" /> invocation.</summary>
+/// <summary>Shared context passed to every XML diagnostics handler invocation.</summary>
 /// <param name="IconsAwaitingRepack">
 ///     Icon base names (no extension) that exist as raw source images but are absent from the
 ///     workspace's mega texture. Empty when the workspace ships no mega texture, since there is then
@@ -26,6 +27,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     handler that uses it must stay silent when it is absent: a context without one is a caller
 ///     that cannot answer the question, not an object that fails the check.
 /// </param>
+[PublicAPI]
 public record DiagnosticsContext(
     ISchemaProvider Schema,
     GameIndex Index,
@@ -37,10 +39,11 @@ public record DiagnosticsContext(
     IEffectiveObjectSource? Objects = null)
 {
     /// <summary>
-    ///     The server's own texts in <see cref="Locale" />. English unless the pipeline says otherwise -
-    ///     which keeps a handler test that builds its own context reading the texts it always read.
+    ///     The server's own texts: the one injected catalogue, which every handler formats through.
+    ///     Required, so no context speaks a language the setting does not control (#306);
+    ///     <see cref="Locale" /> picks the schema's per-locale texts, which do not pass through it.
     /// </summary>
-    public IMessageCatalog Messages { get; init; } = ResxMessageCatalog.Server("en");
+    public required IMessageCatalog Messages { get; init; }
 }
 
 /// <summary>

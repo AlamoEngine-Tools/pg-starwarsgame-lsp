@@ -16,7 +16,7 @@ public sealed class LocalisationIndexChangedNotifierTest
     public void LocalisationChanged_Fires_SendsLocalisationIndexUpdatedNotification()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new LocalisationIndexChangedNotifier(
             indexService, StartupGates.Open(),
             m => sent.Add(m),
@@ -31,7 +31,7 @@ public sealed class LocalisationIndexChangedNotifierTest
     public void LocalisationChanged_FiresMultipleTimes_NotificationSentEachTime()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new LocalisationIndexChangedNotifier(
             indexService, StartupGates.Open(),
             m => sent.Add(m),
@@ -48,7 +48,7 @@ public sealed class LocalisationIndexChangedNotifierTest
     public async Task LocalisationChanged_WhileStartupRuns_IsHeldThenSentOnceWhenTheGateOpens()
     {
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         var gate = StartupGates.Closed();
         _ = new LocalisationIndexChangedNotifier(
             indexService, gate,
@@ -67,7 +67,7 @@ public sealed class LocalisationIndexChangedNotifierTest
     [Fact]
     public void LocalisationChanged_SenderThrows_ExceptionDoesNotPropagate()
     {
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new LocalisationIndexChangedNotifier(
             indexService, StartupGates.Open(),
             _ => throw new InvalidOperationException("boom"),
@@ -81,8 +81,9 @@ public sealed class LocalisationIndexChangedNotifierTest
     [Fact]
     public void NoNotifierConstructed_LocalisationChangedFires_NothingSent()
     {
+        // ReSharper disable once CollectionNeverUpdated.Local - the spy's target; the test is that nothing writes to it
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
 
         // No notifier ever constructed - raising the event must not call our spy
         indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
@@ -96,7 +97,7 @@ public sealed class LocalisationIndexChangedNotifierTest
         // The notifier must be decoupled from the general IndexChanged event (which also fires
         // for unrelated XML/Lua/asset changes) - only LocalisationChanged should trigger it.
         var sent = new List<string>();
-        var indexService = new RaisableIndexService();
+        var indexService = new FakeGameIndexService();
         _ = new LocalisationIndexChangedNotifier(
             indexService, StartupGates.Open(),
             m => sent.Add(m),
@@ -108,80 +109,4 @@ public sealed class LocalisationIndexChangedNotifierTest
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
-
-    private sealed class RaisableIndexService : IGameIndexService
-    {
-        public GameIndex Current => GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged;
-        public event Action<ILocalisationIndex>? LocalisationChanged;
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        public void Raise(GameIndex index)
-        {
-            IndexChanged?.Invoke(index);
-        }
-
-        public void RaiseLocalisation(ILocalisationIndex index)
-        {
-            LocalisationChanged?.Invoke(index);
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
 }

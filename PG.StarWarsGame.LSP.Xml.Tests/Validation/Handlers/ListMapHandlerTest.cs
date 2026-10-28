@@ -6,6 +6,7 @@ using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -67,7 +68,8 @@ public sealed class ListMapHandlerTest
 
     private static DiagnosticsContext Ctx(GameIndex? index = null)
     {
-        return new DiagnosticsContext(new EmptySchemaProvider(), index ?? Game, "file:///units.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index ?? Game, "file:///units.xml", "en")
+            { Messages = TestCatalogues.English };
     }
 
     // Items laid out on one line, ten columns apart, so a diagnostic's column names its item.

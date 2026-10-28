@@ -83,7 +83,7 @@ public sealed class XmlPositionResolverTest
         var result = XmlPositionResolver.FindAtPosition(doc, 3, 10);
 
         Assert.NotNull(result);
-        Assert.Equal("UNIT_A", result!.Value.Id);
+        Assert.Equal("UNIT_A", result.Value.Id);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class XmlPositionResolverTest
         var result = XmlPositionResolver.FindAtPosition(doc, 1, 8);
 
         Assert.NotNull(result);
-        Assert.Equal("UNIT_A", result!.Value.Id);
+        Assert.Equal("UNIT_A", result.Value.Id);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class XmlPositionResolverTest
         var result = XmlPositionResolver.FindAtPosition(doc, 0, 9);
 
         Assert.NotNull(result);
-        Assert.Equal("UNIT_A", result!.Value.Id);
+        Assert.Equal("UNIT_A", result.Value.Id);
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public sealed class XmlPositionResolverTest
         var result = XmlPositionResolver.FindAtPosition(doc, 2, 9);
 
         Assert.NotNull(result);
-        var range = result!.Value.Range;
+        var range = result.Value.Range;
         Assert.Equal(new Position(2, 7), range.Start);
         Assert.Equal(new Position(2, 13), range.End);
     }
@@ -156,7 +156,7 @@ public sealed class XmlPositionResolverTest
         var result = XmlPositionResolver.FindAtPosition(doc, 5, 0);
 
         Assert.NotNull(result);
-        Assert.Equal("UNIT_A", result!.Value.Id);
+        Assert.Equal("UNIT_A", result.Value.Id);
     }
 
     [Fact]
@@ -184,6 +184,6 @@ public sealed class XmlPositionResolverTest
         var result = XmlPositionResolver.FindAtPosition(doc, 0, 6);
 
         Assert.NotNull(result);
-        Assert.Equal("UNIT_REF", result!.Value.Id);
+        Assert.Equal("UNIT_REF", result.Value.Id);
     }
 }

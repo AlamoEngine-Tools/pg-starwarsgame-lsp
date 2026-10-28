@@ -19,7 +19,7 @@ public sealed class LuaVersionSyntaxAnalyzerTest
     private static IReadOnlyList<Diagnostic> Analyze(string text)
     {
         var tree = LuaSyntaxTree.ParseText(text, new LuaParseOptions(LuaSyntaxOptions.Lua51));
-        return LuaVersionSyntaxAnalyzer.Analyze(tree);
+        return LuaVersionSyntaxAnalyzer.Analyze(tree, TestCatalogues.English);
     }
 
     [Fact]

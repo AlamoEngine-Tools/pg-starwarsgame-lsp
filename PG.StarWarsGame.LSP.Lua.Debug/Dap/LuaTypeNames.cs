@@ -22,7 +22,7 @@ public static class LuaTypeNames
     /// <summary>The code the game answers with when it does not have the script asked about.</summary>
     public const int UnknownScript = -1;
 
-    public static string Of(int typeCode, IMessageCatalog? messages = null)
+    public static string Of(int typeCode, IMessageCatalog messages)
     {
         return typeCode switch
         {
@@ -35,8 +35,8 @@ public static class LuaTypeNames
             Function => "function",
             Userdata => "userdata",
             Thread => "thread",
-            UnknownScript => (messages ?? ResxMessageCatalog.Server("en")).Format("LuaTypeNames_UnknownScript"),
-            _ => (messages ?? ResxMessageCatalog.Server("en")).Format("LuaTypeNames_Type", typeCode)
+            UnknownScript => messages.Format("LuaTypeNames_UnknownScript"),
+            _ => messages.Format("LuaTypeNames_Type", typeCode)
         };
     }
 

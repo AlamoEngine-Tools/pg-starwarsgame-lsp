@@ -33,7 +33,7 @@ public sealed partial class FloatVector3ListHandler : SingleValueTypeHandlerBase
                     ctx.Messages.Format("FloatVector3List_IsNotAValidFloat2", trimmed, fact.Tag.Tag))
             ];
 
-        if (parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
+        if (parts.Any(p => !EngineNumber.TryParseFloat(p, out _)))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

@@ -2,10 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
@@ -161,7 +160,7 @@ public sealed class XmlDamageStageFactProducerTest
         bool declaresModel = true,
         IEnumerable<string>? otherModel = null)
     {
-        var symbol = new GameSymbol("BUNKER", GameSymbolKind.XmlObject, "GroundStructure",
+        var symbol = new GameSymbol("BUNKER", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(Uri, 0, 0), null);
 
         var tags = new List<VariantTag>();
@@ -187,7 +186,7 @@ public sealed class XmlDamageStageFactProducerTest
             ModelBones = bones
         };
 
-        return new XmlDamageStageFactProducer(new ModelSchema("Land_Model_Name"), source)
+        return new XmlDamageStageFactProducer(ModelSchema("Land_Model_Name"), source)
             .Produce(Uri, ParsedXmlDocument.Parse(text), index);
     }
 
@@ -208,51 +207,15 @@ public sealed class XmlDamageStageFactProducerTest
         }
     }
 
-    private sealed class ModelSchema(params string[] modelTags) : ISchemaProvider
+    /// <summary>A schema in which these tags, and only these, name a model file.</summary>
+    private static FakeSchemaProvider ModelSchema(params string[] modelTags)
     {
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return modelTags.Contains(tagName, StringComparer.OrdinalIgnoreCase)
-                ? new XmlTagDefinition
-                {
-                    Tag = tagName, ValueType = XmlValueType.NameReference,
-                    ReferenceKind = ReferenceKind.ModelFile
-                }
-                : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
+        var builder = new SchemaProviderBuilder();
+        foreach (var tag in modelTags)
+            builder.WithTag(new XmlTagDefinition
+            {
+                Tag = tag, ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.ModelFile
+            });
+        return builder.Build();
     }
 }

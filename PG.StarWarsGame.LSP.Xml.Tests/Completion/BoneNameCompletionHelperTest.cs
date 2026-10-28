@@ -27,12 +27,12 @@ public sealed class BoneNameCompletionHelperTest
         return GameIndex.Empty with { ModelBones = builder.ToImmutable() };
     }
 
-    private static FakeSchema SchemaWithModelTags(params string[] modelTagNames)
+    private static FakeSchemaProvider SchemaWithModelTags(params string[] modelTagNames)
     {
         var schema = new FakeSchema();
         foreach (var name in modelTagNames)
             schema.Add(name, ReferenceKind.ModelFile);
-        return schema;
+        return schema.Build();
     }
 
     // These cases are all inline object bones (no HardPoint parent), so the hardpoint resolver is never
@@ -181,48 +181,9 @@ public sealed class BoneNameCompletionHelperTest
 
     // ── fake schema ───────────────────────────────────────────────────────────
 
-    private sealed class FakeSchema : ISchemaProvider
+    private sealed class FakeSchema
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return _tags.GetValueOrDefault(tagName);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
 
         public void Add(string tag, ReferenceKind kind)
         {
@@ -230,6 +191,14 @@ public sealed class BoneNameCompletionHelperTest
             {
                 Tag = tag, ValueType = XmlValueType.NameReference, ReferenceKind = kind
             };
+        }
+
+        public FakeSchemaProvider Build()
+        {
+            var builder = new SchemaProviderBuilder();
+            foreach (var item in _tags.Values)
+                builder.WithTag(item);
+            return builder.Build();
         }
     }
 }

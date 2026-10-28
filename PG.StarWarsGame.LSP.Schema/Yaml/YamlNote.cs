@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Schema.Yaml;
 
 /// <summary>
@@ -12,6 +14,7 @@ namespace PG.StarWarsGame.LSP.Schema.Yaml;
 ///         map that <c>description</c> and <c>label</c> already are.
 ///     </para>
 /// </summary>
+[PublicAPI]
 internal sealed class YamlNote
 {
     public string Kind { get; set; } = string.Empty;

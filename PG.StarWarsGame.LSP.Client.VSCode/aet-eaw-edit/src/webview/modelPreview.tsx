@@ -6349,7 +6349,9 @@ function ModelPreview(): React.JSX.Element {
                         "Return this turret to the pose the model authored",
                     )}
                     disabled={!moved}
-                    disabledReason="This turret is already at its authored pose"
+                    disabledReason={l10n.t(
+                        "This turret is already at its authored pose",
+                    )}
                     onClick={(event) => {
                         event.stopPropagation();
                         viewportRef.current?.resetTurretAim(row.id);
@@ -8403,107 +8405,108 @@ function ModelPreview(): React.JSX.Element {
 
             First in the section because it decides how every SURFACE is drawn, and the two below
             it are passes over the finished frame. All three are Tier 1: they describe the picture,
-            not the model, so they follow the reader from one file to the next. */}
-                                        {scene !== null &&
-                                            scene.kind !== "Particle" && (
-                                                <Field
-                                                    label={l10n.t("Renderer")}
-                                                    info={
-                                                        <>
-                                                            {l10n.t(
-                                                                "Default reads each sub-mesh's shader NAME and draws the archetype it names - never wrong about geometry, only about how a surface is lit. Game draws the model the way the engine does: Its own effect shaders, translated, and stencil shadow volumes cast by its authored shadow mesh. Only the shaders need the .fx sources; the shadows work without them.",
-                                                            )}
-                                                        </>
-                                                    }
-                                                >
-                                                    <ModeSelector
-                                                        label={l10n.t(
-                                                            "Which renderer draws the model",
+            not the model, so they follow the reader from one file to the next.
+
+            On a particle file as well: its emitters are drawn through the engine's own Prim effects
+            under Game and by the preview's sprite shader under Default, so the switch decides how
+            they are drawn too. It was withheld there from before the particle effects existed. */}
+                                        {scene !== null && (
+                                            <Field
+                                                label={l10n.t("Renderer")}
+                                                info={
+                                                    <>
+                                                        {l10n.t(
+                                                            "Default reads each sub-mesh's shader NAME and draws the archetype it names - never wrong about geometry, only about how a surface is lit. Game draws the model the way the engine does: Its own effect shaders, translated, and stencil shadow volumes cast by its authored shadow mesh. Only the shaders need the .fx sources; the shadows work without them. An emitter follows the same switch: the engine's effect for its blend mode under Game, the preview's own sprite shader under Default.",
                                                         )}
-                                                        /* What is actually RUNNING, not what could be fully delivered. The stencil
+                                                    </>
+                                                }
+                                            >
+                                                <ModeSelector
+                                                    label={l10n.t(
+                                                        "Which renderer draws the model",
+                                                    )}
+                                                    /* What is actually RUNNING, not what could be fully delivered. The stencil
                                                        shadow pass follows this switch alone and needs no .fx sources, so a reader
                                                        with none was shown Default while the engine's own shadows were being cast -
                                                        and told by the problems list, in the same breath, that they were in Game
                                                        mode with nothing to translate. */
-                                                        value={
-                                                            translatedOn
-                                                                ? "game"
-                                                                : "default"
-                                                        }
-                                                        options={[
-                                                            {
-                                                                id: "default",
-                                                                label: l10n.t(
-                                                                    "Default",
-                                                                ),
-                                                                title: l10n.t(
-                                                                    "Every sub-mesh drawn with the archetype reading of its shader name. Never wrong about geometry - only about how a surface is lit.",
-                                                                ),
-                                                            },
-                                                            {
-                                                                id: "game",
-                                                                label: l10n.t(
-                                                                    "Game",
-                                                                ),
-                                                                // Selectable with no sources, because the mode still
-                                                                // DOES something without them: the stencil shadows
-                                                                // follow this switch and need no .fx at all. It was
-                                                                // disabled here, which - once the value above began
-                                                                // reporting the real mode - would have left a reader
-                                                                // who stepped to Default unable to return to the mode
-                                                                // the panel opens in.
-                                                                title: anyShaderSource
-                                                                    ? l10n.t(
-                                                                          "The model's own effect shaders, translated, and the engine's stencil shadows. {0} of {1} sub-meshes are drawn this way.",
-                                                                          translatedCount.translated,
-                                                                          translatedCount.total,
-                                                                      )
-                                                                    : l10n.t(
-                                                                          "The engine's stencil shadows, which need no sources. For its effect shaders as well, set the .fx sources up.",
-                                                                      ),
-                                                            },
-                                                        ]}
-                                                        onSelect={(id) =>
-                                                            setTranslatedOn(
-                                                                id === "game",
-                                                            )
-                                                        }
-                                                    />
+                                                    value={
+                                                        translatedOn
+                                                            ? "game"
+                                                            : "default"
+                                                    }
+                                                    options={[
+                                                        {
+                                                            id: "default",
+                                                            label: l10n.t(
+                                                                "Default",
+                                                            ),
+                                                            title: l10n.t(
+                                                                "Every sub-mesh drawn with the archetype reading of its shader name. Never wrong about geometry - only about how a surface is lit.",
+                                                            ),
+                                                        },
+                                                        {
+                                                            id: "game",
+                                                            label: l10n.t(
+                                                                "Game",
+                                                            ),
+                                                            // Selectable with no sources, because the mode still
+                                                            // DOES something without them: the stencil shadows
+                                                            // follow this switch and need no .fx at all. It was
+                                                            // disabled here, which - once the value above began
+                                                            // reporting the real mode - would have left a reader
+                                                            // who stepped to Default unable to return to the mode
+                                                            // the panel opens in.
+                                                            title: anyShaderSource
+                                                                ? l10n.t(
+                                                                      "The model's own effect shaders, translated, and the engine's stencil shadows. {0} of {1} sub-meshes and emitters are drawn this way.",
+                                                                      translatedCount.translated,
+                                                                      translatedCount.total,
+                                                                  )
+                                                                : l10n.t(
+                                                                      "The engine's stencil shadows, which need no sources. For its effect shaders as well, set the .fx sources up.",
+                                                                  ),
+                                                        },
+                                                    ]}
+                                                    onSelect={(id) =>
+                                                        setTranslatedOn(
+                                                            id === "game",
+                                                        )
+                                                    }
+                                                />
 
-                                                    {/* Always here, in one of two states - never absent.
+                                                {/* Always here, in one of two states - never absent.
 
                     The setup flow is a command, and a command nobody can find is not a path out of
                     "nothing translated"; but a button that appears only while something is wrong is
                     a control the reader never sees working. So the row always says where the
                     sources stand, and only the wording changes. */}
-                                                    {anyShaderSource ? (
-                                                        <span className="shader-state">
-                                                            <Icon name="check" />
-                                                            {l10n.t(
-                                                                "Shader sources ready",
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        <Button
-                                                            title={l10n.t(
-                                                                "Fetch the .fx shader sources",
-                                                            )}
-                                                            onClick={() =>
-                                                                vscode.postMessage(
-                                                                    {
-                                                                        type: "obtainShaders",
-                                                                    },
-                                                                )
-                                                            }
-                                                        >
-                                                            <Icon name="download" />
-                                                            {l10n.t(
-                                                                "Set up shader sources",
-                                                            )}
-                                                        </Button>
-                                                    )}
-                                                </Field>
-                                            )}
+                                                {anyShaderSource ? (
+                                                    <span className="shader-state">
+                                                        <Icon name="check" />
+                                                        {l10n.t(
+                                                            "Shader sources ready",
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <Button
+                                                        title={l10n.t(
+                                                            "Fetch the .fx shader sources",
+                                                        )}
+                                                        onClick={() =>
+                                                            vscode.postMessage({
+                                                                type: "obtainShaders",
+                                                            })
+                                                        }
+                                                    >
+                                                        <Icon name="download" />
+                                                        {l10n.t(
+                                                            "Set up shader sources",
+                                                        )}
+                                                    </Button>
+                                                )}
+                                            </Field>
+                                        )}
 
                                         <Field
                                             label={l10n.t("Heat distortion")}
@@ -8855,7 +8858,9 @@ function ModelPreview(): React.JSX.Element {
                                                         cameraPresets.length ===
                                                         0
                                                     }
-                                                    disabledReason="No camera preset to bind"
+                                                    disabledReason={l10n.t(
+                                                        "No camera preset to bind",
+                                                    )}
                                                     onClick={() => {
                                                         const preset =
                                                             cameraPresets[
@@ -9030,7 +9035,9 @@ function ModelPreview(): React.JSX.Element {
                                                         captureSizeId !==
                                                         "custom"
                                                     }
-                                                    disabledReason="Custom size only"
+                                                    disabledReason={l10n.t(
+                                                        "Custom size only",
+                                                    )}
                                                     onChange={(width) =>
                                                         setCustomCapture(
                                                             (c) => ({
@@ -9048,7 +9055,9 @@ function ModelPreview(): React.JSX.Element {
                                                         captureSizeId !==
                                                         "custom"
                                                     }
-                                                    disabledReason="Custom size only"
+                                                    disabledReason={l10n.t(
+                                                        "Custom size only",
+                                                    )}
                                                     onChange={(height) =>
                                                         setCustomCapture(
                                                             (c) => ({
@@ -9092,7 +9101,10 @@ function ModelPreview(): React.JSX.Element {
 
                                             <Button
                                                 disabled={captureDims === null}
-                                                disabledReason={`Width and height must be whole numbers from 1 to ${MAX_SIDE}`}
+                                                disabledReason={l10n.t(
+                                                    "Width and height must be whole numbers from 1 to {0}",
+                                                    MAX_SIDE,
+                                                )}
                                                 onClick={() => {
                                                     const viewport =
                                                         viewportRef.current;
@@ -9485,7 +9497,9 @@ function ModelPreview(): React.JSX.Element {
                                                     fireTarget === "hull" &&
                                                     !shipTargetable
                                                 }
-                                                disabledReason="Fire - pick a hardpoint to fire at"
+                                                disabledReason={l10n.t(
+                                                    "Fire - pick a hardpoint to fire at",
+                                                )}
                                                 onClick={fire}
                                             />
                                             <IconButton
@@ -9547,7 +9561,9 @@ function ModelPreview(): React.JSX.Element {
                                                 // Names the control even when it is disabled: a tooltip that
                                                 // gives only the reason leaves a reader who has never opened it
                                                 // no idea what it is.
-                                                disabledReason="Damage log - nothing fired yet"
+                                                disabledReason={l10n.t(
+                                                    "Damage log - nothing fired yet",
+                                                )}
                                                 onClick={() =>
                                                     setLogOpen((open) => !open)
                                                 }
@@ -9671,7 +9687,9 @@ function ModelPreview(): React.JSX.Element {
                                                                 ability,
                                                             ).length === 0
                                                         }
-                                                        disabledReason="This ability declares nothing else"
+                                                        disabledReason={l10n.t(
+                                                            "This ability declares nothing else",
+                                                        )}
                                                         onClick={() =>
                                                             setInfoAbility(
                                                                 (open) =>
@@ -10331,7 +10349,9 @@ function ModelPreview(): React.JSX.Element {
                                                             presetName.trim() ===
                                                             ""
                                                         }
-                                                        disabledReason="Give the weapon a name to save it"
+                                                        disabledReason={l10n.t(
+                                                            "Give the weapon a name to save it",
+                                                        )}
                                                         onClick={() => {
                                                             const name =
                                                                 presetName.trim();
@@ -10368,7 +10388,9 @@ function ModelPreview(): React.JSX.Element {
                                                             attackerPresets.length ===
                                                             0
                                                         }
-                                                        disabledReason="No saved weapons to remove"
+                                                        disabledReason={l10n.t(
+                                                            "No saved weapons to remove",
+                                                        )}
                                                         onClick={() =>
                                                             setAttackerPresets(
                                                                 [],
@@ -10606,7 +10628,9 @@ function ModelPreview(): React.JSX.Element {
                                     count={notices.length}
                                     expanded={problemsOpen}
                                     disabled={notices.length === 0}
-                                    disabledReason="Nothing to report about this model"
+                                    disabledReason={l10n.t(
+                                        "Nothing to report about this model",
+                                    )}
                                     title={
                                         `${problemsOpen ? "Hide" : "Read"} ` +
                                         `${notices.length} ${problemWord}`
@@ -10685,7 +10709,9 @@ function ModelPreview(): React.JSX.Element {
                                                     "Put the model back the way it opened",
                                                 )}
                                                 disabled={!touched}
-                                                disabledReason="The model is as it opened"
+                                                disabledReason={l10n.t(
+                                                    "The model is as it opened",
+                                                )}
                                                 onClick={resetModel}
                                             />
                                         </>
@@ -11403,7 +11429,9 @@ ${becauseText(node.because)}`
                                                                     row.id,
                                                             )
                                                         }
-                                                        disabledReason="No traverse declared"
+                                                        disabledReason={l10n.t(
+                                                            "No traverse declared",
+                                                        )}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             setSweeping(
@@ -11464,7 +11492,9 @@ ${becauseText(node.because)}`
                                                         (c) => c.isDestroyable,
                                                     )
                                                 }
-                                                disabledReason="No hardpoint on this model can be destroyed"
+                                                disabledReason={l10n.t(
+                                                    "No hardpoint on this model can be destroyed",
+                                                )}
                                                 onClick={() => destroyAll(true)}
                                             />
                                             <IconButton
@@ -11475,7 +11505,9 @@ ${becauseText(node.because)}`
                                                     "Repair all hardpoints",
                                                 )}
                                                 disabled={destroyed.size === 0}
-                                                disabledReason="Nothing is destroyed"
+                                                disabledReason={l10n.t(
+                                                    "Nothing is destroyed",
+                                                )}
                                                 onClick={() =>
                                                     destroyAll(false)
                                                 }
@@ -11849,7 +11881,9 @@ ${becauseText(node.because)}`
                                                                     disabled={
                                                                         !card.isDestroyable
                                                                     }
-                                                                    disabledReason="Is_Destroyable is off"
+                                                                    disabledReason={l10n.t(
+                                                                        "Is_Destroyable is off",
+                                                                    )}
                                                                     onClick={(
                                                                         event,
                                                                     ) => {
@@ -11889,7 +11923,9 @@ ${becauseText(node.because)}`
                                                                     disabled={
                                                                         !card.sweepable
                                                                     }
-                                                                    disabledReason="No traverse declared"
+                                                                    disabledReason={l10n.t(
+                                                                        "No traverse declared",
+                                                                    )}
                                                                     onClick={(
                                                                         event,
                                                                     ) => {
@@ -12220,14 +12256,18 @@ ${becauseText(node.because)}`
                                                 disabled={
                                                     orderedClips.length < 2
                                                 }
-                                                disabledReason="Only one clip"
+                                                disabledReason={l10n.t(
+                                                    "Only one clip",
+                                                )}
                                                 onClick={() => step(-1)}
                                             />
                                             <IconButton
                                                 icon="firstFrame"
                                                 title={l10n.t("First frame")}
                                                 disabled={animation === null}
-                                                disabledReason="Pick a clip below to play it"
+                                                disabledReason={l10n.t(
+                                                    "Pick a clip below to play it",
+                                                )}
                                                 onClick={() => seek(0)}
                                             />
                                             <IconButton
@@ -12245,14 +12285,18 @@ ${becauseText(node.because)}`
                                                           : l10n.t("Play")
                                                 }
                                                 disabled={animation === null}
-                                                disabledReason="Pick a clip below to play it"
+                                                disabledReason={l10n.t(
+                                                    "Pick a clip below to play it",
+                                                )}
                                                 onClick={togglePlay}
                                             />
                                             <IconButton
                                                 icon="lastFrame"
                                                 title={l10n.t("Last frame")}
                                                 disabled={animation === null}
-                                                disabledReason="Pick a clip below to play it"
+                                                disabledReason={l10n.t(
+                                                    "Pick a clip below to play it",
+                                                )}
                                                 onClick={() =>
                                                     seek(playhead.duration)
                                                 }
@@ -12263,7 +12307,9 @@ ${becauseText(node.because)}`
                                                 disabled={
                                                     orderedClips.length < 2
                                                 }
-                                                disabledReason="Only one clip"
+                                                disabledReason={l10n.t(
+                                                    "Only one clip",
+                                                )}
                                                 onClick={() => step(1)}
                                             />
                                             <IconButton
@@ -12284,7 +12330,9 @@ ${becauseText(node.because)}`
                                                           )
                                                 }
                                                 disabled={animation === null}
-                                                disabledReason="Pick a clip below to play it"
+                                                disabledReason={l10n.t(
+                                                    "Pick a clip below to play it",
+                                                )}
                                                 onClick={() =>
                                                     setAnimationLoop(
                                                         (current) => !current,

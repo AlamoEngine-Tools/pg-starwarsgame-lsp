@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -24,6 +26,7 @@ public sealed record ApplyCreditsBatchParams(
 /// <param name="NewContentHash">
 ///     Hash of the text just written; the client must echo it on the next save for this file.
 /// </param>
+[PublicAPI]
 public sealed record ApplyCreditsBatchResult(
     bool Success,
     int? FailedIndex = null,
@@ -44,8 +47,10 @@ public sealed record ValidateCreditsBatchParams(
 
 /// <param name="Index">Row the problem sits on, or null when it is about the batch as a whole.</param>
 /// <param name="Severity"><c>error</c> or <c>warning</c>.</param>
+[PublicAPI]
 public sealed record LocProblemDto(int? Index, string? Language, string Severity, string Message);
 
+[PublicAPI]
 public sealed record ValidateCreditsBatchResult(
     IReadOnlyList<LocProblemDto> Problems,
     string? Error = null);

@@ -3,18 +3,24 @@
 
 using System.Collections.Immutable;
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 /// <inheritdoc />
 public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTagSource tagSource)
-    : IXmlHardpointFactProducer
+    : IXmlFactProducer
 {
-    private const string HardpointTypeName = "HardPoint";
+    public string Name => "hardpoint";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
+    private const string HardpointTypeName = GameTypeNames.HardPoint;
     private const string HardpointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
     private const string IsTurretTag = "Is_Turret";
@@ -288,7 +294,9 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
         foreach (var (hardpointId, offset) in XmlUtility.SplitListWithOffsets(hardpointsNode.InnerText))
         {
-            var hardpointTags = pass.TagSource.TryGetTags(hardpointId);
+            var hardpointTags = pass.Index.ResolveOfType(hardpointId, GameTypeNames.HardPoint) is { } hardpoint
+                ? pass.TagSource.TryGetTags(hardpoint)
+                : null;
             if (hardpointTags is null) continue; // unresolved hardpoint: the reference pipeline owns that
 
             var position = pass.TokenPosition(hardpointsNode, offset, hardpointId);
@@ -615,7 +623,8 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         public IReadOnlyList<string> AbilityTypesInOrder(string ownerId)
         {
             if (_abilitiesByOwner.TryGetValue(ownerId, out var cached)) return cached;
-            return _abilitiesByOwner[ownerId] = ObjectAbilities.TypesInOrder(_resolver.Resolve(ownerId));
+            return _abilitiesByOwner[ownerId] =
+                ObjectAbilities.TypesInOrder(_resolver.Resolve(ownerId, GameTypeNames.GameObjectType));
         }
 
         private readonly Dictionary<string, IReadOnlyList<string>> _abilitiesByOwner =
@@ -626,7 +635,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         {
             if (_chainByOwner.TryGetValue(ownerId, out var cached)) return cached;
 
-            var effective = _resolver.Resolve(ownerId);
+            var effective = _resolver.Resolve(ownerId, GameTypeNames.GameObjectType);
             var chain = effective is { Found: true, Cyclic: false }
                 ? effective.Chain
                 : (IReadOnlyList<string>)[ownerId];

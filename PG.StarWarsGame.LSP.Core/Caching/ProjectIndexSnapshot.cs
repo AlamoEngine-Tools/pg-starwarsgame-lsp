@@ -35,9 +35,11 @@ public sealed class ProjectIndexSnapshot
     // items become references, an object-keyed ListMap records every item untyped and an enum key
     // none. The schema fingerprint folds in slots too, but a snapshot whose schema did not change
     // would replay the old parser's references.
+    // 10 = 0.5.0 (2026-10-28): a reference records the id space it is looked up in (LookupType) -
+    // GameObjectType for a tag or slot that names an object kind; it used to resolve by id alone.
     // One bump per release, not per change: within a cycle, clear local caches when parser output
     // changes; only the difference between two releases reaches anyone.
-    public const int CurrentSchemaVersion = 9;
+    public const int CurrentSchemaVersion = 10;
 
     [Key(0)] public int SchemaVersion { get; set; }
 

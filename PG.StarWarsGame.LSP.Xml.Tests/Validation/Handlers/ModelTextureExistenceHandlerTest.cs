@@ -31,8 +31,8 @@ public sealed class ModelTextureExistenceHandlerTest
     private static DiagnosticsContext CtxWith(IModelTextureIndex? textures, params string[] paths)
     {
         var index = GameIndex.Empty with { AssetFiles = new MergedAssetFileIndex(paths) };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en",
-            ModelTextures: textures);
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en",
+            ModelTextures: textures) { Messages = TestCatalogues.English };
     }
 
     [Fact]

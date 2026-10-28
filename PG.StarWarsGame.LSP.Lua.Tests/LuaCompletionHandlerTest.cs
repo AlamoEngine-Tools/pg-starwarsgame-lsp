@@ -39,17 +39,17 @@ public sealed class LuaCompletionHandlerTest
     private static LuaCompletionHandler BuildHandler(
         GameIndex index,
         ILuaApiSchemaProvider schema,
-        FakeWorkspaceHost? host = null,
+        FakeGameWorkspaceHost? host = null,
         ILuaAnalyzer? analyzer = null)
     {
-        var svc = new FakeIndexService { Current = index };
+        var svc = new FakeGameIndexService { Current = index };
         return new LuaCompletionHandler(
             svc,
-            TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
+            TestLuaParseCache.For(host ?? new FakeGameWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             schema,
             NullLogger<LuaCompletionHandler>.Instance,
-            analyzer);
+            analyzer ?? new ScriptedLuaAnalyzer());
     }
 
     // Set_Next_State takes a registered state's name (#252).
@@ -57,7 +57,7 @@ public sealed class LuaCompletionHandlerTest
     public async Task SetNextState_OffersTheRegisteredStates()
     {
         const string library = "file:///data/scripts/library/pgstatemachine.lua";
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri,
             "require(\"PGStateMachine\")\nDefine_State(\"Init\", A)\nDefine_State(\"Attack\", B)\n" +
             "Set_Next_State(\"\")\nfunction A(message) end\nfunction B(message) end", 1);
@@ -86,7 +86,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
         return BuildHandler(index, new LuaApiSchemaProvider(EngineStub), host, analyzer: analyzer);
     }
@@ -204,7 +204,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         // Find_First_Object("UNIT")  - cursor at col 21, inside "UNIT"
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT\")", 1);
 
@@ -232,7 +232,7 @@ public sealed class LuaCompletionHandlerTest
             Localisation = new StubLocalisationIndex(("TEXT_HELLO", "Hello"), ("TEXT_BYE", "Bye"))
         };
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Game_Message(\"TEXT\")", 1); // cursor at col 18, inside "TEXT"
 
         var handler = BuildHandler(index, schema, host);
@@ -266,7 +266,7 @@ public sealed class LuaCompletionHandlerTest
                 .Add("FACTION_A", [factionSym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         // Find_First_Object("")  - cursor at col 19 inside empty string
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"\")", 1);
 
@@ -301,7 +301,7 @@ public sealed class LuaCompletionHandlerTest
                 .Add("FACTION_A", [factionSym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"\")", 1);
 
         var handler = BuildHandler(index, schema, host);
@@ -325,7 +325,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         // require("")  - cursor at col 9, inside empty string
         host.AddOrUpdate(LuaUri, "require(\"\")", 1);
 
@@ -353,7 +353,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "require(\"\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -365,7 +365,7 @@ public sealed class LuaCompletionHandlerTest
         Assert.NotNull(libItem);
         Assert.NotNull(depItem);
         // Library sort text starts with "0_", dependency with "1_" → library sorts before dependency
-        Assert.True(string.Compare(libItem!.SortText, depItem!.SortText, StringComparison.Ordinal) < 0,
+        Assert.True(string.Compare(libItem.SortText, depItem.SortText, StringComparison.Ordinal) < 0,
             $"Library '{libItem.SortText}' should sort before Dependency '{depItem.SortText}'");
     }
 
@@ -380,7 +380,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "require(\"\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -421,11 +421,11 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
         var handler = new LuaCompletionHandler(
-            new FakeIndexService { Current = index },
-            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc - read from disk
+            new FakeGameIndexService { Current = index },
+            TestLuaParseCache.For(new FakeGameWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
             schema,
-            NullLogger<LuaCompletionHandler>.Instance);
+            NullLogger<LuaCompletionHandler>.Instance, new ScriptedLuaAnalyzer());
 
         var result = await handler.Handle(
             new CompletionParams
@@ -439,105 +439,6 @@ public sealed class LuaCompletionHandlerTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-    }
 
     private sealed class StubLocalisationIndex(params (string Key, string Value)[] entries) : ILocalisationIndex
     {

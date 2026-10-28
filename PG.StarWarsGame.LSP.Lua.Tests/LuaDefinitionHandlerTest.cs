@@ -31,16 +31,16 @@ public sealed class LuaDefinitionHandlerTest
         };
     }
 
-    private static LuaDefinitionHandler BuildHandler(GameIndex index, FakeWorkspaceHost? host = null,
+    private static LuaDefinitionHandler BuildHandler(GameIndex index, FakeGameWorkspaceHost? host = null,
         ILuaAnalyzer? analyzer = null, ILuaSandboxProvider? sandbox = null)
     {
         return new LuaDefinitionHandler(
-            new FakeIndexService { Current = index },
-            TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
+            new FakeGameIndexService { Current = index },
+            TestLuaParseCache.For(host ?? new FakeGameWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             NullLogger<LuaDefinitionHandler>.Instance,
-            analyzer,
-            sandbox);
+            analyzer ?? new ScriptedLuaAnalyzer(),
+            sandbox ?? FixedSandbox.Empty());
     }
 
     // ── ours, else the analyzer's (#154) ─────────────────────────────────────
@@ -57,7 +57,7 @@ public sealed class LuaDefinitionHandlerTest
     [Fact]
     public async Task NothingOfOurs_TheAnalyzersDefinition()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "local abc = 1\nprint(abc)", 1);
         var index = MakeIndex(documents: (LuaUri, new DocumentIndex(LuaUri, 1, [], [])));
         var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/definition", TheirLocation());
@@ -75,7 +75,7 @@ public sealed class LuaDefinitionHandlerTest
     {
         const string interdictor = "file:///mod/data/scripts/gameobject/interdictor.lua";
         const string vader = "file:///mod/data/scripts/gameobject/darthvader.lua";
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(interdictor, "Definitions()", 1);
         var documents = ImmutableDictionary.CreateRange(new[]
         {
@@ -191,7 +191,7 @@ public sealed class LuaDefinitionHandlerTest
     public async Task AStateName_GoesToItsHandler()
     {
         const string library = "file:///data/scripts/library/pgstatemachine.lua";
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "require(\"PGStateMachine\")\nDefine_State(\"Attack\", State_Attack)\n" +
                                  "Set_Next_State(\"Attack\")\nfunction State_Attack(message) end", 1);
         host.AddOrUpdate(library, "function Define_State(s, f) end\n" +
@@ -242,7 +242,7 @@ public sealed class LuaDefinitionHandlerTest
     {
         var docIndex = new DocumentIndex(LuaUri, 1, [], []);
         var index = MakeIndex(documents: (LuaUri, docIndex));
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "-- just a comment", 1);
 
         var result = await BuildHandler(index, host).Handle(RequestAt(0, 5), CancellationToken.None);
@@ -392,7 +392,7 @@ public sealed class LuaDefinitionHandlerTest
         var fooDocIndex = new DocumentIndex(fooBarUri, 1, [], []);
         var index = MakeIndex(documents: [(LuaUri, docIndex), (fooBarUri, fooDocIndex)]);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "require(\"foo/bar\")", 1);
 
         var result = await BuildHandler(index, host).Handle(RequestAt(0, 10), CancellationToken.None);
@@ -412,7 +412,7 @@ public sealed class LuaDefinitionHandlerTest
         var docIndex = new DocumentIndex(LuaUri, 1, [], []);
         var index = MakeIndex(documents: (LuaUri, docIndex));
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "require(\"./local\")", 1);
 
         var result = await BuildHandler(index, host).Handle(RequestAt(0, 10), CancellationToken.None);
@@ -425,7 +425,7 @@ public sealed class LuaDefinitionHandlerTest
         var docIndex = new DocumentIndex(LuaUri, 1, [], []);
         var index = MakeIndex(documents: (LuaUri, docIndex));
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "require(\"unknown.module\")", 1);
 
         var result = await BuildHandler(index, host).Handle(RequestAt(0, 10), CancellationToken.None);
@@ -455,10 +455,10 @@ public sealed class LuaDefinitionHandlerTest
 
         // No document in workspace host - simulates not-yet-synced state
         var handler = new LuaDefinitionHandler(
-            new FakeIndexService { Current = index },
-            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc - read from disk
+            new FakeGameIndexService { Current = index },
+            TestLuaParseCache.For(new FakeGameWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
-            NullLogger<LuaDefinitionHandler>.Instance);
+            NullLogger<LuaDefinitionHandler>.Instance, new ScriptedLuaAnalyzer(), FixedSandbox.Empty());
 
         var result = await handler.Handle(
             new DefinitionParams
@@ -492,104 +492,5 @@ public sealed class LuaDefinitionHandlerTest
 
         return new GameIndex(BaselineIndex.Empty, docs, defs,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 }

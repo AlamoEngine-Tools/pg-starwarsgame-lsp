@@ -31,7 +31,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
 
         var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -70,7 +70,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
 
         var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -106,7 +106,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
 
         var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         var diagnosticsReceived = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
 
@@ -132,7 +132,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
 
         var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         var received = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(30));
 
@@ -188,7 +188,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
 
         var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -210,7 +210,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
         var selection = await _fixture.Client.RequestSelectionRange(new SelectionRangeParams
         {
             TextDocument = doc, Positions = new Container<Position>(new Position(line, col))
-        });
+        }, cancellationToken: TestContext.Current.CancellationToken);
         var name = Assert.Single(selection!);
         Assert.Equal(new Position(line, col), name.Range.Start);
         Assert.NotNull(name.Parent);
@@ -218,7 +218,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
         var marks = await _fixture.Client.RequestDocumentHighlight(new DocumentHighlightParams
         {
             TextDocument = doc, Position = new Position(line, col)
-        });
+        }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(2, marks!.Count());
     }
 

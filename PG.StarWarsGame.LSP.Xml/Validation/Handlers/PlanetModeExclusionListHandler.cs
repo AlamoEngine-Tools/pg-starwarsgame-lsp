@@ -3,7 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 

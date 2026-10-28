@@ -4,7 +4,8 @@
 using System.Globalization;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -52,7 +53,7 @@ public sealed class RespawnTimeListHandler : XmlDiagnosticsHandler<XmlTagValueFa
         foreach (var token in tokens)
         {
             // A mistyped token is the FloatList handler's to report; there is no table to judge.
-            if (!LenientFloatParser.TryParse(token.Trim(), out var value)) return [];
+            if (!EngineNumber.TryParseFloat(token.Trim(), out var value)) return [];
             values.Add(value);
         }
 

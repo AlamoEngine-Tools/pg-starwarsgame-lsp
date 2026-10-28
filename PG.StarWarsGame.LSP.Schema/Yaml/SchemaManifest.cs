@@ -25,7 +25,7 @@ public sealed class SchemaManifest
 
     /// <summary>
     ///     SHA-256 of all YAML file contents listed in this manifest (in declaration order:
-    ///     Tags, Types, Enums, Hardcoded, Meta). When present, <see cref="SchemaHttpCache" />
+    ///     Tags, Types, Enums, Hardcoded, Meta). When present, <see cref="Cache.SchemaHttpCache" />
     ///     uses this value for a fast single-compare cache validation instead of re-reading
     ///     every cached YAML file from disk.
     /// </summary>

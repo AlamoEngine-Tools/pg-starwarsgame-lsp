@@ -52,15 +52,18 @@ public sealed class WorkspaceVariantTagSourceTest
         return GameIndex.Empty with { Documents = docs, WorkspaceDefinitions = definitions };
     }
 
-    private static (WorkspaceVariantTagSource Source, FakeIndexService Index, FakeHost Host, MockFileSystem Fs)
+    private static (WorkspaceVariantTagSource Source, FakeGameIndexService Index, FakeGameWorkspaceHost Host,
+        MockFileSystem Fs)
         Build()
     {
         var fs = new MockFileSystem();
-        var host = new FakeHost();
-        var indexService = new FakeIndexService();
+        var host = new FakeGameWorkspaceHost();
+        var indexService = new FakeGameIndexService();
         var textSource = new DocumentTextSource(host, new FileHelper(fs),
             NullLogger<DocumentTextSource>.Instance);
-        var source = new WorkspaceVariantTagSource(new XmlParseCache(textSource, 16), indexService);
+        var source =
+            new WorkspaceVariantTagSource(new XmlParseCache(textSource, 16, NullLogger<XmlParseCache>.Instance),
+                indexService);
         return (source, indexService, host, fs);
     }
 
@@ -104,9 +107,50 @@ public sealed class WorkspaceVariantTagSourceTest
         var tags = source.TryGetTags("V");
 
         Assert.NotNull(tags);
-        Assert.Equal(2, tags!.Count);
+        Assert.Equal(2, tags.Count);
         Assert.Contains(tags, t => t.TagName == "Max_Health" && t.Value == "100");
         Assert.Contains(tags, t => t.TagName == "Mass" && t.Value == "5");
+    }
+
+    /// <summary>
+    ///     Objects of different kinds may share a name - the shipped game has a Sarlacc faction and a
+    ///     Sarlacc indigenous unit - and the game keeps them apart. Asked by symbol, each reads its own
+    ///     document; asked by id alone, which of the two answered depended on which file the parallel
+    ///     scan happened to index first.
+    /// </summary>
+    [Fact]
+    public void TryGetTags_BySymbol_ReadsThatSymbolsOwnDocument_WhenAnotherObjectSharesItsName()
+    {
+        var (source, index, host, _) = Build();
+        const string units = "file:///c:/mod/units.xml";
+        const string factions = "file:///c:/mod/factions.xml";
+        host.AddOrUpdate(units,
+            """<Units><Indigenous_Unit Name="Sarlacc"><Tactical_Health>5</Tactical_Health></Indigenous_Unit></Units>""",
+            1);
+        host.AddOrUpdate(factions, """<Factions><Faction Name="Sarlacc"><Color>1, 2, 3</Color></Faction></Factions>""",
+            1);
+        index.Current = IndexWith(("Sarlacc", units, 1, 0), ("Sarlacc", factions, 1, 0));
+        var both = index.Current.WorkspaceDefinitions["Sarlacc"];
+
+        var unitTags = source.TryGetTags(both.Single(s => ((FileOrigin)s.Origin).Uri == units));
+        var factionTags = source.TryGetTags(both.Single(s => ((FileOrigin)s.Origin).Uri == factions));
+
+        Assert.Equal(["Tactical_Health"], unitTags!.Select(t => t.TagName));
+        Assert.Equal(["Color"], factionTags!.Select(t => t.TagName));
+    }
+
+    /// <summary>
+    ///     A symbol the workspace does not define is the baseline's to answer, even when it points at
+    ///     a file that could be read: by symbol as by id, the workspace source knows only its own.
+    /// </summary>
+    [Fact]
+    public void TryGetTags_BySymbol_IsNull_ForASymbolTheWorkspaceDoesNotDefine()
+    {
+        var (source, index, host, _) = Build();
+        host.AddOrUpdate(Uri, """<Units><SpaceUnit Name="Shipped"><Mass>5</Mass></SpaceUnit></Units>""", 1);
+        index.Current = IndexWith(("Other", Uri, 1, 0));
+
+        Assert.Null(source.TryGetTags(Symbol("Shipped", Uri)));
     }
 
     /// <summary>
@@ -130,9 +174,9 @@ public sealed class WorkspaceVariantTagSourceTest
         var tags = source.TryGetTags("GameConstants");
 
         Assert.NotNull(tags);
-        Assert.Contains(tags!, t => t.TagName == "ShipNameTextFiles"
-                                    && t.Value == "Star_Destroyer, Data\\SD.txt");
-        Assert.Contains(tags!, t => t.TagName == "Credits_Per_CP" && t.Value == "50");
+        Assert.Contains(tags, t => t.TagName == "ShipNameTextFiles"
+                                   && t.Value == "Star_Destroyer, Data\\SD.txt");
+        Assert.Contains(tags, t => t.TagName == "Credits_Per_CP" && t.Value == "50");
     }
 
     [Fact]
@@ -243,7 +287,7 @@ public sealed class WorkspaceVariantTagSourceTest
         var tags = source.TryGetTags("V");
 
         Assert.NotNull(tags);
-        Assert.Contains(tags!, t => t.TagName == "Mass" && t.Value == "7");
+        Assert.Contains(tags, t => t.TagName == "Mass" && t.Value == "7");
     }
 
     [Fact]
@@ -294,86 +338,4 @@ public sealed class WorkspaceVariantTagSourceTest
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new NullDisposable();
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-#pragma warning disable CS0067
-        public event Action<GameIndex>? IndexChanged;
-        public event Action<ILocalisationIndex>? LocalisationChanged;
-        public event Action<GameIndex>? DynamicEnumChanged;
-#pragma warning restore CS0067
-    }
-
-    private sealed class FakeHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-    }
 }

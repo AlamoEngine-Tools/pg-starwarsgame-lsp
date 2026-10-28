@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -203,7 +204,7 @@ public sealed class GameAssetResolverTest
         Assert.Equal(1, tiers.WorkspaceRootCount);
         Assert.False(tiers.HasBaseGamePath);
         Assert.False(tiers.HasExpansionPath);
-        Assert.Contains("baseGameDirectory", tiers.Explain(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("baseGameDirectory", tiers.Explain(TestCatalogues.English), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -309,7 +310,7 @@ public sealed class GameAssetResolverTest
             new MockFileData([0xDE, 0xAD, 0xBE, 0xEF]));
         var resolver = Build(fs, null, BaseGame);
 
-        Assert.Equal<byte[]>([0xDE, 0xAD, 0xBE, 0xEF], resolver.Read(ModelPath)!);
+        Assert.Equal([0xDE, 0xAD, 0xBE, 0xEF], resolver.Read(ModelPath)!);
     }
 
     [Fact]
@@ -329,7 +330,7 @@ public sealed class GameAssetResolverTest
         var found = resolver.Locate(ModelPath);
 
         Assert.Equal(GameAssetTier.Archive, found!.Tier);
-        Assert.Equal<byte[]>([7, 7, 7], resolver.Read(ModelPath)!);
+        Assert.Equal([7, 7, 7], resolver.Read(ModelPath)!);
     }
 
     [Fact]

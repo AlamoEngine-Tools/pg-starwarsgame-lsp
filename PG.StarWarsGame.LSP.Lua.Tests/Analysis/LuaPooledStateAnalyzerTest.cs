@@ -23,7 +23,7 @@ public sealed class LuaPooledStateAnalyzerTest
         string uri = ScriptUri)
     {
         var tree = LuaSyntaxTree.ParseText(text, new LuaParseOptions(LuaSyntaxOptions.Lua51));
-        return LuaPooledStateAnalyzer.Analyze(uri, tree, state ?? Pooled);
+        return LuaPooledStateAnalyzer.Analyze(uri, tree, state ?? Pooled, TestCatalogues.English);
     }
 
     private static IReadOnlyList<Diagnostic> Of(string text, DiagnosticId id, LuaPooledState? state = null)
@@ -164,6 +164,22 @@ public sealed class LuaPooledStateAnalyzerTest
         Assert.DoesNotContain(found,
             d => d.Code!.Value.String == DiagnosticIds.LuaGlobalBleedsBetweenInstances.ToString());
         Assert.Single(found, d => d.Code!.Value.String == DiagnosticIds.LuaHostGlobalInDefinitions.ToString());
+    }
+
+    // The function's name and the reason are two texts joined into one sentence: the first used to
+    // end in a comma the second put a colon after.
+    [Fact]
+    public void AFunctionRunAtDefinitionTime_IsNamedInOneSentence()
+    {
+        var state = new LuaPooledState(true, true, new HashSet<string>())
+            { DefinitionFunctions = new HashSet<string> { "Declare_Goal_Type" } };
+        var found = Analyze("function Declare_Goal_Type()\n  t = Target\nend", state);
+
+        var message = Assert.Single(found,
+            d => d.Code!.Value.String == DiagnosticIds.LuaHostGlobalInDefinitions.ToString()).Message;
+        Assert.Equal(
+            "'Target' is read in 'Declare_Goal_Type', which runs at definition time: " +
+            "The game sets it only after Base_Definitions returns, so it is nil here.", message);
     }
 
     // The library's Base_Definitions runs again at release: what it sets is reset too.

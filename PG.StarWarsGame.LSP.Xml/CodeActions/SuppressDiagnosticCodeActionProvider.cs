@@ -7,6 +7,7 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.CodeActions;
@@ -42,7 +43,11 @@ internal sealed class SuppressDiagnosticCodeActionProvider : IXmlCodeActionProvi
         if (parsed is null) return [];
 
         var line = ctx.Diagnostic.Range.Start.Line;
-        var points = new List<SuppressionInsertionPoint> { new(SuppressionScope.Node, line) };
+        var points = new List<SuppressionInsertionPoint>();
+        // A comment above the XML declaration makes the game drop the file, so a finding on the
+        // declaration has no line to suppress it on; the file scope below covers it.
+        if (line > DeclarationEndLine(parsed.Text))
+            points.Add(new SuppressionInsertionPoint(SuppressionScope.Node, line));
 
         // Offered only where there is an object to attach it to - never a bogus fourth action.
         if (EnclosingObject(parsed.Html, line) is { } objectNode)
@@ -66,6 +71,15 @@ internal sealed class SuppressDiagnosticCodeActionProvider : IXmlCodeActionProvi
         var root = document.DocumentNode.ChildNodes
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
         return root is null ? 0 : XmlUtility.GetLine(root) + 1;
+    }
+
+    /// <summary>The 0-based line the file's leading XML declaration ends on, or -1 without one.</summary>
+    private static int DeclarationEndLine(string text)
+    {
+        var start = text.Length - text.TrimStart().Length;
+        if (!text.AsSpan(start).StartsWith("<?xml", StringComparison.OrdinalIgnoreCase)) return -1;
+        var end = text.IndexOf("?>", start, StringComparison.Ordinal);
+        return end < 0 ? -1 : text.AsSpan(0, end).Count('\n');
     }
 
     private HtmlNode? EnclosingObject(HtmlDocument document, int line)

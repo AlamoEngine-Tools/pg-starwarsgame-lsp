@@ -2,32 +2,18 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using System.Xml;
-using System.Xml.Linq;
+using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
 /// <summary>
-///     Extracts dynamic enum values from game data files and populates
-///     <see cref="Core.Symbols.BaselineIndex.DynamicEnumValues" /> and
-///     <see cref="Core.Symbols.BaselineIndex.HardcodedEnumValues" />.
+///     Reads the values of the schema's dynamic enums out of the game's own files. Parsed through
+///     <see cref="XmlUtility" /> like every other game XML (#308): the game's reader matches an
+///     element name in any case and takes a file a strict parser rejects, and so does this.
 /// </summary>
-/// <remarks>
-///     Two source formats are supported, encoded in <see cref="EnumDefinition.SourceFile" />:
-///     <list type="bullet">
-///         <item>
-///             <c>path$Element</c> (e.g. <c>data/xml/gameconstants.xml$Damage_Types</c>) - text content of a
-///             named element inside the file; supports the "ABOVE this point" boundary comment that separates
-///             mod-extensible values from engine-hardcoded ones.
-///         </item>
-///         <item>
-///             <c>path</c> only (e.g. <c>data/xml/enum/aigoalcategorytype.xml</c>) - an
-///             <c>&lt;EnumDefinition&gt;</c> document whose child element names are the enum values.
-///         </item>
-///     </list>
-/// </remarks>
 public static class DynamicEnumExtractor
 {
     /// <summary>
@@ -46,8 +32,8 @@ public static class DynamicEnumExtractor
         var dyn = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
         var hard = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
 
-        // Cache parsed XDocuments so files read by multiple enums are only loaded once.
-        var docCache = new Dictionary<string, XDocument?>(StringComparer.OrdinalIgnoreCase);
+        // Cache parsed documents so files read by multiple enums are only loaded once.
+        var docCache = new Dictionary<string, HtmlDocument?>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var enumDef in schema.AllEnums)
         {
@@ -65,8 +51,7 @@ public static class DynamicEnumExtractor
 
                 if (!docCache.TryGetValue(filePath, out var doc))
                 {
-                    var content = fileReader(filePath);
-                    doc = TryParse(content);
+                    doc = TryParse(fileReader(filePath));
                     docCache[filePath] = doc;
                 }
 
@@ -99,35 +84,21 @@ public static class DynamicEnumExtractor
     {
         if (string.IsNullOrEmpty(xml)) return [];
 
-        XDocument doc;
-        try
-        {
-            doc = XDocument.Parse(xml, LoadOptions.SetLineInfo);
-        }
-        catch (XmlException)
-        {
-            return [];
-        }
-
-        var el = doc.Descendants(elementName).FirstOrDefault();
+        var el = FindElement(XmlUtility.CreateHtmlDocument(xml), elementName);
         if (el is null) return [];
 
+        var lineIndex = new LineOffsetIndex(xml);
         var result = new List<(string Name, FileOrigin Origin)>();
-        foreach (var node in el.Nodes())
+        foreach (var node in el.ChildNodes)
         {
-            if (node is XComment comment && IsBoundaryComment(comment.Value))
+            if (node is HtmlCommentNode comment && IsBoundaryComment(comment.Comment))
                 break;
 
-            if (node is not XText textNode) continue;
+            if (node.NodeType != HtmlNodeType.Text) continue;
 
-            var text = textNode.Value;
-            var li = (IXmlLineInfo)textNode;
-            var startLine = li.HasLineInfo() ? li.LineNumber - 1 : 0;
-            var startCol = li.HasLineInfo() ? li.LinePosition - 1 : 0;
-
-            foreach (var (token, offset) in SplitTokensWithOffsets(text))
+            foreach (var (token, offset) in SplitTokensWithOffsets(node.InnerText))
             {
-                var (line, col) = AdvancePosition(text, offset, startLine, startCol);
+                var (line, col) = lineIndex.GetPosition(node.StreamPosition + offset);
                 result.Add((token, new FileOrigin(uri, line, col)));
             }
         }
@@ -143,47 +114,14 @@ public static class DynamicEnumExtractor
         string? xml, string uri)
     {
         if (string.IsNullOrEmpty(xml)) return [];
-
-        XDocument doc;
-        try
-        {
-            doc = XDocument.Parse(xml, LoadOptions.SetLineInfo);
-        }
-        catch (XmlException)
-        {
-            return [];
-        }
-
-        var root = doc.Root;
-        if (root is null) return [];
+        if (!XmlUtility.TryGetRootNode(XmlUtility.CreateHtmlDocument(xml), out var root) || root is null) return [];
 
         var result = new List<(string Name, FileOrigin Origin)>();
-        foreach (var element in root.Elements())
-        {
-            var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber - 1 : 0;
-            result.Add((element.Name.LocalName, new FileOrigin(uri, line, null)));
-        }
+        foreach (var element in root.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
+            result.Add((XmlUtility.GetOriginalTagName(element, xml),
+                new FileOrigin(uri, Math.Max(0, XmlUtility.GetLine(element)), null)));
 
         return result;
-    }
-
-    // Walk `offset` characters through `text`, starting at (startLine, startCol),
-    // tracking newlines to compute the final 0-based (line, col).
-    private static (int Line, int Col) AdvancePosition(string text, int offset, int startLine, int startCol)
-    {
-        int line = startLine, col = startCol;
-        for (var i = 0; i < offset && i < text.Length; i++)
-            if (text[i] == '\n')
-            {
-                line++;
-                col = 0;
-            }
-            else if (text[i] != '\r')
-            {
-                col++;
-            }
-
-        return (line, col);
     }
 
     private static IEnumerable<(string Token, int Offset)> SplitTokensWithOffsets(string text)
@@ -205,54 +143,54 @@ public static class DynamicEnumExtractor
     }
 
     /// <summary>
-    ///     Parses an <c>&lt;EnumDefinition&gt;</c> XML document and returns the child element names as enum values.
-    ///     Text content and numeric weights inside each element are ignored.
+    ///     Parses an <c>&lt;EnumDefinition&gt;</c> XML document and returns the child element names as enum
+    ///     values, spelled as the file spells them. Text content and numeric weights inside each
+    ///     element are ignored.
     /// </summary>
     internal static ImmutableArray<string> ParseEnumDefinitionFile(string? xml)
     {
         if (string.IsNullOrEmpty(xml)) return [];
+        if (!XmlUtility.TryGetRootNode(XmlUtility.CreateHtmlDocument(xml), out var root) || root is null) return [];
 
-        var doc = TryParse(xml);
-        if (doc is null) return [];
-
-        var root = doc.Root;
-        if (root is null) return [];
-
-        return [.. root.Elements().Select(e => e.Name.LocalName)];
+        return
+        [
+            .. root.ChildNodes
+                .Where(n => n.NodeType == HtmlNodeType.Element)
+                .Select(e => XmlUtility.GetOriginalTagName(e, xml))
+        ];
     }
 
     internal static (ImmutableArray<string> all, ImmutableArray<string> hardcoded)
-        ParseNameListWithBoundary(XDocument doc, string tagName)
+        ParseNameListWithBoundary(HtmlDocument doc, string tagName)
     {
-        var el = doc.Descendants(tagName).FirstOrDefault();
+        var el = FindElement(doc, tagName);
         if (el is null) return ([], []);
 
         var all = new List<string>();
         var hardcoded = new List<string>();
         var pastBoundary = false;
 
-        foreach (var node in el.Nodes())
+        foreach (var node in el.ChildNodes)
         {
-            if (node is XComment comment && IsBoundaryComment(comment.Value))
+            if (node is HtmlCommentNode comment && IsBoundaryComment(comment.Comment))
             {
                 pastBoundary = true;
                 continue;
             }
 
             IEnumerable<string> tokens;
-            if (node is XText text)
+            switch (node.NodeType)
             {
-                tokens = text.Value.Split((char[])[' ', '\t', '\r', '\n', ','],
-                    StringSplitOptions.RemoveEmptyEntries);
-            }
-            else if (node is XElement child)
-            {
-                var v = child.Value.Trim();
-                tokens = v.Length > 0 ? [v] : [];
-            }
-            else
-            {
-                continue;
+                case HtmlNodeType.Text:
+                    tokens = node.InnerText.Split((char[])[' ', '\t', '\r', '\n', ','],
+                        StringSplitOptions.RemoveEmptyEntries);
+                    break;
+                case HtmlNodeType.Element:
+                    var v = node.InnerText.Trim();
+                    tokens = v.Length > 0 ? [v] : [];
+                    break;
+                default:
+                    continue;
             }
 
             foreach (var t in tokens)
@@ -270,16 +208,15 @@ public static class DynamicEnumExtractor
         return commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static XDocument? TryParse(string? xml)
+    /// <summary>The first element of that name, in any case - the game's reader does not distinguish.</summary>
+    private static HtmlNode? FindElement(HtmlDocument doc, string elementName)
     {
-        if (string.IsNullOrEmpty(xml)) return null;
-        try
-        {
-            return XDocument.Parse(xml);
-        }
-        catch
-        {
-            return null;
-        }
+        return doc.DocumentNode.Descendants().FirstOrDefault(n =>
+            n.NodeType == HtmlNodeType.Element && n.Name.Equals(elementName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static HtmlDocument? TryParse(string? xml)
+    {
+        return string.IsNullOrEmpty(xml) ? null : XmlUtility.CreateHtmlDocument(xml);
     }
 }

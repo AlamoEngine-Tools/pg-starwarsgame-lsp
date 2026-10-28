@@ -11,8 +11,8 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Server.Project;
-using PG.StarWarsGame.LSP.Xml.Util;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
@@ -35,13 +35,14 @@ public sealed class ApplyStoryCommandBatchHandler(
     IModProjectReloadService reloadService,
     IWorkspaceEditApplier applier,
     ILspConfigurationProvider config,
-    ILogger<ApplyStoryCommandBatchHandler> logger)
+    ILogger<ApplyStoryCommandBatchHandler> logger,
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<ApplyStoryCommandBatchParams, ApplyStoryCommandBatchResult>
 {
     public Task<ApplyStoryCommandBatchResult> Handle(
         ApplyStoryCommandBatchParams request, CancellationToken ct)
     {
-        if (StoryEditingFeature.Rejection(config) is { } rejection)
+        if (StoryEditingFeature.Rejection(config, messages) is { } rejection)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false, Error: rejection));
 
         // Checked before anything is composed, and over EVERY command: a batch is applied as one
@@ -51,12 +52,12 @@ public sealed class ApplyStoryCommandBatchHandler(
             if (DependencyOwnership.Rejection(reloadService.LastWorkspaceConfig, command.ThreadUri)
                 is { } notOurs)
                 return Task.FromResult(new ApplyStoryCommandBatchResult(false,
-                    Error: new ConfiguredMessageCatalog(config).Format(notOurs)));
+                    Error: messages.Format(notOurs)));
 
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false,
-                Error: new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound",
+                Error: messages.Format("StoryHandlers_CampaignWasNotFound",
                     request.Campaign)));
 
         if (request.Commands.Count == 0)
@@ -64,7 +65,7 @@ public sealed class ApplyStoryCommandBatchHandler(
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService, logger,
-            new ConfiguredMessageCatalog(config));
+            messages);
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, error) = executor.Compose(
@@ -76,7 +77,7 @@ public sealed class ApplyStoryCommandBatchHandler(
         if (changed.Count == 0)
             return Task.FromResult(new ApplyStoryCommandBatchResult(true));
 
-        var label = new ConfiguredMessageCatalog(config).Format("StoryHandlers_ApplyStoryChangeS",
+        var label = messages.Format("StoryHandlers_ApplyStoryChangeS",
             request.Commands.Count);
         logger.LogDebug("Story batch of {Count} -> applyEdit touching {Files} file(s)",
             request.Commands.Count, changed.Count);

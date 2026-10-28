@@ -2,8 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
@@ -48,7 +47,7 @@ public sealed class SquadronOffsetsRule : IXmlCrossTagRule
                 totalUnits,
                 totalOffsets,
                 unitNodes.Select(ToLocation).ToList(),
-                (offsetNodes ?? []).Select(ToLocation).ToList())
+                offsetNodes.Select(ToLocation).ToList())
         ];
     }
 

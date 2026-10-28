@@ -5,8 +5,9 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Preview;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -17,13 +18,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </summary>
 public sealed class PreviewHandlersTest
 {
-    private static readonly string[] NoAnimations = [];
-
-    private static ILspConfigurationProvider Config()
-    {
-        return new StubConfig(new LspConfiguration());
-    }
-
     private static PreviewSceneBuilder Builder(StubAssets assets, params GameSymbol[] symbols)
     {
         var index = GameIndex.Empty with
@@ -32,8 +26,8 @@ public sealed class PreviewHandlersTest
                 s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase)
         };
 
-        return new PreviewSceneBuilder(new FakeGameIndexService(index), new NullSchemaProvider(),
-            new FakeVariantTagSource(), assets);
+        return new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
+            new FakeVariantTagSource(), assets, ResxMessageCatalog.Server("en"));
     }
 
     // ── the scene endpoint ────────────────────────────────────────────────────
@@ -42,7 +36,8 @@ public sealed class PreviewHandlersTest
     public async Task GetPreviewScene_WithNeitherSubject_SaysSoRatherThanFailing()
     {
         var assets = new StubAssets();
-        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config());
+        var handler =
+            new GetPreviewSceneHandler(Builder(assets), assets, TestCatalogues.English, new NoWorkspaceIcons());
 
         var result = await handler.Handle(new GetPreviewSceneParams(), CancellationToken.None);
 
@@ -54,7 +49,8 @@ public sealed class PreviewHandlersTest
     {
         // The custom editor sends a file:/// URI; the XML sends a bare name. Both mean one model.
         var assets = new StubAssets().With("Data/Art/Models/Ev_stardestroyer.alo", [1, 2, 3]);
-        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config());
+        var handler =
+            new GetPreviewSceneHandler(Builder(assets), assets, TestCatalogues.English, new NoWorkspaceIcons());
 
         var result = await handler.Handle(
             new GetPreviewSceneParams
@@ -125,7 +121,7 @@ public sealed class PreviewHandlersTest
     public async Task GetModelGlb_ForAMissingModel_ExplainsWhyRatherThanReturningNothing()
     {
         var assets = new StubAssets();
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "nope.alo" }, CancellationToken.None);
@@ -140,7 +136,7 @@ public sealed class PreviewHandlersTest
         // The reader is strict by design; its message names the chunk that did not add up, which is
         // far more use than a bare failure.
         var assets = new StubAssets().With("Data/Art/Models/junk.alo", [9, 9, 9, 9, 9, 9, 9, 9]);
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "junk.alo" }, CancellationToken.None);
@@ -157,7 +153,7 @@ public sealed class PreviewHandlersTest
             Assert.Skip("No extracted game tree found.");
 
         var assets = new StubAssets().With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model));
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "Ev_stardestroyer.alo" }, CancellationToken.None);
@@ -167,7 +163,7 @@ public sealed class PreviewHandlersTest
 
         // "glTF" in ASCII is the GLB magic; decoding proves this is a real container, not a blob.
         var bytes = Convert.FromBase64String(result.Glb);
-        Assert.Equal<byte[]>([0x67, 0x6C, 0x54, 0x46], bytes[..4]);
+        Assert.Equal([0x67, 0x6C, 0x54, 0x46], bytes[..4]);
     }
 
     /// <summary>
@@ -197,7 +193,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -230,7 +226,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Nb_basepad.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -265,7 +261,7 @@ public sealed class PreviewHandlersTest
             .With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
         var logger = new ListLogger<GetModelGlbHandler>();
-        var handler = new GetModelGlbHandler(assets, Config(), logger);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, logger);
 
         await handler.Handle(
             new GetModelGlbParams
@@ -306,7 +302,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Ub_turretmst50.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ub_turretmst50_idle00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -329,7 +325,7 @@ public sealed class PreviewHandlersTest
         // client picks its decoder from the reported format, so reporting the request would be wrong.
         var assets = new StubAssets()
             .With("Data/Art/Textures/Ai_rancor.dds", [1, 2, 3, 4], "Data/Art/Textures/Ai_rancor.dds");
-        var handler = new GetModelTextureHandler(assets, Config());
+        var handler = new GetModelTextureHandler(assets, TestCatalogues.English);
 
         var result = await handler.Handle(
             new GetModelTextureParams { Name = "Ai_rancor.tga" }, CancellationToken.None);
@@ -341,7 +337,7 @@ public sealed class PreviewHandlersTest
     [Fact]
     public async Task GetModelTexture_ForAMissingTexture_ExplainsWhy()
     {
-        var handler = new GetModelTextureHandler(new StubAssets(), Config());
+        var handler = new GetModelTextureHandler(new StubAssets(), TestCatalogues.English);
 
         var result = await handler.Handle(
             new GetModelTextureParams { Name = "nope.tga" }, CancellationToken.None);
@@ -400,7 +396,7 @@ public sealed class PreviewHandlersTest
             Tag("Space_Model_Name", "p_explosion_empire_big00.alo"));
 
         var result = await Particles(new StubAssets(), tags,
-            Sym("Large_Explosion_Space_Empire", "Particle")).Handle(
+            Sym("Large_Explosion_Space_Empire", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Large_Explosion_Space_Empire" },
             CancellationToken.None);
 
@@ -415,7 +411,7 @@ public sealed class PreviewHandlersTest
         var tags = new FakeVariantTagSource().With("Ground_Puff",
             Tag("Land_Model_Name", "p_smoke_small.alo"));
 
-        var result = await Particles(new StubAssets(), tags, Sym("Ground_Puff", "Particle")).Handle(
+        var result = await Particles(new StubAssets(), tags, Sym("Ground_Puff", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Ground_Puff" }, CancellationToken.None);
 
         Assert.Contains("p_smoke_small.alo", result.Error);
@@ -482,7 +478,7 @@ public sealed class PreviewHandlersTest
             Tag("Scale_Factor", "2.0"));
 
         var result = await Particles(new StubAssets(), tags,
-            Sym("Empire_Bombing_Run_Explosion_Land", "Particle")).Handle(
+            Sym("Empire_Bombing_Run_Explosion_Land", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Empire_Bombing_Run_Explosion_Land" },
             CancellationToken.None);
 
@@ -496,7 +492,7 @@ public sealed class PreviewHandlersTest
         var tags = new FakeVariantTagSource().With("Plain",
             Tag("Space_Model_Name", "p_plain.alo"));
 
-        var result = await Particles(new StubAssets(), tags, Sym("Plain", "Particle")).Handle(
+        var result = await Particles(new StubAssets(), tags, Sym("Plain", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Plain" }, CancellationToken.None);
 
         Assert.Equal(1f, result.ScaleFactor);
@@ -513,7 +509,7 @@ public sealed class PreviewHandlersTest
         var tags = new FakeVariantTagSource().With("Odd",
             Tag("Space_Model_Name", "p_odd.alo"), Tag("Scale_Factor", raw));
 
-        var result = await Particles(new StubAssets(), tags, Sym("Odd", "Particle")).Handle(
+        var result = await Particles(new StubAssets(), tags, Sym("Odd", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Odd" }, CancellationToken.None);
 
         Assert.Equal(1f, result.ScaleFactor);
@@ -542,7 +538,7 @@ public sealed class PreviewHandlersTest
             Tag("Projectile_Does_Shield_Damage", "Yes"),
             Tag("Projectile_Does_Hitpoint_Damage", "No"));
 
-        var result = await Projectiles(tags, Sym("Proj_Ion_Cannon", "Projectile")).Handle(
+        var result = await Projectiles(tags, Sym("Proj_Ion_Cannon", "GameObjectType")).Handle(
             new GetProjectileParams { Name = "Proj_Ion_Cannon" }, CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -586,7 +582,7 @@ public sealed class PreviewHandlersTest
         };
 
         return new GetProjectileHandler(
-            Config(), new FakeGameIndexService(index), new NullSchemaProvider(), tags);
+            TestCatalogues.English, new FakeGameIndexService(index), new SchemaProviderBuilder().Build(), tags);
     }
 
     private static GetParticleSystemHandler Particles(
@@ -599,7 +595,7 @@ public sealed class PreviewHandlersTest
         };
 
         return new GetParticleSystemHandler(
-            assets, Config(), new FakeGameIndexService(index), new NullSchemaProvider(), tags);
+            assets, TestCatalogues.English, new FakeGameIndexService(index), new SchemaProviderBuilder().Build(), tags);
     }
 
     private static VariantTag Tag(string name, string value)
@@ -616,9 +612,9 @@ public sealed class PreviewHandlersTest
     /// <summary>Keeps what was logged, so a test can assert the preview said what it did.</summary>
     private sealed class ListLogger<T> : ILogger<T>
     {
-        private readonly List<string> messages = [];
+        private readonly List<string> _messages = [];
 
-        public IReadOnlyList<string> Messages => messages;
+        public IReadOnlyList<string> Messages => _messages;
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
         {
@@ -634,16 +630,7 @@ public sealed class PreviewHandlersTest
             LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            messages.Add(formatter(state, exception));
-        }
-    }
-
-    private sealed class StubConfig(LspConfiguration current) : ILspConfigurationProvider
-    {
-        public LspConfiguration Current { get; } = current;
-
-        public void LoadFrom(object? initializationOptions)
-        {
+            _messages.Add(formatter(state, exception));
         }
     }
 
@@ -666,6 +653,8 @@ public sealed class PreviewHandlersTest
             return _files.TryGetValue(gameRelativePath, out var file) ? file.Bytes : null;
         }
 
+        /// <param name="path">The asset's game-relative path.</param>
+        /// <param name="bytes">The asset's bytes.</param>
         /// <param name="resolvedAs">
         ///     The path to report as found, which may differ in extension from the request - that is
         ///     the whole point of the .tga/.dds interchange.

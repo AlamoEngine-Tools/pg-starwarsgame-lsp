@@ -4,6 +4,7 @@
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Variants;
@@ -22,8 +23,6 @@ namespace PG.StarWarsGame.LSP.Xml.Variants;
 /// </remarks>
 public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatisticsSource
 {
-    private const string NameAttribute = "Name";
-
     // Per-document tag maps keyed by canonical URI. Guarded by _gate.
     private readonly Dictionary<string, CacheEntry> _cache = new(StringComparer.Ordinal);
     private readonly object _gate = new();
@@ -48,7 +47,7 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatist
             foreach (var entry in _cache.Values)
             foreach (var tags in entry.TagsById.Values)
             foreach (var tag in tags)
-                chars += tag.TagName.Length + (tag.Value?.Length ?? 0);
+                chars += tag.TagName.Length + tag.Value.Length;
 
             return new CacheStatistics("variant-tags", _cache.Count, chars * sizeof(char));
         }
@@ -60,13 +59,29 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatist
         if (!index.WorkspaceDefinitions.TryGetValue(objectId, out var defs) || defs.Length == 0)
             return null;
 
-        // Highest project layer wins - the same precedence GameIndex.Resolve applies.
-        var winner = defs.Length == 1 ? defs[0] : defs.OrderByDescending(index.LayerRankOf).First();
+        // The definition GameIndex.Resolve picks, so a lookup by id alone reads the same object here.
+        var winner = defs.Length == 1 ? defs[0] : index.Resolve(objectId)!;
         if (winner.Origin is not FileOrigin origin)
             return null;
 
         var map = GetOrBuildDocumentMap(origin.Uri, index);
         return map?.GetValueOrDefault(objectId);
+    }
+
+    /// <summary>
+    ///     The tags in the symbol's own document, whatever else shares its id. Null for a symbol the
+    ///     workspace does not define - a shipped one is the baseline's to answer, as by id.
+    /// </summary>
+    public IReadOnlyList<VariantTag>? TryGetTags(GameSymbol symbol)
+    {
+        var index = _indexService.Current;
+        if (symbol.Origin is not FileOrigin origin
+            || !index.WorkspaceDefinitions.TryGetValue(symbol.Id, out var defs)
+            || !defs.Contains(symbol))
+            return null;
+
+        var map = GetOrBuildDocumentMap(origin.Uri, index);
+        return map?.GetValueOrDefault(symbol.Id);
     }
 
     private Dictionary<string, IReadOnlyList<VariantTag>>? GetOrBuildDocumentMap(string uri, GameIndex index)

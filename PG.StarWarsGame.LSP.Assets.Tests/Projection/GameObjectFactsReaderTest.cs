@@ -154,13 +154,26 @@ public sealed class GameObjectFactsReaderTest
 
     // A shipped file that will not parse must cost that file, not the run. The baseline is built
     // from whatever the game actually holds, and one malformed file is not a reason to ship none.
+    // The game's reader takes a file a strict parser rejects: a stray ampersand is a warning for the
+    // author (#198), never a reason to lose the file's objects.
     [Fact]
-    public void Read_MalformedFile_IsSkippedAndReported()
+    public void Read_AFileAStrictParserRejects_IsStillRead()
+    {
+        var open = Files(("BAD.XML",
+            "<Units><Unit Name=\"A\"><Text>Tom & Jerry</Text><Behavior>IDLE</Behavior></Unit></Units>"));
+
+        var result = GameObjectFactsReader.Read([("A", "BAD.XML")], open);
+
+        Assert.Equal(["IDLE"], result["A"].Behaviors);
+    }
+
+    [Fact]
+    public void Read_AFileThatCannotBeOpened_IsSkippedAndReported()
     {
         var problems = new List<string>();
-        var open = Files(("BAD.XML", "<Units><Unit Name=\"A\"><Behavior>IDLE</Units>"));
 
-        var result = GameObjectFactsReader.Read([("A", "BAD.XML")], open, onProblem: problems.Add);
+        var result = GameObjectFactsReader.Read([("A", "BAD.XML")], _ => throw new IOException("locked"),
+            onProblem: problems.Add);
 
         Assert.Empty(result);
         Assert.Contains("BAD.XML", Assert.Single(problems));

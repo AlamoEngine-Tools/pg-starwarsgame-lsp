@@ -52,7 +52,7 @@ public sealed class StoryDialogSmokeTest : IClassFixture<LspServerFixture>, IAsy
         await OpenAsync(filePath);
 
         var diags = await received;
-        Assert.Contains(diags.Diagnostics!, d =>
+        Assert.Contains(diags.Diagnostics, d =>
             d.Message.Contains("TEXTCOLOR255", StringComparison.OrdinalIgnoreCase));
     }
 

@@ -9,6 +9,9 @@ public static class LspTestEnvironment
     private static readonly string? SolutionRoot = FindSolutionRoot(
         Path.GetDirectoryName(typeof(LspTestEnvironment).Assembly.Location)!);
 
+    /// <summary>The repository root, for a test that reads or records a file kept in the source tree.</summary>
+    public static string? RepositoryRoot => SolutionRoot;
+
     /// <summary>
     ///     Schema directory.  Prefers <c>LSP_SCHEMA_LOCAL_PATH</c> env var; falls back to
     ///     <c>schema/eaw</c> inside the repository.  Returns <c>null</c> if neither exists.
@@ -39,6 +42,8 @@ public static class LspTestEnvironment
     ///     TRACKED, because nothing in it comes from the game - which is what lets a test edit it to
     ///     create the condition it needs.
     /// </summary>
+    // E2e is spelled as a word throughout the E2E test project.
+    // ReSharper disable once InconsistentNaming
     public static string? E2eWorkspacePath =>
         ExistingPath(Environment.GetEnvironmentVariable("LSP_E2E_WORKSPACE_PATH"))
         ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace") : null);
@@ -48,6 +53,8 @@ public static class LspTestEnvironment
     ///     <c>LSP_E2E_MULTI_ROOT_WORKSPACE_PATH</c>; falls back to <c>e2e-workspace-multi-root/</c> in
     ///     the repository. Tracked for the same reason as <c>e2e-workspace/</c>.
     /// </summary>
+    // E2e is spelled as a word throughout the E2E test project.
+    // ReSharper disable once InconsistentNaming
     public static string? E2eMultiRootWorkspacePath =>
         ExistingPath(Environment.GetEnvironmentVariable("LSP_E2E_MULTI_ROOT_WORKSPACE_PATH"))
         ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace-multi-root") : null);

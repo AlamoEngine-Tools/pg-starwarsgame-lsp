@@ -17,17 +17,17 @@ public sealed class BaselineLoader
     private readonly BaselineLocationResolver _locations;
     private readonly ICrossProcessLock _lock;
     private readonly ILogger<BaselineLoader> _logger;
-    private readonly ServerStatusRecorder? _status;
+    private readonly ServerStatusRecorder _status;
 
     public BaselineLoader(HttpClient httpClient, BaselineLocationResolver locations, IFileHelper fileHelper,
-        ILogger<BaselineLoader> logger, ServerStatusRecorder? status = null, ICrossProcessLock? processLock = null)
+        ILogger<BaselineLoader> logger, ServerStatusRecorder status, ICrossProcessLock processLock)
     {
         _httpClient = httpClient;
         _locations = locations;
         _fileHelper = fileHelper;
         _logger = logger;
         _status = status;
-        _lock = processLock ?? new NullCrossProcessLock();
+        _lock = processLock;
     }
 
     private string CacheDir => _fileHelper.FileSystem.Path.Combine(
@@ -43,7 +43,7 @@ public sealed class BaselineLoader
             _ => Task.FromResult((BaselineIndex.Empty, StatusAssetSource.Empty))
         });
 
-        _status?.RecordBaseline(source);
+        _status.RecordBaseline(source);
 
         WarnIfWithoutBehaviors(baseline);
         return baseline;

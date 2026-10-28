@@ -438,7 +438,9 @@ function App(): React.JSX.Element {
                             count={notices.length}
                             expanded={noticesOpen}
                             disabled={notices.length === 0}
-                            disabledReason="Nothing to report about this card"
+                            disabledReason={l10n.t(
+                                "Nothing to report about this card",
+                            )}
                             title={l10n.t(
                                 "{0} {1} about this card. Press to {2} them.",
                                 notices.length,

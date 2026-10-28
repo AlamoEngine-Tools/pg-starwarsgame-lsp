@@ -192,7 +192,7 @@ public sealed class EngineTextLimitTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new LimitSchema(),
+            LimitSchema.Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             []);
@@ -200,7 +200,7 @@ public sealed class EngineTextLimitTest
         return producer.Produce(xml, Uri);
     }
 
-    private sealed class LimitSchema : ISchemaProvider
+    private static class LimitSchema
     {
         private static readonly XmlTagDefinition HardPoints = new()
         {
@@ -213,42 +213,12 @@ public sealed class EngineTextLimitTest
             Tag = "Max_Speed", ValueType = XmlValueType.Float
         };
 
-        public XmlTagDefinition? GetTag(string tagName)
+        public static FakeSchemaProvider Build()
         {
-            if (tagName.Equals("HardPoints", StringComparison.OrdinalIgnoreCase)) return HardPoints;
-            return tagName.Equals("Max_Speed", StringComparison.OrdinalIgnoreCase) ? MaxSpeed : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [HardPoints, MaxSpeed];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
+            return new SchemaProviderBuilder()
+                .WithTag(HardPoints)
+                .WithTag(MaxSpeed)
+                .Build();
         }
     }
 }

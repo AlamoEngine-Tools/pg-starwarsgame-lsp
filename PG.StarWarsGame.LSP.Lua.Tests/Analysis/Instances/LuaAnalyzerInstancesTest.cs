@@ -41,7 +41,7 @@ public sealed class LuaAnalyzerInstancesTest
         new(1, "Mod", [], ["c:/mod/data/scripts"], [], [], null)
     ];
 
-    private readonly FakeIndexService _index = new();
+    private readonly FakeGameIndexService _index = new();
     private readonly MockFileSystem _disk = new();
     private readonly List<FakeProcess> _processes = [];
 
@@ -129,7 +129,7 @@ public sealed class LuaAnalyzerInstancesTest
         var script = setup.ScriptUri(setup.LeafRank, "GameObject/Interdictor.lua");
         disk.AddFile(setup.PathOf(0, "Scripts/Library/PGStateMachine.lua"),
             new MockFileData("function Definitions() end\n"));
-        var index = new FakeIndexService
+        var index = new FakeGameIndexService
         {
             Current = ProjectSetup.Index(setup.Script(0, "Library/PGStateMachine.lua"),
                 setup.Script(setup.LeafRank, "GameObject/Interdictor.lua", ["PGStateMachine"]))
@@ -270,11 +270,11 @@ public sealed class LuaAnalyzerInstancesTest
         instances.DidOpen(Other, "", 1);
         var process = _processes[0];
         var range = new { start = new { line = 0, character = 9 }, end = new { line = 0, character = 18 } };
-        process.Answer = (method, request) => method == "textDocument/codeLens"
+        process.Answer = (m, payload) => m == "textDocument/codeLens"
             ? JToken.FromObject(new[] { new { range, data = new { DeclId = "0|2074" } } })
             : new JObject
             {
-                ["range"] = request["range"], ["data"] = request["data"],
+                ["range"] = payload["range"], ["data"] = payload["data"],
                 ["command"] = new JObject { ["title"] = "1 usage", ["command"] = "editor.action.showReferences" }
             };
 
@@ -320,7 +320,7 @@ public sealed class LuaAnalyzerInstancesTest
         var process = _processes.Single();
 
         Index((Script, ["PGStateMachine", "PGDebug"], 1), (Machine, ["PGBase"], 0), (Base, [], 0), (Debug, [], 0));
-        _index.Change();
+        _index.Raise(_index.Current);
 
         Assert.True(SpinWait.SpinUntil(() => process.Texts.Count == 4, TimeSpan.FromSeconds(5)));
         Assert.True(SpinWait.SpinUntil(() => process.Plans.Count == 2, TimeSpan.FromSeconds(5)));
@@ -337,7 +337,7 @@ public sealed class LuaAnalyzerInstancesTest
 
         _disk.File.WriteAllText(new FileHelper(_disk).FileUriToPath(Base)!, "function TestValid(w, x) end\n");
         Index((Script, ["PGStateMachine"], 1), (Machine, ["PGBase"], 0), (Base, [], 0), (Other, [], 1));
-        _index.Change();
+        _index.Raise(_index.Current);
 
         Assert.True(SpinWait.SpinUntil(() => process.Texts[PlaceIn(process, Base)] == "function TestValid(w, x) end\n",
             TimeSpan.FromSeconds(5)));
@@ -414,7 +414,7 @@ public sealed class LuaAnalyzerInstancesTest
             lock (Texts) Texts.Remove(uri);
         }
 
-        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
         {
             var json = JToken.FromObject(parameters);
             Requests.Add((method, json));
@@ -444,80 +444,6 @@ public sealed class LuaAnalyzerInstancesTest
             {
                 Uri = DocumentUri.From(uri), Diagnostics = new Container<Diagnostic>(diagnostic)
             });
-        }
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged;
-
-        public void Change()
-        {
-            IndexChanged?.Invoke(Current);
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Nothing();
-        }
-
-        private sealed class Nothing : IDisposable
-        {
-            public void Dispose()
-            {
-            }
         }
     }
 }

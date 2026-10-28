@@ -1,13 +1,13 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
-public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
+public sealed class XmlIndexFactProducer : IXmlFactProducer
 {
     private readonly IObjectNameHash _nameHash;
 
@@ -16,7 +16,15 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
         _nameHash = nameHash;
     }
 
-    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
+    public string Name => "index";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
+    /// <summary>Reads the index alone: the document's symbols are what the indexer made of it.</summary>
+    public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         if (!index.Documents.TryGetValue(documentUri, out var doc))
             return [];
@@ -115,7 +123,7 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
                 continue;
             }
 
-            var resolved = index.Resolve(reference.TargetId, reference.ExpectedTypeName);
+            var resolved = index.ResolveReference(reference);
             facts.Add(new XmlReferenceFact(
                 documentUri,
                 reference.Line,

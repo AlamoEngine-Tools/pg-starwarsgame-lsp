@@ -16,11 +16,15 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using PG.Commons.Hashing;
 using PG.StarWarsGame.Files.MEG;
 using PG.StarWarsGame.Files.MTD;
+using PG.StarWarsGame.LSP.Localisation.Rows;
+using PG.StarWarsGame.LSP.Localisation;
+using PG.StarWarsGame.LSP.Preview;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -45,6 +49,7 @@ using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Debug;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Icons;
+using PG.StarWarsGame.LSP.Server.Indexing;
 using PG.StarWarsGame.LSP.Server.ModBrowser;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -60,6 +65,7 @@ using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Server.Workspace;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
+using PG.StarWarsGame.LSP.Story.Sim;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
@@ -70,6 +76,8 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public static class ServerConfigurator
 {
+    /// <param name="options">The OmniSharp options the server is built on.</param>
+    /// <param name="serverOptions">The server's own options; the defaults when null.</param>
     /// <param name="logLevel">
     ///     How loud to be. Comes from <c>--log-level=</c> via <see cref="ServerLogLevel" />; the
     ///     default is Information. Raise it to Debug to see whether a document actually reached the
@@ -260,6 +268,8 @@ public static class ServerConfigurator
 
                 services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
                 services.AddSingleton<IDocumentTextSource, DocumentTextSource>();
+                // Where every diagnostics publisher sends: the editor. The one seam a test replaces.
+                services.AddSingleton<IDiagnosticsSink, LanguageServerDiagnosticsSink>();
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
@@ -292,6 +302,9 @@ public static class ServerConfigurator
                     .AddSingleton<IGlobalSuppressionStore,
                         GlobalSuppressionStore>();
                 services.AddSingleton<IWorkspaceSettingsStore, WorkspaceSettingsStore>();
+                // What the simulator's world may name: the index's symbols. A factory only for the
+                // delegate that tells the client a session moved on.
+                services.AddSingleton<IStoryWorldSymbols, IndexWorldSymbols>();
                 services.AddSingleton<IStorySimulationService>(sp => new StorySimulationService(
                     sp.GetRequiredService<IStoryModelService>(),
                     sp.GetRequiredService<IGameIndexService>(),
@@ -299,8 +312,7 @@ public static class ServerConfigurator
                     key => sp.GetRequiredService<ILanguageServerFacade>()
                         .SendNotification("aet/storySimChanged",
                             new StorySimChangedParams(key.Campaign, key.Faction, key.Scope)),
-                    new IndexWorldSymbols(sp.GetRequiredService<IGameIndexService>(),
-                        sp.GetRequiredService<ISchemaProvider>()),
+                    sp.GetRequiredService<IStoryWorldSymbols>(),
                     sp.GetRequiredService<IMessageCatalog>()));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
@@ -333,12 +345,18 @@ public static class ServerConfigurator
                 services.AddSingleton<ICrossProcessLock, NamedMutexLock>();
                 services.AddSingleton<IProjectIndexCache, ProjectIndexCache>();
                 services.AddSingleton<IModelBoneCatalogCache, ModelBoneCatalogCache>();
+                services.AddSingleton<MetafileRegistrar>();
+                services.AddSingleton<ParseableFiles>();
+                services.AddSingleton<IndexFingerprints>();
+                services.AddSingleton<DocumentIndexer>();
+                services.AddSingleton<AssetCatalogBuilder>();
+                services.AddSingleton<ModelCatalogBuilder>();
+                services.AddSingleton<DynamicEnumCatalogBuilder>();
                 services.AddSingleton<WorkspaceIndexer>();
                 services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 
-                // Built explicitly rather than by convention: the chain and the sink are what make
-                // a project migrate on read, and a container that silently picked the shorter
-                // constructor would migrate nothing while every test still passed.
+                // A factory only for the migration chain, which is a value and not a service; the
+                // loader has one constructor, so the sink and the chain cannot be skipped.
                 services.AddSingleton<ModProjectLoader>(sp => new ModProjectLoader(
                     sp.GetRequiredService<IFileHelper>(),
                     sp.GetRequiredService<ILogger<ModProjectLoader>>(),
@@ -360,13 +378,9 @@ public static class ServerConfigurator
                 services.AddSingleton<LuaStubLocation>();
                 // The annotations this server knows, inserted above the functions in the text the
                 // analyzer reads - an open script's and every file of a script's require tree.
-                services.AddSingleton(sp => new LuaGeneratedTexts(
-                    [
-                        new StubOverrideAnnotations(sp.GetRequiredService<ILuaApiSchemaProvider>()),
-                        new StateHandlerAnnotations(sp.GetRequiredService<IGameIndexService>(),
-                            sp.GetRequiredService<ILuaParseCache>(), sp.GetRequiredService<IFileHelper>())
-                    ],
-                    sp.GetRequiredService<IFileHelper>()));
+                services.AddSingleton<ILuaAnnotationSource, StubOverrideAnnotations>();
+                services.AddSingleton<ILuaAnnotationSource, StateHandlerAnnotations>();
+                services.AddSingleton<LuaGeneratedTexts>();
                 services.AddSingleton(sp =>
                 {
                     var command = ResolveLuaAnalyzer(sp) ?? "";
@@ -512,10 +526,10 @@ public static class ServerConfigurator
                 services.AddSingleton<IModelTextureIndex>(sp =>
                     sp.GetRequiredService<ModelTextureIndex>());
 
-                // Assembles a unit from its XML. Transient rather than singleton: it reads the game
-                // index, which is replaced wholesale on every reindex, so a cached instance would
-                // answer from a stale snapshot.
-                services.AddTransient<PreviewSceneBuilder>();
+                // Assembles a unit from its XML. Holds no index: every build captures one snapshot
+                // and passes it down, so a re-index mid-build cannot mix two into one scene, and a
+                // single instance never answers from a stale one.
+                services.AddSingleton<PreviewSceneBuilder>();
                 services.AddSingleton<ShaderSourceResolver>();
 
                 services.AddHttpClient(nameof(HttpSchemaProvider));
@@ -558,18 +572,18 @@ public static class ServerConfigurator
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<PreviewSceneChangeNotifier>>()));
 
-                // GameHoverHandler routes by extension to one of these providers. Registered as
-                // interfaces only so DryIoc does not see them as competing IHoverHandler
-                // registrations - see the router-vs-dual-registration note above .WithHandler<>().
-                services.AddSingleton<IXmlHoverProvider, XmlHoverHandler>();
-                services.AddSingleton<ILuaHoverProvider, LuaHoverHandler>();
+                // GameHoverHandler hands a request to the first of these that handles the document.
+                // Registered as the provider interface only so DryIoc does not see them as competing
+                // IHoverHandler registrations - see the router-vs-dual-registration note above
+                // .WithHandler<>().
+                services.AddSingleton<IHoverProvider, XmlHoverHandler>();
+                services.AddSingleton<IHoverProvider, LuaHoverHandler>();
 
-                // GameRenameHandler and GamePrepareRenameHandler route by extension to these
-                // providers. Same router pattern as hover, for the same reason.
-                services.AddSingleton<IXmlRenameProvider, XmlRenameHandler>();
-                services.AddSingleton<ILuaRenameProvider, LuaRenameHandler>();
+                // GameRenameHandler and GamePrepareRenameHandler route the same way. Same reason.
+                services.AddSingleton<IRenameProvider, XmlRenameHandler>();
+                services.AddSingleton<IRenameProvider, LuaRenameHandler>();
             })
-            .OnInitialize(async (server, request, ct) =>
+            .OnInitialize(async (server, request, _) =>
             {
                 // Keep this cheap: just load configuration and respond with capabilities so the
                 // client sees the server "ready" immediately. All heavy work (schema, baseline,
@@ -664,7 +678,7 @@ public static class ServerConfigurator
 
                 await Task.CompletedTask;
             })
-            .OnStarted(async (server, ct) =>
+            .OnStarted(async (server, _) =>
             {
                 // The dynamic half of the formatting registration in OnInitialize.
                 RegisterFormatting(server, formattingAfterStart.Document, formattingAfterStart.Range);

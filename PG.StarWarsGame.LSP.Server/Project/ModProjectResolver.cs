@@ -118,7 +118,7 @@ public sealed class ModProjectResolver
     /// </remarks>
     private string Combine(string directory, string relative)
     {
-        var candidate = relative.Replace('\\', '/');
+        var candidate = GamePaths.Forward(relative);
         return OnDisk(ProjectPathResolution.Resolve(directory, candidate));
     }
 

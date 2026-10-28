@@ -18,11 +18,11 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
 {
     private static readonly JsonSerializerOptions FeatureJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly IFileSystem _fileSystem;
-    private readonly IGameInstallLocator? _installs;
+    private readonly IGameInstallLocator _installs;
     private readonly ILogger<LspConfigurationProvider> _logger;
 
     public LspConfigurationProvider(IFileSystem fileSystem, ILogger<LspConfigurationProvider> logger,
-        IGameInstallLocator? installs = null)
+        IGameInstallLocator installs)
     {
         _fileSystem = fileSystem;
         _logger = logger;
@@ -53,7 +53,6 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
     // Only a path left unset is looked for; one the editor or the file sets is taken as given.
     private LspConfiguration WithDetectedInstalls(LspConfiguration config)
     {
-        if (_installs is null) return config;
         var gamePath = string.IsNullOrWhiteSpace(config.GamePath) ? _installs.FindBaseGame() : config.GamePath;
         var expansionPath = string.IsNullOrWhiteSpace(config.ExpansionPath)
             ? _installs.FindExpansion()

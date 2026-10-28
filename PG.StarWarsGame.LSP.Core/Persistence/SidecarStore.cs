@@ -67,9 +67,9 @@ public sealed class SidecarStore<T> where T : class
         IFileHelper fileHelper,
         ILogger logger,
         Func<T> createDefault,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _fileName = fileName;
         _typeName = typeName;
         _current = current;

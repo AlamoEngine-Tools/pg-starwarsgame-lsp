@@ -54,7 +54,7 @@ public sealed class StoryGraphImplicitEdgeTest
     private const string BattleText =
         "<Story><Event Name=\"Ambush\"><Event_Type>STORY_GENERIC</Event_Type></Event></Story>";
 
-    private static readonly ISchemaProvider Schema = new ImplicitSchemaProvider();
+    private static readonly ISchemaProvider Schema = ImplicitSchemaProvider.Build();
 
     private static StoryCampaignModel Model()
     {
@@ -141,7 +141,7 @@ public sealed class StoryGraphImplicitEdgeTest
     }
 }
 
-file sealed class ImplicitSchemaProvider : ISchemaProvider
+file static class ImplicitSchemaProvider
 {
     private static readonly EnumDefinition Events = new()
     {
@@ -219,45 +219,11 @@ file sealed class ImplicitSchemaProvider : ISchemaProvider
         ]
     };
 
-    public event EventHandler? SchemaRefreshed
+    public static FakeSchemaProvider Build()
     {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [Events, Rewards];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string t)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string name)
-    {
-        return name switch
-        {
-            "StoryEventType" => Events,
-            "StoryRewardType" => Rewards,
-            _ => null
-        };
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string t)
-    {
-        return null;
+        return new SchemaProviderBuilder()
+            .WithEnum(Events)
+            .WithEnum(Rewards)
+            .Build();
     }
 }

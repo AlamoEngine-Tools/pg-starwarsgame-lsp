@@ -67,7 +67,7 @@ public sealed class XmlDefinitionHandlerTest
 
     private static XmlDefinitionHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null)
     {
-        var indexService = new FakeIndexService { Current = index };
+        var indexService = new FakeGameIndexService { Current = index };
         var fileHelper = new FileHelper(new MockFileSystem());
         return new XmlDefinitionHandler(indexService, fileHelper, NullLogger<XmlDefinitionHandler>.Instance,
             ctx ?? new AllowAllEaWContext());
@@ -159,7 +159,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(0, 7), CancellationToken.None);
 
         Assert.NotNull(result);
-        var link = Assert.Single(result!);
+        var link = Assert.Single(result);
         Assert.True(link.IsLocationLink);
         Assert.Equal(TargetUri, link.LocationLink!.TargetUri.ToString());
         Assert.Equal(5, link.LocationLink.TargetRange.Start.Line);
@@ -183,7 +183,7 @@ public sealed class XmlDefinitionHandlerTest
         Assert.True(link.IsLocationLink);
         var origin = link.LocationLink!.OriginSelectionRange;
         Assert.NotNull(origin);
-        Assert.Equal(0, origin!.Start.Line);
+        Assert.Equal(0, origin.Start.Line);
         Assert.Equal(4, origin.Start.Character);
         Assert.Equal(0, origin.End.Line);
         Assert.Equal(14, origin.End.Character);
@@ -201,7 +201,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(3, 0), CancellationToken.None);
 
         Assert.NotNull(result);
-        var link = Assert.Single(result!);
+        var link = Assert.Single(result);
         Assert.True(link.IsLocationLink);
         Assert.Equal(TestUri, link.LocationLink!.TargetUri.ToString());
         Assert.Equal(3, link.LocationLink.TargetRange.Start.Line);
@@ -224,7 +224,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(0, 5, mixedCaseUri), CancellationToken.None);
 
         Assert.NotNull(result);
-        var link = Assert.Single(result!);
+        var link = Assert.Single(result);
         Assert.Equal(lowercaseUri, link.LocationLink!.TargetUri.ToString());
     }
 
@@ -265,7 +265,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(1, 7), CancellationToken.None);
 
         Assert.NotNull(result);
-        var targetUris = result!
+        var targetUris = result
             .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri.ToString() : l.Location!.Uri.ToString())
             .ToList();
         Assert.Equal(2, targetUris.Count);
@@ -304,7 +304,7 @@ public sealed class XmlDefinitionHandlerTest
         var result = await handler.Handle(At(0, 6), CancellationToken.None);
 
         Assert.NotNull(result);
-        var link = Assert.Single(result!);
+        var link = Assert.Single(result);
         Assert.True(link.IsLocationLink);
         Assert.Equal(enumFilePath, link.LocationLink!.TargetUri.ToString());
         Assert.Equal(2, link.LocationLink.TargetRange.Start.Line);
@@ -340,80 +340,4 @@ public sealed class XmlDefinitionHandlerTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
 }

@@ -20,7 +20,7 @@ public sealed class PerFactionValueHandler : CommaSeparatedPairHandlerBase
 
         // Same reader, different first slot: Corruption_Level_Override names a planet.
         var planet = fact.Tag.SemanticType == TagSemanticType.PlanetValuePair;
-        if (parts.Length < 2 || parts[0].Length == 0 || !LenientFloatParser.TryParse(parts[1], out _))
+        if (parts.Length < 2 || parts[0].Length == 0 || !EngineNumber.TryParseFloat(parts[1], out _))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

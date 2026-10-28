@@ -77,7 +77,7 @@ public sealed class BoneNameCompletionHelperHardpointTest
         var doc = new HtmlDocument();
         doc.LoadHtml(xml);
         var node = doc.DocumentNode.SelectSingleNode(xpath)!;
-        return new BoneNameCompletionHelper(new EmptySchema(), source)
+        return new BoneNameCompletionHelper(new SchemaProviderBuilder().Build(), source)
             .GetProposals(node, "", index).Select(p => p.Label).ToList();
     }
 
@@ -95,7 +95,8 @@ public sealed class BoneNameCompletionHelperHardpointTest
         (string Hardpoint, string Owner)[] mounts)
     {
         var owners = mounts.Select(m => m.Owner).Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(o => new GameSymbol(o, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin(ObjUri, 0, 0), null))
+            .Select(o =>
+                new GameSymbol(o, GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin(ObjUri, 0, 0), null))
             .ToList();
 
         var references = mounts
@@ -129,48 +130,6 @@ public sealed class BoneNameCompletionHelperHardpointTest
         {
             _byId[id] = tags.Select(t => new VariantTag(t.Tag, t.Value, "", 0)).ToList();
             return this;
-        }
-    }
-
-    private sealed class EmptySchema : ISchemaProvider
-    {
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
         }
     }
 }

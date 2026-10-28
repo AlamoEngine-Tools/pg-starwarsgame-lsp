@@ -5,7 +5,6 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
-using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.CodeActions;
@@ -17,7 +16,7 @@ public sealed class CreateLocKeyCodeActionProviderTest
 
     private static XmlCodeActionContext Ctx(Diagnostic d)
     {
-        return new XmlCodeActionContext(TestUri, d);
+        return new XmlCodeActionContext(TestUri, d) { Messages = TestCatalogues.English };
     }
 
     private static CreateLocKeyCodeActionProvider Provider()

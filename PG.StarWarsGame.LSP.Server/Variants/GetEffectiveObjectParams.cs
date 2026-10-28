@@ -15,4 +15,10 @@ public sealed record GetEffectiveObjectParams : IRequest<GetEffectiveObjectResul
 {
     /// <summary>Id (Name) of the object to resolve.</summary>
     public string ObjectId { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     The type whose object is meant - every type is an id space of its own. None from a document
+    ///     opened before the type travelled with the request: the object is then looked up by id.
+    /// </summary>
+    public string? TypeName { get; init; }
 }

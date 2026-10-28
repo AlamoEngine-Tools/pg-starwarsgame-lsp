@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -19,6 +20,8 @@ public static class AssetFileLookup
     /// <summary>
     ///     True when <paramref name="normalised" /> names something in the catalog.
     /// </summary>
+    /// <param name="index">The asset catalog.</param>
+    /// <param name="normalised">The referenced path, normalised the way the catalog keys are.</param>
     /// <param name="allowedExtensions">
     ///     The extensions a bare filename may be matched against, so a partial path is only matched
     ///     to catalog entries of the right asset type.
@@ -82,10 +85,10 @@ public static class AssetFileLookup
     /// </remarks>
     private static string Canonical(string reference)
     {
-        var path = reference.Replace('\\', '/');
+        var path = GamePaths.Forward(reference);
         if (path.StartsWith("./", StringComparison.Ordinal))
             path = path[2..];
-        return path.TrimStart('/');
+        return GamePaths.Normalize(path);
     }
 
     private static bool Exists(

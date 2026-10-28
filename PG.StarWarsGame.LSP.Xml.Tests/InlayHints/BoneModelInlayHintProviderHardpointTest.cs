@@ -6,9 +6,9 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.InlayHints;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
-using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.InlayHints;
 
@@ -152,8 +152,8 @@ public sealed class BoneModelInlayHintProviderHardpointTest
         var node = hapDoc.DocumentNode.SelectSingleNode(xpath)!;
         var tagDef = new XmlTagDefinition
             { Tag = node.Name, ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.BoneName };
-        var ctx = new InlayHintContext(HpUri, index, new EmptySchemaProvider(), hapDoc, node, tagDef,
-            XmlUtility.GetLine(node), lineIndex: new LineOffsetIndex(xml));
+        var ctx = new InlayHintContext(HpUri, index, new SchemaProviderBuilder().Build(), hapDoc, node, tagDef,
+            XmlUtility.GetLine(node), lineIndex: new LineOffsetIndex(xml)) { Messages = TestCatalogues.English };
         return new BoneModelInlayHintProvider(source).Handle(ctx).ToList();
     }
 
@@ -173,7 +173,7 @@ public sealed class BoneModelInlayHintProviderHardpointTest
         (string Hardpoint, string Owner)[] mounts)
     {
         var ownerSymbols = mounts.Select(m => m.Owner).Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(o => new GameSymbol(o, GameSymbolKind.XmlObject, "SpaceUnit",
+            .Select(o => new GameSymbol(o, GameSymbolKind.XmlObject, "GameObjectType",
                 new FileOrigin(ObjUri, 0, 0), null))
             .ToList();
 

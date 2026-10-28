@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Schema.Yaml;
 
 namespace PG.StarWarsGame.LSP.Schema.Tests;
@@ -47,7 +48,7 @@ public sealed class AbilitySubObjectTypeRegistrationTest
         Assert.True(type is not null,
             $"<{elementName}> maps to object type '{typeName}', which is not registered in types.yaml. "
             + "The ability will not be indexed and references to it are false-positive unresolved.");
-        Assert.Equal("Name", type!.NameTag);
+        Assert.Equal("Name", type.NameTag);
     }
 
     /// <summary>
@@ -101,7 +102,7 @@ public sealed class AbilitySubObjectTypeRegistrationTest
             .FirstOrDefault(t => t.Tag.Equals("Ability_Name", StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(tag);
-        Assert.Equal(ReferenceKind.XmlObject, tag!.ReferenceKind);
+        Assert.Equal(ReferenceKind.XmlObject, tag.ReferenceKind);
         Assert.Equal("SpecialAbility", tag.ReferenceTypeName);
     }
 

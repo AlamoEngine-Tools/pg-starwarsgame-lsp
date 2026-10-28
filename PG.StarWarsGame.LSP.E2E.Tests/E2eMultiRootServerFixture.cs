@@ -16,6 +16,8 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     copy of the base. One source for the mod's files, so a test changing them changes both setups.
 ///     Copied are the projects and their data only, never a cache or a log.
 /// </remarks>
+// E2e is spelled as a word throughout the E2E test project.
+// ReSharper disable once InconsistentNaming
 public sealed class E2eMultiRootServerFixture : E2eWorkspaceServerFixture
 {
     private const string ModProjectFile = "e2e-workspace.pgproj";

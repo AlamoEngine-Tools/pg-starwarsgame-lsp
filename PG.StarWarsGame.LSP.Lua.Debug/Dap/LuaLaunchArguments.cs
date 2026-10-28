@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
 
 namespace PG.StarWarsGame.LSP.Lua.Debug.Dap;
@@ -9,6 +10,7 @@ namespace PG.StarWarsGame.LSP.Lua.Debug.Dap;
 ///     The <c>launch</c> request: start the game executable, then attach as soon as its debug
 ///     server answers. The arguments are passed verbatim; the mod chain is the client's to build.
 /// </summary>
+[PublicAPI]
 public sealed record LuaLaunchArguments : LaunchRequestArguments, ILuaSessionSettings
 {
     /// <summary>The internal/debug game executable.</summary>

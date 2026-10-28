@@ -5,14 +5,15 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Preview.Abilities;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Symbols;
+using PG.StarWarsGame.LSP.Server.Tests.Assets;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -28,16 +29,11 @@ public sealed class StoryProtocolHandlersTest
     private const string SuspendedUri = "file:///ws/data/xml/story_act_ii.xml";
     private const string LuaUri = "file:///ws/data/scripts/story/story_lua.lua";
 
-    private static FiringIndexService Index()
+    private static FakeGameIndexService Index()
     {
         var documents = GameIndex.Empty.Documents.Add(
             LuaUri, new DocumentIndex(LuaUri, 1, [], []));
-        return new FiringIndexService { Current = GameIndex.Empty with { Documents = documents } };
-    }
-
-    private static ILspConfigurationProvider Config()
-    {
-        return new FakeLspConfigurationProvider();
+        return new FakeGameIndexService { Current = GameIndex.Empty with { Documents = documents } };
     }
 
     private static StubModelService Models()
@@ -105,7 +101,7 @@ public sealed class StoryProtocolHandlersTest
                 .Add("Story_Set", [member])
         };
 
-        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index })
+        var result = await new GetStoryPlotsHandler(Models(), new FakeGameIndexService { Current = index })
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Equal("Story_Set", Assert.Single(result.Campaigns).Set);
@@ -150,7 +146,7 @@ public sealed class StoryProtocolHandlersTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("GC", [campaignSym])
         };
 
-        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index })
+        var result = await new GetStoryPlotsHandler(Models(), new FakeGameIndexService { Current = index })
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         var campaign = Assert.Single(result.Campaigns);
@@ -172,7 +168,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ReturnsNodesWithLifecycleAndEdges()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -190,7 +186,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_Scope_GalacticIsTheDefault_UnknownBattleIsEmpty()
     {
-        var handler = new GetStoryGraphHandler(Models(), Config());
+        var handler = new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null));
         var galactic = await handler.Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
         var explicitGalactic =
             await handler.Handle(new GetStoryGraphParams("GC", "Rebel", Scope: ""), CancellationToken.None);
@@ -216,7 +212,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_NameFilter_KeepsMatchingEventsOnly()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", "sta"), CancellationToken.None);
 
         Assert.Equal(["Start"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
@@ -225,7 +221,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_BranchFilter_KeepsBranchMembers()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
 
         Assert.Equal(["Next"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
@@ -237,7 +233,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ReportsEveryBranch_EvenTheOnesTheFilterHid()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
 
         // Act1 is all that survives as a NODE...
@@ -249,7 +245,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ReportsEveryBranch_EvenWhenAPlotStateFilterHidesAThread()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Active"),
                 CancellationToken.None);
 
@@ -261,7 +257,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ReportsEveryThread_SoANewEventCanTargetAHiddenOne()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
 
         Assert.NotNull(result.Threads);
@@ -272,7 +268,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_ThreadFacet_ListsPlotFilesOnly_NeverAScript()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         // The script state is in the graph, so its uri would leak in if the facet read every node -
@@ -289,7 +285,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_PlotStateActive_DropsTheSuspendedThreadsEvents()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Active"),
                 CancellationToken.None);
 
@@ -301,7 +297,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_PlotStateSuspended_KeepsOnlyTheSuspendedThreadsEvents()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Suspended"),
                 CancellationToken.None);
 
@@ -313,7 +309,7 @@ public sealed class StoryProtocolHandlersTest
     {
         // The default is every plot the faction's manifest registers, in either state - a suspended
         // plot is part of the chain, waiting for something to resume it.
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
@@ -324,7 +320,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_PlotStateIsReadHoweverItIsCased()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "suspended"),
                 CancellationToken.None);
 
@@ -336,7 +332,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var startId = $"{ThreadUri}#start";
 
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: startId), CancellationToken.None);
 
         var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
@@ -354,7 +350,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var nextId = $"{ThreadUri}#next";
 
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: "Upstream"),
                 CancellationToken.None);
 
@@ -370,10 +366,10 @@ public sealed class StoryProtocolHandlersTest
     {
         var nextId = $"{ThreadUri}#next";
 
-        var both = await new GetStoryGraphHandler(Models(), Config())
+        var both = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: "Both"),
                 CancellationToken.None);
-        var downstream = await new GetStoryGraphHandler(Models(), Config())
+        var downstream = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId), CancellationToken.None);
 
         Assert.Contains("Start", both.Nodes.Select(n => n.Label));
@@ -388,7 +384,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var nextId = $"{ThreadUri}#next";
 
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: direction),
                 CancellationToken.None);
 
@@ -401,7 +397,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var startId = $"{ThreadUri}#start";
 
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: startId, ReachableDirection: null),
                 CancellationToken.None);
 
@@ -413,7 +409,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_DirectionWithoutAnEvent_FiltersNothing()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableDirection: "Upstream"), CancellationToken.None);
 
         var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
@@ -426,7 +422,7 @@ public sealed class StoryProtocolHandlersTest
     {
         // The graph fetch must be self-sufficient for the node body (no per-node detail round
         // trip needed) - same fields aet/getStoryNodeDetail already projects for "Next".
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         var next = Assert.Single(result.Nodes, n => n.Label == "Next");
@@ -440,7 +436,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryGraph_UnknownCampaign_ReturnsError()
     {
-        var result = await new GetStoryGraphHandler(Models(), Config())
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
             .Handle(new GetStoryGraphParams("Nope", "Rebel"), CancellationToken.None);
 
         Assert.Contains("Nope", result.Error);
@@ -451,7 +447,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryNodeDetail_ReturnsFullEventPayload()
     {
-        var result = await new GetStoryNodeDetailHandler(Models(), Config())
+        var result = await new GetStoryNodeDetailHandler(Models(), TestCatalogues.English)
             .Handle(new GetStoryNodeDetailParams("GC", "Rebel", $"{ThreadUri}#next"), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -466,7 +462,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryNodeDetail_UnknownNode_ReturnsError()
     {
-        var result = await new GetStoryNodeDetailHandler(Models(), Config())
+        var result = await new GetStoryNodeDetailHandler(Models(), TestCatalogues.English)
             .Handle(new GetStoryNodeDetailParams("GC", "Rebel", "ghost"), CancellationToken.None);
 
         Assert.NotNull(result.Error);
@@ -478,7 +474,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_ProjectsEventAndRewardEnums()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
+        var result = await new GetStorySchemaHandler(ProtocolSchemaProvider.Build())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -501,7 +497,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_ShipsEveryNoteKind_WithItsTextAndValue()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
+        var result = await new GetStorySchemaHandler(ProtocolSchemaProvider.Build())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         var bugged = Assert.Single(result.EventTypes, t => t.Name == "STORY_BUGGED");
@@ -522,7 +518,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStorySchema_EnumParams_ShipEnumValuesInline()
     {
-        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider())
+        var result = await new GetStorySchemaHandler(ProtocolSchemaProvider.Build())
             .Handle(new GetStorySchemaParams(), CancellationToken.None);
 
         var battle = Assert.Single(result.RewardTypes, t => t.Name == "LINK_BATTLE");
@@ -535,13 +531,13 @@ public sealed class StoryProtocolHandlersTest
 
     // ── aet/getStoryParamOptions ─────────────────────────────────────────────
 
-    private static GetStoryParamOptionsHandler OptionsHandler(FiringIndexService? index = null)
+    private static GetStoryParamOptionsHandler OptionsHandler(FakeGameIndexService? index = null)
     {
-        return new GetStoryParamOptionsHandler(Models(), index ?? Index(), new ProtocolSchemaProvider(),
+        return new GetStoryParamOptionsHandler(Models(), index ?? Index(), ProtocolSchemaProvider.Build(),
             new StoryParamValueProposalProvider());
     }
 
-    private static FiringIndexService IndexWith(params (string Id, string TypeName)[] symbols)
+    private static FakeGameIndexService IndexWith(params (string Id, string TypeName)[] symbols)
     {
         var definitions = GameIndex.Empty.WorkspaceDefinitions;
         foreach (var (id, typeName) in symbols)
@@ -549,7 +545,7 @@ public sealed class StoryProtocolHandlersTest
                 new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
                     new FileOrigin($"file:///ws/data/xml/{typeName.ToLowerInvariant()}s.xml", 7, 2), null)
             ]);
-        return new FiringIndexService { Current = GameIndex.Empty with { WorkspaceDefinitions = definitions } };
+        return new FakeGameIndexService { Current = GameIndex.Empty with { WorkspaceDefinitions = definitions } };
     }
 
     [Fact]
@@ -665,7 +661,7 @@ public sealed class StoryProtocolHandlersTest
             "<Prereq>Start</Prereq><Branch>Act1</Branch></Event></Story>";
         textSource.Texts[SuspendedUri] = "<Story><Event Name=\"Later\"/></Story>";
         var handler = new GetStoryDiagnosticsHandler(
-            Models(), Index(), collector, textSource, Config());
+            Models(), Index(), collector, textSource, TestCatalogues.English);
         return (handler, collector);
     }
 
@@ -702,10 +698,10 @@ public sealed class StoryProtocolHandlersTest
 
     // ── aet/resolveStoryReference ────────────────────────────────────────────
 
-    private static ResolveStoryReferenceHandler ResolveHandler(FiringIndexService index)
+    private static ResolveStoryReferenceHandler ResolveHandler(FakeGameIndexService index)
     {
         return new ResolveStoryReferenceHandler(
-            new DefinitionLocator(index, new ProtocolSchemaProvider()));
+            new DefinitionLocator(index, ProtocolSchemaProvider.Build(), ResxMessageCatalog.Server("en")));
     }
 
     [Fact]
@@ -733,7 +729,7 @@ public sealed class StoryProtocolHandlersTest
             new GameSymbol("Start", GameSymbolKind.XmlObject, "StoryEvent",
                 new FileOrigin("file:///ws/data/xml/story_act_i.xml", 42, 15), null)
         ]);
-        var index = new FiringIndexService
+        var index = new FakeGameIndexService
         {
             Current = GameIndex.Empty with { WorkspaceDefinitions = definitions }
         };
@@ -763,7 +759,7 @@ public sealed class StoryProtocolHandlersTest
         var definitions = GameIndex.Empty.WorkspaceDefinitions.Add("Coruscant", [
             new GameSymbol("Coruscant", GameSymbolKind.XmlObject, "Planet", new UnknownOrigin("meg"), null)
         ]);
-        var index = new FiringIndexService
+        var index = new FakeGameIndexService
         {
             Current = GameIndex.Empty with { WorkspaceDefinitions = definitions }
         };
@@ -790,12 +786,12 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public void Notifier_InvalidatedCampaigns_SendsNotification()
     {
-        var index = new FiringIndexService();
+        var index = new FakeGameIndexService();
         var sent = new List<StoryGraphChangedParams>();
         _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(["GC"]),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
-        index.Fire();
+        index.Raise(GameIndex.Empty);
 
         Assert.Equal(["GC"], Assert.Single(sent).Campaigns);
     }
@@ -803,17 +799,17 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public void Notifier_NothingInvalidated_StaysQuiet()
     {
-        var index = new FiringIndexService();
+        var index = new FakeGameIndexService();
         var sent = new List<StoryGraphChangedParams>();
         _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
-        index.Fire();
+        index.Raise(GameIndex.Empty);
 
         Assert.Empty(sent);
     }
 
-    private static StubModelService Models(IReadOnlyList<string>? invalidated = null)
+    private static StubModelService Models(IReadOnlyList<string>? invalidated)
     {
         return new StubModelService { Invalidated = invalidated ?? [] };
     }
@@ -907,7 +903,7 @@ public sealed class StoryProtocolHandlersTest
             ]);
             return new StoryCampaignModel("GC", "Rebel", [active, suspended],
                 new HashSet<string>(StringComparer.Ordinal) { SuspendedUri },
-                new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended], null, [machine]))
+                new StoryGraphBuilder(ProtocolSchemaProvider.Build()).Build([active, suspended], null, [machine]))
             {
                 LuaScripts = ["Story_Lua"],
                 LuaMachines = [machine],
@@ -922,88 +918,7 @@ public sealed class StoryProtocolHandlersTest
         }
     }
 
-    private sealed class FiringIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; init; } = GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged;
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string,
-                ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Noop();
-        }
-
-        public void Fire()
-        {
-            IndexChanged?.Invoke(GameIndex.Empty);
-        }
-
-        private sealed class Noop : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class ProtocolSchemaProvider : ISchemaProvider
+    private static class ProtocolSchemaProvider
     {
         private static readonly EnumDefinition Events = new()
         {
@@ -1085,43 +1000,12 @@ public sealed class StoryProtocolHandlersTest
             ]
         };
 
-        public event EventHandler? SchemaRefreshed
+        public static FakeSchemaProvider Build()
         {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [Events, Rewards];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            if (string.Equals(name, Events.Name, StringComparison.OrdinalIgnoreCase)) return Events;
-            if (string.Equals(name, Rewards.Name, StringComparison.OrdinalIgnoreCase)) return Rewards;
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
+            return new SchemaProviderBuilder()
+                .WithEnum(Events)
+                .WithEnum(Rewards)
+                .Build();
         }
     }
 }

@@ -44,10 +44,8 @@ public static class PgprojFormat
     /// </summary>
     public static readonly TypeVersion Current = TypeVersion.Of("aetswg", 1);
 
-    public static PgprojFormatCheck Check(string? declaredVersion, string? declaredType = null,
-        IMessageCatalog? messages = null)
+    public static PgprojFormatCheck Check(string? declaredVersion, string? declaredType, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         // A file claiming to be some other document is not this one at an odd version; reading it
         // anyway would adopt whatever fields happened to match.
         if (declaredType is not null && !string.Equals(declaredType, TypeName, StringComparison.Ordinal))

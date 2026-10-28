@@ -31,8 +31,9 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
         {
             Directory.Delete(_tempDir, true);
         }
-        catch
+        catch (IOException)
         {
+            // A temp directory that cannot be deleted is not a test failure.
         }
     }
 
@@ -744,7 +745,7 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
             return new NullFileSystemWatcher(FileSystem);
         }
 
-        public IFileSystemWatcher? Wrap(FileSystemWatcher? watcher)
+        public IFileSystemWatcher Wrap(FileSystemWatcher? watcher)
         {
             return new NullFileSystemWatcher(FileSystem);
         }

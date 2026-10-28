@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using CoreModinfoData = PG.StarWarsGame.LSP.Core.Project.ModinfoData;
 using ModinfoData = AET.Modinfo.Model.ModinfoData;
 
@@ -52,18 +53,13 @@ public sealed class ModProjectLoader
         ILogger<ModProjectLoader> logger,
         IPgprojMigrationSink migrationSink,
         IReadOnlyList<IDocumentMigration> migrations,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _fileHelper = fileHelper;
         _logger = logger;
         _migrationSink = migrationSink;
         _migrations = migrations;
-    }
-
-    public ModProjectLoader(IFileHelper fileHelper, ILogger<ModProjectLoader> logger)
-        : this(fileHelper, logger, new NullPgprojMigrationSink(), PgprojMigrations.All)
-    {
     }
 
     public ModProjectFile Load(string path)
@@ -138,6 +134,7 @@ public sealed class ModProjectLoader
         var modinfo = parsed is null
             ? null
             : new CoreModinfoData(
+                // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
                 parsed.Name ?? string.Empty,
                 parsed.Version?.ToString(),
                 parsed.Summary,
@@ -300,7 +297,7 @@ public sealed class ModProjectLoader
     // case-sensitive host. Compare them through DocumentUris, never with Ordinal.
     private static string NormalizePath(string path)
     {
-        return path.Replace('\\', '/');
+        return GamePaths.Forward(path);
     }
 
     /// <summary>The name of the first property that repeats within one object, anywhere in the document.</summary>
@@ -421,6 +418,8 @@ public sealed class ModProjectLoader
         public IconsDto? Icons { get; init; }
     }
 
+    // The shapes below are filled by System.Text.Json; their setters have no caller in the code.
+    // ReSharper disable UnusedAutoPropertyAccessor.Local
     private sealed class IconsDto
     {
         public string? MegaTexture { get; init; }
@@ -429,12 +428,12 @@ public sealed class ModProjectLoader
 
     private sealed class DirectoryMapDto
     {
-        public List<string>? Xml { get; init; }
-        public List<string>? Scripts { get; init; }
-        public List<string>? Art { get; init; }
-        public List<string>? Audio { get; init; }
-        public List<string>? Ai { get; init; }
-        public List<string>? StoryDialog { get; init; }
+        public IReadOnlyList<string>? Xml { get; init; }
+        public IReadOnlyList<string>? Scripts { get; init; }
+        public IReadOnlyList<string>? Art { get; init; }
+        public IReadOnlyList<string>? Audio { get; init; }
+        public IReadOnlyList<string>? Ai { get; init; }
+        public IReadOnlyList<string>? StoryDialog { get; init; }
     }
 
     private sealed class ProjectReferenceDto

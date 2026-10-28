@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.Files.DAT.Services;
+using PG.StarWarsGame.LSP.Localisation.Rows;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Dat;
@@ -183,7 +185,7 @@ public sealed class CreateLocalisationLanguageFileHandlerTest
             registry,
             new NoopReloadService(),
             NullLogger<CreateLocalisationLanguageFileHandler>.Instance,
-            new FakeLspConfigurationProvider(),
+            TestCatalogues.English,
             Layers(new FileHelper(fs), dependencyOwnsTheSource));
 
         return (handler, fs);

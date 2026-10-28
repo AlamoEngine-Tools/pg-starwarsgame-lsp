@@ -56,13 +56,9 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
 
         var diags = await OpenAndCollectDiagnosticsAsync("reference_validation.xml");
 
-        // Synthetic names (LSP_TEST_*) don't exist in the workspace - unresolved errors are expected.
-        var unresolved = diags.Where(d =>
-            d.Message.Contains("Cannot resolve reference", StringComparison.OrdinalIgnoreCase)).ToList();
-
         var typeMismatches = TypeMismatchDiagnostics(diags);
 
-        // At least some unresolved errors expected; zero type mismatches required.
+        // Zero type mismatches required; whether the synthetic names resolve is not this test's question.
         Assert.Empty(typeMismatches);
     }
 
@@ -96,7 +92,7 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
         });
 
         var result = await diagsTask;
-        return result?.Diagnostics?.ToList() ?? [];
+        return result?.Diagnostics.ToList() ?? [];
     }
 
     private static IReadOnlyList<Diagnostic> TypeMismatchDiagnostics(IReadOnlyList<Diagnostic> diags)
@@ -110,7 +106,7 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
     ///     subsequent publish that arrives within a short quiet window.  This captures the
     ///     index-level publish that follows the initial document-level one.
     /// </summary>
-    private Task<PublishDiagnosticsParams?> WaitForFinalDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
+    private async Task<PublishDiagnosticsParams?> WaitForFinalDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
     {
         var tcs = new TaskCompletionSource<PublishDiagnosticsParams?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -124,7 +120,9 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
             if (!string.Equals(p.Uri.ToString(), uriStr, StringComparison.OrdinalIgnoreCase)) return;
             last = p;
 
-            quietTimer?.Cancel();
+#pragma warning disable VSTHRD103
+            quietTimer?.Cancel(); // a synchronous notification callback - nothing can be awaited here
+#pragma warning restore VSTHRD103
             quietTimer = new CancellationTokenSource();
             var token = quietTimer.Token;
             _ = Task.Delay(TimeSpan.FromSeconds(1), token).ContinueWith(t =>
@@ -146,6 +144,6 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
             tcs.TrySetResult(last);
         }, TaskScheduler.Default);
 
-        return tcs.Task;
+        return await tcs.Task;
     }
 }

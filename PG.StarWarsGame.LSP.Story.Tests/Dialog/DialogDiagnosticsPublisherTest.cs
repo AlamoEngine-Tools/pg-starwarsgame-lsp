@@ -4,9 +4,11 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -23,22 +25,28 @@ public sealed class DialogDiagnosticsPublisherTest
 
     private static (DialogDiagnosticsPublisher Publisher,
         List<PublishDiagnosticsParams> Published,
-        FakeWorkspaceHost Host,
-        FakeIndexService IndexService) Build(FakeDialogScope? scope = null)
+        FakeGameWorkspaceHost Host,
+        FakeGameIndexService IndexService) Build(FakeDialogScope? scope = null)
     {
-        var published = new List<PublishDiagnosticsParams>();
-        var host = new FakeWorkspaceHost();
-        var indexService = new FakeIndexService();
+        var sink = new RecordingDiagnosticsSink();
+        var host = new FakeGameWorkspaceHost();
+        var indexService = new FakeGameIndexService();
         var fileHelper = new FileHelper(new MockFileSystem());
         var publisher = new DialogDiagnosticsPublisher(
-            p => published.Add(p),
+            sink,
             indexService,
             host,
             scope ?? new FakeDialogScope(),
-            new DialogFactProducer(new EmptySchemaProvider()),
+            new DialogFactProducer(new SchemaProviderBuilder().Build()),
             new DialogDiagnosticsHandlerRegistry([new UnknownDialogCommandHandler()]),
-            fileHelper);
-        return (publisher, published, host, indexService);
+            fileHelper,
+            new DocumentTextSource(host, fileHelper, NullLogger<DocumentTextSource>.Instance),
+            NullLogger<DialogDiagnosticsPublisher>.Instance,
+            new ProjectLayerMap(fileHelper),
+            TestServerOptions.Immediate,
+            new FakeGlobalSuppressionStore(),
+            ResxMessageCatalog.Server("en"));
+        return (publisher, sink.Published, host, indexService);
     }
 
     [Fact]
@@ -49,7 +57,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Contains("BOGUS_COMMAND", diag.Message);
         // A real id, not a single catch-all code: without one it could not be suppressed, nor told
         // apart from any other dialog problem.
@@ -66,7 +74,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -78,7 +86,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
-        Assert.Single(Assert.Single(published).Diagnostics!);
+        Assert.Single(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -89,7 +97,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Contains("chapter header", diag.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
     }
@@ -102,7 +110,7 @@ public sealed class DialogDiagnosticsPublisherTest
 
         await publisher.RevalidateDocumentAsync(OutOfScopeUri, CancellationToken.None);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
@@ -126,7 +134,7 @@ public sealed class DialogDiagnosticsPublisherTest
         publisher.ClearDocument(InScopeUri);
 
         Assert.Equal(2, published.Count);
-        Assert.Empty(published[1].Diagnostics!);
+        Assert.Empty(published[1].Diagnostics);
     }
 
     [Fact]
@@ -136,9 +144,9 @@ public sealed class DialogDiagnosticsPublisherTest
         var (_, published, host, indexService) = Build();
         host.AddOrUpdate(InScopeUri, "[CHAPTER 0]\nBOGUS", 1);
 
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Contains("BOGUS", diag.Message);
     }
 
@@ -161,149 +169,6 @@ public sealed class DialogDiagnosticsPublisherTest
         public IReadOnlyCollection<int> GetChapters(string canonicalUri)
         {
             return [];
-        }
-    }
-
-    internal sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = new(StringComparer.OrdinalIgnoreCase);
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-    }
-
-    internal sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current => GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged;
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string,
-                ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Noop();
-        }
-
-        public void Fire(GameIndex index)
-        {
-            IndexChanged?.Invoke(index);
-        }
-
-        private sealed class Noop : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class EmptySchemaProvider : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string e)
-        {
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
         }
     }
 }

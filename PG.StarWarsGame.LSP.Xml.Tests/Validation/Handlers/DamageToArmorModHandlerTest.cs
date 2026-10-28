@@ -25,7 +25,8 @@ public sealed class DamageToArmorModHandlerTest
         {
             Baseline = BaselineIndex.Empty with { DynamicEnumValues = dict.ToImmutable() }
         };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
     }
 
     [Theory]
@@ -132,7 +133,8 @@ public sealed class DamageToArmorModHandlerTest
                 .Add("DamageType", ImmutableArray.Create("Damage_Mod"))
                 .Add("ArmorType", ImmutableArray.Create("Armor_Default"))
         };
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Damage_Mod, Armor_Default, 1.0"), ctx).ToList();
         Assert.Empty(results);
@@ -148,7 +150,8 @@ public sealed class DamageToArmorModHandlerTest
                 .Add("DamageType", ImmutableArray.Create("Damage_Default"))
                 .Add("ArmorType", ImmutableArray.Create("Armor_Mod"))
         };
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Damage_Default, Armor_Mod, 1.0"), ctx).ToList();
         Assert.Empty(results);
@@ -170,7 +173,8 @@ public sealed class DamageToArmorModHandlerTest
             Baseline = BaselineIndex.Empty with { DynamicEnumValues = baselineDict.ToImmutable() },
             WorkspaceDynamicEnumValues = workspaceDict
         };
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
         // Damage_Mod is workspace-only, Armor_Default is baseline-only - both valid
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Damage_Mod, Armor_Default, 1.0"), ctx).ToList();
@@ -187,7 +191,8 @@ public sealed class DamageToArmorModHandlerTest
                 .Add("DamageType", ImmutableArray.Create("Damage_Default"))
                 .Add("ArmorType", ImmutableArray.Create("Armor_Default"))
         };
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "garbage, Armor_Default, 1.0"), ctx).ToList();
         var d = Assert.Single(results);

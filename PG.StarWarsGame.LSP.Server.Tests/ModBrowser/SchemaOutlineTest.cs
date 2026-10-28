@@ -52,42 +52,32 @@ public sealed class SchemaOutlineTest
         Kind = "SpaceUnit", Behaviors = ["SPACE_UNIT"], Flags = ["Is_Space"], Description = En("Flies in space")
     };
 
-    private sealed class Schema : NullSchemaProvider
+    private static FakeSchemaProvider Schema()
     {
-        public override IReadOnlyList<ObjectKindDefinition> AllKinds => [s_spaceUnit];
-
-        public override IReadOnlyList<EnumDefinition> AllEnums => [s_damage, s_weather];
-
-        public override IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes =>
-        [
-            new() { TypeName = "GameObjectType", NameTag = "Name", Description = En("Units and structures") },
-            new() { TypeName = "SFXEvent" }
-        ];
-
-        public override IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return typeName != "GameObjectType"
-                ? []
-                :
-                [
-                    new XmlTagDefinition
-                    {
-                        Tag = "Tactical_Health", ValueType = XmlValueType.Float, Description = En("Hit points"),
-                        Notes = [new SchemaNote(SchemaNoteKind.Deprecated, En("Use Shield_Points"))]
-                    },
-                    new XmlTagDefinition
-                    {
-                        Tag = "Affiliation", ValueType = XmlValueType.NameReferenceList,
-                        ReferenceKind = ReferenceKind.XmlObject, ReferenceTypeName = "Faction",
-                        MultipleAllowed = true
-                    },
-                    new XmlTagDefinition
-                    {
-                        Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue,
-                        ReferenceKind = ReferenceKind.Enum, Enum = s_damage
-                    }
-                ];
-        }
+        return new SchemaProviderBuilder()
+            .WithKind(s_spaceUnit)
+            .WithEnums(s_damage, s_weather)
+            .WithObjectType(new GameObjectTypeDefinition
+                { TypeName = "GameObjectType", NameTag = "Name", Description = En("Units and structures") })
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "SFXEvent" })
+            .WithTags("GameObjectType",
+                new XmlTagDefinition
+                {
+                    Tag = "Tactical_Health", ValueType = XmlValueType.Float, Description = En("Hit points"),
+                    Notes = [new SchemaNote(SchemaNoteKind.Deprecated, En("Use Shield_Points"))]
+                },
+                new XmlTagDefinition
+                {
+                    Tag = "Affiliation", ValueType = XmlValueType.NameReferenceList,
+                    ReferenceKind = ReferenceKind.XmlObject, ReferenceTypeName = "Faction",
+                    MultipleAllowed = true
+                },
+                new XmlTagDefinition
+                {
+                    Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue,
+                    ReferenceKind = ReferenceKind.Enum, Enum = s_damage
+                })
+            .Build();
     }
 
     private static (SymbolCatalog Catalog, SymbolRelations Relations, SymbolPreviews Previews) Build()
@@ -114,10 +104,10 @@ public sealed class SchemaOutlineTest
             WorkspaceDefinitions =
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(destroyer.Id, [destroyer])
         };
-        var schema = new Schema();
+        var schema = Schema();
         var catalog = SymbolCatalog.Build(index, [s_spaceUnit], [s_damage, s_weather], schema);
         var relations = new SymbolRelations(index, schema, new NoTags(), catalog);
-        return (catalog, relations, new SymbolPreviews(index, relations, null!, null!, null!, schema: schema));
+        return (catalog, relations, new SymbolPreviews(index, relations, null!, null!, null!, _ => null, schema));
     }
 
     private sealed class NoTags : IVariantTagSource
@@ -144,7 +134,7 @@ public sealed class SchemaOutlineTest
     [Fact]
     public void AType_OpensIntoItsTags_EachByWhatItTakes()
     {
-        var (catalog, relations, _) = Build();
+        var (_, relations, _) = Build();
 
         Assert.Equal(3,
             relations.Node("schemaTypes", "GameObjectType").Relations.Single(r => r.Relation == "tags").Count);
@@ -194,7 +184,7 @@ public sealed class SchemaOutlineTest
         // What it references is the enum, said once.
         Assert.DoesNotContain(damage.Tiles[1].Properties!, p => p.Key == "references");
         Assert.Equal([("Damage_Laser", "Lasers"), ("Damage_Ion", null), ("Damage_Mod", null)],
-            damage.Tiles[2].Entries!.Select(e => (e.Name, e.Detail)));
+            damage.Tiles[2].Entries.Select(e => (e.Name, e.Detail)));
     }
 
     // An enum says whether it is built into the engine or read from the game's files, and lists its

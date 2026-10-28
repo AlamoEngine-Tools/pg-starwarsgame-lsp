@@ -39,7 +39,7 @@ public sealed class StorySimulatorScopeTest
         "<Event Name=\"BattleWin\"><Event_Type>STORY_VICTORY</Event_Type><Prereq>Ambush</Prereq></Event>" +
         "</Story>";
 
-    private static readonly ISchemaProvider Schema = new ScopeSchemaProvider();
+    private static readonly ISchemaProvider Schema = ScopeSchemaProvider.Build();
 
     private static StoryCampaignModel Model()
     {
@@ -70,8 +70,8 @@ public sealed class StorySimulatorScopeTest
     {
         var model = Model();
 
-        var galactic = new StorySimulator(model, Schema);
-        var battle = new StorySimulator(model, Schema, null, M2Key);
+        var galactic = new StorySimulator(model, Schema, new AnyWorldSymbols(), TestCatalogues.English);
+        var battle = new StorySimulator(model, Schema, new AnyWorldSymbols(), TestCatalogues.English, M2Key);
 
         var galacticIds = galactic.GetLifecycles(galactic.Start()).Keys.Order(StringComparer.Ordinal).ToList();
         var battleIds = battle.GetLifecycles(battle.Start()).Keys.Order(StringComparer.Ordinal).ToList();
@@ -93,13 +93,13 @@ public sealed class StorySimulatorScopeTest
         var model = Model();
 
         // Galactic: Win waits behind E, which links M2 in - so it is M2's outcome listener.
-        var galactic = new StorySimulator(model, Schema);
+        var galactic = new StorySimulator(model, Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var win = Assert.Single(galactic.GetInterventions(galactic.Start()), i => i.EventName == "Win");
         Assert.Equal("tactical", win.Kind);
         Assert.Equal(M2Key, win.BattleKey);
 
         // Inside the battle every outcome listener is the battle's own.
-        var battle = new StorySimulator(model, Schema, null, M2Key);
+        var battle = new StorySimulator(model, Schema, new AnyWorldSymbols(), TestCatalogues.English, M2Key);
         var snapshot = battle.SatisfyTrigger(battle.Start(), Id(Battle, "Ambush"));
         var battleWin = Assert.Single(battle.GetInterventions(snapshot), i => i.EventName == "BattleWin");
         Assert.Equal(M2Key, battleWin.BattleKey);
@@ -109,7 +109,7 @@ public sealed class StorySimulatorScopeTest
     public void Start_SeedsFlagsAndWorld_BeforeTheFirstPoll()
     {
         var model = Model();
-        var galactic = new StorySimulator(model, Schema);
+        var galactic = new StorySimulator(model, Schema, new AnyWorldSymbols(), TestCatalogues.English);
         var world = StoryWorld.Empty.WithPlanetOwner("Kuat", "Empire");
 
         // STORY_FLAG's default compare is "equal to 0", and an unset flag never fires: the reader
@@ -123,7 +123,7 @@ public sealed class StorySimulatorScopeTest
     }
 }
 
-file sealed class ScopeSchemaProvider : ISchemaProvider
+file static class ScopeSchemaProvider
 {
     private static readonly EnumDefinition Events = new()
     {
@@ -172,45 +172,11 @@ file sealed class ScopeSchemaProvider : ISchemaProvider
         ]
     };
 
-    public event EventHandler? SchemaRefreshed
+    public static FakeSchemaProvider Build()
     {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [Events, Rewards];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string t)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string name)
-    {
-        return name switch
-        {
-            "StoryEventType" => Events,
-            "StoryRewardType" => Rewards,
-            _ => null
-        };
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string t)
-    {
-        return null;
+        return new SchemaProviderBuilder()
+            .WithEnum(Events)
+            .WithEnum(Rewards)
+            .Build();
     }
 }

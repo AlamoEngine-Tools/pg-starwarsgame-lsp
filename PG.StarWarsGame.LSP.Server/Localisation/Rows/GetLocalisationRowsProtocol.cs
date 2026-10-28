@@ -1,8 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Localisation.Rows;
+using PG.StarWarsGame.LSP.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -41,6 +44,7 @@ public sealed record GetLocalisationRowsParams(string ProjectFilePath) : IReques
 ///         add a language to a single-language project.
 ///     </para>
 /// </param>
+[PublicAPI]
 public sealed record GetLocalisationRowsResult(
     IReadOnlyList<LocRowDto> Rows,
     IReadOnlyList<string> Languages,

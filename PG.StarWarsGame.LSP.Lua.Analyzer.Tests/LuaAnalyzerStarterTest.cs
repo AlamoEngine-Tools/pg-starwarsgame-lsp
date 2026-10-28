@@ -92,7 +92,7 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
     [Fact]
     public void ARootNotOnDisk_IsHandedOverAsGiven()
     {
-        Assert.Equal<string>("D:/no/such/root", PathCasing.OnDisk("D:/no/such/root"));
+        Assert.Equal("D:/no/such/root", PathCasing.OnDisk("D:/no/such/root"));
     }
 
     [Theory]
@@ -107,7 +107,7 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
         var resolved = LuaAnalyzerExecutable.Resolve("C:/server", _ => variable,
             path => path == variable || (besideExists && path == beside));
 
-        Assert.Equal<string?>(expected == "beside" ? beside : expected, resolved);
+        Assert.Equal(expected == "beside" ? beside : expected, resolved);
     }
 
     private sealed class RecordingLayers : ILuaAnalyzerLayers

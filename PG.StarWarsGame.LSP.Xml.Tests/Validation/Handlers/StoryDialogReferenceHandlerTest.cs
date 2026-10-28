@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -14,7 +15,8 @@ public sealed class StoryDialogReferenceHandlerTest
 
     private static IReadOnlyList<XmlDiagnosticResult> Handle(StoryDialogRefFact fact, FakeStoryDialogScope scope)
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, fact.DocumentUri, "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, fact.DocumentUri, "en")
+            { Messages = TestCatalogues.English };
         IXmlDiagnosticsHandler handler = new StoryDialogReferenceHandler(scope);
         return handler.Handle(fact, ctx).ToList();
     }
@@ -80,27 +82,5 @@ public sealed class StoryDialogReferenceHandlerTest
 
         var result = Assert.Single(Handle(Fact(chapter: 0, chapterLine: 6), scope));
         Assert.Contains("no chapters", result.Message);
-    }
-
-    private sealed class FakeStoryDialogScope : IStoryDialogScope
-    {
-        public Dictionary<string, string> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public HashSet<int> Chapters { get; init; } = [];
-        public bool Enabled { get; init; } = true;
-
-        public bool IsInScope(string canonicalUri)
-        {
-            return Files.ContainsValue(canonicalUri);
-        }
-
-        public string? ResolveDialogFile(string dialogName)
-        {
-            return Files.GetValueOrDefault(dialogName);
-        }
-
-        public IReadOnlyCollection<int> GetChapters(string canonicalUri)
-        {
-            return Chapters;
-        }
     }
 }

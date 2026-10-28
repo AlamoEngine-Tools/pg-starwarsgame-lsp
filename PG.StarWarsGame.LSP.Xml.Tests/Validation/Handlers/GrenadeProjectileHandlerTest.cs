@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -157,6 +158,11 @@ public sealed class GrenadeProjectileHandlerTest
     private sealed class FakeProjectiles(params (string Id, string? Category, VariantProvenance From)[] objects)
         : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string objectId)
         {
             var match = objects.FirstOrDefault(o =>

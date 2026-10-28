@@ -1,0 +1,83 @@
+[
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 47,
+    "StartCharacter": 2,
+    "EndLine": 47,
+    "EndCharacter": 21,
+    "Message": "<Autoresolve_Health> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 83,
+    "StartCharacter": 2,
+    "EndLine": 83,
+    "EndCharacter": 13,
+    "Message": "<GUI_Offset> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 99,
+    "StartCharacter": 2,
+    "EndLine": 99,
+    "EndCharacter": 19,
+    "Message": "<SFXEvent_Barrage> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 210,
+    "StartCharacter": 4,
+    "EndLine": 210,
+    "EndCharacter": 23,
+    "Message": "<GUI_Bracket_Height> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 248,
+    "StartCharacter": 2,
+    "EndLine": 248,
+    "EndCharacter": 21,
+    "Message": "<Autoresolve_Health> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 255,
+    "StartCharacter": 2,
+    "EndLine": 255,
+    "EndCharacter": 30,
+    "Message": "<Surface_Bombardment_Capable> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 297,
+    "StartCharacter": 2,
+    "EndLine": 297,
+    "EndCharacter": 19,
+    "Message": "<SFXEvent_Barrage> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 340,
+    "StartCharacter": 2,
+    "EndLine": 340,
+    "EndCharacter": 13,
+    "Message": "<GUI_Offset> is not a known SpaceUnit tag. The engine discards it."
+  },
+  {
+    "Code": "aetswg-006-0012",
+    "Severity": "Warning",
+    "StartLine": 422,
+    "StartCharacter": 2,
+    "EndLine": 422,
+    "EndCharacter": 22,
+    "Message": "<xxxSpace_Model_Name> is not a known SpaceUnit tag. <Space_Model_Name> is the nearest known tag."
+  }
+]

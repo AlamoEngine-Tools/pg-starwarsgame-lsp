@@ -20,7 +20,7 @@ public sealed class EawSchemaCompareMethodTest
     private static RawEnumValueDefinition Value(string name)
     {
         var def = YamlSchemaParser.ParseEnumFile(EawSchemaRepo.Read("enums/StoryFlagCompareMethod.yaml"));
-        return Assert.Single(def.Values.Where(v => v.Name == name));
+        return Assert.Single(def.Values, v => v.Name == name);
     }
 
     // Measured in the engine, 2026-09-25: the comparison's jump table has an entry for this value

@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -50,7 +51,7 @@ public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
         if (openRange is null || closeRange is null)
             return Task.FromResult<LinkedEditingRanges>(null!);
 
-        return Task.FromResult<LinkedEditingRanges>(new LinkedEditingRanges
+        return Task.FromResult(new LinkedEditingRanges
         {
             Ranges = new Container<LspRange>(openRange, closeRange),
             WordPattern = @"[a-zA-Z_][a-zA-Z0-9_]*"

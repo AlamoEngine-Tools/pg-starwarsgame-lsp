@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
@@ -37,6 +36,16 @@ public sealed class XmlStructureRepairTest
     {
         Assert.Equal("﻿" + Decl + "<Root><A>1</A></Root>",
             Repair("﻿<Root><A>1</A></Root>", XmlStrictnessCategory.MissingDeclaration));
+    }
+
+    // A declaration behind a comment is one the game does not see first. Inserting another left the
+    // first where it was: two declarations, and standard XML rejecting the second.
+    [Fact]
+    public void ADeclarationBehindAComment_IsMovedToTheTop_NotDuplicated()
+    {
+        Assert.Equal("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- header -->\n<Root><A>1</A></Root>",
+            Repair("<!-- header -->\n<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<Root><A>1</A></Root>",
+                XmlStrictnessCategory.MissingDeclaration));
     }
 
     [Fact]

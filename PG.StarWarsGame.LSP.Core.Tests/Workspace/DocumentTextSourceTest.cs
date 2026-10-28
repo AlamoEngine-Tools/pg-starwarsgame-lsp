@@ -32,7 +32,7 @@ public sealed class DocumentTextSourceTest
         var result = source.GetText(Uri);
 
         Assert.NotNull(result);
-        Assert.Equal("<Buffer/>", result!.Text);
+        Assert.Equal("<Buffer/>", result.Text);
         Assert.True(result.FromOpenBuffer);
     }
 
@@ -46,7 +46,7 @@ public sealed class DocumentTextSourceTest
         var result = source.GetText(Uri);
 
         Assert.NotNull(result);
-        Assert.Equal("<Disk/>", result!.Text);
+        Assert.Equal("<Disk/>", result.Text);
         Assert.False(result.FromOpenBuffer);
     }
 

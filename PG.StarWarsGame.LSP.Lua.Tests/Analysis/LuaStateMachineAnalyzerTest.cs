@@ -23,7 +23,7 @@ public sealed class LuaStateMachineAnalyzerTest
         string uri = ScriptUri)
     {
         var tree = LuaSyntaxTree.ParseText(text, new LuaParseOptions(LuaSyntaxOptions.Lua51));
-        return LuaStateMachineAnalyzer.Analyze(uri, tree, contract ?? Vanilla);
+        return LuaStateMachineAnalyzer.Analyze(uri, tree, contract ?? Vanilla, TestCatalogues.English);
     }
 
     private static Diagnostic Single(string text, DiagnosticId id, LuaStateMachineContract? contract = null)

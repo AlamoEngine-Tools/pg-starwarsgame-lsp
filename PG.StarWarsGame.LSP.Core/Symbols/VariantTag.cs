@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 /// <summary>
@@ -13,6 +15,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 /// <param name="Fragment">The tag's verbatim outer XML.</param>
 /// <param name="StartLine">0-based line of the tag in its source document.</param>
 /// <param name="Origin">Where the tag is defined, for go-to navigation. Null when unknown.</param>
+[PublicAPI]
 public sealed record VariantTag(
     string TagName,
     string Value,

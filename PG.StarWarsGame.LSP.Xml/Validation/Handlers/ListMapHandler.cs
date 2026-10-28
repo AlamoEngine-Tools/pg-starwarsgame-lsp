@@ -139,7 +139,8 @@ public sealed class ListMapHandler : XmlDiagnosticsHandler<XmlListMapFact>
     private static string? ValueKindProblem(string value, XmlTagDefinition tag, TupleSlotDefinition slot,
         GameIndex index, IMessageCatalog messages)
     {
-        if (slot.ReferenceKind != ReferenceKind.XmlObject || index.Resolve(value) is not { } resolved)
+        if (slot.ReferenceKind != ReferenceKind.XmlObject
+            || index.Resolve(value, slot.TargetTypeName) is not { } resolved)
             return null;
 
         if (slot.Kind is { } kind)

@@ -54,7 +54,7 @@ public sealed class SquadronSyncCodeActionProviderTest
 
     private static SquadronSyncCodeActionProvider BuildProvider(string xml)
     {
-        var host = new FakeWorkspaceHost(Uri, xml);
+        var host = new FakeGameWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new SquadronSyncCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper);
     }
@@ -68,7 +68,7 @@ public sealed class SquadronSyncCodeActionProviderTest
             Message = "test",
             Data = data
         };
-        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class SquadronSyncCodeActionProviderTest
             Range = new LspRange(new Position(1, 0), new Position(1, 8)),
             Message = "unrelated"
         };
-        var ctx = new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        var ctx = new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
         Assert.Empty(provider.Handle(ctx));
     }
 
@@ -104,7 +104,7 @@ public sealed class SquadronSyncCodeActionProviderTest
         var actions = provider.Handle(ctx).ToList();
         var preferred = actions.FirstOrDefault(a => a.CodeAction?.IsPreferred == true);
         Assert.NotNull(preferred);
-        Assert.Contains("Add 3 missing", preferred!.CodeAction!.Title);
+        Assert.Contains("Add 3 missing", preferred.CodeAction!.Title);
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public sealed class SquadronSyncCodeActionProviderTest
         var actions = provider.Handle(ctx).ToList();
         var preferred = actions.FirstOrDefault(a => a.CodeAction?.IsPreferred == true);
         Assert.NotNull(preferred);
-        Assert.Contains("Remove 3 excess", preferred!.CodeAction!.Title);
+        Assert.Contains("Remove 3 excess", preferred.CodeAction!.Title);
     }
 
     [Fact]
@@ -171,33 +171,5 @@ public sealed class SquadronSyncCodeActionProviderTest
     {
         var changes = action.CodeAction!.Edit!.Changes!;
         return changes.Values.First().ToList();
-    }
-}
-
-file sealed class FakeWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly string _normalizedUri;
-    private readonly string _text;
-
-    public FakeWorkspaceHost(string uri, string text)
-    {
-        _normalizedUri = uri;
-        _text = text;
-    }
-
-    public IEnumerable<TrackedDocument> All => [new(_normalizedUri, _text, 1)];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string uri)
-    {
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(_normalizedUri, _text, 1);
-        return true;
     }
 }

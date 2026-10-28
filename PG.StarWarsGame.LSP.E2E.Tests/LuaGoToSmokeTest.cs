@@ -32,7 +32,7 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
         var workspace = LspTestEnvironment.EawWorkspacePath!;
         var luaPath = Path.Combine(workspace, InterdictorRel);
         var luaUri = DocumentUri.FromFileSystemPath(luaPath);
-        var lines = await File.ReadAllLinesAsync(luaPath);
+        var lines = await File.ReadAllLinesAsync(luaPath, TestContext.Current.CancellationToken);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -42,7 +42,7 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
                 Text = string.Join(Environment.NewLine, lines)
             }
         });
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
 
         var (line, col) = FindLuaStringArgPosition(lines, "Find_Object_Type", "Marauder_Missile_Cruiser");
         Assert.True(line >= 0, "Could not find Find_Object_Type(\"Marauder_Missile_Cruiser\") in Interdictor.lua");
@@ -56,7 +56,7 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
             }, cts.Token);
 
         Assert.NotNull(result);
-        var locations = result!
+        var locations = result
             .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri).ToList();
         Assert.NotEmpty(locations);
         Assert.Contains(locations, u =>
@@ -77,7 +77,7 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
         var workspace = LspTestEnvironment.EawWorkspacePath!;
         var luaPath = Path.Combine(workspace, InterdictorRel);
         var luaUri = DocumentUri.FromFileSystemPath(luaPath);
-        var lines = await File.ReadAllLinesAsync(luaPath);
+        var lines = await File.ReadAllLinesAsync(luaPath, TestContext.Current.CancellationToken);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -87,7 +87,7 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
                 Text = string.Join(Environment.NewLine, lines)
             }
         });
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
 
         var (line, col) = FindLuaStringArgPosition(lines, "Find_Object_Type", "Marauder_Missile_Cruiser");
         Assert.True(line >= 0);
@@ -101,7 +101,7 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
             }, cts.Token);
 
         Assert.NotNull(result);
-        var content = result!.Contents.MarkupContent?.Value ?? string.Empty;
+        var content = result.Contents.MarkupContent?.Value ?? string.Empty;
         Assert.Contains("Marauder_Missile_Cruiser", content, StringComparison.OrdinalIgnoreCase);
         // Hover must contain some non-trivial content (type name + id, not an empty stub).
         Assert.True(content.Length > "Marauder_Missile_Cruiser".Length,

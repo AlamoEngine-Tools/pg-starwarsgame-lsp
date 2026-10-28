@@ -5,6 +5,7 @@ using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -33,7 +34,8 @@ public sealed class LuaScriptReferenceHandlerTest
     private static DiagnosticsContext CtxWith(params string[] paths)
     {
         var index = GameIndex.Empty with { AssetFiles = new MergedAssetFileIndex(paths) };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
     }
 
     // ── resolves ─────────────────────────────────────────────────────────────

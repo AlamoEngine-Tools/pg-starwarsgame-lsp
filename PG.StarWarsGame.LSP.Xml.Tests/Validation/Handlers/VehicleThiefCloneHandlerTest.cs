@@ -188,6 +188,11 @@ public sealed class VehicleThiefCloneHandlerTest
         string abilitiesFragment,
         (string Tag, string Value)[] behaviours) : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string id)
         {
             if (!string.Equals(id, objectId, StringComparison.OrdinalIgnoreCase))

@@ -11,7 +11,7 @@ public sealed class LuaUpvalueAnalyzerTest
 {
     private static IReadOnlyList<Diagnostic> Analyze(string text, string? uri = null)
     {
-        return LuaUpvalueAnalyzer.Analyze(text, uri);
+        return LuaUpvalueAnalyzer.Analyze(text, uri, TestCatalogues.English);
     }
 
     // ── no-warning baseline ───────────────────────────────────────────────────
@@ -289,7 +289,7 @@ public sealed class LuaUpvalueAnalyzerTest
         var localEntry = diag.RelatedInformation!.FirstOrDefault(r =>
             r.Message.Contains("local", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(localEntry);
-        Assert.Equal(0, localEntry!.Location.Range.Start.Line);
+        Assert.Equal(0, localEntry.Location.Range.Start.Line);
         Assert.Equal("file:///s.lua", localEntry.Location.Uri.ToString());
     }
 
@@ -304,7 +304,7 @@ public sealed class LuaUpvalueAnalyzerTest
         var funcEntry = diag.RelatedInformation!.FirstOrDefault(r =>
             r.Message.Contains("function", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(funcEntry);
-        Assert.Equal(1, funcEntry!.Location.Range.Start.Line);
+        Assert.Equal(1, funcEntry.Location.Range.Start.Line);
     }
 
     [Fact]

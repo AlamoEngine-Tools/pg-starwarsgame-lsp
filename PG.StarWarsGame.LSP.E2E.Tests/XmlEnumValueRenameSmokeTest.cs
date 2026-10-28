@@ -93,15 +93,15 @@ public sealed class XmlEnumValueRenameSmokeTest : IClassFixture<EawLspServerFixt
                 }, cts.Token);
 
             Assert.NotNull(edit);
-            var changes = edit!.Changes;
+            var changes = edit.Changes;
             Assert.NotNull(changes);
-            Assert.NotEmpty(changes!);
+            Assert.NotEmpty(changes);
 
             // The definition site must be edited …
-            Assert.Contains(changes!.Keys, u =>
+            Assert.Contains(changes.Keys, u =>
                 u.ToString().Contains(expectedDefinitionFile, StringComparison.OrdinalIgnoreCase));
             // … and so must the usage file the rename was triggered from.
-            Assert.Contains(changes!.Keys, u =>
+            Assert.Contains(changes.Keys, u =>
                 u.ToString().Contains("Spaceunitscorvettes", StringComparison.OrdinalIgnoreCase));
         }
         finally

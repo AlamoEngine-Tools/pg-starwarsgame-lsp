@@ -3,6 +3,7 @@
 
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 

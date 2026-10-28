@@ -37,7 +37,7 @@ public sealed class LuaDiagnosticIdCoverageTest
             dir = Path.GetDirectoryName(dir);
 
         Assert.NotNull(dir);
-        return Path.Combine(dir!, "PG.StarWarsGame.LSP.Lua");
+        return Path.Combine(dir, "PG.StarWarsGame.LSP.Lua");
     }
 
     // Each `new LspDiagnostic { ... }` object initialiser must assign Code before its closing

@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
@@ -41,32 +41,21 @@ public sealed class SymbolRelationsTest
         ["Max_Speed"] = Tag("Max_Speed", ReferenceKind.None)
     };
 
+    private static FakeSchemaProvider Schema()
+    {
+        var builder = new SchemaProviderBuilder()
+            .WithKind(new ObjectKindDefinition { Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"] });
+        foreach (var tag in s_tags.Values)
+            builder.WithTag(tag);
+        return builder.Build();
+    }
+
     private static XmlTagDefinition Tag(string name, ReferenceKind kind, string? type = null)
     {
         return new XmlTagDefinition
         {
             Tag = name, ValueType = XmlValueType.NameReference, ReferenceKind = kind, ReferenceTypeName = type
         };
-    }
-
-    private sealed class Schema : NullSchemaProvider, ISchemaProvider
-    {
-        private static readonly ObjectKindDefinition s_planet = new()
-        {
-            Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"]
-        };
-
-        public override XmlTagDefinition? GetTag(string tagName)
-        {
-            return s_tags.GetValueOrDefault(tagName);
-        }
-
-        public ObjectKindDefinition? GetKind(string kindName)
-        {
-            return string.Equals(kindName, ObjectKindNames.Planet, StringComparison.OrdinalIgnoreCase)
-                ? s_planet
-                : null;
-        }
     }
 
     private sealed class Tags(Dictionary<string, (string Tag, string Value)[]> tags) : IVariantTagSource
@@ -154,8 +143,9 @@ public sealed class SymbolRelationsTest
             ["Tie_Fighter"] = [("Space_Model_Name", "EV_Missing.alo"), ("Encyclopedia_Text", "TEXT_TIE")],
             ["Coruscant"] = [("Encyclopedia_Text", "TEXT_CORUSCANT")]
         });
-        var schema = new Schema();
-        return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []));
+        var schema = Schema();
+        return new SymbolRelations(index, schema, tags,
+            SymbolCatalog.Build(index, [], [], new SchemaProviderBuilder().Build()));
     }
 
     private static Dictionary<string, SymbolRelation> RelationsOf(string id)

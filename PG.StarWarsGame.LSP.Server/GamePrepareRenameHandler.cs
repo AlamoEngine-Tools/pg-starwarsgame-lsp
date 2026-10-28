@@ -4,54 +4,30 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua;
-using PG.StarWarsGame.LSP.Xml;
 
 namespace PG.StarWarsGame.LSP.Server;
 
+/// <summary>Prepare-rename routes as <see cref="GameRenameHandler" /> does: to the provider that handles the document.</summary>
 public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
 {
-    private readonly ILuaAnalyzer? _analyzer;
     private readonly IFileHelper _fileHelper;
-    private readonly IGameIndexService _indexService;
-    private readonly IProjectLayerMap? _layers;
-    private readonly ILuaRenameProvider _luaProvider;
-    private readonly IXmlRenameProvider _xmlProvider;
+    private readonly IReadOnlyList<IRenameProvider> _providers;
 
-    public GamePrepareRenameHandler(
-        IGameIndexService indexService,
-        IXmlRenameProvider xmlProvider,
-        ILuaRenameProvider luaProvider,
-        IFileHelper fileHelper,
-        // Optional, as for rename: what we do not claim, the analyzer prepares.
-        ILuaAnalyzer? analyzer = null,
-        IProjectLayerMap? layers = null)
+    public GamePrepareRenameHandler(IEnumerable<IRenameProvider> providers, IFileHelper fileHelper)
     {
-        _indexService = indexService;
-        _xmlProvider = xmlProvider;
-        _luaProvider = luaProvider;
+        _providers = [.. providers];
         _fileHelper = fileHelper;
-        _analyzer = analyzer;
-        _layers = layers;
     }
 
-    public override async Task<RangeOrPlaceholderRange?> Handle(PrepareRenameParams request, CancellationToken ct)
+    public override Task<RangeOrPlaceholderRange?> Handle(PrepareRenameParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
-        var index = _indexService.Current;
-        var (line, character) = (request.Position.Line, request.Position.Character);
-
-        if (uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-            return _xmlProvider.HandlePrepare(uri, line, character, index);
-        if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        if (_analyzer is null || _luaProvider.Claims(uri, line, character, index))
-            return _luaProvider.HandlePrepare(uri, line, character, index);
-        return await _analyzer.RequestAsync<RangeOrPlaceholderRange>("textDocument/prepareRename", request, ct);
+        var provider = _providers.FirstOrDefault(p => p.Handles(uri));
+        return provider is null
+            ? Task.FromResult<RangeOrPlaceholderRange?>(null)
+            : provider.PrepareAsync(request, ct);
     }
 
     protected override RenameRegistrationOptions CreateRegistrationOptions(

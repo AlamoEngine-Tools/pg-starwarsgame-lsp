@@ -43,6 +43,10 @@ public sealed class AloParticleReaderTest
     /// <summary>
     ///     One track: a header carrying the endpoints and interpolation, then the keys between them.
     /// </summary>
+    /// <param name="first">The first endpoint's value.</param>
+    /// <param name="last">The last endpoint's value.</param>
+    /// <param name="interpolation">The track's interpolation.</param>
+    /// <param name="keys">The keys between the endpoints, each a value and a time.</param>
     /// <param name="byteValued">
     ///     The four colour channels store endpoints as a byte and key values as an int over 255; the
     ///     rest store floats throughout. Same chunk shape either way.

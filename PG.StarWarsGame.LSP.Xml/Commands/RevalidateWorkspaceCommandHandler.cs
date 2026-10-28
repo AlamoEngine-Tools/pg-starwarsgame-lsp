@@ -3,7 +3,6 @@
 
 using MediatR;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
@@ -25,10 +24,10 @@ public sealed class RevalidateWorkspaceCommandHandler : ExecuteCommandHandlerBas
 
     public RevalidateWorkspaceCommandHandler(
         IEnumerable<IDiagnosticsRepublisher> republishers,
-        ILogger<RevalidateWorkspaceCommandHandler>? logger = null)
+        ILogger<RevalidateWorkspaceCommandHandler> logger)
     {
         _republishers = republishers;
-        _logger = logger ?? NullLogger<RevalidateWorkspaceCommandHandler>.Instance;
+        _logger = logger;
     }
 
     public async Task ExecuteAsync(CancellationToken ct)

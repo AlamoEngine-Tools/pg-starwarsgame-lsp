@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis;
 
@@ -63,7 +64,7 @@ internal static class LuaRequireResolver
         {
             // URI relative resolution: "./sibling" or "../lib" resolved against the caller's URI.
             // The System.Uri constructor handles multi-level traversal (../../foo) correctly.
-            var normalizedArg = requireArg.Replace('\\', '/') + ".lua";
+            var normalizedArg = GamePaths.Forward(requireArg) + ".lua";
             var baseUri = new Uri(callerUri);
             var resolved = new Uri(baseUri, normalizedArg);
             var resolvedNormalized = fileHelper.NormalizeUri(resolved.ToString());

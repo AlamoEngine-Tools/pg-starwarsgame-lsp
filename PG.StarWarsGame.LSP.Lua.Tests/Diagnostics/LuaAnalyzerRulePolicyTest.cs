@@ -104,7 +104,8 @@ public sealed class LuaAnalyzerRulePolicyTest
     [Fact]
     public void AFindingOfAnotherRule_AlwaysHolds()
     {
-        var tree = Loretta.CodeAnalysis.Lua.LuaSyntaxTree.ParseText("Find_First_Object(\"X\", p)");
+        var tree = Loretta.CodeAnalysis.Lua.LuaSyntaxTree.ParseText("Find_First_Object(\"X\", p)",
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(LuaAnalyzerRulePolicy.Holds(LuaAnalyzerRulePolicy.Map(Finding("unused"))!, tree, s_engine));
     }

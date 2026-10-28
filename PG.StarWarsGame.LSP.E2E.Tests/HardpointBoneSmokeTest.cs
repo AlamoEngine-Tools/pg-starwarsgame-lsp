@@ -59,7 +59,7 @@ public sealed class HardpointBoneSmokeTest : IClassFixture<LspServerFixture>, IA
             TextDocument = new TextDocumentItem
             {
                 Uri = uri, LanguageId = "xml", Version = 1,
-                Text = await File.ReadAllTextAsync(filePath)
+                Text = await File.ReadAllTextAsync(filePath, TestContext.Current.CancellationToken)
             }
         });
 
@@ -95,7 +95,7 @@ public sealed class HardpointBoneSmokeTest : IClassFixture<LspServerFixture>, IA
             TextDocument = new TextDocumentItem
             {
                 Uri = uri, LanguageId = "xml", Version = 1,
-                Text = await File.ReadAllTextAsync(filePath)
+                Text = await File.ReadAllTextAsync(filePath, TestContext.Current.CancellationToken)
             }
         });
 

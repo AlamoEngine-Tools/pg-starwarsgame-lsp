@@ -4,6 +4,7 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Messages;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -12,9 +13,12 @@ namespace PG.StarWarsGame.LSP.Xml.CodeLens;
 
 internal sealed class ReferencesCodeLensProvider : IXmlCodeLensProvider
 {
-    public LspCodeLens? Handle(CodeLensSymbolContext ctx)
+    public LspCodeLens Handle(CodeLensSymbolContext ctx)
     {
-        var refs = ctx.Index.WorkspaceReferences.TryGetValue(ctx.Symbol.Id, out var found) ? found : [];
+        // The references that mean this definition's type - a same-named object of another type has
+        // its own. A story symbol is one element indexed under two types and counts as one.
+        var typeName = StoryReferenceTypes.IsStorySymbolType(ctx.Symbol.TypeName) ? null : ctx.Symbol.TypeName;
+        var refs = ctx.Index.ReferencesTo(ctx.Symbol.Id, typeName).ToList();
         return For(ctx.Origin.Uri, ctx.Origin.Line, ctx.Origin.Column ?? 0, refs, ctx.Messages);
     }
 
@@ -25,6 +29,8 @@ internal sealed class ReferencesCodeLensProvider : IXmlCodeLensProvider
     /// <param name="uri">The document the definition is in.</param>
     /// <param name="line">The definition's line; the lens sits at its start.</param>
     /// <param name="column">Where the definition starts on its line, for the references view.</param>
+    /// <param name="refs">The references to the definition.</param>
+    /// <param name="messages">The catalogue the lens text comes from.</param>
     public static LspCodeLens For(string uri, int line, int column, IReadOnlyList<GameReference> refs,
         IMessageCatalog messages)
     {

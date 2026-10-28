@@ -26,18 +26,18 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 public sealed class StartupPipeline
 {
     private readonly IBaselineBootstrapper _baseline;
-    private readonly ILspConfigurationProvider? _configProvider;
+    private readonly ILspConfigurationProvider _configProvider;
+    private readonly IMessageCatalog _messages;
     private readonly IStartupGate _gate;
     private readonly ILogger<StartupPipeline> _logger;
-    private readonly IPgprojMigrationOffer? _migrationOffer;
+    private readonly IPgprojMigrationOffer _migrationOffer;
     private readonly IStartupNotifier _notifier;
     private readonly IStartupProgress _progress;
     private readonly IModProjectReloadService _reloadService;
     private readonly IReadOnlyList<IDiagnosticsRepublisher> _republishers;
     private readonly ISchemaBootstrapper _schema;
-    private readonly ServerStatusRecorder? _status;
+    private readonly ServerStatusRecorder _status;
 
-    // migrationOffer is optional so the minimal test setups can omit it; production always wires it.
     public StartupPipeline(
         ISchemaBootstrapper schema,
         IBaselineBootstrapper baseline,
@@ -46,14 +46,16 @@ public sealed class StartupPipeline
         IStartupProgress progress,
         IStartupNotifier notifier,
         ILogger<StartupPipeline> logger,
-        IPgprojMigrationOffer? migrationOffer = null,
-        IEnumerable<IDiagnosticsRepublisher>? republishers = null,
-        ILspConfigurationProvider? configProvider = null,
-        ServerStatusRecorder? status = null)
+        IPgprojMigrationOffer migrationOffer,
+        IEnumerable<IDiagnosticsRepublisher> republishers,
+        ILspConfigurationProvider configProvider,
+        ServerStatusRecorder status,
+        IMessageCatalog messages)
     {
         _status = status;
         _configProvider = configProvider;
-        _republishers = republishers?.ToList() ?? [];
+        _messages = messages;
+        _republishers = republishers.ToList();
         _migrationOffer = migrationOffer;
         _schema = schema;
         _baseline = baseline;
@@ -64,22 +66,18 @@ public sealed class StartupPipeline
         _logger = logger;
     }
 
-    /// <summary>The server's texts in the configured locale, English for a setup without one.</summary>
-    private IMessageCatalog Messages =>
-        _configProvider is null ? ResxMessageCatalog.Server("en") : new ConfiguredMessageCatalog(_configProvider);
-
     public async Task RunAsync(IReadOnlyList<string> scanRoots, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
         var failed = false;
         try
         {
-            _progress.Report(Messages.Format("StartupPipeline_LoadingSchemaBaseline"), 5);
+            _progress.Report(_messages.Format("StartupPipeline_LoadingSchemaBaseline"), 5);
             await Task.WhenAll(
                 _schema.LoadAsync(ct),
                 _baseline.LoadAsync(ct));
 
-            _progress.Report(Messages.Format("StartupPipeline_IndexingWorkspace"), 30);
+            _progress.Report(_messages.Format("StartupPipeline_IndexingWorkspace"), 30);
             await _reloadService.LoadAsync(scanRoots, ct);
         }
         catch (Exception ex)
@@ -91,7 +89,7 @@ public sealed class StartupPipeline
         finally
         {
             // Before the gate opens, so a status read the moment it opens sees the outcome.
-            _status?.RecordIndexFinished(failed, clock.Elapsed);
+            _status.RecordIndexFinished(failed, clock.Elapsed);
             _progress.Report("Finalising", 95);
             await _gate.OpenAsync();
             _progress.Complete();
@@ -114,7 +112,7 @@ public sealed class StartupPipeline
         // After the gate on purpose: it touches every indexed document, and holding the gate for it
         // would put that work in front of the editor becoming usable.
         // Not an early return: the migration offer below has to run either way.
-        if (_configProvider?.Current.Diagnostics.WorkspaceOnStartup == true)
+        if (_configProvider.Current.Diagnostics.WorkspaceOnStartup)
         {
             _logger.LogWarning(
                 "Diagnosing the whole workspace on startup. This publishes a diagnostic for every " +
@@ -141,7 +139,6 @@ public sealed class StartupPipeline
         // nothing; in front of it, it WAS the server - 22.1s of a startup that otherwise takes
         // 1.75s, measured on the eaw workspace, with every buffered notification waiting on a
         // dialog. A degraded start still asks: the file it offers to write may be the fix.
-        if (_migrationOffer is null) return;
         try
         {
             await _migrationOffer.OfferPendingAsync(ct);

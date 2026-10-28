@@ -67,12 +67,12 @@ public sealed class XmlCodeLensHandlerTest
     private static XmlCodeLensHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null,
         IFileHelper? fileHelper = null, ILspConfigurationProvider? config = null)
     {
-        var svc = new FakeIndexService { Current = index };
-        var registry = new XmlCodeLensRegistry([new ReferencesCodeLensProvider()]);
+        var svc = new FakeGameIndexService { Current = index };
+        IXmlCodeLensProvider[] providers = [new ReferencesCodeLensProvider()];
         return new XmlCodeLensHandler(svc, NullLogger<XmlCodeLensHandler>.Instance,
             ctx ?? new AllowAllEaWContext(),
             fileHelper ?? new FileHelper(new MockFileSystem()),
-            registry, config ?? new FakeLspConfigurationProvider());
+            providers, TestCatalogues.English);
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ public sealed class XmlCodeLensHandlerTest
         var handler = BuildHandler(GameIndex.Empty);
         var result = await handler.Handle(ForDoc(), CancellationToken.None);
         Assert.NotNull(result);
-        Assert.Empty(result!);
+        Assert.Empty(result);
     }
 
     [Fact]
@@ -309,7 +309,7 @@ public sealed class XmlCodeLensHandlerTest
         var result = await handler.Handle(ForDoc(mixedCaseUri), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Single(result!);
+        Assert.Single(result);
     }
 
     // ── resolve passthrough ───────────────────────────────────────────────────
@@ -326,80 +326,4 @@ public sealed class XmlCodeLensHandlerTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
 }

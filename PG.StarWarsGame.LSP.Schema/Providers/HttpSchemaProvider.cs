@@ -37,6 +37,10 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
 
     private IReadOnlyList<RawEnumDefinition> _rawEnumFallbacks = [];
 
+    /// <param name="http">The client the schema files are fetched with.</param>
+    /// <param name="baseUrl">The URL the schema files are fetched under.</param>
+    /// <param name="cache">The on-disk cache the fetched files are kept in.</param>
+    /// <param name="logger">Where the provider logs.</param>
     /// <param name="releaseTag">
     ///     The schema release <paramref name="baseUrl" /> points into, or null for a branch or an
     ///     explicit URL. A cache already holding this tag loads with no request at all.
@@ -51,7 +55,7 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
         _releaseTag = releaseTag;
     }
 
-    /// <inheritdoc />
+    /// <summary>Completes when the schema has loaded, from the cache or from the network.</summary>
     public Task ReadyAsync => _readyTcs.Task;
 
     /// <summary>

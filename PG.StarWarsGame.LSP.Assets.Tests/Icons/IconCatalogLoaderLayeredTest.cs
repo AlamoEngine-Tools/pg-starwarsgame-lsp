@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Project;
@@ -70,7 +71,7 @@ public sealed class IconCatalogLoaderLayeredTest
     private static IconCatalog Load(MockFileSystem fileSystem, params IconLayer[] layers)
     {
         return IconCatalogLoader.Load(
-            fileSystem, MegaTextureFixture.CreateMtdService(fileSystem), layers, EmptyBaseline());
+            fileSystem, MegaTextureFixture.CreateMtdService(fileSystem), layers, EmptyBaseline(), NullLogger.Instance);
     }
 
     /// <summary>The case EaWX is in: no atlas anywhere, the icons loose in the DEPENDENCY.</summary>
@@ -103,7 +104,7 @@ public sealed class IconCatalogLoaderLayeredTest
         var resolved = catalog.Resolve("shared");
         Assert.NotNull(resolved);
         // Byte-for-byte: the two sources differ only in colour, so nothing weaker distinguishes them.
-        Assert.Equal(SolidPng(255, 0, 0), resolved!.Png);
+        Assert.Equal(SolidPng(255, 0, 0), resolved.Png);
     }
 
     /// <summary>

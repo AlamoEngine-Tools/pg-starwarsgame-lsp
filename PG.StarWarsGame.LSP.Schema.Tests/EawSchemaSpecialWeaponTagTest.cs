@@ -60,7 +60,7 @@ public sealed class EawSchemaSpecialWeaponTagTest
         var tag = FactionTags.FirstOrDefault(t =>
             string.Equals(t.Tag, name, StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(tag);
-        return tag!;
+        return tag;
     }
 
     private static IReadOnlyList<RawTagDefinition> LoadTags(string tagFile)

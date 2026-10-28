@@ -28,13 +28,18 @@ public static class RepeatedTagReader
     ///     Every value <paramref name="objectId" /> declares for <paramref name="tagName" />, in
     ///     document order. Empty when the object or the tag is absent.
     /// </summary>
+    /// <param name="typeName">
+    ///     The type whose id space <paramref name="objectId" /> is in; by id alone when null, for a
+    ///     singleton such as GameConstants, whose id is its type.
+    /// </param>
     public static IReadOnlyList<string> Values(
-        GameIndex index, IVariantTagSource workspaceSource, string objectId, string tagName)
+        GameIndex index, IVariantTagSource workspaceSource, string objectId, string tagName,
+        string? typeName = null)
     {
         ArgumentNullException.ThrowIfNull(index);
         ArgumentNullException.ThrowIfNull(workspaceSource);
 
-        return Tags(index, workspaceSource, objectId)
+        return Tags(index, workspaceSource, objectId, typeName)
             .Where(tag => tag.TagName.Equals(tagName, StringComparison.OrdinalIgnoreCase))
             .Select(tag => tag.Value.Trim())
             .ToList();
@@ -51,9 +56,9 @@ public static class RepeatedTagReader
     /// </remarks>
     public static IReadOnlyList<string[]> Rows(
         GameIndex index, IVariantTagSource workspaceSource, string objectId, string tagName,
-        int fields)
+        int fields, string? typeName = null)
     {
-        return Values(index, workspaceSource, objectId, tagName)
+        return Values(index, workspaceSource, objectId, tagName, typeName)
             .Select(value => value.Split(',', StringSplitOptions.TrimEntries))
             .Where(row => row.Length == fields)
             .ToList();
@@ -64,10 +69,20 @@ public static class RepeatedTagReader
     ///     <c>EffectiveObjectResolver.TagsFor</c> does it.
     /// </summary>
     private static IEnumerable<VariantTag> Tags(
-        GameIndex index, IVariantTagSource workspaceSource, string objectId)
+        GameIndex index, IVariantTagSource workspaceSource, string objectId, string? typeName)
     {
-        if (workspaceSource.TryGetTags(objectId) is { } workspace)
+        if (typeName is not null)
+        {
+            // In the type's own id space: a same-named object of another type has other tags.
+            if (index.ResolveOfType(objectId, typeName) is not { } symbol)
+                return [];
+            if (workspaceSource.TryGetTags(symbol) is { } own)
+                return own;
+        }
+        else if (workspaceSource.TryGetTags(objectId) is { } workspace)
+        {
             return workspace;
+        }
 
         return index.Baseline.ObjectTags.TryGetValue(objectId, out var baseline)
             ? baseline.Select(t => new VariantTag(t.TagName, t.Value, t.Fragment, t.StartLine))

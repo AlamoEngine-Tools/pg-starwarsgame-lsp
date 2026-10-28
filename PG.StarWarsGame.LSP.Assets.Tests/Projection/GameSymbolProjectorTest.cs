@@ -3,20 +3,29 @@
 
 using PG.StarWarsGame.Files.XML;
 using PG.StarWarsGame.LSP.Assets.Projection;
-using PG.StarWarsGame.LSP.Assets.Tests.Fakes;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
 public sealed class GameSymbolProjectorTest
 {
-    private static readonly FakeSchemaProvider Schema = new(
+    private static readonly FakeSchemaProvider Schema = SchemaWithTypes(
         "CombatBonusAbility", "SFXEvent", "GameObjectType", "SpawnAbility");
 
     // ── Singletons ───────────────────────────────────────────────────────────
 
-    private static readonly FakeSchemaProvider SchemaWithSingleton = new(
+    private static readonly FakeSchemaProvider SchemaWithSingleton = SchemaWithTypes(
         "CombatBonusAbility", "SFXEvent", "GameObjectType", "GameConstants");
+
+    /// <summary>A schema that knows these object types by name and nothing else.</summary>
+    private static FakeSchemaProvider SchemaWithTypes(params string[] typeNames)
+    {
+        var builder = new SchemaProviderBuilder();
+        foreach (var name in typeNames)
+            builder.WithObjectType(new GameObjectTypeDefinition { TypeName = name });
+        return builder.Build();
+    }
 
     private static GameSymbolProjector Build()
     {
@@ -60,7 +69,7 @@ public sealed class GameSymbolProjectorTest
 
         var result = Build().Project([entry], [], "hash");
 
-        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], result.Symbols["CORUSCANT"].Behaviors);
+        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], result.Symbols["CORUSCANT"].Behaviors!);
     }
 
     [Fact]
@@ -263,8 +272,14 @@ public sealed class GameSymbolProjectorTest
     [Fact]
     public void Project_VariantTag_SetsVariantBaseIdOnSymbol()
     {
-        var schema = new FakeSchemaProvider("CombatBonusAbility");
-        schema.VariantTagNames.Add("Variant_Of_Existing_Type");
+        var schema = new SchemaProviderBuilder()
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "CombatBonusAbility" })
+            .WithTag(new XmlTagDefinition
+            {
+                Tag = "Variant_Of_Existing_Type", ValueType = XmlValueType.TypeReference,
+                ReferenceKind = ReferenceKind.XmlObject, SemanticType = TagSemanticType.VariantParent
+            })
+            .Build();
         var projector = new GameSymbolProjector(schema);
 
         var entry = EntryWithTags("VARIANT_A", "COMBAT_BONUS_ABILITY",

@@ -28,7 +28,7 @@ public sealed class XmlStructureRepairCodeActionProviderTest
 
     private static XmlStructureRepairCodeActionProvider Build(string text, params DiagnosticId[] suppressed)
     {
-        var host = new SingleDocumentHost(Uri, text);
+        var host = new FakeGameWorkspaceHost(Uri, text);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new XmlStructureRepairCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper,
             new XmlStructuralValidator(), new FixedSuppressions(suppressed.Select(SuppressionMatcher.ForId).ToList()),
@@ -42,7 +42,7 @@ public sealed class XmlStructureRepairCodeActionProviderTest
             Code = id.ToString(),
             Range = new LspRange(new Position(line, startCol), new Position(line, endCol)),
             Message = "m"
-        });
+        }) { Messages = TestCatalogues.English };
     }
 
     private static IReadOnlyList<CodeAction> Actions(XmlStructureRepairCodeActionProvider p, XmlCodeActionContext ctx)
@@ -125,24 +125,5 @@ public sealed class XmlStructureRepairCodeActionProviderTest
         public void Remove(SuppressionMatcher matcher)
         {
         }
-    }
-}
-
-file sealed class SingleDocumentHost(string uri, string text) : IGameWorkspaceHost
-{
-    public IEnumerable<TrackedDocument> All => [new(uri, text, 1)];
-
-    public void AddOrUpdate(string u, string t, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string u)
-    {
-    }
-
-    public bool TryGet(string u, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(uri, text, 1);
-        return true;
     }
 }

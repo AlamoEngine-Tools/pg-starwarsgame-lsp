@@ -66,6 +66,9 @@ public sealed record StoryCampaignModel(
 /// </summary>
 public sealed class StoryCampaignAssembler(ISchemaProvider schema)
 {
+    /// <param name="campaignName">The campaign whose manifests are walked.</param>
+    /// <param name="chain">The chain scan the manifests come from.</param>
+    /// <param name="readThread">Reads a thread's URI and text by its manifest path; null when it does not exist.</param>
     /// <param name="faction">
     ///     The faction whose manifest seeds the walk. Null is returned when the campaign declares
     ///     no manifest for it - a caller asking for a faction that is not there is asking about

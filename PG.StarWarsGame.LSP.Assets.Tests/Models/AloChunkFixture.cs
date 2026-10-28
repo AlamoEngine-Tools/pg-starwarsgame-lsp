@@ -97,6 +97,10 @@ internal static class AloChunkFixture
     ///     carries an extra billboard-type integer ahead of the transform; <c>0x205</c> is the older
     ///     form without it.
     /// </summary>
+    /// <param name="name">The bone's name.</param>
+    /// <param name="parent">The parent bone's index, or -1 for a root.</param>
+    /// <param name="visible">Whether the bone starts visible.</param>
+    /// <param name="billboard">The billboard type, or null for the older chunk without one.</param>
     /// <param name="transform">
     ///     The 12 floats as stored: three rows of four, the fourth column of each row being that
     ///     axis's translation component.
@@ -128,6 +132,11 @@ internal static class AloChunkFixture
     ///     sub-mesh. That child order (<c>0x401, 0x402, 0x10100, 0x10000</c>) is what all 3217 sampled
     ///     meshes in the shipped trees use.
     /// </summary>
+    /// <param name="name">The mesh's name.</param>
+    /// <param name="subMeshes">The sub-mesh chunks.</param>
+    /// <param name="min">The bounding box's lower corner.</param>
+    /// <param name="max">The bounding box's upper corner.</param>
+    /// <param name="collidable">Whether the mesh collides.</param>
     /// <param name="hidden">
     ///     The stored field, which is INVERTED: zero means the mesh is visible. Named for what the
     ///     file holds rather than what it means, so the fixture cannot quietly disagree with the file.
@@ -332,6 +341,7 @@ internal static class AloChunkFixture
     ///     Index into the meshes AND lights of the file, in the order they appear at top level - not
     ///     into the meshes alone.
     /// </param>
+    /// <param name="boneIndex">The bone the attachable is attached to.</param>
     public static byte[] Connection(int objectIndex, int boneIndex)
     {
         return Chunk(0x602, true, Mini(2, I32(objectIndex)), Mini(3, I32(boneIndex)));
@@ -340,6 +350,8 @@ internal static class AloChunkFixture
     /// <summary>
     ///     A proxy - the attachment point a particle system or light field hangs from.
     /// </summary>
+    /// <param name="name">The proxy's name.</param>
+    /// <param name="boneIndex">The bone the proxy is anchored to.</param>
     /// <param name="hidden">
     ///     Mini-chunk 7, and INVERTED like the mesh flag: zero means visible. Omitted when null, which
     ///     is what 6399 of the 9412 shipped proxies do.

@@ -40,7 +40,7 @@ public sealed class DiagnosticReportActionTest
     private static List<CodeAction> Actions()
     {
         return SuppressionCodeActionBuilder
-            .Build(Uri, Diagnostic, Id, SuppressionCommentFormat.Xml, Lines, [])
+            .Build(Uri, Diagnostic, Id, SuppressionCommentFormat.Xml, Lines, [], TestCatalogues.English)
             .Select(a => a.CodeAction!)
             .ToList();
     }
@@ -83,7 +83,7 @@ public sealed class DiagnosticReportActionTest
     private static string[] ReportedLines(string[] lines, Diagnostic diagnostic)
     {
         var report = (JObject)SuppressionCodeActionBuilder
-            .Build(Uri, diagnostic, Id, SuppressionCommentFormat.Xml, lines, [])
+            .Build(Uri, diagnostic, Id, SuppressionCommentFormat.Xml, lines, [], TestCatalogues.English)
             .Select(a => a.CodeAction!)
             .First(a => a.Command?.Name == DiagnosticReportCommands.ReportOnGitHub)
             .Command!.Arguments![0];

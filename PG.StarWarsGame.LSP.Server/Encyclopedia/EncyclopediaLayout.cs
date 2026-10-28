@@ -1,9 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Server.Encyclopedia;
 
 /// <summary>A colour as the game writes it: four 0-255 channels, alpha last.</summary>
+[PublicAPI]
 public sealed record EncyclopediaRgba(int R, int G, int B, int A);
 
 /// <summary>
@@ -58,6 +61,7 @@ public static class EncyclopediaTextAlignment
 ///         resolutions at once. <paramref name="Scale" /> is already applied.
 ///     </para>
 /// </param>
+[PublicAPI]
 public sealed record EncyclopediaTextStyle(
     string Component,
     string FontName,

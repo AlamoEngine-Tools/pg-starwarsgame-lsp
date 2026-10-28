@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -10,18 +11,6 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 public sealed class DeprecatedEventTypeHandlerTest
 {
     private static readonly DeprecatedEventTypeHandler Sut = new();
-
-    private static StoryEventFact MakeFact(bool deprecated, bool isReward = false)
-    {
-        return new StoryEventFact("file:///test.xml", 1, 0, 0, "OLD_EVENT", isReward,
-            deprecated
-                ? new EnumValueDefinition
-                {
-                    Name = "OLD_EVENT",
-                    Notes = [new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>())]
-                }
-                : null);
-    }
 
     [Fact]
     public void Deprecated_event_emits_warning_containing_type_name()

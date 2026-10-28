@@ -36,7 +36,7 @@ public sealed class SchemaBootstrapperTest
         var bootstrapper = Build(new FakeHttpClientFactory(handler));
 
         var bootTask = bootstrapper.LoadAsync(CancellationToken.None);
-        var timeout = Task.Delay(TimeSpan.FromSeconds(5));
+        var timeout = Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var first = await Task.WhenAny(bootTask, timeout);
 
         Assert.True(first == bootTask,
@@ -409,8 +409,8 @@ public sealed class SchemaBootstrapperTest
             NullLogger<SchemaBootstrapper>.Instance,
             NullLogger<LocalFileSchemaProvider>.Instance,
             NullLogger<HttpSchemaProvider>.Instance,
-            recorder,
-            stubs);
+            recorder ?? new ServerStatusRecorder(),
+            stubs ?? new LuaStubLocation(), TestCatalogues.English);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

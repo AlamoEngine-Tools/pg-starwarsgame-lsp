@@ -138,7 +138,7 @@ public sealed class MegArchiveSetTest
 
         var archives = Build(fs, null, Project);
 
-        Assert.Equal<byte[]>([4, 2], archives.TryRead("data/art/textures/packed.dds")!);
+        Assert.Equal([4, 2], archives.TryRead("data/art/textures/packed.dds")!);
     }
 
     /// <summary>
@@ -153,7 +153,7 @@ public sealed class MegArchiveSetTest
 
         var archives = Build(fs, null, Project);
 
-        Assert.Equal<byte[]>([9], archives.TryRead("data/audio/sfx/blaster.wav")!);
+        Assert.Equal([9], archives.TryRead("data/audio/sfx/blaster.wav")!);
     }
 
     /// <summary>
@@ -170,7 +170,7 @@ public sealed class MegArchiveSetTest
 
         var archives = Build(fs, Game);
 
-        Assert.Equal<byte[]>([1], archives.TryRead("data/art/models/ship.alo")!);
+        Assert.Equal([1], archives.TryRead("data/art/models/ship.alo")!);
         Assert.Equal(2, archives.ArchiveCount);
     }
 

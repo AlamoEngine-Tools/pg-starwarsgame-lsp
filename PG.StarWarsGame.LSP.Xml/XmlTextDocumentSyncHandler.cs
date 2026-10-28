@@ -20,12 +20,12 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IStartupGate _gate;
     private readonly IGameIndexService _indexService;
-    private readonly ILogger<XmlTextDocumentSyncHandler>? _logger;
+    private readonly ILogger<XmlTextDocumentSyncHandler> _logger;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService,
         IFileHelper fileHelper, IEaWXmlContext eaWXmlContext, IStartupGate gate,
-        ILogger<XmlTextDocumentSyncHandler>? logger = null)
+        ILogger<XmlTextDocumentSyncHandler> logger)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
@@ -40,7 +40,7 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         var text = request.TextDocument.Text;
         var version = request.TextDocument.Version ?? 0;
-        _logger?.LogDebug("didOpen {Uri} v{Version}: gate {Gate}", uri, version, _gate.IsOpen ? "open" : "buffering");
+        _logger.LogDebug("didOpen {Uri} v{Version}: gate {Gate}", uri, version, _gate.IsOpen ? "open" : "buffering");
 
         // While the startup pipeline runs, the gate buffers this open and replays it after the
         // index is built and the EaW directories are known. The IsEaWXmlFile gate is evaluated
@@ -49,7 +49,7 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         {
             if (!_eaWXmlContext.IsEaWXmlFile(uri))
             {
-                _logger?.LogDebug("didOpen {Uri} ignored: outside the EaW XML directories", uri);
+                _logger.LogDebug("didOpen {Uri} ignored: outside the EaW XML directories", uri);
                 return;
             }
 
@@ -131,8 +131,7 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         // host, and the session publishes no diagnostics for any file until it is restarted. A
         // debugger breakpoint proves the call happened but suspends the handshake, which makes an
         // intermittent fault impractical to count; this line can be counted over many restarts.
-        _logger?.LogDebug("XML document sync registered (client synchronization capability: {Capability})",
-            capability is null ? "not declared" : "declared");
+        _logger.LogDebug("XML document sync registered");
 
         return new TextDocumentSyncRegistrationOptions
         {

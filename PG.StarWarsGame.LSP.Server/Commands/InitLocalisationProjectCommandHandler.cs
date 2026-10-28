@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Languages;
@@ -26,6 +27,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
     private readonly IBaselineTranslationProvider _baselineProvider;
     private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly IModProjectFileWriter _fileWriter;
@@ -45,7 +47,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         ILocalisationSeedFileWriter seedWriter,
         ILogger<InitLocalisationProjectCommandHandler> logger,
         ILspConfigurationProvider config,
-        IUserNotifier notifier)
+        IUserNotifier notifier,
+        IMessageCatalog messages)
     {
         _notifier = notifier;
         _baselineProvider = baselineProvider;
@@ -57,6 +60,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         _seedWriter = seedWriter;
         _logger = logger;
         _config = config;
+        _messages = messages;
     }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
@@ -85,13 +89,13 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             var clientDirectory = args?.Value<string>("directory");
             if (string.IsNullOrWhiteSpace(clientFormat) || string.IsNullOrWhiteSpace(clientDirectory))
             {
-                Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_CannotInitialiseLocalisationProjectThis"));
+                Fail(_messages.Format("LocInit_CannotInitialiseLocalisationProjectThis"));
                 return Unit.Value;
             }
 
             if (rootLayer?.ProjectPath is not { } pgprojPath)
             {
-                Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_CannotInitialiseLocalisationProjectNo"));
+                Fail(_messages.Format("LocInit_CannotInitialiseLocalisationProjectNo"));
                 return Unit.Value;
             }
 
@@ -106,7 +110,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
                 .Configured(_langService, _config.Current.Localisation).LanguageIdentifier);
         if (fileName is null)
         {
-            Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_CannotInitialiseLocalisationProjectNot",
+            Fail(_messages.Format("LocInit_CannotInitialiseLocalisationProjectNot",
                 format));
             return Unit.Value;
         }
@@ -115,7 +119,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
         if (fs.File.Exists(targetPath))
         {
-            Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_LocalisationProjectNotInitialisedAlready",
+            Fail(_messages.Format("LocInit_LocalisationProjectNotInitialisedAlready",
                 targetPath));
             return Unit.Value;
         }
@@ -135,7 +139,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         var writtenPath = await _seedWriter.WriteAsync(merged, format, targetDir, ct);
         if (writtenPath is null)
         {
-            Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_CannotInitialiseLocalisationProjectNot",
+            Fail(_messages.Format("LocInit_CannotInitialiseLocalisationProjectNot",
                 format));
             return Unit.Value;
         }
@@ -148,7 +152,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             // from now on, then fully re-resolve the .pgproj (a scoped reload wouldn't pick up
             // the new config since it reuses the stale WorkspaceConfiguration).
             await _fileWriter.SetLocalisationAsync(
-                rootLayer!.ProjectPath!, format.ToUpperInvariant(), bootstrapDirectory, ct);
+                rootLayer.ProjectPath!, format.ToUpperInvariant(), bootstrapDirectory, ct);
             await _reloadService.ReloadAsync(ct);
         }
         else
@@ -156,7 +160,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             await _reloadService.ReloadLocalisationAsync(ct);
         }
 
-        _notifier.ShowInfo(new ConfiguredMessageCatalog(_config).Format("LocInit_LocalisationProjectInitialisedCreated",
+        _notifier.ShowInfo(_messages.Format("LocInit_LocalisationProjectInitialisedCreated",
             writtenPath));
         return Unit.Value;
     }

@@ -2,18 +2,31 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
-public sealed class StoryFactProducer(ISchemaProvider schema) : IStoryFactProducer
+public sealed class StoryFactProducer(
+    ISchemaProvider schema,
+    IFileTypeRegistry fileTypeRegistry,
+    IFileHelper fileHelper)
+    : IXmlFactProducer
 {
     private const int MaxEventParamSlots = 7;
     private const int MaxRewardParamSlots = 14;
 
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+    public string Name => "story";
+
+    /// <summary>Story plot files only: the ones the registry files under the story parser.</summary>
+    public bool AppliesTo(string documentUri)
+    {
+        return fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
+    }
+
+    public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         var facts = new List<XmlFact>();
         var doc = document.Html;

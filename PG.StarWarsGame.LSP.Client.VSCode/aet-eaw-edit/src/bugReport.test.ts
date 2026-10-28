@@ -76,6 +76,7 @@ const extendedServer: ServerStatus = {
             filesParsed: 2,
             boneLayersReused: 3,
             boneLayers: 3,
+            derivedCaches: 4,
         },
         symbolTypes: [
             { typeName: "SpaceUnit", count: 20 },
@@ -142,7 +143,7 @@ describe("formatBugReport, extended tier", () => {
             "- Symbols: 900 XML, 30 Lua, 12000 baseline, 400 localisation keys",
             "- Assets: .ala 0, .alo 1500 (1379 base game)",
             "- Caches: schema Hit; index snapshots 2 of 3 layers, 50 files reused, 2 parsed; " +
-                "bone catalog 3 of 3 layers",
+                "bone catalog 3 of 3 layers; 4 derived from the index",
         ]) {
             assert.ok(text.includes(line), `missing "${line}" in:\n${text}`);
         }

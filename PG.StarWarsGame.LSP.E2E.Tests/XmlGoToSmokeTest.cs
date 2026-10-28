@@ -141,7 +141,7 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
         var workspace = LspTestEnvironment.EawWorkspacePath!;
         var frigatesPath = Path.Combine(workspace, "Data/Xml/Spaceunitsfrigates.xml");
         var frigatesUri = DocumentUri.FromFileSystemPath(frigatesPath);
-        var frigatesText = await File.ReadAllTextAsync(frigatesPath);
+        var frigatesText = await File.ReadAllTextAsync(frigatesPath, TestContext.Current.CancellationToken);
 
         for (var i = 0; i < 3; i++)
         {
@@ -150,12 +150,12 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
                 TextDocument = new TextDocumentItem
                     { Uri = frigatesUri, LanguageId = "xml", Version = 1, Text = frigatesText }
             });
-            await Task.Delay(100);
+            await Task.Delay(100, TestContext.Current.CancellationToken);
             _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
             {
                 TextDocument = new TextDocumentIdentifier { Uri = frigatesUri }
             });
-            await Task.Delay(150);
+            await Task.Delay(150, TestContext.Current.CancellationToken);
         }
 
         await RunGoToAsync(null, "Nebulon_B_Frigate", "Spaceunitsfrigates", FightersXmlRel);
@@ -266,14 +266,14 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
         var workspace = LspTestEnvironment.EawWorkspacePath!;
         var xmlPath = Path.Combine(workspace, "Data/Xml/Campaigns_multiplayer.xml");
         var xmlUri = DocumentUri.FromFileSystemPath(xmlPath);
-        var lines = await File.ReadAllLinesAsync(xmlPath);
+        var lines = await File.ReadAllLinesAsync(xmlPath, TestContext.Current.CancellationToken);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
             TextDocument = new TextDocumentItem
                 { Uri = xmlUri, LanguageId = "xml", Version = 1, Text = string.Join(Environment.NewLine, lines) }
         });
-        await Task.Delay(300);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
 
         try
         {
@@ -290,8 +290,8 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
 
             Assert.NotNull(result);
             // The multiplayer set groups multiple campaigns - find-references lists them all.
-            Assert.True(result!.Count() >= 2,
-                $"Expected multiple campaigns in the set, got {result!.Count()}");
+            Assert.True(result.Count() >= 2,
+                $"Expected multiple campaigns in the set, got {result.Count()}");
         }
         finally
         {
@@ -311,14 +311,14 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
         var workspace = LspTestEnvironment.EawWorkspacePath!;
         var xmlPath = Path.Combine(workspace, "Data/Xml/Campaigns_Alpha.xml");
         var xmlUri = DocumentUri.FromFileSystemPath(xmlPath);
-        var lines = await File.ReadAllLinesAsync(xmlPath);
+        var lines = await File.ReadAllLinesAsync(xmlPath, TestContext.Current.CancellationToken);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
             TextDocument = new TextDocumentItem
                 { Uri = xmlUri, LanguageId = "xml", Version = 1, Text = string.Join(Environment.NewLine, lines) }
         });
-        await Task.Delay(300);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
 
         try
         {
@@ -335,7 +335,7 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
             }, cts.Token);
 
             Assert.NotNull(result);
-            var uris = result!.Select(l => l.Uri.ToString()).ToList();
+            var uris = result.Select(l => l.Uri.ToString()).ToList();
             Assert.Contains(uris,
                 u => u.Contains("story_plots_campaign_empire.xml", StringComparison.OrdinalIgnoreCase));
         }
@@ -388,7 +388,7 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
             Assert.NotNull(result);
             // Definitions are returned as LocationLinks (with an originSelectionRange for the Ctrl-hover
             // decoration); tolerate the plain-Location shape too in case the client downgrades.
-            var targetUris = result!
+            var targetUris = result
                 .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri)
                 .ToList();
             Assert.NotEmpty(targetUris);

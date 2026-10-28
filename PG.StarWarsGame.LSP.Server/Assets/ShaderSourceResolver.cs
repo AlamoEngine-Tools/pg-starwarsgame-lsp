@@ -3,6 +3,7 @@
 
 using System.Text;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 

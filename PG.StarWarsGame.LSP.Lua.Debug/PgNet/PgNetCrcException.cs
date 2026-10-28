@@ -1,9 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Lua.Debug.PgNet;
 
 /// <summary>The stored CRC-32 of a datagram does not match its body.</summary>
+[PublicAPI]
 public sealed class PgNetCrcException : PgNetProtocolException
 {
     public PgNetCrcException(uint stored, uint actual)

@@ -59,7 +59,7 @@ public sealed class EawSchemaPostPatchTagTest
         var tags = YamlSchemaParser.ParseTagFile(File.ReadAllText(Find(file)));
         var tag = tags.FirstOrDefault(t => string.Equals(t.Tag, name, StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(tag);
-        return tag!;
+        return tag;
     }
 
     private static string Find(string file)

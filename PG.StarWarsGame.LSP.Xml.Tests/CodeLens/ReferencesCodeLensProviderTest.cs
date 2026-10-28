@@ -39,7 +39,7 @@ public sealed class ReferencesCodeLensProviderTest
     private static CodeLensSymbolContext MakeCtx(GameSymbol symbol, GameIndex index)
     {
         var origin = (FileOrigin)symbol.Origin;
-        return new CodeLensSymbolContext(symbol, origin, index);
+        return new CodeLensSymbolContext(symbol, origin, index) { Messages = TestCatalogues.English };
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class ReferencesCodeLensProviderTest
         var lens = provider.Handle(MakeCtx(sym, index));
 
         Assert.NotNull(lens);
-        Assert.Equal("0 references", lens!.Command!.Title);
+        Assert.Equal("0 references", lens.Command!.Title);
         Assert.Equal(5, lens.Range.Start.Line);
     }
 
@@ -66,7 +66,7 @@ public sealed class ReferencesCodeLensProviderTest
         var lens = provider.Handle(MakeCtx(sym, index));
 
         Assert.NotNull(lens);
-        Assert.Equal("1 reference", lens!.Command!.Title);
+        Assert.Equal("1 reference", lens.Command!.Title);
         Assert.Equal("aet-eaw-edit.lsp.showReferences", lens.Command!.Name);
     }
 
@@ -80,7 +80,7 @@ public sealed class ReferencesCodeLensProviderTest
         var lens = provider.Handle(MakeCtx(sym, index));
 
         Assert.NotNull(lens);
-        Assert.Equal("2 references", lens!.Command!.Title);
+        Assert.Equal("2 references", lens.Command!.Title);
     }
 
     [Fact]
@@ -93,6 +93,6 @@ public sealed class ReferencesCodeLensProviderTest
         var lens = provider.Handle(MakeCtx(sym, index));
 
         // With 0 refs the command has no name (no showReferences call makes sense)
-        Assert.Null(lens!.Command!.Name);
+        Assert.Null(lens.Command!.Name);
     }
 }

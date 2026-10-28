@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -27,12 +27,11 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     private const string SourceName = "aetswg";
 
     private readonly int _debounceMs;
-    private readonly IGlobalSuppressionStore? _globalSuppressions;
+    private readonly IGlobalSuppressionStore _globalSuppressions;
     private readonly IGameIndexService _indexService;
 
-    private readonly IProjectLayerMap? _layerMap;
+    private readonly IProjectLayerMap _layerMap;
     private readonly ILogger _logger;
-    private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly object _publishLock = new();
 
     // What was last sent per document, before the origin stamp. A project-wide suppression added
@@ -40,6 +39,7 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     // would publish - at none of the cost. Guarded by its own lock: a publisher may send outside
     // the publish lock (a document closed, a dialog scope changed).
     private readonly Dictionary<string, PublishDiagnosticsParams> _sent = new(StringComparer.Ordinal);
+    private readonly IDiagnosticsSink _sink;
     private readonly IGameWorkspaceHost _workspaceHost;
     private HashSet<string> _lastPublishedUris = [];
 
@@ -49,20 +49,24 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     private GameIndex? _lastRunIndex;
     private int _pendingVersion;
 
+    /// <param name="options">
+    ///     Carries the debounce window. Rapid consecutive index changes (a workspace-wide rename)
+    ///     are batched within it, and a test that wants every change published sets it to zero.
+    /// </param>
     protected DiagnosticsPublisherBase(
-        Action<PublishDiagnosticsParams> publish,
+        IDiagnosticsSink sink,
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
-        int debounceMs = 100,
-        ILogger? logger = null,
-        IGlobalSuppressionStore? globalSuppressions = null,
-        IProjectLayerMap? layerMap = null)
+        ServerOptions options,
+        ILogger logger,
+        IGlobalSuppressionStore globalSuppressions,
+        IProjectLayerMap layerMap)
     {
         _layerMap = layerMap;
-        _publish = publish;
+        _sink = sink;
         _workspaceHost = workspaceHost;
-        _debounceMs = debounceMs;
-        _logger = logger ?? NullLogger.Instance;
+        _debounceMs = (int)options.DiagnosticsDebounce.TotalMilliseconds;
+        _logger = logger;
         _globalSuppressions = globalSuppressions;
         _indexService = indexService;
         indexService.IndexChanged += OnIndexChanged;
@@ -171,7 +175,7 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     {
         if (diagnostics.Count == 0) return diagnostics;
 
-        var global = _globalSuppressions?.GetAll() ?? [];
+        var global = _globalSuppressions.GetAll();
         if (ranges.Count == 0 && global.Count == 0) return diagnostics;
 
         var suppressions = new DocumentSuppressions(ranges, global);
@@ -189,7 +193,7 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
                 _sent.Remove(key);
         }
 
-        _publish(WithOrigin(p));
+        _sink.Publish(WithOrigin(p));
     }
 
     /// <summary>
@@ -206,8 +210,8 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 
         var source = SourceName;
         string? layerName = null;
-        var layers = _layerMap?.Layers;
-        if (_layerMap is not null && layers is { Count: > 0 })
+        var layers = _layerMap.Layers;
+        if (layers.Count > 0)
         {
             var topRank = layers.Max(l => l.Rank);
             var project = _layerMap.GetLayerName(topRank);
@@ -223,11 +227,6 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
             if (rank < topRank)
                 layerName = _layerMap.GetLayerName(rank);
         }
-
-        if (_layerMap is null)
-            _logger.LogDebug(
-                "Diagnostic origin: no layer map wired into {Publisher} (suppressions wired: {Suppressions})",
-                GetType().Name, _globalSuppressions is not null);
 
         var stamped = p.Diagnostics.Select(d => Stamp(d, source, layerName, p.Uri)).ToList();
         return new PublishDiagnosticsParams

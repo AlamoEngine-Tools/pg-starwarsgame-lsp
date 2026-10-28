@@ -37,7 +37,7 @@ public sealed class SuppressDiagnosticGloballyCommandHandler : ExecuteCommandHan
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
-        var raw = request.Arguments is { Count: > 0 } args ? args[0]?.Value<string>() : null;
+        var raw = request.Arguments is { Count: > 0 } args ? args[0].Value<string>() : null;
         if (!SuppressionMatcher.TryParse(raw, out var matcher))
         {
             _logger.LogWarning("{Cmd}: '{Raw}' is not a diagnostic id.", CommandName, raw);

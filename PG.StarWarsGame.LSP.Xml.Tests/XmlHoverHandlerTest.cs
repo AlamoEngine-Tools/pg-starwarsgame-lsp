@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -35,23 +36,26 @@ public sealed class XmlHoverHandlerTest
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
     private static (XmlHoverHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
-        FakeConfigProvider config) Build(FakeFileTypeRegistry? registry = null, FakeIndexService? indexService = null,
-            IEaWXmlContext? ctx = null)
+        FakeConfigProvider config) Build(FakeFileTypeRegistry? registry = null,
+            FakeGameIndexService? indexService = null,
+            IEaWXmlContext? ctx = null,
+            IMessageCatalog? messages = null)
     {
         var host = new FakeGameWorkspaceHost();
-        var schema = new FakeSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var config = new FakeConfigProvider();
         var fileTypeRegistry = registry ?? new FakeFileTypeRegistry();
-        var strategyRegistry = new XmlHoverStrategyRegistry([
+        IXmlHoverStrategy[] strategies =
+        [
             new ReferenceHoverStrategy(),
             new AssetHoverStrategy(),
             new TagNameHoverStrategy(fileTypeRegistry)
-        ]);
-        return (new XmlHoverHandler(TestParseCache.For(host), indexService ?? new FakeIndexService(), schema,
+        ];
+        return (new XmlHoverHandler(TestParseCache.For(host), indexService ?? new FakeGameIndexService(), schema,
                 config,
                 NullLogger<XmlHoverHandler>.Instance,
                 new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
-                strategyRegistry),
+                strategies, messages ?? TestCatalogues.English),
             host, schema, config);
     }
 
@@ -129,7 +133,7 @@ public sealed class XmlHoverHandlerTest
     public async Task Handle_BufferEmpty_ReturnsNull()
     {
         var (handler, _, _, _) = Build();
-        var result = await handler.Handle(At(0, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 1), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -139,7 +143,7 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, _, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Foo/>", 1);
 
-        var result = await handler.Handle(At(99, 0), CancellationToken.None);
+        var result = await handler.HoverAsync(At(99, 0), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -149,7 +153,7 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, _, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Max_Speed>500</Max_Speed>", 1);
         // cursor on "500" (position 11)
-        var result = await handler.Handle(At(0, 11), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 11), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -158,10 +162,8 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Max_Speed>500</Max_Speed>", 1);
-        schema.TagToReturn = null;
-        schema.TypeToReturn = null;
 
-        var result = await handler.Handle(At(0, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 2), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -172,10 +174,10 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
-        schema.TagToReturn = MakeTag();
+        schema.Add(MakeTag());
 
         // cursor on 'M' of Max_Speed (line 1, col 1)
-        var result = await handler.Handle(At(1, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 1), CancellationToken.None);
 
         Assert.NotNull(result);
         var md = result.Contents.MarkupContent!.Value;
@@ -187,10 +189,10 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
-        schema.TagToReturn = MakeTag();
+        schema.Add(MakeTag());
 
         // "</Max_Speed>" starts at index 14; 'M' is at 16 (line 1)
-        var result = await handler.Handle(At(1, 16), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 16), CancellationToken.None);
 
         Assert.NotNull(result);
     }
@@ -200,9 +202,9 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Old_Tag/>\n</Root>", 1);
-        schema.TagToReturn = MakeTag("Old_Tag", true);
+        schema.Add(MakeTag("Old_Tag", true));
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("deprecated", md, StringComparison.OrdinalIgnoreCase);
@@ -213,9 +215,9 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<New_Tag/>\n</Root>", 1);
-        schema.TagToReturn = MakeTag("New_Tag", since: "FoC 1.0");
+        schema.Add(MakeTag("New_Tag", since: "FoC 1.0"));
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("FoC 1.0", md);
@@ -226,14 +228,30 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, config) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
-        schema.TagToReturn = MakeTag("Foo", descEn: "English", descDe: "Deutsch");
+        schema.Add(MakeTag("Foo", descEn: "English", descDe: "Deutsch"));
         config.Locale = "de";
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("Deutsch", md);
         Assert.DoesNotContain("English", md);
+    }
+
+    /// <summary>
+    ///     The server's own words in a hover come from the ONE injected catalogue (#306), never from one
+    ///     the hover builds for the locale: a tag without a description says so in the catalogue's voice.
+    /// </summary>
+    [Fact]
+    public async Task Handle_TheHoverSpeaksTheInjectedCatalogue()
+    {
+        var (handler, host, schema, _) = Build(messages: new MarkerMessageCatalog());
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
+        schema.Add(MakeTag("Foo", descEn: null));
+
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
+
+        Assert.Contains("[HoverUtility_NoDescription]", result!.Contents.MarkupContent!.Value);
     }
 
     [Fact]
@@ -242,12 +260,12 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, schema, _) = Build();
         // "<Root>\n<Foo/>\n</Root>" - on line 1, 'F' at col 1, length 3
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
-        schema.TagToReturn = MakeTag("Foo");
+        schema.Add(MakeTag("Foo"));
 
-        var result = await handler.Handle(At(1, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 1), CancellationToken.None);
 
         Assert.NotNull(result?.Range);
-        Assert.Equal(1, result!.Range!.Start.Character);
+        Assert.Equal(1, result.Range!.Start.Character);
         Assert.Equal(4, result.Range.End.Character); // 1 + len("Foo")
     }
 
@@ -258,9 +276,9 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
-        schema.TagToReturn = MakeTag(); // ValueType = Float
+        schema.Add(MakeTag()); // ValueType = Float
 
-        var result = await handler.Handle(At(1, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 1), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("1.0f", md);
@@ -271,15 +289,15 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation/>\n</Root>", 1);
-        schema.TagToReturn = new XmlTagDefinition
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Affiliation",
             ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
-        };
+        });
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("Faction", md);
@@ -291,15 +309,15 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Armor_Type/>\n</Root>", 1);
-        schema.TagToReturn = new XmlTagDefinition
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Armor_Type",
             ValueType = XmlValueType.DynamicEnumValue,
             ReferenceKind = ReferenceKind.Enum,
             Enum = new EnumDefinition { Name = "ArmorType", Kind = EnumKind.DynamicXml, Values = [] }
-        };
+        });
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("ArmorType", md);
@@ -311,11 +329,11 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Hardpoints><Max_Speed>500</Max_Speed></Hardpoints>", 1);
-        schema.TagToReturn = MakeTag("Hardpoints"); // registered as a tag but NOT as a type
-        // schema.TypeToReturn = null (default)
+        schema.Add(MakeTag("Hardpoints")); // registered as a tag but NOT as a type
+        // no type registered
 
         // Cursor on 'H' of <Hardpoints> (document root element)
-        var result = await handler.Handle(At(0, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 1), CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -329,7 +347,7 @@ public sealed class XmlHoverHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
         {
             TypeName = "SpaceUnit",
             NameTag = "Name",
@@ -339,10 +357,10 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(),
             "<GameObjectFiles>\n<Fighter_Mk2/>\n</GameObjectFiles>", 1);
         // cursor on 'F' of Fighter_Mk2 (line 1, col 2)
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         Assert.NotNull(result);
-        var md = result!.Contents.MarkupContent!.Value;
+        var md = result.Contents.MarkupContent!.Value;
         Assert.Contains("fighter_mk2", md);
     }
 
@@ -353,17 +371,17 @@ public sealed class XmlHoverHandlerTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry);
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
 
-        schema.TagToReturn = MakeTag();
+        schema.Add(MakeTag());
 
         host.AddOrUpdate(TestUri.ToString(),
             "<GameObjectFiles>\n<Fighter_Mk2>\n<Max_Speed/>\n</Fighter_Mk2>\n</GameObjectFiles>", 1);
         // cursor on 'M' of Max_Speed (line 2, col 1)
-        var result = await handler.Handle(At(2, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(2, 2), CancellationToken.None);
 
         Assert.NotNull(result);
-        var md = result!.Contents.MarkupContent!.Value;
+        var md = result.Contents.MarkupContent!.Value;
         Assert.Contains("Float", md); // tag hover includes value type
         Assert.DoesNotContain("name tag", md, StringComparison.OrdinalIgnoreCase);
     }
@@ -375,15 +393,14 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<GameObjectType>", 1);
-        schema.TagToReturn = null; // not a tag
-        schema.TypeToReturn = new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
         {
             TypeName = "GameObjectType",
             NameTag = "Name",
             Description = new Dictionary<string, string> { ["en"] = "All game objects." }
-        };
+        });
 
-        var result = await handler.Handle(At(0, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 2), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -394,7 +411,7 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Old_Tag/>\n</Root>", 1);
-        schema.TagToReturn = new XmlTagDefinition
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Old_Tag",
             ValueType = XmlValueType.Float,
@@ -404,9 +421,9 @@ public sealed class XmlHoverHandlerTest
                 new SchemaNote(SchemaNoteKind.Remark,
                     new Dictionary<string, string> { ["en"] = "Never used in vanilla." })
             ]
-        };
+        });
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("Never used in vanilla.", md);
@@ -418,9 +435,9 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed/>\n</Root>", 1);
-        schema.TagToReturn = MakeTag();
+        schema.Add(MakeTag());
 
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.DoesNotContain("**Note:**", md);
@@ -434,10 +451,10 @@ public sealed class XmlHoverHandlerTest
         // Verifies column gating: cursor is on "500", not on the tag name.
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
-        schema.TagToReturn = MakeTag();
+        schema.Add(MakeTag());
 
         // '5' of "500" is at col 11 on line 1
-        var result = await handler.Handle(At(1, 11), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 11), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -447,12 +464,12 @@ public sealed class XmlHoverHandlerTest
         // Closing tag is on a different line from the opening tag.
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>\n500\n</Max_Speed>\n</Root>", 1);
-        schema.TagToReturn = MakeTag();
+        schema.Add(MakeTag());
 
         // </Max_Speed> on line 3: '<' at 0, '/' at 1, 'M' at 2
-        var result = await handler.Handle(At(3, 2), CancellationToken.None);
+        var result = await handler.HoverAsync(At(3, 2), CancellationToken.None);
         Assert.NotNull(result);
-        Assert.Contains("Max_Speed", result!.Contents.MarkupContent!.Value);
+        Assert.Contains("Max_Speed", result.Contents.MarkupContent!.Value);
     }
 
     // ── reference hover ──────────────────────────────────────────────────────
@@ -464,19 +481,19 @@ public sealed class XmlHoverHandlerTest
         // "EMPIRE" starts at col 13 on line 1
         var symbol = SymbolOf("EMPIRE", "Faction");
         var index = IndexWith(DocWithRef("EMPIRE", 1, 13, 6), symbol);
-        var indexService = new FakeIndexService { Current = index };
+        var indexService = new FakeGameIndexService { Current = index };
         var (handler, host, schema, _) = Build(indexService: indexService);
-        schema.AddType(new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
         {
             TypeName = "Faction",
             Description = new Dictionary<string, string> { ["en"] = "A playable faction." }
         });
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>EMPIRE</Affiliation>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 14), CancellationToken.None);
 
         Assert.NotNull(result);
-        var md = result!.Contents.MarkupContent!.Value;
+        var md = result.Contents.MarkupContent!.Value;
         Assert.Contains("Faction", md);
         Assert.Contains("EMPIRE", md);
     }
@@ -486,13 +503,13 @@ public sealed class XmlHoverHandlerTest
     {
         var symbol = SymbolOf("EMPIRE", "Faction");
         var index = IndexWith(DocWithRef("EMPIRE", 1, 13, 6), symbol);
-        var indexService = new FakeIndexService { Current = index };
+        var indexService = new FakeGameIndexService { Current = index };
         var (handler, host, schema, _) = Build(indexService: indexService);
-        schema.AddType(new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
             { TypeName = "Faction", Description = new Dictionary<string, string>() });
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>EMPIRE</Affiliation>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 14), CancellationToken.None);
 
         Assert.Equal(1, result!.Range!.Start.Line);
         Assert.Equal(13, result.Range.Start.Character);
@@ -510,16 +527,16 @@ public sealed class XmlHoverHandlerTest
         var doc = DocWithRefs(refAlpha, refBeta);
         var symbol = SymbolOf("Beta", "SpaceUnit");
         var index = IndexWith(doc, symbol);
-        var indexService = new FakeIndexService { Current = index };
+        var indexService = new FakeGameIndexService { Current = index };
         var (handler, host, schema, _) = Build(indexService: indexService);
-        schema.AddType(new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
             { TypeName = "SpaceUnit", Description = new Dictionary<string, string>() });
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Units>Alpha Beta</Units>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 14), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains("Beta", result!.Contents.MarkupContent!.Value);
+        Assert.Contains("Beta", result.Contents.MarkupContent!.Value);
         Assert.DoesNotContain("Alpha", result.Contents.MarkupContent!.Value);
     }
 
@@ -544,18 +561,18 @@ public sealed class XmlHoverHandlerTest
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(uri, doc),
             defs,
             ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase));
-        var indexService = new FakeIndexService { Current = index };
+        var indexService = new FakeGameIndexService { Current = index };
         var (handler, host, schema, _) = Build(indexService: indexService);
-        schema.AddType(new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
             { TypeName = "SFXEvent", Description = new Dictionary<string, string>() });
-        schema.AddType(new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
             { TypeName = "TradeRouteLine", Description = new Dictionary<string, string>() });
         host.AddOrUpdate(uri, "<Root>\n<SFXEvent_Select>Null</SFXEvent_Select>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 19), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 19), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains("SFXEvent", result!.Contents.MarkupContent!.Value);
+        Assert.Contains("SFXEvent", result.Contents.MarkupContent!.Value);
         Assert.DoesNotContain("TradeRouteLine", result.Contents.MarkupContent!.Value);
     }
 
@@ -563,11 +580,11 @@ public sealed class XmlHoverHandlerTest
     public async Task Handle_CursorOnUnresolvedReference_ReturnsNull()
     {
         var index = IndexWith(DocWithRef("MISSING_UNIT", 1, 13, 12));
-        var indexService = new FakeIndexService { Current = index };
+        var indexService = new FakeGameIndexService { Current = index };
         var (handler, host, _, _) = Build(indexService: indexService);
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>MISSING_UNIT</Affiliation>\n</Root>", 1);
 
-        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        var result = await handler.HoverAsync(At(1, 14), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -591,11 +608,11 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), AbilityXml, 1);
         // Abilities tag must resolve to AbilityDefinitionSubObjectList so parent chain walk works
-        schema.AddTagByName(AbilitiesContainerTag());
-        schema.AddType(AbilityTypeDef("LuckyShotAttackAbility"));
+        schema.Add(AbilitiesContainerTag());
+        schema.Add(AbilityTypeDef("LuckyShotAttackAbility"));
 
         // Line 2: "<Lucky_Shot_Attack_Ability Name="Luke_Shot">" - cursor on 'L'
-        var result = await handler.Handle(At(2, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(2, 1), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains("LuckyShotAttackAbility", result.Contents.MarkupContent!.Value);
@@ -606,9 +623,9 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), AbilityXml, 1);
-        schema.AddTagByName(AbilitiesContainerTag());
-        schema.AddType(AbilityTypeDef("LuckyShotAttackAbility"));
-        schema.AddTagForType("LuckyShotAttackAbility",
+        schema.Add(AbilitiesContainerTag());
+        schema.Add(AbilityTypeDef("LuckyShotAttackAbility"));
+        schema.AddForType("LuckyShotAttackAbility",
             new XmlTagDefinition
             {
                 Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.NameReference,
@@ -616,7 +633,7 @@ public sealed class XmlHoverHandlerTest
             });
 
         // Line 3: "<Applicable_Unit_Categories>..." - cursor on 'A'
-        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(3, 1), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains("Applicable_Unit_Categories", result.Contents.MarkupContent!.Value);
@@ -629,18 +646,18 @@ public sealed class XmlHoverHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("GameObjectType"));
         var (handler, host, schema, _) = Build(registry);
         host.AddOrUpdate(TestUri.ToString(), AbilityXml, 1);
-        schema.AddTagByName(AbilitiesContainerTag());
+        schema.Add(AbilitiesContainerTag());
         // GameObjectType has NO Applicable_Unit_Categories tag; ability type does
-        schema.AddType(AbilityTypeDef("GameObjectType"));
-        schema.AddType(AbilityTypeDef("LuckyShotAttackAbility"));
-        schema.AddTagForType("LuckyShotAttackAbility",
+        schema.Add(AbilityTypeDef("GameObjectType"));
+        schema.Add(AbilityTypeDef("LuckyShotAttackAbility"));
+        schema.AddForType("LuckyShotAttackAbility",
             new XmlTagDefinition
             {
                 Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.Float,
                 Description = new Dictionary<string, string> { ["en"] = "From ability schema" }
             });
 
-        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+        var result = await handler.HoverAsync(At(3, 1), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains("Applicable_Unit_Categories", result.Contents.MarkupContent!.Value);
@@ -655,109 +672,12 @@ public sealed class XmlHoverHandlerTest
         var (handler, host, _, _) = Build(ctx: new DenyAllEaWContext());
         host.AddOrUpdate(TestUri.ToString(), "<Root><Foo/></Root>", 1);
 
-        var result = await handler.Handle(At(0, 7), CancellationToken.None);
+        var result = await handler.HoverAsync(At(0, 7), CancellationToken.None);
 
         Assert.Null(result);
     }
 
     // ── fakes ───────────────────────────────────────────────────────────────
-
-    private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-    }
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, XmlTagDefinition> _tagsByName =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByTypeName =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, GameObjectTypeDefinition> _typesByName =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? TagToReturn { get; set; }
-        public GameObjectTypeDefinition? TypeToReturn { get; set; }
-
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tagsByName.TryGetValue(name, out var def) ? def : TagToReturn;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return TagToReturn is null
-                ? []
-                : [TagToReturn];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _typesByName.TryGetValue(name, out var def) ? def : TypeToReturn;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            if (_tagsByTypeName.TryGetValue(typeName, out var list)) return list;
-            return GetObjectType(typeName) is null ? [] : GetAllTagDefinitions(typeName);
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddTagByName(XmlTagDefinition tag)
-        {
-            _tagsByName[tag.Tag] = tag;
-        }
-
-        public void AddTagForType(string typeName, XmlTagDefinition tag)
-        {
-            if (!_tagsByTypeName.TryGetValue(typeName, out var list))
-                _tagsByTypeName[typeName] = list = [];
-            list.Add(tag);
-        }
-
-        public void AddType(GameObjectTypeDefinition type)
-        {
-            _typesByName[type.TypeName] = type;
-        }
-    }
 
     private sealed class FakeFileTypeRegistry : IFileTypeRegistry
     {
@@ -794,82 +714,6 @@ public sealed class XmlHoverHandlerTest
 
         public void LoadFrom(object? _)
         {
-        }
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
         }
     }
 }

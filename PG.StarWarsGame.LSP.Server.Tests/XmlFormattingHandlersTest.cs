@@ -6,6 +6,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -39,9 +40,8 @@ public sealed class XmlFormattingHandlersTest
         var cache = new OneDocumentCache(text);
         var context = new FixedEaWContext(eaw);
         var files = new FileHelper(new MockFileSystem());
-        var config = new FakeLspConfigurationProvider();
-        return (new XmlDocumentFormattingHandler(cache, context, files, _notifier, config),
-            new XmlDocumentRangeFormattingHandler(cache, context, files, _notifier, config));
+        return (new XmlDocumentFormattingHandler(cache, context, files, _notifier, TestCatalogues.English),
+            new XmlDocumentRangeFormattingHandler(cache, context, files, _notifier, TestCatalogues.English));
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class XmlFormattingHandlersTest
             TextDocument = Doc, Options = new FormattingOptions { TabSize = 2, InsertSpaces = true }
         }, CancellationToken.None);
 
-        Assert.All(All(edits), e => Assert.Equal<string>("  ", e.NewText));
+        Assert.All(All(edits), e => Assert.Equal("  ", e.NewText));
     }
 
     [Fact]

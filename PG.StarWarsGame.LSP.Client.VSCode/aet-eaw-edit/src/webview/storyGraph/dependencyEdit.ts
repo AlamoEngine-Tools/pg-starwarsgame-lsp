@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
+
 import type { StoryGraphNodeDto } from "../../protocol/story";
 
 /**
@@ -43,7 +45,10 @@ export function readOnlyOwnerOf(
 
 /** Why an editing control is disabled, and where the edit does belong. */
 export function readOnlyMessage(owner: string): string {
-    return `Read-only: '${owner}' is a referenced project. Edit this thread in '${owner}' itself`;
+    return l10n.t(
+        "Read-only: '{0}' is a referenced project. Edit this thread in '{0}' itself",
+        owner,
+    );
 }
 
 /**
@@ -79,11 +84,16 @@ export function editModeBlockedBy(
     const named =
         owners.length === 1
             ? `'${owners[0]}'`
-            : owners.map((o) => `'${o}'`).join(" and ");
+            : owners.map((o) => `'${o}'`).join(", ");
     const all = threaded.every((n) => n.readOnlyOwner);
 
-    return (
-        `${all ? "Every thread here belongs" : "Part of this graph belongs"} to ${named}, which ` +
-        "this workspace only references. Open the graph in that project to edit it."
-    );
+    return all
+        ? l10n.t(
+              "Every thread here belongs to {0}, which this workspace only references. Open the graph in that project to edit it",
+              named,
+          )
+        : l10n.t(
+              "Part of this graph belongs to {0}, which this workspace only references. Open the graph in that project to edit it",
+              named,
+          );
 }

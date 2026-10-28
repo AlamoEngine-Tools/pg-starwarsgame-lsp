@@ -129,10 +129,12 @@ export class ModBrowserPanel extends WebviewPanelHost {
                 : undefined;
         const subject = run?.byName ? msg.name : msg.id;
         if (run && typeof subject === "string" && subject) {
+            // The entry's type travels too: one name may be objects of several types.
             await vscode.commands.executeCommand(
                 run.command,
                 subject,
                 this.project.key,
+                typeof msg.objectType === "string" ? msg.objectType : undefined,
             );
         }
     }

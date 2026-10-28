@@ -86,7 +86,7 @@ internal static class StoryBattleFixture
             [M2] = [M2ManifestEntry],
             [M5] = [M5ManifestEntry]
         };
-        var graph = new StoryGraphBuilder(new Schema()).Build(threads, manifests);
+        var graph = new StoryGraphBuilder(Schema.Build()).Build(threads, manifests);
         return new StoryCampaignModel("GC", "Empire", threads, new HashSet<string>(StringComparer.Ordinal), graph)
         {
             TacticalManifestThreads = manifests,
@@ -152,85 +152,7 @@ internal static class StoryBattleFixture
         }
     }
 
-    public sealed class IndexService : IGameIndexService
-    {
-        public GameIndex Current => GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new NoopDisposable();
-        }
-
-        private sealed class NoopDisposable : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    public sealed class Schema : ISchemaProvider
+    public static class Schema
     {
         private static readonly EnumDefinition Events = new()
         {
@@ -281,46 +203,12 @@ internal static class StoryBattleFixture
             ]
         };
 
-        public event EventHandler? SchemaRefreshed
+        public static FakeSchemaProvider Build()
         {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [Events, Rewards];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            return name switch
-            {
-                "StoryEventType" => Events,
-                "StoryRewardType" => Rewards,
-                _ => null
-            };
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
+            return new SchemaProviderBuilder()
+                .WithEnum(Events)
+                .WithEnum(Rewards)
+                .Build();
         }
     }
 }

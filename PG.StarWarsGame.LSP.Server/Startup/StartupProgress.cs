@@ -21,17 +21,17 @@ public sealed class StartupProgress : IStartupProgress
     private readonly ILogger<StartupProgress> _logger;
     private readonly IMessageCatalog _messages;
     private readonly ServerOptions _options;
-    private readonly IServerWorkDoneManager? _workDone;
+    private readonly IServerWorkDoneManager _workDone;
 
     private Task<IWorkDoneObserver>? _createTask;
     private bool _started;
 
-    public StartupProgress(ILogger<StartupProgress> logger, ServerOptions? options = null,
-        IServerWorkDoneManager? workDone = null, IMessageCatalog? messages = null)
+    public StartupProgress(ILogger<StartupProgress> logger, ServerOptions options,
+        IServerWorkDoneManager workDone, IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _logger = logger;
-        _options = options ?? ServerOptions.Default;
+        _options = options;
         _workDone = workDone;
     }
 
@@ -54,7 +54,7 @@ public sealed class StartupProgress : IStartupProgress
     {
         if (_started) return;
         _started = true;
-        if (_workDone is not { IsSupported: true }) return;
+        if (!_workDone.IsSupported) return;
 
         // window/workDoneProgress/create awaits a client response that some clients delay or never
         // send. Cap it so a missing token never blocks startup; reports before it resolves are
@@ -64,7 +64,7 @@ public sealed class StartupProgress : IStartupProgress
 
     private async Task<IWorkDoneObserver> CreateObserverAsync()
     {
-        var createTask = _workDone!.Create(
+        var createTask = _workDone.Create(
             new WorkDoneProgressBegin
             {
                 Title = _messages.Format("StartupProgress_StarWarsLSPStarting"),

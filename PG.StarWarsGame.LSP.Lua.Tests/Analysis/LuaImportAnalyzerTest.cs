@@ -32,7 +32,8 @@ public sealed class LuaImportAnalyzerTest
     [Fact]
     public void Analyze_NoRequireCalls_NoDiagnostics()
     {
-        var result = LuaImportAnalyzer.Analyze(ScriptUri, "function Foo() end", EmptyWorkspace, s_fileHelper);
+        var result = LuaImportAnalyzer.Analyze(ScriptUri, "function Foo() end", EmptyWorkspace, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -40,7 +41,7 @@ public sealed class LuaImportAnalyzerTest
     public void Analyze_RequireResolves_NoDiagnostic()
     {
         var result = LuaImportAnalyzer.Analyze(ScriptUri,
-            """require("PGStateMachine")""", WorkspaceWithLib, s_fileHelper);
+            """require("PGStateMachine")""", WorkspaceWithLib, s_fileHelper, TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -48,7 +49,7 @@ public sealed class LuaImportAnalyzerTest
     public void Analyze_RequireNotResolved_EmitsError()
     {
         var result = LuaImportAnalyzer.Analyze(ScriptUri,
-            """require("MissingLibrary")""", EmptyWorkspace, s_fileHelper);
+            """require("MissingLibrary")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English);
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Contains("MissingLibrary", diag.Message);
@@ -58,7 +59,7 @@ public sealed class LuaImportAnalyzerTest
     public void Analyze_DynamicRequire_NoDiagnostic()
     {
         var result = LuaImportAnalyzer.Analyze(ScriptUri,
-            "require(someVar)", EmptyWorkspace, s_fileHelper);
+            "require(someVar)", EmptyWorkspace, s_fileHelper, TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -67,7 +68,7 @@ public sealed class LuaImportAnalyzerTest
     {
         // Relative requires (../../X) cannot be resolved statically; no false positive.
         var result = LuaImportAnalyzer.Analyze(ScriptUri,
-            """require("../../CustomFactionName")""", EmptyWorkspace, s_fileHelper);
+            """require("../../CustomFactionName")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -79,7 +80,7 @@ public sealed class LuaImportAnalyzerTest
                    require("MissingOne")
                    require("MissingTwo")
                    """;
-        var result = LuaImportAnalyzer.Analyze(ScriptUri, code, WorkspaceWithLib, s_fileHelper);
+        var result = LuaImportAnalyzer.Analyze(ScriptUri, code, WorkspaceWithLib, s_fileHelper, TestCatalogues.English);
         Assert.Equal(2, result.Count);
         Assert.All(result, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
     }
@@ -88,7 +89,7 @@ public sealed class LuaImportAnalyzerTest
     public void Analyze_MissingRequire_DiagnosticRangeIsNonZeroLength()
     {
         var result = LuaImportAnalyzer.Analyze(ScriptUri,
-            """require("Missing")""", EmptyWorkspace, s_fileHelper);
+            """require("Missing")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English);
         var diag = Assert.Single(result);
         Assert.True(diag.Range.End.Character > diag.Range.Start.Character ||
                     diag.Range.End.Line > diag.Range.Start.Line);
@@ -101,7 +102,7 @@ public sealed class LuaImportAnalyzerTest
                    local x = 1
                    require("Missing")
                    """;
-        var result = LuaImportAnalyzer.Analyze(ScriptUri, code, EmptyWorkspace, s_fileHelper);
+        var result = LuaImportAnalyzer.Analyze(ScriptUri, code, EmptyWorkspace, s_fileHelper, TestCatalogues.English);
         var diag = Assert.Single(result);
         Assert.Equal(1, diag.Range.Start.Line);
     }

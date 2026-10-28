@@ -8,13 +8,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -27,26 +28,37 @@ public sealed class LuaDiagnosticsPublisherTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    // ReSharper disable once UnusedTupleComponentInReturnValue - the helper returns everything a test might need; some tests ignore a part
     private static (LuaDiagnosticsPublisher publisher,
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) Build(
             ILuaApiSchemaProvider? schema = null,
-            ILspConfigurationProvider? config = null)
+            IMessageCatalog? messages = null)
     {
-        var published = new List<PublishDiagnosticsParams>();
+        var sink = new RecordingDiagnosticsSink();
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
         var fileHelper = new FileHelper(new MockFileSystem());
-        var publisher = new LuaDiagnosticsPublisher(
-            p => published.Add(p),
-            indexService,
-            workspaceHost,
-            fileHelper,
-            schema ?? new LuaApiSchemaProvider([]),
-            NullLogger<LuaDiagnosticsPublisher>.Instance,
-            configProvider: config);
-        return (publisher, published, indexService, workspaceHost);
+        var publisher = Publisher(sink, indexService, workspaceHost, fileHelper,
+            schema ?? new LuaApiSchemaProvider([]), NullLogger<LuaDiagnosticsPublisher>.Instance,
+            TestLuaParseCache.For(workspaceHost, fileHelper), messages ?? TestCatalogues.English,
+            new FakeAnalyzer());
+        return (publisher, sink.Published, indexService, workspaceHost);
+    }
+
+    /// <summary>
+    ///     The publisher over the test's own collaborators; the rest are the quietest doubles there
+    ///     are - no suppressions, no layers, no debounce - since every dependency is required (#305).
+    /// </summary>
+    private static LuaDiagnosticsPublisher Publisher(
+        IDiagnosticsSink sink, IGameIndexService indexService, IGameWorkspaceHost workspaceHost,
+        IFileHelper fileHelper, ILuaApiSchemaProvider schema, ILogger<LuaDiagnosticsPublisher> logger,
+        ILuaParseCache parseCache, IMessageCatalog messages, ILuaAnalyzer analyzer)
+    {
+        return new LuaDiagnosticsPublisher(sink, indexService, workspaceHost, fileHelper, schema, logger,
+            parseCache, messages, new ProjectLayerMap(fileHelper), TestServerOptions.Immediate,
+            new FakeGlobalSuppressionStore(), analyzer);
     }
 
     // ── the analyzer's findings, folded in (#153) ───────────────────────────
@@ -55,14 +67,15 @@ public sealed class LuaDiagnosticsPublisherTest
         FakeGameIndexService index) BuildWithAnalyzer(bool running = true,
             ILogger<LuaDiagnosticsPublisher>? logger = null, ILuaApiSchemaProvider? schema = null)
     {
-        var published = new List<PublishDiagnosticsParams>();
+        var sink = new RecordingDiagnosticsSink();
         var index = new FakeGameIndexService();
         var host = new FakeGameWorkspaceHost();
+        var fileHelper = new FileHelper(new MockFileSystem());
         var analyzer = new FakeAnalyzer { IsRunning = running };
-        _ = new LuaDiagnosticsPublisher(p => published.Add(p), index, host, new FileHelper(new MockFileSystem()),
-            schema ?? new LuaApiSchemaProvider([]), logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance,
-            analyzer: analyzer);
-        return (published, host, analyzer, index);
+        _ = Publisher(sink, index, host, fileHelper, schema ?? new LuaApiSchemaProvider([]),
+            logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance, TestLuaParseCache.For(host, fileHelper),
+            TestCatalogues.English, analyzer);
+        return (sink.Published, host, analyzer, index);
     }
 
     private static Diagnostic AnalyzerFinding(string rule, int line = 0)
@@ -83,7 +96,7 @@ public sealed class LuaDiagnosticsPublisherTest
     public void AnAnalyzerPublish_ForAnOpenDocument_IsFoldedIntoOnePublish_UnderOurIds()
     {
         var (published, host, analyzer, _) = BuildWithAnalyzer();
-        host.Set(LuaUri, "local x = 1");
+        host.With(LuaUri, "local x = 1");
 
         analyzer.Raise(LuaUri, AnalyzerFinding("unused"), AnalyzerFinding("param-type-mismatch"));
 
@@ -102,7 +115,7 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         var logger = new CapturingLogger();
         var (_, host, analyzer, _) = BuildWithAnalyzer(logger: logger);
-        host.Set(LuaUri, "local x = 1");
+        host.With(LuaUri, "local x = 1");
 
         analyzer.Raise(LuaUri, AnalyzerFinding("unused"), AnalyzerFinding("param-type-mismatch", 4));
 
@@ -122,7 +135,7 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         var logger = new CapturingLogger();
         var (_, host, analyzer, _) = BuildWithAnalyzer(logger: logger);
-        host.Set(LuaUri, "local x = 1");
+        host.With(LuaUri, "local x = 1");
 
         analyzer.Raise(LuaUri, AnalyzerFinding("unused"));
         analyzer.Raise(LuaUri);
@@ -141,7 +154,7 @@ public sealed class LuaDiagnosticsPublisherTest
     public void AnAnalyzerPublish_InAnotherCase_ReachesTheOpenDocument()
     {
         var (published, host, analyzer, _) = BuildWithAnalyzer();
-        host.Set("file:///Mods/MyMod/Data/Scripts/Script.lua", "local x = 1");
+        host.With("file:///Mods/MyMod/Data/Scripts/Script.lua", "local x = 1");
 
         analyzer.Raise("file:///mods/mymod/data/scripts/script.lua", AnalyzerFinding("unused"));
 
@@ -164,10 +177,10 @@ public sealed class LuaDiagnosticsPublisherTest
     public void AnAnalyzerFinding_StaysThroughTheNextIndexRepublish()
     {
         var (published, host, analyzer, index) = BuildWithAnalyzer();
-        host.Set(LuaUri, "local x = 1");
+        host.With(LuaUri, "local x = 1");
         analyzer.Raise(LuaUri, AnalyzerFinding("unused"));
 
-        index.Fire(GameIndex.Empty);
+        index.Raise(GameIndex.Empty);
 
         Assert.Contains(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(published.Last()));
     }
@@ -176,10 +189,10 @@ public sealed class LuaDiagnosticsPublisherTest
     public void WithTheAnalyzerRunning_ItsSyntaxErrorIsTheOnlyOne()
     {
         var (published, host, analyzer, index) = BuildWithAnalyzer();
-        host.Set(LuaUri, "local broken = {1 2}");
+        host.With(LuaUri, "local broken = {1 2}");
         analyzer.Raise(LuaUri, AnalyzerFinding("syntax-error"));
 
-        index.Fire(GameIndex.Empty);
+        index.Raise(GameIndex.Empty);
 
         var codes = Codes(published.Last());
         Assert.Equal([DiagnosticIds.LuaSyntaxError.ToString()], codes);
@@ -190,9 +203,9 @@ public sealed class LuaDiagnosticsPublisherTest
     public void WithTheAnalyzerRunning_Lua51OnlySyntaxIsStillReported()
     {
         var (published, host, _, index) = BuildWithAnalyzer();
-        host.Set(LuaUri, "local n = #units");
+        host.With(LuaUri, "local n = #units");
 
-        index.Fire(GameIndex.Empty);
+        index.Raise(GameIndex.Empty);
 
         Assert.Contains(DiagnosticIds.LuaSyntaxNotInLua50.ToString(), Codes(published.Last()));
     }
@@ -201,9 +214,9 @@ public sealed class LuaDiagnosticsPublisherTest
     public void WithoutTheAnalyzer_OurOwnParserStillReportsSyntaxErrors()
     {
         var (published, host, _, index) = BuildWithAnalyzer(false);
-        host.Set(LuaUri, "local broken = {1 2}");
+        host.With(LuaUri, "local broken = {1 2}");
 
-        index.Fire(GameIndex.Empty);
+        index.Raise(GameIndex.Empty);
 
         Assert.NotEmpty(published.Last().Diagnostics);
         Assert.DoesNotContain(DiagnosticIds.LuaSyntaxError.ToString(), Codes(published.Last()));
@@ -213,7 +226,7 @@ public sealed class LuaDiagnosticsPublisherTest
     public void AnAnalyzerFinding_IsSilencedByAnInlineSuppression()
     {
         var (published, host, analyzer, _) = BuildWithAnalyzer();
-        host.Set(LuaUri, $"-- aetswg:suppress {DiagnosticIds.LuaAnalyzerUnused}\nlocal x = 1");
+        host.With(LuaUri, $"-- aetswg:suppress {DiagnosticIds.LuaAnalyzerUnused}\nlocal x = 1");
 
         analyzer.Raise(LuaUri, AnalyzerFinding("unused", 1));
 
@@ -226,7 +239,7 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         var (published, host, analyzer, _) = BuildWithAnalyzer(
             schema: new LuaApiSchemaProvider(["---@param name string\nfunction Find_First_Object(name) end\n"]));
-        host.Set(LuaUri, "Find_First_Object(\"X\", p)\nSpawnList(a, b, c)");
+        host.With(LuaUri, "Find_First_Object(\"X\", p)\nSpawnList(a, b, c)");
 
         analyzer.Raise(LuaUri,
             AnalyzerFinding("redundant-parameter") with { Range = new Range(0, 23, 0, 24) },
@@ -264,13 +277,13 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_UnknownTextKey_WarnsWithTheLocalisationId()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Game_Message("TEXT_MISSING")""");
+        workspaceHost.With(LuaUri, """Game_Message("TEXT_MISSING")""");
         var index = IndexWithLuaRef(LuaUri, "TEXT_MISSING", kind: GameSymbolKind.LocalisationKey,
             localisation: new StubLocalisationIndex("TEXT_OTHER"));
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
         Assert.Equal(DiagnosticIds.LocalisationKeyExistence.ToString(), diag.Code?.String);
         Assert.Contains("TEXT_MISSING", diag.Message);
@@ -280,13 +293,13 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_KnownTextKey_NoDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Game_Message("TEXT_HELLO")""");
+        workspaceHost.With(LuaUri, """Game_Message("TEXT_HELLO")""");
         var index = IndexWithLuaRef(LuaUri, "TEXT_HELLO", kind: GameSymbolKind.LocalisationKey,
             localisation: new StubLocalisationIndex("TEXT_HELLO"));
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     // ── shared parse (cache) ──────────────────────────────────────────────────
@@ -295,10 +308,10 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_PlanWithoutThreadFunction_PublishesThePlanDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, "TaskForce = { { \"MainForce\" } }\n");
-        indexService.Fire(GameIndex.Empty);
+        workspaceHost.With(LuaUri, "TaskForce = { { \"MainForce\" } }\n");
+        indexService.Raise(GameIndex.Empty);
 
-        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString(), diagnostic.Code?.String);
     }
 
@@ -315,10 +328,10 @@ public sealed class LuaDiagnosticsPublisherTest
             """
         ]);
         var (_, published, indexService, workspaceHost) = Build(schema);
-        workspaceHost.Set(LuaUri, "local origin = nil\nFind_Nearest(origin, PlayerObject)\n");
-        indexService.Fire(GameIndex.Empty);
+        workspaceHost.With(LuaUri, "local origin = nil\nFind_Nearest(origin, PlayerObject)\n");
+        indexService.Raise(GameIndex.Empty);
 
-        Assert.Contains(Assert.Single(published).Diagnostics!,
+        Assert.Contains(Assert.Single(published).Diagnostics,
             d => d.Code?.String == DiagnosticIds.LuaNoCallFormFits.ToString());
     }
 
@@ -328,19 +341,19 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         const string library = "file:///library/pgstatemachine.lua";
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, "require(\"PGStateMachine\")\nSet_Next_State(\"Nowhere\")\n");
-        workspaceHost.Set(library, "function Define_State(s, f) end\n" +
-                                   "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
-                                   "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end\n");
+        workspaceHost.With(LuaUri, "require(\"PGStateMachine\")\nSet_Next_State(\"Nowhere\")\n");
+        workspaceHost.With(library, "function Define_State(s, f) end\n" +
+                                    "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
+                                    "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end\n");
         var documents = ImmutableDictionary<string, DocumentIndex>.Empty
             .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [], ["PGStateMachine"]))
             .Add(library, new DocumentIndex(library, 1, [], []));
 
-        indexService.Fire(new GameIndex(BaselineIndex.Empty, documents,
+        indexService.Raise(new GameIndex(BaselineIndex.Empty, documents,
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty));
 
-        var diagnostics = published.Single(p => p.Uri.ToString() == LuaUri).Diagnostics!;
+        var diagnostics = published.Single(p => p.Uri.ToString() == LuaUri).Diagnostics;
         Assert.Single(diagnostics, d => d.Code?.String == DiagnosticIds.LuaStateTransitionUnregistered.ToString());
     }
 
@@ -349,10 +362,10 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_HostGlobalReadInDefinitions_PublishesTheDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, "function Definitions()\n  difficulty = PlayerObject.Get_Difficulty()\nend\n");
-        indexService.Fire(GameIndex.Empty);
+        workspaceHost.With(LuaUri, "function Definitions()\n  difficulty = PlayerObject.Get_Difficulty()\nend\n");
+        indexService.Raise(GameIndex.Empty);
 
-        Assert.Single(Assert.Single(published).Diagnostics!,
+        Assert.Single(Assert.Single(published).Diagnostics,
             d => d.Code?.String == DiagnosticIds.LuaHostGlobalInDefinitions.ToString());
     }
 
@@ -361,23 +374,19 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         // One publish = one parse shared by the syntax-error pass and all three analyzers
         // (previously four separate parses); a second publish of unchanged content is a cache hit.
-        var published = new List<PublishDiagnosticsParams>();
+        var sink = new RecordingDiagnosticsSink();
+        var published = sink.Published;
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
         var fileHelper = new FileHelper(new MockFileSystem());
         var cache = TestLuaParseCache.For(workspaceHost, fileHelper);
-        var publisher = new LuaDiagnosticsPublisher(
-            p => published.Add(p),
-            indexService,
-            workspaceHost,
-            fileHelper,
-            new LuaApiSchemaProvider([]),
-            NullLogger<LuaDiagnosticsPublisher>.Instance,
-            parseCache: cache);
-        workspaceHost.Set(LuaUri, "function Foo() end");
+        _ = Publisher(sink, indexService, workspaceHost, fileHelper, new LuaApiSchemaProvider([]),
+            NullLogger<LuaDiagnosticsPublisher>.Instance, cache, TestCatalogues.English,
+            new FakeAnalyzer());
+        workspaceHost.With(LuaUri, "function Foo() end");
 
-        indexService.Fire(GameIndex.Empty);
-        indexService.Fire(IndexWithLuaRef(LuaUri, "UNIT_A")); // different index, same text
+        indexService.Raise(GameIndex.Empty);
+        indexService.Raise(IndexWithLuaRef(LuaUri, "UNIT_A")); // different index, same text
 
         Assert.Equal(2, published.Count);
         var (hits, misses, _) = cache.Statistics;
@@ -391,9 +400,9 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_XmlFileOpen_NoPublish()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(XmlUri, "<Root/>");
+        workspaceHost.With(XmlUri, "<Root/>");
 
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         Assert.Empty(published);
     }
@@ -403,7 +412,7 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         var (_, published, indexService, _) = Build();
 
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         Assert.Empty(published);
     }
@@ -414,12 +423,12 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_UnresolvedXmlRef_EmitsErrorDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Find_First_Object("UNIT_MISSING")""");
+        workspaceHost.With(LuaUri, """Find_First_Object("UNIT_MISSING")""");
         var index = IndexWithLuaRef(LuaUri, "UNIT_MISSING");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Contains("UNIT_MISSING", diag.Message);
         Assert.Contains("No object with this name exists", diag.Message);
@@ -431,14 +440,14 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_SuppressionDirective_SilencesTheDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri,
+        workspaceHost.With(LuaUri,
             $"-- aetswg:suppress {DiagnosticIds.UnresolvedReference} reason:: spawned at runtime\n" +
             """Find_First_Object("UNIT_MISSING")""");
         var index = IndexWithLuaRef(LuaUri, "UNIT_MISSING");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     // The directive names one id; everything else it does not name stays visible.
@@ -446,14 +455,14 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_SuppressionOfAnotherId_LeavesTheDiagnosticAlone()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri,
+        workspaceHost.With(LuaUri,
             $"-- aetswg:suppress {DiagnosticIds.LuaEngineUpvalue}\n" +
             """Find_First_Object("UNIT_MISSING")""");
         var index = IndexWithLuaRef(LuaUri, "UNIT_MISSING");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        Assert.Single(Assert.Single(published).Diagnostics!);
+        Assert.Single(Assert.Single(published).Diagnostics);
     }
 
     // The failure this prevents: a mistyped directive suppresses nothing and says nothing, so the
@@ -462,14 +471,14 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_MistypedDirective_WarnsAndLeavesTheDiagnosticVisible()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri,
+        workspaceHost.With(LuaUri,
             "-- aetswg:suppress aetswg-1-21\n" +
             """Find_First_Object("UNIT_MISSING")""");
         var index = IndexWithLuaRef(LuaUri, "UNIT_MISSING");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        var diagnostics = Assert.Single(published).Diagnostics!.ToList();
+        var diagnostics = Assert.Single(published).Diagnostics.ToList();
         var warning = Assert.Single(diagnostics,
             d => d.Code?.String == DiagnosticIds.SuppressionUnknownRule.ToString());
 
@@ -487,14 +496,14 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_SuppressionGroupSuppressed_SilencesTheWarningItself()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri,
+        workspaceHost.With(LuaUri,
             "-- aetswg:suppress-file aetswg-013-*\n" +
             "-- aetswg:suppress aetswg-1-21\n" +
             """Find_First_Object("UNIT_MISSING")""");
 
-        indexService.Fire(IndexWithLuaRef(LuaUri, "UNIT_MISSING"));
+        indexService.Raise(IndexWithLuaRef(LuaUri, "UNIT_MISSING"));
 
-        var diagnostics = Assert.Single(published).Diagnostics!.ToList();
+        var diagnostics = Assert.Single(published).Diagnostics.ToList();
 
         Assert.DoesNotContain(diagnostics,
             d => d.Code?.String == DiagnosticIds.SuppressionUnknownRule.ToString());
@@ -508,29 +517,29 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_ResolvedRef_NoDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Find_First_Object("UNIT_A")""");
+        workspaceHost.With(LuaUri, """Find_First_Object("UNIT_A")""");
         var symbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, null,
             new FileOrigin(XmlUri, 0, null), null);
         var index = IndexWithLuaRef(LuaUri, "UNIT_A", resolvedSymbol: symbol);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
     public void OnIndexChanged_TypeMismatch_EmitsErrorDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Find_Player("UNIT_A")""");
+        workspaceHost.With(LuaUri, """Find_Player("UNIT_A")""");
         var symbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin(XmlUri, 0, null), null);
         var index = IndexWithLuaRef(LuaUri, "UNIT_A",
             "Faction", symbol);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Contains("UNIT_A", diag.Message);
         Assert.Contains("Faction", diag.Message);
@@ -540,42 +549,42 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_TypeMismatch_GameObjectType_NoDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Spawn_Object("UNIT_A")""");
+        workspaceHost.With(LuaUri, """Spawn_Object("UNIT_A")""");
         var symbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin(XmlUri, 0, null), null);
         // GameObjectType is a wildcard - any XmlObject matches, no diagnostic expected.
         var index = IndexWithLuaRef(LuaUri, "UNIT_A", "GameObjectType", symbol);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
     public void OnIndexChanged_ResolvedRef_MatchingType_NoDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Find_Player("REBEL")""");
+        workspaceHost.With(LuaUri, """Find_Player("REBEL")""");
         var symbol = new GameSymbol("REBEL", GameSymbolKind.XmlObject, "Faction",
             new FileOrigin(XmlUri, 0, null), null);
         var index = IndexWithLuaRef(LuaUri, "REBEL",
             "Faction", symbol);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     [Fact]
     public void OnIndexChanged_DiagnosticRange_MatchesReference_LineAndColumn()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Find_First_Object("UNIT_MISSING")""");
+        workspaceHost.With(LuaUri, """Find_First_Object("UNIT_MISSING")""");
         var index = IndexWithLuaRef(LuaUri, "UNIT_MISSING");
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(0, diag.Range.Start.Line);
         Assert.Equal(20, diag.Range.Start.Character);
         Assert.Equal(0, diag.Range.End.Line);
@@ -589,33 +598,33 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         var (_, published, indexService, workspaceHost) = Build();
         // Incomplete function - a real Lua syntax error
-        workspaceHost.Set(LuaUri, "function Foo(");
+        workspaceHost.With(LuaUri, "function Foo(");
         var doc = new DocumentIndex(LuaUri, 1, [], []);
         var index = new GameIndex(BaselineIndex.Empty,
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, doc),
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         var pub = Assert.Single(published);
-        Assert.Contains(pub.Diagnostics!, d => d.Severity == DiagnosticSeverity.Error);
+        Assert.Contains(pub.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]
     public void OnIndexChanged_ValidLua_NoSyntaxDiagnostics()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, "function Definitions() end");
+        workspaceHost.With(LuaUri, "function Definitions() end");
         var index = new GameIndex(BaselineIndex.Empty,
             ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
-        Assert.Empty(Assert.Single(published).Diagnostics!);
+        Assert.Empty(Assert.Single(published).Diagnostics);
     }
 
     // Loretta's ids are surfaced through our own scheme rather than raw, so a syntax error can be
@@ -625,16 +634,16 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_LuaSyntaxError_DiagnosticCodeIsTheMappedDiagnosticId()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, "function Foo(");
+        workspaceHost.With(LuaUri, "function Foo(");
         var index = new GameIndex(BaselineIndex.Empty,
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         var pub = Assert.Single(published);
-        var errorDiags = pub.Diagnostics!.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+        var errorDiags = pub.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
         Assert.NotEmpty(errorDiags);
         Assert.All(errorDiags, d =>
         {
@@ -650,7 +659,7 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_MissingRequire_EmitsError()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """require("MissingLib")""");
+        workspaceHost.With(LuaUri, """require("MissingLib")""");
 
         var index = new GameIndex(
             BaselineIndex.Empty,
@@ -659,10 +668,10 @@ public sealed class LuaDiagnosticsPublisherTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         var pub = Assert.Single(published);
-        Assert.Contains(pub.Diagnostics!,
+        Assert.Contains(pub.Diagnostics,
             d => d.Severity == DiagnosticSeverity.Error && d.Message.Contains("MissingLib"));
     }
 
@@ -670,7 +679,7 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_RequireResolved_NoImportError()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """require("PGStateMachine")""");
+        workspaceHost.With(LuaUri, """require("PGStateMachine")""");
 
         const string libUri = "file:///data/scripts/library/pgstatemachine.lua";
         var index = new GameIndex(
@@ -681,10 +690,10 @@ public sealed class LuaDiagnosticsPublisherTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         // No import error; the unused-require hint (L-6) is acceptable.
-        Assert.DoesNotContain(Assert.Single(published).Diagnostics!,
+        Assert.DoesNotContain(Assert.Single(published).Diagnostics,
             d => d.Severity == DiagnosticSeverity.Error);
     }
 
@@ -695,7 +704,7 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         const string libUri = "file:///data/scripts/library/statemachine.lua";
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, "RunStateMachine()");
+        workspaceHost.With(LuaUri, "RunStateMachine()");
 
         var sym = new GameSymbol("RunStateMachine", GameSymbolKind.LuaGlobal, null,
             new FileOrigin(libUri, 0, null), null);
@@ -708,10 +717,10 @@ public sealed class LuaDiagnosticsPublisherTest
             GameIndex.Empty.WorkspaceDefinitions.Add("RunStateMachine", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        indexService.Fire(index);
+        indexService.Raise(index);
 
         var pub = Assert.Single(published);
-        Assert.Contains(pub.Diagnostics!,
+        Assert.Contains(pub.Diagnostics,
             d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("RunStateMachine"));
     }
 
@@ -721,16 +730,16 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_ClosedLuaFile_ClearsDiagnostics()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.Set(LuaUri, """Find_First_Object("MISSING")""");
-        indexService.Fire(IndexWithLuaRef(LuaUri, "MISSING"));
+        workspaceHost.With(LuaUri, """Find_First_Object("MISSING")""");
+        indexService.Raise(IndexWithLuaRef(LuaUri, "MISSING"));
         published.Clear();
 
         workspaceHost.Remove(LuaUri);
-        indexService.Fire(GameIndex.Empty);
+        indexService.Raise(GameIndex.Empty);
 
         var clear = Assert.Single(published);
         Assert.Equal(LuaUri, clear.Uri.ToString());
-        Assert.Empty(clear.Diagnostics!);
+        Assert.Empty(clear.Diagnostics);
     }
 
     private sealed class CapturingLogger : ILogger<LuaDiagnosticsPublisher>
@@ -768,7 +777,7 @@ public sealed class LuaDiagnosticsPublisherTest
         {
         }
 
-        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
         {
             return Task.FromResult<T?>(null);
         }
@@ -803,115 +812,4 @@ public sealed class LuaDiagnosticsPublisherTest
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
-
-    internal sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = new();
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-
-        public void Set(string uri, string text)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, 1);
-        }
-    }
-
-    internal sealed class FakeGameIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add => _indexChanged += value;
-            remove => _indexChanged -= value;
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private event Action<GameIndex>? _indexChanged;
-
-        public void Fire(GameIndex index)
-        {
-            _indexChanged?.Invoke(index);
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
 }

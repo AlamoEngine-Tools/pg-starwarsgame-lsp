@@ -5,6 +5,7 @@ using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -48,7 +49,8 @@ public sealed class TupleSlotHandlerTest
     private static DiagnosticsContext WithModels(params string[] paths)
     {
         var index = GameIndex.Empty with { AssetFiles = MergedAssetFileIndex.Merge([], paths) };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///units.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///units.xml", "en")
+            { Messages = TestCatalogues.English };
     }
 
     // ── enum items ───────────────────────────────────────────────────────────

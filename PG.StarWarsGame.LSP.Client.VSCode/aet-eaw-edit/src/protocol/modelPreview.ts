@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The 3D model preview. Mirrors PG.StarWarsGame.LSP.Server/Preview/PreviewScene.cs and
-// PreviewProtocol.cs.
+// The 3D model preview. Mirrors PG.StarWarsGame.LSP.Preview/PreviewScene.cs and
+// PG.StarWarsGame.LSP.Server/Preview/PreviewProtocol.cs.
 
 // ── the scene ────────────────────────────────────────────────────────────────
 
@@ -858,7 +858,7 @@ export interface GetModelGlbResult {
 
 // ── aet/getModelDetail ───────────────────────────────────────────────────────
 //
-// Mirrors PG.StarWarsGame.LSP.Server/Preview/PreviewModelDetail.cs. Everything here is read off the
+// Mirrors PG.StarWarsGame.LSP.Preview/PreviewModelDetail.cs. Everything here is read off the
 // FILE, in the file's own axes - which is the whole reason it cannot come from the glTF instead: the
 // exporter rotates the model Z-up to Y-up and splits doubled-up bone/mesh nodes apart, so a matrix
 // taken from the client's scene graph is one the author has never seen.
@@ -931,7 +931,7 @@ export interface ProxyDetail {
 
 // ── aet/getSubMeshGeometry ───────────────────────────────────────────────────
 //
-// Mirrors PG.StarWarsGame.LSP.Server/Preview/PreviewSubMeshGeometry.cs. One page of one table:
+// Mirrors PG.StarWarsGame.LSP.Preview/PreviewSubMeshGeometry.cs. One page of one table:
 // a single Star Destroyer sub-mesh is 3814 triangles, and nobody scrolls that - they look up a
 // handful of rows, so a page with the total beside it answers the question without ever putting the
 // whole buffer on the wire.

@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -26,7 +27,8 @@ public sealed class StoryParamNotesHandlerTest
     [Fact]
     public void Param_with_matching_locale_note_emits_hint()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml",
+            "en") { Messages = TestCatalogues.English };
         var fact = new StoryParamFact("file:///test.xml", 1, 0, 0, "MY_EVENT", false, 0,
             DefWithNote("en", "Param note here."), "42");
         var results = Sut.Handle(fact, ctx).ToList();
@@ -38,7 +40,8 @@ public sealed class StoryParamNotesHandlerTest
     [Fact]
     public void Param_with_different_locale_emits_no_diagnostics()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "de");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml",
+            "de") { Messages = TestCatalogues.English };
         var fact = new StoryParamFact("file:///test.xml", 1, 0, 0, "MY_EVENT", false, 0,
             DefWithNote("en", "Param note here."), "42");
         Assert.Empty(Sut.Handle(fact, ctx));
@@ -47,7 +50,8 @@ public sealed class StoryParamNotesHandlerTest
     [Fact]
     public void Empty_value_emits_no_notes_hint()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml",
+            "en") { Messages = TestCatalogues.English };
         var fact = new StoryParamFact("file:///test.xml", 1, 0, 0, "MY_EVENT", false, 0,
             DefWithNote("en", "Param note here."), "");
         Assert.Empty(Sut.Handle(fact, ctx));

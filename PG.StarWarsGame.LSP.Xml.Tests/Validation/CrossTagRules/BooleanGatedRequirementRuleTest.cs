@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -77,6 +76,7 @@ public sealed class BooleanGatedRequirementRuleTest
     [MemberData(nameof(Pairs))]
     public void Gate_off_is_silent(string element, string gate, string required)
     {
+        _ = required; // the pair's requirement does not matter while the gate is off
         var body = $"<{gate}>No</{gate}>";
 
         Assert.Empty(Gated(Run($"<{element} Name='S'>{body}</{element}>")));
@@ -149,7 +149,7 @@ public sealed class BooleanGatedRequirementRuleTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             CrossTagRuleSets.BooleanGatedRequirements());

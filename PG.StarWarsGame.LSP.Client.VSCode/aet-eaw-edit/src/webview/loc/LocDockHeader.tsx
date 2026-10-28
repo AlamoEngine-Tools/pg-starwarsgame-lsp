@@ -30,7 +30,7 @@ export function LocDockHeader(props: {
                 title={l10n.t("Save - write all staged changes to the file")}
                 badge={props.queue.length > 0 ? ` ${props.queue.length}` : ""}
                 disabled={props.queue.length === 0}
-                disabledReason="Save - nothing is staged"
+                disabledReason={l10n.t("Save - nothing is staged")}
                 onClick={props.onSave}
             />
             <SeverityTag

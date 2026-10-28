@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -125,7 +124,7 @@ public sealed class TagInsertionRepairTest
     {
         var insertion = Fact(body).InsertionEdits;
         Assert.NotNull(insertion);
-        return Assert.Single(insertion!);
+        return Assert.Single(insertion);
     }
 
     private static MissingRequiredTagFact Fact(string body)
@@ -138,7 +137,7 @@ public sealed class TagInsertionRepairTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             [rule]);

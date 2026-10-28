@@ -70,7 +70,7 @@ public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
         _inner.DidClose(uri);
     }
 
-    public async Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+    public async Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
     {
         if (_texts.IsEmpty) return await _inner.RequestAsync<T>(method, parameters, ct);
 

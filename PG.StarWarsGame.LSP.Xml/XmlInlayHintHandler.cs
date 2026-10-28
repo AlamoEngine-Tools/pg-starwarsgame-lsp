@@ -6,11 +6,11 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.InlayHints;
 using PG.StarWarsGame.LSP.Xml.Util;
 using IFileHelper = PG.StarWarsGame.LSP.Core.Util.IFileHelper;
@@ -19,15 +19,16 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlInlayHintHandler> _logger;
     private readonly IXmlParseCache _parseCache;
-    private readonly IXmlInlayHintRegistry _registry;
+    private readonly IReadOnlyList<IXmlInlayHintProvider> _providers;
     private readonly ISchemaProvider _schema;
 
+    // Every provider answers every tag, in registration order.
     public XmlInlayHintHandler(
         IXmlParseCache parseCache,
         IGameIndexService indexService,
@@ -35,8 +36,8 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper,
         ILogger<XmlInlayHintHandler> logger,
-        IXmlInlayHintRegistry registry,
-        ILspConfigurationProvider config)
+        IEnumerable<IXmlInlayHintProvider> providers,
+        IMessageCatalog messages)
     {
         _parseCache = parseCache;
         _indexService = indexService;
@@ -44,8 +45,8 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
         _logger = logger;
-        _registry = registry;
-        _config = config;
+        _providers = [.. providers];
+        _messages = messages;
     }
 
     public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
@@ -75,8 +76,8 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
                 continue;
 
             var ctx = new InlayHintContext(uri, index, _schema, hapDoc, node, tagDef, line,
-                LineEndCharacter(parsed, line), parsed.LineIndex) { Messages = new ConfiguredMessageCatalog(_config) };
-            foreach (var hint in _registry.Dispatch(ctx))
+                LineEndCharacter(parsed, line), parsed.LineIndex) { Messages = _messages };
+            foreach (var hint in _providers.SelectMany(p => p.Handle(ctx)))
             {
                 _logger.LogDebug("InlayHint at line {Line}", line);
                 hints.Add(hint);

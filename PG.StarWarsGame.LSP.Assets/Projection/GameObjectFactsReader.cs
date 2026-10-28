@@ -1,38 +1,20 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Xml;
-using System.Xml.Linq;
+using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
-/// <summary>What a shipped object says about itself that decides its kind.</summary>
-/// <param name="Behaviors">Tokens from its own behaviour tags, in written order, without repeats.</param>
-/// <param name="Flags">
-///     The tracked boolean tags that are TRUE on it. Empty means it was inspected and has none,
-///     which is a different answer from never having been looked at.
-/// </param>
 public readonly record struct ObjectFacts(string[] Behaviors, string[] Flags);
 
 /// <summary>
-///     Reads each shipped game object's kind facts back out of the game's own XML files.
+///     Reads the kind facts of game objects out of their files. Parsed through <see cref="XmlUtility" />
+///     like every other game XML (#308): a file a strict parser rejects is read the way the game
+///     reads it, and only a file that cannot be opened is reported.
 /// </summary>
-/// <remarks>
-///     <para>
-///         Behaviours say what an object IS and flags finish the story for heroes, and the engine's
-///         object model carries neither: it models the object's art, its icon, its ground company
-///         and its variant base, and nothing else this needs. So it goes to the XML.
-///     </para>
-///     <para>
-///         Every object knows the file it came from, so the files are opened once each and every
-///         object wanted from one is read in a single pass. These facts ALONE are read rather than
-///         the object's whole tag tree: the tree would be the fix for variant merging over shipped
-///         objects, but it is also every tag of every shipped object carried verbatim, which is a
-///         size question that wants measuring against a real install first.
-///     </para>
-/// </remarks>
 public static class GameObjectFactsReader
 {
     /// <summary>
@@ -56,20 +38,25 @@ public static class GameObjectFactsReader
                      .Where(o => !string.IsNullOrEmpty(o.XmlFile))
                      .GroupBy(o => o.XmlFile!, StringComparer.OrdinalIgnoreCase))
         {
-            var byName = ReadFile(group.Key, openFile, onProblem);
-            if (byName is null) continue;
+            var file = ReadFile(group.Key, openFile, onProblem);
+            if (file is null) continue;
+            var (byName, text) = file.Value;
 
             foreach (var (name, _) in group)
             {
                 if (!byName.TryGetValue(name, out var element)) continue;
 
-                var children = element.Elements().ToList();
-                var behaviors = ObjectBehaviors.FromTags(children.Select(c => (c.Name.LocalName, c.Value)));
+                // Tag names as the file spells them: the parser lower-cases every element name.
+                var children = element.ChildNodes
+                    .Where(c => c.NodeType == HtmlNodeType.Element)
+                    .Select(c => (Name: XmlUtility.GetOriginalTagName(c, text), Value: c.InnerText))
+                    .ToList();
+                var behaviors = ObjectBehaviors.FromTags(children);
                 if (behaviors.Length == 0) continue;
 
                 var flags = children
-                    .Where(c => tracked.Contains(c.Name.LocalName) && EngineBoolean.IsTrue(c.Value))
-                    .Select(c => c.Name.LocalName)
+                    .Where(c => tracked.Contains(c.Name) && EngineBoolean.IsTrue(c.Value))
+                    .Select(c => c.Name)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
 
@@ -81,10 +68,11 @@ public static class GameObjectFactsReader
     }
 
     /// <summary>
-    ///     Every named element in one game file, keyed by its <c>Name</c> attribute. Null when the
-    ///     file is missing or will not parse - one bad file costs that file, never the run.
+    ///     Every named element in one game file, keyed by its <c>Name</c> attribute, with the text
+    ///     the names are spelled in. Null when the file is missing or cannot be opened - one bad file
+    ///     costs that file, never the run.
     /// </summary>
-    private static Dictionary<string, XElement>? ReadFile(
+    private static (Dictionary<string, HtmlNode> ByName, string Text)? ReadFile(
         string path, Func<string, Stream?> openFile, Action<string>? onProblem)
     {
         try
@@ -92,23 +80,24 @@ public static class GameObjectFactsReader
             using var stream = openFile(path);
             if (stream is null) return null;
 
-            var document = XDocument.Load(stream);
-            var byName = new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+            using var reader = new StreamReader(stream);
+            var text = reader.ReadToEnd();
+            var document = XmlUtility.CreateHtmlDocument(text);
+            var byName = new Dictionary<string, HtmlNode>(StringComparer.OrdinalIgnoreCase);
 
             // Descendants, not the root's children: some shipped files nest their objects a level
             // further down, and a flat pass would silently find nothing in those.
-            foreach (var element in document.Descendants())
+            foreach (var element in document.DocumentNode.Descendants()
+                         .Where(n => n.NodeType == HtmlNodeType.Element))
             {
-                var name = element.Attributes()
-                    .FirstOrDefault(a => a.Name.LocalName.Equals("Name", StringComparison.OrdinalIgnoreCase))
-                    ?.Value;
+                var name = element.GetAttributeValue("name", null);
                 if (string.IsNullOrWhiteSpace(name)) continue;
                 byName.TryAdd(name.Trim(), element);
             }
 
-            return byName;
+            return (byName, text);
         }
-        catch (Exception ex) when (ex is XmlException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             onProblem?.Invoke($"{path}: {ex.Message}");
             return null;

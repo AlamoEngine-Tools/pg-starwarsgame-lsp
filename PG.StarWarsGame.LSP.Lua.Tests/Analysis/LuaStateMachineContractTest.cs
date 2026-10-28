@@ -42,7 +42,7 @@ public sealed class LuaStateMachineContractTest
     private static LuaStateMachineContract ContractOf(
         params (string Uri, string Text, string[] Requires, string[] Globals)[] files)
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         var documents = ImmutableDictionary<string, DocumentIndex>.Empty;
         foreach (var (uri, text, requires, globals) in files)
         {
@@ -100,27 +100,5 @@ public sealed class LuaStateMachineContractTest
 
         Assert.Contains("Shared_Init", contract.FunctionsElsewhere);
         Assert.DoesNotContain("Own", contract.FunctionsElsewhere);
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 }

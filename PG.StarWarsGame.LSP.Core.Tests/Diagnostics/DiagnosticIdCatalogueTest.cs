@@ -71,6 +71,6 @@ public sealed class DiagnosticIdCatalogueTest
     public void EveryGroup_HasAHumanReadableName()
     {
         foreach (var group in Enum.GetValues<DiagnosticGroup>())
-            Assert.False(string.IsNullOrWhiteSpace(DiagnosticGroups.NameOf(group)));
+            Assert.False(string.IsNullOrWhiteSpace(DiagnosticGroups.NameOf(group, TestCatalogues.English)));
     }
 }

@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import * as l10n from "@vscode/l10n";
 
 import { discoverProjects } from "./projectDiscovery";
 import {
@@ -61,6 +62,29 @@ describe("clientSpecs", () => {
         assert.equal(specs[0].logDirectory, "c:/mods/MyMod");
         assert.equal(specs[0].projectPath, "c:/mods/MyMod/mymod.pgproj");
         assert.equal(specs[0].roots, undefined);
+    });
+
+    /**
+     * A panel is bound to its project's key for its whole life (#276). The single project's client
+     * was filed under a fixed key and, once a second project started, under its project file: the
+     * panels opened before that talked to no server.
+     */
+    it("files a single project under the key it keeps when a second project starts", () => {
+        const one = ["c:/dev/EaWX/FotR"];
+        const two = ["c:/dev/EaWX/FotR", "c:/dev/EaWX/Rev"];
+        const single = clientSpecs(
+            discover(one, { "c:/dev/EaWX/FotR/fotr.pgproj": pgproj("FotR") }),
+            one,
+        );
+        const several = clientSpecs(
+            discover(two, {
+                "c:/dev/EaWX/FotR/fotr.pgproj": pgproj("FotR"),
+                "c:/dev/EaWX/Rev/rev.pgproj": pgproj("Rev"),
+            }),
+            two,
+        );
+
+        assert.ok(several.some((s) => s.key === single[0].key));
     });
 
     it("runs one client for a folder laid out like a mod with no project file", () => {
@@ -340,6 +364,31 @@ describe("ownerKey", () => {
 });
 
 describe("statusText", () => {
+    // The status bar reads in the editor's language: its texts come from the catalogue.
+    it("reads its texts from the catalogue", () => {
+        l10n.config({
+            contents: {
+                "EaWEdit LSP: Stopped": "TRANSLATED STOPPED",
+                "EaWEdit LSP: {0} projects indexed": "TRANSLATED {0}",
+            },
+        });
+        try {
+            assert.equal(
+                statusText([{ name: "A", state: "stopped" }]),
+                "$(circle-slash) TRANSLATED STOPPED",
+            );
+            assert.equal(
+                statusText([
+                    { name: "A", state: "ready" },
+                    { name: "B", state: "ready" },
+                ]),
+                "$(check) TRANSLATED 2",
+            );
+        } finally {
+            l10n.config({ contents: {} });
+        }
+    });
+
     it("reads exactly as before for one server", () => {
         assert.equal(
             statusText([{ name: "M", state: "starting" }]),

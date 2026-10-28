@@ -992,7 +992,8 @@ public sealed class ModProjectLoaderTest
         });
         logger = new ListLogger();
         return new ModProjectLoader(
-            new FileHelper(fs), logger, new NullPgprojMigrationSink(), PgprojMigrations.All);
+            new FileHelper(fs), logger, new NullPgprojMigrationSink(), PgprojMigrations.All,
+            ResxMessageCatalog.Server("en"));
     }
 
     /// <summary>A loader with a chain and a sink, for the migrate-on-read tests.</summary>
@@ -1005,7 +1006,8 @@ public sealed class ModProjectLoaderTest
             [ProjectPath] = new(json)
         });
         return new ModProjectLoader(
-            new FileHelper(fs), new ListLogger(), sink ?? new NullPgprojMigrationSink(), migrations);
+            new FileHelper(fs), new ListLogger(), sink ?? new NullPgprojMigrationSink(), migrations,
+            ResxMessageCatalog.Server("en"));
     }
 
     /// <summary>A fixture step: version 0.9.0 called the project's name something else.</summary>
@@ -1014,7 +1016,7 @@ public sealed class ModProjectLoaderTest
         public string TypeName => PgprojFormat.TypeName;
         public TypeVersion From => TypeVersion.Of("aetswg", 0, 9);
         public TypeVersion To => PgprojFormat.Current;
-        public CatalogueText? UserNotice => new("StoryLayout_DroppedPositions", 1);
+        public CatalogueText UserNotice => new("StoryLayout_DroppedPositions", 1);
 
         public JsonNode Migrate(JsonNode document)
         {
@@ -1039,6 +1041,7 @@ public sealed class ModProjectLoaderTest
         }
     }
 
+    // ReSharper disable once NotAccessedPositionalProperty.Local - captured for the debugger, counted by the tests
     private sealed record LogEntry(LogLevel Level, string Message);
 
     private sealed class ListLogger : ILogger<ModProjectLoader>

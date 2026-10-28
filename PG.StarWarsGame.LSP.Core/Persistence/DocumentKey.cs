@@ -3,6 +3,7 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Persistence;
 
@@ -47,10 +48,9 @@ public static class DocumentKey
     /// </summary>
     public static string Fold(string relativePath)
     {
-        var forward = relativePath.Trim().Replace('\\', '/');
+        var forward = GamePaths.Forward(relativePath.Trim());
         while (forward.StartsWith("./", StringComparison.Ordinal)) forward = forward[2..];
-        forward = forward.TrimStart('/').TrimEnd('/');
-        return forward.ToUpperInvariant();
+        return GamePaths.Normalize(forward).ToUpperInvariant();
     }
 
     /// <summary>The key for a project-relative path.</summary>
@@ -101,8 +101,8 @@ public static class DocumentKey
     /// </remarks>
     public static string? Relative(string projectDirectory, string absolutePathOrUri)
     {
-        var path = StripScheme(absolutePathOrUri).Trim().Replace('\\', '/').TrimEnd('/');
-        var root = StripScheme(projectDirectory).Trim().Replace('\\', '/').TrimEnd('/') + "/";
+        var path = GamePaths.Forward(StripScheme(absolutePathOrUri).Trim()).TrimEnd('/');
+        var root = GamePaths.Forward(StripScheme(projectDirectory).Trim()).TrimEnd('/') + "/";
 
         if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return null;
         return path[root.Length..];

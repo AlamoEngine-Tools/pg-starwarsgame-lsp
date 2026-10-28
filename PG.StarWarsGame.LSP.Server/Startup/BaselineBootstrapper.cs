@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
@@ -65,10 +66,10 @@ public sealed class BaselineBootstrapper : IBaselineBootstrapper
             if (!_languageService.TryGetByIdentifier(
                     _config.Current.Localisation.Language, out var language))
                 language = _languageService.Default;
-            var eawDb = _localisationProvider.GetMasterText(GameContext.EaW, language!);
-            var focDb = _localisationProvider.GetMasterText(GameContext.FoC, language!);
+            var eawDb = _localisationProvider.GetMasterText(GameContext.EaW, language);
+            var focDb = _localisationProvider.GetMasterText(GameContext.FoC, language);
             _indexService.ApplyLocalisation(
-                new TranslationDatabaseLocalisationIndex([eawDb, focDb], language!));
+                new TranslationDatabaseLocalisationIndex([eawDb, focDb], language));
         }
         catch (Exception ex)
         {

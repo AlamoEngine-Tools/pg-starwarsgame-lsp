@@ -60,7 +60,8 @@ public sealed class GetServerStatusHandlerTest
             new FakeLspConfigurationProvider { Current = configuration ?? new LspConfiguration() },
             new FakeGameIndexService(index),
             new RootsOnly(roots ?? []),
-            new FileHelper(fileSystem ?? new MockFileSystem()));
+            new FileHelper(fileSystem ?? new MockFileSystem()),
+            new StatsOnly(new IndexCacheStats(0, 0, 0, 0), new BoneCatalogStats(0, 0)), [], TestCatalogues.English);
         return handler.Handle(new GetServerStatusParams(), CancellationToken.None);
     }
 
@@ -222,7 +223,7 @@ public sealed class GetServerStatusHandlerTest
             new RootsOnly([], config),
             new FileHelper(new MockFileSystem()),
             indexer ?? new StatsOnly(new IndexCacheStats(1, 1, 5, 2), new BoneCatalogStats(1, 2)),
-            caches);
+            caches ?? [], TestCatalogues.English);
         return handler.Handle(new GetServerStatusParams { Extended = true }, CancellationToken.None);
     }
 
@@ -363,7 +364,23 @@ public sealed class GetServerStatusHandlerTest
 
         var caches = (await Extended(recorder, LayeredIndex())).Extended!.Caches;
 
-        Assert.Equal(new ServerStatusCachesDto("Hit", 1, 1, 5, 2, 1, 2), caches);
+        Assert.Equal(new ServerStatusCachesDto("Hit", 1, 1, 5, 2, 1, 2, 0), caches);
+    }
+
+    /// <summary>
+    ///     What consumers derived from the index snapshot and keep beside it is a cache like the
+    ///     others, and the report counts it (#311).
+    /// </summary>
+    [Fact]
+    public async Task Extended_CountsWhatWasDerivedFromTheIndex()
+    {
+        var index = LayeredIndex();
+        index.Derived("symbolCatalog", _ => new object());
+        index.Derived("projectileCatalog", _ => new object());
+
+        var caches = (await Extended(HealthyRecorder(), index)).Extended!.Caches;
+
+        Assert.Equal(2, caches.DerivedCaches);
     }
 
     [Fact]
@@ -434,7 +451,7 @@ public sealed class GetServerStatusHandlerTest
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
         public WorkspaceConfiguration? LastWorkspaceConfig => config;
-        public IReadOnlyList<string>? LastWorkspaceRoots => roots;
+        public IReadOnlyList<string> LastWorkspaceRoots => roots;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
         {

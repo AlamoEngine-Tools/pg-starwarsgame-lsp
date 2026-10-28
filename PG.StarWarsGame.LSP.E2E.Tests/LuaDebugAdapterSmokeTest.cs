@@ -183,7 +183,7 @@ public sealed class LuaDebugAdapterSmokeTest : IAsyncLifetime
             try
             {
                 while (await process.StandardError.ReadLineAsync() is { } line)
-                    Console.Error.WriteLine($"[DAP] {line}");
+                    await Console.Error.WriteLineAsync($"[DAP] {line}");
             }
             catch
             {

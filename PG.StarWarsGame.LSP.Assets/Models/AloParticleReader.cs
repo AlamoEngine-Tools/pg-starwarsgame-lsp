@@ -469,7 +469,7 @@ public static class AloParticleReader
                 0x40 => p with { WeatherFadeoutDistance = ReadSingle(bytes, at) },
                 0x41 => p with { HasTail = bytes[at] != 0 },
                 0x42 => p with { TailSize = ReadSingle(bytes, at) },
-                0x43 => Remember(bytes[at] != 0, ref useLinkStrength, p),
+                0x43 => Remember(bytes[at] != 0, out useLinkStrength, p),
                 0x46 => p with { NoDepthTest = bytes[at] != 0 },
                 0x47 => p with { WeatherCubeDistance = ReadSingle(bytes, at) },
                 0x48 => p with { RandomRotation = bytes[at] != 0 },
@@ -528,7 +528,7 @@ public static class AloParticleReader
 
     /// <summary>Records a flag that gates another property, without changing the record.</summary>
     private static AlamoEmitterProperties Remember(
-        bool value, ref bool target, AlamoEmitterProperties properties)
+        bool value, out bool target, AlamoEmitterProperties properties)
     {
         target = value;
         return properties;

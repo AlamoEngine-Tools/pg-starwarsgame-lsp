@@ -56,7 +56,7 @@ public sealed class StoryLayoutStore : IStoryLayoutStore
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger<StoryLayoutStore> logger,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
         _keys = new ProjectDocumentKeys(reloadService, fileHelper);
         _store = new SidecarStore<StoryLayoutDocument.Payload>(

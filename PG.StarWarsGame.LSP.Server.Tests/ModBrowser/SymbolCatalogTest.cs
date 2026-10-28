@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
@@ -79,7 +79,7 @@ public sealed class SymbolCatalogTest
 
     private static SymbolCatalog Catalog()
     {
-        return SymbolCatalog.Build(Index(), Kinds, []);
+        return SymbolCatalog.Build(Index(), Kinds, [], new SchemaProviderBuilder().Build());
     }
 
     private static GetSymbolPageResult Page(string page, string? query = null, int offset = 0, int limit = 200,
@@ -97,6 +97,32 @@ public sealed class SymbolCatalogTest
         Assert.Equal(
             [new SymbolPageSummary("xml:GameObjectType", 3), new SymbolPageSummary("xml:SFXEvent", 1)],
             outline);
+    }
+
+    /// <summary>
+    ///     Every type is an id space of its own: the shipped game has a Sarlacc faction and a Sarlacc
+    ///     unit, and both are entries - one on each type's page - where one used to hide the other.
+    /// </summary>
+    [Fact]
+    public void OneNameOfTwoTypes_IsTwoEntries_OneOnEachTypesPage()
+    {
+        const string factions = "file:///c:/work/mod/data/xml/factions.xml";
+        GameSymbol[] symbols =
+            [Xml("Sarlacc", "GameObjectType", Mod), Xml("Sarlacc", "Faction", factions)];
+        var index = GameIndex.Empty with
+        {
+            Documents = ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(Mod, new DocumentIndex(Mod, 1, [symbols[0]], [], LayerRank: 1, LayerName: "Mod"))
+                .Add(factions, new DocumentIndex(factions, 1, [symbols[1]], [], LayerRank: 1, LayerName: "Mod")),
+            WorkspaceDefinitions = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("Sarlacc", [.. symbols])
+        };
+
+        var catalog = SymbolCatalog.Build(index, Kinds, [], new SchemaProviderBuilder().Build());
+
+        Assert.Equal("Faction", catalog.Find("xml:Faction", "Sarlacc")!.Type);
+        Assert.Equal("GameObjectType", catalog.Find("xml:GameObjectType", "Sarlacc")!.Type);
+        Assert.Equal("Faction", catalog.FindObject("Sarlacc", "Faction")!.Type);
     }
 
     [Fact]
@@ -192,7 +218,8 @@ public sealed class SymbolCatalogTest
                  })
             documents = documents.Add(scripts + path,
                 new DocumentIndex(scripts + path, 1, [], [], LayerRank: 1, LayerName: "Mod"));
-        var catalog = SymbolCatalog.Build(Index() with { Documents = documents }, Kinds, []);
+        var catalog = SymbolCatalog.Build(Index() with { Documents = documents }, Kinds, [],
+            new SchemaProviderBuilder().Build());
 
         var outline = catalog.Outline(SymbolOutlines.Scripts).ToDictionary(p => p.Page, p => p.Count);
 

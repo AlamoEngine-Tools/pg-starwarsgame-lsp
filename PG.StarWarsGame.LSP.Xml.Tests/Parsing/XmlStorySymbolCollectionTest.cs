@@ -20,7 +20,8 @@ public sealed class XmlStorySymbolCollectionTest
     {
         var registry = new StubRegistry(typedAsStoryParser ? ["StoryParser"] : []);
         var parser = new XmlGameDocumentParser(new FileHelper(new MockFileSystem()),
-            new StoryEnumSchemaProvider(), registry, NullLogger<XmlGameDocumentParser>.Instance);
+            StoryEnumSchemaProvider.Build(), registry, NullLogger<XmlGameDocumentParser>.Instance,
+            TestParseCache.For(new FakeGameWorkspaceHost()), new AllowAllEaWContext());
         return await parser.ParseAsync(Uri, xml, 1, CancellationToken.None);
     }
 
@@ -178,7 +179,7 @@ public sealed class XmlStorySymbolCollectionTest
             new Dictionary<string, ImmutableArray<string>>();
     }
 
-    private sealed class StoryEnumSchemaProvider : ISchemaProvider
+    private static class StoryEnumSchemaProvider
     {
         private static readonly EnumDefinition Events = new()
         {
@@ -207,49 +208,6 @@ public sealed class XmlStorySymbolCollectionTest
             ]
         };
 
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [Events, Rewards];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            if (string.Equals(name, Events.Name, StringComparison.OrdinalIgnoreCase)) return Events;
-            if (string.Equals(name, Rewards.Name, StringComparison.OrdinalIgnoreCase)) return Rewards;
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            // "Planet" is a real types.yaml object type; "GameObjectType" is an umbrella that
-            // no concrete symbol carries - mirrors the production schema.
-            return string.Equals(t, "Planet", StringComparison.OrdinalIgnoreCase)
-                ? new GameObjectTypeDefinition { TypeName = "Planet" }
-                : null;
-        }
-
         private static ParamDefinition Param(int position, string referenceType)
         {
             return new ParamDefinition
@@ -257,6 +215,17 @@ public sealed class XmlStorySymbolCollectionTest
                 Position = position, ValueType = XmlValueType.NameReference,
                 ReferenceTypeName = referenceType
             };
+        }
+
+        public static FakeSchemaProvider Build()
+        {
+            // "Planet" is a real types.yaml object type; "GameObjectType" is an umbrella that no
+            // concrete symbol carries - mirrors the production schema.
+            return new SchemaProviderBuilder()
+                .WithEnum(Events)
+                .WithEnum(Rewards)
+                .WithObjectType(new GameObjectTypeDefinition { TypeName = "Planet" })
+                .Build();
         }
     }
 }

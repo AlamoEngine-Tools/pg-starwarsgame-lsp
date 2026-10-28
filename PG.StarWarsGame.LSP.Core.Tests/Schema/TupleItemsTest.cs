@@ -132,8 +132,9 @@ public sealed class TupleItemsTest
     [Fact]
     public void Describe_NamesTheSlots()
     {
-        Assert.Equal("`Terrain, Model` pairs", TupleItems.Describe(TerrainModel));
-        Assert.Equal("comma-separated pairs", TupleItems.Describe(TerrainModel with { Slots = [] }));
+        Assert.Equal("`Terrain, Model` pairs", TupleItems.Describe(TerrainModel, TestCatalogues.English));
+        Assert.Equal("comma-separated pairs",
+            TupleItems.Describe(TerrainModel with { Slots = [] }, TestCatalogues.English));
     }
 
     private static GameIndex IndexOf(params (string Id, string Type)[] symbols)
@@ -205,7 +206,8 @@ public sealed class TupleItemsTest
     [Fact]
     public void Describe_AListMap_SaysKeyThenItems()
     {
-        Assert.Equal("`Animation` keys, each followed by `Unit` items", TupleItems.Describe(Presence));
+        Assert.Equal("`Animation` keys, each followed by `Unit` items",
+            TupleItems.Describe(Presence, TestCatalogues.English));
     }
 
     [Fact]
@@ -216,6 +218,6 @@ public sealed class TupleItemsTest
             Slots = [.. TerrainModel.Slots, new TupleSlotDefinition { Label = "Weight" }]
         };
 
-        Assert.Equal("`Terrain, Model, Weight` groups", TupleItems.Describe(three));
+        Assert.Equal("`Terrain, Model, Weight` groups", TupleItems.Describe(three, TestCatalogues.English));
     }
 }

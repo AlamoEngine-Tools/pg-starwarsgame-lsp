@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -21,7 +22,8 @@ public sealed class UnregisteredXmlFileHandlerTest
     private static readonly UnregisteredXmlFileHandler Sut = new();
 
     private static readonly DiagnosticsContext Ctx =
-        new(new EmptySchemaProvider(), GameIndex.Empty, "file:///data/xml/Orphan.xml", "en");
+        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///data/xml/Orphan.xml", "en")
+            { Messages = TestCatalogues.English };
 
     private static XmlUnregisteredFileFact Fact(string fileName = "Orphan.xml")
     {

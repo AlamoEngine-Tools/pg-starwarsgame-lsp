@@ -4,16 +4,17 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
 internal static class XmlHandlerTestFixtures
 {
     public static readonly DiagnosticsContext EmptyCtx = new(
-        new EmptySchemaProvider(),
+        new SchemaProviderBuilder().Build(),
         GameIndex.Empty,
         "file:///test.xml",
-        "en");
+        "en") { Messages = TestCatalogues.English };
 
     public static XmlTagDefinition MakeTag(
         string name,
@@ -31,45 +32,5 @@ internal static class XmlHandlerTestFixtures
     public static XmlTagValueFact MakeFact(XmlTagDefinition tag, string rawValue)
     {
         return new XmlTagValueFact("file:///test.xml", 0, 0, rawValue.Length, tag, rawValue);
-    }
-}
-
-internal sealed class EmptySchemaProvider : ISchemaProvider
-{
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
     }
 }

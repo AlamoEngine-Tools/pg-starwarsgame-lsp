@@ -40,6 +40,7 @@ public sealed class SetWorkspaceSettingsHandler(IWorkspaceSettingsStore store)
     public Task<WorkspaceSettingsDto> Handle(SetWorkspaceSettingsParams request, CancellationToken ct)
     {
         var current = store.Get();
+        // ReSharper disable once WithExpressionModifiesAllMembers - written as a with-expression so a fourth setting joins without touching this handler
         var updated = current with
         {
             SkipStoryDeleteConfirmation = request.SkipStoryDeleteConfirmation ?? current.SkipStoryDeleteConfirmation,

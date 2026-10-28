@@ -19,7 +19,9 @@ internal sealed class OverrideCodeLensProvider : IXmlCodeLensProvider
 {
     public LspCodeLens? Handle(CodeLensSymbolContext ctx)
     {
-        if (!ctx.Index.WorkspaceDefinitions.TryGetValue(ctx.Symbol.Id, out var all) || all.Length <= 1)
+        // An override is a definition of the same type on a lower layer; another type's is another object.
+        var all = ctx.Index.DefinitionsOf(ctx.Symbol.Id, ctx.Symbol.TypeName).ToList();
+        if (all.Count <= 1)
             return null;
 
         var myRank = ctx.Index.LayerRankOf(ctx.Symbol);

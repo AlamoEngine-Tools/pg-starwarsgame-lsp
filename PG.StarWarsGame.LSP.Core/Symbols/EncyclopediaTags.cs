@@ -100,9 +100,7 @@ public static class EncyclopediaTags
             if (LayerDefinesBody(index, workspaceSource, current))
                 return true;
 
-            current = string.IsNullOrEmpty(current.VariantBaseId)
-                ? null
-                : index.Resolve(current.VariantBaseId);
+            current = index.VariantBaseOf(current);
         }
 
         return false;
@@ -126,7 +124,7 @@ public static class EncyclopediaTags
     private static bool LayerDefinesBody(
         GameIndex index, IVariantTagSource workspaceSource, GameSymbol symbol)
     {
-        var workspace = workspaceSource.TryGetTags(symbol.Id);
+        var workspace = workspaceSource.TryGetTags(symbol);
         if (workspace is not null)
             return workspace.Any(t => IsBodyTag(t.TagName));
 

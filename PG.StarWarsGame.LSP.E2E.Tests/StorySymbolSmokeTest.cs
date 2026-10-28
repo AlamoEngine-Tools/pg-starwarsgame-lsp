@@ -62,7 +62,7 @@ public sealed class StorySymbolSmokeTest : IClassFixture<LspServerFixture>
 
         var xmlPath = Path.Combine(LspTestEnvironment.WorkspacePath!, ThreadXmlRel);
         var xmlUri = DocumentUri.FromFileSystemPath(xmlPath);
-        var lines = await File.ReadAllLinesAsync(xmlPath);
+        var lines = await File.ReadAllLinesAsync(xmlPath, TestContext.Current.CancellationToken);
 
         var received = _fixture.WaitForDiagnosticsAsync(xmlUri, TimeSpan.FromSeconds(20));
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
@@ -129,7 +129,7 @@ public sealed class StorySymbolSmokeTest : IClassFixture<LspServerFixture>
             Assert.NotNull(result);
             // Definitions come back as LocationLinks (carrying an originSelectionRange); tolerate the
             // plain-Location shape too. Callers only assert on the target URI.
-            var targetUris = result!
+            var targetUris = result
                 .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri)
                 .ToList();
             Assert.NotEmpty(targetUris);

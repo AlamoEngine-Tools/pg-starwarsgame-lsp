@@ -20,7 +20,7 @@ public sealed class DamageToArmorModHandler : SingleValueTypeHandlerBase
         if (parts.Length != 3 ||
             parts[0].Trim().Length == 0 ||
             parts[1].Trim().Length == 0 ||
-            !LenientFloatParser.TryParse(parts[2].Trim(), out _))
+            !EngineNumber.TryParseFloat(parts[2].Trim(), out _))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

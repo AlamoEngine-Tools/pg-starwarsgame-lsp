@@ -4,7 +4,7 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -14,14 +14,29 @@ namespace PG.StarWarsGame.LSP.Xml.Tests;
 public sealed class XmlCodeActionHandlerTest
 {
     private static XmlCodeActionHandler MakeSut(IXmlFixCache? cache = null,
-        ILspConfigurationProvider? config = null, IXmlCursorCodeActionProvider? cursor = null)
+        IMessageCatalog? messages = null, IXmlCursorCodeActionProvider? cursor = null)
     {
-        var resolvedConfig = config ?? new FakeLspConfigurationProvider();
-        var registry = new XmlCodeActionRegistry([
+        IXmlCodeActionProvider[] providers =
+        [
             new FixSuggestionCodeActionProvider(cache ?? new EmptyFixCache()),
             new CreateLocKeyCodeActionProvider()
-        ]);
-        return new XmlCodeActionHandler(registry, resolvedConfig, cursor is null ? [] : [cursor]);
+        ];
+        return new XmlCodeActionHandler(providers, messages ?? TestCatalogues.English, cursor is null ? [] : [cursor]);
+    }
+
+    /// <summary>
+    ///     A code action's title comes from the ONE injected catalogue (#306): the context a provider
+    ///     gets carries the handler's catalogue, not one built from the configuration per request.
+    /// </summary>
+    [Fact]
+    public async Task TheActionsSpeakTheInjectedCatalogue()
+    {
+        var range = new LspRange(new Position(0, 10), new Position(0, 13));
+        var request = ParamsWithDiagnostics("file:///test.xml", DiagWithFix(range, "42"));
+
+        var result = await MakeSut(messages: new MarkerMessageCatalog()).Handle(request, CancellationToken.None);
+
+        Assert.Equal("[FixSuggestionAction_Replace]", Assert.Single(result!).CodeAction!.Title);
     }
 
     // ── cursor actions ───────────────────────────────────────────────────────

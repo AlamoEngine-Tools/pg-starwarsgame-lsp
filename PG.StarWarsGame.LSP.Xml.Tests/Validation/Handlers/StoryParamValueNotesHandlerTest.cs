@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -22,7 +23,8 @@ public sealed class StoryParamValueNotesHandlerTest
     private static readonly StoryParamValueNotesHandler Sut = new();
 
     private static readonly DiagnosticsContext Ctx =
-        new(new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
+        new(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
 
     private static StoryParamFact Param(string value, params SchemaNote[] notesOnValue)
     {

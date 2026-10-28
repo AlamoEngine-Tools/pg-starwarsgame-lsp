@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -108,7 +109,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
         var ns = XNamespace.Get(XmlNs);
         var entries = xdoc.Root!.Elements(ns + "Localisation").ToList();
-        Assert.Single(entries.Where(e => e.Attribute("key")?.Value == "TEXT_NEW"));
+        Assert.Single(entries, e => e.Attribute("key")?.Value == "TEXT_NEW");
     }
 
     [Fact]

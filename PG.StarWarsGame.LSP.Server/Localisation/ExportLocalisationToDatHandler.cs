@@ -5,6 +5,8 @@ using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.Files.DAT.Services;
+using PG.StarWarsGame.LSP.Localisation.Rows;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
@@ -26,6 +28,7 @@ public sealed class ExportLocalisationToDatHandler
 {
     private readonly IBaselineTranslationProvider _baselineProvider;
     private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly ICsvTranslationImporter _csvImporter;
     private readonly IDatTranslationExporter _datExporter;
     private readonly IDatService _datFileService;
@@ -53,7 +56,8 @@ public sealed class ExportLocalisationToDatHandler
         ILocalisationLayerRegistry layerRegistry,
         ILogger<ExportLocalisationToDatHandler> logger,
         ILspConfigurationProvider config,
-        IProjectLayerMap layers)
+        IProjectLayerMap layers,
+        IMessageCatalog messages)
     {
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
@@ -68,6 +72,7 @@ public sealed class ExportLocalisationToDatHandler
         _layerRegistry = layerRegistry;
         _logger = logger;
         _config = config;
+        _messages = messages;
         _layers = layers;
     }
 
@@ -76,17 +81,17 @@ public sealed class ExportLocalisationToDatHandler
     {
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
             return Task.FromResult(new ExportLocalisationToDatResult([],
-                new ConfiguredMessageCatalog(_config).Format("LocExportDat_NoProjectFilePathProvided")));
+                _messages.Format("LocExportDat_NoProjectFilePathProvided")));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(request.ProjectFilePath))
             return Task.FromResult(new ExportLocalisationToDatResult([],
-                new ConfiguredMessageCatalog(_config).Format("LocExportDat_FileNotFound", request.ProjectFilePath)));
+                _messages.Format("LocExportDat_FileNotFound", request.ProjectFilePath)));
 
         // The DAT files are written beside the source - into the dependency's own directory when
         // the source is its file (#276).
         if (LocalisationLayerGuard.ReadOnlyObjection(
-                _layers, _fileHelper, request.ProjectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
+                _layers, _fileHelper, request.ProjectFilePath, _messages) is { } readOnly)
             return Task.FromResult(new ExportLocalisationToDatResult([], readOnly));
 
         var languages = _langService.OfficiallySupported();
@@ -147,14 +152,14 @@ public sealed class ExportLocalisationToDatHandler
                     break;
                 default:
                     return Task.FromResult(new ExportLocalisationToDatResult([],
-                        new ConfiguredMessageCatalog(_config).Format("LocExportDat_UnsupportedFormat", ext)));
+                        _messages.Format("LocExportDat_UnsupportedFormat", ext)));
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load workspace file '{Path}'.", request.ProjectFilePath);
             return Task.FromResult(new ExportLocalisationToDatResult([],
-                new ConfiguredMessageCatalog(_config).Format("LocExportDat_FailedLoadFile", ex.Message)));
+                _messages.Format("LocExportDat_FailedLoadFile", ex.Message)));
         }
 
         var dir = fs.Path.GetDirectoryName(request.ProjectFilePath)!;

@@ -50,7 +50,8 @@ public sealed class BaselineLocationResolverTest
         var (resolver, requests) = Build(_ => Releases($"v{Dto}.1.0"));
 
         var location = await resolver.ResolveAsync(
-            new BaselineSourceConfig { Url = "https://example.test/foc-baseline.aet" });
+            new BaselineSourceConfig { Url = "https://example.test/foc-baseline.aet" },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(
             new BaselineLocation("https://example.test/foc-baseline.aet", null, BaselineOrigin.Explicit),
@@ -65,7 +66,7 @@ public sealed class BaselineLocationResolverTest
         // however new it is.
         var (resolver, _) = Build(_ => Releases($"v{Dto}.1.0", $"v{Dto}.2.0", $"v{Dto + 1}.0.0"));
 
-        var location = await resolver.ResolveAsync(Official);
+        var location = await resolver.ResolveAsync(Official, TestContext.Current.CancellationToken);
 
         Assert.Equal(new BaselineLocation(
             $"https://raw.githubusercontent.com/AlamoEngine-Tools/eaw-baseline/refs/tags/v{Dto}.2.0/" +
@@ -80,7 +81,7 @@ public sealed class BaselineLocationResolverTest
         // start are the loader's own fallback, below this one.
         var (resolver, _) = Build(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
 
-        var location = await resolver.ResolveAsync(Official);
+        var location = await resolver.ResolveAsync(Official, TestContext.Current.CancellationToken);
 
         Assert.Equal(new BaselineLocation(
             "https://raw.githubusercontent.com/AlamoEngine-Tools/eaw-baseline/refs/heads/main/" +
@@ -101,8 +102,8 @@ public sealed class BaselineLocationResolverTest
         // lookup serves both, and both read the same tag.
         var (resolver, requests) = Build(_ => Releases($"v{Dto}.1.0"));
 
-        var first = await resolver.ResolveAsync(Official);
-        var second = await resolver.ResolveAsync(new BaselineSourceConfig());
+        var first = await resolver.ResolveAsync(Official, TestContext.Current.CancellationToken);
+        var second = await resolver.ResolveAsync(new BaselineSourceConfig(), TestContext.Current.CancellationToken);
 
         Assert.Equal(first, second);
         Assert.Single(requests);

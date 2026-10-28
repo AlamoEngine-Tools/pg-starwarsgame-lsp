@@ -43,7 +43,7 @@ internal sealed class ScriptedLuaAnalyzer : ILuaAnalyzer
         DiagnosticsPublished?.Invoke(diagnostics);
     }
 
-    public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+    public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
     {
         Requests.Add((method, parameters));
         return Task.FromResult(_answers.GetValueOrDefault(method) as T);

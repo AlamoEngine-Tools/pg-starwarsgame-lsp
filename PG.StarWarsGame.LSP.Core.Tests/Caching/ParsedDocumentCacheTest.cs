@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Util;
 
@@ -19,7 +20,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public void Count_TracksLiveEntriesThroughInsertsReplacementsAndEvictions()
     {
-        var cache = new ParsedDocumentCache<Artifact>(2);
+        var cache = new ParsedDocumentCache<Artifact>(2, NullLogger.Instance);
         Assert.Equal(0, cache.Count);
 
         cache.GetOrParse("file:///a.xml", "<A/>", ContentHasher.Hash("<A/>"), Parse);
@@ -41,7 +42,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public void GetOrParse_SameUriAndHash_ReturnsCachedInstanceWithoutReparsing()
     {
-        var cache = new ParsedDocumentCache<Artifact>(4);
+        var cache = new ParsedDocumentCache<Artifact>(4, NullLogger.Instance);
         var parses = 0;
 
         Artifact CountingParse(string text)
@@ -60,7 +61,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public void GetOrParse_ChangedHash_ReparsesAndReplacesEntry()
     {
-        var cache = new ParsedDocumentCache<Artifact>(4);
+        var cache = new ParsedDocumentCache<Artifact>(4, NullLogger.Instance);
 
         var v1 = cache.GetOrParse("file:///a.xml", "<A/>", ContentHasher.Hash("<A/>"), Parse);
         var v2 = cache.GetOrParse("file:///a.xml", "<A2/>", ContentHasher.Hash("<A2/>"), Parse);
@@ -73,7 +74,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public void GetOrParse_DifferentUris_AreIndependentEntries()
     {
-        var cache = new ParsedDocumentCache<Artifact>(4);
+        var cache = new ParsedDocumentCache<Artifact>(4, NullLogger.Instance);
 
         var a = cache.GetOrParse("file:///a.xml", "<X/>", ContentHasher.Hash("<X/>"), Parse);
         var b = cache.GetOrParse("file:///b.xml", "<X/>", ContentHasher.Hash("<X/>"), Parse);
@@ -88,7 +89,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public void GetOrParse_BeyondCapacity_EvictsLeastRecentlyUsed()
     {
-        var cache = new ParsedDocumentCache<Artifact>(2);
+        var cache = new ParsedDocumentCache<Artifact>(2, NullLogger.Instance);
 
         var a = cache.GetOrParse("file:///a.xml", "<A/>", 1, Parse);
         _ = cache.GetOrParse("file:///b.xml", "<B/>", 2, Parse);
@@ -102,7 +103,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public void GetOrParse_AccessRefreshesRecency()
     {
-        var cache = new ParsedDocumentCache<Artifact>(2);
+        var cache = new ParsedDocumentCache<Artifact>(2, NullLogger.Instance);
 
         var a = cache.GetOrParse("file:///a.xml", "<A/>", 1, Parse);
         _ = cache.GetOrParse("file:///b.xml", "<B/>", 2, Parse);
@@ -117,7 +118,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public void GetOrParse_ZeroCapacity_AlwaysParsesAndStoresNothing()
     {
-        var cache = new ParsedDocumentCache<Artifact>(0);
+        var cache = new ParsedDocumentCache<Artifact>(0, NullLogger.Instance);
         var parses = 0;
 
         Artifact CountingParse(string text)
@@ -138,7 +139,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public void Statistics_TrackHitsMissesEvictions()
     {
-        var cache = new ParsedDocumentCache<Artifact>(1);
+        var cache = new ParsedDocumentCache<Artifact>(1, NullLogger.Instance);
 
         _ = cache.GetOrParse("file:///a.xml", "<A/>", 1, Parse); // miss
         _ = cache.GetOrParse("file:///a.xml", "<A/>", 1, Parse); // hit
@@ -156,7 +157,7 @@ public sealed class ParsedDocumentCacheTest
     public void GetOrParse_Every256Operations_LogsStatisticsAtDebug()
     {
         var logger = new CapturingLogger();
-        var cache = new ParsedDocumentCache<Artifact>(4, "test", logger);
+        var cache = new ParsedDocumentCache<Artifact>(4, logger, "test");
 
         for (var i = 0; i < 256; i++)
             _ = cache.GetOrParse("file:///a.xml", "<A/>", 1, Parse);
@@ -174,7 +175,7 @@ public sealed class ParsedDocumentCacheTest
     public void GetOrParse_FewerThan256Operations_LogsNothing()
     {
         var logger = new CapturingLogger();
-        var cache = new ParsedDocumentCache<Artifact>(4, "test", logger);
+        var cache = new ParsedDocumentCache<Artifact>(4, logger, "test");
 
         for (var i = 0; i < 255; i++)
             _ = cache.GetOrParse("file:///a.xml", "<A/>", 1, Parse);
@@ -187,7 +188,7 @@ public sealed class ParsedDocumentCacheTest
     [Fact]
     public async Task GetOrParse_ConcurrentCallersForSameContent_ConvergeOnOneInstance()
     {
-        var cache = new ParsedDocumentCache<Artifact>(4);
+        var cache = new ParsedDocumentCache<Artifact>(4, NullLogger.Instance);
         const string text = "<Shared/>";
         var hash = ContentHasher.Hash(text);
 
@@ -200,6 +201,7 @@ public sealed class ParsedDocumentCacheTest
         Assert.Same(results[0], cache.GetOrParse("file:///a.xml", text, hash, Parse));
     }
 
+    // ReSharper disable once NotAccessedPositionalProperty.Local - a fixture; the cache never looks inside
     private sealed record Artifact(string Source);
 
     private sealed class CapturingLogger : ILogger

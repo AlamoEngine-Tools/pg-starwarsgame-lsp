@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Schema.Yaml.YamlKind;
 using PG.StarWarsGame.LSP.Schema.Yaml.YamlType;
 using YamlDotNet.Serialization;
@@ -324,7 +325,7 @@ internal static class YamlSchemaParser
                     "cannot register what the file holds - update the extension. Known types: " +
                     $"{string.Join(", ", Enum.GetNames<MetafileType>())}.");
 
-            var normalizedPath = entry.Path.Replace('\\', '/').ToLowerInvariant();
+            var normalizedPath = GamePaths.Key(entry.Path);
             result.Add(new MetafileDefinition(normalizedPath, metafileType, entry.Types)
             {
                 Notes = ReadNotes(entry.Notes)
@@ -350,7 +351,7 @@ internal static class YamlSchemaParser
         {
             // A trailing slash is what tells a directory from a file downstream, so it is added
             // here rather than trusted to the author of the YAML.
-            var normalizedPath = entry.Path.Replace('\\', '/').ToLowerInvariant().TrimEnd('/') + "/";
+            var normalizedPath = GamePaths.Key(entry.Path) + "/";
             result.Add(new ScannedDirectoryDefinition(normalizedPath, entry.Types)
             {
                 Notes = ReadNotes(entry.Notes)

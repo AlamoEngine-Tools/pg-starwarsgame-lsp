@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -66,7 +67,7 @@ public sealed class StoryLayoutStoreTest
     {
         return new StoryLayoutStore(
             new StubReloadService(Config(withProject)), new FileHelper(fs),
-            NullLogger<StoryLayoutStore>.Instance);
+            NullLogger<StoryLayoutStore>.Instance, ResxMessageCatalog.Server("en"));
     }
 
     private static string Sidecar(MockFileSystem fs)
@@ -306,7 +307,7 @@ public sealed class StoryLayoutStoreTest
     private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
+        public WorkspaceConfiguration LastWorkspaceConfig => config;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)

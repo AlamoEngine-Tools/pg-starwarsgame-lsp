@@ -7,9 +7,8 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 public static class MegArchiveOriginHoverText
 {
-    public static string Describe(MegArchiveOrigin origin, IMessageCatalog? messages = null)
+    public static string Describe(MegArchiveOrigin origin, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var archiveName = Path.GetFileName(origin.ArchivePath);
         return messages.Format("MegArchiveOrigin_Packed", archiveName, origin.InternalPath);
     }

@@ -78,7 +78,7 @@ public sealed class HttpSchemaProviderTest
                 ? JsonResponse(manifest)
                 : YamlResponse("tags:\n  - tag: Foo\n    type: Float\n"));
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         // 1 manifest + 2 YAML = 3 requests
         Assert.Equal(3, fake.Requests.Count);
@@ -101,7 +101,7 @@ public sealed class HttpSchemaProviderTest
                 ? JsonResponse(manifest)
                 : YamlResponse(yaml));
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, provider.AllTags.Count);
         Assert.NotNull(provider.GetTag("Tactical_Health"));
@@ -118,9 +118,9 @@ public sealed class HttpSchemaProviderTest
                 ? JsonResponse(manifest)
                 : YamlResponse(yaml));
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(1, provider.GetTagsForType("GameObjectType").Count);
+        Assert.Single(provider.GetTagsForType("GameObjectType"));
     }
 
     // HTTP is the path the shipped extension takes, so a category that loads from disk but not
@@ -143,7 +143,7 @@ public sealed class HttpSchemaProviderTest
                 ? JsonResponse(manifest)
                 : YamlResponse(kindsYaml));
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { "PLANET" }, provider.GetKind("Planet")?.Behaviors);
         Assert.Single(provider.AllKinds);
@@ -165,8 +165,8 @@ public sealed class HttpSchemaProviderTest
             return callCount++ == 0 ? YamlResponse(kindsYaml, "v1") : NotModified();
         });
 
-        await provider.LoadAsync();
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(provider.GetKind("Planet"));
     }
@@ -201,13 +201,14 @@ public sealed class HttpSchemaProviderTest
             return YamlResponse(tagYaml, "v1");
         });
 
-        await provider.LoadAsync(); // first load - downloads + populates cache
+        await provider.LoadAsync(TestContext.Current.CancellationToken); // first load - downloads + populates cache
         // Kept for the bug report: a warm start reads the cache, a cold one rebuilds from the
         // network, and only the log used to say which.
         Assert.False(provider.LastLoadFromCache);
         fake.Requests.Clear();
 
-        await provider.LoadAsync(); // second load - cache hit; only manifest is fetched
+        await provider.LoadAsync(TestContext.Current
+            .CancellationToken); // second load - cache hit; only manifest is fetched
 
         Assert.Single(fake.Requests);
         Assert.EndsWith("_index.json", fake.Requests[0].RequestUri!.ToString());
@@ -231,8 +232,8 @@ public sealed class HttpSchemaProviderTest
                 : NotModified();
         });
 
-        await provider.LoadAsync(); // first load - populates index
-        await provider.LoadAsync(); // second load - 304, should keep existing
+        await provider.LoadAsync(TestContext.Current.CancellationToken); // first load - populates index
+        await provider.LoadAsync(TestContext.Current.CancellationToken); // second load - 304, should keep existing
 
         Assert.NotNull(provider.GetTag("Tactical_Health"));
     }
@@ -246,7 +247,7 @@ public sealed class HttpSchemaProviderTest
         var firedCount = 0;
         provider.SchemaRefreshed += (_, _) => firedCount++;
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, firedCount);
     }
@@ -262,7 +263,7 @@ public sealed class HttpSchemaProviderTest
         var provider = new HttpSchemaProvider(client, "http://schema.test", NoOpCache(),
             NullLogger<HttpSchemaProvider>.Instance);
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         // The manifest request URL must not have a double-slash
         var indexRequest = fake.Requests[0];
@@ -277,7 +278,7 @@ public sealed class HttpSchemaProviderTest
         var client = new HttpClient(fake);
         var provider = new HttpSchemaProvider(client, BaseUrl, NoOpCache(), NullLogger<HttpSchemaProvider>.Instance);
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => provider.LoadAsync());
+        await Assert.ThrowsAsync<HttpRequestException>(() => provider.LoadAsync(TestContext.Current.CancellationToken));
 
         Assert.True(provider.ReadyAsync.IsCompleted);
     }
@@ -305,7 +306,7 @@ public sealed class HttpSchemaProviderTest
             new HttpClient(new FakeFailingHttpHandler(new HttpRequestException("offline"))),
             BaseUrl, cache, NullLogger<HttpSchemaProvider>.Instance, "v2.1.0");
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(provider.GetTag("Mass"));
         Assert.True(provider.LastLoadFromCache);
@@ -323,7 +324,7 @@ public sealed class HttpSchemaProviderTest
         var provider = new HttpSchemaProvider(new HttpClient(fake), BaseUrl, cache,
             NullLogger<HttpSchemaProvider>.Instance, "v2.2.0");
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(fake.Requests);
         Assert.Equal("v2.2.0", cache.CachedTag);
@@ -341,7 +342,7 @@ public sealed class HttpSchemaProviderTest
         var provider = new HttpSchemaProvider(new HttpClient(fake), BaseUrl, cache,
             NullLogger<HttpSchemaProvider>.Instance);
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(cache.CachedTag);
     }
@@ -355,7 +356,7 @@ public sealed class HttpSchemaProviderTest
             new HttpClient(new FakeFailingHttpHandler(new HttpRequestException("offline"))),
             BaseUrl, cache, NullLogger<HttpSchemaProvider>.Instance, "v9.0.0");
 
-        await provider.LoadAsync();
+        await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.False(provider.LastVersionCheck?.CanLoad);
         Assert.Null(provider.GetTag("Mass"));

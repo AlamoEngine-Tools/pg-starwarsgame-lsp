@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
-using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.CodeLens;
 
@@ -18,7 +17,8 @@ public sealed class EncyclopediaCodeLensProviderTest
     private static EncyclopediaCodeLensProvider Provider(IVariantTagSource source)
     {
         return new EncyclopediaCodeLensProvider(source,
-            new PlanetSchema());
+            new SchemaProviderBuilder().WithKind(new ObjectKindDefinition
+                { Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"] }).Build());
     }
 
     private static GameSymbol Sym(string id, string? baseId = null, string[]? behaviors = null)
@@ -36,7 +36,8 @@ public sealed class EncyclopediaCodeLensProviderTest
 
     private static CodeLensSymbolContext Ctx(GameSymbol symbol, GameIndex index)
     {
-        return new CodeLensSymbolContext(symbol, (FileOrigin)symbol.Origin, index);
+        return new CodeLensSymbolContext(symbol, (FileOrigin)symbol.Origin, index)
+            { Messages = TestCatalogues.English };
     }
 
     private static VariantTag Tag(string name, string value)
@@ -53,7 +54,7 @@ public sealed class EncyclopediaCodeLensProviderTest
         var lens = Provider(source).Handle(Ctx(symbol, IndexWith(symbol)));
 
         Assert.NotNull(lens);
-        Assert.Equal(EncyclopediaCodeLensProvider.ShowEncyclopediaCommand, lens!.Command!.Name);
+        Assert.Equal(EncyclopediaCodeLensProvider.ShowEncyclopediaCommand, lens.Command!.Name);
         Assert.Contains("Etahn", lens.Command.Arguments!.ToString());
         Assert.Equal(3, lens.Range.Start.Line);
     }
@@ -112,55 +113,6 @@ public sealed class EncyclopediaCodeLensProviderTest
     }
 
     // Only the Planet kind is known, as a schema that defines the object kinds has it.
-    private sealed class PlanetSchema : ISchemaProvider
-    {
-        public ObjectKindDefinition? GetKind(string kindName)
-        {
-            return string.Equals(kindName, ObjectKindNames.Planet, StringComparison.OrdinalIgnoreCase)
-                ? new ObjectKindDefinition { Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"] }
-                : null;
-        }
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-    }
-
     private sealed class TagSource : IVariantTagSource
     {
         private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =

@@ -6,8 +6,6 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -22,7 +20,6 @@ namespace PG.StarWarsGame.LSP.Lua.Tests;
 public sealed class LuaRenameHandlerTest
 {
     private const string XmlUri = "file:///test.xml";
-    private const string OtherXmlUri = "file:///other.xml";
     private const string LuaUri = "file:///script.lua";
     private const string OtherLuaUri = "file:///lib.lua";
 
@@ -54,11 +51,6 @@ public sealed class LuaRenameHandlerTest
         return new GameSymbol(name, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, 0, null), null);
     }
 
-    private static GameReference XmlRef(string id, string uri, int line, int col, int len)
-    {
-        return new GameReference(id, GameSymbolKind.XmlObject, "Unit", uri, line, col, len);
-    }
-
     private static GameReference LuaRef(string id, string uri, int line, int col, int len)
     {
         return new GameReference(id, GameSymbolKind.XmlObject, null, uri, line, col, len);
@@ -87,21 +79,26 @@ public sealed class LuaRenameHandlerTest
         return new DocumentIndex(uri, 1, syms, refs);
     }
 
-    private static LuaRenameHandler MakeHandler(FakeWorkspaceHost? host = null, FakeSchemaProvider? schema = null,
+    private static LuaRenameHandler MakeHandler(FakeGameWorkspaceHost? host = null, FakeSchemaProvider? schema = null,
         ILuaApiSchemaProvider? luaSchema = null, ILuaSandboxProvider? sandbox = null)
     {
         var textSource = new DocumentTextSource(
-            host ?? new FakeWorkspaceHost(),
+            host ?? new FakeGameWorkspaceHost(),
             new FileHelper(new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
+        var fileHelper = new FileHelper(new MockFileSystem());
         return new LuaRenameHandler(
-            new LuaParseCache(textSource, 16),
+            new LuaParseCache(textSource, 16, NullLogger<LuaParseCache>.Instance),
             textSource,
-            schema ?? new FakeSchemaProvider(),
+            schema ?? new SchemaProviderBuilder().Build(),
             NullLogger<LuaRenameHandler>.Instance,
-            luaSchema,
-            sandbox,
-            new FileHelper(new MockFileSystem()));
+            luaSchema ?? new LuaApiSchemaProvider([]),
+            sandbox ?? FixedSandbox.Empty(),
+            fileHelper,
+            new FakeGameIndexService(),
+            new ScriptedLuaAnalyzer(),
+            new ProjectLayerMap(fileHelper),
+            TestCatalogues.English);
     }
 
     // ── Claims: what is ours to rename (#154) ────────────────────────────────
@@ -109,7 +106,7 @@ public sealed class LuaRenameHandlerTest
     private static bool ClaimsAt(string text, int line, int character, GameIndex index,
         ILuaApiSchemaProvider? luaSchema = null)
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
         return MakeHandler(host, luaSchema: luaSchema).Claims(LuaUri, line, character, index);
     }
@@ -174,12 +171,13 @@ public sealed class LuaRenameHandlerTest
         var xmlDoc = MakeDoc(XmlUri, sym);
         var luaDoc = MakeDoc(LuaUri);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Root>\n<Unit Name=\"UNIT_A\"/>\n</Root>", 1);
         host.AddOrUpdate(LuaUri, "Spawn(\"UNIT_A\")", 1);
 
-        var schema = new FakeSchemaProvider();
-        schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
+        var schema = new SchemaProviderBuilder()
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" })
+            .Build();
 
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, xmlDoc).Add(LuaUri, luaDoc),
@@ -189,7 +187,7 @@ public sealed class LuaRenameHandlerTest
         var result = MakeHandler(host, schema).HandleRename(LuaUri, RenameAt(0, 7, "UNIT_B"), index);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(XmlUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(XmlUri)));
         Assert.True(result.Changes.ContainsKey(DocumentUri.From(LuaUri)));
     }
 
@@ -201,12 +199,13 @@ public sealed class LuaRenameHandlerTest
         var xmlDoc = MakeDoc(XmlUri, sym);
         var luaDoc = MakeDoc(LuaUri);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
         host.AddOrUpdate(LuaUri, "Spawn(\"UNIT_A\")", 1);
 
-        var schema = new FakeSchemaProvider();
-        schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
+        var schema = new SchemaProviderBuilder()
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" })
+            .Build();
 
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, xmlDoc).Add(LuaUri, luaDoc),
@@ -216,7 +215,7 @@ public sealed class LuaRenameHandlerTest
         var result = MakeHandler(host, schema).HandleRename(LuaUri, RenameAt(0, 7, "UNIT_B"), index);
 
         Assert.NotNull(result);
-        var luaEdits = result!.Changes![DocumentUri.From(LuaUri)].ToList();
+        var luaEdits = result.Changes![DocumentUri.From(LuaUri)].ToList();
         var edit = Assert.Single(luaEdits);
         Assert.Equal(0, edit.Range.Start.Line);
         Assert.Equal(7, edit.Range.Start.Character);
@@ -227,7 +226,7 @@ public sealed class LuaRenameHandlerTest
     [Fact]
     public void HandleRename_CursorOnUnknownString_ReturnsNull()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Spawn(\"NOT_A_GAME_OBJECT\")", 1);
         var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, MakeDoc(LuaUri)));
 
@@ -239,7 +238,7 @@ public sealed class LuaRenameHandlerTest
     public void HandleRename_CursorOnXmlObjectString_ArchiveDefinition_ReturnsNull()
     {
         var sym = XmlSymbolInArchive("VANILLA_UNIT");
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Spawn(\"VANILLA_UNIT\")", 1);
 
         var index = BuildIndex(
@@ -260,7 +259,7 @@ public sealed class LuaRenameHandlerTest
         var luaDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty,
             ImmutableArray<GameReference>.Empty, LayerRank: 1);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Spawn(\"UNIT_DEP\")", 1);
 
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
@@ -288,7 +287,7 @@ public sealed class LuaRenameHandlerTest
         var callerDoc = new DocumentIndex(LuaUri, 1, [], [callerRef]);
         var defDoc = new DocumentIndex(OtherLuaUri, 1, [sym], []);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(OtherLuaUri, "function RunMission() end", 1);
         host.AddOrUpdate(LuaUri, "RunMission()", 1);
 
@@ -300,7 +299,7 @@ public sealed class LuaRenameHandlerTest
         var result = MakeHandler(host).HandleRename(LuaUri, RenameAt(0, 0, "ExecuteMission"), index);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(OtherLuaUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(OtherLuaUri)));
         Assert.True(result.Changes.ContainsKey(DocumentUri.From(LuaUri)));
         Assert.False(result.Changes.ContainsKey(DocumentUri.From(XmlUri)));
     }
@@ -313,7 +312,7 @@ public sealed class LuaRenameHandlerTest
         var defDoc = new DocumentIndex(OtherLuaUri, 1, [sym], []);
         var callerDoc = new DocumentIndex(LuaUri, 1, [], [callerRef]);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(OtherLuaUri, "function RunMission() end", 1);
         // LuaUri deliberately NOT in host
 
@@ -325,7 +324,7 @@ public sealed class LuaRenameHandlerTest
         var result = MakeHandler(host).HandleRename(OtherLuaUri, RenameAt(0, 9, "ExecuteMission", OtherLuaUri), index);
 
         Assert.NotNull(result);
-        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(LuaUri)));
+        Assert.True(result.Changes!.ContainsKey(DocumentUri.From(LuaUri)));
         var edit = Assert.Single(result.Changes[DocumentUri.From(LuaUri)]);
         Assert.Equal("ExecuteMission", edit.NewText);
         Assert.Equal(0, edit.Range.Start.Line);
@@ -339,7 +338,7 @@ public sealed class LuaRenameHandlerTest
         var sym = LuaGlobal("Foo", LuaUri);
         var defDoc = new DocumentIndex(LuaUri, 1, [sym], []);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "function Foo() end", 1);
 
         var index = BuildIndex(
@@ -349,7 +348,7 @@ public sealed class LuaRenameHandlerTest
         var result = MakeHandler(host).HandleRename(LuaUri, RenameAt(0, 9, "Bar"), index);
 
         Assert.NotNull(result);
-        var edits = result!.Changes![DocumentUri.From(LuaUri)].ToList();
+        var edits = result.Changes![DocumentUri.From(LuaUri)].ToList();
         var defEdit = edits.First(e => e.Range.Start.Character == 9);
         Assert.Equal(0, defEdit.Range.Start.Line);
         Assert.Equal(9, defEdit.Range.Start.Character);
@@ -374,7 +373,7 @@ public sealed class LuaRenameHandlerTest
         var index = BuildIndex(docs,
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Definitions", [mySym, theirSym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Definitions", [myRef, theirRef]));
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(mine, "function Definitions()\nend\nDefinitions()", 1);
         host.AddOrUpdate(theGames, "function Definitions()\nend\nDefinitions()", 1);
         var sandbox = new FixedSandbox(LuaSandbox.Build(docs, new FileHelper(new MockFileSystem())));
@@ -403,7 +402,7 @@ public sealed class LuaRenameHandlerTest
         var index = BuildIndex(docs,
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Definitions", [mySym, theirSym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Definitions", [call]));
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(mine, "function Definitions()\nend", 1);
         host.AddOrUpdate(another, "function Definitions()\nend", 1);
         host.AddOrUpdate(library, "if Definitions then\n Definitions()\nend", 1);
@@ -416,12 +415,12 @@ public sealed class LuaRenameHandlerTest
 
     // A leaf script redefining a global of a library it loads: in its state the library's definition
     // and calls are the same global.
-    private static (GameIndex Index, FakeWorkspaceHost Host, FixedSandbox Sandbox) LeafRedefinesLibraryGlobal(
-        int libraryRank, out string mine, out string library, out string another)
+    private static (GameIndex Index, FakeGameWorkspaceHost Host, FixedSandbox Sandbox) LeafRedefinesLibraryGlobal(
+        int libraryRank, out string mine, out string library)
     {
         mine = "file:///mod/data/scripts/gameobject/interdictor.lua";
         library = "file:///lib/data/scripts/library/pgcommands.lua";
-        another = "file:///lib/data/scripts/gameobject/darthvader.lua";
+        var another = "file:///lib/data/scripts/gameobject/darthvader.lua";
         var libDef = LuaGlobal("Fire_Weapons", library);
         var libCall = LuaGlobalRef("Fire_Weapons", library, 3, 1, 12);
         var myDef = LuaGlobal("Fire_Weapons", mine);
@@ -432,7 +431,7 @@ public sealed class LuaRenameHandlerTest
         var index = BuildIndex(docs,
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Fire_Weapons", [libDef, myDef]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Fire_Weapons", [libCall]));
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(mine, "function Fire_Weapons()\nend", 1);
         host.AddOrUpdate(library, "function Fire_Weapons()\nend\nfunction Go()\n Fire_Weapons()\nend", 1);
         host.AddOrUpdate(another, "", 1);
@@ -444,7 +443,7 @@ public sealed class LuaRenameHandlerTest
     [Fact]
     public void HandleRename_LeafRedefiningALowerLayerLibraryGlobal_IsRefused()
     {
-        var (index, host, sandbox) = LeafRedefinesLibraryGlobal(0, out var mine, out _, out _);
+        var (index, host, sandbox) = LeafRedefinesLibraryGlobal(0, out var mine, out _);
         var handler = MakeHandler(host, sandbox: sandbox);
 
         Assert.Null(handler.HandleRename(mine, RenameAt(0, 10, "Fire", mine), index));
@@ -456,7 +455,7 @@ public sealed class LuaRenameHandlerTest
     [Fact]
     public void HandleRename_LeafRedefiningALeafLibraryGlobal_RenamesTheLibraryAndEveryScriptLoadingIt()
     {
-        var (index, host, sandbox) = LeafRedefinesLibraryGlobal(1, out var mine, out var library, out _);
+        var (index, host, sandbox) = LeafRedefinesLibraryGlobal(1, out var mine, out var library);
 
         var result = MakeHandler(host, sandbox: sandbox).HandleRename(mine, RenameAt(0, 10, "Fire", mine), index);
 
@@ -489,7 +488,7 @@ public sealed class LuaRenameHandlerTest
             setup.Script(libraryRank, "Library/PGCommands.lua",
                 defines: [ProjectSetup.LuaGlobal("Fire_Weapons", library)],
                 uses: [ProjectSetup.LuaGlobalUse("Fire_Weapons", library, 3, 1)]));
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(mine, "function Fire_Weapons()\nend", 1);
         host.AddOrUpdate(library, "function Fire_Weapons()\nend\nfunction Go()\n Fire_Weapons()\nend", 1);
         var fileHelper = new FileHelper(setup.Disk());
@@ -518,7 +517,7 @@ public sealed class LuaRenameHandlerTest
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, MakeDoc(LuaUri, sym)),
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("main", [sym]));
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "function main()\nend", 1);
         var entryPoints = new LuaApiSchemaProvider([],
             [new LuaEntryPoint("main", LuaEntryPointCaller.ENGINE, [], ["object"], "The script's thread.")]);
@@ -535,7 +534,7 @@ public sealed class LuaRenameHandlerTest
 
     private static (LuaRenameHandler Handler, GameIndex Index) InMachine(string script)
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, script, 1);
         host.AddOrUpdate(MachineLibraryUri, "function Define_State(s, f) end\n" +
                                             "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
@@ -588,12 +587,13 @@ public sealed class LuaRenameHandlerTest
         var index = BuildIndex(docs,
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [myRef, theirRef]));
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
         host.AddOrUpdate(mine, "Spawn(\"UNIT_A\")", 1);
         host.AddOrUpdate(another, "Spawn(\"UNIT_A\")", 1);
-        var schema = new FakeSchemaProvider();
-        schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
+        var schema = new SchemaProviderBuilder()
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" })
+            .Build();
         var sandbox = new FixedSandbox(LuaSandbox.Build(docs, new FileHelper(new MockFileSystem())));
 
         var result = MakeHandler(host, schema, sandbox: sandbox)
@@ -613,7 +613,7 @@ public sealed class LuaRenameHandlerTest
         var leafDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, [callerRef],
             LayerRank: 1);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate("file:///dep/lib.lua", "function DepFunc() end", 1);
         host.AddOrUpdate(LuaUri, "DepFunc()", 1);
 
@@ -643,7 +643,7 @@ public sealed class LuaRenameHandlerTest
         var leafDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, [callerRef],
             LayerRank: 1);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "ArchiveFunc()", 1);
 
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
@@ -662,7 +662,7 @@ public sealed class LuaRenameHandlerTest
     [Fact]
     public void HandleRename_CursorOnUnknownIdentifier_ReturnsNull()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "local x = 1", 1);
         var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, MakeDoc(LuaUri)));
 
@@ -691,7 +691,7 @@ public sealed class LuaRenameHandlerTest
         var result = MakeHandler().HandlePrepare(LuaUri, 0, 5, index);
 
         Assert.NotNull(result);
-        Assert.NotNull(result!.Range);
+        Assert.NotNull(result.Range);
         Assert.Equal(0, result.Range!.Start.Line);
         Assert.Equal(0, result.Range.Start.Character);
         Assert.Equal(10, result.Range.End.Character);
@@ -708,7 +708,7 @@ public sealed class LuaRenameHandlerTest
         var result = MakeHandler().HandlePrepare(LuaUri, 0, 9, index);
 
         Assert.NotNull(result);
-        Assert.NotNull(result!.Range);
+        Assert.NotNull(result.Range);
         // Zero-length [0:9,0:9] extended by "Foo".Length = 3 → [0:9, 0:12]
         Assert.Equal(0, result.Range!.Start.Line);
         Assert.Equal(9, result.Range.Start.Character);
@@ -718,7 +718,7 @@ public sealed class LuaRenameHandlerTest
     [Fact]
     public void HandlePrepare_LuaGlobal_NoDocumentInIndex_ReturnsNull()
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "RunMission()", 1);
 
         var result = MakeHandler(host).HandlePrepare(LuaUri, 0, 0, BuildIndex());
@@ -732,7 +732,7 @@ public sealed class LuaRenameHandlerTest
     {
         var sym = XmlSymbolAt("UNIT_A", XmlUri, 1);
         var luaDoc = MakeDoc(LuaUri);
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Spawn(\"UNIT_A\")", 1);
 
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]);
@@ -741,7 +741,7 @@ public sealed class LuaRenameHandlerTest
         var result = MakeHandler(host).HandlePrepare(LuaUri, 0, 8, index);
 
         Assert.NotNull(result);
-        Assert.NotNull(result!.Range);
+        Assert.NotNull(result.Range);
         Assert.Equal(0, result.Range!.Start.Line);
         Assert.Equal(7, result.Range.Start.Character);
         Assert.Equal(13, result.Range.End.Character);
@@ -752,7 +752,7 @@ public sealed class LuaRenameHandlerTest
     {
         var sym = XmlSymbolInArchive("VANILLA_UNIT");
         var luaDoc = MakeDoc(LuaUri);
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Spawn(\"VANILLA_UNIT\")", 1);
 
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("VANILLA_UNIT", [sym]);
@@ -773,7 +773,7 @@ public sealed class LuaRenameHandlerTest
         var luaDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty,
             ImmutableArray<GameReference>.Empty, LayerRank: 1);
 
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Spawn(\"UNIT_DEP\")", 1);
 
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
@@ -817,7 +817,7 @@ public sealed class LuaRenameHandlerTest
     public void HandlePrepare_CursorOnUnknownString_ReturnsNull()
     {
         var luaDoc = MakeDoc(LuaUri);
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Spawn(\"NOT_A_GAME_OBJECT\")", 1);
 
         var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc));
@@ -834,152 +834,4 @@ public sealed class LuaRenameHandlerTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-    }
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, GameObjectTypeDefinition> _types =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void RegisterType(GameObjectTypeDefinition def)
-        {
-            _types[def.TypeName] = def;
-        }
-    }
-
-    private sealed class FakeGameIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
 }

@@ -5,11 +5,11 @@ using HtmlAgilityPack;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -31,20 +31,20 @@ internal sealed class PreviewModelCodeActionProvider : IXmlCursorCodeActionProvi
 
     private static readonly string[] ModelExtensions = [".alo"];
 
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
 
     public PreviewModelCodeActionProvider(IXmlParseCache parseCache, ISchemaProvider schema,
-        IGameIndexService indexService, IFileHelper fileHelper, ILspConfigurationProvider config)
+        IGameIndexService indexService, IFileHelper fileHelper, IMessageCatalog messages)
     {
         _parseCache = parseCache;
         _schema = schema;
         _indexService = indexService;
         _fileHelper = fileHelper;
-        _config = config;
+        _messages = messages;
     }
 
     public IEnumerable<CommandOrCodeAction> Handle(DocumentUri documentUri, Position position)
@@ -82,17 +82,17 @@ internal sealed class PreviewModelCodeActionProvider : IXmlCursorCodeActionProvi
         [
             new CommandOrCodeAction(new CodeAction
             {
-                Title = new ConfiguredMessageCatalog(_config).Format("PreviewModelAction_Preview", model),
+                Title = _messages.Format("PreviewModelAction_Preview", model),
                 Command = new Command
                 {
-                    Title = new ConfiguredMessageCatalog(_config).Format("PreviewModelAction_Preview", model),
+                    Title = _messages.Format("PreviewModelAction_Preview", model),
                     Name = PreviewModelCommand,
                     Arguments = new JArray(model)
                 },
                 Disabled = found
                     ? null
                     : new CodeActionDisabled
-                        { Reason = new ConfiguredMessageCatalog(_config).Format("PreviewModelAction_NotFound") }
+                        { Reason = _messages.Format("PreviewModelAction_NotFound") }
             })
         ];
     }

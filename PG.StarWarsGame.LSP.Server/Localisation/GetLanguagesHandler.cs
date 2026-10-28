@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Services;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;

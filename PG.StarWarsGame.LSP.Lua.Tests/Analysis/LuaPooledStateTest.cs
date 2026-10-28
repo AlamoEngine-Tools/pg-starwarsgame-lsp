@@ -21,7 +21,7 @@ public sealed class LuaPooledStateTest
 
     private static LuaPooledState StateOf(params (string Uri, string Text, string[] Requires)[] files)
     {
-        var host = new FakeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         var documents = ImmutableDictionary<string, DocumentIndex>.Empty;
         foreach (var (uri, text, requires) in files)
         {
@@ -106,27 +106,5 @@ public sealed class LuaPooledStateTest
         var state = StateOf((Script, "function Helper() end", []), (other, "", ["Interdictor"]));
 
         Assert.True(state.RequiredByOthers);
-    }
-
-    private sealed class FakeWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 }

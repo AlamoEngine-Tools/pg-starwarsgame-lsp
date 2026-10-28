@@ -86,11 +86,13 @@ public static class IconPackSerializer
             if (dto.SchemaVersion != SerializedIconPack.CurrentSchemaVersion)
                 return null;
 
+            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
             var icons = (dto.Icons ?? []).ToImmutableDictionary(
                 i => i.Name, i => i.Png, StringComparer.OrdinalIgnoreCase);
 
             return new IconPack(
                 icons,
+                // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
                 dto.SourceManifestHash ?? string.Empty,
                 DateTimeOffset.FromUnixTimeMilliseconds(dto.BuiltAtMs));
         }

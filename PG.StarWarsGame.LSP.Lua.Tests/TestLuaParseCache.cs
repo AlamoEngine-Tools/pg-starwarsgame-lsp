@@ -20,6 +20,6 @@ internal static class TestLuaParseCache
         return new LuaParseCache(
             new DocumentTextSource(host, fileHelper ?? new FileHelper(new MockFileSystem()),
                 NullLogger<DocumentTextSource>.Instance),
-            capacity);
+            capacity, NullLogger<LuaParseCache>.Instance);
     }
 }

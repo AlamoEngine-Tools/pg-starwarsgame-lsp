@@ -4,11 +4,12 @@
 using System.Text;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua.Syntax;
-using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -17,40 +18,41 @@ using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
-public sealed class LuaHoverHandler : ILuaHoverProvider
+public sealed class LuaHoverHandler : IHoverProvider
 {
-    private readonly ILuaAnalyzer? _analyzer;
+    private readonly ILuaAnalyzer _analyzer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
-    private readonly ILogger<LuaHoverHandler> _logger;
     private readonly IMessageCatalog _messages;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
+    // The analyzer's card follows ours; when none runs, it answers nothing and ours stands alone.
     public LuaHoverHandler(
         IGameIndexService indexService,
         ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
-        ILogger<LuaHoverHandler> logger,
-        // Optional: with the analyzer running, its card follows ours.
-        ILuaAnalyzer? analyzer = null,
-        IMessageCatalog? messages = null)
+        ILuaAnalyzer analyzer,
+        IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _indexService = indexService;
         _parseCache = parseCache;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
-        _logger = logger;
         _analyzer = analyzer;
     }
 
-    public async Task<Hover?> Handle(HoverParams request, CancellationToken ct)
+    public bool Handles(string documentUri)
+    {
+        return documentUri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task<Hover?> HoverAsync(HoverParams request, CancellationToken ct)
     {
         var ours = await HandleOurs(request);
-        if (_analyzer is null ||
-            !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+        if (!request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
         var theirs = await _analyzer.RequestAsync<Hover>("textDocument/hover", request, ct);
         return LuaAnalyzerAnswers.MergeHover(ours, theirs);
@@ -143,7 +145,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
             if (reference.Line != line) continue;
             if (character < reference.Column || character > reference.Column + reference.Length) continue;
 
-            var sym = index.Resolve(reference.TargetId);
+            var sym = index.ResolveReference(reference);
             var typeName = sym?.TypeName ?? reference.ExpectedTypeName ?? "XmlObject";
             var range = new LspRange(
                 new Position(reference.Line, reference.Column),
@@ -185,7 +187,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         string markdown;
         if (resolved is not null)
         {
-            var normalized = resolved.Replace('\\', '/');
+            var normalized = GamePaths.Forward(resolved);
             var slashIdx = normalized.LastIndexOf('/');
             var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
             markdown = _messages.Format("LuaHover_Require", requireArg, filename);
@@ -232,11 +234,13 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 new Position(start.Line, start.Character),
                 new Position(end.Line, end.Character));
 
+            // An entry point first: a library stub declaring the same name (Definitions in
+            // PGInterventions) is the library's own copy, and the game calls the script's.
+            if (schema.GetEntryPoint(name) is { } entryPoint)
+                return BuildHover(BuildEntryPointHoverMarkdown(entryPoint), range);
             if (schema.AllFunctionNames.Contains(name))
                 return BuildHover(BuildFunctionHoverMarkdown(name, schema.GetFunctionDescription(name),
                     schema.GetFunctionParams(name), schema.GetReturnTypeName(name)), range);
-            if (schema.GetEntryPoint(name) is { } entryPoint)
-                return BuildHover(BuildEntryPointHoverMarkdown(entryPoint), range);
         }
 
         return null;

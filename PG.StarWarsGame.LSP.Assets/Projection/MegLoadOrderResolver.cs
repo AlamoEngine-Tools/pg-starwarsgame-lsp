@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Workspace;
+
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
 /// <summary>
@@ -33,7 +35,7 @@ public static class MegLoadOrderResolver
         var sfxMegs = new List<string>();
         var baseMegs = new List<string>();
 
-        var normalizedRoot = gameRootPath.Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+        var normalizedRoot = GamePaths.Forward(gameRootPath).TrimEnd('/');
 
         foreach (var path in megFilePaths)
         {
@@ -45,7 +47,7 @@ public static class MegLoadOrderResolver
                 continue;
             }
 
-            var normalizedPath = path.Replace('\\', '/').ToLowerInvariant();
+            var normalizedPath = GamePaths.Forward(path);
             var relativePath = normalizedPath.Length > normalizedRoot.Length
                 ? normalizedPath[(normalizedRoot.Length + 1)..]
                 : normalizedPath;

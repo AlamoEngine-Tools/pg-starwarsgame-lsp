@@ -8,6 +8,8 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     written against <c>e2e-workspace/</c> run against both, and open the mod's files through
 ///     <see cref="ModPath" /> rather than the repository's copy.
 /// </summary>
+// E2e is spelled as a word throughout the E2E test project.
+// ReSharper disable once InconsistentNaming
 public abstract class E2eWorkspaceServerFixture : LspServerFixture
 {
     /// <summary>The folder holding the mod's project and files; null without <c>e2e-workspace/</c>.</summary>

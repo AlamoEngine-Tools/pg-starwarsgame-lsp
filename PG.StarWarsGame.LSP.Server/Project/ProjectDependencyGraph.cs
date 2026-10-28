@@ -100,7 +100,7 @@ public sealed class ProjectDependencyGraph
 
     private static string Normalize(string path)
     {
-        return path.Replace('\\', '/');
+        return GamePaths.Forward(path);
     }
 
     private static string GetDirectory(string normalizedPath)
@@ -118,7 +118,7 @@ public sealed class ProjectDependencyGraph
     /// </remarks>
     private static string Combine(string directory, string relativeOrAbsolute)
     {
-        var candidate = relativeOrAbsolute.Replace('\\', '/');
+        var candidate = GamePaths.Forward(relativeOrAbsolute);
         return ProjectPathResolution.IsRooted(candidate)
             ? candidate
             : ProjectPathResolution.Resolve(directory, candidate);

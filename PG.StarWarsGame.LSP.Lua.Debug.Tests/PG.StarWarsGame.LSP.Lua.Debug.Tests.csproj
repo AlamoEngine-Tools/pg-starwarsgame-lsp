@@ -35,10 +35,12 @@
 
     <ItemGroup>
         <Using Include="Xunit"/>
+        <Using Include="PG.StarWarsGame.LSP.Testing"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua.Debug\PG.StarWarsGame.LSP.Lua.Debug.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Testing\PG.StarWarsGame.LSP.Testing.csproj"/>
     </ItemGroup>
 
 </Project>

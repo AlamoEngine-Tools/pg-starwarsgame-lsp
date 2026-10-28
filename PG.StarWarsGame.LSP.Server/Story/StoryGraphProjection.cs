@@ -33,6 +33,14 @@ internal static class StoryGraphProjection
     /// <summary>The whole path through the anchored event - both directions at once.</summary>
     private const string Both = "Both";
 
+    /// <param name="model">The assembled campaign.</param>
+    /// <param name="nameFilter">Text an event's label must contain, or null for every event.</param>
+    /// <param name="branch">The branch an event must belong to, or null for every branch.</param>
+    /// <param name="lifecycle">The lifecycle an event must be in, or null for every lifecycle.</param>
+    /// <param name="reachableFrom">The event the reachability filter is anchored on, or null for none.</param>
+    /// <param name="plotState"><c>Active</c> or <c>Suspended</c> to show only such plots, or null for both.</param>
+    /// <param name="reachableDirection"><c>Upstream</c>, <c>Both</c>, or null for downstream of the anchored event.</param>
+    /// <param name="scope">The battle whose panel asks, or null for the galactic level.</param>
     /// <param name="readOnlyOwner">
     ///     The referenced project that owns a thread, or null when this workspace may edit it. A
     ///     thread that comes in through a referenced project is read-only, and the node names its

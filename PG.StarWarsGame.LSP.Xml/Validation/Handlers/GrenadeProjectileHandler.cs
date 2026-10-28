@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -64,7 +65,7 @@ public sealed class GrenadeProjectileHandler : XmlDiagnosticsHandler<XmlTagValue
         var named = fact.RawValue.Trim();
         if (named.Length == 0) return [];
 
-        var resolved = ctx.Objects.Resolve(named);
+        var resolved = ctx.Objects.ResolveIn(named, fact.Tag.TargetTypeName);
 
         // An id nothing defines is the unresolved-reference check's business. Reporting it again
         // here would put two diagnostics on one typo and name the wrong cause.
@@ -73,9 +74,7 @@ public sealed class GrenadeProjectileHandler : XmlDiagnosticsHandler<XmlTagValue
         // The EFFECTIVE object, so a category inherited through Variant_Of_Existing_Type counts -
         // four of the ten shipped declarations name a variant that inherits it, and reading the
         // node instead would report every one of them.
-        var category = resolved.Tags
-            .LastOrDefault(t => string.Equals(t.TagName, CategoryTag, StringComparison.OrdinalIgnoreCase))
-            ?.Value.Trim();
+        var category = resolved.ValueOf(CategoryTag);
 
         // A target with no category at all cannot be judged. The engine has a default here and it
         // was not measured, so calling it "not a grenade" would be inventing the answer.

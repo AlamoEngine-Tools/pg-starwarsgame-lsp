@@ -2,17 +2,21 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSource tagSource)
-    : IXmlVariantFactProducer
+    : IXmlFactProducer
 {
-    private const string NameAttribute = "Name";
+    public string Name => "variant";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
 
     /// <summary>
     ///     Sweeps the engine gives variant resolution before it stops
@@ -44,7 +48,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
             // since that is the one line an author would change to fix any of it.
             var marker = FindVariantChild(node) ?? node;
 
-            var effective = resolver.Resolve(variant.Id);
+            var effective = resolver.Resolve(variant);
             if (effective.Cyclic)
             {
                 facts.Add(new VariantCycleFact(documentUri, XmlUtility.GetLine(marker),
@@ -55,7 +59,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
 
             CollectChainFacts(documentUri, variant, effective, marker, facts);
 
-            var baseValues = BaseValues(resolver, variant.VariantBaseId);
+            var baseValues = BaseValues(resolver, index.VariantBaseOf(variant));
             CollectTagFacts(node, documentUri, text, baseValues, effective, facts);
         }
 
@@ -102,6 +106,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
         // occurrences. The merge outcome is a property of the object, not of each occurrence -
         // reporting it once keeps the Problems panel readable.
         var reportedMerges = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var reportedEmpties = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var child in objectNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
         {
@@ -121,14 +126,30 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
                 continue;
             }
 
+            // An empty value, or exactly TBD, never reaches the game's field mapper, so a variant
+            // writing only that for a tag keeps the base's value instead of clearing it - and the
+            // author is told. Once per tag, and only when no occurrence in this object has a value:
+            // an empty repeat beside a valued one is the document rule's finding, with the line.
+            if (XmlUtility.WritesNoValue(child))
+            {
+                if (baseValues.TryGetValue(child.Name, out var inherited) &&
+                    !HasValuedOccurrence(objectNode, child.Name) && reportedEmpties.Add(child.Name))
+                {
+                    var (endLine, endCol) = XmlUtility.GetElementEndPosition(child, text);
+                    facts.Add(new XmlEmptyRepeatedTagFact(documentUri, line, col, len, name, inherited, null,
+                        endLine, endCol));
+                }
+
+                continue;
+            }
+
             if (mode == VariantMode.Merge)
             {
                 // Take the appended result from the resolver rather than recomputing it here, so
                 // what is reported cannot drift from what the effective-object view and hints show.
-                var mergedTag = effective.Tags.FirstOrDefault(t =>
-                    t.Provenance == VariantProvenance.Merged &&
-                    t.TagName.Equals(child.Name, StringComparison.OrdinalIgnoreCase));
-                if (mergedTag?.BaseValue is not null && reportedMerges.Add(child.Name))
+                var mergedTag = effective.DisplacingTag(child.Name);
+                if (mergedTag is { Provenance: VariantProvenance.Merged, BaseValue: not null }
+                    && reportedMerges.Add(child.Name))
                     facts.Add(new VariantAdditiveMergeFact(documentUri, line, col, len, name,
                         mergedTag.BaseValue, mergedTag.Value));
                 continue;
@@ -145,12 +166,22 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
         }
     }
 
-    private static IReadOnlyDictionary<string, string> BaseValues(EffectiveObjectResolver resolver, string? baseId)
+    private static bool HasValuedOccurrence(HtmlNode objectNode, string tagName)
     {
-        if (string.IsNullOrEmpty(baseId))
+        return objectNode.ChildNodes.Any(n =>
+            n.NodeType == HtmlNodeType.Element &&
+            n.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase) &&
+            !XmlUtility.WritesNoValue(n));
+    }
+
+    // The base in the variant's own type - the parser types the base reference with it.
+    private static IReadOnlyDictionary<string, string> BaseValues(EffectiveObjectResolver resolver,
+        GameSymbol? baseSymbol)
+    {
+        if (baseSymbol is null)
             return new Dictionary<string, string>();
 
-        var baseEffective = resolver.Resolve(baseId);
+        var baseEffective = resolver.Resolve(baseSymbol);
         if (!baseEffective.Found)
             return new Dictionary<string, string>();
 

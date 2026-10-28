@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 
@@ -12,7 +13,7 @@ public sealed class LuaParseCacheStatisticsTest
     [Fact]
     public void Snapshot_ReportsEntriesAndCountersUnderAStableName()
     {
-        var cache = new LuaParseCache(new NoText(), 16);
+        var cache = new LuaParseCache(new NoText(), 16, NullLogger<LuaParseCache>.Instance);
         cache.GetOrParse("file:///a.lua", "local a = 1");
         cache.GetOrParse("file:///a.lua", "local a = 1");
 

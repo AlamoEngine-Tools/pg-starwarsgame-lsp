@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Parsing;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Parsing;
 
@@ -19,9 +20,10 @@ public sealed class XmlGameDocumentParserTest
         FakeFileTypeRegistry? registry = null)
     {
         return new XmlGameDocumentParser(new FileHelper(new MockFileSystem()),
-            schema ?? new FakeSchemaProvider(),
+            schema ?? new SchemaProviderBuilder().Build(),
             registry ?? new FakeFileTypeRegistry(),
-            NullLogger<XmlGameDocumentParser>.Instance);
+            NullLogger<XmlGameDocumentParser>.Instance, TestParseCache.For(new FakeGameWorkspaceHost()),
+            new AllowAllEaWContext());
     }
 
     private static GameObjectTypeDefinition Type(string name, string? nameTag = "Name")
@@ -91,13 +93,13 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task WorkspaceFileTag_SingleValue_EmitsReferenceKeyedByReferenceType()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(WorkspaceFileTag("Empire_Story_Name", "StoryPlotManifest"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(WorkspaceFileTag("Empire_Story_Name", "StoryPlotManifest"));
 
-        var index = await Build(schema).ParseAsync("file:///c.xml",
-            "<Campaigns><Campaign Name=\"T\">\n" +
-            "<Empire_Story_Name>Story_Plots_Campaign_Empire.xml</Empire_Story_Name>\n" +
-            "</Campaign></Campaigns>", 1, default);
+        var index = await Build(schema).ParseAsync("file:///c.xml", "<Campaigns><Campaign Name=\"T\">\n" +
+                                                                    "<Empire_Story_Name>Story_Plots_Campaign_Empire.xml</Empire_Story_Name>\n" +
+                                                                    "</Campaign></Campaigns>", 1,
+            TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
         Assert.Equal("storyplotmanifest:story_plots_campaign_empire.xml", reference.TargetId);
@@ -120,14 +122,14 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task WorkspaceFileTag_OnATypeReferenceList_StillEmitsTheReference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(WorkspaceFileTag("Debug_Hot_Key_Load_Map_Script", "StoryPlotManifest",
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(WorkspaceFileTag("Debug_Hot_Key_Load_Map_Script", "StoryPlotManifest",
             valueType: XmlValueType.TypeReferenceList));
 
-        var index = await Build(schema).ParseAsync("file:///gc.xml",
-            "<GameConstants>\n" +
-            "<Debug_Hot_Key_Load_Map_Script> Story_Plots_UM00_CIN_Test.xml </Debug_Hot_Key_Load_Map_Script>\n" +
-            "</GameConstants>", 1, default);
+        var index = await Build(schema).ParseAsync("file:///gc.xml", "<GameConstants>\n" +
+                                                                     "<Debug_Hot_Key_Load_Map_Script> Story_Plots_UM00_CIN_Test.xml </Debug_Hot_Key_Load_Map_Script>\n" +
+                                                                     "</GameConstants>", 1,
+            TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
         Assert.Equal("storyplotmanifest:story_plots_um00_cin_test.xml", reference.TargetId);
@@ -140,12 +142,12 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task WorkspaceFileTag_SubdirPath_IsNotSplitOnSeparators()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(WorkspaceFileTag("Active_Plot", "StoryParser"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(WorkspaceFileTag("Active_Plot", "StoryParser"));
 
         var index = await Build(schema).ParseAsync("file:///m.xml",
             "<Story_Mode_Plots><Active_Plot>Conquests\\Loader\\Story_Plots_Loader.xml</Active_Plot></Story_Mode_Plots>",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
         Assert.Equal("storyparser:conquests/loader/story_plots_loader.xml", reference.TargetId);
@@ -154,11 +156,12 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task WorkspaceFileTag_LeadingTrailingSpace_RangeCoversTrimmedValue()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
 
         var index = await Build(schema).ParseAsync("file:///c.xml",
-            "<Campaign>\n<Rebel_Story_Name> Story_Plots_Rebel.xml </Rebel_Story_Name>\n</Campaign>", 1, default);
+            "<Campaign>\n<Rebel_Story_Name> Story_Plots_Rebel.xml </Rebel_Story_Name>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
         Assert.Equal("storyplotmanifest:story_plots_rebel.xml", reference.TargetId);
@@ -169,13 +172,13 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task WorkspaceFileTag_FactionPlotFilePairList_EmitsOddSlotsAsPlotFiles()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
             TagSemanticType.FactionPlotFilePairList));
 
         var index = await Build(schema).ParseAsync("file:///c.xml",
-            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>",
-            1, default);
+            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         var refs = index.References.Where(r => r.ExpectedKind == GameSymbolKind.WorkspaceFile).ToList();
         Assert.Equal(
@@ -188,13 +191,13 @@ public sealed class XmlGameDocumentParserTest
     {
         // Without these the faction half of the tuple is invisible: a typo there resolves to no
         // object, is never validated, and offers no go-to. Only the plot half was ever indexed.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
             TagSemanticType.FactionPlotFilePairList));
 
         var index = await Build(schema).ParseAsync("file:///c.xml",
-            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>",
-            1, default);
+            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         var factions = index.References
             .Where(r => r.ExpectedTypeName == "Faction")
@@ -213,8 +216,8 @@ public sealed class XmlGameDocumentParserTest
         // occurrences in eaw and foc, none of them anything else. Today the tag is a
         // NameReferenceList, so BOTH tokens resolve as bare names: the faction happens to resolve
         // and the AI player never can, which is #141. Slot semantics is what separates them.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "AI_Player_Control",
             ValueType = XmlValueType.NameReferenceList,
@@ -224,8 +227,8 @@ public sealed class XmlGameDocumentParserTest
         });
 
         var index = await Build(schema).ParseAsync("file:///c.xml",
-            "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n</Campaign>",
-            1, default);
+            "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(["Empire"],
             index.References.Where(r => r.ExpectedTypeName == "Faction").Select(r => r.TargetId));
@@ -237,8 +240,8 @@ public sealed class XmlGameDocumentParserTest
     public async Task AiPlayerControl_Repeated_EmitsBothSlotsOfEveryOccurrence()
     {
         // The tag repeats, one per faction, rather than carrying several pairs in one value.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "AI_Player_Control",
             ValueType = XmlValueType.NameReferenceList,
@@ -249,8 +252,8 @@ public sealed class XmlGameDocumentParserTest
 
         var index = await Build(schema).ParseAsync("file:///c.xml",
             "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n"
-            + "<AI_Player_Control> Rebel, BasicRebel </AI_Player_Control>\n</Campaign>",
-            1, default);
+            + "<AI_Player_Control> Rebel, BasicRebel </AI_Player_Control>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(["Empire", "Rebel"],
             index.References.Where(r => r.ExpectedTypeName == "Faction").Select(r => r.TargetId));
@@ -263,11 +266,12 @@ public sealed class XmlGameDocumentParserTest
     {
         // Rebel_Story_Name names its faction in the TAG, not in the value - the value is only ever
         // the plot file.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
 
         var index = await Build(schema).ParseAsync("file:///c.xml",
-            "<Campaign>\n<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>\n</Campaign>", 1, default);
+            "<Campaign>\n<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(index.References, r => r.ExpectedTypeName == "Faction");
     }
@@ -306,8 +310,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Known_Element_With_Name_Attribute_Emits_Symbol()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("units.xml", ["Unit"]);
 
@@ -345,8 +349,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Singleton_Type_With_No_NameTag_Emits_Symbol_Under_Its_Type_Name()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("GameConstants", null)); // singleton: no Name attribute
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("GameConstants", null)); // singleton: no Name attribute
         var registry = new FakeFileTypeRegistry();
         registry.Register("gameconstants.xml", ["GameConstants"]);
 
@@ -365,8 +369,8 @@ public sealed class XmlGameDocumentParserTest
     public async Task ParseAsync_Singleton_Emits_One_Symbol_Not_One_Per_Constant()
     {
         // The children are the constants themselves, not a collection of objects.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("GameConstants", null));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("GameConstants", null));
         var registry = new FakeFileTypeRegistry();
         registry.Register("gameconstants.xml", ["GameConstants"]);
 
@@ -381,8 +385,8 @@ public sealed class XmlGameDocumentParserTest
     public async Task ParseAsync_Singleton_Root_Not_Matching_The_Registered_Type_Emits_No_Symbol()
     {
         // Guards against a mistyped registry entry inventing a GameConstants that is not one.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("GameConstants", null));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("GameConstants", null));
         var registry = new FakeFileTypeRegistry();
         registry.Register("gameconstants.xml", ["GameConstants"]);
 
@@ -396,8 +400,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Element_With_Missing_Name_Attribute_Emits_No_Symbol()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml", "<Unit><Max_Health>200</Max_Health></Unit>", 1,
             TestContext.Current.CancellationToken);
@@ -408,8 +412,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Multiple_Objects_Emits_Multiple_Symbols()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("f.xml", ["Unit"]);
 
@@ -429,8 +433,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Symbol_TypeName_Matches_Schema_Type()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SFXEvent"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SFXEvent"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("sfx.xml", ["SFXEvent"]);
 
@@ -446,9 +450,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_XmlObject_Reference_Tag_Emits_Reference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(RefTag("Spawn_Unit", "Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(RefTag("Spawn_Unit", "Unit"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""", 1, TestContext.Current.CancellationToken);
@@ -458,6 +462,34 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
         Assert.Equal("Unit", reference.ExpectedTypeName);
         Assert.Equal("file:///f.xml", reference.DocumentUri);
+    }
+
+    /// <summary>
+    ///     A tag that names an object KIND accepts game objects of that kind, so its reference is
+    ///     looked up in the game objects' id space - not left to resolve by id alone. What it expects
+    ///     stays as before: the kind is judged by behaviour elsewhere.
+    /// </summary>
+    [Fact]
+    public async Task ParseAsync_AKindTypedTag_ReferencesAGameObject()
+    {
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("GameObjectType"));
+        schema.Add(new XmlTagDefinition
+        {
+            Tag = "Home_Planet",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceTypeName = "Planet",
+            Kind = new ObjectKindDefinition { Kind = "Planet", Behaviors = ["PLANET"] }
+        });
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<GameObjectType Name="UNIT_A"><Home_Planet>Sarlacc</Home_Planet></GameObjectType>""", 1,
+            TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Null(reference.ExpectedTypeName);
+        Assert.Equal("GameObjectType", reference.LookupType);
     }
 
     // ── (planet, mode) exclusion pairs ────────────────────────────────────────
@@ -482,9 +514,9 @@ public sealed class XmlGameDocumentParserTest
         // "Fondor, land, Geonosis, land" is two (planet, mode) pairs flattened into one list, not
         // four object references - treating the mode tokens as objects would report every one of
         // them as an unresolved reference.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(ExclusionTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(ExclusionTag());
 
         var result = await Build(schema).ParseAsync("file:///c.xml",
             """<Campaign Name="C"><Autoresolve_Exclusion_Locations>Fondor, land, Geonosis, space</Autoresolve_Exclusion_Locations></Campaign>""",
@@ -497,9 +529,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_PlanetModeExclusionList_ReferenceRangeCoversOnlyThePlanetToken()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(ExclusionTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(ExclusionTag());
 
         const string xml =
             """<Campaign Name="C"><Autoresolve_Exclusion_Locations>Fondor, land</Autoresolve_Exclusion_Locations></Campaign>""";
@@ -516,9 +548,9 @@ public sealed class XmlGameDocumentParserTest
     {
         // An odd token count is a malformed pair, reported by the diagnostics handler. The parser
         // must still index the planet so go-to keeps working while the author fixes the mode.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(ExclusionTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(ExclusionTag());
 
         var result = await Build(schema).ParseAsync("file:///c.xml",
             """<Campaign Name="C"><Autoresolve_Exclusion_Locations>Fondor, land, Geonosis</Autoresolve_Exclusion_Locations></Campaign>""",
@@ -530,9 +562,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_PlanetModeExclusionList_Empty_EmitsNoReference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(ExclusionTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(ExclusionTag());
 
         var result = await Build(schema).ParseAsync("file:///c.xml",
             """<Campaign Name="C"><Autoresolve_Exclusion_Locations>   </Autoresolve_Exclusion_Locations></Campaign>""",
@@ -556,9 +588,9 @@ public sealed class XmlGameDocumentParserTest
     [InlineData(XmlValueType.ConditionalSfxEvent)]
     public async Task ParseAsync_TupleSfxTag_EmitsSfxEventReferenceForSecondSlot(XmlValueType valueType)
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(TupleSfxTag("SFXEvent_Hardpoint_Destroyed", valueType));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(TupleSfxTag("SFXEvent_Hardpoint_Destroyed", valueType));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<Unit Name="UNIT_A"><SFXEvent_Hardpoint_Destroyed> HARD_POINT_WEAPON_LASER, Unit_Lost_Laser </SFXEvent_Hardpoint_Destroyed></Unit>""",
@@ -579,9 +611,9 @@ public sealed class XmlGameDocumentParserTest
     [InlineData("")]
     public async Task ParseAsync_TupleSfxTag_MissingSecondSlot_EmitsNoReference(string value)
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(TupleSfxTag("SFXEvent_GUI_Toggle_Non_Hero_Ability_On", XmlValueType.AbilitySfxMap));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(TupleSfxTag("SFXEvent_GUI_Toggle_Non_Hero_Ability_On", XmlValueType.AbilitySfxMap));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             $"""<Unit Name="UNIT_A"><SFXEvent_GUI_Toggle_Non_Hero_Ability_On>{value}</SFXEvent_GUI_Toggle_Non_Hero_Ability_On></Unit>""",
@@ -593,9 +625,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_TupleSfxTag_ReferenceRangeCoversOnlyTheSfxToken()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(TupleSfxTag("SFXEvent_Attack_Hardpoint", XmlValueType.HardPointSfxMap));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(TupleSfxTag("SFXEvent_Attack_Hardpoint", XmlValueType.HardPointSfxMap));
 
         const string xml =
             """<Unit Name="UNIT_A"><SFXEvent_Attack_Hardpoint>HARD_POINT_WEAPON_LASER, Unit_HP_LASER</SFXEvent_Attack_Hardpoint></Unit>""";
@@ -618,10 +650,10 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_TupleList_RecordsEachObjectSlotAsATypedReference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Faction"));
-        schema.AddType(Type("MusicEvent"));
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Faction"));
+        schema.Add(Type("MusicEvent"));
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Music_Event_List_Ambient", ValueType = XmlValueType.TupleList, MultipleAllowed = true,
             Slots =
@@ -663,9 +695,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_DeathClone_EmitsObjectReferenceForTheCloneSlot()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
-        schema.AddTag(DeathCloneTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
+        schema.Add(DeathCloneTag());
 
         var result = await Build(schema).ParseAsync("file:///u.xml",
             """<SpaceUnit Name="SD"><Death_Clone>Damage_Normal, Star_Destroyer_Death_Clone</Death_Clone></SpaceUnit>""",
@@ -682,9 +714,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_DeathClone_EmitsEnumReferenceForTheDamageType()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
-        schema.AddTag(DeathCloneTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
+        schema.Add(DeathCloneTag());
 
         var result = await Build(schema).ParseAsync("file:///u.xml",
             """<SpaceUnit Name="SD"><Death_Clone>Damage_Normal, Star_Destroyer_Death_Clone</Death_Clone></SpaceUnit>""",
@@ -696,9 +728,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_DeathClone_RangeCoversOnlyTheCloneToken()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
-        schema.AddTag(DeathCloneTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
+        schema.Add(DeathCloneTag());
 
         const string xml =
             """<SpaceUnit Name="SD"><Death_Clone>Damage_Normal, Star_Destroyer_Death_Clone</Death_Clone></SpaceUnit>""";
@@ -716,9 +748,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_DeathClone_WithOnlyOneSlot_RecordsNoCloneReference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
-        schema.AddTag(DeathCloneTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
+        schema.Add(DeathCloneTag());
 
         var result = await Build(schema).ParseAsync("file:///u.xml",
             """<SpaceUnit Name="SD"><Death_Clone>Damage_Normal</Death_Clone></SpaceUnit>""",
@@ -742,9 +774,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_UnitSpawnTable_EmitsGameObjectReferenceForFirstSlot()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceStructure"));
-        schema.AddTag(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceStructure"));
+        schema.Add(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
 
         var result = await Build(schema).ParseAsync("file:///s.xml",
             """<SpaceStructure Name="STARBASE"><Starting_Spawned_Units_Tech_0>StarViper_Squadron, 2</Starting_Spawned_Units_Tech_0></SpaceStructure>""",
@@ -760,9 +792,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_UnitSpawnTable_ReferenceRangeCoversOnlyTheUnitToken()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceStructure"));
-        schema.AddTag(UnitSpawnTag("Reserve_Spawned_Units_Tech_3"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceStructure"));
+        schema.Add(UnitSpawnTag("Reserve_Spawned_Units_Tech_3"));
 
         const string xml =
             """<SpaceStructure Name="STARBASE"><Reserve_Spawned_Units_Tech_3>Skipray_Squadron, -1</Reserve_Spawned_Units_Tech_3></SpaceStructure>""";
@@ -779,9 +811,9 @@ public sealed class XmlGameDocumentParserTest
     {
         // A missing count is a malformed tuple, flagged by UnitSpawnTableHandler. The parser must
         // still index the unit so go-to keeps working while the author adds the count.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceStructure"));
-        schema.AddTag(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceStructure"));
+        schema.Add(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
 
         var result = await Build(schema).ParseAsync("file:///s.xml",
             """<SpaceStructure Name="STARBASE"><Starting_Spawned_Units_Tech_0>StarViper_Squadron</Starting_Spawned_Units_Tech_0></SpaceStructure>""",
@@ -797,9 +829,9 @@ public sealed class XmlGameDocumentParserTest
     [InlineData("")]
     public async Task ParseAsync_UnitSpawnTable_EmptyUnitSlot_EmitsNoReference(string value)
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceStructure"));
-        schema.AddTag(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceStructure"));
+        schema.Add(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
 
         var result = await Build(schema).ParseAsync("file:///s.xml",
             $"""<SpaceStructure Name="STARBASE"><Starting_Spawned_Units_Tech_0>{value}</Starting_Spawned_Units_Tech_0></SpaceStructure>""",
@@ -821,9 +853,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_PerFactionPlanet_EmitsFactionThenPlanetReference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(TupleTag("Home_Location", XmlValueType.PerFactionPlanet));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(TupleTag("Home_Location", XmlValueType.PerFactionPlanet));
 
         var result = await Build(schema).ParseAsync("file:///c.xml",
             """<Campaign Name="C"><Home_Location>Rebel, Dantooine</Home_Location></Campaign>""",
@@ -847,9 +879,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_PerFactionPlanet_ReferenceRangesCoverOnlyTheirTokens()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(TupleTag("Home_Location", XmlValueType.PerFactionPlanet));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(TupleTag("Home_Location", XmlValueType.PerFactionPlanet));
 
         const string xml =
             """<Campaign Name="C"><Home_Location> Rebel, Dantooine </Home_Location></Campaign>""";
@@ -869,9 +901,9 @@ public sealed class XmlGameDocumentParserTest
     [InlineData("Max_Tech_Level")]
     public async Task ParseAsync_PerFactionValue_EmitsFactionReferenceOnly_NotTheNumber(string tag)
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(TupleTag(tag, XmlValueType.PerFactionValue));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(TupleTag(tag, XmlValueType.PerFactionValue));
 
         var result = await Build(schema).ParseAsync("file:///c.xml",
             $"""<Campaign Name="C"><{tag}>Empire, 20000</{tag}></Campaign>""",
@@ -887,9 +919,9 @@ public sealed class XmlGameDocumentParserTest
     [InlineData("Special_Case_Production")]
     public async Task ParseAsync_ForceDeployment_EmitsFactionPlanetUnitTriple(string tag)
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(TupleTag(tag, XmlValueType.ForceDeploymentList));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(TupleTag(tag, XmlValueType.ForceDeploymentList));
 
         var result = await Build(schema).ParseAsync("file:///c.xml",
             $"""<Campaign Name="C"><{tag}>Empire, Anaxes, Empire_Star_Base_1</{tag}></Campaign>""",
@@ -906,9 +938,9 @@ public sealed class XmlGameDocumentParserTest
     {
         // "Empire, DefaultGalacticHints": the faction navigates; the AI galactic markup file lives in
         // the unindexed AI tree and must not be emitted (it would be a false unresolved ref).
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Markup_Filename",
             ValueType = XmlValueType.NameReferenceList,
@@ -930,9 +962,9 @@ public sealed class XmlGameDocumentParserTest
         // Corruption_Level_Override shares the per-faction reader with Starting_Credits, but the game
         // looks slot 0 up as an object type and requires a planet. Emitting it as a Faction made
         // vanilla's "Endor, 1" an unresolved faction.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Corruption_Level_Override",
             ValueType = XmlValueType.PerFactionValue,
@@ -958,8 +990,8 @@ public sealed class XmlGameDocumentParserTest
         // The game compares the value case-insensitively with "Human" and removes the AI; no
         // AIPlayerType is looked up. Emitting it as one made every human-played faction a "cannot
         // check this type" notice.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "AI_Player_Control",
             ValueType = XmlValueType.NameReferenceList,
@@ -969,8 +1001,8 @@ public sealed class XmlGameDocumentParserTest
         });
 
         var index = await Build(schema).ParseAsync("file:///c.xml",
-            $"<Campaign>\n<AI_Player_Control> Rebel, {keyword} </AI_Player_Control>\n</Campaign>",
-            1, default);
+            $"<Campaign>\n<AI_Player_Control> Rebel, {keyword} </AI_Player_Control>\n</Campaign>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(["Rebel"], index.References.Select(r => r.TargetId));
     }
@@ -981,9 +1013,9 @@ public sealed class XmlGameDocumentParserTest
     [InlineData(XmlValueType.ForceDeploymentList)]
     public async Task ParseAsync_FactionTuple_EmptyValue_EmitsNoReference(XmlValueType valueType)
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Campaign"));
-        schema.AddTag(TupleTag("Home_Location", valueType));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Campaign"));
+        schema.Add(TupleTag("Home_Location", valueType));
 
         var result = await Build(schema).ParseAsync("file:///c.xml",
             """<Campaign Name="C"><Home_Location>   </Home_Location></Campaign>""",
@@ -998,9 +1030,9 @@ public sealed class XmlGameDocumentParserTest
         // A <Faction Name="X">…</Faction> object definition shares its tag name with the <Faction>
         // reference tag used elsewhere. Its InnerText (the entire object) must NOT be captured as one
         // giant bogus reference - only leaf elements are reference values.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Faction"));
-        schema.AddTag(RefTag("Faction", "Faction"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Faction"));
+        schema.Add(RefTag("Faction", "Faction"));
 
         var result = await Build(schema).ParseAsync("file:///factions.xml",
             """
@@ -1015,9 +1047,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Non_XmlObject_Reference_Tag_Emits_No_Reference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(PlainTag("Max_Health")); // plain float - not a reference
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(PlainTag("Max_Health")); // plain float - not a reference
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<Unit Name="UNIT_A"><Max_Health>200</Max_Health></Unit>""", 1, TestContext.Current.CancellationToken);
@@ -1028,9 +1060,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Reference_Has_Correct_Uri_And_Position()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(RefTag("Spawn_Unit", "Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(RefTag("Spawn_Unit", "Unit"));
 
         var result = await Build(schema).ParseAsync("file:///units.xml",
             """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""", 1, TestContext.Current.CancellationToken);
@@ -1044,9 +1076,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_VariantParent_Tag_Sets_VariantBaseId_And_Emits_Typed_Reference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
-        schema.AddTag(VariantTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
+        schema.Add(VariantTag());
         var registry = new FakeFileTypeRegistry();
         registry.Register("ships.xml", ["SpaceUnit"]);
 
@@ -1073,8 +1105,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Object_Carries_Its_Behaviour_Tokens()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Planet"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Planet"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("planets.xml", ["Planet"]);
 
@@ -1083,7 +1115,7 @@ public sealed class XmlGameDocumentParserTest
             1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
-        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], sym.Behaviors);
+        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], sym.Behaviors!);
     }
 
     // Shape taken verbatim from the shipped Planets.xml - the real root element, the real tabs and
@@ -1093,8 +1125,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ShippedPlanetShape_CarriesItsBehaviours()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Planet"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Planet"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("planets.xml", ["Planet"]);
 
@@ -1110,14 +1142,14 @@ public sealed class XmlGameDocumentParserTest
 
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("Alderaan", sym.Id);
-        Assert.Equal(["SELECTABLE", "PLANET", "PRODUCTION"], sym.Behaviors);
+        Assert.Equal(["SELECTABLE", "PLANET", "PRODUCTION"], sym.Behaviors!);
     }
 
     [Fact]
     public async Task ParseAsync_Object_WithoutBehaviourTags_CarriesNone()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("units.xml", ["Unit"]);
 
@@ -1131,8 +1163,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_NonVariant_Object_Has_Null_VariantBaseId()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("units.xml", ["Unit"]);
 
@@ -1147,9 +1179,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_VariantParent_EmptyValue_NoBaseId_NoReference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
-        schema.AddTag(VariantTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
+        schema.Add(VariantTag());
         var registry = new FakeFileTypeRegistry();
         registry.Register("ships.xml", ["SpaceUnit"]);
 
@@ -1165,10 +1197,10 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_SubObject_VariantParent_Sets_VariantBaseId_And_Emits_Typed_Reference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("LuckyShotAttackAbility"));
-        schema.AddTag(VariantTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
+        schema.Add(VariantTag());
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"><Variant_Of_Existing_Type>Base_Ability</Variant_Of_Existing_Type></Lucky_Shot_Attack_Ability></Abilities></U>""",
@@ -1187,8 +1219,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Malformed_Xml_Does_Not_Throw()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
 
         // Unclosed tag - HtmlAgilityPack recovers gracefully
         var result = await Build(schema).ParseAsync("file:///f.xml", """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B""", 1,
@@ -1221,9 +1253,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_CommaSeparated_ListTag_Emits_One_Reference_Per_Name()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Squadron"));
-        schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Squadron"));
+        schema.Add(ListRefTag("Squadron_Units", "Unit"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<Squadron Name="SQ_1"><Squadron_Units>X_Wing, A_Wing, B_Wing</Squadron_Units></Squadron>""", 1,
@@ -1238,9 +1270,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_SpaceSeparated_ListTag_Emits_One_Reference_Per_Name()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Squadron"));
-        schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Squadron"));
+        schema.Add(ListRefTag("Squadron_Units", "Unit"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<Squadron Name="SQ_1"><Squadron_Units>X_Wing A_Wing B_Wing</Squadron_Units></Squadron>""", 1,
@@ -1278,8 +1310,8 @@ public sealed class XmlGameDocumentParserTest
         // would look in - so it cannot tell "Rebel" from "Ship_A" and types neither. Every name
         // still resolves, navigates and renames; the ListMap handler, which has the index, judges
         // which is which.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(ListMapTag("Tactical_Buildable_Objects_Multiplayer", new TupleSlotDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(ListMapTag("Tactical_Buildable_Objects_Multiplayer", new TupleSlotDefinition
         {
             Label = "Faction", ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
@@ -1297,8 +1329,8 @@ public sealed class XmlGameDocumentParserTest
     public async Task ParseAsync_ListMap_AnEnumKey_IsNoReference_AndTheItemsAreTyped()
     {
         // An animation state is told apart from the schema alone - every key, wherever it sits.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(ListMapTag("Presence_Induced_Animations", new TupleSlotDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(ListMapTag("Presence_Induced_Animations", new TupleSlotDefinition
         {
             Label = "Animation", ReferenceKind = ReferenceKind.Enum,
             Enum = new EnumDefinition
@@ -1322,9 +1354,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_PrerequisiteExpression_Emits_Reference_Per_Name()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(ListRefTag("Required_Special_Structures", "GameObjectType",
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(ListRefTag("Required_Special_Structures", "GameObjectType",
             XmlValueType.GameObjectTypeReferenceList, TagSemanticType.PrerequisiteExpression));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
@@ -1340,9 +1372,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Empty_ListTag_Value_Emits_No_References()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Squadron"));
-        schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Squadron"));
+        schema.Add(ListRefTag("Squadron_Units", "Unit"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<Squadron Name="SQ_1"><Squadron_Units></Squadron_Units></Squadron>""", 1,
@@ -1354,9 +1386,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_SingleValue_RefTag_Still_Emits_Exactly_One_Reference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(RefTag("Spawn_Unit", "Unit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(RefTag("Spawn_Unit", "Unit"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""", 1, TestContext.Current.CancellationToken);
@@ -1372,8 +1404,8 @@ public sealed class XmlGameDocumentParserTest
     {
         // Mirrors the actual EaW XML format: <?xml?> header, tab-indented elements.
         // Verifies that HAP attribute parsing and column computation are both correct.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("spaceunits.xml", ["SpaceUnit"]);
 
@@ -1397,8 +1429,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Symbol_FileOrigin_Column_IsNameAttributeValueStart()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("ships.xml", ["SpaceUnit"]);
 
@@ -1416,8 +1448,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Symbol_FileOrigin_Column_WithLeadingWhitespace()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SpaceUnit"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SpaceUnit"));
         var registry = new FakeFileTypeRegistry();
         registry.Register("ships.xml", ["SpaceUnit"]);
 
@@ -1439,8 +1471,8 @@ public sealed class XmlGameDocumentParserTest
     {
         // Files not registered in IFileTypeRegistry must produce no symbols.
         // The legacy element-name fallback must be gone.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit")); // element name matches type name - old code would emit a symbol
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit")); // element name matches type name - old code would emit a symbol
 
         var result = await Build(schema).ParseAsync( // no registry
             "file:///units.xml",
@@ -1455,8 +1487,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ArbitraryContainerName_WithRegisteredType_EmitsSymbol()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("HardPoint"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("HardPoint"));
 
         // "f.xml" is the key produced by IFileHelper.NormalizeUri("file:///f.xml")
         var registry = new FakeFileTypeRegistry();
@@ -1475,8 +1507,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_RegisteredSingletonType_EmitsNoSymbol_NoException()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("BinkMovie", null)); // singleton: no NameTag
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("BinkMovie", null)); // singleton: no NameTag
 
         var registry = new FakeFileTypeRegistry();
         registry.Register("movies.xml", ["BinkMovie"]);
@@ -1492,9 +1524,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_References_Collected_WithArbitraryContainerName()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("HardPoint"));
-        schema.AddTag(RefTag("Attached_To", "Bone"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("HardPoint"));
+        schema.Add(RefTag("Attached_To", "Bone"));
 
         var registry = new FakeFileTypeRegistry();
         registry.Register("f.xml", ["HardPoint"]);
@@ -1516,9 +1548,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_NameReferenceList_TwoTokens_CreatesTwoReferences()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1533,9 +1565,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_NameReferenceList_SingleToken_CreatesOneReference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1549,9 +1581,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_NameReferenceList_CommaSeparated_SplitsCorrectly()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("Unit"));
+        schema.Add(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1566,14 +1598,14 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_TypeReferenceList_With_HardcodedSet_ReferenceKind_Does_Not_Emit_Reference()
     {
-        var schema = new FakeSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var tag = new XmlTagDefinition
         {
             Tag = "Behavior",
             ValueType = XmlValueType.TypeReferenceList,
             ReferenceKind = ReferenceKind.HardcodedSet
         };
-        schema.AddTag(tag);
+        schema.Add(tag);
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1588,9 +1620,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ReferenceGroup_Tag_Does_Not_Emit_GameReference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SFXEvent"));
-        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SFXEvent"));
+        schema.Add(GroupRefTag("Overlap_Test", "SFXEvent"));
 
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
@@ -1603,9 +1635,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ReferenceGroup_Tag_Emits_GroupMembership_WithGroupKey()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SFXEvent"));
-        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SFXEvent"));
+        schema.Add(GroupRefTag("Overlap_Test", "SFXEvent"));
 
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
@@ -1620,9 +1652,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ReferenceGroup_MemberOrigin_PointsToParentNameAttribute()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SFXEvent"));
-        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SFXEvent"));
+        schema.Add(GroupRefTag("Overlap_Test", "SFXEvent"));
 
         // Multi-line: SFXEvent is on line 1 (0-indexed)
         var result = await Build(schema).ParseAsync(
@@ -1642,9 +1674,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ReferenceGroup_TagPosition_IsValueSpan()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SFXEvent"));
-        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SFXEvent"));
+        schema.Add(GroupRefTag("Overlap_Test", "SFXEvent"));
 
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
@@ -1658,9 +1690,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ReferenceGroup_EmptyValue_EmitsNoMembership()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SFXEvent"));
-        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SFXEvent"));
+        schema.Add(GroupRefTag("Overlap_Test", "SFXEvent"));
 
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
@@ -1673,9 +1705,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_ReferenceGroup_TwoElements_EmitsTwoMemberships()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("SFXEvent"));
-        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("SFXEvent"));
+        schema.Add(GroupRefTag("Overlap_Test", "SFXEvent"));
 
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
@@ -1705,9 +1737,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_Child_With_NameAttribute_Is_Indexed_As_Symbol()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("LuckyShotAttackAbility"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1723,10 +1755,10 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_Multiple_Children_Index_All_As_Symbols()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("LuckyShotAttackAbility"));
-        schema.AddType(Type("ForceCloakAbility"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
+        schema.Add(Type("ForceCloakAbility"));
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1741,8 +1773,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_Child_With_Unknown_Type_Is_Silently_Skipped()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
         // No type registered for BasePowerAbility
 
         var result = await Build(schema).ParseAsync(
@@ -1756,9 +1788,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_Child_With_No_Name_Attribute_Is_Skipped()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("LuckyShotAttackAbility"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1771,9 +1803,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_Symbol_FileOrigin_Column_IsNameAttributeValueStart()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("CombatBonusAbility"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("CombatBonusAbility"));
 
         // Line 2 (0-based): "<Combat_Bonus_Ability Name="MY_BONUS"/>"
         // "<Combat_Bonus_Ability Name=\"" = 28 chars (0-27) → value at col 28
@@ -1793,8 +1825,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_GUI_Activated_Ability_Name_Emits_XmlObject_Reference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "GUI_Activated_Ability_Name",
             ValueType = XmlValueType.NameReference,
@@ -1817,10 +1849,10 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_Scopes_Symbol_To_Enclosing_Owner()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("LuckyShotAttackAbility"));
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1839,9 +1871,9 @@ public sealed class XmlGameDocumentParserTest
         // NOT schema object types - the schema models one umbrella GameObjectType. Owner scoping
         // must fall back to the nearest ancestor with a Name attribute, or every ability id stays
         // bare and cross-object duplicates fire (SD_Tractor_Beam_Attack_Ability, 2026-07-05).
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("LuckyShotAttackAbility"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1855,9 +1887,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_TwoOwners_SameAbilityName_ProduceDistinctScopedIds()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("SystemSpyAbility"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("SystemSpyAbility"));
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1877,9 +1909,9 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_No_Owner_Id_Uses_Bare_Ability_Name()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("LuckyShotAttackAbility"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
         // No GameObjectType registered, so parent has no known NameTag
 
         var result = await Build(schema).ParseAsync(
@@ -1898,11 +1930,11 @@ public sealed class XmlGameDocumentParserTest
         // cross-object collisions when two units share an ability name. Its Variant_Of_Existing_Type
         // base must be scoped the same way - otherwise a bare "Base_Ability" base id can coincidentally
         // resolve to some unrelated object's same-named ability elsewhere in the workspace.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SubObjectListTag("Abilities"));
-        schema.AddType(Type("LuckyShotAttackAbility"));
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
-        schema.AddTag(VariantTag());
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.Add(VariantTag());
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1921,15 +1953,15 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_OwnerScopedReference_Prefixes_With_Enclosing_Object_Name()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "GUI_Activated_Ability_Name",
             ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.XmlObject,
             SemanticType = TagSemanticType.OwnerScopedReference
         });
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -1945,8 +1977,8 @@ public sealed class XmlGameDocumentParserTest
     {
         // Mirrors the symbol-side fallback: <SpaceUnit> is not a schema object type, but its Name
         // attribute still identifies the owner - the reference must match the scoped symbol id.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "GUI_Activated_Ability_Name",
             ValueType = XmlValueType.NameReference,
@@ -1966,8 +1998,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_OwnerScopedReference_No_Enclosing_Owner_Uses_Bare_Name()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "GUI_Activated_Ability_Name",
             ValueType = XmlValueType.NameReference,
@@ -1993,8 +2025,8 @@ public sealed class XmlGameDocumentParserTest
         // Fire_Inaccuracy_Distance is a (GameObjectCategoryType, float) tuple - slot 0 must be
         // recorded as an enum: reference so go-to-definition lands on the category's definition
         // (2026-07-05 smoketest report).
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Fire_Inaccuracy_Distance", ValueType = XmlValueType.InaccuracyMap
         });
@@ -2040,8 +2072,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_DynamicEnum_Tag_Emits_Enum_Reference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(DynamicEnumTag("SurfaceFX_Name", "SurfaceFXTriggerType"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(DynamicEnumTag("SurfaceFX_Name", "SurfaceFXTriggerType"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             "<Unit><SurfaceFX_Name>GENERIC_TRACK</SurfaceFX_Name></Unit>",
@@ -2055,8 +2087,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_DynamicEnum_Tag_Multi_Value_Emits_One_Reference_Per_Token()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(DynamicEnumTag("SurfaceFX_Name", "SurfaceFXTriggerType"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(DynamicEnumTag("SurfaceFX_Name", "SurfaceFXTriggerType"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             "<Unit><SurfaceFX_Name>GENERIC_TRACK, INFANTRY_TERRAIN_MODIFIER</SurfaceFX_Name></Unit>",
@@ -2070,8 +2102,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_SchemaFixed_Enum_Tag_Emits_No_Reference()
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(SchemaFixedEnumTag("Ship_Class", "ShipClassType"));
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SchemaFixedEnumTag("Ship_Class", "ShipClassType"));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             "<Unit><Ship_Class>Frigate</Ship_Class></Unit>",
@@ -2081,65 +2113,6 @@ public sealed class XmlGameDocumentParserTest
     }
 
     // ── FakeSchemaProvider ───────────────────────────────────────────────────
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, XmlTagDefinition> _tags =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, GameObjectTypeDefinition> _types =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tags.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [.. _types.Values];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddTag(XmlTagDefinition tag)
-        {
-            _tags[tag.Tag] = tag;
-        }
-
-        public void AddType(GameObjectTypeDefinition type)
-        {
-            _types[type.TypeName] = type;
-        }
-    }
 
     private sealed class FakeFileTypeRegistry : IFileTypeRegistry
     {

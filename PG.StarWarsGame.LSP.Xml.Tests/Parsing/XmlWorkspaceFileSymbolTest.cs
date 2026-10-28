@@ -28,16 +28,14 @@ public sealed class XmlWorkspaceFileSymbolTest
         if (types.Length > 0)
             registry.RegisterFile(fileHelper.NormalizeUri(uri), types.ToImmutableArray());
 
-        IEaWXmlContext? ctx = null;
-        if (withContext)
-        {
-            var context = new EaWXmlContext(fileHelper);
-            context.SetDirectories([XmlDir]);
-            ctx = context;
-        }
+        // Without a directory the context cannot place a document, so no workspace-file symbol is
+        // produced - the case a workspace without a project file is in.
+        var ctx = new EaWXmlContext(fileHelper);
+        if (withContext) ctx.SetDirectories([XmlDir]);
 
-        var parser = new XmlGameDocumentParser(fileHelper, new EmptySchemaProvider(), registry,
-            NullLogger<XmlGameDocumentParser>.Instance, eaWXmlContext: ctx);
+        var parser = new XmlGameDocumentParser(fileHelper, new SchemaProviderBuilder().Build(), registry,
+            NullLogger<XmlGameDocumentParser>.Instance, TestParseCache.For(new FakeGameWorkspaceHost(), fileHelper),
+            ctx);
         return await parser.ParseAsync(uri, "<Story_Mode_Plots/>", 1, CancellationToken.None);
     }
 

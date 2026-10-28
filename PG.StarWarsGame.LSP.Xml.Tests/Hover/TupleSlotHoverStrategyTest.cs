@@ -5,8 +5,8 @@ using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;
-using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Hover;
 
@@ -21,7 +21,7 @@ public sealed class TupleSlotHoverStrategyTest
 
     private static ISchemaProvider Schema()
     {
-        return new OneTagSchema(new XmlTagDefinition
+        return new SchemaProviderBuilder().WithTag(new XmlTagDefinition
         {
             Tag = "Pairs", ValueType = XmlValueType.TupleList,
             Slots =
@@ -44,7 +44,7 @@ public sealed class TupleSlotHoverStrategyTest
                 },
                 new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }
             ]
-        });
+        }).Build();
     }
 
     private static string? HoverAt(int character)
@@ -63,7 +63,7 @@ public sealed class TupleSlotHoverStrategyTest
                 ["data/art/models/ei_trooper.alo", "data/art/textures/i_unit.tga"])
         };
         var ctx = new HoverContext("file:///units.xml", index, schema, doc, root!,
-            node ?? new HtmlDocument().DocumentNode, false, 1, character, "en");
+            node ?? new HtmlDocument().DocumentNode, false, 1, character, "en", TestCatalogues.English);
 
         return new TupleSlotHoverStrategy().Handle(ctx)?.Contents.MarkupContent?.Value;
     }
@@ -73,7 +73,7 @@ public sealed class TupleSlotHoverStrategyTest
     {
         // The engine reads "Idle" as a key wherever it sits, so the hover must too.
         const string xml = "<Root>\n<Map>Attention, A, Idle, B</Map>\n</Root>";
-        var schema = new OneTagSchema(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().WithTag(new XmlTagDefinition
         {
             Tag = "Map", ValueType = XmlValueType.ListMap,
             Slots =
@@ -92,7 +92,7 @@ public sealed class TupleSlotHoverStrategyTest
                 },
                 new TupleSlotDefinition { Label = "Unit", ReferenceKind = ReferenceKind.XmlObject }
             ]
-        });
+        }).Build();
 
         var hover = HoverAt(xml, schema, xml.Split('\n')[1].IndexOf("Idle", StringComparison.Ordinal) + 1);
 
@@ -104,7 +104,7 @@ public sealed class TupleSlotHoverStrategyTest
     public void OnATextureItem_IsTheTextureHover()
     {
         const string xml = "<Root>\n<Icons>Space, i_unit.tga</Icons>\n</Root>";
-        var schema = new OneTagSchema(new XmlTagDefinition
+        var schema = new SchemaProviderBuilder().WithTag(new XmlTagDefinition
         {
             Tag = "Icons", ValueType = XmlValueType.TupleList,
             Slots =
@@ -112,7 +112,7 @@ public sealed class TupleSlotHoverStrategyTest
                 new TupleSlotDefinition { Label = "Context" },
                 new TupleSlotDefinition { Label = "Icon", ReferenceKind = ReferenceKind.TextureFile }
             ]
-        });
+        }).Build();
 
         var hover = HoverAt(xml, schema, xml.Split('\n')[1].IndexOf("i_unit", StringComparison.Ordinal) + 1);
 
@@ -145,45 +145,5 @@ public sealed class TupleSlotHoverStrategyTest
     public void BetweenItems_SaysNothing()
     {
         Assert.Null(HoverAt(Xml.Split('\n')[1].IndexOf(',', StringComparison.Ordinal)));
-    }
-
-    private sealed class OneTagSchema(XmlTagDefinition tag) : ISchemaProvider
-    {
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return tag.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase) ? tag : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [tag];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
     }
 }

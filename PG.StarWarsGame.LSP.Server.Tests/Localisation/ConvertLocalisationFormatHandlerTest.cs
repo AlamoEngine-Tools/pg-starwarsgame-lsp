@@ -7,6 +7,7 @@ using System.Xml.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.Files.DAT.Services;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
@@ -362,7 +363,7 @@ public sealed class ConvertLocalisationFormatHandlerTest
             writer,
             NullLogger<ConvertLocalisationFormatHandler>.Instance,
             config ?? new FakeLspConfigurationProvider(),
-            new ProjectLayerMap(new FileHelper(fs)));
+            new ProjectLayerMap(new FileHelper(fs)), TestCatalogues.English);
 
         return (handler, fs, reload, writer);
     }

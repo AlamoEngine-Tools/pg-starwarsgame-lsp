@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Validation;
@@ -18,7 +17,7 @@ public sealed class XmlVariantFactProducerTest
         return new GameSymbol(id, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin(uri, 0, 0), null, baseId);
     }
 
-    private static GameIndex Index(string text, params GameSymbol[] symbols)
+    private static GameIndex Index(params GameSymbol[] symbols)
     {
         var docSymbols = symbols.Where(s => ((FileOrigin)s.Origin).Uri == Uri).ToImmutableArray();
         var docIndex = new DocumentIndex(Uri, 1, docSymbols, ImmutableArray<GameReference>.Empty);
@@ -34,7 +33,7 @@ public sealed class XmlVariantFactProducerTest
     private static IReadOnlyList<XmlFact> Produce(string text, FakeTagSource source, FakeSchema schema,
         params GameSymbol[] symbols)
     {
-        return new XmlVariantFactProducer(schema, source).Produce(Uri, text, Index(text, symbols));
+        return new XmlVariantFactProducer(schema.Build(), source).Produce(Uri, text, Index(symbols));
     }
 
     [Fact]
@@ -152,6 +151,43 @@ public sealed class XmlVariantFactProducerTest
         var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
 
         Assert.Contains(facts, f => f is VariantRedundantOverrideFact { TagName: "Max_Health" });
+    }
+
+    /// <summary>
+    ///     A variant's empty tag does not clear the base's value: the game's field mapper returns
+    ///     before converting an empty value, so the inherited one stays - and the author is told.
+    /// </summary>
+    [Fact]
+    public void Produce_EmptyTagOnVariant_ReportsThatTheInheritedValueStays()
+    {
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Icon_Name></Icon_Name></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+        var source =
+            new FakeTagSource().With("B",
+                new VariantTag("Icon_Name", "base.tga", "<Icon_Name>base.tga</Icon_Name>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        var fact = Assert.Single(facts.OfType<XmlEmptyRepeatedTagFact>());
+        Assert.Equal("Icon_Name", fact.TagName);
+        Assert.Equal("base.tga", fact.KeptValue);
+        Assert.Null(fact.KeptLine);
+        Assert.Empty(facts.OfType<VariantRedundantOverrideFact>());
+    }
+
+    [Fact]
+    public void Produce_EmptyTagOnVariant_WithNoBaseValue_ReportsNothing()
+    {
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Icon_Name></Icon_Name></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+        var source =
+            new FakeTagSource().With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        Assert.Empty(facts.OfType<XmlEmptyRepeatedTagFact>());
     }
 
     [Fact]
@@ -339,48 +375,9 @@ public sealed class XmlVariantFactProducerTest
         }
     }
 
-    private sealed class FakeSchema : ISchemaProvider
+    private sealed class FakeSchema
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return _tags.GetValueOrDefault(tagName);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
 
         public FakeSchema Variant(string tag)
         {
@@ -396,6 +393,14 @@ public sealed class XmlVariantFactProducerTest
         {
             _tags[tag] = new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.NameReference, VariantMode = mode };
             return this;
+        }
+
+        public FakeSchemaProvider Build()
+        {
+            var builder = new SchemaProviderBuilder();
+            foreach (var item in _tags.Values)
+                builder.WithTag(item);
+            return builder.Build();
         }
     }
 }

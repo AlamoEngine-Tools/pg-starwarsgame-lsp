@@ -31,7 +31,9 @@ internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
                 {
                     Title = ctx.Messages.Format("VariantCodeLens_VariantShowEffectiveObject", ctx.Symbol.VariantBaseId),
                     Name = ShowEffectiveCommand,
-                    Arguments = JArray.FromObject(new object[] { ctx.Symbol.Id })
+                    // The id, no project (the command asks for the active one), and the type: one id
+                    // may name objects of several types.
+                    Arguments = JArray.FromObject(new object?[] { ctx.Symbol.Id, null, ctx.Symbol.TypeName })
                 }
             };
         }

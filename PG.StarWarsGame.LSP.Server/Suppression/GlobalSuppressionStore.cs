@@ -41,7 +41,7 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
     private readonly AetswgSidecarLocator _locator;
     private readonly ILogger<GlobalSuppressionStore> _logger;
     private readonly IMessageCatalog _messages;
-    private readonly IUserNotifier? _notifier;
+    private readonly IUserNotifier _notifier;
     private readonly SidecarStore<SuppressionsDocument.Payload> _store;
 
     /// <summary>
@@ -54,10 +54,10 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger<GlobalSuppressionStore> logger,
-        IUserNotifier? notifier = null,
-        IMessageCatalog? messages = null)
+        IUserNotifier notifier,
+        IMessageCatalog messages)
     {
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _notifier = notifier;
         _logger = logger;
         _locator = new AetswgSidecarLocator(reloadService);
@@ -155,6 +155,6 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
 
     private void Report(string message)
     {
-        _notifier?.ShowError(message);
+        _notifier.ShowError(message);
     }
 }

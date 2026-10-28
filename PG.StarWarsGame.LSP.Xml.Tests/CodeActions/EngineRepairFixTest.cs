@@ -4,10 +4,10 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -124,7 +124,7 @@ public sealed class EngineRepairFixTest
         };
 
         var action = Assert.Single(new FixSuggestionCodeActionProvider(new EmptyFixCache())
-            .Handle(new XmlCodeActionContext(TestUri, d))).CodeAction!;
+            .Handle(new XmlCodeActionContext(TestUri, d) { Messages = TestCatalogues.English })).CodeAction!;
 
         Assert.Equal("Apply the engine's own value: GROUND_ACTIVATED", action.Title);
         Assert.Equal("GROUND_ACTIVATED", Assert.Single(action.Edit!.Changes![TestUri]).NewText);
@@ -136,7 +136,7 @@ public sealed class EngineRepairFixTest
         var d = new Diagnostic { Range = TestRange, Data = JToken.FromObject(new { fix = "42" }) };
 
         var action = Assert.Single(new FixSuggestionCodeActionProvider(new EmptyFixCache())
-            .Handle(new XmlCodeActionContext(TestUri, d))).CodeAction!;
+            .Handle(new XmlCodeActionContext(TestUri, d) { Messages = TestCatalogues.English })).CodeAction!;
 
         Assert.Equal("Replace with '42'", action.Title);
     }

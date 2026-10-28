@@ -97,14 +97,14 @@ public sealed class StorySimulationService(
     IGameIndexService indexService,
     ISchemaProvider schema,
     Action<StorySimKey> notifyChanged,
-    IStoryWorldSymbols? symbols = null,
-    IMessageCatalog? messages = null) : IStorySimulationService
+    IStoryWorldSymbols symbols,
+    IMessageCatalog messages) : IStorySimulationService
 {
     private const int LogTail = 200;
     private const string Won = "won";
     private const string Lost = "lost";
     private readonly object _gate = new();
-    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
+    private readonly IMessageCatalog _messages = messages;
     private readonly Dictionary<StorySimKey, Session> _sessions = new();
 
     public (StorySimStateDto? State, string? Error) Start(StorySimKey key, StorySimOptions? options = null)
@@ -126,7 +126,7 @@ public sealed class StorySimulationService(
                     toNotify.Add(battleKey);
                 }
 
-                var simulator = new StorySimulator(model, schema, symbols, null, options, _messages);
+                var simulator = new StorySimulator(model, schema, symbols, _messages, null, options);
                 session = new Session(key, simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts),
                     ImmutableList<SimCommand>.Empty, StorySimBreakpoints.None, model.LuaMachines, model.Battles)
                 {
@@ -149,8 +149,8 @@ public sealed class StorySimulationService(
                 // hands a tactical mission the campaign state, and under the galaxy's options.
                 // Without a galactic session it runs on its own from the campaign seed.
                 _sessions.TryGetValue(key.Galactic, out var galactic);
-                var simulator = new StorySimulator(model, schema, symbols, key.Scope,
-                    OptionsOf(galactic) ?? options, _messages);
+                var simulator = new StorySimulator(model, schema, symbols, _messages, key.Scope,
+                    OptionsOf(galactic) ?? options);
                 var seedFlags = galactic?.Snapshot.Runtime.Flags;
                 var seedWorld = galactic?.Snapshot.Runtime.World;
                 session = new Session(key, simulator,
@@ -412,8 +412,8 @@ public sealed class StorySimulationService(
             }
             else
             {
-                var implicitSim = new StorySimulator(model, schema, symbols, battleSession.Scope,
-                    OptionsOf(galactic), _messages);
+                var implicitSim = new StorySimulator(model, schema, symbols, _messages, battleSession.Scope,
+                    OptionsOf(galactic));
                 seed = galactic?.Snapshot.Runtime.Flags ?? StoryRuntimeState.Initial.Flags;
                 ended = Apply(implicitSim, implicitSim.Start(seed, galactic?.Snapshot.Runtime.World), outcome,
                     StorySimBreakpoints.None);

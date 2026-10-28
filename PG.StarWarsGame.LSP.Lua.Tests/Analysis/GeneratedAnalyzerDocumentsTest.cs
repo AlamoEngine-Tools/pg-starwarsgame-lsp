@@ -123,6 +123,23 @@ public sealed class GeneratedAnalyzerDocumentsTest
                      "local OnUpdate = 2\nfunction F()\n  OnUpdate = 2\nend\n", inner.Texts[Other]);
     }
 
+    // A script's entry point is its own, not the library copy a stub declares under the same name:
+    // the library's documentation was injected above every script's Definitions.
+    [Fact]
+    public void AnEntryPoint_GetsNoLibraryStubsAnnotations()
+    {
+        var inner = new ScriptedLuaAnalyzer();
+        var stubs = LuaApiSchemaProvider.FromFiles(
+            [new LuaStubFile("pginterventions.d.lua", "--- Not documented on the site.\nfunction Definitions() end")],
+            [new LuaEntryPoint("Definitions", LuaEntryPointCaller.LIBRARY, ["PGStateMachine"], ["object"], "Setup.")]);
+        var documents = new GeneratedAnalyzerDocuments(inner, [new StubOverrideAnnotations(stubs)],
+            new FileHelper(new MockFileSystem()));
+
+        documents.DidOpen(Uri, "function Definitions()\nend\n", 1);
+
+        Assert.Equal("function Definitions()\nend\n", inner.Texts[Uri]);
+    }
+
     // A state handler's message is one of the library's three values (#252).
     [Fact]
     public void AStateHandler_GetsItsMessageTyped()
@@ -130,14 +147,14 @@ public sealed class GeneratedAnalyzerDocumentsTest
         const string library = "file:///mod/data/scripts/library/pgstatemachine.lua";
         const string script = "require(\"PGStateMachine\")\nDefine_State(\"Init\", State_Init)\n" +
                               "function State_Init(msg)\nend\n";
-        var host = new StateHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(Uri, script, 1);
         host.AddOrUpdate(library, "function Define_State(s, f) end\n" +
                                   "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
                                   "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end",
             1);
         var fileHelper = new FileHelper(new MockFileSystem());
-        var index = new FakeIndexService
+        var index = new FakeGameIndexService
         {
             Current = new GameIndex(BaselineIndex.Empty,
                 ImmutableDictionary<string, DocumentIndex>.Empty
@@ -154,105 +171,6 @@ public sealed class GeneratedAnalyzerDocumentsTest
 
         Assert.Contains("---@param msg 1|2|3 OnEnter (1), OnUpdate (2) or OnExit (3)\nfunction State_Init(msg)",
             inner.Texts[Uri]);
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(
-            ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class StateHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 
     [Fact]
@@ -522,7 +440,7 @@ public sealed class GeneratedAnalyzerDocumentsTest
 
         Assert.Equal(4, SentParams(inner)["range"]!["start"]!["line"]!.Value<int>());
         Assert.Equal(1, lens!.Range.Start.Line);
-        Assert.Equal(4, ((JArray)lens.Command!.Arguments![2])[0]!["range"]!["start"]!["line"]!.Value<int>());
+        Assert.Equal(4, ((JArray)lens.Command!.Arguments![2])[0]["range"]!["start"]!["line"]!.Value<int>());
     }
 
     [Fact]

@@ -27,7 +27,7 @@ public sealed class ParsedDocumentCache<TArtifact> where TArtifact : class
     private readonly int _capacity;
     private readonly Dictionary<string, LinkedListNode<Entry>> _entries;
     private readonly object _gate = new();
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
     private readonly LinkedList<Entry> _lru = [];
     private readonly string _name;
     private long _evictions;
@@ -35,7 +35,8 @@ public sealed class ParsedDocumentCache<TArtifact> where TArtifact : class
     private long _misses;
     private long _operations;
 
-    public ParsedDocumentCache(int capacity, string? name = null, ILogger? logger = null)
+    /// <param name="name">What the statistics line calls this cache; the artifact's type name when null.</param>
+    public ParsedDocumentCache(int capacity, ILogger logger, string? name = null)
     {
         _capacity = capacity;
         _name = name ?? typeof(TArtifact).Name;
@@ -72,7 +73,7 @@ public sealed class ParsedDocumentCache<TArtifact> where TArtifact : class
         if (_capacity <= 0)
             return parse(text);
 
-        if (_logger is not null && (Interlocked.Increment(ref _operations) & (LogInterval - 1)) == 0)
+        if ((Interlocked.Increment(ref _operations) & (LogInterval - 1)) == 0)
         {
             var (hits, misses, evictions) = Statistics;
             _logger.LogDebug("{Name} parse cache: {Hits} hits, {Misses} misses, {Evictions} evictions",

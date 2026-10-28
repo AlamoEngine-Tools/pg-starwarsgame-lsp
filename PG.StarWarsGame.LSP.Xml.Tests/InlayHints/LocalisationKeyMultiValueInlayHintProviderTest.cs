@@ -29,7 +29,8 @@ public sealed class LocalisationKeyMultiValueInlayHintProviderTest
             ? GameIndex.Empty with { Localisation = localisation }
             : GameIndex.Empty;
 
-        return new InlayHintContext("file:///test.xml", index, new EmptySchemaProvider(), hapDoc, node, tagDef, 0);
+        return new InlayHintContext("file:///test.xml", index, new SchemaProviderBuilder().Build(), hapDoc, node,
+            tagDef, 0) { Messages = TestCatalogues.English };
     }
 
     [Fact]
@@ -134,10 +135,6 @@ file sealed class StubLocalisationIndex : ILocalisationIndex
     {
         _values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (k, v) in pairs) _values[k] = v;
-    }
-
-    public StubLocalisationIndex(string key, string value) : this((key, value))
-    {
     }
 
     public StubLocalisationIndex() : this([])

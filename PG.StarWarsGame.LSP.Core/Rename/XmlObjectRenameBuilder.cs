@@ -13,11 +13,16 @@ namespace PG.StarWarsGame.LSP.Core.Rename;
 
 public static class XmlObjectRenameBuilder
 {
+    /// <param name="typeName">
+    ///     The type whose object is renamed - every type is an id space of its own, so a same-named
+    ///     object of another type and the references that mean it stay. Null renames the id in every
+    ///     type, for a story symbol indexed under two types for one element.
+    /// </param>
     public static WorkspaceEdit? Build(
-        string id, string newName, GameIndex index, ISchemaProvider schema,
+        string id, string? typeName, string newName, GameIndex index, ISchemaProvider schema,
         IDocumentTextSource textSource, ILogger logger)
     {
-        if (!index.IsLeafOwned(id))
+        if (!index.IsLeafOwned(id, typeName))
         {
             logger.LogDebug("Rename blocked: {Id} is not exclusively defined in the leaf layer", id);
             return null;
@@ -28,41 +33,39 @@ public static class XmlObjectRenameBuilder
         // XML definition edits - locate the name-attribute value in the definition file. Symbols
         // whose TypeName is not a schema object type (story events/flags/notifications) carry an
         // exact value column in their origin instead; the definition edit spans the id there.
-        if (index.WorkspaceDefinitions.TryGetValue(id, out var defs))
-            foreach (var sym in defs)
+        foreach (var sym in index.DefinitionsOf(id, typeName))
+        {
+            if (sym.Origin is not FileOrigin fo) continue;
+            var nameTag = sym.TypeName is not null
+                ? schema.GetObjectType(sym.TypeName)?.NameTag
+                : null;
+            if (nameTag is not null)
             {
-                if (sym.Origin is not FileOrigin fo) continue;
-                var nameTag = sym.TypeName is not null
-                    ? schema.GetObjectType(sym.TypeName)?.NameTag
-                    : null;
-                if (nameTag is not null)
-                {
-                    var defRange = FindNameAttributeRange(fo.Uri, fo.Line, nameTag, id, textSource);
-                    if (defRange is null) continue;
-                    AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = defRange });
-                }
-                else if (fo.Column is { } column && StoryReferenceTypes.IsStorySymbolType(sym.TypeName))
-                {
-                    AddEdit(changes, fo.Uri, new TextEdit
-                    {
-                        NewText = newName,
-                        Range = new LspRange(
-                            new Position(fo.Line, column),
-                            new Position(fo.Line, column + id.Length))
-                    });
-                }
+                var defRange = FindNameAttributeRange(fo.Uri, fo.Line, nameTag, id, textSource);
+                if (defRange is null) continue;
+                AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = defRange });
             }
-
-        // Reference edits - use precise positions from the index (covers both XML and Lua files).
-        if (index.WorkspaceReferences.TryGetValue(id, out var refs))
-            foreach (var r in refs)
-                AddEdit(changes, r.DocumentUri, new TextEdit
+            else if (fo.Column is { } column && StoryReferenceTypes.IsStorySymbolType(sym.TypeName))
+            {
+                AddEdit(changes, fo.Uri, new TextEdit
                 {
                     NewText = newName,
                     Range = new LspRange(
-                        new Position(r.Line, r.Column),
-                        new Position(r.Line, r.Column + r.Length))
+                        new Position(fo.Line, column),
+                        new Position(fo.Line, column + id.Length))
                 });
+            }
+        }
+
+        // Reference edits - use precise positions from the index (covers both XML and Lua files).
+        foreach (var r in index.ReferencesTo(id, typeName))
+            AddEdit(changes, r.DocumentUri, new TextEdit
+            {
+                NewText = newName,
+                Range = new LspRange(
+                    new Position(r.Line, r.Column),
+                    new Position(r.Line, r.Column + r.Length))
+            });
 
         if (changes.Count == 0)
             return null;

@@ -53,6 +53,6 @@ public sealed class GetWatchDirectoriesHandler(IProjectLayerMap layers)
 
     private static string Normalize(string path)
     {
-        return path.Replace('\\', '/').TrimEnd('/');
+        return GamePaths.Forward(path).TrimEnd('/');
     }
 }

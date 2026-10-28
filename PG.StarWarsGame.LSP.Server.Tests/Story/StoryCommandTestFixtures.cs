@@ -90,7 +90,7 @@ internal static class StoryCommandTestFixtures
 
     public static DocumentTextSource TextSource(FileHelper fileHelper)
     {
-        return new DocumentTextSource(new FakeHost(), fileHelper, NullLogger<DocumentTextSource>.Instance);
+        return new DocumentTextSource(new FakeGameWorkspaceHost(), fileHelper, NullLogger<DocumentTextSource>.Instance);
     }
 
     public static ILspConfigurationProvider Config(bool storyEditing = true)
@@ -129,12 +129,10 @@ internal static class StoryCommandTestFixtures
     public sealed class CapturingApplier(bool result = true) : IWorkspaceEditApplier
     {
         public WorkspaceEdit? Edit { get; private set; }
-        public string? Label { get; private set; }
 
         public Task<bool> ApplyAsync(WorkspaceEdit edit, string label, CancellationToken ct)
         {
             Edit = edit;
-            Label = label;
             return Task.FromResult(result);
         }
     }
@@ -215,14 +213,14 @@ internal static class StoryCommandTestFixtures
             IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
             return new StoryCampaignModel("GC", "Rebel", threads,
                 new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new StoryTestSchema()).Build([thread]));
+                new StoryGraphBuilder(new SchemaProviderBuilder().Build()).Build([thread]));
         }
     }
 
     public sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
+        public WorkspaceConfiguration LastWorkspaceConfig => config;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
@@ -238,143 +236,6 @@ internal static class StoryCommandTestFixtures
         public Task ReloadLocalisationAsync(CancellationToken ct)
         {
             return Task.CompletedTask;
-        }
-    }
-
-    public sealed class FakeHost : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-        }
-
-        public void Remove(string uri)
-        {
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            doc = default!;
-            return false;
-        }
-    }
-
-    public sealed class StubIndexService(GameIndex index) : IGameIndexService
-    {
-        public GameIndex Current => index;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex localisation)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex assetFiles)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Noop();
-        }
-
-        private sealed class Noop : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    public sealed class StoryTestSchema : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string e)
-        {
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
         }
     }
 }

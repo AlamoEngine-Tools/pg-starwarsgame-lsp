@@ -12,4 +12,13 @@ public interface IVariantTagSource
 {
     /// <summary>Returns the object's direct child tags, or null when this source does not know the object.</summary>
     IReadOnlyList<VariantTag>? TryGetTags(string objectId);
+
+    /// <summary>
+    ///     Returns the direct child tags of this very definition. Objects of different kinds may share
+    ///     an id - a faction and a unit both named Sarlacc - and only the symbol says which is meant.
+    /// </summary>
+    IReadOnlyList<VariantTag>? TryGetTags(GameSymbol symbol)
+    {
+        return TryGetTags(symbol.Id);
+    }
 }

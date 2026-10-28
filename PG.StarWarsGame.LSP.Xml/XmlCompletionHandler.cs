@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -37,9 +38,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
-    private readonly IXmlTagNameCompletionStrategyRegistry _tagNameRegistry;
-    private readonly IXmlTagValueCompletionStrategyRegistry _tagValueRegistry;
+    private readonly IReadOnlyList<IXmlTagNameCompletionStrategy> _tagNameStrategies;
+    private readonly IReadOnlyList<IXmlTagValueCompletionStrategy> _tagValueStrategies;
 
+    // Every strategy contributes its items, in registration order.
     public XmlCompletionHandler(
         IXmlParseCache parseCache,
         ISchemaProvider schema,
@@ -47,8 +49,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
         IEaWXmlContext eaWXmlContext,
-        IXmlTagNameCompletionStrategyRegistry tagNameRegistry,
-        IXmlTagValueCompletionStrategyRegistry tagValueRegistry)
+        IEnumerable<IXmlTagNameCompletionStrategy> tagNameStrategies,
+        IEnumerable<IXmlTagValueCompletionStrategy> tagValueStrategies)
     {
         _parseCache = parseCache;
         _schema = schema;
@@ -56,8 +58,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         _fileTypeRegistry = fileTypeRegistry;
         _fileHelper = fileHelper;
         _eaWXmlContext = eaWXmlContext;
-        _tagNameRegistry = tagNameRegistry;
-        _tagValueRegistry = tagValueRegistry;
+        _tagNameStrategies = [.. tagNameStrategies];
+        _tagValueStrategies = [.. tagValueStrategies];
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
@@ -95,7 +97,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             var tagNameCtx = new TagNameCompletionContext(
                 uri, index, _schema, enclosingNode, enclosingNode.Name,
                 XmlUtility.GetDepth(enclosingNode), prefix, text, lineIndex, character, isStoryParser);
-            var items = _tagNameRegistry.GetCompletions(tagNameCtx);
+            var items = _tagNameStrategies.SelectMany(s => s.Handle(tagNameCtx));
             return Task.FromResult(new CompletionList(items));
         }
 
@@ -147,7 +149,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             {
                 var resCtx = new TagResolutionContext(
                     containingAbilityType!, XmlUtility.GetDepth(enclosingValueNode!), enclosingValueNode!);
-                tagDef = XmlTagResolver.Resolve(_schema, enclosingTag, resCtx);
+                tagDef = XmlObjectTagResolver.Resolve(_schema, enclosingTag, resCtx);
             }
             else if (!fileTypes.IsEmpty)
             {
@@ -183,7 +185,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             uri, valueIndex, _schema, valueDoc, enclosingValueNode!, enclosingTag, enclosingDepth,
             tagDef, partialValue, lineIndex, character, isStoryParserForValue, storyParamSide,
             storyParamPosition, tupleSlotIndex);
-        var valueItems = _tagValueRegistry.GetCompletions(valueCtx);
+        var valueItems = _tagValueStrategies.SelectMany(s => s.Handle(valueCtx));
         return Task.FromResult(new CompletionList(valueItems));
     }
 

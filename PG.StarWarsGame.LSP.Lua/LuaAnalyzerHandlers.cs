@@ -28,10 +28,10 @@ internal static class LuaAnalyzerPassThrough
     ///     Whether a location the analyzer answered is a usage: in the requesting script's state, and not
     ///     in the stubs, which are its library and describe a function rather than use it.
     /// </summary>
-    public static bool IsUsage(string from, string uri, LuaSandbox? sandbox, LuaStubLocation? stubs)
+    public static bool IsUsage(string from, string uri, LuaSandbox sandbox, LuaStubLocation stubs)
     {
-        if (stubs?.Directory is { } directory && IsUnder(uri, directory)) return false;
-        return sandbox is null || sandbox.ShareAState(from, uri);
+        if (stubs.Directory is { } directory && IsUnder(uri, directory)) return false;
+        return sandbox.ShareAState(from, uri);
     }
 
     private static bool IsUnder(string uri, string directory)
@@ -50,17 +50,17 @@ internal static class LuaAnalyzerPassThrough
 /// </summary>
 public sealed class LuaReferencesHandler(
     ILuaAnalyzer analyzer,
-    ILuaSandboxProvider? sandbox = null,
-    LuaStubLocation? stubs = null)
+    ILuaSandboxProvider sandbox,
+    LuaStubLocation stubs)
     : ReferencesHandlerBase
 {
     public override async Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken ct)
     {
         if (!LuaAnalyzerPassThrough.IsLua(request.TextDocument)) return null;
         var theirs = await analyzer.RequestAsync<LocationContainer>("textDocument/references", request, ct);
-        if (theirs is null || (sandbox is null && stubs is null)) return theirs;
+        if (theirs is null) return null;
 
-        var current = sandbox?.Current;
+        var current = sandbox.Current;
         var from = request.TextDocument.Uri.ToString();
         return new LocationContainer(theirs.Where(l =>
             LuaAnalyzerPassThrough.IsUsage(from, l.Uri.ToString(), current, stubs)));
@@ -155,8 +155,8 @@ public sealed class LuaInlayHintHandler(ILuaAnalyzer analyzer) : InlayHintsHandl
 /// <summary>The analyzer's lenses: sent without a command, which its resolve fills (measured, 0.25.1).</summary>
 public sealed class LuaCodeLensHandler(
     ILuaAnalyzer analyzer,
-    ILuaSandboxProvider? sandbox = null,
-    LuaStubLocation? stubs = null)
+    ILuaSandboxProvider sandbox,
+    LuaStubLocation stubs)
     : CodeLensHandlerBase
 {
     // The router's own key rides in the lens data, and with it present the analyzer resolves
@@ -187,12 +187,12 @@ public sealed class LuaCodeLensHandler(
     // number of locations. Recounted over the document's own state (#249), less the stubs.
     private Command InOwnState(Command command)
     {
-        if ((sandbox is null && stubs is null) || command.Arguments is not { Count: 3 } arguments
-                                               || arguments[0] is not { Type: JTokenType.String } document
-                                               || arguments[2] is not JArray locations)
+        if (command.Arguments is not { Count: 3 } arguments
+            || arguments[0] is not { Type: JTokenType.String } document
+            || arguments[2] is not JArray locations)
             return command;
 
-        var current = sandbox?.Current;
+        var current = sandbox.Current;
         var kept = new JArray(locations.Where(l =>
             l["uri"]?.Value<string>() is not { } uri ||
             LuaAnalyzerPassThrough.IsUsage(document.Value<string>()!, uri, current, stubs)));

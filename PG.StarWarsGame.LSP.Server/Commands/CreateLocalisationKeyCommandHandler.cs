@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -42,8 +43,8 @@ public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerB
             return Unit.Value;
         }
 
-        var keyName = request.Arguments[0]?.Value<string>();
-        var filePath = request.Arguments[1]?.Value<string>();
+        var keyName = request.Arguments[0].Value<string>();
+        var filePath = request.Arguments[1].Value<string>();
 
         if (string.IsNullOrWhiteSpace(keyName))
         {

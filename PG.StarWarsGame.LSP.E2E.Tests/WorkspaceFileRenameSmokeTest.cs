@@ -39,7 +39,7 @@ public sealed class WorkspaceFileRenameSmokeTest : IClassFixture<EawLspServerFix
         }, cts.Token);
 
         Assert.NotNull(prepared);
-        Assert.NotNull(prepared!.Range);
+        Assert.NotNull(prepared.Range);
         // The editable range is the stem, not the ".xml" extension.
         Assert.Equal(Stem.Length, prepared.Range!.End.Character - prepared.Range.Start.Character);
     }
@@ -58,7 +58,7 @@ public sealed class WorkspaceFileRenameSmokeTest : IClassFixture<EawLspServerFix
         }, cts.Token);
 
         Assert.NotNull(edit);
-        Assert.NotNull(edit!.DocumentChanges);
+        Assert.NotNull(edit.DocumentChanges);
         var changes = edit.DocumentChanges!.ToList();
 
         var rename = Assert.Single(changes.Where(c => c.IsRenameFile).Select(c => c.RenameFile!));

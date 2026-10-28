@@ -172,9 +172,8 @@ public sealed class ProjectDependencyGraphTest
     public void Build_Cycle_BreaksAndWarns()
     {
         // root -> A -> root
-        ModProjectFile? root = null;
         var a = Project("../root/root.pgproj");
-        root = Project("../a/a.pgproj");
+        var root = Project("../a/a.pgproj");
 
         var files = new Dictionary<string, ModProjectFile>
         {
@@ -213,6 +212,7 @@ public sealed class ProjectDependencyGraphTest
         return NullLogger<ProjectDependencyGraph>.Instance;
     }
 
+    // ReSharper disable once NotAccessedPositionalProperty.Local - captured for the debugger, counted by the tests
     private sealed record LogEntry(LogLevel Level, string Message);
 
     private sealed class ListLogger : ILogger<ProjectDependencyGraph>

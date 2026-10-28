@@ -8,6 +8,8 @@ using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Util;
@@ -18,7 +20,8 @@ internal static class HoverUtility
     private static readonly HashSet<SchemaNoteKind> SummarisedOnTheStatusLine =
         [SchemaNoteKind.Since, SchemaNoteKind.Deprecated];
 
-    public static string Resolve(IReadOnlyDictionary<string, string> descriptions, string locale)
+    public static string Resolve(IReadOnlyDictionary<string, string> descriptions, string locale,
+        IMessageCatalog messages)
     {
         if (descriptions.TryGetValue(locale, out var text))
             return text;
@@ -27,18 +30,18 @@ internal static class HoverUtility
             descriptions.TryGetValue("en", out text))
             return text;
 
-        return ResxMessageCatalog.Server(locale).Format("HoverUtility_NoDescription");
+        return messages.Format("HoverUtility_NoDescription");
     }
 
-    public static Hover BuildTypeHover(GameObjectTypeDefinition type, HtmlNode node, string locale)
+    public static Hover BuildTypeHover(GameObjectTypeDefinition type, HtmlNode node, string locale,
+        IMessageCatalog messages)
     {
-        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
         sb.Append($"### `{type.TypeName}::{node.Name}`");
         var id = XmlUtility.GetXmlObjectId(type, node);
         if (!string.IsNullOrWhiteSpace(id)) sb.Append($" *\"{id}\"*");
         sb.AppendLine();
-        sb.Append(Resolve(type.Description, locale));
+        sb.Append(Resolve(type.Description, locale, messages));
         AppendNotes(sb, type.Notes, locale, messages);
         return new Hover
         {
@@ -51,15 +54,14 @@ internal static class HoverUtility
         };
     }
 
-    public static Hover BuildTagHover(XmlTagDefinition tag, HtmlNode node, string locale)
+    public static Hover BuildTagHover(XmlTagDefinition tag, HtmlNode node, string locale, IMessageCatalog messages)
     {
-        return BuildTagHover(null, tag, node, locale);
+        return BuildTagHover(null, tag, node, locale, messages);
     }
 
     public static Hover BuildTagHover(GameObjectTypeDefinition? type, XmlTagDefinition tag, HtmlNode node,
-        string locale)
+        string locale, IMessageCatalog messages)
     {
-        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
 
         if (type is null)
@@ -89,7 +91,7 @@ internal static class HoverUtility
         }
 
         sb.AppendLine();
-        sb.Append(Resolve(tag.Description, locale));
+        sb.Append(Resolve(tag.Description, locale, messages));
 
         var hint = ValueTypeHint.Build(tag, messages);
         if (hint is not null)
@@ -115,13 +117,12 @@ internal static class HoverUtility
 
     public static Hover BuildReferenceHover(
         GameObjectTypeDefinition type, string symbolId, GameReference reference, string locale,
-        SymbolOrigin? origin = null, string? dependencyLayerName = null)
+        IMessageCatalog messages, SymbolOrigin? origin = null, string? dependencyLayerName = null)
     {
-        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
         sb.Append($"### `{type.TypeName}`");
         sb.AppendLine($" *`\"{symbolId}\"`*");
-        sb.Append(Resolve(type.Description, locale));
+        sb.Append(Resolve(type.Description, locale, messages));
         AppendNotes(sb, type.Notes, locale, messages);
         if (origin is MegArchiveOrigin meg)
             AppendPackedOrigin(sb, meg, messages);
@@ -142,10 +143,9 @@ internal static class HoverUtility
 
     public static Hover? BuildAssetReferenceHover(
         XmlTagDefinition tag, string rawValue, IAssetFileIndex assetFiles, int line, int col, int length,
-        string locale = "en")
+        IMessageCatalog messages)
     {
-        var messages = ResxMessageCatalog.Server(locale);
-        var value = rawValue.Replace('\\', '/').Trim();
+        var value = GamePaths.Forward(rawValue).Trim();
         if (string.IsNullOrEmpty(value)) return null;
 
         var ext = Path.GetExtension(value);
@@ -233,7 +233,7 @@ internal static class HoverUtility
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.Append(messages.Format("HoverUtility_PackedInBaseGame", shipped.Uri.Replace('\\', '/')));
+        sb.Append(messages.Format("HoverUtility_PackedInBaseGame", GamePaths.Forward(shipped.Uri)));
     }
 
     // A navigable workspace definition that lives in a DEPENDENCY project's layer (rank below the
@@ -253,6 +253,10 @@ internal static class HoverUtility
     // know whether they are looking at a caveat or at "the engine ignores this". English is the
     // fallback for a note that has not been translated yet: a note in the wrong language still says
     // more than no note at all.
+    /// <param name="sb">The hover text being built.</param>
+    /// <param name="notes">The element's notes.</param>
+    /// <param name="locale">The locale the notes are shown in.</param>
+    /// <param name="messages">The catalogue the kind labels come from.</param>
     /// <param name="summarised">
     ///     Kinds a caller has already put in its own status line. A note of such a kind is still
     ///     listed when it has words of its own - the reason a tag was retired is worth reading - but

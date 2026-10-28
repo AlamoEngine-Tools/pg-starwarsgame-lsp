@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Preview.Abilities;
 using PG.StarWarsGame.LSP.Server.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Symbols;
@@ -21,7 +23,8 @@ public sealed class DefinitionLocatorTest
 {
     private static DefinitionLocator LocatorFor(GameIndex index)
     {
-        return new DefinitionLocator(new FakeGameIndexService(index), new TypedSchemaProvider());
+        return new DefinitionLocator(new FakeGameIndexService(index), TypedSchemaProvider(),
+            ResxMessageCatalog.Server("en"));
     }
 
     private static GameIndex IndexWith(params (string Id, string TypeName)[] symbols)
@@ -127,13 +130,11 @@ public sealed class DefinitionLocatorTest
     ///     because no symbol is ever indexed under the umbrella. A fake that did not know the name
     ///     would let that regression through.
     /// </remarks>
-    private sealed class TypedSchemaProvider : NullSchemaProvider
+    private static FakeSchemaProvider TypedSchemaProvider()
     {
-        public override GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return typeName is "StoryEvent" or "SpecialAbility" or "Planet" or "GameObjectType"
-                ? new GameObjectTypeDefinition { TypeName = typeName }
-                : null;
-        }
+        var builder = new SchemaProviderBuilder();
+        foreach (var typeName in new[] { "StoryEvent", "SpecialAbility", "Planet", "GameObjectType" })
+            builder.WithObjectType(new GameObjectTypeDefinition { TypeName = typeName });
+        return builder.Build();
     }
 }

@@ -6,6 +6,8 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
+// Named after the XmlValueType member it handles; that spelling is canonical.
+// ReSharper disable once InconsistentNaming
 public sealed class SFXEventReferenceHandler : NonEmptyReferenceHandlerBase
 {
     /// <inheritdoc />

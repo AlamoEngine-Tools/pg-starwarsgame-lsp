@@ -11,4 +11,15 @@ public sealed record GameReference(
     int Line,
     int Column,
     int Length
-);
+)
+{
+    /// <summary>
+    ///     The type whose id space the target is looked up in, when that is not
+    ///     <see cref="ExpectedTypeName" />: a tag that names an object KIND expects the kind, which is
+    ///     judged by behaviour, and looks the id up among game objects.
+    /// </summary>
+    public string? LookupType { get; init; }
+
+    /// <summary>Where the target is looked up: <see cref="LookupType" />, else the expected type.</summary>
+    public string? IdSpace => LookupType ?? ExpectedTypeName;
+}

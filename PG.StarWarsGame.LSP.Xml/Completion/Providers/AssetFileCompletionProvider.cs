@@ -1,9 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
@@ -26,7 +26,7 @@ public sealed class AssetFileCompletionProvider : IXmlCompletionProvider
         if (extensions is null)
             return [];
 
-        var partial = partialValue.Replace('\\', '/');
+        var partial = GamePaths.Forward(partialValue);
 
         return extensions
             .SelectMany(index.AssetFiles.GetByExtension)

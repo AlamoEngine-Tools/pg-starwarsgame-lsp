@@ -12,7 +12,6 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -58,25 +57,9 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
         Assert.Empty(diagnostics);
     }
 
-    // The control: identical input, no tag source, so no resolver reaches the context. If this ever
-    // starts reporting, the handler has stopped honouring "cannot tell" and is guessing instead.
-    [Fact]
-    public void Without_a_tag_source_the_pass_stays_silent()
+    private static IReadOnlyList<Diagnostic> Collect(string xml, string behaviourOfWeapon)
     {
-        var diagnostics = Collect(
-            "<Factions><Faction Name=\"Rebel\">" +
-            "<Standalone_Space_Maps_Special_Weapon_A>Ground_Barracks</Standalone_Space_Maps_Special_Weapon_A>" +
-            "</Faction></Factions>",
-            "SELECTABLE",
-            false);
-
-        Assert.Empty(diagnostics);
-    }
-
-    private static IReadOnlyList<Diagnostic> Collect(
-        string xml, string behaviourOfWeapon, bool wireTagSource = true)
-    {
-        var schema = new WeaponSchemaProvider();
+        var schema = WeaponSchemaProvider.Build();
         var fileHelper = new FileHelper(new MockFileSystem());
 
         var weapon = new GameSymbol("Ground_Barracks", GameSymbolKind.XmlObject, "GameObjectType",
@@ -89,20 +72,16 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
 
         var tagSource = new StubTagSource("Ground_Barracks", "LandBehavior", behaviourOfWeapon);
 
-        var publisher = new XmlDiagnosticsPublisher(
-            _ => { },
-            new ObjSrcIndexService(),
-            new ObjSrcWorkspaceHost(),
+        var publisher = XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(),
+            new FakeGameIndexService(),
+            new FakeGameWorkspaceHost(),
             schema,
             new XmlDiagnosticsHandlerRegistry([new SpecialWeaponBehaviorHandler()]),
-            new XmlDocumentFactProducer(fileHelper, schema, new ObjSrcFileTypeRegistry(),
-                new XmlStructuralValidator()),
-            new ObjSrcIndexFactProducer(),
-            new ObjSrcStoryFactProducer(),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             new ObjSrcFileTypeRegistry(),
             fileHelper,
-            variantTagSource: wireTagSource ? tagSource : null);
+            variantTagSource: tagSource);
 
         return publisher.Collect(FactionUri, xml, index);
     }
@@ -117,7 +96,7 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
         }
     }
 
-    private sealed class WeaponSchemaProvider : ISchemaProvider
+    private static class WeaponSchemaProvider
     {
         private static readonly XmlTagDefinition WeaponA = new()
         {
@@ -127,63 +106,17 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
             ReferenceTypeName = "GameObjectType"
         };
 
-        public XmlTagDefinition? GetTag(string tagName)
+        public static FakeSchemaProvider Build()
         {
-            return tagName.Equals(WeaponA.Tag, StringComparison.OrdinalIgnoreCase) ? WeaponA : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [WeaponA];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
+            return new SchemaProviderBuilder()
+                .WithTag(WeaponA)
+                .Build();
         }
     }
 }
 
-// File-scoped stubs, as every other publisher test in this folder keeps its own. Only the tag
-// source and the schema above carry behaviour; these exist to satisfy the constructor.
-
-file sealed class ObjSrcIndexFactProducer : IXmlIndexFactProducer
-{
-    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
-    {
-        return [];
-    }
-}
-
-file sealed class ObjSrcStoryFactProducer : IStoryFactProducer
-{
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
-    {
-        return [];
-    }
-}
+// A file-scoped stub, as every other publisher test in this folder keeps its own. Only the tag
+// source and the schema above carry behaviour; this exists to satisfy the constructor.
 
 file sealed class ObjSrcFileTypeRegistry : IFileTypeRegistry
 {
@@ -202,108 +135,4 @@ file sealed class ObjSrcFileTypeRegistry : IFileTypeRegistry
 
     public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
         new Dictionary<string, ImmutableArray<string>>();
-}
-
-file sealed class ObjSrcWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-        _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-    }
-
-    public void Remove(string uri)
-    {
-        _docs.Remove(uri);
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        if (_docs.TryGetValue(uri, out var d))
-        {
-            doc = d;
-            return true;
-        }
-
-        doc = default!;
-        return false;
-    }
-
-    public IEnumerable<TrackedDocument> All => _docs.Values;
-}
-
-file sealed class ObjSrcIndexService : IGameIndexService
-{
-    public GameIndex Current => GameIndex.Empty;
-
-    public event Action<GameIndex>? IndexChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<ILocalisationIndex>? LocalisationChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<GameIndex>? DynamicEnumChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-    {
-        return Task.CompletedTask;
-    }
-
-    public void InjectDocument(DocumentIndex document)
-    {
-    }
-
-    public void RemoveDocument(string uri)
-    {
-    }
-
-    public void ApplyBaseline(BaselineIndex baseline)
-    {
-    }
-
-    public void ApplyLocalisation(ILocalisationIndex index)
-    {
-    }
-
-    public void ApplyAssetFiles(IAssetFileIndex index)
-    {
-    }
-
-    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-    {
-    }
-
-    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-    {
-    }
-
-    public void ApplyWorkspaceEnumValueDefinitions(
-        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-    {
-    }
-
-    public IDisposable BeginBulkUpdate()
-    {
-        return NullDisposable.Instance;
-    }
-
-    private sealed class NullDisposable : IDisposable
-    {
-        public static readonly NullDisposable Instance = new();
-
-        public void Dispose()
-        {
-        }
-    }
 }

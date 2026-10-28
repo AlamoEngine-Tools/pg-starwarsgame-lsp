@@ -20,7 +20,7 @@ public sealed class SchemaProviderProxyTest
     public void Configure_WithAlreadyReadyProvider_CompletesReadyAsync()
     {
         var proxy = new SchemaProviderProxy();
-        var inner = new InstantReadyProvider();
+        var inner = new SchemaProviderBuilder().Build();
 
         proxy.Configure(inner);
 
@@ -31,12 +31,13 @@ public sealed class SchemaProviderProxyTest
     public async Task Configure_WithDeferredProvider_CompletesReadyAsyncWhenInnerCompletes()
     {
         var proxy = new SchemaProviderProxy();
-        var inner = new DeferredReadyProvider();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var inner = new SchemaProviderBuilder().WithReady(ready.Task).Build();
 
         proxy.Configure(inner);
         Assert.False(proxy.ReadyAsync.IsCompleted);
 
-        inner.MarkReady();
+        ready.SetResult();
         await proxy.ReadyAsync;
 
         Assert.True(proxy.ReadyAsync.IsCompletedSuccessfully);
@@ -64,7 +65,7 @@ public sealed class SchemaProviderProxyTest
     {
         var proxy = new SchemaProviderProxy();
         var tag = new XmlTagDefinition { Tag = "MyTag", ValueType = XmlValueType.Boolean };
-        var inner = new InstantReadyProvider { Tag = tag };
+        var inner = new SchemaProviderBuilder().WithTag(tag).Build();
 
         proxy.Configure(inner);
 
@@ -75,111 +76,13 @@ public sealed class SchemaProviderProxyTest
     public void SchemaRefreshed_WiredToInnerAfterConfigure()
     {
         var proxy = new SchemaProviderProxy();
-        var inner = new InstantReadyProvider();
+        var inner = new SchemaProviderBuilder().Build();
         var fired = false;
         proxy.Configure(inner);
 
         proxy.SchemaRefreshed += (_, _) => fired = true;
-        inner.Fire();
+        inner.Refresh();
 
         Assert.True(fired);
-    }
-
-    private sealed class InstantReadyProvider : ISchemaProvider
-    {
-        public XmlTagDefinition? Tag { get; init; }
-
-        public Task ReadyAsync => Task.CompletedTask;
-
-        public event EventHandler? SchemaRefreshed;
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return tagName == Tag?.Tag ? Tag : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public void Fire()
-        {
-            SchemaRefreshed?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    private sealed class DeferredReadyProvider : ISchemaProvider
-    {
-        private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Task ReadyAsync => _tcs.Task;
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public void MarkReady()
-        {
-            _tcs.TrySetResult();
-        }
     }
 }

@@ -4,69 +4,31 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
-using PG.StarWarsGame.LSP.Core.Messages;
-using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua;
-using PG.StarWarsGame.LSP.Lua.Analysis;
-using PG.StarWarsGame.LSP.Xml;
 
 namespace PG.StarWarsGame.LSP.Server;
 
+/// <summary>
+///     The one rename handler the client sees. It hands the request to the first registered
+///     <see cref="IRenameProvider" /> that handles the document; it knows no language itself.
+/// </summary>
 public sealed class GameRenameHandler : RenameHandlerBase
 {
-    private readonly ILuaAnalyzer? _analyzer;
-    private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
-    private readonly IGameIndexService _indexService;
-    private readonly IProjectLayerMap? _layers;
-    private readonly ILuaRenameProvider _luaProvider;
-    private readonly ILuaSandboxProvider? _sandbox;
-    private readonly IXmlRenameProvider _xmlProvider;
+    private readonly IReadOnlyList<IRenameProvider> _providers;
 
-    public GameRenameHandler(
-        IGameIndexService indexService,
-        IXmlRenameProvider xmlProvider,
-        ILuaRenameProvider luaProvider,
-        IFileHelper fileHelper,
-        ILspConfigurationProvider config,
-        // Optional: with the analyzer running, what we do not claim (locals, fields) is its to
-        // rename - within the project only, checked against the layers.
-        ILuaAnalyzer? analyzer = null,
-        IProjectLayerMap? layers = null,
-        ILuaSandboxProvider? sandbox = null)
+    public GameRenameHandler(IEnumerable<IRenameProvider> providers, IFileHelper fileHelper)
     {
-        _sandbox = sandbox;
-        _indexService = indexService;
-        _xmlProvider = xmlProvider;
-        _luaProvider = luaProvider;
+        _providers = [.. providers];
         _fileHelper = fileHelper;
-        _config = config;
-        _analyzer = analyzer;
-        _layers = layers;
     }
 
-    public override async Task<WorkspaceEdit?> Handle(RenameParams request, CancellationToken ct)
+    public override Task<WorkspaceEdit?> Handle(RenameParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
-        var index = _indexService.Current;
-
-        if (uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-            return _xmlProvider.HandleRename(uri, request, index);
-        if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        if (_analyzer is null || _luaProvider.Claims(uri, request.Position.Line, request.Position.Character, index))
-            return _luaProvider.HandleRename(uri, request, index);
-
-        var edit = await _analyzer.RequestAsync<WorkspaceEdit>("textDocument/rename", request, ct);
-        if (edit is null) return null;
-        // Another script's state first: its file is no part of this rename, wherever it lives.
-        if (_sandbox is not null) edit = LuaAnalyzerRename.KeepWithinState(edit, _sandbox.Current, uri);
-        LuaAnalyzerRename.EnsureWithinProject(edit, _layers, new ConfiguredMessageCatalog(_config));
-        return edit;
+        var provider = _providers.FirstOrDefault(p => p.Handles(uri));
+        return provider is null ? Task.FromResult<WorkspaceEdit?>(null) : provider.RenameAsync(request, ct);
     }
 
     protected override RenameRegistrationOptions CreateRegistrationOptions(

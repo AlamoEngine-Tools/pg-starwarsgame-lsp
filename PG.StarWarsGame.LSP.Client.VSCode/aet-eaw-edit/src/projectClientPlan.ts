@@ -14,6 +14,8 @@
  * Pure, so the decisions are tested here and the extension only carries them out.
  */
 
+import * as l10n from "@vscode/l10n";
+
 import type { Discovery } from "./projectDiscovery";
 
 /** One client the window should be running. */
@@ -36,7 +38,11 @@ export interface ClientSpec {
     signature: string;
 }
 
-/** The key of the single client a one-project window runs. */
+/**
+ * The key of the client a window runs for a mod folder without a project file. A project's client is
+ * filed under its project file, with one project as with several, so a panel bound to it keeps its
+ * server when a second project starts (#276).
+ */
 export const WINDOW_CLIENT = "window";
 
 /**
@@ -64,7 +70,7 @@ export function clientSpecs(
         }
         return [
             withSignature({
-                key: WINDOW_CLIENT,
+                key: project?.path.toLowerCase() ?? WINDOW_CLIENT,
                 name: project?.name ?? "EaWEdit",
                 projectPath: project?.path,
                 workspaceRoot: first,
@@ -215,13 +221,16 @@ export function statusText(
     if (clients.length === 1) {
         switch (clients[0].state) {
             case "starting":
-                return "$(loading~spin) EaWEdit LSP: Starting...";
+                return "$(loading~spin) " + l10n.t("EaWEdit LSP: Starting...");
             case "indexing":
-                return "$(loading~spin) EaWEdit LSP: Indexing workspace...";
+                return (
+                    "$(loading~spin) " +
+                    l10n.t("EaWEdit LSP: Indexing workspace...")
+                );
             case "failed":
-                return "$(error) EaWEdit LSP: Failed to start";
+                return "$(error) " + l10n.t("EaWEdit LSP: Failed to start");
             case "stopped":
-                return "$(circle-slash) EaWEdit LSP: Stopped";
+                return "$(circle-slash) " + l10n.t("EaWEdit LSP: Stopped");
             default:
                 return "$(check) EaWEdit LSP";
         }
@@ -235,16 +244,20 @@ export function statusText(
     const busy = count("starting") + count("indexing");
 
     const problems = [
-        failed > 0 ? `${failed} failed` : undefined,
-        stopped > 0 ? `${stopped} stopped` : undefined,
+        failed > 0 ? l10n.t("{0} failed", failed) : undefined,
+        stopped > 0 ? l10n.t("{0} stopped", stopped) : undefined,
     ].filter((p) => p !== undefined);
     const icon =
         failed > 0 ? "$(error)" : busy > 0 ? "$(loading~spin)" : "$(check)";
     const indexed =
         ready === clients.length
-            ? `${ready} projects indexed`
-            : `${ready} of ${clients.length} projects indexed`;
-    return [`${icon} EaWEdit LSP: ${indexed}`, ...problems].join(", ");
+            ? l10n.t("EaWEdit LSP: {0} projects indexed", ready)
+            : l10n.t(
+                  "EaWEdit LSP: {0} of {1} projects indexed",
+                  ready,
+                  clients.length,
+              );
+    return [`${icon} ${indexed}`, ...problems].join(", ");
 }
 
 function withSignature(spec: Omit<ClientSpec, "signature">): ClientSpec {

@@ -15,10 +15,10 @@ namespace PG.StarWarsGame.LSP.Story.Graph;
 ///     per file, prerequisite cycles, unreachable events, suspended threads that nothing
 ///     activates, canonical tag-order violations, and over-long flag names.
 /// </summary>
-public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema, IMessageCatalog? messages = null)
+public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema, IMessageCatalog messages)
 {
     private const int MaxFlagNameLength = 31;
-    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
+    private readonly IMessageCatalog _messages = messages;
 
     public IReadOnlyList<StoryGraphDiagnostic> Produce(StoryCampaignModel model, string documentUri)
     {

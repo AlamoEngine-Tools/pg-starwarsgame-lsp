@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -13,19 +14,18 @@ public sealed class TagNameHoverStrategyTest
 {
     private const string DocUri = "file:///test.xml";
 
-    private static (HoverContext ctx, StubSchemaProvider schema) MakeCtx(
+    private static (HoverContext ctx, FakeSchemaProvider schema) MakeCtx(
         string xml,
         int nodeLine,
-        bool isOnTagName = true,
-        IFileTypeRegistry? registry = null)
+        bool isOnTagName = true)
     {
-        var schema = new StubSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var hapDoc = XmlUtility.CreateHtmlDocument(xml);
         XmlUtility.TryGetRootNode(hapDoc, out var rootNode);
         XmlUtility.TryFindNode(hapDoc, nodeLine, out var node);
         var ctx = new HoverContext(DocUri, GameIndex.Empty, schema,
             hapDoc, rootNode!, node ?? rootNode!,
-            isOnTagName, nodeLine, 1, "en");
+            isOnTagName, nodeLine, 1, "en", TestCatalogues.English);
         return (ctx, schema);
     }
 
@@ -58,7 +58,7 @@ public sealed class TagNameHoverStrategyTest
     public void Handle_TagInSchema_ReturnsTagHover()
     {
         var (ctx, schema) = MakeCtx("<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
-        schema.SetTag("max_speed", new XmlTagDefinition
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Max_Speed",
             ValueType = XmlValueType.Float,
@@ -68,7 +68,7 @@ public sealed class TagNameHoverStrategyTest
         var hover = Strategy().Handle(ctx);
 
         Assert.NotNull(hover);
-        Assert.Contains("Max_Speed", hover!.Contents.MarkupContent!.Value);
+        Assert.Contains("Max_Speed", hover.Contents.MarkupContent!.Value);
     }
 
     // ── type hover ─────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ public sealed class TagNameHoverStrategyTest
     public void Handle_TypeInSchema_ReturnsTypeHover()
     {
         var (ctx, schema) = MakeCtx("<Root>\n<SpaceUnit/>\n</Root>", 1);
-        schema.AddType(new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
         {
             TypeName = "SpaceUnit",
             NameTag = "Name",
@@ -87,7 +87,7 @@ public sealed class TagNameHoverStrategyTest
         var hover = Strategy().Handle(ctx);
 
         Assert.NotNull(hover);
-        Assert.Contains("SpaceUnit", hover!.Contents.MarkupContent!.Value);
+        Assert.Contains("SpaceUnit", hover.Contents.MarkupContent!.Value);
     }
 
     [Fact]
@@ -96,13 +96,13 @@ public sealed class TagNameHoverStrategyTest
         // <Faction> is both the type root element AND has a same-named global tag (FactionReference).
         // The type hover must win; XmlObjectTagResolver's global fallback must be suppressed.
         var (ctx, schema) = MakeCtx("<Factions>\n<Faction Name=\"Rebels\"/>\n</Factions>", 1);
-        schema.AddType(new GameObjectTypeDefinition
+        schema.Add(new GameObjectTypeDefinition
         {
             TypeName = "Faction",
             NameTag = "Name",
             Description = new Dictionary<string, string> { ["en"] = "A playable or AI faction" }
         });
-        schema.SetTag("faction", new XmlTagDefinition
+        schema.Add(new XmlTagDefinition
         {
             Tag = "Faction",
             ValueType = XmlValueType.FactionReference,
@@ -112,7 +112,7 @@ public sealed class TagNameHoverStrategyTest
         var hover = Strategy().Handle(ctx);
 
         Assert.NotNull(hover);
-        var content = hover!.Contents.MarkupContent!.Value;
+        var content = hover.Contents.MarkupContent!.Value;
         Assert.Contains("A playable or AI faction", content, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("A faction reference", content, StringComparison.OrdinalIgnoreCase);
     }
@@ -125,7 +125,7 @@ public sealed class TagNameHoverStrategyTest
         var reg = new StubFileTypeRegistry();
         reg.Register(DocUri, ["SpaceUnit"]);
         var (ctx, schema) = MakeCtx("<GameObjectFiles>\n<Fighter_Mk2/>\n</GameObjectFiles>", 1);
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
 
         var hover = Strategy(reg).Handle(ctx);
 
@@ -133,72 +133,6 @@ public sealed class TagNameHoverStrategyTest
     }
 
     // ── file-scoped fakes ─────────────────────────────────────────────────────
-
-    internal sealed class StubSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, XmlTagDefinition> _tags =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, GameObjectTypeDefinition> _types =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tags.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return _tagsByType.TryGetValue(typeName, out var list) ? list : [];
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void SetTag(string name, XmlTagDefinition tag)
-        {
-            _tags[name] = tag;
-        }
-
-        public void AddType(GameObjectTypeDefinition type)
-        {
-            _types[type.TypeName] = type;
-        }
-
-        public void AddTagForType(string typeName, XmlTagDefinition tag)
-        {
-            if (!_tagsByType.TryGetValue(typeName, out var list))
-                _tagsByType[typeName] = list = [];
-            list.Add(tag);
-        }
-    }
 
     private sealed class EmptyFileTypeRegistry : IFileTypeRegistry
     {

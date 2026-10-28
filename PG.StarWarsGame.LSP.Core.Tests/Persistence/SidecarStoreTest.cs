@@ -22,7 +22,7 @@ public sealed class SidecarStoreTest
         Assert.True(TypeVersion.TryParse(currentVersion, out var current));
         return new SidecarStore<TestDocument>(
             "test-document.json", TypeName, current, migrations, new FixedLocator(path),
-            new FileHelper(fs), NullLogger.Instance, () => new TestDocument());
+            new FileHelper(fs), NullLogger.Instance, () => new TestDocument(), ResxMessageCatalog.Server("en"));
     }
 
     private static MockFileSystem WithFile(string contents)
@@ -355,6 +355,7 @@ public sealed class SidecarStoreTest
         CatalogueText? userNotice = null)
         : IDocumentMigration
     {
+        // ReSharper disable once MemberHidesStaticFromOuterClass - the interface member returns the outer constant it is named after
         public string TypeName => SidecarStoreTest.TypeName;
         public TypeVersion From { get; } = Parse(from);
         public TypeVersion To { get; } = Parse(to);

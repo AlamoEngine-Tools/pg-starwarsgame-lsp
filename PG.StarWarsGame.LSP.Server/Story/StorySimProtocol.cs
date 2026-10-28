@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -13,10 +14,10 @@ public static class StorySimFeature
 {
     public const string DisabledKey = "StorySimFeature_Disabled";
 
-    public static string? Rejection(ILspConfigurationProvider config)
+    public static string? Rejection(ILspConfigurationProvider config, IMessageCatalog messages)
     {
         if (!config.Current.Features.StorySimulator)
-            return new ConfiguredMessageCatalog(config).Format(DisabledKey);
+            return messages.Format(DisabledKey);
         return null;
     }
 }
@@ -27,6 +28,7 @@ public static class StorySimFeature
 // dictionaries in the DTOs: OmniSharp's serializer camelCases dictionary string keys, which
 // would corrupt flag names and node ids.
 
+[PublicAPI]
 public sealed record StorySimStateDto(
     bool Running,
     int Tick,
@@ -76,6 +78,7 @@ public sealed record StorySimStateDto(
 ///     The flags the battle's own rewards can write, with the value each would set - offered on the
 ///     portal as picks when the battle is decided without being played.
 /// </param>
+[PublicAPI]
 public sealed record StorySimBattleDto(
     string Key,
     string Label,
@@ -84,6 +87,7 @@ public sealed record StorySimBattleDto(
     IReadOnlyList<StorySimFlagDto>? Writes = null);
 
 /// <summary>A campaign script's state machine: where it is, where it goes next, and the Story_Event calls it still owes.</summary>
+[PublicAPI]
 public sealed record StorySimLuaStateDto(
     string ScriptUri,
     string ScriptName,
@@ -91,6 +95,7 @@ public sealed record StorySimLuaStateDto(
     string? Next,
     IReadOnlyList<StorySimLuaPendingDto> Pending);
 
+[PublicAPI]
 public sealed record StorySimLuaPendingDto(string Id, string State, double DueClock);
 
 public sealed record StorySimFlagDto(string Name, int Value);
@@ -99,6 +104,7 @@ public sealed record StorySimFlagDto(string Name, int Value);
 ///     <see cref="GateLabel" /> and <see cref="GateProgress" /> describe an armed event's clock
 ///     or flag gate ("4/10 s", "FLAG_X 2 of 3", 0..1); null for events with no such gate.
 /// </summary>
+[PublicAPI]
 public sealed record StorySimNodeStateDto(
     string NodeId,
     string Lifecycle,
@@ -110,6 +116,7 @@ public sealed record StorySimNodeStateDto(
 ///     <see cref="Facet" /> is the world change kind that fires this event when its type reads
 ///     the world; <see cref="Suggested" /> is a ready change built from the event's own parameters.
 /// </summary>
+[PublicAPI]
 public sealed record StorySimInterventionDto(
     string Kind,
     string NodeId,
@@ -134,11 +141,14 @@ public sealed record StorySimWorldChangeDto(string Kind)
     public string? NodeId { get; init; }
 }
 
+[PublicAPI]
 public sealed record StorySimPlanetDto(string Name, string? Owner, bool Revealed, bool Corrupted, bool Destroyed);
 
+[PublicAPI]
 public sealed record StorySimUnitDto(string Type, string Owner, string Planet, int Count);
 
 /// <summary>The fact table. Lists, never dictionaries, for the serializer's sake.</summary>
+[PublicAPI]
 public sealed record StorySimWorldDto(
     IReadOnlyList<StorySimPlanetDto> Planets,
     IReadOnlyList<StorySimUnitDto> Units,
@@ -152,6 +162,7 @@ public sealed record StorySimWorldDto(
 }
 
 /// <summary>One trace transition; lifecycles travel as their enum names, null when the step is not a lifecycle change.</summary>
+[PublicAPI]
 public sealed record StorySimStepDto(
     int Tick,
     int Seq,
@@ -317,4 +328,5 @@ public sealed record StorySimRetryBattleParams(
 ///     campaign faction and scope re-fetches the state. A battle's resolution pushes both scopes.
 /// </summary>
 [Method("aet/storySimChanged", Direction.ServerToClient)]
+[PublicAPI]
 public sealed record StorySimChangedParams(string Campaign, string Faction, string? Scope = null) : IRequest;

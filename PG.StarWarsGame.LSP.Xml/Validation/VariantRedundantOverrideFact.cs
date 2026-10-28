@@ -1,0 +1,15 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+namespace PG.StarWarsGame.LSP.Xml.Validation;
+
+/// <summary>A variant redefines a tag with the same value it would inherit from its base.</summary>
+public sealed record VariantRedundantOverrideFact(
+    string DocumentUri,
+    int Line,
+    int Column,
+    int Length,
+    string TagName,
+    int? EndLine = null,
+    int? EndColumn = null
+) : XmlFact(DocumentUri, Line, Column, Length, EndLine, EndColumn);

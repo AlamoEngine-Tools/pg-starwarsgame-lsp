@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 ///     returns in declaration order. Everything else the block declares is the analyzer's (#155).
 /// </summary>
 public sealed record EmmyLuaAnnotations(
-    /// <summary>Accumulated prose lines (non-@ comment text), joined with \n.</summary>
+    // Accumulated prose lines (non-@ comment text), joined with \n.
     string? Description,
     ImmutableArray<LuaParamAnnotation> Params,
     ImmutableArray<LuaReturnAnnotation> Returns)

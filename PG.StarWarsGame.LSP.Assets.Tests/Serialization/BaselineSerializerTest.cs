@@ -80,7 +80,7 @@ public sealed class BaselineSerializerTest
 
         var result = Deserialize(BaselineSerializer.Serialize(Baseline(sym))).Symbols["CORUSCANT"];
 
-        Assert.Equal(["PLANET", "PRODUCTION"], result.Behaviors);
+        Assert.Equal(["PLANET", "PRODUCTION"], result.Behaviors!);
     }
 
     // The behaviour key is additive, so a baseline built before it still loads and simply answers
@@ -89,14 +89,15 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void Deserialize_SymbolWrittenBeforeBehaviours_ReadsAsNone()
     {
-        var legacy = MessagePackSerializer.Serialize(
-            new LegacyGameSymbol
-            {
-                Id = "CORUSCANT", Kind = GameSymbolKind.XmlObject, TypeName = "GameObjectType",
-                Origin = new UnknownOrigin("engine")
-            });
+        var legacy = MessagePackSerializer.Serialize(new LegacyGameSymbol
+        {
+            Id = "CORUSCANT", Kind = GameSymbolKind.XmlObject, TypeName = "GameObjectType",
+            Origin = new UnknownOrigin("engine")
+        }, cancellationToken: TestContext.Current.CancellationToken);
 
-        var symbol = MessagePackSerializer.Deserialize<GameSymbol>(legacy);
+        var symbol =
+            MessagePackSerializer.Deserialize<GameSymbol>(legacy,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("CORUSCANT", symbol.Id);
         Assert.Null(symbol.Behaviors);
@@ -353,15 +354,15 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void RoundTrip_GroupMemberships_MultipleGroupsAndMembers()
     {
-        var g1m1 = new GroupMembership("GRP_A", "SFXEvent", new FileOrigin("file:///a.xml", 1, null));
-        var g1m2 = new GroupMembership("GRP_A", "SFXEvent", new FileOrigin("file:///b.xml", 2, null));
-        var g2m1 = new GroupMembership("GRP_B", "SFXEvent", new FileOrigin("file:///c.xml", 3, null));
+        var groupAFirst = new GroupMembership("GRP_A", "SFXEvent", new FileOrigin("file:///a.xml", 1, null));
+        var groupASecond = new GroupMembership("GRP_A", "SFXEvent", new FileOrigin("file:///b.xml", 2, null));
+        var groupBFirst = new GroupMembership("GRP_B", "SFXEvent", new FileOrigin("file:///c.xml", 3, null));
         var baseline = Baseline() with
         {
             GroupMemberships = ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(
                     StringComparer.OrdinalIgnoreCase)
-                .Add("GRP_A", [g1m1, g1m2])
-                .Add("GRP_B", [g2m1])
+                .Add("GRP_A", [groupAFirst, groupASecond])
+                .Add("GRP_B", [groupBFirst])
         };
 
         var result = Deserialize(BaselineSerializer.Serialize(baseline));

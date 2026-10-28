@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Util;
 
@@ -26,7 +26,7 @@ public sealed class ParsedXmlDocumentTest
         var unit = parsed.Html.DocumentNode.Descendants()
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element && n.Name == "unit");
         Assert.NotNull(unit);
-        Assert.Equal(2, unit!.Line);
+        Assert.Equal(2, unit.Line);
     }
 
     [Fact]

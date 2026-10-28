@@ -73,6 +73,8 @@ public static class StoryLayoutDocument
     {
         private int _dropped;
 
+        // The interface member returns the outer constant it is named after; hiding it is the point.
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         public string TypeName => StoryLayoutDocument.TypeName;
         public TypeVersion From => TypeVersion.Zero("aetswg");
         public TypeVersion To => Version;

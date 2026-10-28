@@ -33,6 +33,31 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
             return new EffectiveObject(objectId, null, false, false, null,
                 ImmutableArray<string>.Empty, ImmutableArray<EffectiveTag>.Empty);
 
+        return Resolve(root);
+    }
+
+    /// <summary>
+    ///     The effective object named <paramref name="objectId" /> in the id space of
+    ///     <paramref name="typeName" />; not found when that type defines no such object, whatever
+    ///     other types do.
+    /// </summary>
+    public EffectiveObject Resolve(string objectId, string typeName)
+    {
+        var root = _index.ResolveOfType(objectId, typeName);
+        if (root is null)
+            return new EffectiveObject(objectId, null, false, false, null,
+                ImmutableArray<string>.Empty, ImmutableArray<EffectiveTag>.Empty);
+
+        return Resolve(root);
+    }
+
+    /// <summary>
+    ///     The effective object of this very definition: its own tags, then its base chain by id. For
+    ///     a caller that already holds the symbol, because an id alone may name objects of different
+    ///     kinds - a faction and a unit both called Sarlacc.
+    /// </summary>
+    public EffectiveObject Resolve(GameSymbol root)
+    {
         var (chain, cyclic, cycleAt) = BuildChain(root);
 
         // Apply innermost base first so derived layers override; preserve first-seen tag order.
@@ -48,6 +73,14 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
                 var schemaTag = _schema.GetTag(tag.TagName);
                 if (schemaTag?.SemanticType == TagSemanticType.VariantParent)
                     continue; // the variant-declaration tag is metadata, not part of the effective object
+
+                // The game's field mapper returns before converting an empty value, and its parser
+                // withholds a value of exactly TBD: neither writes the field, so the earlier
+                // occurrence - or the inherited value - stays. Han_Solo names its icon and then
+                // repeats Icon_Name empty, and the game shows the icon; so does this. A sub-object
+                // list has no text value and is read another way, so it is not touched.
+                if (EngineTagValue.WritesNothing(tag.Value, tag.Fragment))
+                    continue;
 
                 var mode = schemaTag?.VariantMode ?? VariantMode.Replace;
 
@@ -89,9 +122,7 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
                 return (chain, true, current.Id);
 
             chain.Add(current);
-            if (string.IsNullOrEmpty(current.VariantBaseId))
-                break;
-            current = _index.Resolve(current.VariantBaseId);
+            current = _index.VariantBaseOf(current);
         }
 
         return (chain, false, null);
@@ -99,7 +130,7 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
 
     private IReadOnlyList<VariantTag> TagsFor(GameSymbol symbol)
     {
-        var workspace = _workspaceSource.TryGetTags(symbol.Id);
+        var workspace = _workspaceSource.TryGetTags(symbol);
         if (workspace is not null)
             return workspace;
 
@@ -112,7 +143,7 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
             .ToList();
     }
 
-    private static SymbolOrigin? TagOrigin(SymbolOrigin objectOrigin, int startLine)
+    private static SymbolOrigin TagOrigin(SymbolOrigin objectOrigin, int startLine)
     {
         return objectOrigin switch
         {

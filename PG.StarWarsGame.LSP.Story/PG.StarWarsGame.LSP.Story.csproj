@@ -5,14 +5,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="HtmlAgilityPack"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
         <PackageReference Include="OmniSharp.Extensions.LanguageServer"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Core\PG.StarWarsGame.LSP.Core.csproj"/>
-        <ProjectReference Include="..\PG.StarWarsGame.LSP.Xml\PG.StarWarsGame.LSP.Xml.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

@@ -5,6 +5,7 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -43,8 +44,9 @@ internal sealed class RemoveEarlierDuplicatesCodeActionProvider : IXmlCodeAction
         if (!XmlUtility.TryFindNode(hapDoc, diagnosticLine, out var node) || node?.ParentNode is null)
             return [];
 
-        // All same-named siblings in document order; everything BEFORE the last one is dead
-        // weight the engine ignores.
+        // All same-named siblings in document order. The game keeps the last one WITH A VALUE -
+        // its field mapper skips an empty one - so that one stays and every other occurrence, an
+        // empty tail included, is dead weight the engine ignores.
         var occurrences = node.ParentNode.ChildNodes
             .Where(n => n.NodeType == HtmlNodeType.Element &&
                         n.Name.Equals(node.Name, StringComparison.OrdinalIgnoreCase))
@@ -52,7 +54,9 @@ internal sealed class RemoveEarlierDuplicatesCodeActionProvider : IXmlCodeAction
         if (occurrences.Count < 2)
             return [];
 
-        var edits = occurrences[..^1]
+        var kept = occurrences.LastOrDefault(n => !XmlUtility.WritesNoValue(n)) ?? occurrences[^1];
+        var edits = occurrences
+            .Where(n => !ReferenceEquals(n, kept))
             .Select(n => new TextEdit
             {
                 Range = new LspRange(new Position(n.Line - 1, 0), new Position(EndHapLine(n), 0)),

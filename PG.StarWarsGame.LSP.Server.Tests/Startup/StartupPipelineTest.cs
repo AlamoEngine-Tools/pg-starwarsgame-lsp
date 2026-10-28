@@ -28,10 +28,10 @@ public sealed class StartupPipelineTest
             new RecordingProgress(log),
             new RecordingNotifier(log),
             NullLogger<StartupPipeline>.Instance,
-            migrationOffer,
-            republishers,
+            migrationOffer ?? new RecordingMigrationOffer(log),
+            republishers ?? [],
             new StubConfigurationProvider(workspaceDiagnosticsOnStartup),
-            status);
+            status ?? new ServerStatusRecorder(), TestCatalogues.English);
     }
 
     // ── what the bug report is told ──────────────────────────────────────────
@@ -162,10 +162,14 @@ public sealed class StartupPipelineTest
             gate,
             new RecordingProgress(log),
             new RecordingNotifier(log),
-            NullLogger<StartupPipeline>.Instance);
+            NullLogger<StartupPipeline>.Instance,
+            new RecordingMigrationOffer(log),
+            [],
+            new StubConfigurationProvider(false),
+            new ServerStatusRecorder(), TestCatalogues.English);
 
         var pipelineTask = pipeline.RunAsync(["/ws"], CancellationToken.None);
-        var timeout = Task.Delay(TimeSpan.FromSeconds(5));
+        var timeout = Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var first = await Task.WhenAny(pipelineTask, timeout);
 
         Assert.True(first == pipelineTask,
@@ -473,7 +477,9 @@ public sealed class StartupPipelineTest
 
         public Task LoadAsync(CancellationToken ct)
         {
+#pragma warning disable VSTHRD003 // the fake hands back the signal the test controls
             return _unblockSignal;
+#pragma warning restore VSTHRD003
         }
     }
 

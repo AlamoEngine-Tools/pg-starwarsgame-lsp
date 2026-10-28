@@ -17,7 +17,7 @@ public sealed class AbilityModMultiplierHandler : CommaSeparatedPairHandlerBase
     {
         var parts = SplitOnFirstComma(fact.RawValue.Trim());
         if (parts.Length != 2 || parts[0].Trim().Length == 0 ||
-            !LenientFloatParser.TryParse(parts[1].Trim(), out _))
+            !EngineNumber.TryParseFloat(parts[1].Trim(), out _))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

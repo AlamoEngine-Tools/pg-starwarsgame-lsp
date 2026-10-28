@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using OmniSharp.Extensions.JsonRpc;
 
 namespace PG.StarWarsGame.LSP.Lua.Debug.Dap;
@@ -10,6 +11,7 @@ namespace PG.StarWarsGame.LSP.Lua.Debug.Dap;
 ///     protocol library's coded RPC error with an implementation-defined code, which is the one
 ///     shape that reaches the client with its message intact.
 /// </summary>
+[PublicAPI]
 public sealed class LuaDebugAdapterException : RpcErrorException
 {
     /// <summary>Inside the range JSON-RPC reserves for implementation-defined server errors.</summary>

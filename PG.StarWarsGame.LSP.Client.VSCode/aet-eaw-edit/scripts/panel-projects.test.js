@@ -58,6 +58,24 @@ describe("panel projects", () => {
         );
     });
 
+    it("keys a panel's per-subject state by project and subject, like its registry", () => {
+        // A static map keyed by the subject alone served two projects' same-named objects from one
+        // entry: the camera and selection left on one greeted the other.
+        for (const panel of panelClasses()) {
+            const staticMaps = [...panel.text.matchAll(/static readonly (\w+) = new Map<string/g)].map((m) => m[1]);
+            for (const map of staticMaps) {
+                const keyed = new RegExp(`${map}\\.(get|set|has|delete)\\(\\s*this\\.stateKey\\b`).test(panel.text);
+                if (keyed) {
+                    assert.match(
+                        panel.text,
+                        /stateKey\(\): string \{\s*return projectSubjectKey\(this\.project\.key,/,
+                        `${panel.name}.${map} is keyed without the project`,
+                    );
+                }
+            }
+        }
+    });
+
     it("builds a panel's project in one place", () => {
         const extension = fs.readFileSync(path.join(src, "extension.ts"), "utf8");
         // The one literal of a project is panelProject()'s; a second would be a panel bound some

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Util;
 
@@ -43,11 +44,10 @@ public sealed class XmlParseCache : IXmlParseCache, ICacheStatisticsSource
     private readonly ParsedDocumentCache<ParsedXmlDocument> _cache;
     private readonly IDocumentTextSource _textSource;
 
-    public XmlParseCache(IDocumentTextSource textSource, int capacity,
-        ILogger<XmlParseCache>? logger = null)
+    public XmlParseCache(IDocumentTextSource textSource, int capacity, ILogger<XmlParseCache> logger)
     {
         _textSource = textSource;
-        _cache = new ParsedDocumentCache<ParsedXmlDocument>(capacity, "XML", logger);
+        _cache = new ParsedDocumentCache<ParsedXmlDocument>(capacity, logger, "XML");
     }
 
     public (long Hits, long Misses, long Evictions) Statistics => _cache.Statistics;

@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 
@@ -165,12 +166,12 @@ public sealed class ModelTextureIndexTest
     {
         public GameAssetTiers Tiers => new(1, false, false, 0);
 
-        public GameAssetLocation? Locate(string gameRelativePath)
+        public GameAssetLocation Locate(string gameRelativePath)
         {
             throw Fail();
         }
 
-        public byte[]? Read(string gameRelativePath)
+        public byte[] Read(string gameRelativePath)
         {
             throw Fail();
         }

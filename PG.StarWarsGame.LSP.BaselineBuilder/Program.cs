@@ -25,6 +25,8 @@ using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Story.Discovery;
 // Aliased: BaselineTag would otherwise read ambiguously beside the engine's own XML tag types.
@@ -34,13 +36,13 @@ using Tag = PG.StarWarsGame.LSP.Core.Symbols.BaselineTag;
 
 // Both verbs name a game folder the same way, and each folder can come from the environment, so one
 // run configuration serves every machine.
-const string EawPathVariable = "AET_EAW_PATH";
-const string FocPathVariable = "AET_FOC_PATH";
+const string eawPathVariable = "AET_EAW_PATH";
+const string focPathVariable = "AET_FOC_PATH";
 
 var eawOption = new Option<DirectoryInfo?>("--eaw", "-e")
 {
-    Description = $"EaW game data directory (GameData), the base asset layer; {EawPathVariable} if omitted",
-    DefaultValueFactory = _ => FromEnvironment(EawPathVariable)
+    Description = $"EaW game data directory (GameData), the base asset layer; {eawPathVariable} if omitted",
+    DefaultValueFactory = _ => FromEnvironment(eawPathVariable)
 };
 var outputOption = new Option<FileInfo?>("--output", "-o")
 {
@@ -61,7 +63,7 @@ var eawCommand = new Command("eaw",
 };
 eawCommand.SetAction((parseResult, _) =>
 {
-    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", EawPathVariable);
+    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", eawPathVariable);
     var output = Output(parseResult.GetValue(outputOption), "eaw");
     var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindInRepository("schema", "eaw");
     return eawPath is null || output is null ? Task.FromResult(1) : RunAsync(eawPath, null, output, schema);
@@ -71,8 +73,8 @@ eawCommand.SetAction((parseResult, _) =>
 
 var focOption = new Option<DirectoryInfo?>("--foc", "-f")
 {
-    Description = $"FoC game data directory (corruption); {FocPathVariable} if omitted",
-    DefaultValueFactory = _ => FromEnvironment(FocPathVariable)
+    Description = $"FoC game data directory (corruption); {focPathVariable} if omitted",
+    DefaultValueFactory = _ => FromEnvironment(focPathVariable)
 };
 
 var focCommand = new Command("foc",
@@ -82,8 +84,8 @@ var focCommand = new Command("foc",
 };
 focCommand.SetAction((parseResult, _) =>
 {
-    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", EawPathVariable);
-    var focPath = Folder(parseResult.GetValue(focOption), "--foc", FocPathVariable);
+    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", eawPathVariable);
+    var focPath = Folder(parseResult.GetValue(focOption), "--foc", focPathVariable);
     var output = Output(parseResult.GetValue(outputOption), "foc");
     var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindInRepository("schema", "eaw");
     return eawPath is null || focPath is null || output is null
@@ -228,7 +230,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     //
     // Same stopgap as music events above (see that comment for the full rationale):
     // PG.StarWarsGame.Engine has no shadow-blob-material support, and Shadowblobmaterials.xml is
-    // another single direct-content file - a flat <Shadow_Blob_Materials><Material name="…">
+    // another single direct-content file - a flat <Shadow_Blob_Materials><Material name="...">
     // list, so a direct parse is sufficient. Note the LOWERCASE `name` attribute (unlike every
     // other object type's `Name`); matched case-insensitively for robustness.
     //
@@ -340,13 +342,12 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     // ── MEG loading (EaW layer first, then engine layer) ──────────────────────
     //
     // MegLoadOrderResolver ensures non-patch MEGs come first (sorted), then
-    // patch.meg → patch2.meg → 64patch.meg.  SFX MEGs are filtered to
+    // patch.meg -> patch2.meg -> 64patch.meg.  SFX MEGs are filtered to
     // non_localized + English.  The entry lookup is built with last-wins
     // semantics: EaW entries are written first, engine (FoC) entries overwrite
     // them for the same normalised path.
 
     var megFileService = sp.GetRequiredService<IMegService>();
-    var megExtractor = sp.GetRequiredService<IMegFileExtractor>();
     var aloFileService = sp.GetRequiredService<IAloFileService>();
     var mtdFileService = sp.GetRequiredService<IMtdService>();
     var assetLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(MegAssetCatalogBuilder));
@@ -460,25 +461,15 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
                     try
                     {
                         var xmlContent = await new StreamReader(stream).ReadToEndAsync();
-                        var xdoc = XDocument.Parse(xmlContent);
-                        foreach (var elem in xdoc.Descendants()
-                                     .Where(e => e.Name.LocalName.Equals("File", StringComparison.OrdinalIgnoreCase)))
+                        foreach (var filename in MetafileReader.ReadFileList(xmlContent))
                         {
-                            var filename = elem.Value.Trim();
-                            if (string.IsNullOrEmpty(filename))
-                                filename = elem.Attributes()
-                                    .FirstOrDefault(a =>
-                                        a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
-                            if (!string.IsNullOrEmpty(filename))
-                            {
-                                var normalizedPath = filename.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
-                                fileTypeMapBuilder[normalizedPath] = [.. def.Types];
-                            }
+                            var normalizedPath = GamePaths.Key(filename);
+                            fileTypeMapBuilder[normalizedPath] = [.. def.Types];
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine($"Warning: Failed to parse metafile '{def.Path}': {ex.Message}");
+                        Console.Error.WriteLine($"Warning: Failed to read metafile '{def.Path}': {ex.Message}");
                     }
             }
             else
@@ -670,7 +661,7 @@ static string ComputeManifestHash(string gamePath)
 // normalization as file-registry entries (forward slashes, lowercase).
 static string NormalizeChainPath(string xmlRelativePath)
 {
-    return xmlRelativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    return GamePaths.Key(xmlRelativePath);
 }
 
 // Walk up from the binary's directory until we find schema/eaw

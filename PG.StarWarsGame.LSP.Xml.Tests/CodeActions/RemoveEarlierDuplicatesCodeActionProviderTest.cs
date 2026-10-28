@@ -37,7 +37,7 @@ public sealed class RemoveEarlierDuplicatesCodeActionProviderTest
 
     private static RemoveEarlierDuplicatesCodeActionProvider BuildProvider(string xml)
     {
-        var host = new FakeDuplicatesWorkspaceHost(Uri, xml);
+        var host = new FakeGameWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new RemoveEarlierDuplicatesCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper);
     }
@@ -51,7 +51,7 @@ public sealed class RemoveEarlierDuplicatesCodeActionProviderTest
             Message = "duplicate",
             Data = data
         };
-        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
+        return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic) { Messages = TestCatalogues.English };
     }
 
     [Fact]
@@ -87,32 +87,38 @@ public sealed class RemoveEarlierDuplicatesCodeActionProviderTest
         Assert.Equal(2, edits.Count);
         Assert.DoesNotContain(edits, e => e.Range.Start.Line == 5); // the winner stays
     }
-}
 
-file sealed class FakeDuplicatesWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly string _normalizedUri;
-    private readonly string _text;
+    //  line 0: <Units>
+    //  line 1:   <Unit Name="A">
+    //  line 2:     <Icon_Name>first.tga</Icon_Name>
+    //  line 3:     <Icon_Name>winner.tga</Icon_Name>
+    //  line 4:     <Icon_Name />
+    //  line 5:   </Unit>
+    //  line 6: </Units>
+    private const string XmlWithEmptyLast = """
+                                            <Units>
+                                              <Unit Name="A">
+                                                <Icon_Name>first.tga</Icon_Name>
+                                                <Icon_Name>winner.tga</Icon_Name>
+                                                <Icon_Name />
+                                              </Unit>
+                                            </Units>
+                                            """;
 
-    public FakeDuplicatesWorkspaceHost(string uri, string text)
+    /// <summary>
+    ///     The game keeps the last occurrence WITH A VALUE - an empty one changes nothing - so the
+    ///     fix keeps that one and removes the rest, the empty tail included. Removing everything
+    ///     before the last occurrence would delete the value the game shows and leave the no-op.
+    /// </summary>
+    [Fact]
+    public void An_empty_last_occurrence_is_removed_and_the_last_valued_one_stays()
     {
-        _normalizedUri = uri;
-        _text = text;
-    }
+        var action = Assert.Single(BuildProvider(XmlWithEmptyLast).Handle(MakeCtx(4, true)));
 
-    public IEnumerable<TrackedDocument> All => [new(_normalizedUri, _text, 1)];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-    }
-
-    public void Remove(string uri)
-    {
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        doc = new TrackedDocument(_normalizedUri, _text, 1);
-        return true;
+        var edits = action.CodeAction!.Edit!.Changes!.Values.First().ToList();
+        Assert.Equal(2, edits.Count);
+        Assert.Contains(edits, e => e.Range.Start == new Position(2, 0) && e.Range.End == new Position(3, 0));
+        Assert.Contains(edits, e => e.Range.Start == new Position(4, 0) && e.Range.End == new Position(5, 0));
+        Assert.DoesNotContain(edits, e => e.Range.Start.Line == 3); // the winner stays
     }
 }

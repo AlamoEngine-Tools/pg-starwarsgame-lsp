@@ -4,7 +4,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Caching;
-using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -12,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Commands;
+using PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Completion.Providers;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;
@@ -134,8 +134,9 @@ public static class XmlLanguageServiceExtensions
         // XmlUnregisteredFileFact handler (nothing reaches this file)
         services.AddSingleton<IXmlDiagnosticsHandler, UnregisteredXmlFileHandler>();
 
-        // XmlDuplicateTagFact + XmlNotesFact handlers (document-level)
+        // XmlDuplicateTagFact + XmlEmptyRepeatedTagFact + XmlNotesFact handlers (document-level)
         services.AddSingleton<IXmlDiagnosticsHandler, XmlDuplicateTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, XmlEmptyRepeatedTagHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, XmlNotesHandler>();
 
         // XmlSymbolFact + XmlReferenceFact handlers (index-level)
@@ -281,20 +282,31 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, SeeCreditIncomeBreakdownNeedsIncomeRule>();
         services.AddSingleton<IXmlCrossTagRule, SeePoliticalControlBreakdownNeedsControlRule>();
         services.AddSingleton<IXmlCrossTagRule, CreditHaltNeedsDurationRule>();
-        services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
-        services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
-        services.AddSingleton<IStoryFactProducer, StoryFactProducer>();
+
+        // The fact producers, in the order the publisher runs them - which is the order their facts
+        // and so their diagnostics come out in (#307). The document's own facts first, then what the
+        // index says about it, then the two rules that used to build their diagnostics by hand.
+        services.AddSingleton<IXmlFactProducer, XmlDocumentFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlIndexFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlVariantFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlLayerShadowFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlHardpointFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlDamageStageFactProducer>();
+        services.AddSingleton<IXmlFactProducer, StoryFactProducer>();
+        services.AddSingleton<IXmlFactProducer, HardcodedSetValueFactProducer>();
+        services.AddSingleton<IXmlFactProducer, DamageTypeTailFactProducer>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardcodedSetValueHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageTypesIncompleteHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageTypeOutOfOrderHandler>();
 
         // Proposal system - add IXmlValueProposalProvider implementations here to register new providers
-        services.AddSingleton<IXmlValueProposalRegistry, XmlValueProposalRegistry>();
         services.AddSingleton<IXmlValueProposalProvider, BooleanValueProposalProvider>();
         services.AddSingleton<IXmlValueProposalProvider, DynamicEnumValueProposalProvider>();
         services.AddSingleton<IXmlValueProposalProvider, VictoryConditionProposalProvider>();
 
         services.AddSingleton<StoryParamValueProposalProvider>();
 
-        // Completion registry - add IXmlCompletionProvider implementations here for index-aware completion
-        services.AddSingleton<IXmlCompletionRegistry, XmlCompletionRegistry>();
+        // Completion providers - add IXmlCompletionProvider implementations here for index-aware completion
         services.AddSingleton<IXmlCompletionProvider, GameObjectReferenceCompletionProvider>();
         services.AddSingleton<IXmlCompletionProvider, HardcodedSetCompletionProvider>();
         services.AddSingleton<IXmlCompletionProvider, LocalisationKeyCompletionProvider>();
@@ -304,19 +316,16 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<BoneNameCompletionHelper>();
 
         // Tag-name completion strategies - add IXmlTagNameCompletionStrategy implementations here
-        services.AddSingleton<IXmlTagNameCompletionStrategyRegistry, XmlTagNameCompletionStrategyRegistry>();
         services.AddSingleton<IXmlTagNameCompletionStrategy, StoryEventTagNameStrategy>();
         services.AddSingleton<IXmlTagNameCompletionStrategy, StandardTagNameStrategy>();
 
         // Tag-value completion strategies - add IXmlTagValueCompletionStrategy implementations here
-        services.AddSingleton<IXmlTagValueCompletionStrategyRegistry, XmlTagValueCompletionStrategyRegistry>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, StoryParamValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, BoneNameValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, StandardValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, TupleValueCompletionStrategy>();
 
         // Code action providers - add IXmlCodeActionProvider implementations here to register new providers
-        services.AddSingleton<IXmlCodeActionRegistry, XmlCodeActionRegistry>();
         services.AddSingleton<IXmlCodeActionProvider, FixSuggestionCodeActionProvider>();
         // The engine's own correction, where it edits a tag other than the one reported.
         services.AddSingleton<IXmlCodeActionProvider, EngineRepairCodeActionProvider>();
@@ -330,7 +339,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCursorCodeActionProvider, PreviewModelCodeActionProvider>();
 
         // Hover strategies - add IXmlHoverStrategy implementations here to register new strategies
-        services.AddSingleton<IXmlHoverStrategyRegistry, XmlHoverStrategyRegistry>();
         services.AddSingleton<IXmlHoverStrategy, ReferenceHoverStrategy>();
         // After the reference hover, which already answers for object-typed tuple items.
         services.AddSingleton<IXmlHoverStrategy, TupleSlotHoverStrategy>();
@@ -338,7 +346,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlHoverStrategy, TagNameHoverStrategy>();
 
         // Code lens providers - add IXmlCodeLensProvider implementations here to register new providers
-        services.AddSingleton<IXmlCodeLensRegistry, XmlCodeLensRegistry>();
         services.AddSingleton<IXmlCodeLensProvider, ReferencesCodeLensProvider>();
         services.AddSingleton<IXmlCodeLensProvider, VariantCodeLensProvider>();
         services.AddSingleton<IXmlCodeLensProvider, OverrideCodeLensProvider>();
@@ -346,7 +353,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeLensProvider, PreviewUnitCodeLensProvider>();
 
         // Inlay hint providers - add IXmlInlayHintProvider implementations here to register new providers
-        services.AddSingleton<IXmlInlayHintRegistry, XmlInlayHintRegistry>();
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeySingleValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, VariantInlayHintProvider>();
@@ -358,9 +364,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IVariantTagSource, WorkspaceVariantTagSource>();
         services.AddSingleton<ICacheStatisticsSource>(sp =>
             (ICacheStatisticsSource)sp.GetRequiredService<IVariantTagSource>());
-        services.AddSingleton<IXmlVariantFactProducer, XmlVariantFactProducer>();
-        services.AddSingleton<IXmlHardpointFactProducer, XmlHardpointFactProducer>();
-        services.AddSingleton<IXmlDamageStageFactProducer, XmlDamageStageFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
         // Deprecated but still registered - see the handler for why. Warnings are errors in this
         // project, so the obsolete reference is suppressed here rather than at every call site.
@@ -371,9 +374,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, VariantAdditiveMergeHandler>();
 
         // Layer-shadow and cross-type shadow warnings
-        services.AddSingleton<IXmlLayerShadowFactProducer, XmlLayerShadowFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, CrossLayerShadowHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, CrossTypeShadowHandler>();
 
         return services;
     }

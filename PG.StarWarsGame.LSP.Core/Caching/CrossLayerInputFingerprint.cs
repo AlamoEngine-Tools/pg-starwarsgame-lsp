@@ -4,6 +4,7 @@
 using System.Text;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Caching;
 
@@ -123,7 +124,6 @@ public static class CrossLayerInputFingerprint
 
     private static string NormalizeRoot(string directory)
     {
-        var normalized = directory.Replace('\\', '/').ToLowerInvariant();
-        return normalized.EndsWith('/') ? normalized : normalized + "/";
+        return GamePaths.Key(directory) + "/";
     }
 }

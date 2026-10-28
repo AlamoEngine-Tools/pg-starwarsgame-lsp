@@ -26,7 +26,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
 
     private static XmlLinkedEditingRangeHandler Build(string text)
     {
-        var host = new FakeHost(TestUri, text);
+        var host = new FakeGameWorkspaceHost(TestUri, text);
         return new XmlLinkedEditingRangeHandler(TestParseCache.For(host), new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()));
     }
@@ -43,7 +43,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
         var result = await handler.Handle(At(0, 1), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Equal(2, result!.Ranges.Count());
+        Assert.Equal(2, result.Ranges.Count());
         var ranges = result.Ranges.OrderBy(r => r.Start.Line).ToList();
 
         // Opening tag name: line 0, cols 1–3 (exclusive end = 4 but length 3)
@@ -67,7 +67,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
         var result = await handler.Handle(At(2, 2), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Equal(2, result!.Ranges.Count());
+        Assert.Equal(2, result.Ranges.Count());
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
         var result = await handler.Handle(At(1, 3), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Equal(2, result!.Ranges.Count());
+        Assert.Equal(2, result.Ranges.Count());
     }
 
     // ── cursor on content/attribute - returns null ───────────────────────────
@@ -119,7 +119,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     [Fact]
     public async Task Handle_NonEaWFile_ReturnsNull()
     {
-        var host = new FakeHost(TestUri, "<Foo>\nbar\n</Foo>");
+        var host = new FakeGameWorkspaceHost(TestUri, "<Foo>\nbar\n</Foo>");
         var handler = new XmlLinkedEditingRangeHandler(TestParseCache.For(host), new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()));
         var result = await handler.Handle(At(0, 1), CancellationToken.None);
@@ -136,7 +136,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
         var result = await handler.Handle(At(0, 1), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.NotNull(result!.WordPattern);
+        Assert.NotNull(result.WordPattern);
     }
 
     // ── nested and malformed documents ──────────────────────────────────────
@@ -148,7 +148,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
         const string text = "<Root>\n\t<Unit>\n\t\t<Max_Speed>1</Max_Speed>\n\t</Unit>\n</Root>";
         var result = await Build(text).Handle(At(2, 5), CancellationToken.None);
 
-        var ranges = result!.Ranges.OrderBy(r => r.Start.Character).ToList();
+        var ranges = result.Ranges.OrderBy(r => r.Start.Character).ToList();
         Assert.Equal(new Range(2, 3, 2, 12), ranges[0]);
         Assert.Equal(new Range(2, 16, 2, 25), ranges[1]);
     }
@@ -166,7 +166,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
         const string text = "<Root>\n\t<A>\n\t<B>1</B>\n</Root>";
         var result = await Build(text).Handle(At(2, 2), CancellationToken.None);
 
-        var ranges = result!.Ranges.OrderBy(r => r.Start.Character).ToList();
+        var ranges = result.Ranges.OrderBy(r => r.Start.Character).ToList();
         Assert.Equal(new Range(2, 2, 2, 3), ranges[0]);
         Assert.Equal(new Range(2, 7, 2, 8), ranges[1]);
     }
@@ -179,29 +179,4 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class FakeHost(string uri, string text) : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [new(uri, text, 1)];
-
-        public void AddOrUpdate(string u, string t, int v, bool publishDiagnostics = true)
-        {
-        }
-
-        public void Remove(string u)
-        {
-        }
-
-        public bool TryGet(string u, out TrackedDocument doc)
-        {
-            if (string.Equals(u, uri, StringComparison.OrdinalIgnoreCase))
-            {
-                doc = new TrackedDocument(uri, text, 1);
-                return true;
-            }
-
-            doc = default!;
-            return false;
-        }
-    }
 }

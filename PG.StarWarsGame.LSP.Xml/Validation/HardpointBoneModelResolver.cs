@@ -5,6 +5,7 @@ using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
@@ -200,7 +201,7 @@ public sealed class HardpointBoneModelResolver
     {
         if (_modelsByOwner.TryGetValue(ownerId, out var cached)) return cached;
 
-        var effective = _resolver.Resolve(ownerId);
+        var effective = _resolver.Resolve(ownerId, GameTypeNames.GameObjectType);
         var models = !effective.Found || effective.Cyclic
             ? []
             : effective.Tags
@@ -220,7 +221,8 @@ public sealed class HardpointBoneModelResolver
     /// </summary>
     public IEnumerable<GameSymbol> FindAttachingObjects(string hardpointId)
     {
-        if (!_index.WorkspaceReferences.TryGetValue(hardpointId, out var references))
+        var references = _index.ReferencesTo(hardpointId, GameTypeNames.HardPoint).ToList();
+        if (references.Count == 0)
             yield break;
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -232,7 +234,7 @@ public sealed class HardpointBoneModelResolver
             {
                 if (!seen.Add(symbol.Id)) continue;
 
-                var tags = _tagSource.TryGetTags(symbol.Id);
+                var tags = _tagSource.TryGetTags(symbol);
                 if (tags is null) continue;
 
                 var attaches = tags.Any(t =>

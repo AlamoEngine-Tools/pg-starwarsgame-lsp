@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -13,7 +14,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
     private const string UriA = "file:///ws/data/xml/story_a.xml";
     private const string UriB = "file:///ws/data/xml/story_b.xml";
 
-    private static readonly ISchemaProvider Schema = new DiagnosticsSchemaProvider();
+    private static readonly ISchemaProvider Schema = DiagnosticsSchemaProvider.Build();
 
     private static StoryCampaignModel Model(
         IReadOnlyList<(string Uri, string Inner)> threads,
@@ -30,7 +31,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
 
     private static IReadOnlyList<StoryGraphDiagnostic> Produce(StoryCampaignModel model, string uri = UriA)
     {
-        return new StoryGraphDiagnosticsProducer(Schema).Produce(model, uri);
+        return new StoryGraphDiagnosticsProducer(Schema, ResxMessageCatalog.Server("en")).Produce(model, uri);
     }
 
     // A listener the game never reaches is a warning on its name: the file is valid, the event is dead.
@@ -200,7 +201,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
     }
 }
 
-file sealed class DiagnosticsSchemaProvider : ISchemaProvider
+file static class DiagnosticsSchemaProvider
 {
     private static readonly EnumDefinition Rewards = new()
     {
@@ -246,40 +247,10 @@ file sealed class DiagnosticsSchemaProvider : ISchemaProvider
         ]
     };
 
-    public event EventHandler? SchemaRefreshed
+    public static FakeSchemaProvider Build()
     {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [Rewards];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public XmlTagDefinition? GetTag(string t)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-    {
-        return [];
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string name)
-    {
-        return string.Equals(name, Rewards.Name, StringComparison.OrdinalIgnoreCase) ? Rewards : null;
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string t)
-    {
-        return null;
+        return new SchemaProviderBuilder()
+            .WithEnum(Rewards)
+            .Build();
     }
 }

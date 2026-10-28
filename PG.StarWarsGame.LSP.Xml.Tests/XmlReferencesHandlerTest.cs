@@ -65,10 +65,33 @@ public sealed class XmlReferencesHandlerTest
     private static XmlReferencesHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null,
         IFileHelper? fileHelper = null)
     {
-        var svc = new FakeIndexService { Current = index };
+        var svc = new FakeGameIndexService { Current = index };
         return new XmlReferencesHandler(svc, NullLogger<XmlReferencesHandler>.Instance,
             ctx ?? new AllowAllEaWContext(),
             fileHelper ?? new FileHelper(new MockFileSystem()));
+    }
+
+    /// <summary>
+    ///     Every type is an id space of its own. On a reference to the Sarlacc faction the list is the
+    ///     faction's references and definition, never the Sarlacc unit's.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ListsOnlyTheTypeUnderTheCursor()
+    {
+        var toFaction = new GameReference("Sarlacc", GameSymbolKind.XmlObject, "Faction", TestUri, 0, 10, 7);
+        var toUnit = new GameReference("Sarlacc", GameSymbolKind.XmlObject, "Unit", OtherUri, 5, 10, 7);
+        var faction = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin(OtherUri, 9, null), null);
+        var unit = SymbolAt("Sarlacc", OtherUri, 20);
+        var doc = new DocumentIndex(TestUri, 1, ImmutableArray<GameSymbol>.Empty, [toFaction]);
+        var index = BuildIndex(doc,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Sarlacc", [toFaction, toUnit]),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Sarlacc", [unit, faction]));
+
+        var result = await BuildHandler(index).Handle(At(0, 12, true), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal([0, 9], result.Select(l => l.Range.Start.Line).Order());
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────
@@ -104,7 +127,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 0), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Empty(result!);
+        Assert.Empty(result);
     }
 
     // ── reference lookup ─────────────────────────────────────────────────────
@@ -122,7 +145,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 5), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Equal(2, locations.Count);
         Assert.Contains(locations, l => l.Uri.ToString() == TestUri && l.Range.Start.Line == 0);
         Assert.Contains(locations, l => l.Uri.ToString() == OtherUri && l.Range.Start.Line == 2);
@@ -139,7 +162,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(1, 8), CancellationToken.None);
 
         Assert.NotNull(result);
-        var loc = Assert.Single(result!);
+        var loc = Assert.Single(result);
         Assert.Equal(1, loc.Range.Start.Line);
         Assert.Equal(7, loc.Range.Start.Character);
         Assert.Equal(1, loc.Range.End.Line);
@@ -163,7 +186,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 0), CancellationToken.None);
 
         Assert.NotNull(result);
-        var loc = Assert.Single(result!);
+        var loc = Assert.Single(result);
         Assert.Equal(OtherUri, loc.Uri.ToString());
     }
 
@@ -182,7 +205,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 5, true), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Equal(2, locations.Count);
         Assert.Contains(locations, l => l.Uri.ToString() == OtherUri && l.Range.Start.Line == 5);
         Assert.Contains(locations, l => l.Uri.ToString() == TestUri && l.Range.Start.Line == 0);
@@ -201,7 +224,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 5), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Single(locations);
         Assert.DoesNotContain(locations, l => l.Uri.ToString() == OtherUri);
     }
@@ -223,7 +246,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(0, 5, uri: mixedCaseUri), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Single(locations);
     }
 
@@ -260,7 +283,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(6, 25), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         Assert.Equal(2, locations.Count);
         Assert.Contains(locations, l => l.Range.Start.Line == 5 && l.Range.Start.Character == 10);
         Assert.Contains(locations, l => l.Range.Start.Line == 3 && l.Range.Start.Character == 8);
@@ -294,7 +317,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(1, 7), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         // Should return only the group member (line 2), NOT the regular ref (line 9)
         Assert.Single(locations);
         Assert.Equal(2, locations[0].Range.Start.Line);
@@ -332,7 +355,7 @@ public sealed class XmlReferencesHandlerTest
         var result = await handler.Handle(At(1, 7), CancellationToken.None);
 
         Assert.NotNull(result);
-        var locations = result!.ToList();
+        var locations = result.ToList();
         // Should include the baseline-shipped member (line 5 of shipped.xml)
         Assert.Contains(locations, l => l.Uri.ToString().Contains("shipped.xml") && l.Range.Start.Line == 5);
     }
@@ -348,80 +371,4 @@ public sealed class XmlReferencesHandlerTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(
-            ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
 }

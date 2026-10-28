@@ -47,7 +47,7 @@ public sealed class LuaCallFormAnalyzerTest
     private static IReadOnlyList<Diagnostic> Analyze(string text)
     {
         var tree = LuaSyntaxTree.ParseText(text, new LuaParseOptions(LuaSyntaxOptions.Lua51));
-        return LuaCallFormAnalyzer.Analyze(Uri, tree, Stubs);
+        return LuaCallFormAnalyzer.Analyze(Uri, tree, Stubs, TestCatalogues.English);
     }
 
     [Theory]

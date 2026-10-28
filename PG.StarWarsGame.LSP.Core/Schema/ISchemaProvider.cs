@@ -42,23 +42,6 @@ public interface ISchemaProvider
     /// </summary>
     Task ReadyAsync => Task.CompletedTask;
 
-    /// <summary>
-    ///     Whether this document sits under a directory the engine walks, in which case nothing
-    ///     names it and nothing was ever supposed to.
-    /// </summary>
-    /// <param name="path">
-    ///     A path or URI in any spelling; matched case-insensitively on the declared directory as a
-    ///     substring, because the declaration is game-relative and the document is not.
-    /// </param>
-    bool IsInScannedDirectory(string path)
-    {
-        if (AllScannedDirectories.Count == 0) return false;
-
-        var normalized = path.Replace('\\', '/');
-        return AllScannedDirectories.Any(d =>
-            normalized.Contains(d.Path, StringComparison.OrdinalIgnoreCase));
-    }
-
     /// <summary>The kind of that name, or null. Kind names are compared case-insensitively.</summary>
     ObjectKindDefinition? GetKind(string kindName)
     {

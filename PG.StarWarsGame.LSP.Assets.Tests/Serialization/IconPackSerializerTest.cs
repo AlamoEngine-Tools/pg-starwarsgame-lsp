@@ -60,7 +60,8 @@ public sealed class IconPackSerializerTest
             SourceManifestHash = "h"
         };
 
-        Assert.Null(IconPackSerializer.Deserialize(MessagePackSerializer.Serialize(dto)));
+        Assert.Null(IconPackSerializer.Deserialize(MessagePackSerializer.Serialize(dto,
+            cancellationToken: TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -77,7 +78,8 @@ public sealed class IconPackSerializerTest
         var icons = names.ToDictionary(n => n, _ => new byte[] { 1 });
 
         var dto = MessagePackSerializer.Deserialize<SerializedIconPack>(
-            IconPackSerializer.Serialize(icons, "h", BuiltAt));
+            IconPackSerializer.Serialize(icons, "h", BuiltAt),
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(names.Order(StringComparer.Ordinal), dto.Icons.Select(i => i.Name));
     }

@@ -44,7 +44,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         var index = IndexWith("Kashyyyk", "PLANET");
 
         var result = ReferenceResolutionEvaluator.Evaluate("Kashyyyk", "Planet",
-            index.Resolve("Kashyyyk"), expectedKind: PlanetKind, index: index);
+            index.Resolve("Kashyyyk"), TestCatalogues.English, expectedKind: PlanetKind, index: index);
 
         Assert.Null(result);
     }
@@ -55,10 +55,10 @@ public sealed class ReferenceResolutionEvaluatorTest
         var index = IndexWith("X_Wing", "DUMMY_STARSHIP");
 
         var result = ReferenceResolutionEvaluator.Evaluate("X_Wing", "Planet",
-            index.Resolve("X_Wing"), expectedKind: PlanetKind, index: index);
+            index.Resolve("X_Wing"), TestCatalogues.English, expectedKind: PlanetKind, index: index);
 
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
         Assert.Contains("Expected a Planet", result.Value.Message);
         Assert.Contains("PLANET behaviour", result.Value.Message);
     }
@@ -69,7 +69,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_KindWithoutAnIndex_IsSilent()
     {
         var result = ReferenceResolutionEvaluator.Evaluate("X_Wing", "Planet",
-            Symbol("X_Wing", "GameObjectType"), expectedKind: PlanetKind);
+            Symbol("X_Wing", "GameObjectType"), TestCatalogues.English, expectedKind: PlanetKind);
 
         Assert.Null(result);
     }
@@ -83,7 +83,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         var heroKind = new ObjectKindDefinition { Kind = "HeroUnit", Flags = ["Is_Named_Hero"] };
 
         var result = ReferenceResolutionEvaluator.Evaluate("Vader", "HeroUnit",
-            index.Resolve("Vader"), expectedKind: heroKind, index: index);
+            index.Resolve("Vader"), TestCatalogues.English, expectedKind: heroKind, index: index);
 
         Assert.Null(result);
     }
@@ -93,24 +93,24 @@ public sealed class ReferenceResolutionEvaluatorTest
     [Fact]
     public void Evaluate_Unresolved_ReturnsError()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", null, null);
+        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", null, null, TestCatalogues.English);
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     [Fact]
     public void Evaluate_Unresolved_MessageContainsTargetId()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", null, null);
+        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", null, null, TestCatalogues.English);
         Assert.Contains("UNIT_A", result!.Value.Message);
     }
 
     [Fact]
     public void Evaluate_Unresolved_WithExpectedType_StillReturnsError()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("MISSING", "Unit", null);
+        var result = ReferenceResolutionEvaluator.Evaluate("MISSING", "Unit", null, TestCatalogues.English);
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     // ── unresolved because the TYPE is not indexed at all ─────────────────────
@@ -125,10 +125,11 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_Unresolved_ExpectedTypeHasNoIndexedInstances_IsInformation()
     {
         var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
+            TestCatalogues.English,
             new HashSet<string> { "Faction", "GameObjectType" });
 
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Information, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Information, result.Value.Severity);
     }
 
     [Fact]
@@ -137,6 +138,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // Never UnresolvedReference: suppressing "we cannot check this yet" must not suppress every
         // genuine unresolved reference along with it.
         var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
+            TestCatalogues.English,
             new HashSet<string> { "Faction" });
 
         Assert.Equal(DiagnosticIds.ReferenceTypeNotIndexed, result!.Value.Id);
@@ -146,6 +148,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_Unresolved_ExpectedTypeHasNoIndexedInstances_MessageDoesNotBlameTheAuthor()
     {
         var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
+            TestCatalogues.English,
             new HashSet<string> { "Faction" });
 
         Assert.DoesNotContain("No object with this name exists", result!.Value.Message);
@@ -158,6 +161,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // The AI tree is a later milestone: the gap is the tool's, and the notice has to say so
         // rather than read as "nothing is indexed" - which sounds like the data is missing.
         var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
+            TestCatalogues.English,
             new HashSet<string> { "Faction" });
 
         Assert.Equal("Cannot verify reference 'BasicEmpire': Checking AIPlayerType references is not supported yet.",
@@ -170,6 +174,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // The type indexes fine and the name is still missing: that is a typo, and it keeps the
         // error it has always had.
         var result = ReferenceResolutionEvaluator.Evaluate("MISPELLED", "Faction", null,
+            TestCatalogues.English,
             new HashSet<string> { "Faction" });
 
         Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
@@ -183,6 +188,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // is unsupported". Reading it the other way would downgrade every missing reference in the
         // workspace to a notice until indexing finished.
         var result = ReferenceResolutionEvaluator.Evaluate("MISSING", "SpaceUnit", null,
+            TestCatalogues.English,
             new HashSet<string>());
 
         Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
@@ -193,7 +199,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_Unresolved_NoTypeIndexSupplied_BehavesAsBefore()
     {
         // Every caller that has not been taught about the type index keeps today's behaviour.
-        var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null);
+        var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null, TestCatalogues.English);
 
         Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
     }
@@ -203,7 +209,8 @@ public sealed class ReferenceResolutionEvaluatorTest
     [Fact]
     public void Evaluate_Resolved_NoExpectedType_ReturnsNull()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", null, Symbol("UNIT_A", "Unit"));
+        var result =
+            ReferenceResolutionEvaluator.Evaluate("UNIT_A", null, Symbol("UNIT_A", "Unit"), TestCatalogues.English);
         Assert.Null(result);
     }
 
@@ -212,21 +219,24 @@ public sealed class ReferenceResolutionEvaluatorTest
     [Fact]
     public void Evaluate_GameObjectType_ReturnsNull()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "GameObjectType", Symbol("UNIT_A", "Unit"));
+        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "GameObjectType", Symbol("UNIT_A", "Unit"),
+            TestCatalogues.English);
         Assert.Null(result);
     }
 
     [Fact]
     public void Evaluate_GameObjectType_CaseInsensitive_ReturnsNull()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "gameobjecttype", Symbol("UNIT_A", "Unit"));
+        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "gameobjecttype", Symbol("UNIT_A", "Unit"),
+            TestCatalogues.English);
         Assert.Null(result);
     }
 
     [Fact]
     public void Evaluate_GameObjectType_MixedCase_ReturnsNull()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "GameObjectType", Symbol("UNIT_A", "GroundUnit"));
+        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "GameObjectType", Symbol("UNIT_A", "GroundUnit"),
+            TestCatalogues.English);
         Assert.Null(result);
     }
 
@@ -235,14 +245,16 @@ public sealed class ReferenceResolutionEvaluatorTest
     [Fact]
     public void Evaluate_CorrectType_ReturnsNull()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Unit", Symbol("UNIT_A", "Unit"));
+        var result =
+            ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Unit", Symbol("UNIT_A", "Unit"), TestCatalogues.English);
         Assert.Null(result);
     }
 
     [Fact]
     public void Evaluate_CorrectType_CaseInsensitive_ReturnsNull()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "unit", Symbol("UNIT_A", "Unit"));
+        var result =
+            ReferenceResolutionEvaluator.Evaluate("UNIT_A", "unit", Symbol("UNIT_A", "Unit"), TestCatalogues.English);
         Assert.Null(result);
     }
 
@@ -255,7 +267,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // (referenceType: SpecialAbility) must accept it, not just literal "SpecialAbility".
         var result = ReferenceResolutionEvaluator.Evaluate(
             "Bacara_Proximity_Mines_AV", "SpecialAbility",
-            Symbol("Bacara_Proximity_Mines_AV", "ProximityMinesAbility"));
+            Symbol("Bacara_Proximity_Mines_AV", "ProximityMinesAbility"), TestCatalogues.English);
         Assert.Null(result);
     }
 
@@ -263,7 +275,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_SpecialAbilityExpected_ConcreteAbilitySubtype_CaseInsensitive_ReturnsNull()
     {
         var result = ReferenceResolutionEvaluator.Evaluate(
-            "X", "specialability", Symbol("X", "proximityminesability"));
+            "X", "specialability", Symbol("X", "proximityminesability"), TestCatalogues.English);
         Assert.Null(result);
     }
 
@@ -271,7 +283,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_SpecialAbilityExpected_LiteralSpecialAbility_ReturnsNull()
     {
         var result = ReferenceResolutionEvaluator.Evaluate(
-            "X", "SpecialAbility", Symbol("X", "SpecialAbility"));
+            "X", "SpecialAbility", Symbol("X", "SpecialAbility"), TestCatalogues.English);
         Assert.Null(result);
     }
 
@@ -279,9 +291,9 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_SpecialAbilityExpected_UnrelatedType_ReturnsError()
     {
         var result = ReferenceResolutionEvaluator.Evaluate(
-            "X", "SpecialAbility", Symbol("X", "Unit"));
+            "X", "SpecialAbility", Symbol("X", "Unit"), TestCatalogues.English);
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     [Fact]
@@ -290,9 +302,9 @@ public sealed class ReferenceResolutionEvaluatorTest
         // The allowlist relaxation is scoped to expectedTypeName == SpecialAbility only - an
         // unrelated expected type must still require an exact match.
         var result = ReferenceResolutionEvaluator.Evaluate(
-            "X", "UnitAbility", Symbol("X", "ProximityMinesAbility"));
+            "X", "UnitAbility", Symbol("X", "ProximityMinesAbility"), TestCatalogues.English);
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     // ── type mismatch ─────────────────────────────────────────────────────────
@@ -300,23 +312,29 @@ public sealed class ReferenceResolutionEvaluatorTest
     [Fact]
     public void Evaluate_TypeMismatch_ReturnsError()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Faction", Symbol("UNIT_A", "Unit"));
+        var result =
+            ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Faction", Symbol("UNIT_A", "Unit"),
+                TestCatalogues.English);
         Assert.NotNull(result);
-        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result.Value.Severity);
     }
 
     [Fact]
     public void Evaluate_TypeMismatch_MessageContainsTargetId()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Faction", Symbol("UNIT_A", "Unit"));
+        var result =
+            ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Faction", Symbol("UNIT_A", "Unit"),
+                TestCatalogues.English);
         Assert.Contains("UNIT_A", result!.Value.Message);
     }
 
     [Fact]
     public void Evaluate_TypeMismatch_MessageContainsBothTypes()
     {
-        var result = ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Faction", Symbol("UNIT_A", "Unit"));
+        var result =
+            ReferenceResolutionEvaluator.Evaluate("UNIT_A", "Faction", Symbol("UNIT_A", "Unit"),
+                TestCatalogues.English);
         Assert.Contains("Faction", result!.Value.Message);
-        Assert.Contains("Unit", result!.Value.Message);
+        Assert.Contains("Unit", result.Value.Message);
     }
 }

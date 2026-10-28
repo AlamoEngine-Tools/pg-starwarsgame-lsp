@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Tests.Story;
@@ -30,7 +31,7 @@ public sealed class WorkspaceSettingsStoreTest
         return new WorkspaceSettingsStore(
             new StoryCommandTestFixtures.StubReloadService(config),
             new FileHelper(fs),
-            NullLogger<WorkspaceSettingsStore>.Instance);
+            NullLogger<WorkspaceSettingsStore>.Instance, ResxMessageCatalog.Server("en"));
     }
 
     private static string SidecarPath()
@@ -121,7 +122,7 @@ public sealed class WorkspaceSettingsStoreTest
         var store = new WorkspaceSettingsStore(
             new StoryCommandTestFixtures.StubReloadService(WorkspaceConfiguration.Empty),
             new FileHelper(new MockFileSystem()),
-            NullLogger<WorkspaceSettingsStore>.Instance);
+            NullLogger<WorkspaceSettingsStore>.Instance, ResxMessageCatalog.Server("en"));
 
         store.Set(new WorkspaceSettings { SkipStoryDeleteConfirmation = true });
         Assert.True(store.Get().SkipStoryDeleteConfirmation); // same instance keeps it in-session

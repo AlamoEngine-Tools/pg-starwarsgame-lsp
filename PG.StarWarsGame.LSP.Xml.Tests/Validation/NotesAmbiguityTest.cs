@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -35,7 +34,7 @@ public sealed class NotesAmbiguityTest
     [Fact]
     public void A_note_from_the_only_declaring_type_is_shown()
     {
-        var schema = new SharedTagSchema(("Solo", "the one note"));
+        var schema = new SharedTagSchema(("Solo", "the one note")).Build();
 
         Assert.Single(Produce(schema, "<Root><Solo>1</Solo></Root>").OfType<XmlNotesFact>());
     }
@@ -44,7 +43,7 @@ public sealed class NotesAmbiguityTest
     [Fact]
     public void Identical_notes_on_several_owners_are_still_shown()
     {
-        var schema = new SharedTagSchema(("Shared", "same note"), ("Shared", "same note"));
+        var schema = new SharedTagSchema(("Shared", "same note"), ("Shared", "same note")).Build();
 
         Assert.Single(Produce(schema, "<Root><Shared>1</Shared></Root>").OfType<XmlNotesFact>());
     }
@@ -56,7 +55,7 @@ public sealed class NotesAmbiguityTest
     [Fact]
     public void Conflicting_notes_on_several_owners_are_not_shown()
     {
-        var schema = new SharedTagSchema(("Shared", "one meaning"), ("Shared", "another meaning"));
+        var schema = new SharedTagSchema(("Shared", "one meaning"), ("Shared", "another meaning")).Build();
 
         Assert.Empty(Produce(schema, "<Root><Shared>1</Shared></Root>").OfType<XmlNotesFact>());
     }
@@ -65,7 +64,7 @@ public sealed class NotesAmbiguityTest
     [Fact]
     public void A_silent_owner_does_not_suppress_the_note()
     {
-        var schema = new SharedTagSchema(("Shared", "the note"), ("Shared", null));
+        var schema = new SharedTagSchema(("Shared", "the note"), ("Shared", null)).Build();
 
         Assert.Single(Produce(schema, "<Root><Shared>1</Shared></Root>").OfType<XmlNotesFact>());
     }
@@ -83,7 +82,7 @@ public sealed class NotesAmbiguityTest
     }
 
     /// <summary>One tag name, declared by one or more types, each with or without a note.</summary>
-    private sealed class SharedTagSchema : ISchemaProvider
+    private sealed class SharedTagSchema
     {
         private readonly List<XmlTagDefinition> _definitions = [];
 
@@ -100,44 +99,12 @@ public sealed class NotesAmbiguityTest
                 });
         }
 
-        public XmlTagDefinition? GetTag(string tagName)
+        public FakeSchemaProvider Build()
         {
-            return _definitions.FirstOrDefault(d =>
-                d.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return _definitions
-                .Where(d => d.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => _definitions;
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
+            var builder = new SchemaProviderBuilder();
+            foreach (var item in _definitions)
+                builder.WithTag(item);
+            return builder.Build();
         }
     }
 }

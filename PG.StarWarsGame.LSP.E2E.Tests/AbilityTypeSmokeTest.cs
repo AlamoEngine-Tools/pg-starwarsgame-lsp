@@ -34,7 +34,7 @@ public abstract class AbilityTypeSmokeTestBase<TFixture> : IClassFixture<TFixtur
 
         var filePath = Path.Combine(_fixture.ModPath!, "Data", "XML", "Spaceunitsfighters.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         var received = _fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
 
@@ -52,6 +52,8 @@ public abstract class AbilityTypeSmokeTestBase<TFixture> : IClassFixture<TFixtur
         var diags = await received;
         Assert.Contains(diags.Diagnostics,
             d => d.Message.Contains("HUN", StringComparison.OrdinalIgnoreCase));
+
+        Close(uri);
     }
 
     [Fact]
@@ -62,7 +64,7 @@ public abstract class AbilityTypeSmokeTestBase<TFixture> : IClassFixture<TFixtur
 
         var filePath = Path.Combine(_fixture.ModPath!, "Data", "XML", "Spaceunitsfighters.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         var (line, col) = FindLineContaining(lines, "<Type>HUN</Type>");
         Assert.True(line >= 0, "Could not find <Type>HUN</Type> in eaw Spaceunitsfighters.xml");
@@ -78,7 +80,7 @@ public abstract class AbilityTypeSmokeTestBase<TFixture> : IClassFixture<TFixtur
             }
         });
 
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var hover = await _fixture.Client.RequestHover(
@@ -93,10 +95,26 @@ public abstract class AbilityTypeSmokeTestBase<TFixture> : IClassFixture<TFixtur
         Assert.DoesNotContain("GameObjectType", content, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("SpaceUnit", content, StringComparison.OrdinalIgnoreCase);
         Assert.NotEmpty(content);
+
+        Close(uri);
+    }
+
+    // Both tests open the same document on the shared server. A second didOpen with the same text is
+    // a no-op there (it logs "content unchanged" and publishes nothing), so whichever test runs
+    // second would wait for diagnostics that never come. Closing hands the next test a fresh open.
+    // Test order is the assembly's unique-id order, which changes with the checkout's path.
+    private void Close(DocumentUri uri)
+    {
+        _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = uri }
+        });
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    // E2e is spelled as a word throughout the E2E test project.
+    // ReSharper disable once InconsistentNaming
     private static void RequireE2eWorkspace()
     {
         if (LspTestEnvironment.E2eWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)

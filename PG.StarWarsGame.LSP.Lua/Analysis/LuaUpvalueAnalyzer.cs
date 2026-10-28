@@ -22,16 +22,13 @@ internal static class LuaUpvalueAnalyzer
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
-    public static IReadOnlyList<LspDiagnostic> Analyze(string text, string? documentUri = null,
-        IMessageCatalog? messages = null)
+    public static IReadOnlyList<LspDiagnostic> Analyze(string text, string? documentUri, IMessageCatalog messages)
     {
         return Analyze(LuaSyntaxTree.ParseText(text, s_parseOptions), documentUri, messages);
     }
 
-    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree, string? documentUri = null,
-        IMessageCatalog? messages = null)
+    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree, string? documentUri, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 

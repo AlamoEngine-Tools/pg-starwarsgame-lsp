@@ -14,10 +14,10 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         new() { Tag = "Speed", ValueType = XmlValueType.Float };
 
     private static readonly DiagnosticsContext EmptyCtx = new(
-        new StubSchemaProvider(),
+        new SchemaProviderBuilder().Build(),
         GameIndex.Empty,
         "file:///test.xml",
-        "en");
+        "en") { Messages = TestCatalogues.English };
 
     // ── empty registry ───────────────────────────────────────────────────────
 
@@ -140,7 +140,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         var rgbaTag = new XmlTagDefinition { Tag = "Color", ValueType = XmlValueType.RGBA };
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, rgbaTag, "x");
 
-        registry.Dispatch(fact, EmptyCtx).ToList();
+        _ = registry.Dispatch(fact, EmptyCtx).ToList();
 
         Assert.True(calledBoolean, "Boolean-typed handler should still be dispatched.");
         Assert.True(calledFloat, "Float-typed handler should still be dispatched.");
@@ -162,7 +162,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, FloatTag, "bad");
 
-        registry.Dispatch(fact, EmptyCtx).ToList();
+        _ = registry.Dispatch(fact, EmptyCtx).ToList();
 
         Assert.Same(EmptyCtx, received);
     }
@@ -238,7 +238,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, tag, "0");
 
-        registry.Dispatch(fact, EmptyCtx).ToList();
+        _ = registry.Dispatch(fact, EmptyCtx).ToList();
 
         Assert.Equal(["named", "default"], invocationOrder);
     }
@@ -263,7 +263,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, tag, "0");
 
-        registry.Dispatch(fact, EmptyCtx).ToList();
+        _ = registry.Dispatch(fact, EmptyCtx).ToList();
 
         Assert.Equal(["default", "named"], invocationOrder);
     }
@@ -354,45 +354,5 @@ file sealed class NamedLambdaHandler<TFact> : XmlDiagnosticsHandler<TFact>, IXml
     protected override IEnumerable<XmlDiagnosticResult> Handle(TFact fact, DiagnosticsContext ctx)
     {
         return _fn(fact, ctx);
-    }
-}
-
-file sealed class StubSchemaProvider : ISchemaProvider
-{
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
     }
 }

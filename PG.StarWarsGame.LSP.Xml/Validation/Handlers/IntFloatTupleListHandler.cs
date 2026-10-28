@@ -4,7 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -43,7 +43,7 @@ public sealed class IntFloatTupleListHandler : CommaSeparatedPairHandlerBase
                     fact, intOffset, intToken.Length));
             }
 
-            if (!LenientFloatParser.TryParse(floatToken, out _))
+            if (!EngineNumber.TryParseFloat(floatToken, out _))
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                         ctx.Messages.Format("IntFloatTupleList_IsNotAValidFloat", floatToken, fact.Tag.Tag)),
                     fact, floatOffset, floatToken.Length));

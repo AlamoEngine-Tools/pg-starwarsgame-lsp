@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Completion;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -17,21 +18,21 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaCompletionHandler : CompletionHandlerBase
 {
-    private readonly ILuaAnalyzer? _analyzer;
+    private readonly ILuaAnalyzer _analyzer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaCompletionHandler> _logger;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
+    // The analyzer's items join ours; when none runs, it answers nothing.
     public LuaCompletionHandler(
         IGameIndexService indexService,
         ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaCompletionHandler> logger,
-        // Optional: with the analyzer running, its items join ours.
-        ILuaAnalyzer? analyzer = null)
+        ILuaAnalyzer analyzer)
     {
         _indexService = indexService;
         _parseCache = parseCache;
@@ -44,8 +45,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
     public override async Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
         var ours = await HandleOurs(request);
-        if (_analyzer is null ||
-            !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+        if (!request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
 
         var theirs = await _analyzer.RequestAsync<CompletionList>("textDocument/completion", request, ct);
@@ -70,7 +70,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
     public override async Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
     {
         // Only the analyzer's own items are its to resolve; ours are complete as sent.
-        if (_analyzer is null || LuaAnalyzerAnswers.AnalyzerItem(request) is not { } original) return request;
+        if (LuaAnalyzerAnswers.AnalyzerItem(request) is not { } original) return request;
         return await _analyzer.RequestAsync<CompletionItem>("completionItem/resolve", original, ct) ?? request;
     }
 
@@ -161,7 +161,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;
             if (string.Equals(uri, currentUri, StringComparison.OrdinalIgnoreCase)) continue;
 
-            var normalized = uri.Replace('\\', '/');
+            var normalized = GamePaths.Forward(uri);
             var slashIdx = normalized.LastIndexOf('/');
             var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
             if (!filename.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;

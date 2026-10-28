@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.Files.DAT.Services;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
@@ -546,7 +547,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             writer,
             NullLogger<ImportLocalisationProjectCommandHandler>.Instance,
             lspConfig ?? new FakeLspConfigurationProvider(),
-            notifier);
+            notifier, TestCatalogues.English);
 
         return (handler, reload, writer, notifier);
     }

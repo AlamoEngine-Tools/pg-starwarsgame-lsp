@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -38,11 +39,11 @@ public static class WorkspaceFileKey
 
     private static string BaseName(string value)
     {
-        var forward = value.Replace('\\', '/');
+        var forward = GamePaths.Key(value);
         var slash = forward.LastIndexOf('/');
         var name = slash >= 0 ? forward[(slash + 1)..] : forward;
         var dot = name.LastIndexOf('.');
         if (dot > 0) name = name[..dot];
-        return name.Trim().ToLowerInvariant();
+        return name.Trim();
     }
 }

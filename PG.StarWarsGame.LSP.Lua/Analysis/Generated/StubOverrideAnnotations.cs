@@ -28,6 +28,8 @@ public sealed class StubOverrideAnnotations(ILuaApiSchemaProvider schema) : ILua
             if (function.Name is not SimpleFunctionNameSyntax simple) continue;
             var name = simple.Name.Text;
             if (!schema.AllFunctionNames.Contains(name)) continue;
+            // A script's entry point is its own; a library stub of that name documents the library's.
+            if (schema.GetEntryPoint(name) is not null) continue;
 
             var line = function.GetLocation().GetLineSpan().StartLinePosition.Line;
             if (LuaAnnotations.AuthorAnnotated(text, line)) continue;

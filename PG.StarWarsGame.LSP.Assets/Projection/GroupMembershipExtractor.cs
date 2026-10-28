@@ -2,22 +2,18 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using System.Xml;
-using System.Xml.Linq;
+using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
 /// <summary>
-///     Extracts <see cref="GroupMembership" /> records from shipped-game XML files and populates
-///     <see cref="BaselineIndex.GroupMemberships" />.
+///     Reads the reference-group memberships out of the game's files. Parsed through
+///     <see cref="XmlUtility" /> like every other game XML (#308): a file a strict parser rejects is
+///     read the way the game reads it.
 /// </summary>
-/// <remarks>
-///     Only tags declared with <see cref="TagSemanticType.ReferenceGroup" /> in the schema are
-///     extracted. Today that is only <c>Overlap_Test</c> in <c>SFXEvent</c>, but any new
-///     ReferenceGroup tags added to the schema are handled automatically.
-/// </remarks>
 public static class GroupMembershipExtractor
 {
     /// <summary>
@@ -58,25 +54,16 @@ public static class GroupMembershipExtractor
             var content = readFile(filePath);
             if (string.IsNullOrEmpty(content)) continue;
 
-            XDocument doc;
-            try
+            var doc = XmlUtility.CreateHtmlDocument(content);
+            foreach (var element in doc.DocumentNode.Descendants().Where(n => n.NodeType == HtmlNodeType.Element))
+            foreach (var child in element.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
             {
-                doc = XDocument.Load(new StringReader(content), LoadOptions.SetLineInfo);
-            }
-            catch
-            {
-                continue;
-            }
+                if (!groupTagsByName.TryGetValue(child.Name, out var tagDef)) continue;
 
-            foreach (var element in doc.Descendants())
-            foreach (var child in element.Elements())
-            {
-                if (!groupTagsByName.TryGetValue(child.Name.LocalName, out var tagDef)) continue;
-
-                var groupKey = child.Value.Trim();
+                var groupKey = child.InnerText.Trim();
                 if (string.IsNullOrEmpty(groupKey)) continue;
 
-                var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber - 1 : 0;
+                var line = Math.Max(0, XmlUtility.GetLine(element));
                 var memberTypeName = tagDef.ObjectType?.TypeName;
                 var membership = new GroupMembership(groupKey, memberTypeName,
                     new FileOrigin(filePath, line, null));

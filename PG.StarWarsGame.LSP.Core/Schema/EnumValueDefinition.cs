@@ -1,8 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
+
 namespace PG.StarWarsGame.LSP.Core.Schema;
 
+[PublicAPI]
 public sealed record EnumValueDefinition
 {
     /// <summary>The member's key: the name XML writes, which the engine matches ignoring case.</summary>

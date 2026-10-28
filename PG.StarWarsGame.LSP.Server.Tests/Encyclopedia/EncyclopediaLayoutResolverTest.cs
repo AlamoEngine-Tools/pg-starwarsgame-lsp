@@ -36,7 +36,7 @@ public sealed class EncyclopediaLayoutResolverTest
     private static EncyclopediaLayout Resolve(GameIndex index, FakeVariantTagSource source)
     {
         return new EncyclopediaLayoutResolver(
-            new EffectiveObjectResolver(index, new NullSchemaProvider(), source)).Resolve();
+            new EffectiveObjectResolver(index, new SchemaProviderBuilder().Build(), source)).Resolve();
     }
 
     // ── the base-game floor ──────────────────────────────────────────────────

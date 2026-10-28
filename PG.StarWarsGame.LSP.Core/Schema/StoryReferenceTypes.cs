@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Workspace;
+
 namespace PG.StarWarsGame.LSP.Core.Schema;
 
 /// <summary>
@@ -45,7 +47,7 @@ public static class StoryReferenceTypes
         return typeName is EventSymbol or FlagSymbol or NotificationSymbol;
     }
 
-    /// <summary>((event/reward type, 0-based position) → referenceType) lookup over a schema enum.</summary>
+    /// <summary>((event/reward type, 0-based position) -> referenceType) lookup over a schema enum.</summary>
     public static Dictionary<(string Type, int Position), string> BuildParamMap(EnumDefinition? definition)
     {
         var map = new Dictionary<(string, int), string>();
@@ -71,7 +73,7 @@ public static class StoryReferenceTypes
     /// </summary>
     public static string NormalizeRelativePath(string reference)
     {
-        var normalized = reference.Replace('\\', '/').TrimStart('/');
+        var normalized = GamePaths.Normalize(reference);
         const string xmlPrefix = "data/xml/";
         return normalized.StartsWith(xmlPrefix, StringComparison.OrdinalIgnoreCase)
             ? normalized[xmlPrefix.Length..]

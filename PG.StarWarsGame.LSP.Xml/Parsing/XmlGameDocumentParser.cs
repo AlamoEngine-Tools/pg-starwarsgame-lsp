@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Parsing;
@@ -15,7 +16,7 @@ namespace PG.StarWarsGame.LSP.Xml.Parsing;
 public sealed class XmlGameDocumentParser : IGameDocumentParser
 {
     // Markup_Filename: slot 0 is a Faction, slot 1 (the markup file) is not indexable and not emitted.
-    private const string FactionTypeName = "Faction";
+    private const string FactionTypeName = GameTypeNames.Faction;
 
     /// <summary>The schema enum a <c>Death_Clone</c>'s first slot names.</summary>
     private const string DamageTypeEnum = "DamageType";
@@ -39,21 +40,21 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
     private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
 
-    private readonly IEaWXmlContext? _eaWXmlContext;
+    private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlGameDocumentParser> _logger;
-    private readonly IXmlParseCache? _parseCache;
+    private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
 
-    // parseCache is optional so minimal test setups can omit it; production wires the shared
-    // cache so the indexing parse seeds it - the diagnostics publish and the first hover/inlay
-    // request after an edit then reuse this parse instead of re-parsing. eaWXmlContext is optional
-    // too; without it a doc's xml-relative path is unknown, so workspace-file symbols are skipped.
+    // The parse cache is the shared one, so the indexing parse seeds it: the diagnostics publish
+    // and the first hover or inlay request after an edit reuse this parse instead of re-parsing.
+    // The EaW context is what turns a document URI into its xml-relative path, which the
+    // workspace-file symbols are keyed by.
     public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
         IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger,
-        IXmlParseCache? parseCache = null,
-        IEaWXmlContext? eaWXmlContext = null)
+        IXmlParseCache parseCache,
+        IEaWXmlContext eaWXmlContext)
     {
         _fileHelper = fileHelper;
         _schema = schema;
@@ -72,7 +73,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         string documentUri, string text, int version, CancellationToken ct)
     {
         var canonicalUri = _fileHelper.NormalizeUri(documentUri);
-        var parsed = _parseCache?.GetOrParse(canonicalUri, text) ?? ParsedXmlDocument.Parse(text);
+        var parsed = _parseCache.GetOrParse(canonicalUri, text);
         var doc = parsed.Html;
 
         var registeredTypes = _fileTypeRegistry.GetTypesForFile(canonicalUri);
@@ -104,8 +105,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private List<GameSymbol> CollectWorkspaceFileSymbols(
         string documentUri, ImmutableArray<string> registeredTypes)
     {
-        if (_eaWXmlContext is null) return [];
-
         var fileType = WorkspaceFileTypes.FirstOrDefault(t =>
             registeredTypes.Contains(t, StringComparer.OrdinalIgnoreCase));
         if (fileType is null) return [];
@@ -369,7 +368,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 {
                     if (HasChildElement(child)) continue;
                     CollectLeadingSlotReference(child, tagDef.ObjectType?.TypeName, lineIndex, documentUri,
-                        references);
+                        references, tagDef.TargetTypeName);
                     continue;
                 }
 
@@ -449,7 +448,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                         documentUri,
                         line,
                         column,
-                        length));
+                        length) { LookupType = LookupBeyond(tagDef.ObjectType?.TypeName, tagDef.TargetTypeName) });
                 }
             }
         }
@@ -462,7 +461,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     // across any object type, matching the untyped lookup its handler used to perform. A
     // PlanetValuePair passes the tag's own type, or none when its referenceType is a kind.
     private static void CollectLeadingSlotReference(HtmlNode child, string? expectedTypeName,
-        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references, string? lookupType = null)
     {
         var innerText = child.InnerText;
         var comma = innerText.IndexOf(',');
@@ -480,7 +479,16 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri,
             line,
             column,
-            length));
+            length) { LookupType = LookupBeyond(expectedTypeName, lookupType) });
+    }
+
+    /// <summary>
+    ///     The id space a reference is looked up in, recorded only where it is not the expected type
+    ///     itself: a tag or slot naming an object kind expects the kind and looks among game objects.
+    /// </summary>
+    private static string? LookupBeyond(string? expectedTypeName, string? lookupType)
+    {
+        return string.Equals(expectedTypeName, lookupType, StringComparison.OrdinalIgnoreCase) ? null : lookupType;
     }
 
     private static IReadOnlyList<string?> FactionTupleSlotTypes(XmlValueType valueType)
@@ -631,7 +639,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                length));
+                length) { LookupType = LookupBeyond(tagDef.ObjectType?.TypeName, tagDef.TargetTypeName) });
         }
     }
 
@@ -690,7 +698,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                length));
+                length)
+            {
+                LookupType = untyped
+                    ? null
+                    : LookupBeyond(item.Slot.ObjectType?.TypeName ?? item.Slot.ReferenceTypeName,
+                        item.Slot.TargetTypeName)
+            });
         }
     }
 

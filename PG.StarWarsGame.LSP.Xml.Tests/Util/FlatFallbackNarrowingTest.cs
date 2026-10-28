@@ -3,6 +3,7 @@
 
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Util;
@@ -52,7 +53,7 @@ public sealed class FlatFallbackNarrowingTest
         var resolved = Resolve("StunAbility");
 
         Assert.NotNull(resolved);
-        Assert.Empty(resolved!.AllowedValues);
+        Assert.Empty(resolved.AllowedValues);
         Assert.Null(resolved.ValidationOverride);
     }
 
@@ -77,14 +78,14 @@ public sealed class FlatFallbackNarrowingTest
         var parent = new TagResolutionContext("GalacticSabotageAbility", 0, HtmlNode());
         var child = new TagResolutionContext("SomeSubObject", 1, HtmlNode(), parent);
 
-        var resolved = XmlTagResolver.Resolve(new NarrowedSchema(), Tag, child);
+        var resolved = XmlObjectTagResolver.Resolve(NarrowedSchema.Build(), Tag, child);
 
         Assert.Equal(["GROUND_ACTIVATED"], resolved!.AllowedValues);
     }
 
     private static XmlTagDefinition? Resolve(string typeName)
     {
-        return XmlTagResolver.Resolve(new NarrowedSchema(), Tag,
+        return XmlObjectTagResolver.Resolve(NarrowedSchema.Build(), Tag,
             new TagResolutionContext(typeName, 0, HtmlNode()));
     }
 
@@ -94,7 +95,7 @@ public sealed class FlatFallbackNarrowingTest
     }
 
     /// <summary>One type narrows the tag; the flat map holds that same narrowed definition.</summary>
-    private sealed class NarrowedSchema : ISchemaProvider
+    private static class NarrowedSchema
     {
         private static readonly XmlTagDefinition Narrowed = new()
         {
@@ -104,43 +105,11 @@ public sealed class FlatFallbackNarrowingTest
             ValidationOverride = new TagValidationOverride { ValidationId = "some-rule" }
         };
 
-        public XmlTagDefinition? GetTag(string tagName)
+        public static FakeSchemaProvider Build()
         {
-            return tagName.Equals(Tag, StringComparison.OrdinalIgnoreCase) ? Narrowed : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return typeName.Equals("GalacticSabotageAbility", StringComparison.OrdinalIgnoreCase)
-                ? [Narrowed]
-                : [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [Narrowed];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
+            return new SchemaProviderBuilder()
+                .WithTags("GalacticSabotageAbility", Narrowed)
+                .Build();
         }
     }
 }

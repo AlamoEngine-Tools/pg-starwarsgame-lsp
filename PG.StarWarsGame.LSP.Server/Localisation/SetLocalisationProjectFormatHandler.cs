@@ -3,9 +3,10 @@
 
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
@@ -30,7 +31,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class SetLocalisationProjectFormatHandler
     : IJsonRpcRequestHandler<SetLocalisationProjectFormatParams, SetLocalisationProjectFormatResult>
 {
-    private readonly ILspConfigurationProvider _config;
+    private readonly IMessageCatalog _messages;
     private readonly IFileHelper _fileHelper;
     private readonly IModProjectFileWriter _fileWriter;
     private readonly ILogger<SetLocalisationProjectFormatHandler> _logger;
@@ -43,14 +44,14 @@ public sealed class SetLocalisationProjectFormatHandler
         IModProjectReloadService reloadService,
         IModProjectFileWriter fileWriter,
         ILogger<SetLocalisationProjectFormatHandler> logger,
-        ILspConfigurationProvider config)
+        IMessageCatalog messages)
     {
         _fileHelper = fileHelper;
         _projectRegistry = projectRegistry;
         _reloadService = reloadService;
         _fileWriter = fileWriter;
         _logger = logger;
-        _config = config;
+        _messages = messages;
     }
 
     public async Task<SetLocalisationProjectFormatResult> Handle(
@@ -58,17 +59,17 @@ public sealed class SetLocalisationProjectFormatHandler
     {
         var extension = LocalisationFormatUtility.ToExtension(request.Format);
         if (extension is null)
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NotLocalisationFormatUseCSV",
+            return Fail(_messages.Format("LocSetFormat_NotLocalisationFormatUseCSV",
                 request.Format));
 
         var rootLayer = _reloadService.LastWorkspaceConfig?.Layers
             .OrderByDescending(l => l.Rank).FirstOrDefault();
 
         if (rootLayer?.ProjectPath is not { } pgprojPath)
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NoModProjectOpenLocalisation"));
+            return Fail(_messages.Format("LocSetFormat_NoModProjectOpenLocalisation"));
 
         if (rootLayer.TextResourceType is not { } previous || rootLayer.TextRoots.Count == 0)
-            return Fail(new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NoLocalisationYet"));
+            return Fail(_messages.Format("LocSetFormat_NoLocalisationYet"));
 
         var format = request.Format.ToUpperInvariant();
         if (string.Equals(previous, format, StringComparison.OrdinalIgnoreCase))
@@ -78,11 +79,11 @@ public sealed class SetLocalisationProjectFormatHandler
         var relative = fs.Path.GetRelativePath(fs.Path.GetDirectoryName(pgprojPath)!, rootLayer.TextRoots[0]);
         if (fs.Path.IsPathRooted(relative))
             return Fail(
-                new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NotBelowProject", rootLayer.TextRoots[0]));
+                _messages.Format("LocSetFormat_NotBelowProject", rootLayer.TextRoots[0]));
 
         // The same shape the conversion writes, so the two never disagree about the node.
         await _fileWriter.SetLocalisationAsync(
-            pgprojPath, format, relative.Replace('\\', '/').ToLowerInvariant(), ct);
+            pgprojPath, format, GamePaths.Key(relative), ct);
         await _reloadService.ReloadAsync(ct);
 
         var count = CountInFormat(extension);

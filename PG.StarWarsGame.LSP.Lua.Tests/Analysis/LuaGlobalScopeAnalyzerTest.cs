@@ -43,7 +43,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
     }
 
     // Adds the current document to the index (needed for workspace URI resolution).
-    private static GameIndex AddCurrentDoc(GameIndex index, string text = "")
+    private static GameIndex AddCurrentDoc(GameIndex index)
     {
         var doc = new DocumentIndex(CurrentUri, 1, [], []);
         return index with { Documents = index.Documents.Add(CurrentUri, doc) };
@@ -54,7 +54,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
     [Fact]
     public void Analyze_EmptyDocument_NoDiagnostics()
     {
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "", GameIndex.Empty, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "", GameIndex.Empty, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -65,7 +66,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                             local x = 1
                             local function Helper() return x end
                             """;
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, GameIndex.Empty, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, GameIndex.Empty, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -77,7 +79,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                                 print(k, v)
                             end
                             """;
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, GameIndex.Empty, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, GameIndex.Empty, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -88,7 +91,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         // define the same name does not make the standard library something to require.
         var schema = new LuaApiSchemaProvider(["function tostring(v) end\n"]);
         var index = AddCurrentDoc(IndexWithLibGlobal("tostring"));
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "local s = tostring(1)", index, schema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "local s = tostring(1)", index, schema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -103,7 +107,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             new LuaStubFile("pgbase.d.lua", "---@param time number\nfunction Sleep(time) end\n")
         ]);
         var index = AddCurrentDoc(IndexWithLibGlobal("Sleep", "file:///scripts/library/pgbase.lua"));
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "Sleep(1)", index, schema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "Sleep(1)", index, schema, s_fileHelper,
+            TestCatalogues.English);
         var diagnostic = Assert.Single(result);
         Assert.Contains("Sleep", diagnostic.Message);
         Assert.Contains("not required", diagnostic.Message);
@@ -116,7 +121,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         // without a declaration `math` is whatever a library file makes it.
         var index = AddCurrentDoc(IndexWithLibGlobal("math"));
         var result =
-            LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "local x = math.floor(1.5)", index, EmptySchema, s_fileHelper);
+            LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "local x = math.floor(1.5)", index, EmptySchema, s_fileHelper,
+                TestCatalogues.English);
         Assert.Single(result);
     }
 
@@ -125,7 +131,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
     {
         const string text = """Find_First_Object("UNIT_REBEL")""";
         var index = AddCurrentDoc(GameIndex.Empty);
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, SchemaWithFindFirst, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, SchemaWithFindFirst, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -145,7 +152,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("MyHelper", [sym])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -157,7 +165,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string text = "MyHelper()";
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
@@ -174,7 +183,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                             """;
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         Assert.Empty(result);
     }
@@ -185,7 +195,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string text = "MyHelper()";
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var diag = Assert.Single(LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper));
+        var diag = Assert.Single(LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English));
 
         Assert.Contains("mylib", diag.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -200,7 +211,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                             """;
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         // Only one warning for MyHelper even though called 3 times
         Assert.Single(result);
@@ -236,7 +248,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add("HelperB", [symB])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         Assert.Equal(2, result.Count);
     }
@@ -247,7 +260,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string text = "MyHelper()";
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var diag = Assert.Single(LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper));
+        var diag = Assert.Single(LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English));
 
         // "MyHelper" starts at col 0 on line 0
         Assert.Equal(0, diag.Range.Start.Line);
@@ -267,7 +281,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                             """;
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -277,7 +292,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string text = """require("mylib")""";
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Hint, diag.Severity);
@@ -297,7 +313,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(LibUri, libDoc)
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Hint, diag.Severity);
@@ -309,7 +326,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string text = """require("mylib")""";
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var diag = Assert.Single(LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper));
+        var diag = Assert.Single(LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English));
 
         Assert.Contains("mylib", diag.Message);
     }
@@ -322,7 +340,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string text = """require("nonexistent")""";
         var index = AddCurrentDoc(GameIndex.Empty);
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -332,7 +351,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string text = "require(someVar)";
         var index = AddCurrentDoc(IndexWithLibGlobal("MyHelper"));
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -363,7 +383,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [symFoo])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -387,7 +408,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [symFoo])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Warning,
             result[0].Severity);
@@ -415,7 +437,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [symFoo])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         // Unused-require hint for require("b") since Foo is not called
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Hint,
@@ -440,7 +463,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriB, docB)
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(uriA, text, index, EmptySchema, s_fileHelper);
+        var result =
+            LuaGlobalScopeAnalyzer.Analyze(uriA, text, index, EmptySchema, s_fileHelper, TestCatalogues.English);
 
         var errors = result.Where(d =>
             d.Severity == DiagnosticSeverity.Error).ToList();
@@ -466,7 +490,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriC, docC)
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(uriA, text, index, EmptySchema, s_fileHelper);
+        var result =
+            LuaGlobalScopeAnalyzer.Analyze(uriA, text, index, EmptySchema, s_fileHelper, TestCatalogues.English);
 
         var errors = result.Where(d =>
             d.Severity == DiagnosticSeverity.Error).ToList();
@@ -487,7 +512,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(OtherUri, docC)
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.DoesNotContain(result, d =>
             d.Severity == DiagnosticSeverity.Error);
     }
@@ -503,7 +529,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.DoesNotContain(result, d =>
             d.Severity == DiagnosticSeverity.Error);
     }
@@ -534,7 +561,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add("State_Init", [symCurrent, symOther])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -562,7 +590,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add("State_Init", [symCurrent, symOther])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -584,7 +613,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add("counter", [symOther])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -606,7 +636,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add("Helper", [symOther])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -629,7 +660,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add("counter", [symOther])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -652,7 +684,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [sym])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var overrideWarnings = result.Where(d =>
             d.Severity == DiagnosticSeverity.Warning &&
@@ -683,7 +716,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [sym])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var overrideWarnings = result.Where(d =>
             d.Severity == DiagnosticSeverity.Warning &&
@@ -709,7 +743,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [sym])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         Assert.DoesNotContain(result, d =>
             d.Severity == DiagnosticSeverity.Warning &&
@@ -733,7 +768,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Bar", [sym])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         Assert.DoesNotContain(result, d =>
             d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase));
@@ -758,7 +794,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [sym])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var warning = result.Single(d =>
             d.Severity == DiagnosticSeverity.Warning &&
@@ -789,7 +826,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriC, docC)
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var redundant = result.Where(d =>
             d.Severity == DiagnosticSeverity.Warning &&
@@ -818,7 +856,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriC, docC)
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         Assert.DoesNotContain(result, d =>
             d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
@@ -836,7 +875,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriB, new DocumentIndex(uriB, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         Assert.DoesNotContain(result, d =>
             d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
@@ -862,7 +902,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriBase, docBase)
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var redundant = result.Single(d =>
             d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
@@ -893,7 +934,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriD, docD)
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var redundant = result.Where(d =>
             d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase)).ToList();
@@ -915,7 +957,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriB, new DocumentIndex(uriB, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
         Assert.Single(dups);
@@ -935,7 +978,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriB, new DocumentIndex(uriB, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
         Assert.Equal(2, dups.Count);
@@ -953,7 +997,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriB, new DocumentIndex(uriB, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         Assert.DoesNotContain(result, d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
     }
@@ -972,7 +1017,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriC, new DocumentIndex(uriC, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         Assert.DoesNotContain(result, d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
     }
@@ -988,7 +1034,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
         Assert.Single(dups);
@@ -1006,7 +1053,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriB, new DocumentIndex(uriB, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var dup = result.Single(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
         Assert.True(dup.Code?.IsString == true);
@@ -1025,7 +1073,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(uriB, new DocumentIndex(uriB, 1, [], []))
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var dup = result.Single(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
         // Original is on line 0 (0-indexed) = line 1 for human display.
@@ -1058,7 +1107,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add("Definitions", [symCurrent, symOther])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -1079,7 +1129,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("UniqueHelper", [sym])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -1090,7 +1141,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string text = "LibHelper()";
         var index = AddCurrentDoc(IndexWithLibGlobal("LibHelper"));
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
@@ -1117,7 +1169,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("StateMachineInit", [sym])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
@@ -1153,7 +1206,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add("HelperA", [symA, symB])
         };
 
-        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
+            TestCatalogues.English);
         Assert.Empty(result);
     }
 
@@ -1184,7 +1238,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(library, "if Definitions then Definitions() end", index,
-            EmptySchema, s_fileHelper);
+            EmptySchema, s_fileHelper, TestCatalogues.English);
 
         Assert.Equal(warns, result.Any(d => d.Message.Contains("Definitions")));
     }

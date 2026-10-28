@@ -29,7 +29,8 @@ public sealed class LocalisationKeySingleValueInlayHintProviderTest
             ? GameIndex.Empty with { Localisation = localisation }
             : GameIndex.Empty;
 
-        return new InlayHintContext("file:///test.xml", index, new EmptySchemaProvider(), hapDoc, node, tagDef, 0);
+        return new InlayHintContext("file:///test.xml", index, new SchemaProviderBuilder().Build(), hapDoc, node,
+            tagDef, 0) { Messages = TestCatalogues.English };
     }
 
     [Fact]

@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
 using System.IO.Abstractions;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Icons;
@@ -9,11 +8,11 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Server.Abilities;
+using PG.StarWarsGame.LSP.Core.Xml;
+using PG.StarWarsGame.LSP.Preview.Abilities;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.ShipNames;
-using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Encyclopedia;
 
@@ -43,7 +42,7 @@ public sealed class GetEncyclopediaEntryHandler
     // Resolving the workspace root and asking for its catalog is shared with the XML diagnostics
     // and the model preview - see WorkspaceIconCatalog, which is also where the bug lived that had
     // this asking DI for a concrete type nothing registers.
-    private readonly IWorkspaceIconCatalog? _catalog;
+    private readonly IWorkspaceIconCatalog _catalog;
     private readonly ILspConfigurationProvider _config;
 
     // Only to ask whether a project ships the conventional mega texture, which decides whether its
@@ -54,18 +53,18 @@ public sealed class GetEncyclopediaEntryHandler
     // Still needed for the ship-name catalog, which resolves its own root. The INTERFACE, not the
     // concrete service: only `IModProjectReloadService` is registered, so asking for the class
     // handed this a permanent null and every project-configured path silently fell back.
-    private readonly IModProjectReloadService? _projects;
+    private readonly IModProjectReloadService _projects;
     private readonly ISchemaProvider _schema;
 
-    private readonly IShipNameCatalogProvider? _shipNames;
+    private readonly IShipNameCatalogProvider _shipNames;
     private readonly IVariantTagSource _tagSource;
 
     public GetEncyclopediaEntryHandler(IGameIndexService indexService, ISchemaProvider schema,
         IVariantTagSource tagSource, ILspConfigurationProvider config,
-        IWorkspaceIconCatalog? catalog = null,
-        IShipNameCatalogProvider? shipNames = null,
-        IModProjectReloadService? projects = null,
-        IFileSystem? fileSystem = null)
+        IWorkspaceIconCatalog catalog,
+        IShipNameCatalogProvider shipNames,
+        IModProjectReloadService projects,
+        IFileSystem fileSystem)
     {
         _indexService = indexService;
         _schema = schema;
@@ -74,7 +73,7 @@ public sealed class GetEncyclopediaEntryHandler
         _catalog = catalog;
         _shipNames = shipNames;
         _projects = projects;
-        _fileSystem = fileSystem ?? new FileSystem();
+        _fileSystem = fileSystem;
     }
 
     public async Task<GetEncyclopediaEntryResult> Handle(GetEncyclopediaEntryParams request,
@@ -89,7 +88,7 @@ public sealed class GetEncyclopediaEntryHandler
                 request.ScreenHeight ?? EncyclopediaGlyphSize.DefaultScreenHeight)
             .Resolve();
 
-        var effective = resolver.Resolve(request.ObjectId);
+        var effective = resolver.Resolve(request.ObjectId, GameTypeNames.GameObjectType);
         if (!effective.Found)
             return GetEncyclopediaEntryResult.NotFound(request.ObjectId, layout);
 
@@ -98,12 +97,12 @@ public sealed class GetEncyclopediaEntryHandler
 
         // MP replaces the body wholesale, but only when it actually carries keys - an empty MP tag
         // is not an instruction to show an empty popup.
-        var multiplayerBody = TagValue(effective, EncyclopediaTags.MultiplayerBody);
+        var multiplayerBody = effective.ValueOf(EncyclopediaTags.MultiplayerBody);
         var useMultiplayerBody = request.Multiplayer && !string.IsNullOrWhiteSpace(multiplayerBody);
         var body = XmlUtility
             .SplitList(useMultiplayerBody
                 ? multiplayerBody!
-                : TagValue(effective, EncyclopediaTags.Body) ?? string.Empty)
+                : effective.ValueOf(EncyclopediaTags.Body) ?? string.Empty)
             .Select(key => new EncyclopediaLine(key, loca.GetValue(key)))
             .ToList();
 
@@ -114,25 +113,25 @@ public sealed class GetEncyclopediaEntryHandler
         // Both feed a row's wrap budget, and both travel on the result so the numbers can be
         // checked against a card rather than taken on trust - see EncyclopediaRowBudgets.
         var abilities = ResolveAbilities(effective, catalog);
-        var buildCost = ParseCount(TagValue(effective, EncyclopediaTags.BuildCostCredits));
+        var buildCost = effective.IntOf(EncyclopediaTags.BuildCostCredits);
 
         return new GetEncyclopediaEntryResult(
             true,
             effective.ObjectId,
             effective.TypeName,
-            Translate(loca, TagValue(effective, EncyclopediaTags.TextId)),
-            Translate(loca, TagValue(effective, EncyclopediaTags.UnitClass)),
+            Translate(loca, effective.ValueOf(EncyclopediaTags.TextId)),
+            Translate(loca, effective.ValueOf(EncyclopediaTags.UnitClass)),
             body,
             useMultiplayerBody,
-            ParseCount(TagValue(effective, EncyclopediaTags.PopulationValue)),
+            effective.IntOf(EncyclopediaTags.PopulationValue),
             abilities,
-            ResolveReferences(resolver, loca, catalog, TagValue(effective, EncyclopediaTags.GoodAgainst)),
-            ResolveReferences(resolver, loca, catalog, TagValue(effective, EncyclopediaTags.VulnerableTo)),
+            ResolveReferences(resolver, loca, catalog, effective.ValueOf(EncyclopediaTags.GoodAgainst)),
+            ResolveReferences(resolver, loca, catalog, effective.ValueOf(EncyclopediaTags.VulnerableTo)),
             layout,
             ResolveIcon(catalog, effective),
             ResolveChrome(catalog, layout),
             shipNames,
-            IconSourceGap.ProjectsWithoutIconSources(_projects?.LastWorkspaceConfig, _fileSystem),
+            IconSourceGap.ProjectsWithoutIconSources(_projects.LastWorkspaceConfig, _fileSystem),
             buildCost,
             new EncyclopediaRowBudget(
                 EncyclopediaRowBudgets.Name(layout.Header.WrapChars, buildCost is > 0),
@@ -150,10 +149,7 @@ public sealed class GetEncyclopediaEntryHandler
     /// </remarks>
     private EncyclopediaShipNames? ResolveShipNames(EffectiveObjectResolver resolver, string objectId)
     {
-        if (_shipNames is null)
-            return null;
-
-        var root = _projects?.LastWorkspaceRoots?.FirstOrDefault() ?? _config.Current.WorkspaceRoot;
+        var root = _projects.LastWorkspaceRoots?.FirstOrDefault() ?? _config.Current.WorkspaceRoot;
         if (string.IsNullOrEmpty(root))
             return null;
 
@@ -164,7 +160,7 @@ public sealed class GetEncyclopediaEntryHandler
                 return null;
 
             var pool = _shipNames
-                .Get(root, TagValue(constants, EncyclopediaTags.ShipNameTextFiles))
+                .Get(root, constants.ValueOf(EncyclopediaTags.ShipNameTextFiles))
                 .For(objectId);
 
             return pool is null
@@ -190,14 +186,12 @@ public sealed class GetEncyclopediaEntryHandler
     /// </summary>
     private Task<IconCatalog?> GetCatalogAsync(CancellationToken ct)
     {
-        // Spelled as a branch rather than `_catalog?.GetAsync(ct) ?? ...`: inside a null-conditional
-        // the call reads as an unobserved awaitable (VSTHRD110) even though it is returned.
-        return _catalog is null ? Task.FromResult<IconCatalog?>(null) : _catalog.GetAsync(ct);
+        return _catalog.GetAsync(ct);
     }
 
     private static EncyclopediaIcon? ResolveIcon(IconCatalog? catalog, EffectiveObject effective)
     {
-        var iconName = TagValue(effective, EncyclopediaTags.IconName)?.Trim();
+        var iconName = effective.ValueOf(EncyclopediaTags.IconName);
         if (catalog is null || string.IsNullOrEmpty(iconName))
             return null;
 
@@ -249,26 +243,6 @@ public sealed class GetEncyclopediaEntryHandler
         return new EncyclopediaImage(DataUri(png), width, height);
     }
 
-    private static string? TagValue(EffectiveObject effective, string tagName)
-    {
-        return effective.Tags
-            .FirstOrDefault(t => string.Equals(t.TagName, tagName, StringComparison.OrdinalIgnoreCase))
-            ?.Value;
-    }
-
-    /// <summary>
-    ///     Reads a whole-number tag, or null when absent or not a number. Null rather than a
-    ///     defaulted 0: the preview draws a blip only when there is a real value, and inventing one
-    ///     would put a wrong number on the card.
-    /// </summary>
-    private static int? ParseCount(string? rawValue)
-    {
-        return int.TryParse(rawValue?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture,
-            out var parsed)
-            ? parsed
-            : null;
-    }
-
     /// <summary>
     ///     The unit's active abilities, in document order.
     /// </summary>
@@ -289,25 +263,6 @@ public sealed class GetEncyclopediaEntryHandler
     ///         Read from the tag's verbatim fragment rather than its value, because
     ///         <c>Unit_Abilities_Data</c> is a sub-object list - the children are the data and the
     ///         value itself is only whitespace. Parsed with HAP, which lower-cases element names.
-    ///     </para>
-    /// </remarks>
-    /// <summary>
-    ///     The icon the engine draws for an ability of <paramref name="type" />, if we can find one.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         A HEURISTIC, and knowingly so. Ability icons are named <c>I_SA_&lt;something&gt;</c> in
-    ///         the mega texture, but nothing in the game's data connects an ability to its icon -
-    ///         <c>I_SA_*</c> occurs in exactly one file across an install, the .mtd itself, so the
-    ///         engine hardcodes the mapping and there is nothing to read. Guessing
-    ///         <c>I_SA_&lt;TYPE&gt;</c> matches 43 of the ability types FoC ships.
-    ///     </para>
-    ///     <para>
-    ///         Safe despite being a guess, because the catalog validates it: a name only resolves if
-    ///         that exact entry exists, so a wrong guess yields NO icon rather than the WRONG one.
-    ///         The misses are real naming variants - <c>BARRAGE</c> has no <c>I_SA_BARRAGE</c> though
-    ///         the atlas carries <c>I_SA_BARRAGE_AREA</c>, and the <c>I_SA_BL_*</c> family takes a
-    ///         prefix no type name has. Those slots keep showing the type as text, exactly as before.
     ///     </para>
     /// </remarks>
     /// <summary>
@@ -386,10 +341,7 @@ public sealed class GetEncyclopediaEntryHandler
         // Through the shared reader. This walked the block with its own HAP pass until the preview
         // needed the same list, and two walkers is two places for "which child names the type" to
         // drift apart.
-        var fragment = effective.Tags.FirstOrDefault(t =>
-                string.Equals(t.TagName, EncyclopediaTags.UnitAbilitiesData,
-                    StringComparison.OrdinalIgnoreCase))
-            ?.Fragment;
+        var fragment = effective.FragmentOf(EncyclopediaTags.UnitAbilitiesData);
 
         return
         [
@@ -428,7 +380,7 @@ public sealed class GetEncyclopediaEntryHandler
                 // A second hop through the TARGET object: the panel shows what that unit looks like
                 // and is called, so both its name and its portrait come from its own tags rather
                 // than anything on the object being previewed.
-                var target = resolver.Resolve(id);
+                var target = resolver.Resolve(id, GameTypeNames.GameObjectType);
                 if (!target.Found)
                     return new EncyclopediaReference(id, null);
 
@@ -436,7 +388,7 @@ public sealed class GetEncyclopediaEntryHandler
                 // the same resolution the card's portrait goes through, placeholder included.
                 return new EncyclopediaReference(
                     id,
-                    Translate(loca, TagValue(target, EncyclopediaTags.TextId)),
+                    Translate(loca, target.ValueOf(EncyclopediaTags.TextId)),
                     ResolveIcon(catalog, target)?.DataUri);
             })
             .ToList();

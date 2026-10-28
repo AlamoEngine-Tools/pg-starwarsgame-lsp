@@ -49,7 +49,7 @@ export function ClearFiltersButton({
             icon="clearFilter"
             title={l10n.t("Clear all filters")}
             disabled={!active}
-            disabledReason="Clear all filters - no filters are set"
+            disabledReason={l10n.t("Clear all filters - no filters are set")}
             onClick={onClear}
         />
     );

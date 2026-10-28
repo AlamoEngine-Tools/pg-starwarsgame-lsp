@@ -1,10 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
@@ -113,10 +112,8 @@ public abstract class TagComparisonRuleBase : IXmlCrossTagRule
 
     private static bool TryValue(HtmlNode node, out double value)
     {
-        return double.TryParse(
-            node.InnerText.Trim().TrimEnd('f', 'F'),
-            NumberStyles.Float,
-            CultureInfo.InvariantCulture,
-            out value);
+        var read = EngineNumber.ReadDouble(node.InnerText);
+        value = read ?? 0.0;
+        return read.HasValue;
     }
 }

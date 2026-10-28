@@ -1,0 +1,47 @@
+[
+  {
+    "Code": "aetswg-006-0007",
+    "Severity": "Hint",
+    "StartLine": 8,
+    "StartCharacter": 3,
+    "EndLine": 8,
+    "EndCharacter": 14,
+    "Message": "(Type annotation is a best-guess inferred from observed game data - may need refinement.)"
+  },
+  {
+    "Code": "aetswg-006-0007",
+    "Severity": "Hint",
+    "StartLine": 9,
+    "StartCharacter": 3,
+    "EndLine": 9,
+    "EndCharacter": 13,
+    "Message": "(Type annotation is a best-guess inferred from observed game data - may need refinement.)"
+  },
+  {
+    "Code": "aetswg-006-0007",
+    "Severity": "Hint",
+    "StartLine": 10,
+    "StartCharacter": 3,
+    "EndLine": 10,
+    "EndCharacter": 16,
+    "Message": "(Type annotation is a best-guess inferred from observed game data - may need refinement.)"
+  },
+  {
+    "Code": "aetswg-006-0007",
+    "Severity": "Hint",
+    "StartLine": 13,
+    "StartCharacter": 3,
+    "EndLine": 13,
+    "EndCharacter": 13,
+    "Message": "(Type annotation is a best-guess inferred from observed game data - may need refinement.)"
+  },
+  {
+    "Code": "aetswg-006-0007",
+    "Severity": "Hint",
+    "StartLine": 14,
+    "StartCharacter": 3,
+    "EndLine": 14,
+    "EndCharacter": 13,
+    "Message": "(Type annotation is a best-guess inferred from observed game data - may need refinement.)"
+  }
+]

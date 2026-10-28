@@ -14,20 +14,24 @@ public sealed class LuaRequireCallLocatorTest
     public void TryFindAt_CursorInsideStringArg_ReturnsArgTextAndRange()
     {
         const string source = "local x = require(\"PGStateMachine\")";
-        var root = LuaSyntaxTree.ParseText(source, ParseOptions).GetRoot();
+        var root = LuaSyntaxTree
+            .ParseText(source, ParseOptions, cancellationToken: TestContext.Current.CancellationToken)
+            .GetRoot(TestContext.Current.CancellationToken);
 
         // Cursor inside "PGStateMachine" - after the opening quote at column 19.
         var result = LuaRequireCallLocator.TryFindAt(root, 0, 22);
 
         Assert.NotNull(result);
-        Assert.Equal("PGStateMachine", result!.Value.ArgText);
+        Assert.Equal("PGStateMachine", result.Value.ArgText);
     }
 
     [Fact]
     public void TryFindAt_CursorOutsideAnyRequireCall_ReturnsNull()
     {
         const string source = "local x = require(\"PGStateMachine\")";
-        var root = LuaSyntaxTree.ParseText(source, ParseOptions).GetRoot();
+        var root = LuaSyntaxTree
+            .ParseText(source, ParseOptions, cancellationToken: TestContext.Current.CancellationToken)
+            .GetRoot(TestContext.Current.CancellationToken);
 
         var result = LuaRequireCallLocator.TryFindAt(root, 0, 2);
 
@@ -38,7 +42,9 @@ public sealed class LuaRequireCallLocatorTest
     public void TryFindAt_NoRequireCallInSource_ReturnsNull()
     {
         const string source = "local x = 1";
-        var root = LuaSyntaxTree.ParseText(source, ParseOptions).GetRoot();
+        var root = LuaSyntaxTree
+            .ParseText(source, ParseOptions, cancellationToken: TestContext.Current.CancellationToken)
+            .GetRoot(TestContext.Current.CancellationToken);
 
         var result = LuaRequireCallLocator.TryFindAt(root, 0, 5);
 

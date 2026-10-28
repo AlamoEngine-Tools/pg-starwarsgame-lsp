@@ -460,8 +460,9 @@ internal sealed class StoryCommandExecutor(
         if (StoryRenameGuard.Check(request.EventName!, request.NewName, index) is { } objection)
             return (null, objection);
 
+        // A story event is one element indexed under two types: renamed in both.
         var edit = XmlObjectRenameBuilder.Build(
-            request.EventName!, request.NewName!, index, schema, textSource, logger);
+            request.EventName!, null, request.NewName!, index, schema, textSource, logger);
         if (edit is null)
             return (null, messages.Format("StoryCommand_CannotBeRenamedNotOwned", request.EventName));
 

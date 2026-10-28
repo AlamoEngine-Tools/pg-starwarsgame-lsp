@@ -3,16 +3,20 @@
 
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Features;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
-public sealed class XmlRenameHandler : IXmlRenameProvider
+public sealed class XmlRenameHandler : IRenameProvider
 {
     private readonly IEaWXmlContext _eaWXmlContext;
+    private readonly IFileHelper _fileHelper;
+    private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlRenameHandler> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
@@ -21,12 +25,34 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         IEaWXmlContext eaWXmlContext,
         IDocumentTextSource textSource,
         ISchemaProvider schema,
-        ILogger<XmlRenameHandler> logger)
+        ILogger<XmlRenameHandler> logger,
+        IFileHelper fileHelper,
+        IGameIndexService indexService)
     {
         _eaWXmlContext = eaWXmlContext;
         _textSource = textSource;
         _schema = schema;
         _logger = logger;
+        _fileHelper = fileHelper;
+        _indexService = indexService;
+    }
+
+    public bool Handles(string documentUri)
+    {
+        return documentUri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public Task<WorkspaceEdit?> RenameAsync(RenameParams request, CancellationToken ct)
+    {
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        return Task.FromResult(HandleRename(uri, request, _indexService.Current));
+    }
+
+    public Task<RangeOrPlaceholderRange?> PrepareAsync(PrepareRenameParams request, CancellationToken ct)
+    {
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        return Task.FromResult(HandlePrepare(uri, request.Position.Line, request.Position.Character,
+            _indexService.Current));
     }
 
     public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
@@ -51,13 +77,21 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         if (index.Resolve(hit.Value.Id) is { Kind: GameSymbolKind.WorkspaceFile })
             return FileReferenceRenameBuilder.Build(hit.Value.Id, request.NewName, index, _textSource, _logger);
 
+        // A story symbol is one element indexed under two types, renamed as one; any other object is
+        // renamed in its own type's id space.
+        string? typeName = null;
         if (StoryRenameGuard.IsStorySymbol(hit.Value.Id, index))
         {
             if (StoryRenameGuard.Check(hit.Value.Id, request.NewName, index) is { } objection)
                 throw new InvalidOperationException(objection);
         }
+        else
+        {
+            typeName = index.TypeMeant(hit.Value.Id, hit.Value.TypeName);
+        }
 
-        return XmlObjectRenameBuilder.Build(hit.Value.Id, request.NewName, index, _schema, _textSource, _logger);
+        return XmlObjectRenameBuilder.Build(hit.Value.Id, typeName, request.NewName, index, _schema, _textSource,
+            _logger);
     }
 
     public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
@@ -100,7 +134,10 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
             return new RangeOrPlaceholderRange(hit.Value.Range);
         }
 
-        if (!index.IsLeafOwned(hit.Value.Id)) return null;
+        var ownType = StoryRenameGuard.IsStorySymbol(hit.Value.Id, index)
+            ? null
+            : index.TypeMeant(hit.Value.Id, hit.Value.TypeName);
+        if (!index.IsLeafOwned(hit.Value.Id, ownType)) return null;
 
         return new RangeOrPlaceholderRange(hit.Value.Range);
     }

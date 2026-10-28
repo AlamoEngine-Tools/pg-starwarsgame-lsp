@@ -151,6 +151,11 @@ public sealed class SpecialWeaponBehaviorHandlerTest
     private sealed class FakeObjects(params (string Id, string BehaviorTag, string Value)[] objects)
         : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string objectId)
         {
             var match = objects.FirstOrDefault(o =>

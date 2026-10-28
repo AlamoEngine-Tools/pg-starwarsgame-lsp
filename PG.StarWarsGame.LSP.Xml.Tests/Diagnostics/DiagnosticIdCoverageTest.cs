@@ -2,7 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.DependencyInjection;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
 
@@ -19,6 +20,8 @@ public sealed class DiagnosticIdCoverageTest
     {
         var services = new ServiceCollection();
         services.AddXmlLanguageServices();
+        // The one handler dependency the server supplies rather than the Xml project.
+        services.AddSingleton<IStoryDialogScope>(new FakeStoryDialogScope());
         return services.BuildServiceProvider().GetServices<IXmlDiagnosticsHandler>().ToList();
     }
 
@@ -35,10 +38,10 @@ public sealed class DiagnosticIdCoverageTest
         Assert.Empty(missing);
     }
 
-    // A handful of diagnostics are built directly by XmlDiagnosticsPublisher instead of by a
-    // handler, so the reflection check above cannot see them - and they are exactly the ones that
-    // would quietly ship without a code. Source-level, because there is no runtime seam that
-    // enumerates them.
+    // Two diagnostics are built directly by XmlDiagnosticsPublisher instead of by a handler - the
+    // story chain's and the story graph's, which arrive as problems rather than facts - so the
+    // reflection check above cannot see them, and they are exactly the ones that would quietly ship
+    // without a code. Source-level, because there is no runtime seam that enumerates them.
     [Fact]
     public void EveryPublisherBuiltDiagnostic_SetsACode()
     {
@@ -76,7 +79,7 @@ public sealed class DiagnosticIdCoverageTest
             dir = Path.GetDirectoryName(dir);
 
         Assert.NotNull(dir);
-        return Path.Combine(dir!, "PG.StarWarsGame.LSP.Xml", "XmlDiagnosticsPublisher.cs");
+        return Path.Combine(dir, "PG.StarWarsGame.LSP.Xml", "XmlDiagnosticsPublisher.cs");
     }
 
     // Two handlers sharing a default id would make them indistinguishable to a suppression, and

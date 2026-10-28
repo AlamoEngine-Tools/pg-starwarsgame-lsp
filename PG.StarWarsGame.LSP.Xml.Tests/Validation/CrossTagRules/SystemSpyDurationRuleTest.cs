@@ -38,6 +38,9 @@ public sealed class SystemSpyDurationRuleTest
     [InlineData("0")]
     [InlineData("0.0")]
     [InlineData("30")]
+    [InlineData("30.0f")]
+    // The game reads 30 here and ignores the rest; the type handler reports the spelling.
+    [InlineData("30.0ff")]
     public void Galactic_automatic_refuses_a_non_negative_duration(string duration)
     {
         var d = Report("Galactic_Automatic", duration);
@@ -117,7 +120,7 @@ public sealed class SystemSpyDurationRuleTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             [new SystemSpyDurationRule()]);

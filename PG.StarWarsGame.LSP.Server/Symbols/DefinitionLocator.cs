@@ -48,10 +48,10 @@ public interface IDefinitionLocator
 public sealed class DefinitionLocator(
     IGameIndexService indexService,
     ISchemaProvider schema,
-    IMessageCatalog? messages = null)
+    IMessageCatalog messages)
     : IDefinitionLocator
 {
-    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
+    private readonly IMessageCatalog _messages = messages;
 
     /// <inheritdoc />
     public DefinitionLocation Locate(string? value, string? referenceType)

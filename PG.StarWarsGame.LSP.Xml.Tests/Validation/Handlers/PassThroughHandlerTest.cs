@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.DependencyInjection;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -21,6 +21,8 @@ public sealed class PassThroughHandlerTest
     {
         var services = new ServiceCollection();
         services.AddXmlLanguageServices();
+        // The one handler dependency the server supplies rather than the Xml project.
+        services.AddSingleton<IStoryDialogScope>(new FakeStoryDialogScope());
         var provider = services.BuildServiceProvider();
         return new XmlDiagnosticsHandlerRegistry(provider.GetServices<IXmlDiagnosticsHandler>());
     }

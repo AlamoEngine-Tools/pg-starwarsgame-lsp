@@ -59,6 +59,28 @@ public sealed class StoryChainScannerTest
         Assert.Equal("Hoth", seed.HomePlanets["Rebel"]);
     }
 
+    /// <summary>
+    ///     A registry may name a campaign file in the attribute form, <c>&lt;File filename="..."/&gt;</c>:
+    ///     the one metafile reader the indexer and the baseline builder use reads it here too (#308).
+    /// </summary>
+    [Fact]
+    public void Scan_ReadsACampaignFileNamedByTheFilenameAttribute()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, """<Campaign_Files><File filename="Campaigns_Test.xml"/></Campaign_Files>""")
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Test">
+                    <Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Rebel.xml", "<Story_Mode_Plots/>");
+
+        Assert.Equal("Test", Scan(resolver).Campaigns.Single().Name);
+    }
+
     [Fact]
     public void Scan_ReadsThePlayerFactionAndAiControl()
     {

@@ -21,7 +21,7 @@ public sealed class NamedMutexLockTest
     }
 
     [Fact]
-    public void Acquire_SameName_SecondHolderWaitsForTheFirst()
+    public async Task Acquire_SameName_SecondHolderWaitsForTheFirst()
     {
         var name = "test-" + Guid.NewGuid().ToString("N");
         var firstHeld = new ManualResetEventSlim();
@@ -46,8 +46,8 @@ public sealed class NamedMutexLockTest
                     order.Add("first-out");
                 }
             }
-        });
-        firstHeld.Wait(TimeSpan.FromSeconds(10));
+        }, TestContext.Current.CancellationToken);
+        firstHeld.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         var second = Task.Run(() =>
         {
@@ -59,12 +59,12 @@ public sealed class NamedMutexLockTest
                     order.Add("second-in");
                 }
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
         // The second holder must still be waiting while the first holds the lock.
-        Assert.False(second.Wait(TimeSpan.FromMilliseconds(300)));
+        Assert.NotSame(second, await Task.WhenAny(second, Task.Delay(300, TestContext.Current.CancellationToken)));
         releaseFirst.Set();
-        Assert.True(Task.WaitAll([first, second], TimeSpan.FromSeconds(10)));
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(["first-in", "first-out", "second-in"], order);
     }
@@ -73,6 +73,9 @@ public sealed class NamedMutexLockTest
     public void Acquire_DifferentNames_DoNotBlockEachOther()
     {
         var l = Build();
+        // The lock is a named mutex, released on the thread that took it: this test holds one across
+        // the wait, so it must stay on its thread and cannot await.
+#pragma warning disable VSTHRD002, xUnit1031, xUnit1051
         using var a = l.Acquire("test-a-" + Guid.NewGuid().ToString("N"));
         var acquiredB = Task.Run(() =>
         {
@@ -81,6 +84,7 @@ public sealed class NamedMutexLockTest
         });
 
         Assert.True(acquiredB.Wait(TimeSpan.FromSeconds(5)));
+#pragma warning restore VSTHRD002, xUnit1031, xUnit1051
     }
 
     [Fact]

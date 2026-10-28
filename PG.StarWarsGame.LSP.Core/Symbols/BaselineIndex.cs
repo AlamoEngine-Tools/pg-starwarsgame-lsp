@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 ///     tooling once a game-install-path config exists.
 /// </param>
 /// <param name="DynamicEnumValues">
-///     All values for every <see cref="EnumKind.DynamicXml" /> enum (DamageType, ArmorType,
+///     All values for every <see cref="Schema.EnumKind.DynamicXml" /> enum (DamageType, ArmorType,
 ///     MovementClassType, etc.) extracted from the shipped game files.
 /// </param>
 /// <param name="HardcodedEnumValues">

@@ -28,7 +28,7 @@ public sealed class XmlOnTypeFormattingHandlerTest
     private static XmlOnTypeFormattingHandler Build(string text,
         IEaWXmlContext? eaWContext = null)
     {
-        var host = new FakeHost(TestUri, text);
+        var host = new FakeGameWorkspaceHost(TestUri, text);
         return new XmlOnTypeFormattingHandler(TestParseCache.For(host), eaWContext ?? new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()));
     }
@@ -44,7 +44,7 @@ public sealed class XmlOnTypeFormattingHandlerTest
         var result = await handler.Handle(At(1, 5), CancellationToken.None);
 
         Assert.NotNull(result);
-        var edit = Assert.Single(result!);
+        var edit = Assert.Single(result);
         Assert.Equal("</Foo>", edit.NewText);
         Assert.Equal(1, edit.Range.Start.Line);
         Assert.Equal(5, edit.Range.Start.Character);
@@ -61,7 +61,7 @@ public sealed class XmlOnTypeFormattingHandlerTest
         var result = await handler.Handle(At(1, 13), CancellationToken.None);
 
         Assert.NotNull(result);
-        var edit = Assert.Single(result!);
+        var edit = Assert.Single(result);
         Assert.Equal("</Foo>", edit.NewText);
     }
 
@@ -74,7 +74,7 @@ public sealed class XmlOnTypeFormattingHandlerTest
         var result = await handler.Handle(At(1, 11), CancellationToken.None);
 
         Assert.NotNull(result);
-        var edit = Assert.Single(result!);
+        var edit = Assert.Single(result);
         Assert.Equal("</Max_Speed>", edit.NewText);
     }
 
@@ -148,29 +148,4 @@ public sealed class XmlOnTypeFormattingHandlerTest
     }
 
     // ── fake host ─────────────────────────────────────────────────────────────
-
-    private sealed class FakeHost(string uri, string text) : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [new(uri, text, 1)];
-
-        public void AddOrUpdate(string u, string t, int v, bool publishDiagnostics = true)
-        {
-        }
-
-        public void Remove(string u)
-        {
-        }
-
-        public bool TryGet(string u, out TrackedDocument doc)
-        {
-            if (string.Equals(u, uri, StringComparison.OrdinalIgnoreCase))
-            {
-                doc = new TrackedDocument(uri, text, 1);
-                return true;
-            }
-
-            doc = default!;
-            return false;
-        }
-    }
 }

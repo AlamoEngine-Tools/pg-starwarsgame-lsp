@@ -66,9 +66,8 @@ public static class SuppressionCodeActionBuilder
         SuppressionCommentFormat format,
         string[] lines,
         IReadOnlyList<SuppressionInsertionPoint> points,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var actions = points
             .Where(p => p.Scope != SuppressionScope.Global)
             .Select(p => Insert(documentUri, diagnostic, id, format, lines, p, messages))

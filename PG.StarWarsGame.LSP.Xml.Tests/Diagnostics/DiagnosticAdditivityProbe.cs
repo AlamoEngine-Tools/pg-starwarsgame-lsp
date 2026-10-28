@@ -12,7 +12,6 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
@@ -70,7 +69,7 @@ public sealed class DiagnosticAdditivityProbe
     [Fact]
     public async Task The_position_keyed_fix_cache_keeps_only_the_last_one()
     {
-        var host = new ProbeWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(Uri, Xml, 1);
         var publisher = Publisher(out _, host);
 
@@ -85,27 +84,23 @@ public sealed class DiagnosticAdditivityProbe
 
     private static IReadOnlyList<Diagnostic> Collect()
     {
-        var publisher = Publisher(out var index, new ProbeWorkspaceHost());
+        var publisher = Publisher(out var index, new FakeGameWorkspaceHost());
         return publisher.Collect(Uri, Xml, index);
     }
 
     private static XmlDiagnosticsPublisher Publisher(out GameIndex index, IGameWorkspaceHost host)
     {
-        var schema = new ProbeSchemaProvider();
+        var schema = ProbeSchemaProvider.Build();
         var fileHelper = new FileHelper(new MockFileSystem());
         index = GameIndex.Empty;
 
-        return new XmlDiagnosticsPublisher(
-            _ => { },
-            new ProbeIndexService(),
+        return XmlPublisherFixture.Create(
+            new RecordingDiagnosticsSink(),
+            new FakeGameIndexService(),
             host,
             schema,
             new XmlDiagnosticsHandlerRegistry(
                 [new FirstProbeHandler(), new SecondProbeHandler()]),
-            new XmlDocumentFactProducer(fileHelper, schema, new ProbeFileTypeRegistry(),
-                new XmlStructuralValidator()),
-            new ProbeIndexFactProducer(),
-            new ProbeStoryFactProducer(),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             new ProbeFileTypeRegistry(),
             fileHelper);
@@ -132,7 +127,7 @@ file sealed class SecondProbeHandler : XmlDiagnosticsHandler<XmlTagValueFact>
     }
 }
 
-file sealed class ProbeSchemaProvider : ISchemaProvider
+file static class ProbeSchemaProvider
 {
     private static readonly XmlTagDefinition Health = new()
     {
@@ -140,123 +135,11 @@ file sealed class ProbeSchemaProvider : ISchemaProvider
         ValueType = XmlValueType.Float
     };
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public static FakeSchemaProvider Build()
     {
-        return tagName.Equals(Health.Tag, StringComparison.OrdinalIgnoreCase) ? Health : null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => [Health];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-}
-
-file sealed class ProbeIndexFactProducer : IXmlIndexFactProducer
-{
-    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
-    {
-        return [];
-    }
-}
-
-file sealed class ProbeStoryFactProducer : IStoryFactProducer
-{
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
-    {
-        return [];
-    }
-}
-
-file sealed class ProbeIndexService : IGameIndexService
-{
-    public GameIndex Current => GameIndex.Empty;
-
-    public event Action<GameIndex>? IndexChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<ILocalisationIndex>? LocalisationChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public event Action<GameIndex>? DynamicEnumChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-    {
-        return Task.CompletedTask;
-    }
-
-    public void InjectDocument(DocumentIndex document)
-    {
-    }
-
-    public void RemoveDocument(string uri)
-    {
-    }
-
-    public void ApplyBaseline(BaselineIndex baseline)
-    {
-    }
-
-    public void ApplyLocalisation(ILocalisationIndex index)
-    {
-    }
-
-    public void ApplyAssetFiles(IAssetFileIndex index)
-    {
-    }
-
-    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-    {
-    }
-
-    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-    {
-    }
-
-    public void ApplyWorkspaceEnumValueDefinitions(
-        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-    {
-    }
-
-    public IDisposable BeginBulkUpdate()
-    {
-        return NullProbeDisposable.Instance;
+        return new SchemaProviderBuilder()
+            .WithTag(Health)
+            .Build();
     }
 }
 
@@ -267,35 +150,6 @@ file sealed class NullProbeDisposable : IDisposable
     public void Dispose()
     {
     }
-}
-
-file sealed class ProbeWorkspaceHost : IGameWorkspaceHost
-{
-    private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-    {
-        _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
-    }
-
-    public void Remove(string uri)
-    {
-        _docs.Remove(uri);
-    }
-
-    public bool TryGet(string uri, out TrackedDocument doc)
-    {
-        if (_docs.TryGetValue(uri, out var d))
-        {
-            doc = d;
-            return true;
-        }
-
-        doc = default!;
-        return false;
-    }
-
-    public IEnumerable<TrackedDocument> All => _docs.Values;
 }
 
 file sealed class ProbeFileTypeRegistry : IFileTypeRegistry

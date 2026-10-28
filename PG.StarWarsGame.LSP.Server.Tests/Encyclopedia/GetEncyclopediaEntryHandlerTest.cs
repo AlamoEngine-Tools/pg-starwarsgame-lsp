@@ -6,6 +6,8 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
+using PG.StarWarsGame.LSP.Server.Tests.Assets;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Encyclopedia;
 
@@ -38,7 +40,7 @@ public sealed class GetEncyclopediaEntryHandlerTest
 
     private static GameSymbol Sym(string id, string? variantBaseId = null)
     {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, "SpaceUnit",
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin($"file:///{id}.xml", 0, 0), null, variantBaseId);
     }
 
@@ -52,8 +54,10 @@ public sealed class GetEncyclopediaEntryHandlerTest
     private static GetEncyclopediaEntryHandler Handler(
         GameIndex index, FakeVariantTagSource source, ILspConfigurationProvider? config = null)
     {
-        return new GetEncyclopediaEntryHandler(new FakeGameIndexService(index), new NullSchemaProvider(), source,
-            config ?? new FakeLspConfigurationProvider());
+        return new GetEncyclopediaEntryHandler(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
+            source,
+            config ?? new FakeLspConfigurationProvider(),
+            new NoWorkspaceIcons(), new NoShipNames(), new StubProjects(null), new MockFileSystem());
     }
 
     private static VariantTag Tag(string name, string value)
@@ -329,6 +333,36 @@ public sealed class GetEncyclopediaEntryHandlerTest
             .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
 
         Assert.Null(result.PopulationValue);
+    }
+
+    [Fact]
+    public async Task Handle_PopulationValueWrittenWithBlanks_ReadsIt()
+    {
+        var index = IndexWith(new FakeLocalisation(), Sym("U"));
+        var source = new FakeVariantTagSource().With("U", Tag("Population_Value", " 3 "));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Equal(3, result.PopulationValue);
+    }
+
+    [Fact]
+    public async Task Handle_RepeatedTag_ShowsTheLaterValue()
+    {
+        // The card reads every tag through EffectiveObject's accessors, so a repeated tag shows the
+        // occurrence the game keeps and the diagnostics report - the last one.
+        var loca = new FakeLocalisation().With("TEXT_FIRST", "First").With("TEXT_LATER", "Later");
+        var index = IndexWith(loca, Sym("U"));
+        var source = new FakeVariantTagSource().With("U",
+            Tag("Text_ID", "TEXT_FIRST"), Tag("Text_ID", "TEXT_LATER"),
+            Tag("Population_Value", "2"), Tag("Population_Value", "4"));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Equal("Later", result.DisplayName);
+        Assert.Equal(4, result.PopulationValue);
     }
 
     [Fact]

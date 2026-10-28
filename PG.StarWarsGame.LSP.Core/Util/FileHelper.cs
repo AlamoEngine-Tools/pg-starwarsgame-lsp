@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Util;
 
@@ -24,7 +25,7 @@ public sealed class FileHelper : IFileHelper
     /// </remarks>
     public string PathToFileUri(string path)
     {
-        var forward = path.Replace('\\', '/');
+        var forward = GamePaths.Forward(path);
         return forward.StartsWith('/') ? "file://" + forward : "file:///" + forward;
     }
 
@@ -68,7 +69,7 @@ public sealed class FileHelper : IFileHelper
 
     public string NormalizeGamePath(string raw)
     {
-        return raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+        return GamePaths.Key(raw);
     }
 
     public string? FileUriToPath(string fileUri)
@@ -81,18 +82,18 @@ public sealed class FileHelper : IFileHelper
     }
 
     // Case-insensitive path traversal so game files with mixed case work on Linux too.
-    public string? TraverseCaseInsensitive(IFileSystem _fs, string dir, string[] parts)
+    public string? TraverseCaseInsensitive(IFileSystem fs, string dir, string[] parts)
     {
         var current = dir;
         for (var i = 0; i < parts.Length; i++)
         {
-            if (!_fs.Directory.Exists(current)) return null;
-            var match = _fs.Directory.EnumerateFileSystemEntries(current)
+            if (!fs.Directory.Exists(current)) return null;
+            var match = fs.Directory.EnumerateFileSystemEntries(current)
                 .FirstOrDefault(e => string.Equals(
-                    _fs.Path.GetFileName(e), parts[i], StringComparison.OrdinalIgnoreCase));
+                    fs.Path.GetFileName(e), parts[i], StringComparison.OrdinalIgnoreCase));
             if (match is null) return null;
             if (i == parts.Length - 1)
-                return _fs.File.Exists(match) ? match : null;
+                return fs.File.Exists(match) ? match : null;
             current = match;
         }
 

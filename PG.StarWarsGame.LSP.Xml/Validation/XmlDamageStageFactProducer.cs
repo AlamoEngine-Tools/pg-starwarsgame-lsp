@@ -2,17 +2,23 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Core.Xml;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 /// <inheritdoc />
 public sealed class XmlDamageStageFactProducer(ISchemaProvider schema, IVariantTagSource tagSource)
-    : IXmlDamageStageFactProducer
+    : IXmlFactProducer
 {
+    public string Name => "damageStage";
+
+    public bool AppliesTo(string documentUri)
+    {
+        return true;
+    }
+
     private const string AlternatesTag = "Land_Damage_Alternates";
 
     public IReadOnlyList<XmlFact> Produce(

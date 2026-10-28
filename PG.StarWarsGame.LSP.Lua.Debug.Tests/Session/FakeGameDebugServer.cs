@@ -49,6 +49,7 @@ internal sealed class FakeGameDebugServer : IAsyncDisposable
 
     public string? ClientName { get; private set; }
 
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global - read by the adapter and session tests
     public bool HelloReceived { get; private set; }
 
     public bool GoodbyeReceived { get; private set; }
@@ -59,15 +60,18 @@ internal sealed class FakeGameDebugServer : IAsyncDisposable
 
     public Dictionary<int, List<ThreadEntry>> Threads { get; } = [];
 
+    // ReSharper disable once CollectionNeverUpdated.Global - the fake supports scenarios no test writes yet
     public Dictionary<int, List<string>> ChildScripts { get; } = [];
 
     public Dictionary<(int ScriptId, string Name), (int Type, string Text)> Variables { get; } = [];
 
+    // ReSharper disable once CollectionNeverUpdated.Global - the fake supports scenarios no test writes yet
     public Dictionary<(int ScriptId, string Table), List<TableMember>> Tables { get; } = [];
 
     public Func<int, string, string> ExecuteResult { get; set; } = (_, text) => $"ran: {text}";
 
     /// <summary>When set, thread-list requests are swallowed, so a request times out.</summary>
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global - a fake switch no test flips yet
     public bool IgnoreThreadRequests { get; set; }
 
     /// <summary>Drop this many inbound guaranteed datagrams before processing them, to force resends.</summary>
@@ -83,6 +87,7 @@ internal sealed class FakeGameDebugServer : IAsyncDisposable
 
     public int CallstackSize { get; private set; }
 
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global - read by the adapter and session tests
     public int SelectedLevel { get; private set; } = -1;
 
     public IReadOnlyList<LuaDebugMessage> Received
@@ -135,7 +140,9 @@ internal sealed class FakeGameDebugServer : IAsyncDisposable
         _socket.Dispose();
         try
         {
+#pragma warning disable VSTHRD003 // the fake awaits its own loop
             await _loop;
+#pragma warning restore VSTHRD003
         }
         catch (OperationCanceledException)
         {

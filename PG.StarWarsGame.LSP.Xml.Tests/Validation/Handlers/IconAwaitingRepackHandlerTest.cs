@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -19,8 +20,8 @@ public sealed class IconAwaitingRepackHandlerTest
     private static DiagnosticsContext Context(params string[] awaitingRepack)
     {
         return new DiagnosticsContext(
-            new EmptySchemaProvider(), GameIndex.Empty, "file:///u.xml", "en",
-            awaitingRepack.ToHashSet(StringComparer.OrdinalIgnoreCase));
+            new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///u.xml", "en",
+            awaitingRepack.ToHashSet(StringComparer.OrdinalIgnoreCase)) { Messages = TestCatalogues.English };
     }
 
     private static XmlTagValueFact Fact(string tagName, string value)
@@ -74,7 +75,8 @@ public sealed class IconAwaitingRepackHandlerTest
     [Fact]
     public void Silent_WhenTheContextCarriesNoIconInformation()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), GameIndex.Empty, "file:///u.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), GameIndex.Empty, "file:///u.xml", "en")
+            { Messages = TestCatalogues.English };
 
         Assert.Empty(Run(ctx, Fact("Icon_Name", "I_BUTTON_LUKE.TGA")));
     }

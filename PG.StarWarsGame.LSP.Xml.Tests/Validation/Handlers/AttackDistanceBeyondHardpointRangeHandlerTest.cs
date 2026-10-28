@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -140,6 +141,11 @@ public sealed class AttackDistanceBeyondHardpointRangeHandlerTest
 
     private sealed class FakeObjects((string Id, EffectiveTag[] Tags)[] objects) : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string id)
         {
             foreach (var (objectId, tags) in objects)

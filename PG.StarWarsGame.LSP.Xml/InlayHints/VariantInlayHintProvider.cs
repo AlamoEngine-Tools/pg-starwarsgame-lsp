@@ -31,7 +31,8 @@ internal sealed class VariantInlayHintProvider : IXmlInlayHintProvider
         if (objectId is null)
             return [];
 
-        var effective = new EffectiveObjectResolver(ctx.Index, ctx.Schema, _tagSource).Resolve(objectId);
+        var resolver = new EffectiveObjectResolver(ctx.Index, ctx.Schema, _tagSource);
+        var effective = ctx.DefinitionHere(objectId) is { } here ? resolver.Resolve(here) : resolver.Resolve(objectId);
         if (!effective.Found)
             return [];
 

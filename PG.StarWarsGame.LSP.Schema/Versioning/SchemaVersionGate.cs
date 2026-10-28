@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using JetBrains.Annotations;
 using Semver;
 
 namespace PG.StarWarsGame.LSP.Schema.Versioning;
@@ -44,6 +45,7 @@ public enum SchemaVersionCompatibility
 ///     User-facing explanation, empty when there is nothing to say. Written for a
 ///     <c>window/showMessage</c> balloon, so it names the versions and the remedy.
 /// </param>
+[PublicAPI]
 public sealed record SchemaVersionCheck(
     SchemaVersionCompatibility Compatibility,
     string? DeclaredVersion,

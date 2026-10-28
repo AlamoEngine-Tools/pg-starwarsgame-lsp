@@ -25,7 +25,7 @@ public sealed partial class FloatListHandler : SingleValueTypeHandlerBase
             ];
 
         var parts = Separator().Split(trimmed);
-        if (parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
+        if (parts.Any(p => !EngineNumber.TryParseFloat(p, out _)))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

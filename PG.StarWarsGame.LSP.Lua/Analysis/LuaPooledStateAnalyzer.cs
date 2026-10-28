@@ -214,9 +214,8 @@ internal static class LuaPooledStateAnalyzer
         { "Sleep", "PumpEvents", "BlockOnCommand" };
 
     public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree, LuaPooledState state,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var definitionTime = DefinitionTime(root, state);
         var diagnostics = new List<LspDiagnostic>();

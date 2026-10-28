@@ -30,7 +30,7 @@ public sealed class EawSchemaCampaignStoryTagTest
             string.Equals(t.Tag, tagName, StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(tag);
-        Assert.Equal(ReferenceKind.WorkspaceFile, tag!.ReferenceKind);
+        Assert.Equal(ReferenceKind.WorkspaceFile, tag.ReferenceKind);
         Assert.Equal("StoryPlotManifest", tag.ReferenceType);
     }
 
@@ -51,7 +51,7 @@ public sealed class EawSchemaCampaignStoryTagTest
             string.Equals(t.Tag, tagName, StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(tag);
-        Assert.Equal(ReferenceKind.WorkspaceFile, tag!.ReferenceKind);
+        Assert.Equal(ReferenceKind.WorkspaceFile, tag.ReferenceKind);
         Assert.Equal(expectedReferenceType, tag.ReferenceType);
     }
 
@@ -74,7 +74,7 @@ public sealed class EawSchemaCampaignStoryTagTest
             string.Equals(t.Tag, "Debug_Hot_Key_Load_Map_Script", StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(tag);
-        Assert.Equal(ReferenceKind.WorkspaceFile, tag!.ReferenceKind);
+        Assert.Equal(ReferenceKind.WorkspaceFile, tag.ReferenceKind);
         Assert.Equal("StoryPlotManifest", tag.ReferenceType);
     }
 
@@ -87,7 +87,7 @@ public sealed class EawSchemaCampaignStoryTagTest
             string.Equals(t.Tag, "Debug_Hot_Key_Load_Map", StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(tag);
-        Assert.Equal(ReferenceKind.MapFile, tag!.ReferenceKind);
+        Assert.Equal(ReferenceKind.MapFile, tag.ReferenceKind);
     }
 
     private static IReadOnlyList<RawTagDefinition> LoadTags(string tagFile)

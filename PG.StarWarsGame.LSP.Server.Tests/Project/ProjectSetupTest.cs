@@ -1,7 +1,8 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Testing;
@@ -22,7 +23,8 @@ public sealed class ProjectSetupTest
     {
         var setup = ProjectSetup.Named(name);
         var fileHelper = new FileHelper(setup.Disk());
-        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
+        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance,
+            new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var resolver = new ModProjectResolver(fileHelper, loader,
             new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
             NullLogger<ModProjectResolver>.Instance);

@@ -42,16 +42,16 @@ public sealed class OverrideCodeLensProviderTest
         var index = TwoLayerIndex(out _, out var rev);
 
         var lens = new OverrideCodeLensProvider().Handle(
-            new CodeLensSymbolContext(rev, (FileOrigin)rev.Origin, index));
+            new CodeLensSymbolContext(rev, (FileOrigin)rev.Origin, index) { Messages = TestCatalogues.English });
 
         Assert.NotNull(lens);
-        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens!.Command!.Name);
+        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens.Command!.Name);
         Assert.Contains("UNIT_A", lens.Command.Title);
         Assert.Contains("Core Library", lens.Command.Title);
 
-        var locations = (JArray)lens.Command.Arguments![2]!;
+        var locations = (JArray)lens.Command.Arguments![2];
         Assert.Single(locations);
-        Assert.Equal("file:///core/u.xml", (string)locations[0]!["uri"]!);
+        Assert.Equal("file:///core/u.xml", (string)locations[0]["uri"]!);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class OverrideCodeLensProviderTest
         var index = TwoLayerIndex(out var core, out _);
 
         var lens = new OverrideCodeLensProvider().Handle(
-            new CodeLensSymbolContext(core, (FileOrigin)core.Origin, index));
+            new CodeLensSymbolContext(core, (FileOrigin)core.Origin, index) { Messages = TestCatalogues.English });
 
         Assert.Null(lens);
     }
@@ -78,6 +78,6 @@ public sealed class OverrideCodeLensProviderTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
         Assert.Null(new OverrideCodeLensProvider().Handle(
-            new CodeLensSymbolContext(only, (FileOrigin)only.Origin, index)));
+            new CodeLensSymbolContext(only, (FileOrigin)only.Origin, index) { Messages = TestCatalogues.English }));
     }
 }

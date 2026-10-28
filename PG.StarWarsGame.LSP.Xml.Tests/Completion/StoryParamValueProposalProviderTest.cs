@@ -56,15 +56,6 @@ public sealed class StoryParamValueProposalProviderTest
         };
     }
 
-    private static ParamDefinition ScalarParam(XmlValueType valueType)
-    {
-        return new ParamDefinition
-        {
-            Position = 0,
-            ValueType = valueType
-        };
-    }
-
     /// <summary>A story-style param: raw referenceType string only, no resolved ObjectType.</summary>
     private static ParamDefinition RawRefParam(string referenceTypeName,
         XmlValueType valueType = XmlValueType.NameReference)

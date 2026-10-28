@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.ModBrowser;
 using PG.StarWarsGame.LSP.Server.Tests.Preview;
 using System.IO.Abstractions.TestingHelpers;
@@ -37,7 +36,7 @@ public sealed class ModBrowserHandlersTest
     public async Task EveryRequest_AnswersFromTheIndex()
     {
         var index = new FakeGameIndexService(s_index);
-        var schema = new NullSchemaProvider();
+        var schema = new SchemaProviderBuilder().Build();
         var layers = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
         var assets = new FakeAssets();
 

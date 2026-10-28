@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -214,7 +213,7 @@ public sealed class RequiredTagsRuleTest
     {
         var producer = new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
-            new EmptySchemaProvider(),
+            new SchemaProviderBuilder().Build(),
             new EmptyFileTypeRegistry(),
             new XmlStructuralValidator(),
             CrossTagRuleSets.RequiredTags());

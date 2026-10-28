@@ -48,8 +48,8 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
         var luaPath = Path.Combine(workspace, InterdictorRel);
         var xmlUri = DocumentUri.FromFileSystemPath(xmlPath);
         var luaUri = DocumentUri.FromFileSystemPath(luaPath);
-        var xmlLines = await File.ReadAllLinesAsync(xmlPath);
-        var luaLines = await File.ReadAllLinesAsync(luaPath);
+        var xmlLines = await File.ReadAllLinesAsync(xmlPath, TestContext.Current.CancellationToken);
+        var luaLines = await File.ReadAllLinesAsync(luaPath, TestContext.Current.CancellationToken);
 
         try
         {
@@ -69,7 +69,7 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
                     Text = string.Join(Environment.NewLine, luaLines)
                 }
             });
-            await Task.Delay(300);
+            await Task.Delay(300, TestContext.Current.CancellationToken);
 
             // ── XML: tag-name completion inside <SpaceUnit> ────────────────────
             var (xmlLine, xmlCol) = FindFirstGrandchildElementPosition(xmlLines);
@@ -132,8 +132,8 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
         var luaPath = Path.Combine(workspace, InterdictorRel);
         var xmlUri = DocumentUri.FromFileSystemPath(xmlPath);
         var luaUri = DocumentUri.FromFileSystemPath(luaPath);
-        var xmlLines = await File.ReadAllLinesAsync(xmlPath);
-        var luaLines = await File.ReadAllLinesAsync(luaPath);
+        var xmlLines = await File.ReadAllLinesAsync(xmlPath, TestContext.Current.CancellationToken);
+        var luaLines = await File.ReadAllLinesAsync(luaPath, TestContext.Current.CancellationToken);
 
         try
         {
@@ -153,7 +153,7 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
                     Text = string.Join(Environment.NewLine, luaLines)
                 }
             });
-            await Task.Delay(300);
+            await Task.Delay(300, TestContext.Current.CancellationToken);
 
             // ── Lua → Xml: Find_Object_Type("Marauder_Missile_Cruiser") ────────
             var (luaLine, luaCol) =
@@ -170,7 +170,7 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
                 }, luaCts.Token);
 
             Assert.NotNull(luaResult);
-            var luaLocations = luaResult!
+            var luaLocations = luaResult
                 .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri).ToList();
             Assert.NotEmpty(luaLocations);
             Assert.Contains(luaLocations, u =>
@@ -192,7 +192,7 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
                 }, xmlCts.Token);
 
             Assert.NotNull(xmlResult);
-            var xmlLocations = xmlResult!
+            var xmlLocations = xmlResult
                 .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri).ToList();
             Assert.NotEmpty(xmlLocations);
             Assert.Contains(xmlLocations, u =>

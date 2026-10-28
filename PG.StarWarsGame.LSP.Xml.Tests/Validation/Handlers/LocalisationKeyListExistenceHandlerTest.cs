@@ -5,6 +5,7 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -30,7 +31,8 @@ public sealed class LocalisationKeyListExistenceHandlerTest
     private static DiagnosticsContext CtxWithKeys(params string[] keys)
     {
         var index = GameIndex.Empty with { Localisation = new ValueLocIndex(keys) };
-        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
     }
 
     [Fact]

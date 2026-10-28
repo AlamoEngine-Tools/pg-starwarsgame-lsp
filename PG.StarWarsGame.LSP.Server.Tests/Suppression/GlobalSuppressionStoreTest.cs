@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -47,7 +48,7 @@ public sealed class GlobalSuppressionStoreTest
         var fs = new MockFileSystem(files);
         var store = new GlobalSuppressionStore(
             new StubReloadService(WorkspaceConfiguration.Empty with { Layers = layers }),
-            new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance, notifier);
+            new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance, notifier, ResxMessageCatalog.Server("en"));
         return (store, fs);
     }
 
@@ -70,7 +71,7 @@ public sealed class GlobalSuppressionStoreTest
         var setup = ProjectSetup.Named(name);
         var fs = setup.Disk();
         var store = new GlobalSuppressionStore(new StubReloadService(setup.Configuration()), new FileHelper(fs),
-            NullLogger<GlobalSuppressionStore>.Instance, new RecordingUserNotifier());
+            NullLogger<GlobalSuppressionStore>.Instance, new RecordingUserNotifier(), ResxMessageCatalog.Server("en"));
 
         store.Add(SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), "intentional in this mod");
 
@@ -102,6 +103,19 @@ public sealed class GlobalSuppressionStoreTest
         Assert.Equal([CommentInsideValue], store.GetAll());
     }
 
+    // The bare array is older than version 1, so it gains the default-off entry too: the migration
+    // wrapping it jumped straight to version 2 and skipped the one that adds it, turning the
+    // finding on for the project.
+    [Fact]
+    public void BareArrayFile_GainsTheDefaultEntryOnce()
+    {
+        var (store, fs) = Build(existingJson: """[ { "id": "aetswg-010-0001" } ]""");
+
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), CommentInsideValue], store.GetAll());
+        var written = JsonNode.Parse(fs.File.ReadAllText(SidecarPath))!.AsObject();
+        Assert.Equal(SuppressionsDocument.Version.ToString(), (string?)written["_typeVersion"]);
+    }
+
     [Fact]
     public void CurrentFileWithoutTheEntry_HasOptedIn_AndIsNotChanged()
     {
@@ -127,7 +141,8 @@ public sealed class GlobalSuppressionStoreTest
             {
                 Layers = [new ProjectLayer(1, "Mod", [], [], [], [], null, PgprojPath.Replace('\\', '/'))]
             }),
-            new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance);
+            new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance, new RecordingUserNotifier(),
+            ResxMessageCatalog.Server("en"));
 
         Assert.Equal(
             [CommentInsideValue, SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], reread.GetAll());
@@ -184,7 +199,8 @@ public sealed class GlobalSuppressionStoreTest
         var (store, _) = Build(existingJson:
             """[{"id":"garbage"},{"id":"aetswg-010-0001"}]""");
 
-        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], store.GetAll());
+        // A bare array migrates like any file older than version 2: it gains the default-off entry.
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), CommentInsideValue], store.GetAll());
     }
 
     // The failure this prevents: suppressions.json is hand-editable and committed, so a typo in it
@@ -329,7 +345,7 @@ public sealed class GlobalSuppressionStoreTest
     private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
+        public WorkspaceConfiguration LastWorkspaceConfig => config;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)

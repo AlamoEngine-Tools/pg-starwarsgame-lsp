@@ -93,7 +93,7 @@ public enum TagSemanticType
     FactionMarkupPairList,
 
     /// <summary>
-    ///     A <c>Faction, AIPlayerType</c> pair: slot 0 names a <see cref="Faction" /> object, slot 1
+    ///     A <c>Faction, AIPlayerType</c> pair: slot 0 names a <c>Faction</c> object, slot 1
     ///     the AI player type the faction is played by. Used by <c>Campaign.AI_Player_Control</c>,
     ///     which repeats - one tag per faction - rather than carrying several pairs in one value.
     ///     The engine reads the value as a plain name list (<see cref="XmlValueType.NameReferenceList" />)

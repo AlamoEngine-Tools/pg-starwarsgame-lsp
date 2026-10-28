@@ -24,7 +24,7 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
 
         var filePath = Path.Combine(LspTestEnvironment.EawWorkspacePath!, "Data", "XML", "Spaceunitscapital.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         // Replace one valid SFXEvent_Attack_Hardpoint value with a malformed one (no comma)
         var injected = lines
@@ -62,7 +62,7 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
 
         var filePath = Path.Combine(LspTestEnvironment.EawWorkspacePath!, "Data", "XML", "Spaceunitscapital.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath, TestContext.Current.CancellationToken);
 
         // Settled, not the first publish: both tests open this file at version 1, so a publish still
         // in flight from the other test is indistinguishable from this one's.

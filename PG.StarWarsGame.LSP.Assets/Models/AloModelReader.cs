@@ -105,6 +105,7 @@ public static class AloModelReader
     private const int IndicesPerFace = 3;
 
     /// <summary>Parses <paramref name="bytes" /> as an ALO model.</summary>
+    /// <param name="bytes">The file's bytes.</param>
     /// <param name="options">
     ///     Use <see cref="AloReadOptions.SkipGeometry" /> when only names and structure are wanted.
     /// </param>
@@ -185,6 +186,9 @@ public static class AloModelReader
         return bones;
     }
 
+    /// <param name="bytes">The file's bytes.</param>
+    /// <param name="chunk">The bone's chunk.</param>
+    /// <param name="index">The bone's position in the file's bone list.</param>
     /// <param name="preceding">
     ///     The bones already read. The parent's absolute transform is composed from it, so a parent
     ///     index must point backwards - which the exporter always honours, and which is checked here
@@ -732,7 +736,7 @@ public static class AloModelReader
     ///     component - which is the transpose of the row-vector matrix the engine works in, hence the
     ///     <c>transpose()</c> call in <c>Models.cpp</c>. Transposing on the way in rather than storing
     ///     the file's layout means translation lands where <see cref="Matrix4x4.Translation" /> looks
-    ///     for it, and <see cref="Matrix4x4.Multiply" /> composes parents the same way the engine does.
+    ///     for it, and <see cref="Matrix4x4.Multiply(Matrix4x4, Matrix4x4)" /> composes parents the same way the engine does.
     /// </remarks>
     private static Matrix4x4 ReadTransform(byte[] bytes, int offset)
     {

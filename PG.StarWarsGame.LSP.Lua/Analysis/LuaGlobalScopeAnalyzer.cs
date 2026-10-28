@@ -24,7 +24,7 @@ internal static class LuaGlobalScopeAnalyzer
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, string text, GameIndex index, ILuaApiSchemaProvider schemaProvider,
-        IFileHelper fileHelper, IMessageCatalog? messages = null)
+        IFileHelper fileHelper, IMessageCatalog messages)
     {
         return Analyze(documentUri, LuaSyntaxTree.ParseText(text, s_parseOptions), index, schemaProvider,
             fileHelper, messages);
@@ -32,9 +32,8 @@ internal static class LuaGlobalScopeAnalyzer
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, SyntaxTree tree, GameIndex index, ILuaApiSchemaProvider schemaProvider,
-        IFileHelper fileHelper, IMessageCatalog? messages = null)
+        IFileHelper fileHelper, IMessageCatalog messages)
     {
-        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 

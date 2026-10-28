@@ -81,9 +81,9 @@ public sealed class ExecuteStoryCommandHandlerTest
         var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags { StoryEditing = storyEditing });
         return new ExecuteStoryCommandHandler(
             modelService ?? new StubModelService(),
-            new StubIndexService(index ?? DefaultIndex()),
-            new DocumentTextSource(new FakeHost(), fileHelper, NullLogger<DocumentTextSource>.Instance),
-            new EmptySchema(),
+            new FakeGameIndexService(index ?? DefaultIndex()),
+            new DocumentTextSource(new FakeGameWorkspaceHost(), fileHelper, NullLogger<DocumentTextSource>.Instance),
+            new SchemaProviderBuilder().Build(),
             fileHelper,
             new StubReloadService(WorkspaceConfiguration.Empty with
             {
@@ -91,7 +91,7 @@ public sealed class ExecuteStoryCommandHandlerTest
             }),
             applier,
             config,
-            NullLogger<ExecuteStoryCommandHandler>.Instance);
+            NullLogger<ExecuteStoryCommandHandler>.Instance, TestCatalogues.English);
     }
 
     private static GameIndex DefaultIndex()
@@ -646,14 +646,14 @@ public sealed class ExecuteStoryCommandHandlerTest
             IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
             return new StoryCampaignModel("GC", "Rebel", threads,
                 new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new EmptySchema()).Build([thread]));
+                new StoryGraphBuilder(new SchemaProviderBuilder().Build()).Build([thread]));
         }
     }
 
     private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
+        public WorkspaceConfiguration LastWorkspaceConfig => config;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
@@ -669,143 +669,6 @@ public sealed class ExecuteStoryCommandHandlerTest
         public Task ReloadLocalisationAsync(CancellationToken ct)
         {
             return Task.CompletedTask;
-        }
-    }
-
-    private sealed class FakeHost : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [];
-
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-        }
-
-        public void Remove(string uri)
-        {
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            doc = default!;
-            return false;
-        }
-    }
-
-    private sealed class StubIndexService(GameIndex index) : IGameIndexService
-    {
-        public GameIndex Current => index;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new Noop();
-        }
-
-        private sealed class Noop : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class EmptySchema : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public XmlTagDefinition? GetTag(string t)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string e)
-        {
-            return null;
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string t)
-        {
-            return null;
         }
     }
 }

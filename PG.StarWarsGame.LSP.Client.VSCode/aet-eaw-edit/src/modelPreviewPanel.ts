@@ -12,7 +12,7 @@ import * as vscode from "vscode";
 
 import { subMeshGeometryReply } from "./lsp/subMeshGeometry";
 import { ModelInspectorPanel } from "./modelInspectorPanel";
-import { PanelProject } from "./panelProject";
+import { PanelProject, projectSubjectKey } from "./panelProject";
 import {
     GET_MODEL_DETAIL,
     GetModelDetailResult,
@@ -103,8 +103,10 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     /**
      * Per-subject state, for as long as the window lives.
      *
-     * Keyed by the same key the panel tracker uses, and held on the CLASS rather than the instance
-     * so closing a preview and reopening the same subject picks up where it left off. Deliberately
+     * Keyed by project AND subject, the same key the panel registry files panels under, and held on
+     * the CLASS rather than the instance so closing a preview and reopening the same subject picks up
+     * where it left off. The project is part of the key because two projects can hold an object of
+     * one name, and the camera and selection left on one must not greet the other. Deliberately
      * not written to disk - see `setSubjectState`.
      */
     private static readonly subjectStates = new Map<string, SubjectState>();
@@ -174,7 +176,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     }
 
     private get stateKey(): string {
-        return subjectKey(this.subject);
+        return projectSubjectKey(this.project.key, subjectKey(this.subject));
     }
 
     /**
@@ -254,7 +256,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                     // Beside the room rather than inside it: the two are at different TIERS -
                     // the room follows the person, these follow the project. See
                     // `projectSettingsStorage`.
-                    project: readProjectSettings(),
+                    project: readProjectSettings(this.project.key),
                     subject:
                         ModelPreviewPanel.subjectStates.get(this.stateKey) ??
                         null,
@@ -276,7 +278,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 return;
 
             case "setProjectSettings":
-                saveProjectSettings(message.project);
+                saveProjectSettings(this.project.key, message.project);
                 return;
 
             case "setSubjectState":
@@ -508,7 +510,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
             this.post({
                 type: "viewerSettings",
                 settings: readViewerSettings(),
-                project: readProjectSettings(),
+                project: readProjectSettings(this.project.key),
                 subject:
                     ModelPreviewPanel.subjectStates.get(this.stateKey) ?? null,
             });

@@ -18,14 +18,14 @@ public sealed class GameIndexService : IGameIndexService
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _inflightCts =
         new(DocumentUris.Comparer);
 
-    private readonly IProjectLayerMap? _layerMap;
+    private readonly IProjectLayerMap _layerMap;
     private readonly ILogger<GameIndexService> _logger;
 
     private readonly object _mergeLock = new();
 
     // Production passes a CachedObjectNameHash, so a name leaving or re-entering the index is not
     // hashed again.
-    private readonly IObjectNameHash? _nameHash;
+    private readonly IObjectNameHash _nameHash;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
 
     // Document operations deferred while a bulk update is open. Applying documents one-by-one to
@@ -42,11 +42,11 @@ public sealed class GameIndexService : IGameIndexService
     private int _hasPendingEvent; // 0 = false, 1 = true; int for Interlocked
     private int _suppressionDepth;
 
-    // layerMap is optional so minimal test setups can omit it (rank defaults to 0); production wires
-    // the registered IProjectLayerMap so each document is stamped with its project layer's precedence.
-    // nameHash likewise: without one the name-hash tables stay empty and no collision is found.
+    // The layer map stamps each document with its project layer's precedence; the name hash fills
+    // the collision tables. Both REQUIRED: optional, they were the two dependencies a container
+    // could skip without a word, leaving every rank 0 and every collision unfound (#305).
     public GameIndexService(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
-        ILogger<GameIndexService> logger, IProjectLayerMap? layerMap = null, IObjectNameHash? nameHash = null)
+        ILogger<GameIndexService> logger, IProjectLayerMap layerMap, IObjectNameHash nameHash)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
@@ -85,13 +85,9 @@ public sealed class GameIndexService : IGameIndexService
 
         // Snapshots persist the LayerRank at write time; if the dependency graph changed between
         // sessions the ranks renumber, and a stale rank silently breaks the leaf-ownership gates
-        // (IsLeafOwned, LayerRankOfUri == LeafLayerRank). Re-stamp from the live layer map when
-        // one is registered; minimal setups without a map keep the serialized stamp.
-        if (_layerMap is not null)
-        {
-            var layerRank = _layerMap.GetRank(uri);
-            document = document with { LayerRank = layerRank, LayerName = _layerMap.GetLayerName(layerRank) };
-        }
+        // (IsLeafOwned, LayerRankOfUri == LeafLayerRank). Re-stamp from the live layer map.
+        var layerRank = _layerMap.GetRank(uri);
+        document = document with { LayerRank = layerRank, LayerName = _layerMap.GetLayerName(layerRank) };
 
         if (TryDeferToBulk(new PendingOp(document, null)))
         {
@@ -303,14 +299,18 @@ public sealed class GameIndexService : IGameIndexService
         }
 
         // Cancel any in-flight parse for this URI and register the new one.
-        // AddOrUpdate is atomic: the prior CTS is cancelled before the new one is stored.
+        // AddOrUpdate is atomic: the prior CTS is cancelled before the new one is stored. Both
+        // lambdas run inside AddOrUpdate, before the dispose in the finally block below, so the
+        // "captured variable is disposed" warning does not apply.
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _inflightCts.AddOrUpdate(
             uri,
+            // ReSharper disable once AccessToDisposedClosure
             _ => cts,
             (_, prior) =>
             {
                 prior.Cancel();
+                // ReSharper disable once AccessToDisposedClosure
                 return cts;
             });
 
@@ -335,11 +335,11 @@ public sealed class GameIndexService : IGameIndexService
         // Stamp the owning project layer's precedence (and name) so same-id overrides resolve by
         // rank and the override hint can name the shadowed layer, plus the content hash for the
         // unchanged-content fast path above.
-        var layerRank = _layerMap?.GetRank(uri) ?? 0;
+        var layerRank = _layerMap.GetRank(uri);
         newDoc = newDoc with
         {
             LayerRank = layerRank,
-            LayerName = _layerMap?.GetLayerName(layerRank),
+            LayerName = _layerMap.GetLayerName(layerRank),
             ContentHash = contentHash
         };
 
@@ -541,19 +541,17 @@ public sealed class GameIndexService : IGameIndexService
 
     private uint HashOf(string name)
     {
-        return _nameHash!.Of(name);
+        return _nameHash.Of(name);
     }
 
     /// <summary>
     ///     <paramref name="table" /> with <paramref name="removed" /> taken out and <paramref name="added" />
-    ///     put in - game objects only, and unchanged when the service was given no hash.
+    ///     put in - game objects only.
     /// </summary>
     private ImmutableDictionary<uint, ImmutableArray<GameSymbol>> HashedTable(
         ImmutableDictionary<uint, ImmutableArray<GameSymbol>> table, IEnumerable<GameSymbol> added,
         IEnumerable<GameSymbol> removed)
     {
-        if (_nameHash is null) return table;
-
         Dictionary<uint, List<GameSymbol>>? touched = null;
 
         List<GameSymbol> Bucket(uint hash)
@@ -632,23 +630,23 @@ public sealed class GameIndexService : IGameIndexService
             return index with { Documents = index.Documents.SetItem(doc.DocumentUri, doc) };
 
         // Strip the previous version of this document before applying the new one.
-        var base_ = index.Documents.ContainsKey(doc.DocumentUri)
+        var stripped = index.Documents.ContainsKey(doc.DocumentUri)
             ? StripDocumentFromIndex(index, doc.DocumentUri)
             : index;
 
-        var defs = base_.WorkspaceDefinitions;
+        var defs = stripped.WorkspaceDefinitions;
         foreach (var sym in doc.Symbols)
             defs = defs.TryGetValue(sym.Id, out var arr)
                 ? defs.SetItem(sym.Id, arr.Add(sym))
                 : defs.Add(sym.Id, ImmutableArray.Create(sym));
 
-        var refs = base_.WorkspaceReferences;
+        var refs = stripped.WorkspaceReferences;
         foreach (var reference in doc.References)
             refs = refs.TryGetValue(reference.TargetId, out var arr)
                 ? refs.SetItem(reference.TargetId, arr.Add(reference))
                 : refs.Add(reference.TargetId, ImmutableArray.Create(reference));
 
-        var groups = base_.WorkspaceGroupMemberships;
+        var groups = stripped.WorkspaceGroupMemberships;
         if (!doc.GroupMemberships.IsDefault)
             foreach (var dgm in doc.GroupMemberships)
             {
@@ -658,13 +656,13 @@ public sealed class GameIndexService : IGameIndexService
                     : groups.Add(key, ImmutableArray.Create(dgm.Membership));
             }
 
-        return base_ with
+        return stripped with
         {
-            Documents = base_.Documents.SetItem(doc.DocumentUri, doc),
+            Documents = stripped.Documents.SetItem(doc.DocumentUri, doc),
             WorkspaceDefinitions = defs,
             WorkspaceReferences = refs,
             WorkspaceGroupMemberships = groups,
-            WorkspaceNameHashes = HashedTable(base_.WorkspaceNameHashes, doc.Symbols, [])
+            WorkspaceNameHashes = HashedTable(stripped.WorkspaceNameHashes, doc.Symbols, [])
         };
     }
 

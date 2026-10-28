@@ -2,10 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 
-namespace PG.StarWarsGame.LSP.Xml.Completion;
+namespace PG.StarWarsGame.LSP.Xml.Completion.Strategies;
 
 /// <summary>
 ///     Positional completion for comma-separated tuple value types (e.g. <c>HardPointSfxMap</c>,
@@ -18,18 +17,18 @@ namespace PG.StarWarsGame.LSP.Xml.Completion;
 /// </summary>
 internal sealed class TupleValueCompletionStrategy : IXmlTagValueCompletionStrategy
 {
-    private readonly IXmlCompletionRegistry _completionRegistry;
-    private readonly IXmlValueProposalRegistry _proposals;
+    private readonly IReadOnlyList<IXmlCompletionProvider> _completion;
+    private readonly IReadOnlyList<IXmlValueProposalProvider> _proposals;
     private readonly ISchemaProvider _schema;
 
     public TupleValueCompletionStrategy(
         ISchemaProvider schema,
-        IXmlValueProposalRegistry proposals,
-        IXmlCompletionRegistry completionRegistry)
+        IEnumerable<IXmlValueProposalProvider> proposals,
+        IEnumerable<IXmlCompletionProvider> completion)
     {
         _schema = schema;
-        _proposals = proposals;
-        _completionRegistry = completionRegistry;
+        _proposals = [.. proposals];
+        _completion = [.. completion];
     }
 
     public IEnumerable<CompletionItem> Handle(TagValueCompletionContext ctx)
@@ -125,7 +124,7 @@ internal sealed class TupleValueCompletionStrategy : IXmlTagValueCompletionStrat
                 {
                     Tag = tag.Tag, ValueType = tag.ValueType, ReferenceKind = slot.ReferenceKind
                 };
-                return _completionRegistry.GetProposals(assetTag, ctx.PartialValue, ctx.Index);
+                return _completion.GetProposals(assetTag, ctx.PartialValue, ctx.Index);
             case ReferenceKind.XmlObject when (slot.ObjectType?.TypeName ?? slot.ReferenceTypeName) is { } type:
                 return ObjectReference(ctx, type);
             default:
@@ -156,7 +155,7 @@ internal sealed class TupleValueCompletionStrategy : IXmlTagValueCompletionStrat
             Tag = ctx.TagDef!.Tag, ValueType = ctx.TagDef.ValueType,
             ReferenceKind = ReferenceKind.HardcodedSet, HardcodedSet = set
         };
-        return _completionRegistry.GetProposals(synthetic, ctx.PartialValue, ctx.Index);
+        return _completion.GetProposals(synthetic, ctx.PartialValue, ctx.Index);
     }
 
     private IReadOnlyList<ValueProposal> ObjectReference(TagValueCompletionContext ctx, string typeName)
@@ -167,6 +166,6 @@ internal sealed class TupleValueCompletionStrategy : IXmlTagValueCompletionStrat
             ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = typeName }
         };
-        return _completionRegistry.GetProposals(synthetic, ctx.PartialValue, ctx.Index);
+        return _completion.GetProposals(synthetic, ctx.PartialValue, ctx.Index);
     }
 }

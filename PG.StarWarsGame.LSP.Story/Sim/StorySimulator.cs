@@ -148,20 +148,20 @@ public sealed partial class StorySimulator
     private readonly Dictionary<string, List<List<string>>> _prereqLinesById;
     private readonly Dictionary<(string Type, int Position), string> _rewardParamTypes;
     private readonly List<string> _startupNotes = [];
-    private readonly IStoryWorldSymbols? _symbols;
+    private readonly IStoryWorldSymbols _symbols;
 
     /// <summary>
     ///     <paramref name="symbols" /> answers whether a planet, unit type or faction the author
-    ///     names exists in the game; null skips the check (tests, static callers).
+    ///     names exists in the game; a caller with no index to ask hands in one that says yes.
     ///     <paramref name="scope" /> is the battle this simulator runs, or null for the galactic
     ///     story: the game freezes the galaxy while a battle plays and a battle's plot files only
     ///     ever run there, so a session arms one scope's events and never the other's.
     /// </summary>
-    public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols? symbols = null,
-        string? scope = null, StorySimOptions? options = null, IMessageCatalog? messages = null)
+    public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols symbols,
+        IMessageCatalog messages, string? scope = null, StorySimOptions? options = null)
     {
         _model = model;
-        _messages = messages ?? ResxMessageCatalog.Server("en");
+        _messages = messages;
         _symbols = symbols;
         Options = options ?? StorySimOptions.Default;
         Scope = StoryGraphScoper.IsGalactic(scope) ? null : StoryGraphScoper.BattleKey(scope!);
@@ -788,9 +788,10 @@ public sealed partial class StorySimulator
         var lines = _prereqLinesById[node.Id];
         if (!lines.Any(line => line.All(runtime.FiredEvents.Contains))) return snapshot;
 
+        var armedAt = snapshot.GameplayClock;
         snapshot = Transition(snapshot, node, sourceId, StorySimCause.Prereq,
             "  -> " + _messages.Format("StorySim_Armed", node.Event!.Name),
-            r => r.WithArmed(node.Id, snapshot.GameplayClock));
+            r => r.WithArmed(node.Id, armedAt));
         return IsStoryTrigger(node.Event) ? Fire(snapshot, node, StorySimCause.Prereq, sourceId, depth) : snapshot;
     }
 

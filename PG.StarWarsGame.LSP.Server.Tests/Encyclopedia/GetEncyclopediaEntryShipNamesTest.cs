@@ -7,6 +7,8 @@ using PG.StarWarsGame.LSP.Assets.ShipNames;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.ShipNames;
+using PG.StarWarsGame.LSP.Server.Tests.Assets;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Encyclopedia;
 
@@ -38,7 +40,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
     }
 
     private static async Task<GetEncyclopediaEntryResult> Run(
-        IShipNameCatalogProvider? shipNames, string? shipNameTagValue = "STAR_DESTROYER, Data\\SD.txt")
+        IShipNameCatalogProvider shipNames, string? shipNameTagValue = "STAR_DESTROYER, Data\\SD.txt")
     {
         var source = new FakeVariantTagSource()
             .With(ObjectId, Tag("Encyclopedia_Text", "TEXT_A"), Tag("Encyclopedia_Unit_Class", "Class: Capital"));
@@ -46,7 +48,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
         if (shipNameTagValue is not null)
             source.With("GameConstants", Tag("ShipNameTextFiles", shipNameTagValue));
 
-        var defs = new[] { Sym(ObjectId, "SpaceUnit"), Sym("GameConstants", "GameConstants") }
+        var defs = new[] { Sym(ObjectId, "GameObjectType"), Sym("GameConstants", "GameConstants") }
             .ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase);
 
         var config = new FakeLspConfigurationProvider();
@@ -54,7 +56,8 @@ public sealed class GetEncyclopediaEntryShipNamesTest
 
         var handler = new GetEncyclopediaEntryHandler(
             new FakeGameIndexService(GameIndex.Empty with { WorkspaceDefinitions = defs }),
-            new NullSchemaProvider(), source, config, null, shipNames);
+            new SchemaProviderBuilder().Build(), source, config, new NoWorkspaceIcons(), shipNames,
+            new StubProjects(null), new MockFileSystem());
 
         return await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
     }
@@ -132,7 +135,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
                 ])
         };
 
-        var defs = new[] { Sym(ObjectId, "SpaceUnit") }
+        var defs = new[] { Sym(ObjectId, "GameObjectType") }
             .ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase);
 
         var config = new FakeLspConfigurationProvider();
@@ -143,9 +146,11 @@ public sealed class GetEncyclopediaEntryShipNamesTest
             {
                 WorkspaceDefinitions = defs, Baseline = baseline
             }),
-            new NullSchemaProvider(), source, config, null, stub);
+            new SchemaProviderBuilder().Build(), source, config, new NoWorkspaceIcons(), stub,
+            new StubProjects(null), new MockFileSystem());
 
-        var result = await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
+        var result = await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("STAR_DESTROYER, Data\\SD.txt", stub.LastTagValue);
         Assert.NotNull(result.ShipNames);
@@ -176,9 +181,9 @@ public sealed class GetEncyclopediaEntryShipNamesTest
     }
 
     [Fact]
-    public async Task Handle_WithoutTheShipNameService_StillReturnsTheEntry()
+    public async Task Handle_WithNoShipNamePools_StillReturnsTheEntry()
     {
-        var result = await Run(null);
+        var result = await Run(new NoShipNames());
 
         Assert.True(result.Found);
         Assert.Null(result.ShipNames);

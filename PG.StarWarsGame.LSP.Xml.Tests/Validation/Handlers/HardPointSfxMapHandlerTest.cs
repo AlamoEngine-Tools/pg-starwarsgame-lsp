@@ -55,7 +55,8 @@ public sealed class HardPointSfxMapHandlerTest
             Name = "HardPointType", Kind = EnumKind.SchemaFixed,
             Values = names.Select(n => new EnumValueDefinition { Name = n }).ToList()
         };
-        return new DiagnosticsContext(new StubSchemaWithEnum(enumDef), GameIndex.Empty, "file:///test.xml", "en");
+        return new DiagnosticsContext(new SchemaProviderBuilder().WithEnum(enumDef).Build(), GameIndex.Empty,
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
     }
 
     [Theory]
@@ -103,8 +104,8 @@ public sealed class HardPointSfxMapHandlerTest
     [Fact]
     public void SfxEvent_UnresolvedSymbol_HighlightsOnlyTheSfxToken()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithSfxEvent("Other_SFX"),
-            "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Other_SFX"),
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(
             XmlHandlerTestFixtures.MakeFact(Tag, "HARDPOINT_WEAPON, Missing_SFX"), ctx).ToList();
 
@@ -130,8 +131,8 @@ public sealed class HardPointSfxMapHandlerTest
     [Fact]
     public void SfxEvent_ResolvedSymbol_ReturnsNoDiagnostics()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithSfxEvent("Unit_HP_LASER"),
-            "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Unit_HP_LASER"),
+            "file:///test.xml", "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HARD_POINT_WEAPON_LASER, Unit_HP_LASER"), ctx)
             .ToList();
         Assert.Empty(results);
@@ -140,8 +141,9 @@ public sealed class HardPointSfxMapHandlerTest
     [Fact]
     public void SfxEvent_UnresolvedSymbol_WithLoadedIndex_ReturnsError()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithSfxEvent("Other_SFX"), "file:///test.xml",
-            "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Other_SFX"),
+            "file:///test.xml",
+            "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HARD_POINT_WEAPON_LASER, Missing_SFX"), ctx)
             .ToList();
         var d = Assert.Single(results);
@@ -160,49 +162,10 @@ public sealed class HardPointSfxMapHandlerTest
     [Fact]
     public void SfxEvent_EmptyName_IsAllowed()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithSfxEvent("Some_SFX"), "file:///test.xml",
-            "en");
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), IndexWithSfxEvent("Some_SFX"),
+            "file:///test.xml",
+            "en") { Messages = TestCatalogues.English };
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HARD_POINT_WEAPON_LASER,"), ctx).ToList();
         Assert.Empty(results);
-    }
-
-    private sealed class StubSchemaWithEnum(EnumDefinition enumDef) : ISchemaProvider
-    {
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string name)
-        {
-            return name.Equals(enumDef.Name, StringComparison.OrdinalIgnoreCase) ? enumDef : null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [enumDef];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
     }
 }

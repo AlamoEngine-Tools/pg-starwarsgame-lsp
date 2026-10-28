@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -34,7 +35,7 @@ public sealed class PgprojMigrationOfferTest
         var prompt = new FakePrompt { Accept = accept };
         return (new PgprojMigrationOffer(
             new FileHelper(fs), prompt, new RecordingUserNotifier(),
-            NullLogger<PgprojMigrationOffer>.Instance), fs, prompt);
+            NullLogger<PgprojMigrationOffer>.Instance, ResxMessageCatalog.Server("en")), fs, prompt);
     }
 
     // ── declining ────────────────────────────────────────────────────────────
@@ -99,7 +100,7 @@ public sealed class PgprojMigrationOfferTest
     [Fact]
     public async Task TheProposal_CarriesTheFileAndTheTextThatWouldBeWritten()
     {
-        var (offer, fs, prompt) = Build(false);
+        var (offer, _, prompt) = Build(false);
         offer.Migrated(Path, Migrated(), []);
 
         await offer.OfferPendingAsync(CancellationToken.None);

@@ -55,6 +55,8 @@ public static class WorkspaceSettingsDocument
     /// </summary>
     private sealed class AdoptUnversionedFile : IDocumentMigration
     {
+        // The interface member returns the outer constant it is named after; hiding it is the point.
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         public string TypeName => WorkspaceSettingsDocument.TypeName;
         public TypeVersion From => TypeVersion.Zero("aetswg");
         public TypeVersion To => Version;
@@ -88,7 +90,7 @@ public sealed class WorkspaceSettingsStore : IWorkspaceSettingsStore
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger<WorkspaceSettingsStore> logger,
-        IMessageCatalog? messages = null)
+        IMessageCatalog messages)
     {
         _store = new SidecarStore<WorkspaceSettings>(
             "settings/workspace.settings.json", WorkspaceSettingsDocument.TypeName,

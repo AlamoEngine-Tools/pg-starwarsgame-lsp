@@ -35,7 +35,7 @@ public sealed class PreviewSceneChangedSmokeTest(EawLspServerFixture fixture)
         var filePath = Path.Combine(
             LspTestEnvironment.EawWorkspacePath!, "Data", "XML", "Spaceunitsfighters.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var text = await File.ReadAllTextAsync(filePath);
+        var text = await File.ReadAllTextAsync(filePath, TestContext.Current.CancellationToken);
 
         // Armed BEFORE the edit. The notification is debounced by 100 ms, not delayed by a round
         // trip, so subscribing afterwards is a race this test would lose intermittently.

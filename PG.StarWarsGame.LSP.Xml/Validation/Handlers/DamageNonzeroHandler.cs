@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -15,7 +16,7 @@ public sealed class DamageNonzeroHandler : XmlDiagnosticsHandler<XmlTagValueFact
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         var trimmed = fact.RawValue.Trim();
-        if (!LenientFloatParser.TryParse(trimmed, out var value))
+        if (!EngineNumber.TryParseFloat(trimmed, out var value))
             return [];
 
         if (value <= 0f)

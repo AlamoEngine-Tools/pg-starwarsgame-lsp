@@ -51,6 +51,6 @@ public sealed class XmlValueTypeObsoleteMarkerTest
             .GetMember(value.ToString(), BindingFlags.Public | BindingFlags.Static)
             .FirstOrDefault();
         Assert.NotNull(member);
-        return member!.GetCustomAttribute<ObsoleteAttribute>();
+        return member.GetCustomAttribute<ObsoleteAttribute>();
     }
 }
