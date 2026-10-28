@@ -396,7 +396,8 @@ public static class ServerConfigurator
                         sp.GetRequiredService<LuaStubLocation>(),
                         sp.GetRequiredService<LuaGeneratedTexts>(),
                         LuaAnalyzerDirectory,
-                        sp.GetRequiredService<ILogger<LuaAnalyzerInstances>>());
+                        sp.GetRequiredService<ILogger<LuaAnalyzerInstances>>(),
+                        timing: LuaAnalyzerInstanceTiming.Editor);
                 });
                 services.AddSingleton(sp => new LuaAnalyzerHost(new LuaAnalyzerOptions
                 {

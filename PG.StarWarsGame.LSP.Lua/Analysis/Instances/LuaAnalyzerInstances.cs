@@ -38,6 +38,12 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 ///         open in the editor is an instance of its own. The index decides the trees: a change to it
 ///         (a require edited, a file changed on disk) re-sends what changed.
 ///     </para>
+///     <para>
+///         A script's analyzer starts once the script has stayed open for
+///         <see cref="LuaAnalyzerInstanceTiming.Settle" />, and is kept for
+///         <see cref="LuaAnalyzerInstanceTiming.Grace" /> after it closes, silent, for the script
+///         reopened.
+///     </para>
 /// </remarks>
 public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAsyncDisposable, IDisposable
 {
@@ -55,10 +61,14 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
     private readonly Dictionary<string, Instance> _instances = new(DocumentUris.Comparer);
     private readonly ILogger<LuaAnalyzerInstances> _logger;
     private readonly Dictionary<string, (string Text, int Version)> _open = new(DocumentUris.Comparer);
+    private readonly Dictionary<string, (Instance Instance, ITimer Timer)> _kept = new(DocumentUris.Comparer);
+    private readonly Dictionary<string, ITimer> _settling = new(DocumentUris.Comparer);
     private readonly Func<string, ILuaAnalyzerProcess> _processes;
     private readonly Func<int, bool> _processAlive;
     private readonly LuaStubLocation _stubs;
     private readonly LuaGeneratedTexts _texts;
+    private readonly TimeProvider _time;
+    private readonly LuaAnalyzerInstanceTiming _timing;
     private bool _disposed;
     private int _next;
     private int _refreshQueued;
@@ -75,10 +85,15 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
     ///     Whether a process of the given id runs: the directory beside <paramref name="directory" /> of
     ///     one that does not is a server's that ended without stopping its analyzers, and is removed.
     /// </param>
+    /// <param name="timing">When an analyzer starts and stops around its script; none waits by default.</param>
+    /// <param name="time">The clock <paramref name="timing" /> is measured on.</param>
     public LuaAnalyzerInstances(Func<string, ILuaAnalyzerProcess> processes, IGameIndexService index,
         IFileHelper fileHelper, LuaStubLocation stubs, LuaGeneratedTexts texts, string directory,
-        ILogger<LuaAnalyzerInstances> logger, Func<int, bool>? processAlive = null)
+        ILogger<LuaAnalyzerInstances> logger, Func<int, bool>? processAlive = null,
+        LuaAnalyzerInstanceTiming? timing = null, TimeProvider? time = null)
     {
+        _timing = timing ?? LuaAnalyzerInstanceTiming.Immediate;
+        _time = time ?? TimeProvider.System;
         _processes = processes;
         _index = index;
         _fileHelper = fileHelper;
@@ -96,8 +111,7 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
         lock (_gate)
         {
             _disposed = true;
-            running = _instances.Values.ToList();
-            _instances.Clear();
+            running = TakeAll();
         }
 
         foreach (var instance in running) await instance.Process.DisposeAsync();
@@ -111,8 +125,7 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
         lock (_gate)
         {
             _disposed = true;
-            running = _instances.Values.ToList();
-            _instances.Clear();
+            running = TakeAll();
         }
 
         foreach (var instance in running) instance.Process.Dispose();
@@ -141,7 +154,20 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
             _open[key] = (text, version);
             if (!Configured) return;
             foreach (var instance in _instances.Values) Resend(instance, key);
-            if (!_instances.ContainsKey(key)) Start(key);
+            if (_instances.ContainsKey(key) || _settling.ContainsKey(key)) return;
+            if (_kept.Remove(key, out var kept))
+            {
+                kept.Timer.Dispose();
+                Reopen(kept.Instance);
+            }
+            else if (_timing.Settle <= TimeSpan.Zero)
+            {
+                Start(key);
+            }
+            else
+            {
+                _settling[key] = _time.CreateTimer(_ => Settled(key), null, _timing.Settle, Timeout.InfiniteTimeSpan);
+            }
         }
     }
 
@@ -162,7 +188,8 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
         lock (_gate)
         {
             _open.Remove(key);
-            if (_instances.Remove(key, out var own)) Stop(own);
+            if (_settling.Remove(key, out var settling)) settling.Dispose();
+            if (_instances.Remove(key, out var own)) Keep(own);
             foreach (var instance in _instances.Values) Resend(instance, key);
         }
     }
@@ -208,8 +235,7 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
             if (_disposed) return;
             if (_scriptRoots is null) RemoveStaleDirectories();
             _scriptRoots = layers.SelectMany(l => l.ScriptRoots).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            foreach (var instance in _instances.Values) Stop(instance);
-            _instances.Clear();
+            foreach (var instance in TakeAll()) Stop(instance);
             foreach (var uri in _open.Keys.ToList()) Start(uri);
         }
     }
@@ -286,6 +312,67 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
     private void Stop(Instance instance)
     {
         _ = StopAsync(instance.Process);
+    }
+
+    // Every instance, the kept ones too, out of the books; nothing waits to start any more.
+    private List<Instance> TakeAll()
+    {
+        foreach (var timer in _settling.Values) timer.Dispose();
+        _settling.Clear();
+        var all = _instances.Values.Concat(_kept.Values.Select(k => k.Instance)).ToList();
+        foreach (var kept in _kept.Values) kept.Timer.Dispose();
+        _kept.Clear();
+        _instances.Clear();
+        return all;
+    }
+
+    private void Settled(string uri)
+    {
+        lock (_gate)
+        {
+            if (!_settling.Remove(uri, out var timer)) return;
+            timer.Dispose();
+            if (Configured && _open.ContainsKey(uri) && !_instances.ContainsKey(uri)) Start(uri);
+        }
+    }
+
+    // A closed script's instance, kept silent for the grace: out of _instances, nothing it publishes is passed on.
+    private void Keep(Instance instance)
+    {
+        if (_timing.Grace <= TimeSpan.Zero)
+        {
+            Stop(instance);
+            return;
+        }
+
+        var timer = _time.CreateTimer(_ => Expired(instance), null, _timing.Grace, Timeout.InfiniteTimeSpan);
+        _kept[instance.Uri] = (instance, timer);
+    }
+
+    private void Expired(Instance instance)
+    {
+        lock (_gate)
+        {
+            if (!_kept.TryGetValue(instance.Uri, out var kept) || !ReferenceEquals(kept.Instance, instance)) return;
+            _kept.Remove(instance.Uri);
+            kept.Timer.Dispose();
+            Stop(instance);
+        }
+    }
+
+    // The kept instance serves its script again: what changed while it was kept is sent, and the
+    // script's new version makes the analyzer infer and report it again.
+    private void Reopen(Instance instance)
+    {
+        _instances[instance.Uri] = instance;
+        if (Sync(instance, _index.Current))
+        {
+            Launch(instance);
+            return;
+        }
+
+        foreach (var file in instance.Held.Keys.ToList()) Resend(instance, file);
+        Touch(instance);
     }
 
     private async Task StopAsync(ILuaAnalyzerProcess process)

@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using SyntaxTree = Loretta.CodeAnalysis.SyntaxTree;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -81,6 +82,12 @@ public sealed class LuaAnalyzerInstancesTest
 
     private LuaAnalyzerInstances Instances(params ILuaAnnotationSource[] sources)
     {
+        return Instances(LuaAnalyzerInstanceTiming.Immediate, TimeProvider.System, sources);
+    }
+
+    private LuaAnalyzerInstances Instances(LuaAnalyzerInstanceTiming timing, TimeProvider time,
+        params ILuaAnnotationSource[] sources)
+    {
         var fileHelper = new FileHelper(_disk);
         return new LuaAnalyzerInstances(_ =>
             {
@@ -88,7 +95,7 @@ public sealed class LuaAnalyzerInstancesTest
                 _processes.Add(process);
                 return process;
             }, _index, fileHelper, _stubs, new LuaGeneratedTexts(sources, fileHelper), Directory,
-            NullLogger<LuaAnalyzerInstances>.Instance);
+            NullLogger<LuaAnalyzerInstances>.Instance, timing: timing, time: time);
     }
 
     private static string PlaceIn(FakeProcess process, string real)
@@ -385,6 +392,111 @@ public sealed class LuaAnalyzerInstancesTest
         {
             return [new LuaAnnotationInsertion(0, ["---@generated"])];
         }
+    }
+
+    // ── lifetime ─────────────────────────────────────────────────────────────
+
+    private static readonly LuaAnalyzerInstanceTiming Timing =
+        new(TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(60));
+
+    // The editor opens a file for a moment to show a hover or a peek of it, and closes it again: an
+    // analyzer started for that was killed while it started (34 starts in one measured session).
+    [Fact]
+    public void AScriptOpenedAndClosedAgainAtOnce_StartsNoAnalyzer()
+    {
+        var time = new FakeTimeProvider();
+        var instances = Instances(Timing, time);
+        instances.Configure(Layers);
+
+        instances.DidOpen(Script, "", 1);
+        instances.DidClose(Script);
+        time.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.Empty(_processes);
+    }
+
+    [Fact]
+    public void AScriptThatStaysOpen_GetsItsAnalyzer_OnceItSettled()
+    {
+        var time = new FakeTimeProvider();
+        var instances = Instances(Timing, time);
+        instances.Configure(Layers);
+
+        instances.DidOpen(Script, "Definitions()\n", 1);
+        Assert.Empty(_processes);
+        time.Advance(TimeSpan.FromMilliseconds(250));
+
+        var process = Assert.Single(_processes);
+        Assert.Equal("Definitions()\n", process.Texts[PlaceIn(process, Script)]);
+    }
+
+    [Fact]
+    public void AClosedScriptsAnalyzer_IsKeptForTheGrace_AndServesTheScriptReopened()
+    {
+        var time = new FakeTimeProvider();
+        var instances = Instances(Timing, time);
+        instances.Configure(Layers);
+        instances.DidOpen(Script, "Definitions()\n", 1);
+        time.Advance(TimeSpan.FromMilliseconds(250));
+
+        instances.DidClose(Script);
+        time.Advance(TimeSpan.FromSeconds(59));
+        instances.DidOpen(Script, "Definitions()\nx = 1\n", 2);
+        time.Advance(TimeSpan.FromSeconds(120));
+
+        var process = Assert.Single(_processes);
+        Assert.False(process.Disposed);
+        Assert.Equal("Definitions()\nx = 1\n", process.Texts[PlaceIn(process, Script)]);
+    }
+
+    [Fact]
+    public void AClosedScriptsAnalyzer_StopsAfterTheGrace()
+    {
+        var time = new FakeTimeProvider();
+        var instances = Instances(Timing, time);
+        instances.Configure(Layers);
+        instances.DidOpen(Script, "", 1);
+        time.Advance(TimeSpan.FromMilliseconds(250));
+
+        instances.DidClose(Script);
+        time.Advance(TimeSpan.FromSeconds(60));
+
+        Assert.True(Assert.Single(_processes).Disposed);
+    }
+
+    // A closed script's findings leave with it: the analyzer kept for its reopening says nothing.
+    [Fact]
+    public void AClosedScriptsAnalyzer_PublishesNothing_WhileItIsKept()
+    {
+        var time = new FakeTimeProvider();
+        var instances = Instances(Timing, time);
+        var published = new List<PublishDiagnosticsParams>();
+        instances.DiagnosticsPublished += published.Add;
+        instances.Configure(Layers);
+        instances.DidOpen(Script, "", 1);
+        time.Advance(TimeSpan.FromMilliseconds(250));
+        var process = _processes.Single();
+        var place = PlaceIn(process, Script);
+
+        instances.DidClose(Script);
+        process.Publish(place, new Diagnostic { Message = "late" });
+
+        Assert.Empty(published);
+    }
+
+    [Fact]
+    public void Disposing_StopsTheAnalyzersKeptForAReopening()
+    {
+        var time = new FakeTimeProvider();
+        var instances = Instances(Timing, time);
+        instances.Configure(Layers);
+        instances.DidOpen(Script, "", 1);
+        time.Advance(TimeSpan.FromMilliseconds(250));
+        instances.DidClose(Script);
+
+        instances.Dispose();
+
+        Assert.True(Assert.Single(_processes).Disposed);
     }
 
     private sealed class FakeProcess : ILuaAnalyzerProcess
