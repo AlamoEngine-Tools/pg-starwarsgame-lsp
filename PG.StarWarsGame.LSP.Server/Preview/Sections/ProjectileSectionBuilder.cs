@@ -69,21 +69,22 @@ public sealed class ProjectileSectionBuilder(IVariantTagSource tagSource, IMessa
         // restate nothing but their model and colour.
         var ids = new SortedSet<string>(declared, StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (id, symbols) in index.WorkspaceDefinitions)
+        foreach (var id in index.WorkspaceDefinitions.Keys)
         {
-            var at = symbols.FirstOrDefault()?.VariantBaseId;
+            // A projectile is a game object, and so is the base it varies.
+            var current = index.ResolveOfType(id, GameTypeNames.GameObjectType);
 
             // Bounded by the object count: a mod can write a variant cycle, and the preview reports
             // one rather than being attached to it.
-            for (var hops = 0; !string.IsNullOrEmpty(at) && hops < 64; hops++)
+            for (var hops = 0; current is { VariantBaseId: { Length: > 0 } baseId } && hops < 64; hops++)
             {
-                if (declared.Contains(at))
+                if (declared.Contains(baseId))
                 {
                     ids.Add(id);
                     break;
                 }
 
-                at = index.Resolve(at)?.VariantBaseId;
+                current = index.VariantBaseOf(current);
             }
         }
 
@@ -99,7 +100,8 @@ public sealed class ProjectileSectionBuilder(IVariantTagSource tagSource, IMessa
     private bool DeclaresProjectileBehavior(GameIndex index, string objectId)
     {
         return PreviewTagReader.BehaviorListTags
-            .SelectMany(tagName => RepeatedTagReader.Values(index, tagSource, objectId, tagName))
+            .SelectMany(tagName =>
+                RepeatedTagReader.Values(index, tagSource, objectId, tagName, GameTypeNames.GameObjectType))
             .SelectMany(value => value.Split(
                 ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Any(token => token.Equals("PROJECTILE", StringComparison.OrdinalIgnoreCase));
@@ -144,7 +146,7 @@ public sealed class ProjectileSectionBuilder(IVariantTagSource tagSource, IMessa
 
         foreach (var id in ids.Where(seen.Add))
         {
-            var effective = resolver.Resolve(id);
+            var effective = resolver.Resolve(id, GameTypeNames.GameObjectType);
             if (!effective.Found)
             {
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewProjectileNotDefined, "warning",

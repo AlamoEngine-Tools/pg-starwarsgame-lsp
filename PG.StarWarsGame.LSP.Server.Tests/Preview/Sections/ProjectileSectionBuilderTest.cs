@@ -39,7 +39,7 @@ public sealed class ProjectileSectionBuilderTest
     [Fact]
     public void ProjectilesFor_ResolvesEachIdOnce_AndNoticesTheUndefined()
     {
-        var index = Index(Sym("Proj_Red", "Projectile", "Proj_Generic"), Sym("Proj_Generic", "Projectile"));
+        var index = Index(Sym("Proj_Red", "GameObjectType", "Proj_Generic"), Sym("Proj_Generic", "GameObjectType"));
         var tags = new FakeVariantTagSource()
             .With("Proj_Generic", Tag("Max_Speed", "11"), Tag("Projectile_Does_Shield_Damage", "Yes"))
             .With("Proj_Red", Tag("Variant_Of_Existing_Type", "Proj_Generic"), Tag("Projectile_Damage", "5"),
@@ -65,9 +65,9 @@ public sealed class ProjectileSectionBuilderTest
     public void ProjectileCatalog_NamesEveryObjectWithAProjectileBehaviour_AndItsVariants_Sorted()
     {
         var index = Index(
-            Sym("Proj_Zeta", "Projectile"),
-            Sym("Proj_Alpha_Variant", "Projectile", "Proj_Zeta"),
-            Sym("Xwing", "SpaceUnit"));
+            Sym("Proj_Zeta", "GameObjectType"),
+            Sym("Proj_Alpha_Variant", "GameObjectType", "Proj_Zeta"),
+            Sym("Xwing", "GameObjectType"));
         var tags = new FakeVariantTagSource()
             .With("Proj_Zeta", Tag("Behavior", "PROJECTILE, HIDE_WHEN_FOGGED"))
             .With("Proj_Alpha_Variant", Tag("Variant_Of_Existing_Type", "Proj_Zeta"))

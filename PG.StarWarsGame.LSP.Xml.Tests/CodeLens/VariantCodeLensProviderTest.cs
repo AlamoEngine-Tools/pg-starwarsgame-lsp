@@ -44,6 +44,8 @@ public sealed class VariantCodeLensProviderTest
         Assert.Equal(VariantCodeLensProvider.ShowEffectiveCommand, lens.Command!.Name);
         Assert.Contains("Variant of B", lens.Command.Title);
         Assert.Equal("V", (string)lens.Command.Arguments![0]!);
+        // The type travels with the id: one name may be objects of several types.
+        Assert.Equal(v.TypeName, (string?)lens.Command.Arguments[2]);
     }
 
     [Fact]

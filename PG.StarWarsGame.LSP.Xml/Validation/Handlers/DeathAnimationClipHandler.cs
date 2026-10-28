@@ -40,7 +40,7 @@ public sealed class DeathAnimationClipHandler : XmlDiagnosticsHandler<DeathAnima
     {
         if (ctx.Objects is null) return [];
 
-        var unit = ctx.Objects.Resolve(fact.ObjectId);
+        var unit = ctx.Objects.Resolve(fact.ObjectId, GameTypeNames.GameObjectType);
         if (!unit.Found) return [];
 
         var type = unit.ValueOf(TypeTag);

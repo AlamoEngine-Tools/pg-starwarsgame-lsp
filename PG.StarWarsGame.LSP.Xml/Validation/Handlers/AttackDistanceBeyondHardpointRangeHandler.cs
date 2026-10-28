@@ -51,7 +51,7 @@ public sealed class AttackDistanceBeyondHardpointRangeHandler : XmlDiagnosticsHa
         // No resolver, or a unit it cannot find: the values are unknown, and silence is the honest answer.
         if (ctx.Objects is null) return [];
 
-        var unit = ctx.Objects.Resolve(fact.ObjectId);
+        var unit = ctx.Objects.Resolve(fact.ObjectId, GameTypeNames.GameObjectType);
         if (!unit.Found) return [];
 
         // On the WEAPON path the attack distance is the shot's own flight distance.
@@ -67,7 +67,7 @@ public sealed class AttackDistanceBeyondHardpointRangeHandler : XmlDiagnosticsHa
         var longest = 0.0;
         foreach (var hardpointId in hardpoints.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries))
         {
-            var hardpoint = ctx.Objects.Resolve(hardpointId);
+            var hardpoint = ctx.Objects.Resolve(hardpointId, GameTypeNames.HardPoint);
             if (!hardpoint.Found) continue;
 
             var type = hardpoint.ValueOf(TypeTag);

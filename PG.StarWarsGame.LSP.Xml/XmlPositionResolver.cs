@@ -8,7 +8,8 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public static class XmlPositionResolver
 {
-    public static (string Id, LspRange Range)? FindAtPosition(DocumentIndex docIndex, int line, int character)
+    public static (string Id, LspRange Range, string? TypeName)? FindAtPosition(DocumentIndex docIndex, int line,
+        int character)
     {
         return DocumentPositionResolver.FindAtPosition(
             docIndex, line, character,

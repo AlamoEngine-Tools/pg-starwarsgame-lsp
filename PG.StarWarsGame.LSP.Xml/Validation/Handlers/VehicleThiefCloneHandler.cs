@@ -49,7 +49,7 @@ public sealed class VehicleThiefCloneHandler : XmlDiagnosticsHandler<XmlTagValue
         var value = fact.RawValue.Trim();
         if (value.Length == 0) return [];
 
-        var resolved = ctx.Objects.Resolve(value);
+        var resolved = ctx.Objects.ResolveIn(value, fact.Tag.TargetTypeName);
 
         // An id nothing defines belongs to the unresolved-reference check.
         if (!resolved.Found) return [];

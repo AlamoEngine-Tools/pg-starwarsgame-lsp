@@ -60,7 +60,7 @@ public sealed class WeaponSectionBuilder(IVariantTagSource tagSource, IMessageCa
             effective.FloatOf("Fire_Min_Range_Distance"),
             PreviewFireArcs.HardpointArcYawDegrees(effective),
             PreviewFireArcs.HardpointArcPitchDegrees(effective),
-            Inaccuracy(index, hardpointId),
+            Inaccuracy(index, hardpointId, GameTypeNames.HardPoint),
             effective.IntOf("Fire_Pulse_Count"),
             effective.FloatOf("Fire_Pulse_Delay_Seconds"),
             effective.FloatOf("Fire_Min_Recharge_Seconds") ??
@@ -120,7 +120,7 @@ public sealed class WeaponSectionBuilder(IVariantTagSource tagSource, IMessageCa
             null,
             PreviewFireArcs.UnitArcYawDegrees(effective),
             PreviewFireArcs.UnitArcPitchDegrees(effective),
-            Inaccuracy(index, effective.ObjectId),
+            Inaccuracy(index, effective.ObjectId, GameTypeNames.GameObjectType),
             effective.IntOf("Projectile_Fire_Pulse_Count"),
             effective.FloatOf("Projectile_Fire_Pulse_Delay_Seconds"),
             effective.FloatOf("Projectile_Fire_Recharge_Seconds"),
@@ -201,12 +201,12 @@ public sealed class WeaponSectionBuilder(IVariantTagSource tagSource, IMessageCa
     ///     a single <c>Number</c> before, which cannot parse <c>Fighter, 30.0</c> - so the field has
     ///     never once been non-null, on any of the 1017 rows the shipped tree declares.
     /// </remarks>
-    private List<PreviewInaccuracy> Inaccuracy(GameIndex index, string objectId)
+    private List<PreviewInaccuracy> Inaccuracy(GameIndex index, string objectId, string typeName)
     {
         var rows = new List<PreviewInaccuracy>();
 
         foreach (var row in RepeatedTagReader.Rows(
-                     index, tagSource, objectId, "Fire_Inaccuracy_Distance", 2))
+                     index, tagSource, objectId, "Fire_Inaccuracy_Distance", 2, typeName))
         {
             // A row naming no category, or a distance that is not a number, is a broken row rather
             // than a zero - dropping it leaves the weapon with one fewer category, which is what the

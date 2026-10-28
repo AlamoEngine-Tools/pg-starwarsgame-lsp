@@ -37,6 +37,21 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
     }
 
     /// <summary>
+    ///     The effective object named <paramref name="objectId" /> in the id space of
+    ///     <paramref name="typeName" />; not found when that type defines no such object, whatever
+    ///     other types do.
+    /// </summary>
+    public EffectiveObject Resolve(string objectId, string typeName)
+    {
+        var root = _index.ResolveOfType(objectId, typeName);
+        if (root is null)
+            return new EffectiveObject(objectId, null, false, false, null,
+                ImmutableArray<string>.Empty, ImmutableArray<EffectiveTag>.Empty);
+
+        return Resolve(root);
+    }
+
+    /// <summary>
     ///     The effective object of this very definition: its own tags, then its base chain by id. For
     ///     a caller that already holds the symbol, because an id alone may name objects of different
     ///     kinds - a faction and a unit both called Sarlacc.
@@ -107,9 +122,7 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
                 return (chain, true, current.Id);
 
             chain.Add(current);
-            if (string.IsNullOrEmpty(current.VariantBaseId))
-                break;
-            current = _index.Resolve(current.VariantBaseId);
+            current = _index.VariantBaseOf(current);
         }
 
         return (chain, false, null);

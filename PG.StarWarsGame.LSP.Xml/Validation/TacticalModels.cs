@@ -37,9 +37,7 @@ public static class TacticalModels
             if (LayerDeclaresModel(index, tagSource, current))
                 return true;
 
-            current = string.IsNullOrEmpty(current.VariantBaseId)
-                ? null
-                : index.Resolve(current.VariantBaseId);
+            current = index.VariantBaseOf(current);
         }
 
         return false;
@@ -50,7 +48,7 @@ public static class TacticalModels
         // The workspace SHADOWS the baseline rather than adding to it - a mod that redefines an
         // object replaces its tags, so a baseline model must not answer for a workspace object that
         // dropped it.
-        var workspace = tagSource.TryGetTags(symbol.Id);
+        var workspace = tagSource.TryGetTags(symbol);
         if (workspace is not null)
             return workspace.Any(tag => IsModelTag(tag.TagName));
 

@@ -395,7 +395,7 @@ public sealed class PreviewHandlersTest
             Tag("Space_Model_Name", "p_explosion_empire_big00.alo"));
 
         var result = await Particles(new StubAssets(), tags,
-            Sym("Large_Explosion_Space_Empire", "Particle")).Handle(
+            Sym("Large_Explosion_Space_Empire", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Large_Explosion_Space_Empire" },
             CancellationToken.None);
 
@@ -410,7 +410,7 @@ public sealed class PreviewHandlersTest
         var tags = new FakeVariantTagSource().With("Ground_Puff",
             Tag("Land_Model_Name", "p_smoke_small.alo"));
 
-        var result = await Particles(new StubAssets(), tags, Sym("Ground_Puff", "Particle")).Handle(
+        var result = await Particles(new StubAssets(), tags, Sym("Ground_Puff", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Ground_Puff" }, CancellationToken.None);
 
         Assert.Contains("p_smoke_small.alo", result.Error);
@@ -477,7 +477,7 @@ public sealed class PreviewHandlersTest
             Tag("Scale_Factor", "2.0"));
 
         var result = await Particles(new StubAssets(), tags,
-            Sym("Empire_Bombing_Run_Explosion_Land", "Particle")).Handle(
+            Sym("Empire_Bombing_Run_Explosion_Land", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Empire_Bombing_Run_Explosion_Land" },
             CancellationToken.None);
 
@@ -491,7 +491,7 @@ public sealed class PreviewHandlersTest
         var tags = new FakeVariantTagSource().With("Plain",
             Tag("Space_Model_Name", "p_plain.alo"));
 
-        var result = await Particles(new StubAssets(), tags, Sym("Plain", "Particle")).Handle(
+        var result = await Particles(new StubAssets(), tags, Sym("Plain", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Plain" }, CancellationToken.None);
 
         Assert.Equal(1f, result.ScaleFactor);
@@ -508,7 +508,7 @@ public sealed class PreviewHandlersTest
         var tags = new FakeVariantTagSource().With("Odd",
             Tag("Space_Model_Name", "p_odd.alo"), Tag("Scale_Factor", raw));
 
-        var result = await Particles(new StubAssets(), tags, Sym("Odd", "Particle")).Handle(
+        var result = await Particles(new StubAssets(), tags, Sym("Odd", "GameObjectType")).Handle(
             new GetParticleSystemParams { Name = "Odd" }, CancellationToken.None);
 
         Assert.Equal(1f, result.ScaleFactor);
@@ -537,7 +537,7 @@ public sealed class PreviewHandlersTest
             Tag("Projectile_Does_Shield_Damage", "Yes"),
             Tag("Projectile_Does_Hitpoint_Damage", "No"));
 
-        var result = await Projectiles(tags, Sym("Proj_Ion_Cannon", "Projectile")).Handle(
+        var result = await Projectiles(tags, Sym("Proj_Ion_Cannon", "GameObjectType")).Handle(
             new GetProjectileParams { Name = "Proj_Ion_Cannon" }, CancellationToken.None);
 
         Assert.Null(result.Error);

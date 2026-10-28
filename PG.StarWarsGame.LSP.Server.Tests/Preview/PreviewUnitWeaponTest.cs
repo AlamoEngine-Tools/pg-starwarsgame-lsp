@@ -412,7 +412,7 @@ public sealed class PreviewUnitWeaponTest
     private static PreviewScene Build(
         string hull, string[] bones, (string Name, string Value)[] unitTags)
     {
-        var index = Index([Sym("Unit", "SpaceUnit")], new Dictionary<string, string[]> { [hull] = bones });
+        var index = Index([Sym("Unit", "GameObjectType")], new Dictionary<string, string[]> { [hull] = bones });
 
         var tags = new FakeVariantTagSource().With("Unit",
             unitTags.Select(t => Tag(t.Name, t.Value))

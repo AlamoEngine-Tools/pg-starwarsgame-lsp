@@ -327,7 +327,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // 159 -> 162: HardcodedSetValueHandler, DamageTypesIncompleteHandler and
         // DamageTypeOutOfOrderHandler (#307). The two rules the publisher used to run by hand, building
         // their diagnostics itself, are facts with handlers like every other rule.
-        const int expectedHandlerCount = 162;
+        // 162 -> 161: CrossTypeShadowHandler retired. Every type is an id space of its own and every
+        // lookup names the type it means, so a name shared across types is nothing to warn about.
+        const int expectedHandlerCount = 161;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

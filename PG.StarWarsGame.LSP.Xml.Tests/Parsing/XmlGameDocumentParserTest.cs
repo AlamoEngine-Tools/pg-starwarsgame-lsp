@@ -464,6 +464,34 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("file:///f.xml", reference.DocumentUri);
     }
 
+    /// <summary>
+    ///     A tag that names an object KIND accepts game objects of that kind, so its reference is
+    ///     looked up in the game objects' id space - not left to resolve by id alone. What it expects
+    ///     stays as before: the kind is judged by behaviour elsewhere.
+    /// </summary>
+    [Fact]
+    public async Task ParseAsync_AKindTypedTag_ReferencesAGameObject()
+    {
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(Type("GameObjectType"));
+        schema.Add(new XmlTagDefinition
+        {
+            Tag = "Home_Planet",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceTypeName = "Planet",
+            Kind = new ObjectKindDefinition { Kind = "Planet", Behaviors = ["PLANET"] }
+        });
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<GameObjectType Name="UNIT_A"><Home_Planet>Sarlacc</Home_Planet></GameObjectType>""", 1,
+            TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Null(reference.ExpectedTypeName);
+        Assert.Equal("GameObjectType", reference.LookupType);
+    }
+
     // ── (planet, mode) exclusion pairs ────────────────────────────────────────
 
     // The canonical engine type stays TypeReferenceList; the alternating-slot meaning is a schema

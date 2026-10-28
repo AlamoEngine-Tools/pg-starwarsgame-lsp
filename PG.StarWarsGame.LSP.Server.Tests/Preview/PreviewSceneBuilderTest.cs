@@ -26,7 +26,7 @@ public sealed class PreviewSceneBuilderTest
     {
         // Which faction's fallback colour applies when no team tint does. 772 shipped objects
         // declare one; nothing read it.
-        var index = Index([Sym("Xwing", "SpaceUnit")]);
+        var index = Index([Sym("Xwing", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Xwing",
             Tag("Space_Model_Name", "hull.alo"), Tag("Affiliation", "Rebel"));
 
@@ -38,7 +38,7 @@ public sealed class PreviewSceneBuilderTest
     {
         // 29 of the 775 name more than one - `Neutral, Rebel, Empire` on the capturable structures.
         // The first is the primary; a unit cannot wear two fallback colours at once.
-        var index = Index([Sym("Pad", "GroundStructure")]);
+        var index = Index([Sym("Pad", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Pad",
             Tag("Space_Model_Name", "hull.alo"), Tag("Affiliation", " Neutral, Rebel, Empire "));
 
@@ -48,7 +48,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_LeavesTheAffiliationNullWhenTheObjectDeclaresNone()
     {
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
 
         Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").Affiliation);
@@ -62,7 +62,7 @@ public sealed class PreviewSceneBuilderTest
         // it is object-specific: a TIE is 75,75,75 whoever owns it, an indigenous Bantha is
         // 128,101,79, and ten of the 25 write pure white, which is the identity for the
         // `Colorization` multiply - "leave my texture alone".
-        var index = Index([Sym("TIE_Fighter", "SpaceUnit")]);
+        var index = Index([Sym("TIE_Fighter", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("TIE_Fighter",
             Tag("Space_Model_Name", "hull.alo"),
             Tag("No_Colorization_Color", "75, 75, 75, 255"));
@@ -77,7 +77,7 @@ public sealed class PreviewSceneBuilderTest
     {
         // Absent is NOT white: the client falls back on its own, and inventing a colour here would
         // stop it telling "declared untinted" from "said nothing".
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
 
         Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").NoColorizationColor);
@@ -89,7 +89,7 @@ public sealed class PreviewSceneBuilderTest
         // The large command-bar icon has no tag of its own: the engine looks up `big_` + Icon_Name,
         // so a capture can only be named for it if the scene says what Icon_Name is. Verbatim,
         // extension included - that is the string the engine formats.
-        var index = Index([Sym("Luke", "GroundInfantry")]);
+        var index = Index([Sym("Luke", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Luke",
             Tag("Land_Model_Name", "hull.alo"), Tag("Icon_Name", " I_BUTTON_LUKE.TGA "));
 
@@ -99,7 +99,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_LeavesTheIconNameNullWhenTheObjectDeclaresNone()
     {
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
 
         Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").IconName);
@@ -111,7 +111,7 @@ public sealed class PreviewSceneBuilderTest
         // Every tag the scene reads goes through EffectiveObject's accessors, so the preview shows
         // the occurrence the game keeps and the diagnostics report - the last - trimmed, and a
         // number read as the game reads it, suffix and all.
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Ship",
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Scale_Factor", "1.0"), Tag("Scale_Factor", " 2.5f "),
@@ -127,7 +127,7 @@ public sealed class PreviewSceneBuilderTest
     public void BuildForObject_ReadsAnEmptyElementAsNoValue()
     {
         // An empty element writes nothing, so the scene carries no icon name rather than a blank one.
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Ship",
             Tag("Space_Model_Name", "hull.alo"), Tag("Icon_Name", "   "));
 
@@ -225,7 +225,7 @@ public sealed class PreviewSceneBuilderTest
     private static (GameIndex Index, FakeVariantTagSource Tags) Destroyer()
     {
         var index = Index(
-            [Sym("Generic_Star_Destroyer", "SpaceUnit"), Sym("HP_SD_Weapon_FL", "HardPoint")],
+            [Sym("Generic_Star_Destroyer", "GameObjectType"), Sym("HP_SD_Weapon_FL", "HardPoint")],
             new Dictionary<string, string[]>
             {
                 ["EV_StarDestroyer.ALO"] = ["HP_F-L_Bone", "HP_F-L_EmitDamage", "HP_F-L_Blast"]
@@ -283,7 +283,7 @@ public sealed class PreviewSceneBuilderTest
         var (baseIndex, tags) = Destroyer();
         var index = Index(
             baseIndex.WorkspaceDefinitions.SelectMany(kv => kv.Value)
-                .Append(Sym("Star_Destroyer_Elite", "SpaceUnit", "Generic_Star_Destroyer")),
+                .Append(Sym("Star_Destroyer_Elite", "GameObjectType", "Generic_Star_Destroyer")),
             new Dictionary<string, string[]>
             {
                 ["EV_StarDestroyer.ALO"] = ["HP_F-L_Bone", "HP_F-L_EmitDamage", "HP_F-L_Blast"]
@@ -301,7 +301,7 @@ public sealed class PreviewSceneBuilderTest
     {
         // Two of the Star Destroyer's ten hardpoints attach nothing. They still occupy a bone and are
         // still destroyable, so they must appear - just without a part.
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Shield", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Shield", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Shield"))
             .With("HP_Shield", Tag("Attachment_Bone", "HP_SHIELD"), Tag("Is_Destroyable", "Yes"));
@@ -337,7 +337,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_ReportsAHardpointAsNotDestroyableWhenItSaysSo()
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Fixed", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Fixed", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Fixed"))
             .With("HP_Fixed", Tag("Is_Destroyable", "No"));
@@ -352,7 +352,7 @@ public sealed class PreviewSceneBuilderTest
     {
         // Null, not zero: a hardpoint that declares no cone and one with a zero-degree cone are
         // different, and drawing the second for the first would be a confident lie.
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Gun", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Gun", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Gun"))
             .With("HP_Gun", Tag("Fire_Bone_A", "FP_00"));
@@ -544,7 +544,7 @@ public sealed class PreviewSceneBuilderTest
         // named after the OVERRIDE model, so a preview looking under the hull's name finds none at all
         // while the game plays a full set.
         var index = Index(
-            [Sym("Trooper", "GroundUnit")],
+            [Sym("Trooper", "GameObjectType")],
             new Dictionary<string, string[]>
             {
                 ["ei_trooper_body.alo"] = ["Root", "Spine"],
@@ -566,7 +566,7 @@ public sealed class PreviewSceneBuilderTest
     {
         // Unused by any shipped object, but it is in the schema and in the engine's own parser, so a
         // mod may well use it.
-        var index = Index([Sym("Fighter", "SpaceUnit")]);
+        var index = Index([Sym("Fighter", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Fighter",
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Space_Model_Anim_Override_Name", "other.alo"));
@@ -588,7 +588,7 @@ public sealed class PreviewSceneBuilderTest
     public void BuildForObject_NotesWhenTheOverrideSkeletonDiffers()
     {
         var index = Index(
-            [Sym("Trooper", "GroundUnit")],
+            [Sym("Trooper", "GameObjectType")],
             new Dictionary<string, string[]>
             {
                 ["ei_trooper_body.alo"] = ["Root", "Spine"],
@@ -610,7 +610,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_LeavesAnimationSourceNullWithoutAnOverride()
     {
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
 
         Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").AnimationSource);
@@ -619,7 +619,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_OmitsTheArcEntirelyWhenNoFireBoneIsNamed()
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Hull", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Hull", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Hull"))
             .With("HP_Hull", Tag("Attachment_Bone", "HP_00"));
@@ -630,7 +630,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_ReadsTurretPoseOnlyForATurret()
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_T", "HardPoint"), Sym("HP_F", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_T", "HardPoint"), Sym("HP_F", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_T, HP_F"))
             .With("HP_T",
@@ -674,7 +674,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_AppliesTheHardpointsOwnTurretExtentDefaults()
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_T", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_T", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_T"))
             .With("HP_T", Tag("Is_Turret", "Yes"), Tag("Turret_Bone_Name", "TURRET_01"));
@@ -706,7 +706,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_SendsTheSubjectsRenderScale()
     {
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("Scale_Factor", "0.5"));
 
@@ -717,7 +717,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_DefaultsTheRenderScaleToOne()
     {
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
 
         Assert.Equal(1f, Builder(index, tags, "hull.alo").BuildForObject("Ship").ScaleFactor);
@@ -734,7 +734,7 @@ public sealed class PreviewSceneBuilderTest
     [InlineData("")]
     public void BuildForObject_RefusesARenderScaleThatWouldCollapseTheSubject(string raw)
     {
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("Scale_Factor", raw));
 
@@ -745,7 +745,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_DoesNotSubstituteADefaultOverAnAuthoredTurretExtent()
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_T", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_T", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_T"))
             .With("HP_T",
@@ -783,7 +783,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_TakesATurretHardpointsArcFromTheExtentNotTheCone()
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_T", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_T", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_T"))
             .With("HP_T",
@@ -808,7 +808,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_TakesANonTurretHardpointsArcFromTheCone()
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_F", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_F", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_F"))
             .With("HP_F",
@@ -843,7 +843,7 @@ public sealed class PreviewSceneBuilderTest
     public void BuildForObject_FlagsAnAttachmentBoneTheHullDoesNotHave()
     {
         var index = Index(
-            [Sym("Ship", "SpaceUnit"), Sym("HP_Bad", "HardPoint")],
+            [Sym("Ship", "GameObjectType"), Sym("HP_Bad", "HardPoint")],
             new Dictionary<string, string[]> { ["hull.alo"] = ["ROOT"] });
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Bad"))
@@ -857,7 +857,7 @@ public sealed class PreviewSceneBuilderTest
     [Fact]
     public void BuildForObject_FlagsAMountedHardpointThatIsNotDefined()
     {
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Ghost"));
 
@@ -894,7 +894,7 @@ public sealed class PreviewSceneBuilderTest
     {
         // All of them, not just the object's own: the preview compares a unit in two factions' colours
         // side by side, and shipping the set makes that a local switch.
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("Rebel", "Faction"), Sym("Empire", "Faction")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("Rebel", "Faction"), Sym("Empire", "Faction")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"))
             .With("Rebel",
@@ -923,7 +923,7 @@ public sealed class PreviewSceneBuilderTest
         // Ids chosen so alphabetical order is NOT declaration order: sorting by name would pass a
         // weaker version of this test and still be wrong about the file.
         var index = Index([
-            Sym("Ship", "SpaceUnit"),
+            Sym("Ship", "GameObjectType"),
             SymAt("Zann", "Faction", "factions.xml", 10),
             SymAt("Empire", "Faction", "factions.xml", 30),
             SymAt("Rebel", "Faction", "factions.xml", 20)
@@ -946,7 +946,7 @@ public sealed class PreviewSceneBuilderTest
         // Two files, and each one's own declaration order kept inside it. Whichever file comes
         // first, the answer has to be the SAME every time - that is the whole point.
         var index = Index([
-            Sym("Ship", "SpaceUnit"),
+            Sym("Ship", "GameObjectType"),
             SymAt("Second", "Faction", "b_more.xml", 5),
             SymAt("Third", "Faction", "b_more.xml", 40),
             SymAt("First", "Faction", "a_core.xml", 90)

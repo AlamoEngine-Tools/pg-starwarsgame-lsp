@@ -375,7 +375,6 @@ public static class XmlLanguageServiceExtensions
 
         // Layer-shadow and cross-type shadow warnings
         services.AddSingleton<IXmlDiagnosticsHandler, CrossLayerShadowHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, CrossTypeShadowHandler>();
 
         return services;
     }

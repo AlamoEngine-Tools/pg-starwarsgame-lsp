@@ -82,7 +82,7 @@ public sealed class PreviewHardpointTextTest
         var index = GameIndex.Empty with
         {
             WorkspaceDefinitions = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
-                .Add("Frigate", [Sym("Frigate", "SpaceUnit")])
+                .Add("Frigate", [Sym("Frigate", "GameObjectType")])
                 .Add("HP_Comm", [Sym("HP_Comm", "HardPoint")]),
             Localisation = localisation
         };

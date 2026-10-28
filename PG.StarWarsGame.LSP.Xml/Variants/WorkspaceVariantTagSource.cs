@@ -59,8 +59,8 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatist
         if (!index.WorkspaceDefinitions.TryGetValue(objectId, out var defs) || defs.Length == 0)
             return null;
 
-        // Highest project layer wins - the same precedence GameIndex.Resolve applies.
-        var winner = defs.Length == 1 ? defs[0] : defs.OrderByDescending(index.LayerRankOf).First();
+        // The definition GameIndex.Resolve picks, so a lookup by id alone reads the same object here.
+        var winner = defs.Length == 1 ? defs[0] : index.Resolve(objectId)!;
         if (winner.Origin is not FileOrigin origin)
             return null;
 

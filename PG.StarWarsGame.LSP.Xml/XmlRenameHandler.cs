@@ -77,13 +77,21 @@ public sealed class XmlRenameHandler : IRenameProvider
         if (index.Resolve(hit.Value.Id) is { Kind: GameSymbolKind.WorkspaceFile })
             return FileReferenceRenameBuilder.Build(hit.Value.Id, request.NewName, index, _textSource, _logger);
 
+        // A story symbol is one element indexed under two types, renamed as one; any other object is
+        // renamed in its own type's id space.
+        string? typeName = null;
         if (StoryRenameGuard.IsStorySymbol(hit.Value.Id, index))
         {
             if (StoryRenameGuard.Check(hit.Value.Id, request.NewName, index) is { } objection)
                 throw new InvalidOperationException(objection);
         }
+        else
+        {
+            typeName = index.TypeMeant(hit.Value.Id, hit.Value.TypeName);
+        }
 
-        return XmlObjectRenameBuilder.Build(hit.Value.Id, request.NewName, index, _schema, _textSource, _logger);
+        return XmlObjectRenameBuilder.Build(hit.Value.Id, typeName, request.NewName, index, _schema, _textSource,
+            _logger);
     }
 
     public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
@@ -126,7 +134,10 @@ public sealed class XmlRenameHandler : IRenameProvider
             return new RangeOrPlaceholderRange(hit.Value.Range);
         }
 
-        if (!index.IsLeafOwned(hit.Value.Id)) return null;
+        var ownType = StoryRenameGuard.IsStorySymbol(hit.Value.Id, index)
+            ? null
+            : index.TypeMeant(hit.Value.Id, hit.Value.TypeName);
+        if (!index.IsLeafOwned(hit.Value.Id, ownType)) return null;
 
         return new RangeOrPlaceholderRange(hit.Value.Range);
     }

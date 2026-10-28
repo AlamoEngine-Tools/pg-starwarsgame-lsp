@@ -80,8 +80,8 @@ public sealed class PreviewProjectileTest
     public void BuildForObject_ListsAProjectileSharedByTwoWeaponsOnlyOnce()
     {
         var index = Index([
-            Sym("Ship", "SpaceUnit"), Sym("HP_L", "HardPoint"), Sym("HP_R", "HardPoint"),
-            Sym("Proj", "Projectile")
+            Sym("Ship", "GameObjectType"), Sym("HP_L", "HardPoint"), Sym("HP_R", "HardPoint"),
+            Sym("Proj", "GameObjectType")
         ]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_L, HP_R"))
@@ -98,7 +98,7 @@ public sealed class PreviewProjectileTest
     [Fact]
     public void BuildForObject_ReportsAProjectileThatIsNamedButNotDefined()
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_L", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_L", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_L"))
             .With("HP_L", Tag("Fire_Bone_A", "FP_00"), Tag("Fire_Projectile_Type", "Proj_Missing"));
@@ -113,7 +113,7 @@ public sealed class PreviewProjectileTest
     [Fact]
     public void BuildForObject_CarriesNoProjectilesForAnUnarmedSubject()
     {
-        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var index = Index([Sym("Ship", "GameObjectType")]);
         var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
 
         Assert.Empty(Builder(index, tags).BuildForObject("Ship").Projectiles);
@@ -159,9 +159,9 @@ public sealed class PreviewProjectileTest
     private static PreviewScene Build(params (string Name, string Value)[] overrides)
     {
         var index = Index([
-            Sym("Ship", "SpaceUnit"), Sym("HP_Gun", "HardPoint"),
-            Sym("Proj_Ship_Small_Laser_Cannon_Generic", "Projectile"),
-            SymVariant("Proj_Ship_Small_Laser_Cannon_Red", "Projectile",
+            Sym("Ship", "GameObjectType"), Sym("HP_Gun", "HardPoint"),
+            Sym("Proj_Ship_Small_Laser_Cannon_Generic", "GameObjectType"),
+            SymVariant("Proj_Ship_Small_Laser_Cannon_Red", "GameObjectType",
                 "Proj_Ship_Small_Laser_Cannon_Generic")
         ]);
 

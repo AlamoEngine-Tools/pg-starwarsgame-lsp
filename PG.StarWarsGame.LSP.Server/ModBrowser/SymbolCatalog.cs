@@ -18,15 +18,18 @@ namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 /// </remarks>
 public sealed class SymbolCatalog
 {
-    private const string GameObjectType = "GameObjectType";
+    private const string GameObjectType = GameTypeNames.GameObjectType;
     private const int MostPerPage = 1000;
 
     private static readonly string[] s_textureExtensions = [".tga", ".dds"];
     private static readonly string[] s_audioExtensions = [".wav", ".mp3"];
 
     private readonly Dictionary<string, IReadOnlyList<string>> _outlines;
+
     private readonly Dictionary<string, List<SymbolRow>> _pages;
-    private readonly Dictionary<string, SymbolRow> _xmlById;
+
+    // Every XML object's rows by id: one id may name objects of several types, one row each.
+    private readonly Dictionary<string, List<SymbolRow>> _xmlById;
     private readonly Dictionary<string, Dictionary<string, SymbolRow>> _byName;
     private readonly IReadOnlyList<string> _kinds;
 
@@ -36,7 +39,7 @@ public sealed class SymbolCatalog
         _pages = pages;
         _outlines = outlines;
         _kinds = kinds;
-        _xmlById = new Dictionary<string, SymbolRow>(StringComparer.OrdinalIgnoreCase);
+        _xmlById = new Dictionary<string, List<SymbolRow>>(StringComparer.OrdinalIgnoreCase);
         _byName = new Dictionary<string, Dictionary<string, SymbolRow>>(StringComparer.Ordinal);
         foreach (var (page, rows) in pages)
         {
@@ -44,7 +47,9 @@ public sealed class SymbolCatalog
             foreach (var row in rows)
             {
                 byName.TryAdd(row.Name, row);
-                if (page.StartsWith("xml:", StringComparison.Ordinal)) _xmlById.TryAdd(row.Id, row);
+                if (!page.StartsWith("xml:", StringComparison.Ordinal)) continue;
+                if (!_xmlById.TryGetValue(row.Id, out var same)) _xmlById[row.Id] = same = [];
+                same.Add(row);
             }
         }
     }
@@ -141,8 +146,9 @@ public sealed class SymbolCatalog
     /// <summary>The row an entry of a page is listed as, by its id or name; null when there is none.</summary>
     public SymbolRow? Find(string page, string idOrName)
     {
+        // An XML page is one type's: the row is that type's, whatever other types share the id.
         if (page.StartsWith("xml:", StringComparison.Ordinal))
-            return _xmlById.GetValueOrDefault(idOrName);
+            return FindObject(idOrName, page["xml:".Length..]);
         return _byName.TryGetValue(page, out var byName)
             ? byName.GetValueOrDefault(idOrName) ?? _pages[page].FirstOrDefault(r => r.Id == idOrName)
             : null;
@@ -151,7 +157,19 @@ public sealed class SymbolCatalog
     /// <summary>The row of an XML object, on whatever page its type puts it; null when none defines it.</summary>
     public SymbolRow? FindObject(string id)
     {
-        return _xmlById.GetValueOrDefault(id);
+        return FindObject(id, null);
+    }
+
+    /// <summary>
+    ///     The row of the XML object <paramref name="id" /> of <paramref name="typeName" /> - every type
+    ///     is an id space of its own. With no type, or none of it, the game object's row, else the first.
+    /// </summary>
+    public SymbolRow? FindObject(string id, string? typeName)
+    {
+        if (!_xmlById.TryGetValue(id, out var rows)) return null;
+        return rows.FirstOrDefault(r => string.Equals(r.Type, typeName, StringComparison.OrdinalIgnoreCase))
+               ?? rows.FirstOrDefault(r => string.Equals(r.Type, GameObjectType, StringComparison.OrdinalIgnoreCase))
+               ?? rows[0];
     }
 
     /// <summary>Every row of a page, sorted by name; none for a page that does not exist.</summary>
@@ -161,7 +179,7 @@ public sealed class SymbolCatalog
     }
 
     /// <summary>Every XML object's row, on every page.</summary>
-    public IEnumerable<SymbolRow> Objects => _xmlById.Values;
+    public IEnumerable<SymbolRow> Objects => _xmlById.Values.SelectMany(rows => rows);
 
     /// <summary>
     ///     Rows filtered by the request's query, kinds and origins, and paged; with every kind counted
@@ -260,14 +278,25 @@ public sealed class SymbolCatalog
             var shipped = index.Baseline.Symbols.TryGetValue(id, out var s) && s.Kind == GameSymbolKind.XmlObject
                 ? s
                 : null;
-            var winner = workspace.FirstOrDefault() ?? shipped;
-            if (winner?.TypeName is not { } type) continue;
+            // One row per type: the metafile that lists a file types it, and every type is an id space
+            // of its own - the shipped game has a Sarlacc faction and a Sarlacc unit.
+            var types = workspace.Select(d => d.TypeName).Append(shipped?.TypeName).OfType<string>()
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+            foreach (var type in types)
+            {
+                var ofType = workspace.Where(d => string.Equals(d.TypeName, type, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var shippedOfType = string.Equals(shipped?.TypeName, type, StringComparison.OrdinalIgnoreCase)
+                    ? shipped
+                    : null;
+                var winner = ofType.FirstOrDefault() ?? shippedOfType!;
 
-            var origins = workspace.Select(d => OriginOf(index, d)).Distinct().ToList();
-            if (shipped is not null) origins.Add(("game", null));
+                var origins = ofType.Select(d => OriginOf(index, d)).Distinct().ToList();
+                if (shippedOfType is not null) origins.Add(("game", null));
 
-            yield return new SymbolRow(id, id, type, KindsOf(index, winner, kinds), origins[0].Key, origins[0].Name,
-                origins.Skip(1).Select(o => o.Key).ToList());
+                yield return new SymbolRow(id, id, type, KindsOf(index, winner, kinds), origins[0].Key,
+                    origins[0].Name, origins.Skip(1).Select(o => o.Key).ToList());
+            }
         }
     }
 

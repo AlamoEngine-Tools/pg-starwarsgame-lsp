@@ -240,7 +240,7 @@ public sealed class DamageSectionBuilder(
             if (row.Length < 2 || row[1].Length == 0)
                 continue;
 
-            var clone = resolver.Resolve(row[1]);
+            var clone = resolver.Resolve(row[1], GameTypeNames.GameObjectType);
 
             if (!clone.Found)
             {

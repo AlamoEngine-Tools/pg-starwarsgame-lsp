@@ -48,7 +48,7 @@ public sealed class FiresForwardHandler : XmlDiagnosticsHandler<FiresForwardFact
         // honest answer.
         if (ctx.Objects is null) return [];
 
-        var resolved = ctx.Objects.Resolve(fact.ObjectId);
+        var resolved = ctx.Objects.Resolve(fact.ObjectId, GameTypeNames.GameObjectType);
         if (!resolved.Found) return [];
 
         var behaviours = ObjectBehaviors.Of(resolved);

@@ -32,7 +32,8 @@ public sealed class GetEncyclopediaEntryIconTest
 
     private static GameSymbol Sym()
     {
-        return new GameSymbol(ObjectId, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin("file:///u.xml", 0, 0),
+        return new GameSymbol(ObjectId, GameSymbolKind.XmlObject, "GameObjectType",
+            new FileOrigin("file:///u.xml", 0, 0),
             null);
     }
 

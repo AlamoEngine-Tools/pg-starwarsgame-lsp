@@ -112,7 +112,12 @@ public sealed class LuaRenameHandler : IRenameProvider
             if (StoryRenameGuard.IsStorySymbol(xmlObjectId, index) &&
                 StoryRenameGuard.Check(xmlObjectId, request.NewName, index) is { } objection)
                 throw new InvalidOperationException(objection);
-            return XmlObjectRenameBuilder.Build(xmlObjectId, request.NewName, index, _schema, _textSource, _logger);
+            // A script names an object by a bare string: it means the type the id resolves to.
+            var typeName = StoryRenameGuard.IsStorySymbol(xmlObjectId, index)
+                ? null
+                : index.TypeMeant(xmlObjectId, null);
+            return XmlObjectRenameBuilder.Build(xmlObjectId, typeName, request.NewName, index, _schema, _textSource,
+                _logger);
         }
 
         // A state name: the library looks states up by the string, so every literal of it moves (#252).
@@ -272,7 +277,7 @@ public sealed class LuaRenameHandler : IRenameProvider
             if (character < innerStart || character > innerEnd) continue;
 
             if (!IsKnownXmlObject(value, index)) continue;
-            if (!index.IsLeafOwned(value)) return null;
+            if (!index.IsLeafOwned(value, index.TypeMeant(value, null))) return null;
 
             return new RangeOrPlaceholderRange(new LspRange(
                 new Position(line, innerStart),

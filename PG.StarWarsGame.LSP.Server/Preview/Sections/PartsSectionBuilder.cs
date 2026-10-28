@@ -44,7 +44,7 @@ public sealed class PartsSectionBuilder(
         List<PreviewWeapon> weapons,
         List<PreviewProblem> problems)
     {
-        var effective = resolver.Resolve(hardpointId);
+        var effective = resolver.Resolve(hardpointId, GameTypeNames.HardPoint);
         if (!effective.Found)
         {
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointNotDefined, "warning",
@@ -185,7 +185,7 @@ public sealed class PartsSectionBuilder(
                      .Select(id => id!)
                      .Where(seen.Add))
         {
-            var effective = resolver.Resolve(id);
+            var effective = resolver.Resolve(id, GameTypeNames.GameObjectType);
             if (!effective.Found)
             {
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewBreakoffPropNotDefined, "warning",

@@ -61,7 +61,7 @@ public sealed class PreviewBreakoffPropTest
     {
         // A modder renaming a prop and missing one hardpoint is exactly the mistake this preview
         // exists to catch - so the prop is still listed, unresolved, rather than dropped.
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Gun", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Gun", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Gun"))
             .With("HP_Gun",
@@ -83,8 +83,8 @@ public sealed class PreviewBreakoffPropTest
         // The Star Destroyer shares breakoff props between mirrored mounts. Two entries would have
         // the client instantiate the same wreck twice.
         var index = Index([
-            Sym("Ship", "SpaceUnit"), Sym("HP_L", "HardPoint"), Sym("HP_R", "HardPoint"),
-            Sym("Breakoff", "SpaceProp")
+            Sym("Ship", "GameObjectType"), Sym("HP_L", "HardPoint"), Sym("HP_R", "HardPoint"),
+            Sym("Breakoff", "GameObjectType")
         ]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_L, HP_R"))
@@ -103,9 +103,9 @@ public sealed class PreviewBreakoffPropTest
     private static PreviewScene Build()
     {
         var index = Index([
-            Sym("Generic_Star_Destroyer", "SpaceUnit"),
+            Sym("Generic_Star_Destroyer", "GameObjectType"),
             Sym("HP_SD_Weapon_FL", "HardPoint"),
-            Sym("Hardpoint_Breakoff_Star_Dest_Weapon_FL", "SpaceProp")
+            Sym("Hardpoint_Breakoff_Star_Dest_Weapon_FL", "GameObjectType")
         ]);
 
         var tags = new FakeVariantTagSource()

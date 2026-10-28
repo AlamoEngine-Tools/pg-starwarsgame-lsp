@@ -158,6 +158,11 @@ public sealed class GrenadeProjectileHandlerTest
     private sealed class FakeProjectiles(params (string Id, string? Category, VariantProvenance From)[] objects)
         : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string objectId)
         {
             var match = objects.FirstOrDefault(o =>

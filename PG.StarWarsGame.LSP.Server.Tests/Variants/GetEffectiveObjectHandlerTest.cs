@@ -50,6 +50,30 @@ public sealed class GetEffectiveObjectHandlerTest
         Assert.Contains("inherited from B", result.Xml);
     }
 
+    /// <summary>One name may be objects of several types; the view shows the type it was opened on.</summary>
+    [Fact]
+    public async Task Handle_WithAType_ShowsThatTypesObject()
+    {
+        var unit = Sym("Sarlacc");
+        var faction = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin("file:///factions.xml", 0, 0), null);
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(
+                StringComparer.OrdinalIgnoreCase).Add("Sarlacc", [unit, faction])
+        };
+        var source = new FakeVariantTagSource()
+            .With(unit, new VariantTag("Tactical_Health", "5", "<Tactical_Health>5</Tactical_Health>", 0))
+            .With(faction, new VariantTag("Color", "1, 2, 3", "<Color>1, 2, 3</Color>", 0));
+
+        var result = await Handler(index, source).Handle(
+            new GetEffectiveObjectParams { ObjectId = "Sarlacc", TypeName = "Faction" }, CancellationToken.None);
+
+        Assert.Equal("Faction", result.TypeName);
+        Assert.Contains("<Color>1, 2, 3</Color>", result.Xml);
+        Assert.DoesNotContain("Tactical_Health", result.Xml);
+    }
+
     [Fact]
     public async Task Handle_UnknownId_NotFound()
     {

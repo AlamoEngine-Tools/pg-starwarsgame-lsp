@@ -88,7 +88,7 @@ public sealed class HardpointCollisionMeshTest
             .With("HP_B", new VariantTag("Is_Destroyable", "Yes", "", 0),
                 new VariantTag("Collision_Mesh", "SHARED_COLL", "", 0));
 
-        var fact = Assert.Single(Produce(text, source, Sym("SHIP", "SpaceUnit"))
+        var fact = Assert.Single(Produce(text, source, Sym("SHIP", "GameObjectType"))
             .OfType<HardpointUnhittableFact>());
 
         // Reported on the one that loses the lookup, naming the one that wins it.
@@ -109,7 +109,7 @@ public sealed class HardpointCollisionMeshTest
             .With("HP_B", new VariantTag("Is_Destroyable", "Yes", "", 0),
                 new VariantTag("Collision_Mesh", "SHARED_COLL", "", 0));
 
-        Assert.Single(Produce(text, source, Sym("SHIP", "SpaceUnit")).OfType<HardpointUnhittableFact>());
+        Assert.Single(Produce(text, source, Sym("SHIP", "GameObjectType")).OfType<HardpointUnhittableFact>());
     }
 
     /// <summary>
@@ -128,7 +128,7 @@ public sealed class HardpointCollisionMeshTest
             .With("HP_B", new VariantTag("Is_Destroyable", "Yes", "", 0),
                 new VariantTag("Collision_Mesh", "SHARED_COLL", "", 0));
 
-        Assert.Empty(Produce(text, source, Sym("SHIP", "SpaceUnit")).OfType<HardpointUnhittableFact>());
+        Assert.Empty(Produce(text, source, Sym("SHIP", "GameObjectType")).OfType<HardpointUnhittableFact>());
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class HardpointCollisionMeshTest
             .With("HP_B", new VariantTag("Is_Destroyable", "Yes", "", 0),
                 new VariantTag("Collision_Mesh", "B_COLL", "", 0));
 
-        Assert.Empty(Produce(text, source, Sym("SHIP", "SpaceUnit")).OfType<HardpointUnhittableFact>());
+        Assert.Empty(Produce(text, source, Sym("SHIP", "GameObjectType")).OfType<HardpointUnhittableFact>());
     }
 
     private static IReadOnlyList<XmlFact> Produce(string text, IVariantTagSource source,
@@ -153,6 +153,13 @@ public sealed class HardpointCollisionMeshTest
         var docIndex = new DocumentIndex(Uri, 1, docSymbols, ImmutableArray<GameReference>.Empty);
         var defs = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
             StringComparer.OrdinalIgnoreCase);
+        // Every hardpoint the text mounts is defined too, in a hardpoint file of its own: a real index
+        // holds one, and a hardpoint is looked up in HardPointDataFiles' id space.
+        foreach (var hardpoint in MountedHardpoints(text).Where(h => !defs.ContainsKey(h)))
+            defs = defs.Add(hardpoint, [
+                new GameSymbol(hardpoint, GameSymbolKind.XmlObject, GameTypeNames.HardPoint,
+                    new FileOrigin("file:///hardpoints.xml", 0, 0), null)
+            ]);
         var index = GameIndex.Empty with
         {
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty.Add(Uri, docIndex),
@@ -164,6 +171,14 @@ public sealed class HardpointCollisionMeshTest
 
         return new XmlHardpointFactProducer(new SchemaProviderBuilder().Build(), source)
             .Produce(Uri, ParsedXmlDocument.Parse(text), index);
+    }
+
+    private static IEnumerable<string> MountedHardpoints(string text)
+    {
+        var html = ParsedXmlDocument.Parse(text).Html;
+        return html.DocumentNode.Descendants("hardpoints")
+            .SelectMany(n =>
+                n.InnerText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static GameSymbol Sym(string id, string typeName)

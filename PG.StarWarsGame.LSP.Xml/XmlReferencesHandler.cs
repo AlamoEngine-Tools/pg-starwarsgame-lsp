@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -44,6 +45,9 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
 
         var id = hit.Value.Id;
         var locations = new List<Location>();
+        // Every type is an id space of its own, so the list is the type's under the cursor. A story
+        // symbol is one element indexed under two types and lists as one.
+        var typeName = StoryRenameGuard.IsStorySymbol(id, index) ? null : index.TypeMeant(id, hit.Value.TypeName);
 
         if (index.AllGroupMemberships.TryGetValue(id, out var members) && members.Length > 0)
         {
@@ -58,18 +62,17 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
             return Task.FromResult<LocationContainer?>(new LocationContainer(locations));
         }
 
-        if (index.WorkspaceReferences.TryGetValue(id, out var refs))
-            foreach (var r in refs)
-                locations.Add(new Location
-                {
-                    Uri = r.DocumentUri,
-                    Range = new LspRange(
-                        new Position(r.Line, r.Column),
-                        new Position(r.Line, r.Column + r.Length))
-                });
+        foreach (var r in index.ReferencesTo(id, typeName))
+            locations.Add(new Location
+            {
+                Uri = r.DocumentUri,
+                Range = new LspRange(
+                    new Position(r.Line, r.Column),
+                    new Position(r.Line, r.Column + r.Length))
+            });
 
-        if (request.Context.IncludeDeclaration && index.WorkspaceDefinitions.TryGetValue(id, out var defs))
-            foreach (var s in defs)
+        if (request.Context.IncludeDeclaration)
+            foreach (var s in index.DefinitionsOf(id, typeName))
             {
                 if (s.Origin is not FileOrigin { IsNavigable: true } fo) continue;
                 locations.Add(fo.ToLspLocation());

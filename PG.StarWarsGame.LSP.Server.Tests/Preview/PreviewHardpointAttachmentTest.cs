@@ -143,7 +143,7 @@ public sealed class PreviewHardpointAttachmentTest
     private static PreviewScene SceneWith(bool targetable, string? attachmentBone,
         string? fireBoneA = null)
     {
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Gun", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Gun", "HardPoint")]);
 
         var hardpointTags = new List<VariantTag>
         {

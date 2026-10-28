@@ -136,7 +136,8 @@ public sealed class EncyclopediaLayoutResolver
     /// </summary>
     private EncyclopediaOffsets Offsets()
     {
-        var tags = TagsOf(EncyclopediaTags.GameConstantsId);
+        // A singleton: its id is its type.
+        var tags = TagsOf(EncyclopediaTags.GameConstantsId, EncyclopediaTags.GameConstantsId);
         var shipped = EncyclopediaOffsets.Shipped;
 
         return new EncyclopediaOffsets(
@@ -155,9 +156,10 @@ public sealed class EncyclopediaLayoutResolver
         return value is null || double.IsNaN(value.Value) ? fallback : (int)value.Value;
     }
 
-    private IReadOnlyDictionary<string, string> TagsOf(string componentId)
+    private IReadOnlyDictionary<string, string> TagsOf(string componentId,
+        string typeName = GameTypeNames.CommandBarComponent)
     {
-        var effective = _resolver.Resolve(componentId);
+        var effective = _resolver.Resolve(componentId, typeName);
         if (!effective.Found)
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 

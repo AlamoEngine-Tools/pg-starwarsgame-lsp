@@ -212,6 +212,11 @@ public sealed class DeathAnimationClipHandlerTest
 
     private sealed class FakeObjects(string id, (string Tag, string Value)[] tags) : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string objectId)
         {
             if (!string.Equals(id, objectId, StringComparison.OrdinalIgnoreCase))

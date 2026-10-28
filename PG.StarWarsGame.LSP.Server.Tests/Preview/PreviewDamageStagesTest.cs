@@ -208,7 +208,7 @@ public sealed class PreviewDamageStagesTest
         {
             WorkspaceDefinitions = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("Bunker", [
-                    new GameSymbol("Bunker", GameSymbolKind.XmlObject, "GroundStructure",
+                    new GameSymbol("Bunker", GameSymbolKind.XmlObject, "GameObjectType",
                         new FileOrigin("file:///structures.xml", 0, 0), null)
                 ]),
 

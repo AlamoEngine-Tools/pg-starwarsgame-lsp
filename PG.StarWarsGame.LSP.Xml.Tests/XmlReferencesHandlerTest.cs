@@ -71,6 +71,29 @@ public sealed class XmlReferencesHandlerTest
             fileHelper ?? new FileHelper(new MockFileSystem()));
     }
 
+    /// <summary>
+    ///     Every type is an id space of its own. On a reference to the Sarlacc faction the list is the
+    ///     faction's references and definition, never the Sarlacc unit's.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ListsOnlyTheTypeUnderTheCursor()
+    {
+        var toFaction = new GameReference("Sarlacc", GameSymbolKind.XmlObject, "Faction", TestUri, 0, 10, 7);
+        var toUnit = new GameReference("Sarlacc", GameSymbolKind.XmlObject, "Unit", OtherUri, 5, 10, 7);
+        var faction = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin(OtherUri, 9, null), null);
+        var unit = SymbolAt("Sarlacc", OtherUri, 20);
+        var doc = new DocumentIndex(TestUri, 1, ImmutableArray<GameSymbol>.Empty, [toFaction]);
+        var index = BuildIndex(doc,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Sarlacc", [toFaction, toUnit]),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Sarlacc", [unit, faction]));
+
+        var result = await BuildHandler(index).Handle(At(0, 12, true), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal([0, 9], result.Select(l => l.Range.Start.Line).Order());
+    }
+
     // ── null / miss cases ─────────────────────────────────────────────────────
 
     [Fact]

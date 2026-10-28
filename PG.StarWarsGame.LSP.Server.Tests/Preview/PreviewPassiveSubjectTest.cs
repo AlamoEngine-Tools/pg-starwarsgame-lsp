@@ -49,7 +49,7 @@ public sealed class PreviewPassiveSubjectTest
                 "data/art/models/ev_stardestroyer_idle_00.ala",
                 "data/art/models/ev_stardestroyer_d_die_00.ala"
             ],
-            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
             tags => tags.With("Wreck", Tag("Space_Model_Name", "Ev_stardestroyer_d.alo")),
             Tag("Space_Model_Name", "Ev_stardestroyer.alo"),
             Tag("Death_Clone", "Damage_Normal, Wreck"));
@@ -64,7 +64,7 @@ public sealed class PreviewPassiveSubjectTest
     {
         var scene = Scene(
             ["data/art/models/ev_stardestroyer_idle_00.ala"],
-            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
             tags => tags,
             Tag("Space_Model_Name", "Ev_stardestroyer.alo"),
             Tag("Death_Clone", "Damage_Normal, Wreck"));
@@ -81,7 +81,7 @@ public sealed class PreviewPassiveSubjectTest
                 "data/art/models/ev_stardestroyer_idle_00.ala",
                 "data/art/models/ev_stardestroyer_dead_die_00.ala"
             ],
-            [Sym("Ship", "SpaceUnit"), Sym("Mount", "HardPoint"), Sym("Debris", "SpaceProp")],
+            [Sym("Ship", "GameObjectType"), Sym("Mount", "HardPoint"), Sym("Debris", "GameObjectType")],
             tags => tags
                 .With("Mount", Tag("Is_Destroyable", "Yes"), Tag("Death_Breakoff_Prop", "Debris"))
                 .With("Debris", Tag("Space_Model_Name", "Ev_stardestroyer_dead.alo")),
@@ -178,8 +178,8 @@ public sealed class PreviewPassiveSubjectTest
         {
             WorkspaceDefinitions = new[]
                 {
-                    Sym("Ship", "SpaceUnit"), Sym("Mount", "HardPoint"),
-                    Sym("Wreck", "SpaceUnit"), Sym("Debris", "SpaceProp")
+                    Sym("Ship", "GameObjectType"), Sym("Mount", "HardPoint"),
+                    Sym("Wreck", "GameObjectType"), Sym("Debris", "GameObjectType")
                 }
                 .ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
                     StringComparer.OrdinalIgnoreCase)

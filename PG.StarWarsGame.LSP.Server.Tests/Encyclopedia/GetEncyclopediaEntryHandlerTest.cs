@@ -40,7 +40,7 @@ public sealed class GetEncyclopediaEntryHandlerTest
 
     private static GameSymbol Sym(string id, string? variantBaseId = null)
     {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, "SpaceUnit",
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin($"file:///{id}.xml", 0, 0), null, variantBaseId);
     }
 

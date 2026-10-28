@@ -145,7 +145,7 @@ public sealed class LuaHoverHandler : IHoverProvider
             if (reference.Line != line) continue;
             if (character < reference.Column || character > reference.Column + reference.Length) continue;
 
-            var sym = index.Resolve(reference.TargetId);
+            var sym = index.ResolveReference(reference);
             var typeName = sym?.TypeName ?? reference.ExpectedTypeName ?? "XmlObject";
             var range = new LspRange(
                 new Position(reference.Line, reference.Column),

@@ -33,7 +33,7 @@ public sealed class HardpointModeRowTest
         var source = new HardpointTagSource()
             .With("SHIP", Hardpoints("HP_A"), Abilities("DEFEND"));
 
-        var fact = Assert.Single(Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("HP_A", "HardPoint"))
+        var fact = Assert.Single(Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("HP_A", "HardPoint"))
             .OfType<HardpointModeRowWithoutAbilityFact>());
 
         Assert.Equal("HP_A", fact.HardpointId);
@@ -52,7 +52,7 @@ public sealed class HardpointModeRowTest
         var source = new HardpointTagSource()
             .With("SHIP", Hardpoints("HP_A"), Abilities("TURBO", "DEFEND"));
 
-        Assert.Empty(Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("HP_A", "HardPoint"))
+        Assert.Empty(Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("HP_A", "HardPoint"))
             .OfType<HardpointModeRowWithoutAbilityFact>());
     }
 
@@ -66,7 +66,7 @@ public sealed class HardpointModeRowTest
         var source = new HardpointTagSource()
             .With("SHIP", Hardpoints("HP_A"), Abilities("DEFEND", "TURBO", "FULL_SALVO"));
 
-        var fact = Assert.Single(Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("HP_A", "HardPoint"))
+        var fact = Assert.Single(Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("HP_A", "HardPoint"))
             .OfType<HardpointModeRowWithoutAbilityFact>());
 
         Assert.Equal(2, fact.SlotOfType);
@@ -83,7 +83,7 @@ public sealed class HardpointModeRowTest
             .With("SHIP", Hardpoints("HP_A"), Abilities("DEFEND"))
             .With("HP_A", new VariantTag("Turbo_Mode_Weapon_Delay_Multiplier", "2", "", 0));
 
-        var fact = Assert.Single(Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("HP_A", "HardPoint"))
+        var fact = Assert.Single(Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("HP_A", "HardPoint"))
             .OfType<HardpointModeRowWithoutAbilityFact>());
 
         Assert.Equal("TURBO", fact.AbilityType);
@@ -102,7 +102,7 @@ public sealed class HardpointModeRowTest
         var source = new HardpointTagSource()
             .With("SHIP", Hardpoints("HP_A"), Abilities("DEFEND"));
 
-        var facts = Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("HP_A", "HardPoint"));
+        var facts = Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("HP_A", "HardPoint"));
 
         var dead = Assert.Single(facts.OfType<HardpointNeverFiresFact>());
         Assert.Equal("SHIP", dead.OwnerId);
@@ -119,7 +119,7 @@ public sealed class HardpointModeRowTest
         var source = new HardpointTagSource()
             .With("SHIP", Hardpoints("HP_A"), Abilities("ROCKET_ATTACK"));
 
-        var dead = Assert.Single(Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("HP_A", "HardPoint"))
+        var dead = Assert.Single(Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("HP_A", "HardPoint"))
             .OfType<HardpointNeverFiresFact>());
 
         Assert.True(dead.BothFlagsOff);
@@ -136,7 +136,7 @@ public sealed class HardpointModeRowTest
             .With("SHIP", Hardpoints("HP_A"), Abilities("DEFEND"))
             .With("OTHER", Hardpoints("HP_A"), Abilities("ROCKET_ATTACK"));
 
-        var dead = Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("OTHER", "SpaceUnit"),
+        var dead = Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("OTHER", "GameObjectType"),
             Sym("HP_A", "HardPoint"), Sym("HP_B", "HardPoint")).OfType<HardpointNeverFiresFact>().ToList();
 
         Assert.Equal(["HP_A", "HP_B"], dead.Select(d => d.HardpointId).Order());
@@ -151,7 +151,7 @@ public sealed class HardpointModeRowTest
         var source = new HardpointTagSource()
             .With("SHIP", Hardpoints("HP_A"), Abilities("DEFEND", "TURBO", "ROCKET_ATTACK"));
 
-        var facts = Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("HP_A", "HardPoint"));
+        var facts = Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("HP_A", "HardPoint"));
 
         Assert.Empty(facts.OfType<HardpointNeverFiresFact>());
         Assert.Empty(facts.OfType<HardpointModeRowWithoutAbilityFact>());
@@ -165,7 +165,7 @@ public sealed class HardpointModeRowTest
         var source = new HardpointTagSource()
             .With("SHIP", Hardpoints("HP_A"), Abilities("DEFEND"));
 
-        var facts = Produce(text, source, Sym("SHIP", "SpaceUnit"), Sym("HP_A", "HardPoint"));
+        var facts = Produce(text, source, Sym("SHIP", "GameObjectType"), Sym("HP_A", "HardPoint"));
 
         var inert = Assert.Single(facts.OfType<HardpointModeRowWithoutAbilityFact>());
         Assert.Equal("ROCKET_ATTACK", inert.AbilityType);
@@ -184,7 +184,8 @@ public sealed class HardpointModeRowTest
             .With("SHIP", new VariantTag("Variant_Of_Existing_Type", "BASE", "", 0), Hardpoints("HP_A"),
                 Abilities("TURBO"));
 
-        var fact = Assert.Single(Produce(text, source, Sym("BASE", "SpaceUnit"), Sym("SHIP", "SpaceUnit", "BASE"),
+        var fact = Assert.Single(Produce(text, source, Sym("BASE", "GameObjectType"),
+            Sym("SHIP", "GameObjectType", "BASE"),
             Sym("HP_A", "HardPoint")).OfType<HardpointModeRowWithoutAbilityFact>());
 
         Assert.Equal("SHIP", fact.OwnerId);
@@ -200,7 +201,7 @@ public sealed class HardpointModeRowTest
             .With("BASE", Abilities("DEFEND"))
             .With("SHIP", new VariantTag("Variant_Of_Existing_Type", "BASE", "", 0), Hardpoints("HP_A"));
 
-        Assert.Empty(Produce(text, source, Sym("BASE", "SpaceUnit"), Sym("SHIP", "SpaceUnit", "BASE"),
+        Assert.Empty(Produce(text, source, Sym("BASE", "GameObjectType"), Sym("SHIP", "GameObjectType", "BASE"),
             Sym("HP_A", "HardPoint")).OfType<HardpointModeRowWithoutAbilityFact>());
     }
 

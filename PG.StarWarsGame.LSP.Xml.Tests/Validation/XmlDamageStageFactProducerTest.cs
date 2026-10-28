@@ -160,7 +160,7 @@ public sealed class XmlDamageStageFactProducerTest
         bool declaresModel = true,
         IEnumerable<string>? otherModel = null)
     {
-        var symbol = new GameSymbol("BUNKER", GameSymbolKind.XmlObject, "GroundStructure",
+        var symbol = new GameSymbol("BUNKER", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(Uri, 0, 0), null);
 
         var tags = new List<VariantTag>();

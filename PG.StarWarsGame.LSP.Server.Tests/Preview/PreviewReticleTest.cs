@@ -97,7 +97,7 @@ public sealed class PreviewReticleTest
     {
         // 258 of foc's 355 hardpoints say Yes and 97 say No; none omit it. A mount that is not
         // targetable gets no reticle, which is the honest picture rather than a decoration.
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Gun", "HardPoint"), Sym("HP_Dummy", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Gun", "HardPoint"), Sym("HP_Dummy", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Gun, HP_Dummy"))
             .With("HP_Gun", Tag("Type", "HARD_POINT_WEAPON_LASER"), Tag("Is_Targetable", "Yes"))

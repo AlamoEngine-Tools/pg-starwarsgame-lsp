@@ -16,7 +16,7 @@ namespace PG.StarWarsGame.LSP.Xml.Parsing;
 public sealed class XmlGameDocumentParser : IGameDocumentParser
 {
     // Markup_Filename: slot 0 is a Faction, slot 1 (the markup file) is not indexable and not emitted.
-    private const string FactionTypeName = "Faction";
+    private const string FactionTypeName = GameTypeNames.Faction;
 
     /// <summary>The schema enum a <c>Death_Clone</c>'s first slot names.</summary>
     private const string DamageTypeEnum = "DamageType";
@@ -368,7 +368,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 {
                     if (HasChildElement(child)) continue;
                     CollectLeadingSlotReference(child, tagDef.ObjectType?.TypeName, lineIndex, documentUri,
-                        references);
+                        references, tagDef.TargetTypeName);
                     continue;
                 }
 
@@ -448,7 +448,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                         documentUri,
                         line,
                         column,
-                        length));
+                        length) { LookupType = LookupBeyond(tagDef.ObjectType?.TypeName, tagDef.TargetTypeName) });
                 }
             }
         }
@@ -461,7 +461,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     // across any object type, matching the untyped lookup its handler used to perform. A
     // PlanetValuePair passes the tag's own type, or none when its referenceType is a kind.
     private static void CollectLeadingSlotReference(HtmlNode child, string? expectedTypeName,
-        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references, string? lookupType = null)
     {
         var innerText = child.InnerText;
         var comma = innerText.IndexOf(',');
@@ -479,7 +479,16 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri,
             line,
             column,
-            length));
+            length) { LookupType = LookupBeyond(expectedTypeName, lookupType) });
+    }
+
+    /// <summary>
+    ///     The id space a reference is looked up in, recorded only where it is not the expected type
+    ///     itself: a tag or slot naming an object kind expects the kind and looks among game objects.
+    /// </summary>
+    private static string? LookupBeyond(string? expectedTypeName, string? lookupType)
+    {
+        return string.Equals(expectedTypeName, lookupType, StringComparison.OrdinalIgnoreCase) ? null : lookupType;
     }
 
     private static IReadOnlyList<string?> FactionTupleSlotTypes(XmlValueType valueType)
@@ -630,7 +639,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                length));
+                length) { LookupType = LookupBeyond(tagDef.ObjectType?.TypeName, tagDef.TargetTypeName) });
         }
     }
 
@@ -689,7 +698,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                length));
+                length)
+            {
+                LookupType = untyped
+                    ? null
+                    : LookupBeyond(item.Slot.ObjectType?.TypeName ?? item.Slot.ReferenceTypeName,
+                        item.Slot.TargetTypeName)
+            });
         }
     }
 

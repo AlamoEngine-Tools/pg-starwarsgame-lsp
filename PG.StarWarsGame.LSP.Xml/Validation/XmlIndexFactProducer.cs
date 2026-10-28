@@ -123,7 +123,7 @@ public sealed class XmlIndexFactProducer : IXmlFactProducer
                 continue;
             }
 
-            var resolved = index.Resolve(reference.TargetId, reference.ExpectedTypeName);
+            var resolved = index.ResolveReference(reference);
             facts.Add(new XmlReferenceFact(
                 documentUri,
                 reference.Line,

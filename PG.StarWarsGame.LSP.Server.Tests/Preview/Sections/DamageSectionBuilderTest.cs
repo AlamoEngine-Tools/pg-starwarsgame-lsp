@@ -47,7 +47,7 @@ public sealed class DamageSectionBuilderTest
     public void DamageStages_AreTheDistinctNonNegativeStages_Sorted()
     {
         var tags = new FakeVariantTagSource().With("Unit", Tag("Land_Damage_Alternates", "2, 1, 2, x, -1, 0"));
-        var (_, resolver) = Setup(tags, Sym("Unit", "GroundVehicle"));
+        var (_, resolver) = Setup(tags, Sym("Unit", "GameObjectType"));
 
         Assert.Equal([0, 1, 2], DamageSectionBuilder.DamageStages(resolver.Resolve("Unit")));
     }
@@ -58,7 +58,7 @@ public sealed class DamageSectionBuilderTest
         var tags = new FakeVariantTagSource()
             .With("Paired", Tag("Land_Damage_Alternates", "1, 2"), Tag("Land_Damage_Thresholds", "0.66, 0.33"))
             .With("Odd", Tag("Land_Damage_Alternates", "1, 2"), Tag("Land_Damage_Thresholds", "0.5"));
-        var (_, resolver) = Setup(tags, Sym("Paired", "GroundVehicle"), Sym("Odd", "GroundVehicle"));
+        var (_, resolver) = Setup(tags, Sym("Paired", "GameObjectType"), Sym("Odd", "GameObjectType"));
 
         Assert.Equal([new PreviewDamageBand(0.66f, 1), new PreviewDamageBand(0.33f, 2)],
             DamageSectionBuilder.DamageTable(resolver.Resolve("Paired")));
@@ -72,8 +72,8 @@ public sealed class DamageSectionBuilderTest
             .With("Silent", Tag("Max_Speed", "4"))
             .With("Denies", Tag("Should_Be_Destroyed_When_All_Hardpoints_Destroyed", "No"))
             .With("Says", Tag("Should_Be_Destroyed_When_All_Hardpoints_Destroyed", "Yes"));
-        var (_, resolver) = Setup(tags, Sym("Silent", "SpaceUnit"), Sym("Denies", "SpaceUnit"),
-            Sym("Says", "SpaceUnit"));
+        var (_, resolver) = Setup(tags, Sym("Silent", "GameObjectType"), Sym("Denies", "GameObjectType"),
+            Sym("Says", "GameObjectType"));
 
         Assert.True(DamageSectionBuilder.DiesWithHardpoints(resolver.Resolve("Silent")));
         Assert.False(DamageSectionBuilder.DiesWithHardpoints(resolver.Resolve("Denies")));
@@ -87,7 +87,7 @@ public sealed class DamageSectionBuilderTest
             .With("Spins", Tag("Spin_Away_On_Death", "Yes"), Tag("Spin_Away_On_Death_Chance", "0.5"),
                 Tag("Spin_Away_On_Death_Explosion", "Big_Boom"), Tag("Max_Speed", "4"))
             .With("Still", Tag("Max_Speed", "4"));
-        var (_, resolver) = Setup(tags, Sym("Spins", "SpaceUnit"), Sym("Still", "SpaceUnit"));
+        var (_, resolver) = Setup(tags, Sym("Spins", "GameObjectType"), Sym("Still", "GameObjectType"));
 
         Assert.Equal(new PreviewSpinAway(2.0f, 0.5f, "Big_Boom", 4f),
             DamageSectionBuilder.SpinAway(resolver.Resolve("Spins")));
@@ -101,7 +101,7 @@ public sealed class DamageSectionBuilderTest
             Tag("SpaceBehavior", "SELECTABLE, SHIELDED"), Tag("Armor_Type", " Armor_Frigate "),
             Tag("Shield_Armor_Type", "Shield_Frigate"), Tag("Shield_Points", "900"), Tag("Tactical_Health", "1800"),
             Tag("Energy_Capacity", "500"), Tag("Should_Be_Destroyed_When_All_Hardpoints_Destroyed", "No"));
-        var (index, resolver) = Setup(tags, Sym("Ship", "SpaceUnit"));
+        var (index, resolver) = Setup(tags, Sym("Ship", "GameObjectType"));
         PreviewHardpoint[] hardpoints =
         [
             new("HP_A", null, "T", "B", true, true, 100f, null, null, null, null, null, null, true, null, null, null),
@@ -130,7 +130,7 @@ public sealed class DamageSectionBuilderTest
             .With("Ship", Tag("Death_Clone", "Damage_Normal, Ship_Death_Clone"),
                 Tag("Should_Death_Clone_Play_Idle", "Yes"))
             .With("Ship_Death_Clone", Tag("Space_Model_Name", "ship_death.alo"), Tag("Scale_Factor", "2"));
-        var (index, resolver) = Setup(tags, Sym("Ship", "SpaceUnit"), Sym("Ship_Death_Clone", "SpaceUnit"));
+        var (index, resolver) = Setup(tags, Sym("Ship", "GameObjectType"), Sym("Ship_Death_Clone", "GameObjectType"));
         var problems = new List<PreviewProblem>();
 
         var clone = Assert.Single(Builder(tags).DeathClones(index, resolver, resolver.Resolve("Ship"), problems));
@@ -147,7 +147,7 @@ public sealed class DamageSectionBuilderTest
     public void DeathClones_AnUndefinedClone_IsListedWithoutAModel_AndNoticed()
     {
         var tags = new FakeVariantTagSource().With("Ship", Tag("Death_Clone", ", Ship_Ghost_Clone"));
-        var (index, resolver) = Setup(tags, Sym("Ship", "SpaceUnit"));
+        var (index, resolver) = Setup(tags, Sym("Ship", "GameObjectType"));
         var problems = new List<PreviewProblem>();
 
         var clone = Assert.Single(Builder(tags).DeathClones(index, resolver, resolver.Resolve("Ship"), problems));

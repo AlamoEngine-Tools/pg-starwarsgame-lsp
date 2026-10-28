@@ -24,7 +24,7 @@ public sealed class AnimationSectionBuilderTest
         {
             WorkspaceDefinitions = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Unit",
             [
-                new GameSymbol("Unit", GameSymbolKind.XmlObject, "GroundInfantry",
+                new GameSymbol("Unit", GameSymbolKind.XmlObject, "GameObjectType",
                     new FileOrigin("file:///unit.xml", 0, 0), null, null)
             ])
         };

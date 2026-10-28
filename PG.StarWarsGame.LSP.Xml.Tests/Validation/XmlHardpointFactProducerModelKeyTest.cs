@@ -39,7 +39,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         var bones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("ub_palace.alo", ["HP_Bone_A", "HP_Bone_B", "Root"]);
 
-        var facts = Produce(text, schema, source, bones, Sym("PALACE", "SpecialStructure"));
+        var facts = Produce(text, schema, source, bones, Sym("PALACE", "GameObjectType"));
 
         Assert.DoesNotContain(facts, f => f is HardpointModelBonesUnavailableFact);
         Assert.DoesNotContain(facts, f => f is HardpointBoneNotOnModelFact);
@@ -61,7 +61,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         var bones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("ub_palace.alo", ["HP_Bone_A", "Root"]);
 
-        var facts = Produce(text, schema, source, bones, Sym("PALACE", "SpecialStructure"));
+        var facts = Produce(text, schema, source, bones, Sym("PALACE", "GameObjectType"));
 
         Assert.Contains(facts, f => f is HardpointBoneNotOnModelFact { BoneName: "Nonexistent_Bone" });
     }
@@ -89,7 +89,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("ub_palace.alo", ["HP_Bone", "Root"]); // HP_Blast is absent
 
         var hpSym = Sym("HP_A", "HardPoint");
-        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(objUri, 0, 0), null);
 
         var hpDoc = new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty);
@@ -188,7 +188,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("ub_palace.alo", ["Good_Bone", "Good_Emit", "Root"]); // Bad_Coll and Bad_Blast absent
 
         var hpSym = Sym("HP_A", "HardPoint");
-        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(objUri, 0, 0), null);
         var hpDoc = new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty);
         var objDoc = new DocumentIndex(objUri, 1, [objSym], ImmutableArray<GameReference>.Empty);
@@ -232,7 +232,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("ub_01_station.alo", ["HP01_COM_Bone", "Root"]) // tactical model HAS the bone (mixed case)
             .Add("i_ub_01_station.alo", ["Root"]); // galactic model lacks it
 
-        var facts = Produce(text, schema, source, bones, Sym("STATION", "SpaceUnit"));
+        var facts = Produce(text, schema, source, bones, Sym("STATION", "GameObjectType"));
 
         Assert.DoesNotContain(facts, f => f is HardpointBoneNotOnModelFact);
     }
@@ -252,7 +252,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Add("ub_palace.alo", ["Root"]);
 
         var hpSym = Sym("HP_A", "HardPoint");
-        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(objUri, 0, 0), null);
         var index = GameIndex.Empty with
         {
@@ -280,7 +280,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
     {
         const string objUri = "file:///object.xml";
         var hpSym = Sym("HP_A", "HardPoint");
-        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(objUri, 0, 0), null);
 
         var index = GameIndex.Empty with
@@ -349,7 +349,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         var facts = Produce(text, ModelSchema("Space_Model_Name"),
             GargantuanSource("HP_turret_front_00_COL"), GargantuanBones("HP_turret_front_00_COLLISION"),
-            Sym("PALACE", "UniqueUnit"));
+            Sym("PALACE", "GameObjectType"));
 
         var fact = Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>());
         Assert.Null(fact.SuggestedName);
@@ -424,6 +424,13 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         var docIndex = new DocumentIndex(Uri, 1, docSymbols, ImmutableArray<GameReference>.Empty);
         var defs = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
             StringComparer.OrdinalIgnoreCase);
+        // Every hardpoint the text mounts is defined too, in a hardpoint file of its own: a real index
+        // holds one, and a hardpoint is looked up in HardPointDataFiles' id space.
+        foreach (var hardpoint in MountedHardpoints(text).Where(h => !defs.ContainsKey(h)))
+            defs = defs.Add(hardpoint, [
+                new GameSymbol(hardpoint, GameSymbolKind.XmlObject, GameTypeNames.HardPoint,
+                    new FileOrigin("file:///hardpoints.xml", 0, 0), null)
+            ]);
         var index = GameIndex.Empty with
         {
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty.Add(Uri, docIndex),
@@ -433,6 +440,14 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         return new XmlHardpointFactProducer(schema, source)
             .Produce(Uri, ParsedXmlDocument.Parse(text), index);
+    }
+
+    private static IEnumerable<string> MountedHardpoints(string text)
+    {
+        var html = ParsedXmlDocument.Parse(text).Html;
+        return html.DocumentNode.Descendants("hardpoints")
+            .SelectMany(n =>
+                n.InnerText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static GameSymbol Sym(string id, string typeName)

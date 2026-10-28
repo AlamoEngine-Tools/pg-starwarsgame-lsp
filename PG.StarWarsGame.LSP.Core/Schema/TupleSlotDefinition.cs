@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Symbols;
+
 namespace PG.StarWarsGame.LSP.Core.Schema;
 
 /// <summary>
@@ -30,4 +32,10 @@ public sealed record TupleSlotDefinition
     ///     <see cref="XmlTagDefinition.Kind" /> does for a whole tag.
     /// </summary>
     public ObjectKindDefinition? Kind { get; init; }
+
+    /// <summary>
+    ///     The type whose id space this slot's object reference is looked up in, as
+    ///     <see cref="XmlTagDefinition.TargetTypeName" /> is for a whole tag.
+    /// </summary>
+    public string? TargetTypeName => ObjectType?.TypeName ?? (Kind is not null ? GameTypeNames.GameObjectType : null);
 }

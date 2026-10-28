@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -64,7 +65,7 @@ public sealed class GrenadeProjectileHandler : XmlDiagnosticsHandler<XmlTagValue
         var named = fact.RawValue.Trim();
         if (named.Length == 0) return [];
 
-        var resolved = ctx.Objects.Resolve(named);
+        var resolved = ctx.Objects.ResolveIn(named, fact.Tag.TargetTypeName);
 
         // An id nothing defines is the unresolved-reference check's business. Reporting it again
         // here would put two diagnostics on one typo and name the wrong cause.

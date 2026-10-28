@@ -383,7 +383,7 @@ public sealed record GameIndex(
             if (string.IsNullOrEmpty(current.VariantBaseId) || !seen.Add(current.Id))
                 return ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
 
-            var next = Resolve(current.VariantBaseId);
+            var next = VariantBaseOf(current);
             if (next is null)
                 return ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -391,24 +391,86 @@ public sealed record GameIndex(
         }
     }
 
+    /// <summary>
+    ///     The definition of <paramref name="id" /> for a caller that does not know its type: the
+    ///     highest project layer's.
+    /// </summary>
+    /// <remarks>
+    ///     Every type is an id space of its own - the metafile that lists a file decides its type - so
+    ///     an id may name objects of several types on one layer: the shipped game has a Sarlacc faction
+    ///     and a Sarlacc indigenous unit. Without a type there is no right answer between them, only a
+    ///     stable one: they are ordered by type, file and line rather than by which the parallel scan
+    ///     inserted first. A caller that knows the type asks <see cref="ResolveOfType" />.
+    /// </remarks>
     public GameSymbol? Resolve(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)
-            // Highest project layer wins. OrderByDescending is stable, so a same-rank collision yields
-            // the first-inserted definition - and the parallel scan decides which that is, so it is
-            // NOT stable across starts. Objects of different kinds may share an id legitimately (a
-            // faction and a unit both named Sarlacc); a caller that holds the symbol resolves by it.
-            return ws.Length == 1 ? ws[0] : ws.OrderByDescending(LayerRankOf).First();
+            return ws.Length == 1 ? ws[0] : InPrecedence(ws).First();
         return Baseline.Symbols.GetValueOrDefault(id);
     }
 
+    /// <summary>
+    ///     The definition of <paramref name="id" /> in the id space of <paramref name="typeName" /> -
+    ///     the highest layer's of that type, else the baseline's when it is of that type - or null
+    ///     when that type defines no such object, whatever other types do.
+    /// </summary>
+    public GameSymbol? ResolveOfType(string id, string typeName)
+    {
+        if (WorkspaceDefinitions.TryGetValue(id, out var ws)
+            && InPrecedence(ws).FirstOrDefault(s => IsOfType(s, typeName)) is { } typed)
+            return typed;
+
+        return Baseline.Symbols.TryGetValue(id, out var b) && IsOfType(b, typeName) ? b : null;
+    }
+
+    /// <summary>
+    ///     The object <paramref name="symbol" /> is a variant of, looked up in the symbol's own type:
+    ///     the parser types the base reference with it, so a same-named object of another type is
+    ///     never the base. Null when there is no base or it does not resolve.
+    /// </summary>
+    public GameSymbol? VariantBaseOf(GameSymbol symbol)
+    {
+        if (string.IsNullOrEmpty(symbol.VariantBaseId))
+            return null;
+        return symbol.TypeName is { } type ? ResolveOfType(symbol.VariantBaseId, type) : Resolve(symbol.VariantBaseId);
+    }
+
+    /// <summary>
+    ///     The workspace definitions of <paramref name="id" /> in the id space of
+    ///     <paramref name="typeName" />, highest layer first; every type's when it is null.
+    /// </summary>
+    public IEnumerable<GameSymbol> DefinitionsOf(string id, string? typeName)
+    {
+        return WorkspaceDefinitions.TryGetValue(id, out var ws)
+            ? InPrecedence(ws).Where(s => typeName is null || IsOfType(s, typeName))
+            : [];
+    }
+
+    /// <summary>
+    ///     The workspace references that mean the object <paramref name="id" /> of
+    ///     <paramref name="typeName" />: those its tag types so, and those whose tag names no type and
+    ///     whose id resolves to that type. Every reference to the id when the type is null.
+    /// </summary>
+    public IEnumerable<GameReference> ReferencesTo(string id, string? typeName)
+    {
+        if (!WorkspaceReferences.TryGetValue(id, out var references))
+            return [];
+        if (typeName is null)
+            return references;
+
+        var untypedMeans = Resolve(id)?.TypeName;
+        return references.Where(r => r.IdSpace is { } expected
+            ? string.Equals(expected, typeName, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(untypedMeans, typeName, StringComparison.OrdinalIgnoreCase));
+    }
+
     // Workspace definitions ordered highest layer first, then the baseline. Multiple workspace
-    // entries at the SAME rank are a duplicate-ID error; the diagnostics publisher uses this to find
-    // all offending sites. Cross-layer entries are valid overrides.
+    // entries of one type at the SAME rank are a duplicate-ID error; the diagnostics publisher uses
+    // this to find all offending sites. Cross-layer entries are valid overrides.
     public IEnumerable<GameSymbol> ResolveAll(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws))
-            foreach (var s in ws.OrderByDescending(LayerRankOf))
+            foreach (var s in InPrecedence(ws))
                 yield return s;
         if (Baseline.Symbols.TryGetValue(id, out var b))
             yield return b;
@@ -416,19 +478,31 @@ public sealed record GameIndex(
 
     public (GameSymbol Winner, GameSymbol? Shadowed)? ResolveWithShadow(string id)
     {
-        var winner = Resolve(id);
+        return ResolveWithShadow(id, null);
+    }
+
+    /// <summary>
+    ///     The winning definition in the id space of <paramref name="typeName" /> - by id alone when
+    ///     it is null - and the definition of the same type it overrides.
+    /// </summary>
+    public (GameSymbol Winner, GameSymbol? Shadowed)? ResolveWithShadow(string id, string? typeName)
+    {
+        var winner = typeName is null ? Resolve(id) : ResolveOfType(id, typeName);
         if (winner is null) return null;
 
-        // The shadowed definition is the next layer below the winner: a lower-ranked workspace
-        // definition if one exists, otherwise the baseline symbol.
+        // The shadowed definition is the next layer below the winner IN THE WINNER'S TYPE: a
+        // lower-ranked workspace definition if one exists, otherwise the baseline symbol. A
+        // same-named object of another type is a different object, not an override.
         GameSymbol? shadowed = null;
         if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 1)
         {
             var winnerRank = LayerRankOf(winner);
-            shadowed = ws.OrderByDescending(LayerRankOf).FirstOrDefault(s => LayerRankOf(s) < winnerRank);
+            shadowed = InPrecedence(ws).FirstOrDefault(s =>
+                LayerRankOf(s) < winnerRank && IsOfType(s, winner.TypeName));
         }
 
-        shadowed ??= Baseline.Symbols.GetValueOrDefault(id);
+        if (shadowed is null && Baseline.Symbols.TryGetValue(id, out var b) && IsOfType(b, winner.TypeName))
+            shadowed = b;
 
         // Only report a shadow when it is a different object than the winner.
         return (winner, !ReferenceEquals(winner, shadowed) ? shadowed : null);
@@ -457,9 +531,27 @@ public sealed record GameIndex(
     // definition lives in a dependency layer (rank < LeafLayerRank).
     public bool IsLeafOwned(string id)
     {
-        return WorkspaceDefinitions.TryGetValue(id, out var defs)
-               && defs.Length > 0
-               && defs.All(s => s.Origin is FileOrigin && LayerRankOf(s) == LeafLayerRank);
+        return IsLeafOwned(id, null);
+    }
+
+    /// <summary>
+    ///     <see cref="IsLeafOwned(string)" /> within the id space of <paramref name="typeName" />: a
+    ///     dependency's same-named object of another type is another object and does not block it.
+    /// </summary>
+    public bool IsLeafOwned(string id, string? typeName)
+    {
+        var definitions = DefinitionsOf(id, typeName).ToList();
+        return definitions.Count > 0
+               && definitions.All(s => s.Origin is FileOrigin && LayerRankOf(s) == LeafLayerRank);
+    }
+
+    /// <summary>
+    ///     The type an occurrence of <paramref name="id" /> means: the one its tag or definition gives,
+    ///     else the type its id resolves to - the rule <see cref="ReferencesTo" /> applies.
+    /// </summary>
+    public string? TypeMeant(string id, string? typeName)
+    {
+        return typeName ?? Resolve(id)?.TypeName;
     }
 
     // True iff the given symbol belongs to the leaf (highest-rank) layer.
@@ -468,28 +560,37 @@ public sealed record GameIndex(
         return LayerRankOf(symbol) == LeafLayerRank;
     }
 
-    // Resolve with optional type preference. Among all definitions of <id>, prefer those whose
-    // TypeName matches <preferredTypeName> (highest rank among type-matches); fall back to the
-    // untyped winner if no type-match exists.
+    /// <summary>The definition a reference means, looked up in its <see cref="GameReference.IdSpace" />.</summary>
+    public GameSymbol? ResolveReference(GameReference reference)
+    {
+        return Resolve(reference.TargetId, reference.IdSpace);
+    }
+
+    // Resolve with optional type preference: the definition in <preferredTypeName>'s id space, else
+    // the untyped winner - so a reference to an object of the wrong type reaches TypeMismatchHandler
+    // rather than UnresolvedReferenceHandler.
     public GameSymbol? Resolve(string id, string? preferredTypeName)
     {
         if (preferredTypeName is null) return Resolve(id);
+        return ResolveOfType(id, preferredTypeName) ?? Resolve(id);
+    }
 
-        if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)
-        {
-            var typeMatch = ws
-                .Where(s => string.Equals(s.TypeName, preferredTypeName, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(LayerRankOf)
-                .FirstOrDefault();
-            if (typeMatch is not null) return typeMatch;
-        }
+    private static bool IsOfType(GameSymbol symbol, string? typeName)
+    {
+        return string.Equals(symbol.TypeName, typeName, StringComparison.OrdinalIgnoreCase);
+    }
 
-        if (Baseline.Symbols.TryGetValue(id, out var b) &&
-            string.Equals(b.TypeName, preferredTypeName, StringComparison.OrdinalIgnoreCase))
-            return b;
-
-        // No type-matched definition found - fall back to untyped resolution so TypeMismatchHandler
-        // fires rather than UnresolvedReferenceHandler.
-        return Resolve(id);
+    /// <summary>
+    ///     Highest layer first; within a layer by type, file and line, so the order never depends on
+    ///     which definition the parallel scan inserted first.
+    /// </summary>
+    private IOrderedEnumerable<GameSymbol> InPrecedence(IEnumerable<GameSymbol> definitions)
+    {
+        return definitions
+            .OrderByDescending(LayerRankOf)
+            .ThenBy(s => s.TypeName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(s => (s.Origin as FileOrigin)?.Uri ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(s => (s.Origin as FileOrigin)?.Line ?? 0)
+            .ThenBy(s => (s.Origin as FileOrigin)?.Column ?? 0);
     }
 }

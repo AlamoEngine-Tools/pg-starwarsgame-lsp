@@ -92,7 +92,7 @@ public sealed class PreviewSceneBuilder(
     {
         var index = indexService.Current;
         var resolver = new EffectiveObjectResolver(index, schema, tagSource);
-        var effective = resolver.Resolve(objectId);
+        var effective = resolver.Resolve(objectId, GameTypeNames.GameObjectType);
 
         if (!effective.Found)
             return PreviewScene.NotFound(objectId, _messages.Format("PreviewScene_NoObjectNamedIndexed", objectId),

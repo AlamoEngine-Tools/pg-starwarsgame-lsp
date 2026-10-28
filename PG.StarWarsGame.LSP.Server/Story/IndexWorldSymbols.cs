@@ -26,7 +26,7 @@ public sealed class IndexWorldSymbols(IGameIndexService indexService, ISchemaPro
 
         if (kind == StoryWorldSymbolKind.Planet && schema.GetKind(ObjectKindNames.Planet) is { } planet)
         {
-            var symbol = index.Resolve(name);
+            var symbol = index.ResolveOfType(name, GameTypeNames.GameObjectType);
             // Unknown counts as existing: a predicate the index cannot judge must not turn into
             // "no such planet" in a simulation the author is trying to run.
             return symbol is not null && ObjectKinds.Match(index, symbol, planet) != KindMatch.No;

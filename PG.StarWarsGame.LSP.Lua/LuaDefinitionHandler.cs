@@ -77,7 +77,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             var hit = LuaPositionResolver.FindAtPosition(docIndex, line, character);
             if (hit is not null)
             {
-                var links = ResolveInStates(index, hit.Value.Id, uri)
+                var links = ResolveInStates(index, hit.Value.Id, hit.Value.TypeName, uri)
                     .Select(s => s.Origin)
                     .OfType<FileOrigin>()
                     .Select(fo => new LocationOrLocationLink(fo.ToLspLocationLink(hit.Value.Range)))
@@ -150,10 +150,13 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     // first as before: a script has one state (1:1), a library one per script requiring it (1:n), so an
     // entry point a library calls goes to every implementation. A definition in a file no state holds -
     // an XML object's - is the game's, reachable from every state.
-    private IReadOnlyList<GameSymbol> ResolveInStates(GameIndex index, string id, string uri)
+    private IReadOnlyList<GameSymbol> ResolveInStates(GameIndex index, string id, string? typeName, string uri)
     {
-        if (!index.WorkspaceDefinitions.TryGetValue(id, out var definitions))
-            return index.Resolve(id) is { } resolved ? [resolved] : [];
+        if (!index.WorkspaceDefinitions.TryGetValue(id, out var all))
+            return index.Resolve(id, typeName) is { } resolved ? [resolved] : [];
+        // In the type the reference names, when it names one: every type is an id space of its own.
+        var typed = typeName is null ? [] : index.DefinitionsOf(id, typeName).ToList();
+        IReadOnlyList<GameSymbol> definitions = typed.Count > 0 ? typed : all;
         var current = _sandbox.Current;
         var states = current.StatesHolding(uri);
         if (states.Count == 0)

@@ -15,6 +15,7 @@ describe("effective object URI", () => {
         const ref = {
             objectId: "Star_Destroyer",
             projectKey: "c:/dev/eawx/rev/rev.pgproj",
+            typeName: "GameObjectType",
         };
         assert.deepEqual(
             parseEffectiveObjectQuery(effectiveObjectQuery(ref)),
@@ -27,10 +28,29 @@ describe("effective object URI", () => {
             effectiveObjectQuery({
                 objectId: "Star_Destroyer",
                 projectKey: "c:/dev/eawx/rev/rev.pgproj",
+                typeName: "GameObjectType",
             }),
             effectiveObjectQuery({
                 objectId: "Star_Destroyer",
                 projectKey: "c:/dev/eawx/fotr/fotr.pgproj",
+                typeName: "GameObjectType",
+            }),
+        );
+    });
+
+    // Every type is an id space of its own: the Sarlacc faction and the Sarlacc unit are two objects.
+    it("gives one name of two types two documents", () => {
+        const projectKey = "c:/dev/foc/foc.pgproj";
+        assert.notEqual(
+            effectiveObjectQuery({
+                objectId: "Sarlacc",
+                projectKey,
+                typeName: "Faction",
+            }),
+            effectiveObjectQuery({
+                objectId: "Sarlacc",
+                projectKey,
+                typeName: "GameObjectType",
             }),
         );
     });
@@ -39,6 +59,7 @@ describe("effective object URI", () => {
         assert.deepEqual(parseEffectiveObjectQuery("Star_Destroyer"), {
             objectId: "Star_Destroyer",
             projectKey: "",
+            typeName: "",
         });
     });
 

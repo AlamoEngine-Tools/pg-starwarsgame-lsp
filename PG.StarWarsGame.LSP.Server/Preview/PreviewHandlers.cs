@@ -109,7 +109,7 @@ public sealed class GetParticleSystemHandler(
             return null;
 
         return new EffectiveObjectResolver(indexService.Current, schema, tagSource)
-            .Resolve(objectId.Trim());
+            .Resolve(objectId.Trim(), GameTypeNames.GameObjectType);
     }
 
     /// <summary>

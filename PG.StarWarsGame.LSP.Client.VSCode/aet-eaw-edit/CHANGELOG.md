@@ -281,6 +281,14 @@
 
 ### Fixes
 
+- **One name in two types is two objects** - the metafile that lists a file types it, and every type is an
+  id space of its own: the shipped game has a Sarlacc faction and a Sarlacc unit, and SFX and speech events
+  of one name. Where an id alone was looked up, whichever definition the index listed first answered, and
+  that changed from start to start. Find references, rename, go to definition, the references and
+  overrides lenses, the model preview, the encyclopedia, the effective-object view and the hardpoint and
+  variant checks now each work in the type they are about, and a variant's base is looked up in the
+  variant's own type. The Mod Browser lists both objects, one on each type's page; it listed one. A tag
+  that names an object kind looks its value up among game objects
 - **A faction keeps its colours in the model preview when a unit shares its name** - the shipped game names
   a faction and an indigenous unit Sarlacc, and the preview read whichever of the two the index listed first,
   which changed from start to start, and on some starts the Sarlacc swatch had no colours at
@@ -475,6 +483,8 @@
 - **New, Lua_Script** - `Assets16` to `Assets20` (`aetswg-004-0016` to `aetswg-004-0020`: missing, backslash,
   `..`, extension, outside GameObject)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
+- **Retired** - `Symbols3` (`aetswg-010-0003`), one name defined in two types: every lookup names its type now,
+  so that is two objects, as it is to the game, and nothing to warn about; the number is never reused
 
 ### Breaking changes
 

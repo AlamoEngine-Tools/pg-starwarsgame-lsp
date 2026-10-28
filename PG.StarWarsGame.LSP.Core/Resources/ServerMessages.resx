@@ -210,9 +210,6 @@
   <data name="CrossLayerShadow_OverridesADefinitionFromIf" xml:space="preserve">
     <value>'{0}' overrides a definition from '{1}'. If that is intended, declare it: &lt;!-- &lt;Override Name="{2}"/&gt; --&gt;</value>
   </data>
-  <data name="CrossTypeShadow_IsDefinedAsBothAnd" xml:space="preserve">
-    <value>'{0}' is defined as both {1} and {2}. Typed references resolve to the matching type, but untyped lookups pick the highest-rank definition. If that is intended, declare it: &lt;!-- &lt;Override Name="{3}"/&gt; --&gt;</value>
-  </data>
   <data name="DamageAbsorbsNothing_BothAre" xml:space="preserve">
     <value>Both are {0}</value>
   </data>

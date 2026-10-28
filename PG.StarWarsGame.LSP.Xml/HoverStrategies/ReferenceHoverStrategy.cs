@@ -24,7 +24,7 @@ internal sealed class ReferenceHoverStrategy : IXmlHoverStrategy
         if (reference is null)
             return null;
 
-        var symbol = ctx.Index.Resolve(reference.TargetId, reference.ExpectedTypeName);
+        var symbol = ctx.Index.ResolveReference(reference);
         if (symbol?.TypeName is null)
             return null;
 

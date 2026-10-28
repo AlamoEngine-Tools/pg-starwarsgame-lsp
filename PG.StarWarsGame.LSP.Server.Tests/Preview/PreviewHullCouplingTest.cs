@@ -95,7 +95,7 @@ public sealed class PreviewHullCouplingTest
     {
         var index = GameIndex.Empty with
         {
-            WorkspaceDefinitions = new[] { Sym("Ship", "SpaceUnit") }.ToImmutableDictionary(
+            WorkspaceDefinitions = new[] { Sym("Ship", "GameObjectType") }.ToImmutableDictionary(
                 s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase)
         };
 
@@ -110,7 +110,7 @@ public sealed class PreviewHullCouplingTest
     private static PreviewScene Ship(
         VariantTag[] shipTags, params (string Id, VariantTag[] Tags)[] hardpoints)
     {
-        var symbols = new List<GameSymbol> { Sym("Ship", "SpaceUnit") };
+        var symbols = new List<GameSymbol> { Sym("Ship", "GameObjectType") };
         symbols.AddRange(hardpoints.Select(h => Sym(h.Id, "HardPoint")));
 
         var index = GameIndex.Empty with

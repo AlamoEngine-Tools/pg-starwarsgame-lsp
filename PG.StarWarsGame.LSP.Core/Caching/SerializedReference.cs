@@ -16,6 +16,7 @@ public sealed class SerializedReference
     [Key(4)] public int Line { get; set; }
     [Key(5)] public int Column { get; set; }
     [Key(6)] public int Length { get; set; }
+    [Key(7)] public string? LookupType { get; set; }
 
     public static SerializedReference FromRuntime(GameReference r)
     {
@@ -27,12 +28,16 @@ public sealed class SerializedReference
             DocumentUri = r.DocumentUri,
             Line = r.Line,
             Column = r.Column,
-            Length = r.Length
+            Length = r.Length,
+            LookupType = r.LookupType
         };
     }
 
     public GameReference ToRuntime()
     {
-        return new GameReference(TargetId, ExpectedKind, ExpectedTypeName, DocumentUri, Line, Column, Length);
+        return new GameReference(TargetId, ExpectedKind, ExpectedTypeName, DocumentUri, Line, Column, Length)
+        {
+            LookupType = LookupType
+        };
     }
 }

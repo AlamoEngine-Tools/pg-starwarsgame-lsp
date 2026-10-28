@@ -33,7 +33,9 @@ public sealed class GetEffectiveObjectHandler
         CancellationToken cancellationToken)
     {
         var resolver = new EffectiveObjectResolver(_indexService.Current, _schema, _tagSource);
-        var effective = resolver.Resolve(request.ObjectId);
+        var effective = request.TypeName is { Length: > 0 } typeName
+            ? resolver.Resolve(request.ObjectId, typeName)
+            : resolver.Resolve(request.ObjectId);
 
         if (!effective.Found)
             return Task.FromResult(new GetEffectiveObjectResult(false, false, null, [], string.Empty, null));

@@ -48,7 +48,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
         if (shipNameTagValue is not null)
             source.With("GameConstants", Tag("ShipNameTextFiles", shipNameTagValue));
 
-        var defs = new[] { Sym(ObjectId, "SpaceUnit"), Sym("GameConstants", "GameConstants") }
+        var defs = new[] { Sym(ObjectId, "GameObjectType"), Sym("GameConstants", "GameConstants") }
             .ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase);
 
         var config = new FakeLspConfigurationProvider();
@@ -135,7 +135,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
                 ])
         };
 
-        var defs = new[] { Sym(ObjectId, "SpaceUnit") }
+        var defs = new[] { Sym(ObjectId, "GameObjectType") }
             .ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase);
 
         var config = new FakeLspConfigurationProvider();

@@ -44,7 +44,7 @@ public sealed class XmlObjectRenameBuilderTest
         var index = BuildIndex(
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
 
-        var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
+        var result = XmlObjectRenameBuilder.Build("UNIT_A", null, "UNIT_B", index,
             SchemaWithUnit(), Source(new FakeGameWorkspaceHost()),
             NullLogger.Instance);
 
@@ -54,7 +54,7 @@ public sealed class XmlObjectRenameBuilderTest
     [Fact]
     public void Build_NoDefinitionsNoRefs_ReturnsNull()
     {
-        var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", GameIndex.Empty,
+        var result = XmlObjectRenameBuilder.Build("UNIT_A", null, "UNIT_B", GameIndex.Empty,
             SchemaWithUnit(), Source(new FakeGameWorkspaceHost()),
             NullLogger.Instance);
 
@@ -71,7 +71,7 @@ public sealed class XmlObjectRenameBuilderTest
         var index = BuildIndex(
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
 
-        var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
+        var result = XmlObjectRenameBuilder.Build("UNIT_A", null, "UNIT_B", index,
             SchemaWithUnit(), Source(host),
             NullLogger.Instance);
 
@@ -97,7 +97,7 @@ public sealed class XmlObjectRenameBuilderTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [r]));
 
-        var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
+        var result = XmlObjectRenameBuilder.Build("UNIT_A", null, "UNIT_B", index,
             SchemaWithUnit(), Source(host),
             NullLogger.Instance);
 
@@ -129,7 +129,7 @@ public sealed class XmlObjectRenameBuilderTest
         var index = BuildIndex(ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
             .Add("Story_Ev", [storyEvent, storyParser]));
 
-        var result = XmlObjectRenameBuilder.Build("Story_Ev", "Renamed_Ev", index,
+        var result = XmlObjectRenameBuilder.Build("Story_Ev", null, "Renamed_Ev", index,
             schema, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
@@ -151,7 +151,7 @@ public sealed class XmlObjectRenameBuilderTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [luaRef]));
 
-        var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
+        var result = XmlObjectRenameBuilder.Build("UNIT_A", null, "UNIT_B", index,
             SchemaWithUnit(), Source(host),
             NullLogger.Instance);
 
@@ -165,5 +165,40 @@ public sealed class XmlObjectRenameBuilderTest
     {
         return new DocumentTextSource(host, new FileHelper(new MockFileSystem()),
             NullLogger<DocumentTextSource>.Instance);
+    }
+
+    /// <summary>
+    ///     Every type is an id space of its own: renaming the Sarlacc faction leaves the Sarlacc unit,
+    ///     and the references that mean the unit, as they are.
+    /// </summary>
+    [Fact]
+    public void Build_InOneType_LeavesTheSameNamedObjectOfAnotherType_AndItsReferences()
+    {
+        const string factions = "file:///factions.xml";
+        var faction = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "Faction", new FileOrigin(factions, 0, null),
+            null);
+        var unit = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "Unit", new FileOrigin(XmlUri, 0, null), null);
+        var host = new FakeGameWorkspaceHost();
+        host.AddOrUpdate(factions, "<Faction Name=\"Sarlacc\"/>", 1);
+        host.AddOrUpdate(XmlUri, "<Unit Name=\"Sarlacc\"/>", 1);
+        var index = BuildIndex(
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Sarlacc", [unit, faction]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Sarlacc",
+            [
+                new GameReference("Sarlacc", GameSymbolKind.XmlObject, "Faction", OtherXmlUri, 3, 10, 7),
+                new GameReference("Sarlacc", GameSymbolKind.XmlObject, "Unit", OtherXmlUri, 4, 10, 7)
+            ]));
+        var schema = new SchemaProviderBuilder()
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" })
+            .WithObjectType(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" })
+            .Build();
+
+        var result = XmlObjectRenameBuilder.Build("Sarlacc", "Faction", "Sarlacc_Pit", index, schema, Source(host),
+            NullLogger.Instance);
+
+        Assert.NotNull(result);
+        Assert.DoesNotContain(DocumentUri.From(XmlUri), result.Changes!.Keys);
+        Assert.Single(result.Changes[DocumentUri.From(factions)]);
+        Assert.Equal(3, Assert.Single(result.Changes[DocumentUri.From(OtherXmlUri)]).Range.Start.Line);
     }
 }

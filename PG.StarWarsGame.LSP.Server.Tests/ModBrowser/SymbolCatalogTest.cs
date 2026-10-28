@@ -99,6 +99,32 @@ public sealed class SymbolCatalogTest
             outline);
     }
 
+    /// <summary>
+    ///     Every type is an id space of its own: the shipped game has a Sarlacc faction and a Sarlacc
+    ///     unit, and both are entries - one on each type's page - where one used to hide the other.
+    /// </summary>
+    [Fact]
+    public void OneNameOfTwoTypes_IsTwoEntries_OneOnEachTypesPage()
+    {
+        const string factions = "file:///c:/work/mod/data/xml/factions.xml";
+        GameSymbol[] symbols =
+            [Xml("Sarlacc", "GameObjectType", Mod), Xml("Sarlacc", "Faction", factions)];
+        var index = GameIndex.Empty with
+        {
+            Documents = ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(Mod, new DocumentIndex(Mod, 1, [symbols[0]], [], LayerRank: 1, LayerName: "Mod"))
+                .Add(factions, new DocumentIndex(factions, 1, [symbols[1]], [], LayerRank: 1, LayerName: "Mod")),
+            WorkspaceDefinitions = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("Sarlacc", [.. symbols])
+        };
+
+        var catalog = SymbolCatalog.Build(index, Kinds, [], new SchemaProviderBuilder().Build());
+
+        Assert.Equal("Faction", catalog.Find("xml:Faction", "Sarlacc")!.Type);
+        Assert.Equal("GameObjectType", catalog.Find("xml:GameObjectType", "Sarlacc")!.Type);
+        Assert.Equal("Faction", catalog.FindObject("Sarlacc", "Faction")!.Type);
+    }
+
     [Fact]
     public void ARow_IsTheDefinitionTheGameUses_NamingWhatItOverrides()
     {

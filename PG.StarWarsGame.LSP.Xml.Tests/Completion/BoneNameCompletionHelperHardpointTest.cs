@@ -95,7 +95,8 @@ public sealed class BoneNameCompletionHelperHardpointTest
         (string Hardpoint, string Owner)[] mounts)
     {
         var owners = mounts.Select(m => m.Owner).Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(o => new GameSymbol(o, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin(ObjUri, 0, 0), null))
+            .Select(o =>
+                new GameSymbol(o, GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin(ObjUri, 0, 0), null))
             .ToList();
 
         var references = mounts

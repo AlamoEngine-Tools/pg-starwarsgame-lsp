@@ -144,7 +144,7 @@ public sealed class PreviewUnkillableTest
     private static PreviewScene Ship(
         VariantTag[] extra, params (string Id, VariantTag[] Tags)[] hardpoints)
     {
-        var symbols = new List<GameSymbol> { Sym("Ship", "SpaceUnit") };
+        var symbols = new List<GameSymbol> { Sym("Ship", "GameObjectType") };
         symbols.AddRange(hardpoints.Select(h => Sym(h.Id, "HardPoint")));
 
         var index = GameIndex.Empty with

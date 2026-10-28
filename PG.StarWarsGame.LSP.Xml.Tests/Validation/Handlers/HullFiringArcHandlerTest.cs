@@ -137,6 +137,11 @@ public sealed class HullFiringArcHandlerTest
 
     private sealed class FakeObjects(EffectiveTag[] tags) : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string id)
         {
             return string.Equals(id, "X-Wing", StringComparison.OrdinalIgnoreCase)

@@ -43,7 +43,7 @@ public sealed class PartsSectionBuilderTest
     public void HardpointIds_SplitTheListAsWritten()
     {
         var (_, resolver, _) = Setup(new FakeVariantTagSource().With("Ship", Tag("HardPoints", " HP_A, HP_B ,HP_C ")),
-            Sym("Ship", "SpaceUnit"));
+            Sym("Ship", "GameObjectType"));
 
         Assert.Equal(["HP_A", "HP_B", "HP_C"], PartsSectionBuilder.HardpointIds(resolver.Resolve("Ship")));
         Assert.Empty(PartsSectionBuilder.HardpointIds(resolver.Resolve("Nobody")));

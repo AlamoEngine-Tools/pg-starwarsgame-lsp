@@ -50,7 +50,7 @@ public sealed class PreviewDeathCloneTest
     public void DeathClones_CarryTheCloneModel_SoThePreviewCanShowIt()
     {
         var scene = Scene(
-            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
             tags => tags.With("Wreck", Tag("Space_Model_Name", "EV_StarDestroyer_D.ALO")),
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Death_Clone", "Damage_Normal, Wreck"));
@@ -69,7 +69,7 @@ public sealed class PreviewDeathCloneTest
     public void DeathClones_CarryTheClonesOwnScale_NotTheShips()
     {
         var scene = Scene(
-            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
             tags => tags.With("Wreck",
                 Tag("Space_Model_Name", "falcon_d.alo"), Tag("Scale_Factor", "1.0")),
             Tag("Space_Model_Name", "hull.alo"),
@@ -84,7 +84,7 @@ public sealed class PreviewDeathCloneTest
     public void DeathClones_DefaultTheirScaleToOne_WhenTheCloneDeclaresNone()
     {
         var scene = Scene(
-            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
             tags => tags.With("Wreck", Tag("Space_Model_Name", "wreck.alo")),
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Scale_Factor", "0.7"),
@@ -153,7 +153,7 @@ public sealed class PreviewDeathCloneTest
 
     private static PreviewScene Scene(params VariantTag[] shipTags)
     {
-        return Scene([Sym("Ship", "SpaceUnit")], tags => tags, shipTags);
+        return Scene([Sym("Ship", "GameObjectType")], tags => tags, shipTags);
     }
 
     private static PreviewScene Scene(

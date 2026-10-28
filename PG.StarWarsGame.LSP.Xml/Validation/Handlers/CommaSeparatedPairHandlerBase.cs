@@ -77,7 +77,7 @@ public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
             return null;
         if (index.Baseline.Symbols.Count == 0 && index.WorkspaceDefinitions.Count == 0)
             return null;
-        if (index.Resolve(sfxEventName) is not null)
+        if (index.ResolveOfType(sfxEventName, GameTypeNames.SfxEvent) is not null)
             return null;
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             messages.Format("CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs", sfxEventName, tagName));
@@ -88,7 +88,7 @@ public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
     {
         if (index.Baseline.Symbols.Count == 0 && index.WorkspaceDefinitions.Count == 0)
             return null;
-        if (index.Resolve(name) is not null)
+        if (index.ResolveOfType(name, GameTypeNames.GameObjectType) is not null)
             return null;
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             messages.Format("CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs2", name, tagName));

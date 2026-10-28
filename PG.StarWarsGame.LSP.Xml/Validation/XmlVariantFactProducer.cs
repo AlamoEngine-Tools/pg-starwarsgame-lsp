@@ -48,7 +48,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
             // since that is the one line an author would change to fix any of it.
             var marker = FindVariantChild(node) ?? node;
 
-            var effective = resolver.Resolve(variant.Id);
+            var effective = resolver.Resolve(variant);
             if (effective.Cyclic)
             {
                 facts.Add(new VariantCycleFact(documentUri, XmlUtility.GetLine(marker),
@@ -59,7 +59,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
 
             CollectChainFacts(documentUri, variant, effective, marker, facts);
 
-            var baseValues = BaseValues(resolver, variant.VariantBaseId);
+            var baseValues = BaseValues(resolver, index.VariantBaseOf(variant));
             CollectTagFacts(node, documentUri, text, baseValues, effective, facts);
         }
 
@@ -174,12 +174,14 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
             !XmlUtility.WritesNoValue(n));
     }
 
-    private static IReadOnlyDictionary<string, string> BaseValues(EffectiveObjectResolver resolver, string? baseId)
+    // The base in the variant's own type - the parser types the base reference with it.
+    private static IReadOnlyDictionary<string, string> BaseValues(EffectiveObjectResolver resolver,
+        GameSymbol? baseSymbol)
     {
-        if (string.IsNullOrEmpty(baseId))
+        if (baseSymbol is null)
             return new Dictionary<string, string>();
 
-        var baseEffective = resolver.Resolve(baseId);
+        var baseEffective = resolver.Resolve(baseSymbol);
         if (!baseEffective.Found)
             return new Dictionary<string, string>();
 

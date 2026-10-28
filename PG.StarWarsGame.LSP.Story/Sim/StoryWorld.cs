@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Story.Sim;
 
@@ -260,6 +261,6 @@ public interface IStoryWorldSymbols
 public static class StoryWorldSymbolKind
 {
     public const string Planet = "Planet";
-    public const string UnitType = "GameObjectType";
+    public const string UnitType = GameTypeNames.GameObjectType;
     public const string Faction = "Faction";
 }

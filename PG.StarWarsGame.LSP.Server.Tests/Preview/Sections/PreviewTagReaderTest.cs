@@ -20,7 +20,7 @@ public sealed class PreviewTagReaderTest
         {
             WorkspaceDefinitions = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Unit",
             [
-                new GameSymbol("Unit", GameSymbolKind.XmlObject, "SpaceUnit",
+                new GameSymbol("Unit", GameSymbolKind.XmlObject, "GameObjectType",
                     new FileOrigin("file:///unit.xml", 0, 0), null, null)
             ])
         };

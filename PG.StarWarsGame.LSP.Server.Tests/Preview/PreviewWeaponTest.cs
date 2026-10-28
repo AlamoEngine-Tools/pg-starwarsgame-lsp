@@ -99,7 +99,7 @@ public sealed class PreviewWeaponTest
     public void BuildForObject_EmitsNoWeaponForAMountThatNamesNoFireBone()
     {
         // A shield generator is a hardpoint with no armament. It still has to appear as a mount.
-        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Shield", "HardPoint")]);
+        var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Shield", "HardPoint")]);
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Shield"))
             .With("HP_Shield",
@@ -116,7 +116,7 @@ public sealed class PreviewWeaponTest
 
     private static PreviewScene Build(params (string Name, string Value)[] extraHardpointTags)
     {
-        var index = Index([Sym("Generic_Star_Destroyer", "SpaceUnit"), Sym("HP_SD_Weapon_FL", "HardPoint")]);
+        var index = Index([Sym("Generic_Star_Destroyer", "GameObjectType"), Sym("HP_SD_Weapon_FL", "HardPoint")]);
 
         var hardpointTags = new List<VariantTag>
         {

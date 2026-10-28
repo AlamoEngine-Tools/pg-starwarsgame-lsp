@@ -141,6 +141,11 @@ public sealed class AttackDistanceBeyondHardpointRangeHandlerTest
 
     private sealed class FakeObjects((string Id, EffectiveTag[] Tags)[] objects) : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string id)
         {
             foreach (var (objectId, tags) in objects)

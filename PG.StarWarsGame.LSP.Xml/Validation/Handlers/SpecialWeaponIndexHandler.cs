@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -45,7 +46,7 @@ public sealed class SpecialWeaponIndexHandler : XmlDiagnosticsHandler<XmlTagValu
         var value = fact.RawValue.Trim();
         if (value.Length == 0) return [];
 
-        var resolved = ctx.Objects.Resolve(value);
+        var resolved = ctx.Objects.ResolveIn(value, fact.Tag.TargetTypeName);
         if (!resolved.Found) return [];
 
         var text = resolved.ValueOf(IndexTag);

@@ -64,7 +64,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
         // owner-scoped id the ability was indexed under.
         var symbol = OwnerAgnosticReferenceId.TryGetBareName(hit.Value.Id, out var bareName)
             ? index.ResolveOwnerAgnostic(bareName)
-            : index.Resolve(hit.Value.Id);
+            : index.Resolve(hit.Value.Id, hit.Value.TypeName);
         if (symbol is null || symbol.Origin is not FileOrigin { IsNavigable: true } fo)
         {
             // Baseline symbols carry a game-relative path (DATA\XML\…) the editor cannot open;

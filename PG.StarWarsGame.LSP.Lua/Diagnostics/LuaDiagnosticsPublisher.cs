@@ -204,7 +204,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
             {
                 case GameSymbolKind.XmlObject:
                 {
-                    var resolved = index.Resolve(reference.TargetId);
+                    var resolved = index.ResolveReference(reference);
                     var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName,
                         resolved, messages: messages);
                     if (eval is null) continue;

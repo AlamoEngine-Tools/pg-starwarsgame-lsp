@@ -106,6 +106,11 @@ public sealed class FiresForwardHandlerTest
 
     private sealed class FakeObjects(string objectId, EffectiveTag[] tags) : IEffectiveObjectSource
     {
+        public EffectiveObject Resolve(string objectId, string typeName)
+        {
+            return Resolve(objectId);
+        }
+
         public EffectiveObject Resolve(string id)
         {
             return string.Equals(id, objectId, StringComparison.OrdinalIgnoreCase)

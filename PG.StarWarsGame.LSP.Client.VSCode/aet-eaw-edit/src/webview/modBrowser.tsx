@@ -671,6 +671,7 @@ function App(): React.JSX.Element {
                 action,
                 id: node.row.id,
                 name: node.row.name,
+                objectType: node.row.type,
             });
         }
     };

@@ -196,7 +196,7 @@ public sealed class PreviewAbilityTest
         {
             WorkspaceDefinitions = new[]
             {
-                new GameSymbol("Ship", GameSymbolKind.XmlObject, "SpaceUnit",
+                new GameSymbol("Ship", GameSymbolKind.XmlObject, "GameObjectType",
                     new FileOrigin("file:///Ship.xml", 0, 0), null)
             }.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
                 StringComparer.OrdinalIgnoreCase)

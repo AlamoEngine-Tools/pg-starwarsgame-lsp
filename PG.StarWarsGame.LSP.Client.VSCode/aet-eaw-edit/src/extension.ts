@@ -286,7 +286,9 @@ class EffectiveObjectContentProvider
     }
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-        const { objectId, projectKey } = parseEffectiveObjectQuery(uri.query);
+        const { objectId, projectKey, typeName } = parseEffectiveObjectQuery(
+            uri.query,
+        );
 
         // The document IS the report here - it is read-only generated text, so a failure is written
         // into it as a comment rather than raised as a notification over the tab that just opened.
@@ -294,6 +296,7 @@ class EffectiveObjectContentProvider
             projectKey,
         ).request<GetEffectiveObjectResult>("aet/getEffectiveObject", {
             objectId,
+            typeName: typeName || undefined,
         });
 
         if (!outcome.ok) {
@@ -3321,7 +3324,11 @@ export async function activate(
     context.subscriptions.push(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.showEffectiveObject",
-            async (objectIdArg?: string, projectKeyArg?: string) => {
+            async (
+                objectIdArg?: string,
+                projectKeyArg?: string | null,
+                typeNameArg?: string | null,
+            ) => {
                 const projectKey = projectKeyArg ?? (await commandProjectKey());
                 if (projectKey === null) {
                     return;
@@ -3362,6 +3369,7 @@ export async function activate(
                     query: effectiveObjectQuery({
                         objectId,
                         projectKey: project.key,
+                        typeName: typeNameArg ?? "",
                     }),
                 });
                 effectiveObjectProvider?.refresh(uri);

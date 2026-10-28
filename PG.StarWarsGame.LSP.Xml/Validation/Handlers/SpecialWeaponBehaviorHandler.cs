@@ -53,7 +53,7 @@ public sealed class SpecialWeaponBehaviorHandler : XmlDiagnosticsHandler<XmlTagV
         var value = fact.RawValue.Trim();
         if (value.Length == 0) return [];
 
-        var resolved = ctx.Objects.Resolve(value);
+        var resolved = ctx.Objects.ResolveIn(value, fact.Tag.TargetTypeName);
 
         // An id nothing defines belongs to the unresolved-reference check. Reporting it again as a
         // behaviour fault would put two diagnostics on one typo and name the wrong cause.

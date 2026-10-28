@@ -52,6 +52,50 @@ public sealed class EffectiveObjectResolverTest
         Assert.False(result.Found);
     }
 
+    // ── one id, several types ────────────────────────────────────────────────
+
+    private static readonly GameSymbol SarlaccFaction = new("Sarlacc", GameSymbolKind.XmlObject, "Faction",
+        new FileOrigin("file:///factions.xml", 1682, 1), null);
+
+    /// <summary>
+    ///     A variant's base lives in the variant's own type - the parser types the base reference
+    ///     with it - so a faction of the same name is never the base of a unit.
+    /// </summary>
+    [Fact]
+    public void Resolve_AVariantsBase_IsTheObjectOfTheVariantsOwnType()
+    {
+        var unit = Sym("Sarlacc");
+        var variant = Sym("Sarlacc_Large", "Sarlacc");
+        var index = WorkspaceIndex(SarlaccFaction, unit, variant);
+        var source = new FakeTagSource()
+            .With(SarlaccFaction, Tag("Color", "153, 21, 223"))
+            .With(unit, Tag("Tactical_Health", "5"))
+            .With(variant, Tag("Scale_Factor", "2"));
+
+        var result = Resolver(index, source).Resolve("Sarlacc_Large");
+
+        Assert.Equal(["Sarlacc_Large", "Sarlacc"], result.Chain);
+        Assert.Equal("5", TagNamed(result, "Tactical_Health").Value);
+        Assert.DoesNotContain(result.Tags, t => t.TagName == "Color");
+    }
+
+    [Fact]
+    public void Resolve_ByIdAndType_ReadsThatTypesObject()
+    {
+        var unit = Sym("Sarlacc");
+        var index = WorkspaceIndex(unit, SarlaccFaction);
+        var source = new FakeTagSource()
+            .With(SarlaccFaction, Tag("Color", "153, 21, 223"))
+            .With(unit, Tag("Tactical_Health", "5"));
+
+        var faction = Resolver(index, source).Resolve("Sarlacc", "Faction");
+        var none = Resolver(index, source).Resolve("Sarlacc", "HardPoint");
+
+        Assert.Equal("Faction", faction.TypeName);
+        Assert.Equal("153, 21, 223", TagNamed(faction, "Color").Value);
+        Assert.False(none.Found);
+    }
+
     // ── plain object (no base) ───────────────────────────────────────────────
 
     [Fact]
@@ -550,14 +594,27 @@ public sealed class EffectiveObjectResolverTest
         private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
             new(StringComparer.OrdinalIgnoreCase);
 
+        private readonly Dictionary<GameSymbol, IReadOnlyList<VariantTag>> _bySymbol = [];
+
         public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
         {
             return _byId.GetValueOrDefault(objectId);
         }
 
+        public IReadOnlyList<VariantTag>? TryGetTags(GameSymbol symbol)
+        {
+            return _bySymbol.GetValueOrDefault(symbol) ?? TryGetTags(symbol.Id);
+        }
+
         public FakeTagSource With(string id, params VariantTag[] tags)
         {
             _byId[id] = tags;
+            return this;
+        }
+
+        public FakeTagSource With(GameSymbol symbol, params VariantTag[] tags)
+        {
+            _bySymbol[symbol] = tags;
             return this;
         }
     }

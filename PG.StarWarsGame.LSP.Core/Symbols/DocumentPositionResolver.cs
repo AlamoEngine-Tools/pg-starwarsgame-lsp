@@ -16,7 +16,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 /// </summary>
 public static class DocumentPositionResolver
 {
-    public static (string Id, LspRange Range)? FindAtPosition(
+    public static (string Id, LspRange Range, string? TypeName)? FindAtPosition(
         DocumentIndex docIndex, int line, int character,
         Func<GameReference, bool> referenceFilter,
         Func<GameSymbol, int?> symbolRangeLength)
@@ -25,14 +25,14 @@ public static class DocumentPositionResolver
             if (referenceFilter(r) && r.Line == line && character >= r.Column && character < r.Column + r.Length)
                 return (r.TargetId, new LspRange(
                     new Position(line, r.Column),
-                    new Position(line, r.Column + r.Length)));
+                    new Position(line, r.Column + r.Length)), r.IdSpace);
 
         if (!docIndex.GroupMemberships.IsDefault)
             foreach (var gm in docIndex.GroupMemberships)
                 if (gm.TagLine == line && character >= gm.TagColumn && character < gm.TagColumn + gm.TagLength)
                     return (gm.Membership.GroupKey, new LspRange(
                         new Position(line, gm.TagColumn),
-                        new Position(line, gm.TagColumn + gm.TagLength)));
+                        new Position(line, gm.TagColumn + gm.TagLength)), null);
 
         foreach (var s in docIndex.Symbols)
             if (s.Origin is FileOrigin fo && fo.Line == line)
@@ -43,7 +43,7 @@ public static class DocumentPositionResolver
                 var col = fo.Column ?? 0;
                 return (s.Id, new LspRange(
                     new Position(line, col),
-                    new Position(line, col + len.Value)));
+                    new Position(line, col + len.Value)), s.TypeName);
             }
 
         return null;

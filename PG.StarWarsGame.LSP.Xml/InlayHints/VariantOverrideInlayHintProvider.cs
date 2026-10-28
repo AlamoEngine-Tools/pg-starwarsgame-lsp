@@ -120,18 +120,22 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
 
     private EffectiveObject ResolveCached(InlayHintContext ctx, string objectId)
     {
+        // Keyed by type as well: one id may name objects of several types.
+        var here = ctx.DefinitionHere(objectId);
+        var key = here?.TypeName is { } type ? objectId + "|" + type : objectId;
         var perIndex = ctx.Index.Derived(EffectiveObjectsKey, _ => new Dictionary<string, EffectiveObject>());
         lock (perIndex)
         {
-            if (perIndex.TryGetValue(objectId, out var cached))
+            if (perIndex.TryGetValue(key, out var cached))
                 return cached;
         }
 
-        var resolved = new EffectiveObjectResolver(ctx.Index, ctx.Schema, _tagSource).Resolve(objectId);
+        var resolver = new EffectiveObjectResolver(ctx.Index, ctx.Schema, _tagSource);
+        var resolved = here is not null ? resolver.Resolve(here) : resolver.Resolve(objectId);
 
         lock (perIndex)
         {
-            perIndex[objectId] = resolved;
+            perIndex[key] = resolved;
         }
 
         return resolved;

@@ -100,11 +100,12 @@ public sealed class SymbolRelations(
             : named.Where(r => r.Value.Count > 0).Select(r => r.Key).ToArray();
         var relations = keys
             .Select(k => Counted(k, named.GetValueOrDefault(k)?.Count ?? 0, known ? "none" : "notInModFiles"))
-            .Append(Counted(ReferencedBy, ReferencingObjects(entry.Id).Count(), "none"))
-            .Append(Counted(Overrides, OverrideRows(entry.Id).Count, "definedOnce"))
+            .Append(Counted(ReferencedBy, ReferencingObjects(entry).Count(), "none"))
+            .Append(Counted(Overrides, OverrideRows(entry).Count, "definedOnce"))
             .ToList();
-        var defined = WorkspaceDefinition(entry.Id);
-        var winner = defined ?? index.Baseline.Symbols.GetValueOrDefault(entry.Id);
+        var defined = WorkspaceDefinition(entry);
+        var shipped = index.Baseline.Symbols.GetValueOrDefault(entry.Id);
+        var winner = defined ?? (OfEntryType(shipped, entry) ? shipped : null);
         // Only a workspace definition is a document to go to: the baseline's origin is the game's own
         // path of the file, inside its packed data.
         var location = defined?.Origin is FileOrigin origin ? new SymbolLocation(origin.Uri, origin.Line) : null;
@@ -170,14 +171,17 @@ public sealed class SymbolRelations(
             : actions.Where(a => a.Action is not ("previewUnit" or "encyclopedia")).ToList();
     }
 
-    // The highest layer's definition - with the game's, the one the catalog lists.
-    private GameSymbol? WorkspaceDefinition(string id)
+    // An entry is one type's object: a same-named object of another type is another entry.
+    private static bool OfEntryType(GameSymbol? symbol, SymbolRow entry)
     {
-        return index.WorkspaceDefinitions.TryGetValue(id, out var definitions)
-            ? definitions.Where(s => s is { Kind: GameSymbolKind.XmlObject, Origin: FileOrigin })
-                .OrderByDescending(index.LayerRankOf)
-                .FirstOrDefault()
-            : null;
+        return symbol is not null && string.Equals(symbol.TypeName, entry.Type, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // The highest layer's definition of the entry's type - with the game's, the one the catalog lists.
+    private GameSymbol? WorkspaceDefinition(SymbolRow entry)
+    {
+        return index.DefinitionsOf(entry.Id, entry.Type)
+            .FirstOrDefault(s => s is { Kind: GameSymbolKind.XmlObject, Origin: FileOrigin });
     }
 
     /// <summary>The rows of one relation of an entry; null for an entry or relation there is not.</summary>
@@ -192,9 +196,10 @@ public sealed class SymbolRelations(
         switch (relation)
         {
             case ReferencedBy:
-                return ReferencingObjects(entry.Id).Select(o => catalog.FindObject(o) ?? Missing(o, null)).ToList();
+                return ReferencingObjects(entry)
+                    .Select(o => catalog.FindObject(o.Id, o.Type) ?? Missing(o.Id, null)).ToList();
             case Overrides:
-                return OverrideRows(entry.Id);
+                return OverrideRows(entry);
         }
 
         var (named, _) = TagRelations(entry);
@@ -299,13 +304,13 @@ public sealed class SymbolRelations(
     {
         var users = index.Derived(AssetUsersKey, _ => AllUsers());
         return users.TryGetValue(asset, out var objects)
-            ? objects.Select(o => catalog.FindObject(o) ?? Missing(o, null))
+            ? objects.Select(o => catalog.FindObject(o.Id, o.Type) ?? Missing(o.Id, null))
             : [];
     }
 
-    private Dictionary<string, SortedSet<string>> AllUsers()
+    private Dictionary<string, SortedSet<(string Id, string? Type)>> AllUsers()
     {
-        var users = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var users = new Dictionary<string, SortedSet<(string Id, string? Type)>>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in catalog.Objects)
         {
             var (named, _) = TagRelations(row);
@@ -316,8 +321,8 @@ public sealed class SymbolRelations(
                 {
                     var asset = relation is "models" or "particleSystems" ? WithExtension(name, ".alo") : name;
                     if (!users.TryGetValue(asset, out var objects))
-                        users[asset] = objects = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-                    objects.Add(row.Id);
+                        users[asset] = objects = new SortedSet<(string Id, string? Type)>(ObjectOrder);
+                    objects.Add((row.Id, row.Type));
                 }
             }
         }
@@ -328,10 +333,22 @@ public sealed class SymbolRelations(
     private IEnumerable<SymbolRow> ObjectsReferencing(string key)
     {
         return index.WorkspaceReferences.TryGetValue(key, out var references)
-            ? references.Select(ContainingObject).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase)
-                .Order(StringComparer.OrdinalIgnoreCase)
-                .Select(o => catalog.FindObject(o) ?? Missing(o, null))
+            ? Containing(references).Select(o => catalog.FindObject(o.Id, o.Type) ?? Missing(o.Id, null))
             : [];
+    }
+
+    // Objects by id, then type - one id may name objects of several types.
+    private static readonly Comparer<(string Id, string? Type)> ObjectOrder =
+        Comparer<(string Id, string? Type)>.Create((a, b) =>
+            StringComparer.OrdinalIgnoreCase.Compare(a.Id, b.Id) is var byId and not 0
+                ? byId
+                : StringComparer.OrdinalIgnoreCase.Compare(a.Type, b.Type));
+
+    // The objects references sit in, each once, ordered.
+    private IEnumerable<(string Id, string? Type)> Containing(IEnumerable<GameReference> references)
+    {
+        return references.Select(ContainingObject).OfType<(string Id, string? Type)>()
+            .Distinct().Order(ObjectOrder);
     }
 
     private static SymbolRelation Counted(string relation, int count, string emptyReason)
@@ -343,7 +360,10 @@ public sealed class SymbolRelations(
     private (Dictionary<string, List<(string Name, string? Type)>> Named, bool Known) TagRelations(SymbolRow entry)
     {
         var named = new Dictionary<string, List<(string Name, string? Type)>>(StringComparer.Ordinal);
-        var effective = new EffectiveObjectResolver(index, schema, tags).Resolve(entry.Id);
+        var resolver = new EffectiveObjectResolver(index, schema, tags);
+        var effective = entry.Type is { } entryType
+            ? resolver.Resolve(entry.Id, entryType)
+            : resolver.Resolve(entry.Id);
         foreach (var tag in effective.Tags)
         {
             if (schema.GetTag(tag.TagName) is not { } definition) continue;
@@ -397,7 +417,10 @@ public sealed class SymbolRelations(
             "textures" => Texture(name),
             "samples" => catalog.Find("audio", name),
             "luaScript" => catalog.Find("luaScripts", WithExtension(name, ".lua")),
-            _ => catalog.FindObject(name)
+            // A kind is a predicate over game objects; a type is its own id space.
+            _ => catalog.FindObject(name, type is not null && schema.GetKind(type) is not null
+                ? GameTypeNames.GameObjectType
+                : type)
         };
         return found ?? Missing(name, type);
     }
@@ -436,55 +459,56 @@ public sealed class SymbolRelations(
         return Path.HasExtension(name) ? name : name + extension;
     }
 
-    // The objects whose definitions name this one: each reference mapped to the object it sits in.
-    private IEnumerable<string> ReferencingObjects(string id)
+    // The objects whose definitions name this one - the references that mean its type - each mapped
+    // to the object it sits in.
+    private IEnumerable<(string Id, string? Type)> ReferencingObjects(SymbolRow entry)
     {
-        if (!index.WorkspaceReferences.TryGetValue(id, out var references)) return [];
-        return references
-            .Select(ContainingObject)
-            .OfType<string>()
-            .Where(o => !o.Equals(id, StringComparison.OrdinalIgnoreCase))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase);
+        return Containing(index.ReferencesTo(entry.Id, entry.Type))
+            .Where(o => !(o.Id.Equals(entry.Id, StringComparison.OrdinalIgnoreCase)
+                          && string.Equals(o.Type, entry.Type, StringComparison.OrdinalIgnoreCase)));
     }
 
-    private string? ContainingObject(GameReference reference)
+    private (string Id, string? Type)? ContainingObject(GameReference reference)
     {
         if (!index.Documents.TryGetValue(reference.DocumentUri, out var document)) return null;
-        var id = document.Symbols
+        var symbol = document.Symbols
             .Where(s => s.Kind == GameSymbolKind.XmlObject && s.Origin is FileOrigin fo && fo.Line <= reference.Line)
-            .MaxBy(s => ((FileOrigin)s.Origin).Line)?.Id;
+            .MaxBy(s => ((FileOrigin)s.Origin).Line);
+        if (symbol is null) return null;
         // An ability defined inside an object (OWNER$Ability) is indexed on its own; the reference is
-        // the owner's.
-        var owner = id?.IndexOf(GameIndex.OwnerScopeSeparator) ?? -1;
-        return owner > 0 ? id![..owner] : id;
+        // the owner's, whose definition sits in the same document.
+        var owner = symbol.Id.IndexOf(GameIndex.OwnerScopeSeparator);
+        if (owner <= 0) return (symbol.Id, symbol.TypeName);
+        var ownerId = symbol.Id[..owner];
+        var ownerSymbol = document.Symbols.FirstOrDefault(s =>
+            s.Kind == GameSymbolKind.XmlObject && s.Id.Equals(ownerId, StringComparison.OrdinalIgnoreCase));
+        return (ownerId, ownerSymbol?.TypeName);
     }
 
     // Every layer's definition of the object, the one the game uses first, then the game's own.
     // The definitions the one the game uses replaces, highest layer first: every layer's below the
     // winner, then the game's. One in a file the editor can open carries its location for a go-to;
     // one inside packed data - a MEG's, the game's - is marked so.
-    private List<SymbolRow> OverrideRows(string id)
+    private List<SymbolRow> OverrideRows(SymbolRow entry)
     {
         var rows = new List<SymbolRow>();
-        if (index.WorkspaceDefinitions.TryGetValue(id, out var definitions))
-            foreach (var definition in definitions
-                         .Where(s => s.Kind == GameSymbolKind.XmlObject && s.Origin is FileOrigin)
-                         .OrderByDescending(index.LayerRankOf))
+        foreach (var definition in index.DefinitionsOf(entry.Id, entry.Type)
+                     .Where(s => s.Kind == GameSymbolKind.XmlObject && s.Origin is FileOrigin))
+        {
+            var origin = (FileOrigin)definition.Origin;
+            var layer = index.Documents.GetValueOrDefault(origin.Uri)?.LayerName;
+            rows.Add(new SymbolRow(origin.Uri + "#" + origin.Line,
+                $"{origin.Uri[(origin.Uri.LastIndexOf('/') + 1)..]}:{origin.Line + 1}", definition.TypeName, [],
+                "layer:" + index.LayerRankOf(definition), layer, [])
             {
-                var origin = (FileOrigin)definition.Origin;
-                var layer = index.Documents.GetValueOrDefault(origin.Uri)?.LayerName;
-                rows.Add(new SymbolRow(origin.Uri + "#" + origin.Line,
-                    $"{origin.Uri[(origin.Uri.LastIndexOf('/') + 1)..]}:{origin.Line + 1}", definition.TypeName, [],
-                    "layer:" + index.LayerRankOf(definition), layer, [])
-                {
-                    Location = origin.IsNavigable ? new SymbolLocation(origin.Uri, origin.Line) : null,
-                    Packed = !origin.IsNavigable
-                });
-            }
+                Location = origin.IsNavigable ? new SymbolLocation(origin.Uri, origin.Line) : null,
+                Packed = !origin.IsNavigable
+            });
+        }
 
-        if (index.Baseline.Symbols.TryGetValue(id, out var shipped) && shipped.Kind == GameSymbolKind.XmlObject)
-            rows.Add(new SymbolRow(id, id, shipped.TypeName, [], "game", null, []) { Packed = true });
+        if (index.Baseline.Symbols.TryGetValue(entry.Id, out var shipped) && shipped.Kind == GameSymbolKind.XmlObject
+                                                                          && OfEntryType(shipped, entry))
+            rows.Add(new SymbolRow(entry.Id, entry.Id, shipped.TypeName, [], "game", null, []) { Packed = true });
         return rows.Skip(1).ToList();
     }
 }

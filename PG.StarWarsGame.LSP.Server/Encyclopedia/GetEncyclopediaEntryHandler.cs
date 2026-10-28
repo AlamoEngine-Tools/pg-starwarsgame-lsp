@@ -88,7 +88,7 @@ public sealed class GetEncyclopediaEntryHandler
                 request.ScreenHeight ?? EncyclopediaGlyphSize.DefaultScreenHeight)
             .Resolve();
 
-        var effective = resolver.Resolve(request.ObjectId);
+        var effective = resolver.Resolve(request.ObjectId, GameTypeNames.GameObjectType);
         if (!effective.Found)
             return GetEncyclopediaEntryResult.NotFound(request.ObjectId, layout);
 
@@ -380,7 +380,7 @@ public sealed class GetEncyclopediaEntryHandler
                 // A second hop through the TARGET object: the panel shows what that unit looks like
                 // and is called, so both its name and its portrait come from its own tags rather
                 // than anything on the object being previewed.
-                var target = resolver.Resolve(id);
+                var target = resolver.Resolve(id, GameTypeNames.GameObjectType);
                 if (!target.Found)
                     return new EncyclopediaReference(id, null);
 

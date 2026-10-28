@@ -43,7 +43,7 @@ public sealed class PreviewSceneParticleTest
         {
             WorkspaceDefinitions = new[]
                 {
-                    new GameSymbol("Generic_Star_Destroyer", GameSymbolKind.XmlObject, "SpaceUnit",
+                    new GameSymbol("Generic_Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType",
                         new FileOrigin("file:///ships.xml", 0, 0), null),
                     new GameSymbol("HP_SD_Weapon_FL", GameSymbolKind.XmlObject, "HardPoint",
                         new FileOrigin("file:///hardpoints.xml", 0, 0), null)
