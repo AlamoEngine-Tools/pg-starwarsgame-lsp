@@ -396,6 +396,24 @@ public sealed class LuaAnalyzerInstancesTest
 
     // ── lifetime ─────────────────────────────────────────────────────────────
 
+    // The analyzer reads a file written under its folder as a change of its own; with the edit sent
+    // as well it reported nothing on 17 of 24 edits of a vanilla script (measured, 0.25.1). The copy
+    // on disk is for its startup scan only.
+    [Fact]
+    public void AnEditToAnOpenScript_IsSent_AndNotWrittenToTheInstancesCopy()
+    {
+        var instances = Instances();
+        instances.Configure(Layers);
+        instances.DidOpen(Script, "Definitions()\n", 1);
+        var process = _processes.Single();
+        var place = PlaceIn(process, Script);
+
+        instances.DidChange(Script, "Definitions()\nx = \"broken\n", 2);
+
+        Assert.Equal("Definitions()\nx = \"broken\n", process.Texts[place]);
+        Assert.Equal("Definitions()\n", _disk.File.ReadAllText(new FileHelper(_disk).FileUriToPath(place)!));
+    }
+
     private static readonly LuaAnalyzerInstanceTiming Timing =
         new(TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(60));
 
