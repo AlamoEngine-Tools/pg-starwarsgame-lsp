@@ -63,19 +63,18 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var context = new EaWXmlContext(fileHelper);
         var indexer = new WorkspaceIndexer(
             fileHelper,
-            [],
             idx,
-            registry,
             schemaProvider,
-            context,
-            new NullProjectIndexCache(),
             new MetafileRegistrar(fileHelper, registry, schemaProvider, context, new StoryChainProblemStore(),
                 NullLogger<MetafileRegistrar>.Instance),
+            new DocumentIndexer(fileHelper, idx, new NullProjectIndexCache(), new ParseableFiles(fileHelper, [], context),
+                new IndexFingerprints(schemaProvider, new LuaApiSchemaProvider([]), registry, fileHelper),
+                NullLogger<DocumentIndexer>.Instance),
             new FakeLspConfigurationProvider(),
             NoMegEntries.Instance,
             new MegArchiveLoadOrder(fileHelper),
             new NullModelBoneCatalogCache(),
-            NullLogger<WorkspaceIndexer>.Instance, new LuaApiSchemaProvider([]));
+            NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,
             host ?? new FakeGameWorkspaceHost(),

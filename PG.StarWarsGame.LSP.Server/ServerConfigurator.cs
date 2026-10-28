@@ -343,6 +343,9 @@ public static class ServerConfigurator
                 services.AddSingleton<IProjectIndexCache, ProjectIndexCache>();
                 services.AddSingleton<IModelBoneCatalogCache, ModelBoneCatalogCache>();
                 services.AddSingleton<MetafileRegistrar>();
+                services.AddSingleton<ParseableFiles>();
+                services.AddSingleton<IndexFingerprints>();
+                services.AddSingleton<DocumentIndexer>();
                 services.AddSingleton<WorkspaceIndexer>();
                 services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 
