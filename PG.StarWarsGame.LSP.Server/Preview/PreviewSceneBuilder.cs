@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Assets;
+using PG.StarWarsGame.LSP.Server.Preview.Sections;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
@@ -46,7 +47,6 @@ public sealed class PreviewSceneBuilder(
     private const string HardPointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
     private const string AttachmentBoneTag = "Attachment_Bone";
-    private const string FactionTypeName = "Faction";
 
     /// <summary>What both shipped corpora write, and what the engine falls back to.</summary>
     private const float DefaultHullVsHardpointsConstraint = 0.2f;
@@ -130,8 +130,6 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private const string ProjectileCatalogKey = "projectileCatalog";
 
-    private const string FactionsKey = "previewFactions";
-
     private static readonly string[] BehaviorTags = ["SpaceBehavior", "LandBehavior"];
 
     private static readonly string[] FireModeTags =
@@ -141,6 +139,7 @@ public sealed class PreviewSceneBuilder(
     ];
 
     private readonly IMessageCatalog _messages = messages;
+    private readonly FactionSectionBuilder _factions = new(schema, tagSource);
 
     /// <summary>
     ///     A scene for a single <c>.alo</c>, opened directly - a model or a particle system.
@@ -203,7 +202,7 @@ public sealed class PreviewSceneBuilder(
             modelReference,
             [part],
             [],
-            Factions(index),
+            _factions.Factions(index),
             problems,
             assets.Tiers,
             null,
@@ -394,7 +393,7 @@ public sealed class PreviewSceneBuilder(
             .ToList();
 
         return new PreviewScene(PreviewSceneKind.Object, effective.ObjectId, parts, hardpoints,
-            Factions(index), problems, assets.Tiers, animationSource, particles,
+            _factions.Factions(index), problems, assets.Tiers, animationSource, particles,
             // The clips are named after the model whose skeleton they were authored against, which
             // is the OVERRIDE when a unit borrows another model's set.
             AnimationsFor(index, animationSource ?? hull ?? string.Empty),
@@ -402,7 +401,7 @@ public sealed class PreviewSceneBuilder(
             // declare one, but it was aimed at the turret, and the subject here is the whole unit.
             hull is null ? [] : CamerasOf(hull, problems),
             effective.ValueOf("Type"),
-            CategoryTokens(effective.ValueOf("CategoryMask")),
+            PreviewTagReader.CategoryTokens(effective.ValueOf("CategoryMask")),
             BreakoffProps(index, resolver, hardpoints, problems),
             weapons,
             Reticles(index, hardpoints, problems),
@@ -420,8 +419,8 @@ public sealed class PreviewSceneBuilder(
             ProjectileCatalog(index),
             // What it wears when no faction colour applies, which is most of the time - its own
             // colour first, and whose fallback to use when it declares none.
-            Colour(effective, "No_Colorization_Color"),
-            FirstToken(effective.ValueOf("Affiliation")),
+            PreviewTagReader.Colour(effective, "No_Colorization_Color"),
+            PreviewTagReader.FirstToken(effective.ValueOf("Affiliation")),
             stages,
             DamageTable(effective),
             EngineScaleFactor.Of(effective.ValueOf("Scale_Factor")),
@@ -505,7 +504,7 @@ public sealed class PreviewSceneBuilder(
                 // and the game says nothing about it.
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewDeathCloneNotDefined, "warning",
                     _messages.Format("PreviewScene_DeathCloneNotDefinedThis", row[1])));
-                clones.Add(new PreviewDeathClone(Blank(row[0]), row[1], null, playsIdle));
+                clones.Add(new PreviewDeathClone(PreviewTagReader.Blank(row[0]), row[1], null, playsIdle));
                 continue;
             }
 
@@ -513,7 +512,7 @@ public sealed class PreviewSceneBuilder(
 
             // Its OWN model's clips and effects. Everything else on the wire describes the subject,
             // and a clone is a replacement for it rather than a piece of it.
-            clones.Add(new PreviewDeathClone(Blank(row[0]), row[1], model, playsIdle,
+            clones.Add(new PreviewDeathClone(PreviewTagReader.Blank(row[0]), row[1], model, playsIdle,
                 model is null ? [] : AnimationsFor(index, model),
                 model is null ? [] : ProxiesOf(model, row[1], [], problems),
                 // The clone's OWN scale, read off the resolved clone - variants included - through
@@ -522,11 +521,6 @@ public sealed class PreviewSceneBuilder(
         }
 
         return clones;
-    }
-
-    private static string? Blank(string value)
-    {
-        return value.Length == 0 ? null : value;
     }
 
     /// <summary>
@@ -935,8 +929,8 @@ public sealed class PreviewSceneBuilder(
                 id,
                 modelRef,
                 true,
-                Vector3Tag(effective, "Debris_Movement_Vector"),
-                Vector3Tag(effective, "Debris_Facing_Rotate_Vector"),
+                PreviewTagReader.Vector3Tag(effective, "Debris_Movement_Vector"),
+                PreviewTagReader.Vector3Tag(effective, "Debris_Facing_Rotate_Vector"),
                 effective.FloatOf("Debris_Min_Lifetime_Seconds"),
                 effective.FloatOf("Debris_Max_Lifetime_Seconds"),
                 effective.ValueOf("Debris_Attached_Particle"),
@@ -949,24 +943,6 @@ public sealed class PreviewSceneBuilder(
         }
 
         return props;
-    }
-
-    /// <summary>A comma-separated triple, or null when the tag is absent or malformed.</summary>
-    private static PreviewVector3? Vector3Tag(EffectiveObject effective, string tagName)
-    {
-        var raw = effective.ValueOf(tagName);
-        if (string.IsNullOrEmpty(raw))
-            return null;
-
-        var parts = raw.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 3)
-            return null;
-
-        return float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) &&
-               float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var y) &&
-               float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var z)
-            ? new PreviewVector3(x, y, z)
-            : null;
     }
 
     /// <summary>
@@ -1294,7 +1270,7 @@ public sealed class PreviewSceneBuilder(
             PreviewFirePointMode.CycleBones,
             effective.BoolOf("Fires_Forward"),
             // A list, but only 2 of 95 shipped objects name more than one.
-            FirstToken(effective.ValueOf("Projectile_Types")),
+            PreviewTagReader.FirstToken(effective.ValueOf("Projectile_Types")),
             effective.FloatOf("Damage"),
             effective.ValueOf("Damage_Type"),
             effective.FloatOf("Targeting_Max_Attack_Distance"),
@@ -1597,44 +1573,13 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static IReadOnlyList<PreviewDamageBand> DamageTable(EffectiveObject effective)
     {
-        var stages = Numbers<int>(effective.ValueOf("Land_Damage_Alternates"), int.TryParse);
-        var thresholds = Numbers<float>(effective.ValueOf("Land_Damage_Thresholds"), float.TryParse);
+        var stages = PreviewTagReader.Numbers<int>(effective.ValueOf("Land_Damage_Alternates"), int.TryParse);
+        var thresholds = PreviewTagReader.Numbers<float>(effective.ValueOf("Land_Damage_Thresholds"), float.TryParse);
 
         if (stages.Count == 0 || stages.Count != thresholds.Count)
             return [];
 
         return [.. stages.Select((stage, at) => new PreviewDamageBand(thresholds[at], stage))];
-    }
-
-    /// <summary>
-    ///     Every entry of a comma-separated list that parses, in written order.
-    /// </summary>
-    /// <remarks>
-    ///     A non-numeric entry is DROPPED rather than skipped-with-a-hole, which is the same rule
-    ///     <see cref="DamageStages" /> uses. It also means a table carrying one is caught by the
-    ///     length check above and discarded whole, which is the safe direction for a positional
-    ///     pairing.
-    /// </remarks>
-    private static List<T> Numbers<T>(string? raw, ParseNumber<T> parse)
-    {
-        var found = new List<T>();
-        if (string.IsNullOrWhiteSpace(raw))
-            return found;
-
-        foreach (var token in raw.Split(
-                     ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-            if (parse(token, out var value))
-                found.Add(value);
-
-        return found;
-    }
-
-    /// <summary>The first entry of a comma-separated list, or null when there is none.</summary>
-    private static string? FirstToken(string? value)
-    {
-        return (value ?? string.Empty)
-            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .FirstOrDefault();
     }
 
     /// <summary>
@@ -1722,97 +1667,7 @@ public sealed class PreviewSceneBuilder(
 
     // ── factions ──────────────────────────────────────────────────────────────
 
-    /// <summary>
-    ///     Every indexed faction's colours.
-    /// </summary>
-    /// <remarks>
-    ///     All of them travel, not just the object's own. The preview lets an author try a unit in any
-    ///     faction's colours and compare two side by side, and shipping the whole set makes that a
-    ///     local switch rather than a round trip each time.
-    /// </remarks>
-    /// <summary>The factions of a snapshot, resolved once per snapshot and shared by every scene built from it.</summary>
-    private List<PreviewFaction> Factions(GameIndex index)
-    {
-        return index.Derived(FactionsKey, i => BuildFactions(i, new EffectiveObjectResolver(i, schema, tagSource)));
-    }
-
-    private List<PreviewFaction> BuildFactions(GameIndex index, EffectiveObjectResolver resolver)
-    {
-        var factions = new List<PreviewFaction>();
-
-        // Workspace first, then the baseline: a mod's own faction shadows a shipped one of the same
-        // id, and DistinctBy keeps whichever it saw first.
-        //
-        // Each group in DECLARATION order, which is the order the palette is drawn in. It used to
-        // come straight off the dictionaries, which have no order to give - so the swatches came
-        // back arranged differently on every reload and the reader reached for the position they
-        // used last time and got someone else's colour. Sorted within the groups rather than across
-        // them, so the shadowing above still means what it says.
-        var candidates = InXmlOrder(index.WorkspaceDefinitions.SelectMany(kv => kv.Value))
-            .Concat(InXmlOrder(index.Baseline.Symbols.Values));
-
-        // ReSharper disable once LoopCanBeConvertedToQuery - each faction is resolved and the
-        // unresolvable skipped; a query would hide the resolve.
-        foreach (var symbol in candidates
-                     .Where(s => string.Equals(s.TypeName, FactionTypeName, StringComparison.OrdinalIgnoreCase))
-                     .DistinctBy(s => s.Id, StringComparer.OrdinalIgnoreCase))
-        {
-            var effective = resolver.Resolve(symbol.Id);
-            if (!effective.Found)
-                continue;
-
-            factions.Add(new PreviewFaction(
-                effective.ObjectId,
-                Colour(effective, "Color"),
-                Colour(effective, "No_Colorization_Color"),
-                Colour(effective, "Display_Font_Color")));
-        }
-
-        return factions;
-    }
-
-    /// <summary>
-    ///     Symbols in the order their file declares them: by file, then by position within it.
-    /// </summary>
-    /// <remarks>
-    ///     A symbol with no file to point at - one out of a MEG archive, or one whose origin was
-    ///     never resolved - sorts after the rest and then by id, so it has SOME fixed place instead
-    ///     of wherever the dictionary happened to put it. Being last is the honest answer: nothing
-    ///     is known about where it was written.
-    /// </remarks>
-    private static IEnumerable<GameSymbol> InXmlOrder(IEnumerable<GameSymbol> symbols)
-    {
-        return symbols
-            .OrderBy(s => s.Origin is FileOrigin ? 0 : 1)
-            .ThenBy(s => (s.Origin as FileOrigin)?.Uri ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(s => (s.Origin as FileOrigin)?.Line ?? 0)
-            .ThenBy(s => (s.Origin as FileOrigin)?.Column ?? 0)
-            .ThenBy(s => s.Id, StringComparer.OrdinalIgnoreCase);
-    }
-
     // ── tag reading ───────────────────────────────────────────────────────────
-
-    /// <summary>
-    ///     One category per entry, out of a mask that names several.
-    /// </summary>
-    /// <remarks>
-    ///     <c>CategoryMask</c> is written <c>Vehicle | AntiInfantry | AntiVehicle</c>, so it is not
-    ///     a value that can be looked up - it is a set that has to be tested against. Splitting it
-    ///     server-side keeps the client from having to know the engine's punctuation.
-    /// </remarks>
-    private static List<string> CategoryTokens(string? mask)
-    {
-        if (string.IsNullOrWhiteSpace(mask))
-            return [];
-
-        return
-        [
-            .. mask
-                .Split(['|', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Where(token => token.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-        ];
-    }
 
     /// <summary>
     ///     How the subject comes apart when it declares no death clone, or null where it does not.
@@ -1842,27 +1697,4 @@ public sealed class PreviewSceneBuilder(
             effective.FloatOf("Max_Speed") ?? 0f);
     }
 
-    private static PreviewRgba? Colour(EffectiveObject effective, string tagName)
-    {
-        if (effective.ValueOf(tagName) is not { } raw)
-            return null;
-
-        var tokens = raw.Split([' ', '\t', ',', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-        if (tokens.Length < 3)
-            return null;
-
-        var channels = new int[4];
-        channels[3] = 255;
-
-        for (var i = 0; i < Math.Min(4, tokens.Length); i++)
-        {
-            if (!int.TryParse(tokens[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var v))
-                return null;
-            channels[i] = Math.Clamp(v, 0, 255);
-        }
-
-        return new PreviewRgba(channels[0], channels[1], channels[2], channels[3]);
-    }
-
-    private delegate bool ParseNumber<T>(string written, out T value);
 }
