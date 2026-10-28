@@ -243,6 +243,17 @@ public sealed class LuaRenameHandler : IRenameProvider
         var parsed = _parseCache.GetOrParse(uri);
         if (parsed is null) return null;
 
+        // A global function named by value - the handler handed to Define_State - is no call site the
+        // index holds: it is read from the script itself.
+        if (LuaGlobalRenameBuilder.GlobalAt(parsed.Tree, line, character) is { } use &&
+            IsKnownLuaGlobal(use.Name, index))
+        {
+            if (IsEngineEntryPoint(use.Name)) return null;
+            return LuaGlobalRenameBuilder.IsLeafOwned(use.Name, index, InScope(uri, use.Name, index))
+                ? new RangeOrPlaceholderRange(use.Range)
+                : null;
+        }
+
         return FindXmlObjectStringRange(parsed.Tree, line, character, index);
     }
 
@@ -324,11 +335,9 @@ public sealed class LuaRenameHandler : IRenameProvider
     {
         var root = tree.GetRoot();
 
-        foreach (var id in root.DescendantNodes().OfType<IdentifierNameSyntax>())
-        {
-            if (!LocationContainsPosition(id.GetLocation(), line, character)) continue;
-            if (IsKnownLuaGlobal(id.Name, index)) return id.Name;
-        }
+        // A local of a global's name is not the global.
+        if (LuaGlobalRenameBuilder.GlobalAt(tree, line, character) is { } use && IsKnownLuaGlobal(use.Name, index))
+            return use.Name;
 
         foreach (var funcDecl in root.DescendantNodes().OfType<FunctionDeclarationStatementSyntax>())
         {
