@@ -205,8 +205,28 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
         Instance? instance;
         lock (_gate)
         {
-            if (origin is null || !_instances.TryGetValue(_fileHelper.NormalizeUri(origin), out instance)) return null;
+            if (origin is null) return null;
+            var key = _fileHelper.NormalizeUri(origin);
+            // The editor asks about a script it shows - its outline the moment it opens it, kept until
+            // the script changes - so a request does not wait out the settle.
+            if (!_instances.TryGetValue(key, out instance) && _settling.Remove(key, out var settling))
+            {
+                settling.Dispose();
+                Start(key);
+                instance = _instances[key];
+            }
+
+            if (instance is null) return null;
             instance.Mirror.ToMirror(request);
+        }
+
+        try
+        {
+            await instance.Started.Task.WaitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
         }
 
         var answer = await instance.Process.RequestAsync<JToken>(method, request, ct);
@@ -403,6 +423,10 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
             _logger.LogWarning(ex, "Lua analyzer instance not started");
             return;
         }
+        finally
+        {
+            instance.Started.TrySetResult();
+        }
 
         lock (_gate)
         {
@@ -566,5 +590,8 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
         public LuaInstanceMirror Mirror { get; } = mirror;
         public Dictionary<string, Sent> Held { get; } = new(DocumentUris.Comparer);
         public IReadOnlyList<string> Library { get; set; } = [];
+
+        /// <summary>Done once its analyzer's first start has ended, started or not: a request waits for it.</summary>
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

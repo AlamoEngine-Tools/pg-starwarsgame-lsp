@@ -45,6 +45,8 @@ public sealed class LuaAnalyzerInstancesTest
     private readonly FakeGameIndexService _index = new();
     private readonly MockFileSystem _disk = new();
     private readonly List<FakeProcess> _processes = [];
+    private Func<string, JToken, JToken?>? _answer;
+    private Task _starting = Task.CompletedTask;
 
     private readonly LuaStubLocation _stubs = new()
     {
@@ -91,7 +93,8 @@ public sealed class LuaAnalyzerInstancesTest
         var fileHelper = new FileHelper(_disk);
         return new LuaAnalyzerInstances(_ =>
             {
-                var process = new FakeProcess();
+                var process = new FakeProcess { Starting = _starting };
+                if (_answer is not null) process.Answer = _answer;
                 _processes.Add(process);
                 return process;
             }, _index, fileHelper, _stubs, new LuaGeneratedTexts(sources, fileHelper), Directory,
@@ -517,6 +520,46 @@ public sealed class LuaAnalyzerInstancesTest
         Assert.True(Assert.Single(_processes).Disposed);
     }
 
+    // The editor asks for a script's outline the moment it opens it and keeps the answer until the
+    // script changes: the request starts the analyzer it would otherwise wait for, and is answered.
+    [Fact]
+    public async Task ARequestAboutASettlingScript_StartsItsAnalyzer_AndIsAnswered()
+    {
+        var time = new FakeTimeProvider();
+        var instances = Instances(Timing, time);
+        instances.Configure(Layers);
+        _answer = (_, _) => new JArray();
+        instances.DidOpen(Script, "Definitions()\n", 1);
+
+        var answer = await instances.RequestAsync<JToken>("textDocument/documentSymbol",
+            new DocumentSymbolParams { TextDocument = new TextDocumentIdentifier(DocumentUri.From(Script)) },
+            CancellationToken.None);
+
+        var process = Assert.Single(_processes);
+        Assert.NotNull(answer);
+        Assert.Equal("textDocument/documentSymbol", Assert.Single(process.Requests).Method);
+    }
+
+    [Fact]
+    public async Task ARequest_WaitsForItsAnalyzerToStart()
+    {
+        var instances = Instances();
+        instances.Configure(Layers);
+        _answer = (_, _) => new JArray();
+        var starting = new TaskCompletionSource();
+        _starting = starting.Task;
+        instances.DidOpen(Script, "Definitions()\n", 1);
+
+        var request = instances.RequestAsync<JToken>("textDocument/documentSymbol",
+            new DocumentSymbolParams { TextDocument = new TextDocumentIdentifier(DocumentUri.From(Script)) },
+            CancellationToken.None);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.False(request.IsCompleted);
+        starting.SetResult();
+
+        Assert.NotNull(await request);
+    }
+
     private sealed class FakeProcess : ILuaAnalyzerProcess
     {
         public Dictionary<string, string> Texts { get; } = new(StringComparer.Ordinal);
@@ -525,6 +568,7 @@ public sealed class LuaAnalyzerInstancesTest
         public List<(string Method, JToken Parameters)> Requests { get; } = [];
         public Func<string, JToken, JToken?> Answer { get; set; } = (_, _) => null;
         public bool Disposed { get; private set; }
+        public Task Starting { get; init; } = Task.CompletedTask;
 
         public bool IsRunning => Plans.Count > 0 && !Disposed;
         public event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
@@ -554,7 +598,7 @@ public sealed class LuaAnalyzerInstancesTest
         public Task StartAsync(LuaAnalyzerInstancePlan plan)
         {
             lock (Plans) Plans.Add(plan);
-            return Task.CompletedTask;
+            return Starting;
         }
 
         public ValueTask DisposeAsync()

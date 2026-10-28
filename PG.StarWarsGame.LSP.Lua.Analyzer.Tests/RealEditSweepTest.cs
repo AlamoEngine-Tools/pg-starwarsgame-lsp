@@ -2,17 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
 using System.Diagnostics;
-using System.IO.Abstractions;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Core.Symbols;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua.Analysis.Generated;
-using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
-using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Analyzer.Tests;
 
@@ -20,73 +14,28 @@ namespace PG.StarWarsGame.LSP.Lua.Analyzer.Tests;
 ///     Every edit of an open script is reported on, through the instances as the server runs them: each
 ///     string of a vanilla script broken in turn, and mended again, is a report each time.
 /// </summary>
-/// <remarks>
-///     Local only: set <c>AET_EMMYLUA_LS</c> to the binary, with the vanilla EaW scripts under
-///     <c>eaw/Data/Scripts</c> at the repository root.
-/// </remarks>
+/// <remarks>Local only, see <see cref="VanillaScriptStack" />.</remarks>
 public sealed partial class RealEditSweepTest
 {
+    private const string Interdictor = "Gameobject/Interdictor.lua";
+
     [Fact]
     public async Task EveryStringBrokenInTurn_IsReported_AndSoIsItsMending()
     {
-        var binary = Environment.GetEnvironmentVariable("AET_EMMYLUA_LS") ?? "";
-        if (!File.Exists(binary))
-            Assert.Skip("Set AET_EMMYLUA_LS to an emmylua_ls binary to run against the real analyzer.");
-        var scripts = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "eaw",
-            "Data", "Scripts"));
-        if (!Directory.Exists(scripts)) Assert.Skip("The vanilla EaW scripts are not at " + scripts);
-
-        var work = Path.Combine(Path.GetTempPath(), "aet-emmylua-sweep-" + Guid.NewGuid().ToString("N"));
-        var fileHelper = new FileHelper(new FileSystem());
-        var stubDirectory = Path.Combine(AppContext.BaseDirectory, "schema", "lua");
-        var stubFiles = Directory.GetFiles(stubDirectory, "*.d.lua").Select(Path.GetFileName).OfType<string>()
-            .ToList();
-        var stubs = new LuaStubLocation
-        {
-            Directory = stubDirectory,
-            Files = stubFiles,
-            Libraries = stubFiles.Where(f => f.StartsWith("pg", StringComparison.OrdinalIgnoreCase))
-                .ToDictionary(f => f[..^".d.lua".Length], f => f, StringComparer.OrdinalIgnoreCase)
-        };
-        var schema = LuaApiSchemaProvider.FromFiles(stubs.Files.Select(f =>
-            new LuaStubFile(f, File.ReadAllText(Path.Combine(stubDirectory, f)))));
-
-        var documents = new Dictionary<string, DocumentIndex>(DocumentUris.Comparer);
-        foreach (var path in Directory.GetFiles(Path.Combine(scripts, "Library"), "*.lua")
-                     .Append(Path.Combine(scripts, "Gameobject", "Interdictor.lua")))
-        {
-            var uri = fileHelper.NormalizeUri(fileHelper.PathToFileUri(path));
-            var requires = Require().Matches(File.ReadAllText(path)).Select(m => m.Groups[1].Value).ToImmutableArray();
-            documents[uri] = new DocumentIndex(uri, 1, [], [], [.. requires], LayerRank: 0);
-        }
-
-        var index = new FakeGameIndexService(GameIndex.Empty with
-        {
-            Documents = documents.ToImmutableDictionary(DocumentUris.Comparer)
-        });
-        var texts = new LuaGeneratedTexts([new StubOverrideAnnotations(schema)], fileHelper);
-        await using var instances = new LuaAnalyzerInstances(directory => new LuaAnalyzerHost(new LuaAnalyzerOptions
-            {
-                Command = binary, ConfigDirectory = directory, RequestTimeout = TimeSpan.FromSeconds(10)
-            }, NullLogger<LuaAnalyzerHost>.Instance), index, fileHelper, stubs, texts,
-            Path.Combine(work, "instances", "1"), NullLogger<LuaAnalyzerInstances>.Instance);
-        var analyzer = new GeneratedAnalyzerDocuments(instances, texts);
-        instances.Configure([new ProjectLayer(0, "Game", [], [scripts.ToLowerInvariant()], [], [], null)]);
-
-        var script = fileHelper.NormalizeUri(fileHelper.PathToFileUri(Path.Combine(scripts, "Gameobject",
-            "Interdictor.lua")));
+        await using var stack = VanillaScriptStack.Create(Interdictor);
+        var script = stack.UriOf(Interdictor);
         var reports = new ConcurrentQueue<(TimeSpan At, int Count)>();
         var clock = Stopwatch.StartNew();
-        analyzer.DiagnosticsPublished += p =>
+        stack.Analyzer.DiagnosticsPublished += p =>
         {
             if (DocumentUris.Same(p.Uri.ToString(), script)) reports.Enqueue((clock.Elapsed, p.Diagnostics.Count()));
         };
 
-        var original = await File.ReadAllTextAsync(fileHelper.FileUriToPath(script)!,
+        var original = await File.ReadAllTextAsync(stack.FileHelper.FileUriToPath(script)!,
             TestContext.Current.CancellationToken);
         var version = 1;
-        analyzer.DidOpen(script, original, version);
-        await UntilAsync(() => !reports.IsEmpty, TimeSpan.FromSeconds(30));
+        stack.Analyzer.DidOpen(script, original, version);
+        await VanillaScriptStack.UntilAsync(() => !reports.IsEmpty, TimeSpan.FromSeconds(30));
         Assert.NotEmpty(reports);
         await Task.Delay(1500, TestContext.Current.CancellationToken);
 
@@ -99,8 +48,8 @@ public sealed partial class RealEditSweepTest
             {
                 var before = reports.Count;
                 var sent = clock.Elapsed;
-                analyzer.DidChange(script, text, ++version);
-                await UntilAsync(() => reports.Count > before, TimeSpan.FromSeconds(4));
+                stack.Analyzer.DidChange(script, text, ++version);
+                await VanillaScriptStack.UntilAsync(() => reports.Count > before, TimeSpan.FromSeconds(4));
                 if (reports.Count == before)
                     silent.Add($"{what} at line {original[..quote].Count(c => c == '\n') + 1} (v{version})");
                 else
@@ -113,17 +62,6 @@ public sealed partial class RealEditSweepTest
             $"edit -> report, ms: min {latencies.FirstOrDefault():F0}, median " +
             $"{(latencies.Count == 0 ? 0 : latencies[latencies.Count / 2]):F0}, max {latencies.LastOrDefault():F0}");
         Assert.True(silent.Count == 0, "edits with no report within 4 s: " + string.Join("; ", silent));
-
-        // ReSharper disable once DisposeOnUsingVariable - stopped before the directory goes; the using covers the failure path
-        await instances.DisposeAsync();
-        try
-        {
-            Directory.Delete(work, true);
-        }
-        catch (IOException)
-        {
-            // released late; temp
-        }
     }
 
     // The same sweep, the analyzer alone: a copy of the script and its library as its workspace, the
@@ -131,13 +69,7 @@ public sealed partial class RealEditSweepTest
     [Fact]
     public async Task EveryStringBrokenInTurn_IsReported_ByTheAnalyzerAlone()
     {
-        var binary = Environment.GetEnvironmentVariable("AET_EMMYLUA_LS") ?? "";
-        if (!File.Exists(binary))
-            Assert.Skip("Set AET_EMMYLUA_LS to an emmylua_ls binary to run against the real analyzer.");
-        var scripts = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "eaw",
-            "Data", "Scripts"));
-        if (!Directory.Exists(scripts)) Assert.Skip("The vanilla EaW scripts are not at " + scripts);
-
+        var (binary, scripts) = VanillaScriptStack.Prerequisites();
         var work = Path.Combine(Path.GetTempPath(), "aet-emmylua-sweep-bare-" + Guid.NewGuid().ToString("N"));
         var root = Path.Combine(work, "root");
         Directory.CreateDirectory(Path.Combine(root, "Library"));
@@ -145,12 +77,12 @@ public sealed partial class RealEditSweepTest
         foreach (var path in Directory.GetFiles(Path.Combine(scripts, "Library"), "*.lua"))
             File.Copy(path, Path.Combine(root, "Library", Path.GetFileName(path)));
         var file = Path.Combine(root, "Gameobject", "Interdictor.lua");
-        File.Copy(Path.Combine(scripts, "Gameobject", "Interdictor.lua"), file);
+        File.Copy(Path.Combine(scripts, Interdictor), file);
         var stubDirectory = Path.Combine(AppContext.BaseDirectory, "schema", "lua");
         var library = Directory.GetFiles(stubDirectory, "*.d.lua")
             .Where(f => !Path.GetFileName(f).StartsWith("pg", StringComparison.OrdinalIgnoreCase)).ToList();
 
-        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.FromFileSystemPath(file);
+        var uri = DocumentUri.FromFileSystemPath(file);
         var reports = new ConcurrentQueue<int>();
         await using var host = new LuaAnalyzerHost(new LuaAnalyzerOptions
         {
@@ -165,7 +97,7 @@ public sealed partial class RealEditSweepTest
         var original = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
         var version = 1;
         host.DidOpen(uri.ToString(), original, version);
-        await UntilAsync(() => !reports.IsEmpty, TimeSpan.FromSeconds(30));
+        await VanillaScriptStack.UntilAsync(() => !reports.IsEmpty, TimeSpan.FromSeconds(30));
         Assert.NotEmpty(reports);
         await Task.Delay(1500, TestContext.Current.CancellationToken);
 
@@ -175,16 +107,26 @@ public sealed partial class RealEditSweepTest
         {
             var before = reports.Count;
             host.DidChange(uri.ToString(), text, ++version);
-            await UntilAsync(() => reports.Count > before, TimeSpan.FromSeconds(4));
+            await VanillaScriptStack.UntilAsync(() => reports.Count > before, TimeSpan.FromSeconds(4));
             if (reports.Count == before)
                 silent.Add($"{what} at line {original[..quote].Count(c => c == '\n') + 1} (v{version})");
         }
 
         Assert.True(silent.Count == 0, "edits with no report within 4 s: " + string.Join("; ", silent));
+        // ReSharper disable once DisposeOnUsingVariable - stopped before the directory goes; the using covers the failure path
+        await host.DisposeAsync();
+        try
+        {
+            Directory.Delete(work, true);
+        }
+        catch (IOException)
+        {
+            // released late; temp
+        }
     }
 
     // The offset of each string literal's closing quote outside comments, at most a dozen.
-    private static IEnumerable<int> ClosingQuotes(string text)
+    private static List<int> ClosingQuotes(string text)
     {
         return StringLiteral().Matches(text).Where(m => !InComment(text, m.Index))
             .Select(m => m.Index + m.Length - 1).Take(12).ToList();
@@ -195,15 +137,6 @@ public sealed partial class RealEditSweepTest
         var lineStart = text.LastIndexOf('\n', Math.Max(0, at - 1)) + 1;
         return text.AsSpan(lineStart, at - lineStart).Contains("--", StringComparison.Ordinal);
     }
-
-    private static async Task UntilAsync(Func<bool> done, TimeSpan limit)
-    {
-        var deadline = DateTime.UtcNow + limit;
-        while (!done() && DateTime.UtcNow < deadline) await Task.Delay(50, TestContext.Current.CancellationToken);
-    }
-
-    [GeneratedRegex("""require\s*\(?\s*"([^"]+)"\s*\)?""")]
-    private static partial Regex Require();
 
     [GeneratedRegex("\"[^\"\\n]*\"")]
     private static partial Regex StringLiteral();
