@@ -12,6 +12,7 @@ import type {
     SymbolKindCount,
     SymbolLayer,
     SymbolLocation,
+    SymbolOutline,
     SymbolRow,
 } from "../protocol/modBrowser";
 import type { IconName } from "./shared/Icon";
@@ -19,6 +20,17 @@ import type { IconName } from "./shared/Icon";
 const XML_PREFIX = "xml:";
 /** A Scripts outline list: the scripts in one folder under Data/Scripts. */
 const SCRIPTS_PREFIX = "scripts:";
+
+/**
+ * Whether a picked outline opens afresh. The one already shown keeps the browser as it was left:
+ * its lists, tabs and searches.
+ */
+export function opensOutline(
+    shown: SymbolOutline | null,
+    picked: SymbolOutline,
+): boolean {
+    return picked !== shown;
+}
 
 /** A list's name: the game objects' list by what it holds, every other XML type by its own name. */
 export function pageLabel(page: string): string {

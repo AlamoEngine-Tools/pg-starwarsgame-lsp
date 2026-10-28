@@ -54,6 +54,7 @@ import {
     kindChoices,
     listColumns,
     menuChoices,
+    opensOutline,
     originChoices,
     originLabel,
     pageIcon,
@@ -313,6 +314,8 @@ const shipNames = new Map<string, string | null>();
 
 function App(): React.JSX.Element {
     const [outline, setOutline] = useState<SymbolOutline | null>(null);
+    /** The outline shown, for the message handler, which outlives every render. */
+    const shownOutline = useRef<SymbolOutline | null>(null);
     const [summary, setSummary] = useState<GetSymbolOutlineResult | null>(null);
     /** What is selected - in the rail and, when it is one of its rows, in the table. */
     const [current, setCurrent] = useState<RailNode | null>(null);
@@ -373,7 +376,12 @@ function App(): React.JSX.Element {
                 type?: string;
                 outline?: SymbolOutline;
             };
-            if (msg.type === "outline" && msg.outline) {
+            if (
+                msg.type === "outline" &&
+                msg.outline &&
+                opensOutline(shownOutline.current, msg.outline)
+            ) {
+                shownOutline.current = msg.outline;
                 setOutline(msg.outline);
                 setCurrent(null);
                 setTableList(null);
