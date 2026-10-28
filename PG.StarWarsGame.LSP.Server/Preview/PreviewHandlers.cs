@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
+using PG.StarWarsGame.LSP.Server.Preview.Sections;
 using PG.StarWarsGame.LSP.Server.Icons;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
@@ -26,7 +27,7 @@ namespace PG.StarWarsGame.LSP.Server.Preview;
 ///         made the catalogue look incomplete: measured, it holds all 105.
 ///     </para>
 ///     <para>
-///         Resolution is <see cref="PreviewSceneBuilder.ProjectilesFor" />, the same reader the scene
+///         Resolution is <see cref="ProjectileSectionBuilder.ProjectilesFor" />, the same reader the scene
 ///         uses, so a projectile filled on demand and one that arrived with the scene cannot differ.
 ///     </para>
 /// </remarks>
@@ -49,7 +50,7 @@ public sealed class GetProjectileHandler(
         // for ONE projectile and the caller wants an answer about it, not a scene's problem list.
         var problems = new List<PreviewProblem>();
         var resolver = new EffectiveObjectResolver(indexService.Current, schema, tagSource);
-        var found = PreviewSceneBuilder.ProjectilesFor(resolver, [id], problems, messages)
+        var found = ProjectileSectionBuilder.ProjectilesFor(resolver, [id], problems, messages)
             .FirstOrDefault();
 
         return Task.FromResult(found is null

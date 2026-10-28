@@ -12,6 +12,9 @@ namespace PG.StarWarsGame.LSP.Server.Preview.Sections;
 /// </summary>
 public static class PreviewTagReader
 {
+    /// <summary>The three tags an object lists its behaviours under, as the engine's parser reads them.</summary>
+    public static readonly string[] BehaviorListTags = ["Behavior", "SpaceBehavior", "LandBehavior"];
+
     /// <summary>The first entry of a comma-separated list, or null when there is none.</summary>
     public static string? FirstToken(string? value)
     {

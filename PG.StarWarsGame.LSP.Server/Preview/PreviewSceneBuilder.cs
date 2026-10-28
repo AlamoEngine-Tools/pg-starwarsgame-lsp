@@ -88,48 +88,6 @@ public sealed class PreviewSceneBuilder(
     /// <summary>A full angle covers everything at 360; there is nothing past a whole turn.</summary>
     private const float FullTurnDegrees = 360f;
 
-    /// <summary>
-    ///     The animation-set overrides, land first.
-    /// </summary>
-    /// <remarks>
-    ///     Only the land tag appears in the shipped data - about 47 uses, all infantry and indigenous -
-    ///     but the space one is in the schema and in the engine's own parser, so a mod may well use it.
-    /// </remarks>
-    private static readonly string[] AnimationOverrideTags =
-        ["Land_Model_Anim_Override_Name", "Space_Model_Anim_Override_Name"];
-
-    private static readonly string[] ShieldBehaviorTags = ["Behavior", "SpaceBehavior", "LandBehavior"];
-
-    /// <summary>
-    ///     Every projectile the tree defines, resolved.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         The attacker panel picks from all of them, not from the handful this subject happens
-    ///         to fire - you are building a weapon to shoot AT the subject, so its own armament is
-    ///         the wrong list entirely.
-    ///     </para>
-    ///     <para>
-    ///         NAMES only. Resolving all 105 through the variant chain was measured at 830ms added
-    ///         to every scene open - a real cost for a list most readers scroll past - against about
-    ///         nothing for the behaviour scan that finds them. The values for the ones this subject
-    ///         actually fires are already on the wire; the rest are fetched when one is picked.
-    ///     </para>
-    /// </remarks>
-    /// <summary>
-    ///     The keys the builder derives things under, kept on the index snapshot (#311): the
-    ///     projectile catalogue, because finding it costs a parse of the whole workspace, and the
-    ///     factions, read once per snapshot rather than once per scene.
-    /// </summary>
-    /// <remarks>
-    ///     <c>TryGetTags</c> parses a document the first time anything asks about an object in it,
-    ///     so reading a behaviour off EVERY object pulls every XML file through the parser -
-    ///     measured at about 830ms on the eaw tree. Derived from the index instance, the cost is
-    ///     paid once rather than on every scene open. It should really move off the scene request
-    ///     altogether and onto one the panel makes when the attacker section first opens.
-    /// </remarks>
-    private const string ProjectileCatalogKey = "projectileCatalog";
-
     private static readonly string[] BehaviorTags = ["SpaceBehavior", "LandBehavior"];
 
     private static readonly string[] FireModeTags =
@@ -140,6 +98,9 @@ public sealed class PreviewSceneBuilder(
 
     private readonly IMessageCatalog _messages = messages;
     private readonly FactionSectionBuilder _factions = new(schema, tagSource);
+    private readonly ReticleSectionBuilder _reticles = new(tagSource, messages);
+    private readonly AnimationSectionBuilder _animations = new(messages);
+    private readonly ProjectileSectionBuilder _projectiles = new(tagSource, messages);
 
     /// <summary>
     ///     A scene for a single <c>.alo</c>, opened directly - a model or a particle system.
@@ -207,7 +168,7 @@ public sealed class PreviewSceneBuilder(
             assets.Tiers,
             null,
             particles,
-            AnimationsFor(index, modelReference),
+            AnimationSectionBuilder.AnimationsFor(index, modelReference),
             resolved ? CamerasOf(modelReference, problems) : [])
         {
             SourceFile = SourceFileOf(location)
@@ -376,7 +337,7 @@ public sealed class PreviewSceneBuilder(
         if (UnitWeapon(index, effective, hull, problems) is { } unitWeapon)
             weapons.Add(unitWeapon);
 
-        var animationSource = ResolveAnimationOverride(index, effective, hull, problems);
+        var animationSource = _animations.ResolveAnimationOverride(index, effective, hull, problems);
 
         // Read once: the scene carries it and the check below compares against it.
         var stages = DamageStages(effective);
@@ -396,7 +357,7 @@ public sealed class PreviewSceneBuilder(
             _factions.Factions(index), problems, assets.Tiers, animationSource, particles,
             // The clips are named after the model whose skeleton they were authored against, which
             // is the OVERRIDE when a unit borrows another model's set.
-            AnimationsFor(index, animationSource ?? hull ?? string.Empty),
+            AnimationSectionBuilder.AnimationsFor(index, animationSource ?? hull ?? string.Empty),
             // The HULL's cameras only. A turret carries its own skeleton and could in principle
             // declare one, but it was aimed at the turret, and the subject here is the whole unit.
             hull is null ? [] : CamerasOf(hull, problems),
@@ -404,19 +365,19 @@ public sealed class PreviewSceneBuilder(
             PreviewTagReader.CategoryTokens(effective.ValueOf("CategoryMask")),
             BreakoffProps(index, resolver, hardpoints, problems),
             weapons,
-            Reticles(index, hardpoints, problems),
-            Projectiles(resolver, weapons, problems),
+            _reticles.Reticles(index, hardpoints, problems),
+            _projectiles.Projectiles(resolver, weapons, problems),
             // NAMED from here on. The positional list is twenty arguments long and every optional
             // one is a list or a record, so inserting in the wrong slot type-checks against its
             // neighbour often enough to be dangerous - it did, once.
             Defence(index, effective, hardpoints),
             Abilities(effective, particles,
-                AnimationsFor(index, animationSource ?? hull ?? string.Empty), problems,
+                AnimationSectionBuilder.AnimationsFor(index, animationSource ?? hull ?? string.Empty), problems,
                 icons, index.Localisation),
             DeathClones(index, resolver, effective, problems),
             SpinAway(effective),
             effective.ValueOf("Death_Explosions"),
-            ProjectileCatalog(index),
+            _projectiles.ProjectileCatalog(index),
             // What it wears when no faction colour applies, which is most of the time - its own
             // colour first, and whose fallback to use when it declares none.
             PreviewTagReader.Colour(effective, "No_Colorization_Color"),
@@ -513,7 +474,7 @@ public sealed class PreviewSceneBuilder(
             // Its OWN model's clips and effects. Everything else on the wire describes the subject,
             // and a clone is a replacement for it rather than a piece of it.
             clones.Add(new PreviewDeathClone(PreviewTagReader.Blank(row[0]), row[1], model, playsIdle,
-                model is null ? [] : AnimationsFor(index, model),
+                model is null ? [] : AnimationSectionBuilder.AnimationsFor(index, model),
                 model is null ? [] : ProxiesOf(model, row[1], [], problems),
                 // The clone's OWN scale, read off the resolved clone - variants included - through
                 // the same reader the subject's scale uses.
@@ -704,187 +665,10 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static bool IsShielded(EffectiveObject effective)
     {
-        return ShieldBehaviorTags
+        return PreviewTagReader.BehaviorListTags
             .SelectMany(tag => (effective.ValueOf(tag) ?? string.Empty)
                 .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Any(token => token.Equals("SHIELDED", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private List<string> ProjectileCatalog(GameIndex index)
-    {
-        return index.Derived(ProjectileCatalogKey, BuildProjectileCatalog);
-    }
-
-    private List<string> BuildProjectileCatalog(GameIndex index)
-    {
-        // By BEHAVIOUR, which the user pointed at and which measurement then settled outright: over
-        // the eaw tree, `PROJECTILE` in a behaviour list appears on 0 non-projectiles, and following
-        // `Variant_Of_Existing_Type` from the objects that declare it reaches 102 of 102. Exact,
-        // both ways.
-        //
-        // Nothing else works. Every game object shares the one registered type - `GameObjectType`
-        // covers units, structures, props, planets and projectiles alike - and the best tag marker,
-        // `Projectile_Damage`, is on only 83% of projectiles and on 58 hardpoints besides.
-        var declared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var (id, _) in index.WorkspaceDefinitions)
-            if (DeclaresProjectileBehavior(index, id))
-                declared.Add(id);
-
-        // Then everything that VARIES one of them. Read off the symbol's own `VariantBaseId`, so no
-        // object has to be resolved to find out - 54 of foc's 173 projectiles are variants that
-        // restate nothing but their model and colour.
-        var ids = new SortedSet<string>(declared, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var (id, symbols) in index.WorkspaceDefinitions)
-        {
-            var at = symbols.FirstOrDefault()?.VariantBaseId;
-
-            // Bounded by the object count: a mod can write a variant cycle, and the preview reports
-            // one rather than being attached to it.
-            for (var hops = 0; !string.IsNullOrEmpty(at) && hops < 64; hops++)
-            {
-                if (declared.Contains(at))
-                {
-                    ids.Add(id);
-                    break;
-                }
-
-                at = index.Resolve(at)?.VariantBaseId;
-            }
-        }
-
-        return [.. ids];
-    }
-
-    /// <summary>
-    ///     The projectiles this subject's weapons name, one entry per DISTINCT projectile.
-    /// </summary>
-    /// <remarks>
-    ///     Only what this subject fires, not the 173 in the tree. Deduplicated because a ship's
-    ///     mirrored batteries fire the same bolt and a copy each would have the client build the
-    ///     same material twice.
-    /// </remarks>
-    private List<PreviewProjectile> Projectiles(
-        EffectiveObjectResolver resolver,
-        IReadOnlyList<PreviewWeapon> weapons,
-        List<PreviewProblem> problems)
-    {
-        return ProjectilesFor(
-            resolver,
-            weapons.Select(w => w.ProjectileType).Where(id => !string.IsNullOrEmpty(id))
-                .Select(id => id!),
-            problems,
-            _messages);
-    }
-
-    /// <summary>Whether an object's own behaviour lists name <c>PROJECTILE</c>.</summary>
-    /// <remarks>
-    ///     Read from the raw tag sources rather than through the resolver: this runs over every
-    ///     object in the workspace, and a variant chain per object would turn a dictionary scan into
-    ///     real work. Inheritance is handled separately, by walking the symbols' own base ids.
-    /// </remarks>
-    private bool DeclaresProjectileBehavior(GameIndex index, string objectId)
-    {
-        return ShieldBehaviorTags
-            .SelectMany(tagName => RepeatedTagReader.Values(index, tagSource, objectId, tagName))
-            .SelectMany(value => value.Split(
-                ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-            .Any(token => token.Equals("PROJECTILE", StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>Resolves a list of projectile ids, skipping repeats.</summary>
-    /// <remarks>
-    ///     Internal rather than private because <c>aet/getProjectile</c> resolves one on demand for
-    ///     the attacker panel, which offers the whole tree and not just what this subject fires. The
-    ///     twenty-odd tags below are the definition of what a projectile IS to the preview, and a
-    ///     second reader of them would be free to drift.
-    /// </remarks>
-    internal static List<PreviewProjectile> ProjectilesFor(
-        EffectiveObjectResolver resolver,
-        IEnumerable<string> ids,
-        List<PreviewProblem> problems,
-        IMessageCatalog messages)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var projectiles = new List<PreviewProjectile>();
-
-        foreach (var id in ids.Where(seen.Add))
-        {
-            var effective = resolver.Resolve(id);
-            if (!effective.Found)
-            {
-                problems.Add(new PreviewProblem(DiagnosticIds.PreviewProjectileNotDefined, "warning",
-                    messages.Format("PreviewScene_ProjectileNotDefinedThisProject", id)));
-                continue;
-            }
-
-            var model = effective.ValueOf("Space_Model_Name") ?? effective.ValueOf("Land_Model_Name");
-
-            projectiles.Add(new PreviewProjectile(
-                id,
-                effective.BoolOf("Projectile_Custom_Render")
-                    ? PreviewProjectileRender.CustomQuad
-                    : PreviewProjectileRender.Model,
-                model,
-                effective.FloatOf("Projectile_Width"),
-                effective.FloatOf("Projectile_Length"),
-                effective.ValueOf("Projectile_Texture_Slot"),
-                effective.ValueOf("Projectile_Laser_Color"),
-                effective.FloatOf("Max_Speed"),
-                effective.FloatOf("Projectile_Max_Flight_Distance"),
-                effective.FloatOf("Max_Rate_Of_Turn"),
-                effective.FloatOf("Projectile_Damage"),
-                effective.ValueOf("Damage_Type"),
-                effective.ValueOf("Projectile_Category"),
-                effective.BoolOf("Projectile_Does_Shield_Damage"),
-                effective.BoolOf("Projectile_Does_Energy_Damage"),
-                effective.BoolOf("Projectile_Does_Hitpoint_Damage"),
-                effective.FloatOf("Projectile_Blast_Area_Damage"),
-                effective.FloatOf("Projectile_Blast_Area_Range"),
-                effective.IntOf("Projectile_Blast_Area_Max_Victims"),
-                effective.BoolOf("Projectile_Blast_Area_Dropoff"),
-                effective.IntOf("Projectile_Blast_Area_Dropoff_Tiers"),
-                effective.ValueOf("Projectile_Object_Detonation_Particle"),
-                effective.ValueOf("Projectile_Absorbed_By_Shields_Particle"),
-                effective.ValueOf("Projectile_SFXEvent_Detonate")));
-        }
-
-        return projectiles;
-    }
-
-    /// <summary>
-    ///     The reticle art for the hardpoint types this subject actually mounts, without the images.
-    /// </summary>
-    /// <remarks>
-    ///     Only the types present, not all thirteen. The PNGs are attached later by
-    ///     <c>GetPreviewSceneHandler</c>, which is where the icon catalog lives - resolving them is
-    ///     asynchronous and this builder is not.
-    /// </remarks>
-    private PreviewReticles? Reticles(GameIndex index,
-        IReadOnlyList<PreviewHardpoint> hardpoints, List<PreviewProblem> problems)
-    {
-        var targetable = hardpoints
-            .Where(h => h.IsTargetable && !string.IsNullOrEmpty(h.Type))
-            .Select(h => h.Type!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (targetable.Count == 0)
-            return null;
-
-        var map = PreviewReticleMap.From(index, tagSource);
-        var byType = new Dictionary<string, PreviewReticleStates>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var type in targetable)
-            if (map.ForType(type) is { } states)
-                byType[type] = states;
-            else
-                problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoReticleForType, "info",
-                    _messages.Format("PreviewScene_NoReticle", type)));
-
-        return new PreviewReticles(byType, new Dictionary<string, string>(),
-            map.EnemyScreenSize, map.FriendlyScreenSize);
     }
 
     /// <summary>
@@ -938,37 +722,11 @@ public sealed class PreviewSceneBuilder(
                 effective.BoolOf("Remove_Upon_Death"),
                 // Its OWN model's, like a death clone's - a burning piece of debris trails its own
                 // fire, and `Debris_Attached_Particle` is a second, separate effect the XML names.
-                modelRef is null ? [] : AnimationsFor(index, modelRef),
+                modelRef is null ? [] : AnimationSectionBuilder.AnimationsFor(index, modelRef),
                 modelRef is null ? [] : ProxiesOf(modelRef, id, [], problems)));
         }
 
         return props;
-    }
-
-    /// <summary>
-    ///     The animations that belong to a model, by filename.
-    /// </summary>
-    /// <remarks>
-    ///     An <c>.ala</c> names no model, so the pairing is the filename: the clips sit beside their
-    ///     model under a <c>&lt;model&gt;_</c> prefix, which is the same rule
-    ///     <see cref="BuildForAnimation" /> uses in reverse. The separator matters -
-    ///     <c>Ei_bobafettish_wave.ala</c> is not Boba Fett's.
-    ///     Offered, not verified: each is checked against the skeleton when it is actually loaded,
-    ///     and 50 of the shipped animations sit beside a model they do not fit. Listing one that
-    ///     turns out not to match costs an entry in a picker; listing none at all - which is what
-    ///     happened while nothing could enumerate them - reads as a model with no animations.
-    ///     <para>
-    ///         The matching lives in <see cref="ModelAnimationClips" />, shared with the death animation
-    ///         diagnostic. The longest model name prefixing a clip owns it there: without that a hull
-    ///         collected its own death clone's clips - <c>rv_gargantuan_</c> prefixes
-    ///         <c>rv_gargantuan_dc_die_00</c> - and since a clip binds by INDEX and carries VISIBILITY tracks,
-    ///         the clone's clip switched off whichever hull bones sat at the indices its own skeleton hides.
-    ///         Two of the Gargantuan's turrets were mounted on those bones and went with them.
-    ///     </para>
-    /// </remarks>
-    private static IReadOnlyList<string> AnimationsFor(GameIndex index, string modelReference)
-    {
-        return ModelAnimationClips.For(index, PreviewModelReference.Normalise(modelReference));
     }
 
     /// <summary>
@@ -1024,51 +782,6 @@ public sealed class PreviewSceneBuilder(
                 _messages.Format("PreviewScene_CouldNotBeReadIts2", modelRef, e.Message)));
             return [];
         }
-    }
-
-    /// <summary>
-    ///     The model whose animations this object actually plays, or null when it uses its own.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         The override borrows another model's animation set. This used to insist the two
-    ///         skeletons be IDENTICAL and report a difference as a warning, on the reasoning that the
-    ///         engine could not otherwise bind the tracks. The user reported that the message fires
-    ///         all over the BASE GAME, on units that animate correctly in the engine - so the rule
-    ///         was simply wrong, and the clips are loaded and bound by index either way.
-    ///     </para>
-    ///     <para>
-    ///         It is still reported, as INFORMATION rather than a warning: where the two skeletons
-    ///         disagree about what a bone is called, the clip drives whatever sits at that index, and
-    ///         a reader watching a model move oddly deserves to know that is possible. What the exact
-    ///         engine rule is - the user's guess is that the animated bones need only share a tree -
-    ///         is not settled, and nothing here claims it is.
-    ///     </para>
-    /// </remarks>
-    private string? ResolveAnimationOverride(GameIndex index,
-        EffectiveObject effective, string? hull, List<PreviewProblem> problems)
-    {
-        var overrideModel = AnimationOverrideTags
-            .Select(tag => effective.ValueOf(tag))
-            .FirstOrDefault(value => value is not null);
-
-        if (overrideModel is null)
-            return null;
-
-        if (hull is null)
-            return overrideModel;
-
-        var hullBones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(hull));
-        var overrideBones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(overrideModel));
-
-        // Only compare when both are catalogued; an unknown model is already reported elsewhere.
-        if (!hullBones.IsDefaultOrEmpty && !overrideBones.IsDefaultOrEmpty
-                                        && !hullBones.SequenceEqual(overrideBones, StringComparer.OrdinalIgnoreCase))
-            problems.Add(new PreviewProblem(DiagnosticIds.PreviewAnimationSkeletonMismatch, "info",
-                _messages.Format("PreviewScene_AnimationSkeletonDiffers", effective.ObjectId, overrideModel, hull,
-                    overrideBones.Length, hullBones.Length)));
-
-        return overrideModel;
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────
