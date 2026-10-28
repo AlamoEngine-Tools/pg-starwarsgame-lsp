@@ -52,7 +52,8 @@ public sealed class FactionSectionBuilder(ISchemaProvider schema, IVariantTagSou
                      .Where(s => string.Equals(s.TypeName, FactionTypeName, StringComparison.OrdinalIgnoreCase))
                      .DistinctBy(s => s.Id, StringComparer.OrdinalIgnoreCase))
         {
-            var effective = resolver.Resolve(symbol.Id);
+            // By the symbol, not its id: the shipped game also names an indigenous unit Sarlacc.
+            var effective = resolver.Resolve(symbol);
             if (!effective.Found)
                 continue;
 

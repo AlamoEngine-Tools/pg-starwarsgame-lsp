@@ -113,6 +113,47 @@ public sealed class WorkspaceVariantTagSourceTest
     }
 
     /// <summary>
+    ///     Objects of different kinds may share a name - the shipped game has a Sarlacc faction and a
+    ///     Sarlacc indigenous unit - and the game keeps them apart. Asked by symbol, each reads its own
+    ///     document; asked by id alone, which of the two answered depended on which file the parallel
+    ///     scan happened to index first.
+    /// </summary>
+    [Fact]
+    public void TryGetTags_BySymbol_ReadsThatSymbolsOwnDocument_WhenAnotherObjectSharesItsName()
+    {
+        var (source, index, host, _) = Build();
+        const string units = "file:///c:/mod/units.xml";
+        const string factions = "file:///c:/mod/factions.xml";
+        host.AddOrUpdate(units,
+            """<Units><Indigenous_Unit Name="Sarlacc"><Tactical_Health>5</Tactical_Health></Indigenous_Unit></Units>""",
+            1);
+        host.AddOrUpdate(factions, """<Factions><Faction Name="Sarlacc"><Color>1, 2, 3</Color></Faction></Factions>""",
+            1);
+        index.Current = IndexWith(("Sarlacc", units, 1, 0), ("Sarlacc", factions, 1, 0));
+        var both = index.Current.WorkspaceDefinitions["Sarlacc"];
+
+        var unitTags = source.TryGetTags(both.Single(s => ((FileOrigin)s.Origin).Uri == units));
+        var factionTags = source.TryGetTags(both.Single(s => ((FileOrigin)s.Origin).Uri == factions));
+
+        Assert.Equal(["Tactical_Health"], unitTags!.Select(t => t.TagName));
+        Assert.Equal(["Color"], factionTags!.Select(t => t.TagName));
+    }
+
+    /// <summary>
+    ///     A symbol the workspace does not define is the baseline's to answer, even when it points at
+    ///     a file that could be read: by symbol as by id, the workspace source knows only its own.
+    /// </summary>
+    [Fact]
+    public void TryGetTags_BySymbol_IsNull_ForASymbolTheWorkspaceDoesNotDefine()
+    {
+        var (source, index, host, _) = Build();
+        host.AddOrUpdate(Uri, """<Units><SpaceUnit Name="Shipped"><Mass>5</Mass></SpaceUnit></Units>""", 1);
+        index.Current = IndexWith(("Other", Uri, 1, 0));
+
+        Assert.Null(source.TryGetTags(Symbol("Shipped", Uri)));
+    }
+
+    /// <summary>
     ///     A singleton object - GameConstants, AudioConstants - is keyed by its ROOT ELEMENT NAME,
     ///     because it carries no <c>Name</c> attribute to key on.
     /// </summary>

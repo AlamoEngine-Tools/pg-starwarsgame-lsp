@@ -281,6 +281,11 @@
 
 ### Fixes
 
+- **A faction keeps its colours in the model preview when a unit shares its name** - the shipped game names
+  a faction and an indigenous unit Sarlacc, and the preview read whichever of the two the index listed first,
+  which changed from start to start, and on some starts the Sarlacc swatch had no colours at
+  all. A faction now reads its own definition
+  ([#314](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/314))
 - **A game file a strict XML parser rejects keeps its facts** - the readers behind the dynamic enum values,
   the group memberships and the object kinds used a strict parser and dropped a whole file over a stray
   ampersand the game reads past; they now parse the way every other XML path does, and find an element

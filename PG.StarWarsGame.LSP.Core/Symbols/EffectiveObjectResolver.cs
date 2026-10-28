@@ -33,6 +33,16 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
             return new EffectiveObject(objectId, null, false, false, null,
                 ImmutableArray<string>.Empty, ImmutableArray<EffectiveTag>.Empty);
 
+        return Resolve(root);
+    }
+
+    /// <summary>
+    ///     The effective object of this very definition: its own tags, then its base chain by id. For
+    ///     a caller that already holds the symbol, because an id alone may name objects of different
+    ///     kinds - a faction and a unit both called Sarlacc.
+    /// </summary>
+    public EffectiveObject Resolve(GameSymbol root)
+    {
         var (chain, cyclic, cycleAt) = BuildChain(root);
 
         // Apply innermost base first so derived layers override; preserve first-seen tag order.
@@ -107,7 +117,7 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
 
     private IReadOnlyList<VariantTag> TagsFor(GameSymbol symbol)
     {
-        var workspace = _workspaceSource.TryGetTags(symbol.Id);
+        var workspace = _workspaceSource.TryGetTags(symbol);
         if (workspace is not null)
             return workspace;
 

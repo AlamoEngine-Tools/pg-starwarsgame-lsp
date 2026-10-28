@@ -68,6 +68,22 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatist
         return map?.GetValueOrDefault(objectId);
     }
 
+    /// <summary>
+    ///     The tags in the symbol's own document, whatever else shares its id. Null for a symbol the
+    ///     workspace does not define - a shipped one is the baseline's to answer, as by id.
+    /// </summary>
+    public IReadOnlyList<VariantTag>? TryGetTags(GameSymbol symbol)
+    {
+        var index = _indexService.Current;
+        if (symbol.Origin is not FileOrigin origin
+            || !index.WorkspaceDefinitions.TryGetValue(symbol.Id, out var defs)
+            || !defs.Contains(symbol))
+            return null;
+
+        var map = GetOrBuildDocumentMap(origin.Uri, index);
+        return map?.GetValueOrDefault(symbol.Id);
+    }
+
     private Dictionary<string, IReadOnlyList<VariantTag>>? GetOrBuildDocumentMap(string uri, GameIndex index)
     {
         var indexed = index.Documents.GetValueOrDefault(uri);

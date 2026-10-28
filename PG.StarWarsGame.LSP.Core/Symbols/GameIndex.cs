@@ -394,8 +394,10 @@ public sealed record GameIndex(
     public GameSymbol? Resolve(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)
-            // Highest project layer wins. OrderByDescending is stable, so a same-rank collision
-            // (a real duplicate) deterministically yields the first-inserted definition.
+            // Highest project layer wins. OrderByDescending is stable, so a same-rank collision yields
+            // the first-inserted definition - and the parallel scan decides which that is, so it is
+            // NOT stable across starts. Objects of different kinds may share an id legitimately (a
+            // faction and a unit both named Sarlacc); a caller that holds the symbol resolves by it.
             return ws.Length == 1 ? ws[0] : ws.OrderByDescending(LayerRankOf).First();
         return Baseline.Symbols.GetValueOrDefault(id);
     }

@@ -15,14 +15,29 @@ public sealed class FakeVariantTagSource : IVariantTagSource
     private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
         new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly Dictionary<GameSymbol, IReadOnlyList<VariantTag>> _bySymbol = [];
+
     public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
     {
         return _byId.GetValueOrDefault(objectId);
     }
 
+    /// <summary>The tags registered for this very symbol, else those registered for its id.</summary>
+    public IReadOnlyList<VariantTag>? TryGetTags(GameSymbol symbol)
+    {
+        return _bySymbol.GetValueOrDefault(symbol) ?? TryGetTags(symbol.Id);
+    }
+
     public FakeVariantTagSource With(string id, params VariantTag[] tags)
     {
         _byId[id] = tags;
+        return this;
+    }
+
+    /// <summary>Tags for one symbol only, for objects of different kinds that share an id.</summary>
+    public FakeVariantTagSource With(GameSymbol symbol, params VariantTag[] tags)
+    {
+        _bySymbol[symbol] = tags;
         return this;
     }
 }

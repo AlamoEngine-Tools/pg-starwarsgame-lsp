@@ -51,6 +51,31 @@ public sealed class FactionSectionBuilderTest
         Assert.Equal(new PreviewRgba(9, 9, 9, 255), factions[1].NoColorizationColor);
     }
 
+    /// <summary>
+    ///     The shipped game names a faction and an indigenous unit Sarlacc. The faction's colours are
+    ///     the faction's own tags, whichever of the two the index happens to list first - by id alone,
+    ///     some starts drew the faction with no colours at all.
+    /// </summary>
+    [Fact]
+    public void Factions_ReadTheFactionsOwnTags_WhenAnObjectOfAnotherKindSharesItsName()
+    {
+        var unit = At("Sarlacc", "Indigenous_Unit", "file:///groundindigenous.xml", 3513);
+        var faction = At("Sarlacc", "Faction", "file:///factions.xml", 1682);
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = ImmutableDictionary
+                .Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Sarlacc", [unit, faction])
+        };
+        var tags = new FakeVariantTagSource()
+            .With(unit, Tag("Tactical_Health", "5"))
+            .With(faction, Tag("Color", "153, 21, 223"));
+
+        var sarlacc = Assert.Single(new FactionSectionBuilder(new SchemaProviderBuilder().Build(), tags).Factions(index));
+
+        Assert.Equal(new PreviewRgba(153, 21, 223, 255), sarlacc.Color);
+    }
+
     [Fact]
     public void Factions_AreReadOncePerIndexSnapshot()
     {
