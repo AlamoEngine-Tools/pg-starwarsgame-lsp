@@ -98,7 +98,8 @@ public sealed class LuaRenameHandlerTest
             new FakeGameIndexService(),
             new ScriptedLuaAnalyzer(),
             new ProjectLayerMap(fileHelper),
-            TestCatalogues.English);
+            TestCatalogues.English,
+            new LuaStubLocation());
     }
 
     // ── Claims: what is ours to rename (#154) ────────────────────────────────

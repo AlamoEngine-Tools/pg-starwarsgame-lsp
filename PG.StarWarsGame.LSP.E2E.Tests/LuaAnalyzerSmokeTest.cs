@@ -69,7 +69,7 @@ public sealed class LuaAnalyzerSmokeTest
                !(offered.Type == JTokenType.Boolean && !offered.Value<bool>());
     }
 
-    private static string? FindAnalyzer(string repoRoot)
+    internal static string? FindAnalyzer(string repoRoot)
     {
         var configured = Environment.GetEnvironmentVariable("AET_EMMYLUA_LS");
         if (!string.IsNullOrEmpty(configured) && File.Exists(configured)) return configured;
@@ -78,7 +78,7 @@ public sealed class LuaAnalyzerSmokeTest
         return File.Exists(staged) ? staged : null;
     }
 
-    private static async Task<JToken?> PollAsync(Func<Task<JToken?>> request)
+    internal static async Task<JToken?> PollAsync(Func<Task<JToken?>> request)
     {
         var deadline = DateTime.UtcNow.AddSeconds(90);
         while (DateTime.UtcNow < deadline)

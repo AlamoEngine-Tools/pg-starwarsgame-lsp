@@ -30,8 +30,14 @@ internal static class LuaAnalyzerPassThrough
     /// </summary>
     public static bool IsUsage(string from, string uri, LuaSandbox sandbox, LuaStubLocation stubs)
     {
-        if (stubs.Directory is { } directory && IsUnder(uri, directory)) return false;
+        if (IsInStubs(uri, stubs)) return false;
         return sandbox.ShareAState(from, uri);
+    }
+
+    /// <summary>Whether <paramref name="uri" /> is one of the engine stubs.</summary>
+    public static bool IsInStubs(string uri, LuaStubLocation stubs)
+    {
+        return stubs.Directory is { } directory && IsUnder(uri, directory);
     }
 
     private static bool IsUnder(string uri, string directory)
