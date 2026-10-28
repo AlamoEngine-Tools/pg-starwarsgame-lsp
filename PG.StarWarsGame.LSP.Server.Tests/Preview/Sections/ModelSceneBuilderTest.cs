@@ -45,6 +45,7 @@ public sealed class ModelSceneBuilderTest
         var problem = Assert.Single(scene.Problems);
         Assert.Equal(DiagnosticIds.PreviewModelNotFound, problem.DiagnosticId);
         Assert.Equal("error", problem.Severity);
+        Assert.NotNull(scene.Cameras);
         Assert.Empty(scene.Cameras);
     }
 

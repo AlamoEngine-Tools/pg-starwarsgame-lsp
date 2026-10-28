@@ -16,6 +16,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
+using PG.StarWarsGame.LSP.Server.Indexing;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -58,15 +59,18 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var fileHelper = new FileHelper(fileSystem);
         var idx = index ?? new FakeGameIndexService();
         var schemaProvider = schema ?? new SchemaProviderBuilder().Build();
+        var registry = new FileTypeRegistry();
+        var context = new EaWXmlContext(fileHelper);
         var indexer = new WorkspaceIndexer(
             fileHelper,
             [],
             idx,
-            new FileTypeRegistry(),
+            registry,
             schemaProvider,
-            new EaWXmlContext(fileHelper),
+            context,
             new NullProjectIndexCache(),
-            new StoryChainProblemStore(),
+            new MetafileRegistrar(fileHelper, registry, schemaProvider, context, new StoryChainProblemStore(),
+                NullLogger<MetafileRegistrar>.Instance),
             new FakeLspConfigurationProvider(),
             NoMegEntries.Instance,
             new MegArchiveLoadOrder(fileHelper),

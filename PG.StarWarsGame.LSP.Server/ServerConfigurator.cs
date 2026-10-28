@@ -46,6 +46,7 @@ using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Debug;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Icons;
+using PG.StarWarsGame.LSP.Server.Indexing;
 using PG.StarWarsGame.LSP.Server.ModBrowser;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -341,6 +342,7 @@ public static class ServerConfigurator
                 services.AddSingleton<ICrossProcessLock, NamedMutexLock>();
                 services.AddSingleton<IProjectIndexCache, ProjectIndexCache>();
                 services.AddSingleton<IModelBoneCatalogCache, ModelBoneCatalogCache>();
+                services.AddSingleton<MetafileRegistrar>();
                 services.AddSingleton<WorkspaceIndexer>();
                 services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 
