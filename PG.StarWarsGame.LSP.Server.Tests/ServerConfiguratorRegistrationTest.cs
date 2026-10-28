@@ -8,6 +8,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.Files.MEG.Services;
 using PG.StarWarsGame.Files.MTD.Services;
+using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Preview;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Preview;

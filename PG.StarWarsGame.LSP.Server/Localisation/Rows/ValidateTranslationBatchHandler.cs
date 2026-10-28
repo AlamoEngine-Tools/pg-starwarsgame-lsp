@@ -5,6 +5,7 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.Commons.Hashing;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 

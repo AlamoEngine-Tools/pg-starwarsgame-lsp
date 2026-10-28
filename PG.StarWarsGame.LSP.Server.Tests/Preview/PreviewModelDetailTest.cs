@@ -4,6 +4,7 @@
 using System.Numerics;
 using Newtonsoft.Json.Linq;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Preview;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;

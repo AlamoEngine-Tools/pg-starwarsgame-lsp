@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import * as l10n from "@vscode/l10n";
-// The localisation editor's wire contract. Mirrors the records under
-// PG.StarWarsGame.LSP.Server/Localisation - see ../protocol/README.md for why this is declared
-// exactly once.
+// The localisation editor's wire contract. Mirrors the records under PG.StarWarsGame.LSP.Localisation
+// and the request records under PG.StarWarsGame.LSP.Server/Localisation - see ../protocol/README.md
+// for why this is declared exactly once.
 
 /**
  * What kind of localisation file this is. Mirrors `LocCategory` in CreditsFileClassifier.cs.

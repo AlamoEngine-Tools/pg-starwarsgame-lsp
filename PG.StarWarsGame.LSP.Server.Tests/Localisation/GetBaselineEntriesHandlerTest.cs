@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Services;

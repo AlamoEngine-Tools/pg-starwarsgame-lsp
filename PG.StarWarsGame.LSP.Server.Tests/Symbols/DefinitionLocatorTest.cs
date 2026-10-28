@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Preview.Abilities;
 using PG.StarWarsGame.LSP.Server.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Symbols;

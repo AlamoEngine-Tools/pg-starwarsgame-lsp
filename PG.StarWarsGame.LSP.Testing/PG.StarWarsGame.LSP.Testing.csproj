@@ -12,6 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Assets\PG.StarWarsGame.LSP.Assets.csproj"/>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Core\PG.StarWarsGame.LSP.Core.csproj"/>
     </ItemGroup>
 

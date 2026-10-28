@@ -4,6 +4,7 @@
 using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 

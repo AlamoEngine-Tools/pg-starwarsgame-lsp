@@ -5,6 +5,7 @@ using JetBrains.Annotations;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
