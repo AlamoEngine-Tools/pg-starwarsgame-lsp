@@ -5,14 +5,13 @@ using System.IO.Abstractions;
 using System.Text;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Localisation;
 
 public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
 {
-    private const string XmlNs = "urn:alamoenginetools:localisation:v1";
-
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LocalisationEntryWriter> _logger;
 
@@ -146,24 +145,25 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
         var content = await fs.File.ReadAllTextAsync(filePath, ct);
         if (!TryParseXml(content, out var xdoc)) return false;
 
-        var ns = XNamespace.Get(XmlNs);
         var root = xdoc!.Root;
         if (root is null) return false;
 
-        var translationData = new XElement(ns + "TranslationData");
+        var translationData = new XElement(XmlTranslationFormat.TranslationData);
         if (translations is not null)
             foreach (var (lang, value) in translations)
-                translationData.Add(new XElement(ns + "Translation", new XAttribute("Language", lang), value));
+                translationData.Add(new XElement(XmlTranslationFormat.Translation,
+                    new XAttribute(XmlTranslationFormat.Language, lang), value));
 
         var existing = FindXmlElement(xdoc, key);
         if (existing is not null)
         {
-            existing.Element(ns + "TranslationData")?.Remove();
+            existing.Element(XmlTranslationFormat.TranslationData)?.Remove();
             existing.Add(translationData);
         }
         else
         {
-            root.Add(new XElement(ns + "Localisation", new XAttribute("key", key), translationData));
+            root.Add(new XElement(XmlTranslationFormat.Localisation, new XAttribute(XmlTranslationFormat.Key, key),
+                translationData));
         }
 
         await SaveXmlAsync(fs, filePath, xdoc, ct);
@@ -172,8 +172,8 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
 
     private static XElement? FindXmlElement(XDocument xdoc, string key)
     {
-        var ns = XNamespace.Get(XmlNs);
-        return xdoc.Root?.Elements(ns + "Localisation").FirstOrDefault(e => e.Attribute("key")?.Value == key);
+        return xdoc.Root?.Elements(XmlTranslationFormat.Localisation)
+            .FirstOrDefault(e => e.Attribute(XmlTranslationFormat.Key)?.Value == key);
     }
 
     private bool TryParseXml(string content, out XDocument? xdoc)

@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.Files.DAT.Services;
-using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
@@ -21,8 +20,8 @@ using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Server.Commands;
-using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Commands;
@@ -293,7 +292,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
 
         var xdoc = XDocument.Parse(mockFs.File.ReadAllText("/mod/data/text2/mastertextfile.xml"));
         Assert.Contains(xdoc.Root!.Elements(), e =>
-            e.Attribute("key")?.Value == "TEXT_CONVERTED");
+            e.Attribute("Key")?.Value == "TEXT_CONVERTED");
     }
 
     [Fact]
@@ -393,7 +392,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
 
         var xdoc = XDocument.Parse(mockFs.File.ReadAllText("/mod/data/text2/mastertextfile.xml"));
-        var keys = xdoc.Root!.Elements().Select(e => e.Attribute("key")?.Value).ToList();
+        var keys = xdoc.Root!.Elements().Select(e => e.Attribute("Key")?.Value).ToList();
         Assert.Contains("TEXT_A", keys);
         Assert.Contains("TEXT_B", keys);
     }

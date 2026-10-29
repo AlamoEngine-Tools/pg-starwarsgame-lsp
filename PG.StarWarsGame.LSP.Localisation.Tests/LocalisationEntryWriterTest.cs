@@ -5,14 +5,11 @@ using System.IO.Abstractions.TestingHelpers;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Localisation;
 
 namespace PG.StarWarsGame.LSP.Localisation.Tests;
 
 public sealed class LocalisationEntryWriterTest
 {
-    private const string XmlNs = "urn:alamoenginetools:localisation:v1";
-
     // ── ExistsAsync ──────────────────────────────────────────────────────────
 
     [Theory]
@@ -91,10 +88,10 @@ public sealed class LocalisationEntryWriterTest
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var entries = xdoc.Root!.Elements(ns + "Localisation").ToList();
         Assert.Equal(2, entries.Count);
-        var newEntry = entries.Single(e => e.Attribute("key")?.Value == "TEXT_B");
+        var newEntry = entries.Single(e => e.Attribute("Key")?.Value == "TEXT_B");
         Assert.Equal("World", newEntry.Descendants(ns + "Translation").First().Value);
     }
 
@@ -139,7 +136,7 @@ public sealed class LocalisationEntryWriterTest
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var entries = xdoc.Root!.Elements(ns + "Localisation").ToList();
         Assert.Single(entries);
         Assert.Equal("New", entries[0].Descendants(ns + "Translation").First().Value);
@@ -153,11 +150,11 @@ public sealed class LocalisationEntryWriterTest
 
     private static string BuildXml(params (string Key, string Lang, string Value)[] entries)
     {
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var root = new XElement(ns + "LocalisationData");
         foreach (var (key, lang, value) in entries)
             root.Add(new XElement(ns + "Localisation",
-                new XAttribute("key", key),
+                new XAttribute("Key", key),
                 new XElement(ns + "TranslationData",
                     new XElement(ns + "Translation", new XAttribute("Language", lang), value))));
         return new XDocument(root).ToString();

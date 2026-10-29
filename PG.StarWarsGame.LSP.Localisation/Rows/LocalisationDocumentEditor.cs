@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Text;
 using System.Globalization;
 using System.Text;
 using System.Xml;
@@ -11,7 +10,9 @@ using CsvHelper.Configuration;
 using PG.Commons.Hashing;
 using PG.StarWarsGame.Files.DAT.Data;
 using PG.StarWarsGame.Files.DAT.Services;
+using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.LSP.Core.Messages;
+using PG.StarWarsGame.LSP.Core.Text;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Localisation.Rows;
@@ -19,8 +20,6 @@ namespace PG.StarWarsGame.LSP.Localisation.Rows;
 /// <inheritdoc />
 public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 {
-    private const string XmlNs = "urn:alamoenginetools:localisation:v1";
-
     private readonly IDatService _datFileService;
     private readonly IFileHelper _fileHelper;
     private readonly ICrc32HashingService _hashing;
@@ -373,11 +372,10 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             return LocalisationEditResult.Fail(0, _messages.Format("LocEditor_FailedParseFile", ex.Message));
         }
 
-        var ns = XNamespace.Get(XmlNs);
-        var rows = document.Root?.Elements(ns + "Localisation").ToList() ?? [];
+        var rows = document.Root?.Elements(XmlTranslationFormat.Localisation).ToList() ?? [];
 
         for (var i = 0; i < commands.Count; i++)
-            if (ApplyXmlCommand(commands[i], rows, ns) is { } error)
+            if (ApplyXmlCommand(commands[i], rows) is { } error)
                 return LocalisationEditResult.Fail(i, error);
 
         var lineEnding = LineEndings.Detect(text);
@@ -442,7 +440,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             last.AddAfterSelf(translation);
     }
 
-    private string? ApplyXmlCommand(LocEditCommandDto command, List<XElement> rows, XNamespace ns)
+    private string? ApplyXmlCommand(LocEditCommandDto command, List<XElement> rows)
     {
         if (command.Kind == "addLanguage")
             return string.IsNullOrWhiteSpace(command.Language)
@@ -454,7 +452,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
         var element = rows[index];
         if (command.ExpectedKey is { } expected
-            && !string.Equals(element.Attribute("key")?.Value, expected, StringComparison.Ordinal))
+            && !string.Equals(element.Attribute(XmlTranslationFormat.Key)?.Value, expected, StringComparison.Ordinal))
             return _messages.Format("LocEditor_RowNoLongerReloadBefore", index, expected);
 
         switch (command.Kind)
@@ -462,17 +460,18 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             case "setCell":
                 if (string.IsNullOrWhiteSpace(command.Language)) return _messages.Format("LocEditor_NoLanguageGiven");
 
-                var data = element.Elements(ns + "TranslationData").FirstOrDefault();
+                var data = element.Elements(XmlTranslationFormat.TranslationData).FirstOrDefault();
                 if (data is null)
                 {
-                    data = new XElement(ns + "TranslationData");
+                    data = new XElement(XmlTranslationFormat.TranslationData);
                     element.Add(data);
                 }
 
                 var translation = data
-                    .Elements(ns + "Translation")
+                    .Elements(XmlTranslationFormat.Translation)
                     .FirstOrDefault(e => string.Equals(
-                        e.Attribute("Language")?.Value, command.Language, StringComparison.OrdinalIgnoreCase));
+                        e.Attribute(XmlTranslationFormat.Language)?.Value, command.Language,
+                        StringComparison.OrdinalIgnoreCase));
 
                 // A language exists in this format only where a value does - there is no column list
                 // to extend, which is why addLanguage has nothing to do here. So writing a value for
@@ -480,8 +479,8 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
                 // Refusing instead meant every write to a newly added language failed on save.
                 if (translation is null)
                 {
-                    translation = new XElement(ns + "Translation",
-                        new XAttribute("Language", command.Language));
+                    translation = new XElement(XmlTranslationFormat.Translation,
+                        new XAttribute(XmlTranslationFormat.Language, command.Language));
                     AppendTranslation(data, translation);
                 }
 
@@ -489,7 +488,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
                 return null;
 
             case "setKey":
-                element.SetAttributeValue("key", command.Key ?? string.Empty);
+                element.SetAttributeValue(XmlTranslationFormat.Key, command.Key ?? string.Empty);
                 return null;
 
             case "deleteRow":

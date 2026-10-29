@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.Files.DAT.Services;
-using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Dat;
@@ -18,7 +17,6 @@ using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Localisation.Tests;
 
@@ -27,6 +25,8 @@ public sealed class LocalisationLoaderTest
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private const string BilingualCsvPath = "/mod/text/my_text.csv";
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
     // ── LocalisationConfig defaults ──────────────────────────────────────────
 
     [Fact]
@@ -327,7 +327,36 @@ public sealed class LocalisationLoaderTest
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_DEP_KEY"));
     }
 
-    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+    // ── XML resource type ─────────────────────────────────────────────────────
+
+    // The format the EaW text editor writes, and the one its schema describes: no namespace, a
+    // capital Key, every translation of a key in one TranslationData.
+    [Fact]
+    public async Task LoadAsync_XmlResourceType_TheTextEditorsFile_Loads()
+    {
+        const string xml = """
+                           <?xml version="1.0"?>
+                           <LocalisationData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                             <Localisation Key="TEXT_HOTH">
+                               <TranslationData>
+                                 <Translation Language="GERMAN"><![CDATA[Angriff auf Hoth]]></Translation>
+                                 <Translation Language="ENGLISH"><![CDATA[Assault on Hoth]]></Translation>
+                               </TranslationData>
+                             </Localisation>
+                           </LocalisationData>
+                           """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/TranslationManifest.xml"] = new(xml)
+        });
+        var config = new LspConfiguration { Localisation = new LocalisationConfig { ResourceType = "Xml" } };
+
+        var (loader, indexService, _, _) = BuildLoader(fs, config);
+        await loader.LoadAsync(new WorkspaceConfiguration([], [], ["/mod/data/text"], [], "Xml"),
+            CancellationToken.None);
+
+        Assert.Equal("Assault on Hoth", indexService.Current.Localisation.GetValue("TEXT_HOTH"));
+    }
 
     // Every shape (#280): every layer's text is loaded through its lower-cased text root, and the
     // highest layer's translation of a shared key wins.
