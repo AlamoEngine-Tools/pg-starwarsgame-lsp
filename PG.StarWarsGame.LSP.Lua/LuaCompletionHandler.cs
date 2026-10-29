@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Loretta.CodeAnalysis;
+using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -44,27 +46,40 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
     public override async Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
-        var ours = await HandleOurs(request);
-        if (!request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+        var (ours, alone) = HandleOurs(request);
+        if (alone || !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
 
         var theirs = await _analyzer.RequestAsync<CompletionList>("textDocument/completion", request, ct);
         return LuaAnalyzerAnswers.MergeCompletion(ours, theirs);
     }
 
-    private Task<CompletionList> HandleOurs(CompletionParams request)
+    // Alone: an argument naming a game reference, before its quotes - a string, so none of the
+    // analyzer's functions, keywords or other variables belong there.
+    private (CompletionList List, bool Alone) HandleOurs(CompletionParams request)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-            return Task.FromResult(new CompletionList());
+            return (new CompletionList(), false);
 
         var parsed = _parseCache.GetOrParse(uri);
         if (parsed is null)
-            return Task.FromResult(new CompletionList());
+            return (new CompletionList(), false);
 
         var ctx = LuaCompletionContextClassifier.Classify(parsed.Text, request.Position.Line,
             request.Position.Character);
-        return Task.FromResult(BuildCompletions(ctx, uri, _indexService.Current));
+        if (ctx is { Quoted: false })
+        {
+            var lines = parsed.Tree.GetText().Lines;
+            if (request.Position.Line >= lines.Count) return (new CompletionList(), false);
+            var position = Math.Min(lines[request.Position.Line].Start + request.Position.Character,
+                lines[request.Position.Line].End);
+            return BuildUnquoted(ctx, parsed.Tree, position, _indexService.Current) is { } unquoted
+                ? (unquoted, true)
+                : (new CompletionList(), false);
+        }
+
+        return (BuildCompletions(ctx, uri, _indexService.Current), false);
     }
 
     public override async Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
@@ -87,7 +102,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         };
     }
 
-    private CompletionList BuildCompletions(StringArgContext? ctx, string uri, GameIndex index)
+    private CompletionList BuildCompletions(ArgumentContext? ctx, string uri, GameIndex index)
     {
         switch (ctx)
         {
@@ -100,35 +115,72 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
             case { FunctionName: var fn, ParamIndex: var param }:
             {
-                var xmlRefs = _schemaProvider.GetXmlRefs(fn);
-                if (xmlRefs.Count == 0) return new CompletionList();
-
-                XmlRefEntry? refEntry = null;
-                foreach (var r in xmlRefs)
-                    if (r.ParamIndex == param)
-                    {
-                        refEntry = r;
-                        break;
-                    }
-
-                if (refEntry is null) return new CompletionList();
-
-                _logger.LogDebug("Lua completion: {Function} param {Index} -> {Kind} {Type}",
-                    fn, param, refEntry.Value.Kind, refEntry.Value.ExpectedTypeName ?? "*");
-
-                return refEntry.Value.Kind switch
+                if (ReferenceAt(fn, param) is not { } refEntry) return new CompletionList();
+                return new CompletionList(LiteralCompletions(refEntry).Concat(refEntry.Kind switch
                 {
-                    ReferenceKind.XmlObject => new CompletionList(
-                        BuildXmlRefCompletions(index, refEntry.Value.ExpectedTypeName)),
-                    ReferenceKind.LocalisationKey => new CompletionList(BuildTextKeyCompletions(index)),
-                    _ => new CompletionList()
-                };
+                    ReferenceKind.XmlObject => BuildXmlRefCompletions(index, refEntry.ExpectedTypeName),
+                    ReferenceKind.LocalisationKey => BuildTextKeyCompletions(index),
+                    _ => []
+                }));
             }
 
             // Identifiers, members and keywords are the analyzer's (#155).
             default:
                 return new CompletionList();
         }
+    }
+
+    // The reference a function's parameter takes, from its @aetref.
+    private XmlRefEntry? ReferenceAt(string function, int param)
+    {
+        foreach (var r in _schemaProvider.GetXmlRefs(function))
+            if (r.ParamIndex == param)
+            {
+                _logger.LogDebug("Lua completion: {Function} param {Index} -> {Kind} {Type}",
+                    function, param, r.Kind, r.ExpectedTypeName ?? "*");
+                return r;
+            }
+
+        return null;
+    }
+
+    // Before the quotes: every value the argument takes, written as the string it is, and the
+    // variables only ever holding one. Null where the argument takes no reference.
+    private CompletionList? BuildUnquoted(ArgumentContext ctx, SyntaxTree tree, int position,
+        GameIndex index)
+    {
+        if (ReferenceAt(ctx.FunctionName, ctx.ParamIndex) is not { } refEntry ||
+            refEntry.Kind is not (ReferenceKind.XmlObject or ReferenceKind.LocalisationKey))
+            return null;
+
+        var values = LiteralCompletions(refEntry).Concat(refEntry.Kind == ReferenceKind.XmlObject
+            ? BuildXmlRefCompletions(index, refEntry.ExpectedTypeName)
+            : BuildTextKeyCompletions(index)).ToList();
+        var taken = values.Select(v => v.Label).ToHashSet(StringComparer.Ordinal);
+
+        var quoted = values.Select(v => v with
+        {
+            Label = $"\"{v.Label}\"", InsertText = $"\"{v.Label}\"", FilterText = v.Label
+        });
+        var variables = LuaStringVariables.Holding(tree, position, taken.Contains).Select(name =>
+            new CompletionItem
+            {
+                Label = name,
+                Kind = CompletionItemKind.Variable,
+                Detail = refEntry.ExpectedTypeName ?? refEntry.Kind.ToString()
+            });
+        return new CompletionList(variables.Concat(quoted));
+    }
+
+    // The literals the parameter's declared type names, such as "local": values the engine takes
+    // as they are.
+    private static IEnumerable<CompletionItem> LiteralCompletions(XmlRefEntry refEntry)
+    {
+        return (refEntry.Literals ?? []).Select(literal => new CompletionItem
+        {
+            Label = literal,
+            Kind = CompletionItemKind.EnumMember
+        });
     }
 
     // The states the script registers, where its state machine library keeps the game's contract.
@@ -140,7 +192,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
         var states = LuaStateMachine.Read(parsed.Tree.GetRoot()).Registrations
             .Where(r => r.Source == LuaStateSource.DEFINE_STATE || contract.StoryMode)
-            .Select(r => (r.Name, Detail: (r.Value as Loretta.CodeAnalysis.Lua.Syntax.IdentifierNameSyntax)?.Name))
+            .Select(r => (r.Name, Detail: (r.Value as IdentifierNameSyntax)?.Name))
             .ToList();
         if (contract.StoryMode) states.Insert(0, (LuaStateMachine.StoryInitState, null));
         return states.DistinctBy(s => s.Name).Select(s => new CompletionItem

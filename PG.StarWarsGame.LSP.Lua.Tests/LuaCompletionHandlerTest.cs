@@ -6,11 +6,9 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -26,6 +24,18 @@ public sealed class LuaCompletionHandlerTest
 
     private static readonly string[] EngineStub =
         ["---@param objectName string\n---@aetref XmlObject:Unit\nfunction Find_First_Object(objectName) end"];
+
+    // ── gating ────────────────────────────────────────────────────────────────
+
+    // ── a reference argument before its quotes (LUA-03/07) ──────────────────────
+
+    // The engine takes the faction's name as a string: "local" from the declared type, the
+    // factions from the index, each written with its quotes.
+    private static readonly string[] FactionStub =
+    [
+        "---@param faction_name string|\"local\"\n---@aetref XmlObject:Faction\nfunction Find_Player(faction_name) end",
+        "---@param textId string\n---@aetref LocalisationKey\nfunction Game_Message(textId) end"
+    ];
 
     private static CompletionParams CompletionAt(int line, int character, string uri = LuaUri)
     {
@@ -88,7 +98,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
         var host = new FakeGameWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
-        return BuildHandler(index, new LuaApiSchemaProvider(EngineStub), host, analyzer: analyzer);
+        return BuildHandler(index, new LuaApiSchemaProvider(EngineStub), host, analyzer);
     }
 
     private static CompletionList TheirList(params CompletionItem[] items)
@@ -165,7 +175,112 @@ public sealed class LuaCompletionHandlerTest
         Assert.Contains(result.Items, i => i.Label == "UNIT_A");
     }
 
-    // ── gating ────────────────────────────────────────────────────────────────
+    private static LuaCompletionHandler ForFactions(string text, ScriptedLuaAnalyzer? analyzer = null)
+    {
+        GameSymbol Symbol(string id, string type)
+        {
+            return new GameSymbol(id, GameSymbolKind.XmlObject, type, new FileOrigin("file:///x.xml", 0, null), null);
+        }
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("EMPIRE", [Symbol("EMPIRE", "Faction")])
+                .Add("REBEL", [Symbol("REBEL", "Faction")])
+                .Add("UNIT_A", [Symbol("UNIT_A", "Unit")]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty)
+        {
+            Localisation = new StubLocalisationIndex(("TEXT_HELLO", "Hello"))
+        };
+        var host = new FakeGameWorkspaceHost();
+        host.AddOrUpdate(LuaUri, text, 1);
+        return BuildHandler(index, new LuaApiSchemaProvider(FactionStub), host, analyzer);
+    }
+
+    private static async Task<CompletionList> CompleteAtEnd(string text, ScriptedLuaAnalyzer? analyzer = null)
+    {
+        var lines = text.Split('\n');
+        var marker = Array.FindIndex(lines, l => l.Contains('|'));
+        var column = lines[marker].IndexOf('|');
+        return await ForFactions(text.Replace("|", ""), analyzer)
+            .Handle(CompletionAt(marker, column), CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task AReferenceArgument_BeforeItsQuotes_OffersTheQuotedValues()
+    {
+        var result = await CompleteAtEnd("local p = Find_Player(|)");
+
+        Assert.Equal(["\"EMPIRE\"", "\"local\"", "\"REBEL\""], result.Items.Select(i => i.InsertText).Order());
+        Assert.Equal(["EMPIRE", "local", "REBEL"], result.Items.Select(i => i.FilterText).Order());
+    }
+
+    // The analyzer offers every function and variable in reach there (measured, 0.25.1): the
+    // argument is a string, so they are not offered.
+    [Fact]
+    public async Task AReferenceArgument_BeforeItsQuotes_IsOursAlone()
+    {
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/completion", TheirList(
+            new CompletionItem { Label = "Cancel_Interdiction", Kind = CompletionItemKind.Function },
+            new CompletionItem { Label = "\"local\"", Kind = CompletionItemKind.EnumMember }));
+
+        var result = await CompleteAtEnd("local p = Find_Player(Can|)", analyzer);
+
+        Assert.DoesNotContain(result.Items, i => i.Label == "Cancel_Interdiction");
+        Assert.Single(result.Items, i => i.InsertText == "\"local\"");
+    }
+
+    // A variable is offered where every value assigned to it is a string the argument takes.
+    [Fact]
+    public async Task AReferenceArgument_OffersTheVariablesHoldingAValueItTakes()
+    {
+        var result = await CompleteAtEnd("""
+                                         local faction = "EMPIRE"
+                                         local count = 3
+                                         local mixed = "EMPIRE"
+                                         mixed = 3
+                                         unknown = "NOBODY"
+                                         pirates = "local"
+                                         function Elsewhere()
+                                           local hidden = "REBEL"
+                                         end
+                                         function Here()
+                                           local mine = "REBEL"
+                                           local p = Find_Player(|)
+                                         end
+                                         """);
+
+        Assert.Equal(["faction", "mine", "pirates"],
+            result.Items.Where(i => i.Kind == CompletionItemKind.Variable).Select(i => i.Label).Order());
+    }
+
+    [Fact]
+    public async Task ATextKeyArgument_BeforeItsQuotes_OffersTheQuotedKeys()
+    {
+        var result = await CompleteAtEnd("Game_Message(|)");
+
+        Assert.Equal(["\"TEXT_HELLO\""], result.Items.Select(i => i.InsertText));
+    }
+
+    [Fact]
+    public async Task AReferenceArgument_InsideItsQuotes_OffersTheDeclaredLiterals()
+    {
+        var result = await CompleteAtEnd("Find_Player(\"|\")");
+
+        Assert.Equal(["EMPIRE", "local", "REBEL"], result.Items.Select(i => i.Label).Order());
+    }
+
+    // A declaration's parameter list is no call.
+    [Fact]
+    public async Task AFunctionDeclaredUnderTheName_IsNoReferenceArgument()
+    {
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/completion", TheirList(
+            new CompletionItem { Label = "faction_name", Kind = CompletionItemKind.Variable }));
+
+        var result = await CompleteAtEnd("function Find_Player(|)", analyzer);
+
+        Assert.Equal(["faction_name"], result.Items.Select(i => i.Label));
+    }
 
     [Fact]
     public async Task Handle_NonLuaFile_ReturnsEmpty()

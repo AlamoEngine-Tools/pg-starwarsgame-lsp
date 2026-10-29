@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Lua.Tests.Completion;
 
 public sealed class LuaCompletionContextClassifierTest
 {
-    private static StringArgContext? Classify(string text, int line = 0, int character = -1)
+    private static ArgumentContext? Classify(string text, int line = 0, int character = -1)
     {
         var lines = text.Split('\n');
         var col = character < 0 ? line < lines.Length ? lines[line].TrimEnd('\r').Length : 0 : character;
@@ -22,9 +22,10 @@ public sealed class LuaCompletionContextClassifierTest
         // cursor is just past the opening quote: require("|)
         const string text = "require(\"";
         var ctx = Classify(text, character: text.Length);
-        var s = Assert.IsType<StringArgContext>(ctx);
+        var s = Assert.IsType<ArgumentContext>(ctx);
         Assert.Equal("require", s.FunctionName, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(0, s.ParamIndex);
+        Assert.True(s.Quoted);
     }
 
     [Fact]
@@ -33,7 +34,7 @@ public sealed class LuaCompletionContextClassifierTest
         // Find_Object("UNIT", "|cursor  (second arg)
         const string text = "Find_Object(\"UNIT\", \"";
         var ctx = Classify(text, character: text.Length);
-        var s = Assert.IsType<StringArgContext>(ctx);
+        var s = Assert.IsType<ArgumentContext>(ctx);
         Assert.Equal(1, s.ParamIndex);
     }
 
@@ -42,7 +43,7 @@ public sealed class LuaCompletionContextClassifierTest
     {
         const string text = "Find_Player(\"";
         var ctx = Classify(text, character: text.Length);
-        var s = Assert.IsType<StringArgContext>(ctx);
+        var s = Assert.IsType<ArgumentContext>(ctx);
         Assert.Equal("Find_Player", s.FunctionName);
     }
 
@@ -61,8 +62,24 @@ public sealed class LuaCompletionContextClassifierTest
     [InlineData("unit:Get")]
     [InlineData("local x = Fin")]
     [InlineData("")]
+    [InlineData("function Find_Player(")]
+    [InlineData("local function Find_Player(fa")]
     public void Classify_OutsideAStringArgument_ReturnsNull(string text)
     {
         Assert.Null(Classify(text));
+    }
+
+    // ── an argument before any quote ─────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Find_Player(", "Find_Player", 0)]
+    [InlineData("local p = Find_Player(Em", "Find_Player", 0)]
+    [InlineData("Find_Object(\"UNIT\", ", "Find_Object", 1)]
+    [InlineData("Story_Event(Find_Player(x), ", "Story_Event", 1)]
+    [InlineData("Story_Event(Find_Player(", "Find_Player", 0)]
+    public void Classify_AnArgumentBeforeAnyQuote_IsUnquoted(string text, string function, int index)
+    {
+        var s = Assert.IsType<ArgumentContext>(Classify(text));
+        Assert.Equal((function, index, false), (s.FunctionName, s.ParamIndex, s.Quoted));
     }
 }

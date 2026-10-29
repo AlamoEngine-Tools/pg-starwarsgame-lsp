@@ -3,5 +3,9 @@
 
 namespace PG.StarWarsGame.LSP.Lua.Completion;
 
-/// <summary>Cursor is inside a string literal that is an argument to a function call.</summary>
-internal sealed record StringArgContext(string FunctionName, int ParamIndex);
+/// <summary>The cursor is in an argument of a function call.</summary>
+/// <param name="Quoted">
+///     Inside the argument's string literal; otherwise before any quote, where a value is written with
+///     its quotes.
+/// </param>
+internal sealed record ArgumentContext(string FunctionName, int ParamIndex, bool Quoted = true);
