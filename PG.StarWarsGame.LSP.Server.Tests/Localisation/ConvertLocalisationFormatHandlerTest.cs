@@ -125,6 +125,19 @@ public sealed class ConvertLocalisationFormatHandlerTest
         Assert.Equal(2, xdoc.Root!.Elements().Count());
     }
 
+    // Only a file without the namespace opens in the EaW text editor.
+    [Fact]
+    public async Task Convert_ToXml_WritesTheTextEditorsFormat()
+    {
+        var (handler, fs, _, _) = Build();
+
+        await handler.Handle(Request(CsvPath, "Xml"), CancellationToken.None);
+
+        var root = XDocument.Parse(fs.File.ReadAllText("/mod/data/text/MasterTextFile.xml")).Root!;
+        Assert.Equal(XName.Get("LocalisationData"), root.Name);
+        Assert.All(root.Elements("Localisation"), e => Assert.NotNull(e.Attribute("Key")));
+    }
+
     // Credits repeat their key by design; a keyed database would collapse them into one row and
     // silently shorten the crawl.
     [Fact]
