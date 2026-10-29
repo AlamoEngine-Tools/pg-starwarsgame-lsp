@@ -148,7 +148,9 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
         var root = xdoc!.Root;
         if (root is null) return false;
 
-        var format = XmlTranslationFormat.Of(xdoc);
+        // Saved in the text editor's format, the only one it opens, whatever shape the file was in.
+        var format = XmlTranslationFormat.TextEditor;
+        format.Rewrite(xdoc);
         var translationData = new XElement(format.TranslationData);
         if (translations is not null)
             foreach (var (lang, value) in translations)

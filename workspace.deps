@@ -10,6 +10,6 @@
 #
 # name            path                 group  ref                                       url
 ModVerify         ../ModVerify         build  ee9fc4bd6126054ac791e3a5c6e39d17c385e921  https://github.com/AlamoEngine-Tools/ModVerify.git
-PetroglyphTools   ../PetroglyphTools   build  c4b0939f87fa64c6042b9fc6d6208152a992b82c  https://github.com/AlamoEngine-Tools/PetroglyphTools.git
+PetroglyphTools   ../PetroglyphTools   build  d4b22821b8cdace5ab1dadb09e6c78b9b3e487bb  https://github.com/AlamoEngine-Tools/PetroglyphTools.git
 eaw-schema        schema               build  default                                   https://github.com/AlamoEngine-Tools/eaw-schema.git
 eaw-baseline      baseline             e2e    default                                   https://github.com/AlamoEngine-Tools/eaw-baseline.git

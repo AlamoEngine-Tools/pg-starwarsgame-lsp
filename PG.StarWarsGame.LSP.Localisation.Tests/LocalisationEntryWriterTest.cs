@@ -95,9 +95,9 @@ public sealed class LocalisationEntryWriterTest
         Assert.Equal("World", newEntry.Descendants(ns + "Translation").First().Value);
     }
 
-    // A file in the shape earlier builds wrote gets its new key in that shape.
+    // A file in the namespaced shape is saved in the text editor's format, the only one it opens.
     [Fact]
-    public async Task UpsertAsync_Xml_TheNamespacedShape_NewKeyIsInItsShape()
+    public async Task UpsertAsync_Xml_TheNamespacedShape_IsSavedInTheTextEditorsFormat()
     {
         const string path = "/mod/f.xml";
         var (writer, fs) = Build(path, """
@@ -111,11 +111,12 @@ public sealed class LocalisationEntryWriterTest
         await writer.UpsertAsync(path, "TEXT_B", new Dictionary<string, string> { ["ENGLISH"] = "World" },
             CancellationToken.None);
 
-        var ns = XNamespace.Get("urn:alamoenginetools:localisation:v1");
-        var entries = XDocument.Parse(fs.File.ReadAllText(path)).Root!.Elements(ns + "Localisation").ToList();
-        Assert.Equal(2, entries.Count);
-        var newEntry = entries.Single(e => e.Attribute("key")?.Value == "TEXT_B");
-        Assert.Equal("World", newEntry.Descendants(ns + "Translation").First().Value);
+        var saved = fs.File.ReadAllText(path);
+        Assert.DoesNotContain("urn:", saved, StringComparison.Ordinal);
+        var entries = XDocument.Parse(saved).Root!.Elements("Localisation").ToList();
+        Assert.Equal(["TEXT_A", "TEXT_B"], entries.Select(e => e.Attribute("Key")?.Value));
+        Assert.Equal("Hello", entries[0].Descendants("Translation").First().Value);
+        Assert.Equal("World", entries[1].Descendants("Translation").First().Value);
         Assert.True(await writer.ExistsAsync(path, "TEXT_B", CancellationToken.None));
     }
 

@@ -372,8 +372,9 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             return LocalisationEditResult.Fail(0, _messages.Format("LocEditor_FailedParseFile", ex.Message));
         }
 
-        // A file is edited in the shape it is written in.
-        var format = XmlTranslationFormat.Of(document);
+        // Saved in the text editor's format, the only one it opens, whatever shape the file was in.
+        var format = XmlTranslationFormat.TextEditor;
+        format.Rewrite(document);
         var rows = document.Root?.Elements(format.Localisation).ToList() ?? [];
 
         for (var i = 0; i < commands.Count; i++)

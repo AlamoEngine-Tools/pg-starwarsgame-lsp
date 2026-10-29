@@ -382,9 +382,9 @@ public sealed class LocalisationDocumentEditorTest
         Assert.Contains("TEXT_B", result, StringComparison.Ordinal);
     }
 
-    // A file in the shape earlier builds wrote is edited in that shape, not switched to the text editor's.
+    // A file in the namespaced shape is saved in the text editor's format, the only one it opens.
     [Fact]
-    public void Xml_TheNamespacedShape_IsEditedInItsShape()
+    public void Xml_TheNamespacedShape_IsSavedInTheTextEditorsFormat()
     {
         const string xml = """
                            <LocalisationData xmlns="urn:alamoenginetools:localisation:v1">
@@ -396,9 +396,14 @@ public sealed class LocalisationDocumentEditorTest
 
         var result = Apply(xml, ".xml", SetCell(0, "ENGLISH", "Changed", "TEXT_A"), SetCell(0, "GERMAN", "Alfa"));
 
-        Assert.Contains(">Changed<", result, StringComparison.Ordinal);
-        Assert.Contains("<Translation Language=\"GERMAN\">Alfa</Translation>", result, StringComparison.Ordinal);
-        Assert.DoesNotContain("xmlns=\"\"", result, StringComparison.Ordinal);
+        Assert.Equal(
+            xml.Replace(" xmlns=\"urn:alamoenginetools:localisation:v1\"", "", StringComparison.Ordinal)
+                .Replace("key=", "Key=", StringComparison.Ordinal)
+                .Replace(">Alpha<", ">Changed<", StringComparison.Ordinal)
+                .Replace("</Translation></TranslationData>",
+                    "</Translation><Translation Language=\"GERMAN\">Alfa</Translation></TranslationData>",
+                    StringComparison.Ordinal),
+            result);
     }
 
     // ── the reference model ──────────────────────────────────────────────────
