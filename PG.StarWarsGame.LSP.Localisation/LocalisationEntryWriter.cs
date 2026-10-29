@@ -148,21 +148,22 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
         var root = xdoc!.Root;
         if (root is null) return false;
 
-        var translationData = new XElement(XmlTranslationFormat.TranslationData);
+        var format = XmlTranslationFormat.Of(xdoc);
+        var translationData = new XElement(format.TranslationData);
         if (translations is not null)
             foreach (var (lang, value) in translations)
-                translationData.Add(new XElement(XmlTranslationFormat.Translation,
-                    new XAttribute(XmlTranslationFormat.Language, lang), value));
+                translationData.Add(new XElement(format.Translation,
+                    new XAttribute(format.Language, lang), value));
 
         var existing = FindXmlElement(xdoc, key);
         if (existing is not null)
         {
-            existing.Element(XmlTranslationFormat.TranslationData)?.Remove();
+            existing.Element(format.TranslationData)?.Remove();
             existing.Add(translationData);
         }
         else
         {
-            root.Add(new XElement(XmlTranslationFormat.Localisation, new XAttribute(XmlTranslationFormat.Key, key),
+            root.Add(new XElement(format.Localisation, new XAttribute(format.Key, key),
                 translationData));
         }
 
@@ -172,8 +173,9 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
 
     private static XElement? FindXmlElement(XDocument xdoc, string key)
     {
-        return xdoc.Root?.Elements(XmlTranslationFormat.Localisation)
-            .FirstOrDefault(e => e.Attribute(XmlTranslationFormat.Key)?.Value == key);
+        var format = XmlTranslationFormat.Of(xdoc);
+        return xdoc.Root?.Elements(format.Localisation)
+            .FirstOrDefault(e => e.Attribute(format.Key)?.Value == key);
     }
 
     private bool TryParseXml(string content, out XDocument? xdoc)

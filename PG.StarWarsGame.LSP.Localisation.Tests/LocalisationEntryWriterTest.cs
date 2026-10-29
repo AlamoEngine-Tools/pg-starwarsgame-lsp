@@ -95,6 +95,30 @@ public sealed class LocalisationEntryWriterTest
         Assert.Equal("World", newEntry.Descendants(ns + "Translation").First().Value);
     }
 
+    // A file in the shape earlier builds wrote gets its new key in that shape.
+    [Fact]
+    public async Task UpsertAsync_Xml_TheNamespacedShape_NewKeyIsInItsShape()
+    {
+        const string path = "/mod/f.xml";
+        var (writer, fs) = Build(path, """
+                                       <LocalisationData xmlns="urn:alamoenginetools:localisation:v1">
+                                         <Localisation key="TEXT_A">
+                                           <TranslationData><Translation Language="ENGLISH">Hello</Translation></TranslationData>
+                                         </Localisation>
+                                       </LocalisationData>
+                                       """);
+
+        await writer.UpsertAsync(path, "TEXT_B", new Dictionary<string, string> { ["ENGLISH"] = "World" },
+            CancellationToken.None);
+
+        var ns = XNamespace.Get("urn:alamoenginetools:localisation:v1");
+        var entries = XDocument.Parse(fs.File.ReadAllText(path)).Root!.Elements(ns + "Localisation").ToList();
+        Assert.Equal(2, entries.Count);
+        var newEntry = entries.Single(e => e.Attribute("key")?.Value == "TEXT_B");
+        Assert.Equal("World", newEntry.Descendants(ns + "Translation").First().Value);
+        Assert.True(await writer.ExistsAsync(path, "TEXT_B", CancellationToken.None));
+    }
+
     // ── UpsertAsync: existing key (update) ───────────────────────────────────
 
     [Fact]

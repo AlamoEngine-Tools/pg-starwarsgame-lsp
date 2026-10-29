@@ -151,15 +151,16 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     {
         var lineEnding = LineEndings.Detect(text);
         var document = XDocument.Parse(text, LoadOptions.PreserveWhitespace);
+        var format = XmlTranslationFormat.Of(document);
 
-        var elements = document.Root?.Elements(XmlTranslationFormat.Localisation).ToList() ?? [];
+        var elements = document.Root?.Elements(format.Localisation).ToList() ?? [];
 
         // Declared union in first-seen order: a language present on one element but not another is
         // still a column, and must be an editable empty cell on the rows that lack it.
         var languages = elements
-            .Elements(XmlTranslationFormat.TranslationData)
-            .Elements(XmlTranslationFormat.Translation)
-            .Select(e => e.Attribute(XmlTranslationFormat.Language)?.Value)
+            .Elements(format.TranslationData)
+            .Elements(format.Translation)
+            .Select(e => e.Attribute(format.Language)?.Value)
             .Where(l => !string.IsNullOrEmpty(l))
             .Select(l => l!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -169,10 +170,10 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
         foreach (var element in elements)
         {
             var byLanguage = element
-                .Elements(XmlTranslationFormat.TranslationData)
-                .Elements(XmlTranslationFormat.Translation)
-                .Where(e => e.Attribute(XmlTranslationFormat.Language)?.Value is { Length: > 0 })
-                .GroupBy(e => e.Attribute(XmlTranslationFormat.Language)!.Value, StringComparer.OrdinalIgnoreCase)
+                .Elements(format.TranslationData)
+                .Elements(format.Translation)
+                .Where(e => e.Attribute(format.Language)?.Value is { Length: > 0 })
+                .GroupBy(e => e.Attribute(format.Language)!.Value, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First().Value, StringComparer.OrdinalIgnoreCase);
 
             var values = languages
@@ -181,7 +182,7 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
 
             rows.Add(new LocRowDto(
                 rows.Count,
-                element.Attribute(XmlTranslationFormat.Key)?.Value ?? string.Empty,
+                element.Attribute(format.Key)?.Value ?? string.Empty,
                 values,
                 element.ToString(SaveOptions.DisableFormatting)));
         }

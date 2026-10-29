@@ -238,6 +238,24 @@ public sealed class LocalisationRowReaderTest
         Assert.Equal("Producer", Value(doc.Rows[1], "ENGLISH"));
     }
 
+    // The shape earlier builds wrote: a namespace and a lower-case key.
+    [Fact]
+    public void Xml_TheNamespacedShape_IsRead()
+    {
+        const string xml = """
+                           <LocalisationData xmlns="urn:alamoenginetools:localisation:v1">
+                             <Localisation key="TEXT_A">
+                               <TranslationData><Translation Language="ENGLISH">Alpha</Translation></TranslationData>
+                             </Localisation>
+                           </LocalisationData>
+                           """;
+
+        var row = Assert.Single(Reader().Read(xml, ".xml").Rows);
+
+        Assert.Equal("TEXT_A", row.Key);
+        Assert.Equal("Alpha", Value(row, "ENGLISH"));
+    }
+
     // ── .properties ──────────────────────────────────────────────────────────
 
     [Fact]

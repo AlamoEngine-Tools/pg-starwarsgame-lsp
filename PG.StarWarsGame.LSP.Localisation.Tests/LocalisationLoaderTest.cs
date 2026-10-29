@@ -358,6 +358,30 @@ public sealed class LocalisationLoaderTest
         Assert.Equal("Assault on Hoth", indexService.Current.Localisation.GetValue("TEXT_HOTH"));
     }
 
+    // The shape earlier builds wrote: a namespace, a lower-case key, one TranslationData per language.
+    [Fact]
+    public async Task LoadAsync_XmlResourceType_TheNamespacedFile_Loads()
+    {
+        const string xml = """
+                           <LocalisationData xmlns="urn:alamoenginetools:localisation:v1">
+                             <Localisation key="TEXT_HOTH">
+                               <TranslationData><Translation Language="ENGLISH">Assault on Hoth</Translation></TranslationData>
+                             </Localisation>
+                           </LocalisationData>
+                           """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/TranslationManifest.xml"] = new(xml)
+        });
+        var config = new LspConfiguration { Localisation = new LocalisationConfig { ResourceType = "Xml" } };
+
+        var (loader, indexService, _, _) = BuildLoader(fs, config);
+        await loader.LoadAsync(new WorkspaceConfiguration([], [], ["/mod/data/text"], [], "Xml"),
+            CancellationToken.None);
+
+        Assert.Equal("Assault on Hoth", indexService.Current.Localisation.GetValue("TEXT_HOTH"));
+    }
+
     // Every shape (#280): every layer's text is loaded through its lower-cased text root, and the
     // highest layer's translation of a shared key wins.
     [Theory]
