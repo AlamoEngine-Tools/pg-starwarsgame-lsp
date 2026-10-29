@@ -379,10 +379,12 @@ public static class ServerConfigurator
                 // each with its configuration in a directory of its own. Absent executable: never
                 // started, every call a no-op.
                 services.AddSingleton<LuaStubLocation>();
-                // The annotations this server knows, inserted above the functions in the text the
-                // analyzer reads - an open script's and every file of a script's require tree.
+                // The annotations this server knows - stub types, state handler messages, a plan's
+                // task forces - inserted into the text the analyzer reads: an open script's and
+                // every file of a script's require tree.
                 services.AddSingleton<ILuaAnnotationSource, StubOverrideAnnotations>();
                 services.AddSingleton<ILuaAnnotationSource, StateHandlerAnnotations>();
+                services.AddSingleton<ILuaAnnotationSource, TaskForceAnnotations>();
                 services.AddSingleton<LuaGeneratedTexts>();
                 services.AddSingleton(sp =>
                 {

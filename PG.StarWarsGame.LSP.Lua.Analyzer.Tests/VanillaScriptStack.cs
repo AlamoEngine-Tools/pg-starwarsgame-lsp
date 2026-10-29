@@ -60,7 +60,10 @@ internal sealed partial class VanillaScriptStack : IAsyncDisposable
         }
     }
 
-    /// <param name="scripts">Paths below <c>Data/Scripts</c> indexed beside the library, such as <c>Gameobject/Interdictor.lua</c>.</param>
+    /// <param name="scripts">
+    ///     Paths below <c>Data/Scripts</c> indexed beside the library, such as
+    ///     <c>Gameobject/Interdictor.lua</c>.
+    /// </param>
     public static VanillaScriptStack Create(params string[] scripts)
     {
         var (binary, root) = Prerequisites();
@@ -98,7 +101,10 @@ internal sealed partial class VanillaScriptStack : IAsyncDisposable
         var parseCache = new LuaParseCache(new DocumentTextSource(new FakeGameWorkspaceHost(), fileHelper,
             NullLogger<DocumentTextSource>.Instance), 64, NullLogger<LuaParseCache>.Instance);
         var texts = new LuaGeneratedTexts(
-            [new StubOverrideAnnotations(schema), new StateHandlerAnnotations(index, parseCache, fileHelper)],
+            [
+                new StubOverrideAnnotations(schema), new StateHandlerAnnotations(index, parseCache, fileHelper),
+                new TaskForceAnnotations()
+            ],
             fileHelper);
         var instances = new LuaAnalyzerInstances(directory => new LuaAnalyzerHost(new LuaAnalyzerOptions
             {
