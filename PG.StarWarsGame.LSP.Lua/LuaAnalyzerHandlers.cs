@@ -3,11 +3,12 @@
 
 using System.Collections.Immutable;
 using Newtonsoft.Json.Linq;
-using PG.StarWarsGame.LSP.Lua.Analysis;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua;
@@ -190,20 +191,36 @@ public sealed class LuaCodeLensHandler(
     }
 
     // The arguments are (document, position, locations), measured; the count in the title is the
-    // number of locations. Recounted over the document's own state (#249), less the stubs.
+    // number of locations. Recounted over the document's own state (#249), less the stubs and less
+    // the declaration the lens sits on, which the analyzer lists as a usage of itself.
     private Command InOwnState(Command command)
     {
         if (command.Arguments is not { Count: 3 } arguments
             || arguments[0] is not { Type: JTokenType.String } document
+            || arguments[1] is not JObject position
             || arguments[2] is not JArray locations)
             return command;
 
         var current = sandbox.Current;
         var kept = new JArray(locations.Where(l =>
             l["uri"]?.Value<string>() is not { } uri ||
-            LuaAnalyzerPassThrough.IsUsage(document.Value<string>()!, uri, current, stubs)));
+            (LuaAnalyzerPassThrough.IsUsage(document.Value<string>()!, uri, current, stubs) &&
+             !(DocumentUris.Same(uri, document.Value<string>()!) && Covers(l["range"], position)))));
         var title = kept.Count == 1 ? "1 usage" : $"{kept.Count} usages";
         return command with { Title = title, Arguments = new JArray(document, arguments[1], kept) };
+    }
+
+    private static bool Covers(JToken? range, JObject position)
+    {
+        if (range?["start"] is not JObject start || range["end"] is not JObject end) return false;
+        var at = (position.Value<int>("line"), position.Value<int>("character"));
+        return Compare((start.Value<int>("line"), start.Value<int>("character")), at) <= 0 &&
+               Compare(at, (end.Value<int>("line"), end.Value<int>("character"))) <= 0;
+    }
+
+    private static int Compare((int Line, int Character) a, (int Line, int Character) b)
+    {
+        return a.Line != b.Line ? a.Line.CompareTo(b.Line) : a.Character.CompareTo(b.Character);
     }
 
     protected override CodeLensRegistrationOptions CreateRegistrationOptions(
