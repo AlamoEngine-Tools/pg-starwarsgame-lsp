@@ -38,7 +38,7 @@ public sealed class WorkspaceIndexerTest
         var ctx = new EaWXmlContext(fh);
         return new WorkspaceIndexer(svc,
             new MetafileRegistrar(fh, registry, schema, ctx, new StoryChainProblemStore(),
-                NullLogger<MetafileRegistrar>.Instance),
+                new RegistryWalkStore(), NullLogger<MetafileRegistrar>.Instance),
             new DocumentIndexer(fh, svc, new NullProjectIndexCache(), new ParseableFiles(fh, [], ctx),
                 new IndexFingerprints(schema, new LuaApiSchemaProvider([]), registry, fh),
                 NullLogger<DocumentIndexer>.Instance),

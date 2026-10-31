@@ -273,6 +273,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
+                services.AddSingleton<IRegistryWalkStore, RegistryWalkStore>();
                 // Live chain problems (open-buffer-first, invalidated per document version); the
                 // startup snapshot it also accepts only answers until the first real scan.
                 services.AddSingleton<IStoryChainProblemStore>(sp =>

@@ -48,13 +48,23 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         };
     }
 
+    private static DidChangeWatchedFilesParams Created(params string[] uris)
+    {
+        return new DidChangeWatchedFilesParams
+        {
+            Changes = new Container<FileEvent>(uris.Select(u =>
+                new FileEvent { Uri = DocumentUri.From(u), Type = FileChangeType.Created }))
+        };
+    }
+
     private static GameDidChangeWatchedFilesHandler BuildHandler(
         FakeGameIndexService? index = null,
         FakeGameWorkspaceHost? host = null,
         MockFileSystem? fs = null,
         FakeReloadService? reload = null,
         ISchemaProvider? schema = null,
-        ILocalisationWriteLedger? writeLedger = null)
+        ILocalisationWriteLedger? writeLedger = null,
+        IRegistryWalkStore? walks = null)
     {
         var fileSystem = fs ?? new MockFileSystem();
         var fileHelper = new FileHelper(fileSystem);
@@ -62,10 +72,11 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var schemaProvider = schema ?? new SchemaProviderBuilder().Build();
         var registry = new FileTypeRegistry();
         var context = new EaWXmlContext(fileHelper);
+        var walkStore = walks ?? new RegistryWalkStore();
         var indexer = new WorkspaceIndexer(
             idx,
             new MetafileRegistrar(fileHelper, registry, schemaProvider, context, new StoryChainProblemStore(),
-                NullLogger<MetafileRegistrar>.Instance),
+                walkStore, NullLogger<MetafileRegistrar>.Instance),
             new DocumentIndexer(fileHelper, idx, new NullProjectIndexCache(),
                 new ParseableFiles(fileHelper, [], context),
                 new IndexFingerprints(schemaProvider, new LuaApiSchemaProvider([]), registry, fileHelper),
@@ -84,8 +95,92 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             reload ?? new FakeReloadService(),
             schemaProvider,
             writeLedger ?? new LocalisationWriteLedger(fileHelper),
+            walkStore,
             new OpenStartupGate(),
             NullLogger<GameDidChangeWatchedFilesHandler>.Instance);
+    }
+
+    // ── registry and load order changes ──────────────────────────────────────
+
+    private const string ModXml = @"c:\mods\mymod\data\xml";
+
+    private static FakeReloadService ModReload()
+    {
+        return new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([ModXml], [], [], [], null)
+        };
+    }
+
+    private static ISchemaProvider ObjectRegistrySchema()
+    {
+        return new SchemaProviderBuilder().WithMetafiles(
+                new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]))
+            .Build();
+    }
+
+    private static RegistryWalkStore WalkListing(string key)
+    {
+        var walks = new RegistryWalkStore();
+        walks.Replace([new RegistryWalk("data/xml/gameobjectfiles.xml", null, [new RegistryWalkEntry(key, null)])]);
+        return walks;
+    }
+
+    // A registry decides which files load and in which order, so editing it re-runs the metafile
+    // stage through a full reload. It used to change nothing until the next project reload.
+    [Fact]
+    public async Task Handle_ChangedRegistryFile_ReloadsTheProject()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ModXml + @"\GameObjectFiles.xml"] = new("<Game_Object_Files/>")
+        });
+        var reload = ModReload();
+        var handler = BuildHandler(fs: fs, reload: reload, schema: ObjectRegistrySchema());
+
+        await handler.Handle(Changed("file:///c:/mods/mymod/data/xml/GameObjectFiles.xml"), CancellationToken.None);
+
+        Assert.Equal(1, reload.ReloadCount);
+    }
+
+    // A new copy of a listed file can win over a dependency's or the shipped one, and a deleted one
+    // can hand the entry back to them: the winner changes, so the metafile stage runs again.
+    [Fact]
+    public async Task Handle_CreatedOrDeletedFileARegistryLists_ReloadsTheProject()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ModXml + @"\Units\Alpha.xml"] = new("<Units/>")
+        });
+        var created = ModReload();
+        var deleted = ModReload();
+
+        await BuildHandler(fs: fs, reload: created, walks: WalkListing("units/alpha.xml"))
+            .Handle(Created("file:///c:/mods/mymod/data/xml/Units/Alpha.xml"), CancellationToken.None);
+        await BuildHandler(fs: fs, reload: deleted, walks: WalkListing("units/alpha.xml"))
+            .Handle(Deleted("file:///c:/mods/mymod/data/xml/Units/Alpha.xml"), CancellationToken.None);
+
+        Assert.Equal(1, created.ReloadCount);
+        Assert.Equal(1, deleted.ReloadCount);
+    }
+
+    // Editing a listed file changes its definitions, not which copy loads: it is re-indexed, never
+    // reloaded. Nor does a new file no registry lists change the load order.
+    [Fact]
+    public async Task Handle_ChangedListedFile_OrCreatedUnlistedFile_DoesNotReload()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ModXml + @"\Units\Alpha.xml"] = new("<Units/>"),
+            [ModXml + @"\Notes.xml"] = new("<Notes/>")
+        });
+        var reload = ModReload();
+        var handler = BuildHandler(fs: fs, reload: reload, walks: WalkListing("units/alpha.xml"));
+
+        await handler.Handle(Changed("file:///c:/mods/mymod/data/xml/Units/Alpha.xml"), CancellationToken.None);
+        await handler.Handle(Created("file:///c:/mods/mymod/data/xml/Notes.xml"), CancellationToken.None);
+
+        Assert.Equal(0, reload.ReloadCount);
     }
 
     // ── changed file not open in editor ──────────────────────────────────────
