@@ -51,7 +51,7 @@ public sealed class TargetGameProbe(
 
             var root = JsonNode.Parse(fileHelper.FileSystem.File.ReadAllText(path), documentOptions: DocumentOptions);
             var value = root is JsonObject project && project["game"] is JsonValue game
-                        && game.TryGetValue<string>(out var text)
+                                                   && game.TryGetValue<string>(out var text)
                 ? text
                 : null;
             return TargetGameNames.TryParse(value, out var named) ? named : TargetGame.FOC;

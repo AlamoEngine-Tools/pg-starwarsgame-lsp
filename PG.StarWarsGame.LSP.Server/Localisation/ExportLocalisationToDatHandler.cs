@@ -119,7 +119,11 @@ public sealed class ExportLocalisationToDatHandler
             // The shipped text is the project's game's only: the base game ships none of the expansion's.
             var keyed = _factory.CreateKeyed(languages);
             LocalisationLayerMerge.MergeBaselineAndLowerLayers(
-                keyed, [.. BaselineMasterTexts.Contexts(_project.Game).Select(g => _baselineProvider.GetMasterText(g, languages))],
+                keyed,
+                [
+                    .. BaselineMasterTexts.Contexts(_project.Game)
+                        .Select(g => _baselineProvider.GetMasterText(g, languages))
+                ],
                 _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
             merged = keyed;
         }

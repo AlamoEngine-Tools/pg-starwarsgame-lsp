@@ -89,7 +89,10 @@ public sealed class BaselineBootstrapper : IBaselineBootstrapper
                 language = _languageService.Default;
             _indexService.ApplyLocalisation(
                 new TranslationDatabaseLocalisationIndex(
-                    [.. BaselineMasterTexts.Contexts(game).Select(c => _localisationProvider.GetMasterText(c, language))],
+                    [
+                        .. BaselineMasterTexts.Contexts(game)
+                            .Select(c => _localisationProvider.GetMasterText(c, language))
+                    ],
                     language));
         }
         catch (Exception ex)

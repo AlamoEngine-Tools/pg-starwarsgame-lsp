@@ -72,8 +72,8 @@ public static class LspTestEnvironment
         ?? ExistingPath(Environment.GetEnvironmentVariable("LSP_BASELINE_LOCAL_PATH"))
         ?? (SolutionRoot is not null
             && File.Exists(Path.Combine(SolutionRoot, "baseline", "foc", "aet-pg-swg-lsp-foc-baseline.aet"))
-                ? Path.Combine(SolutionRoot, "baseline")
-                : null);
+            ? Path.Combine(SolutionRoot, "baseline")
+            : null);
 
     public static string Locale =>
         Environment.GetEnvironmentVariable("LSP_LOCALE") ?? "en";
