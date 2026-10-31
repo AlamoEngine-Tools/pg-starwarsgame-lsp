@@ -43,7 +43,8 @@ public sealed class ModProjectReloadServiceTest
         IIconCatalogProvider? icons = null,
         ServerStatusRecorder? status = null,
         IHeapTrimmer? heapTrimmer = null,
-        ILuaAnalyzerStarter? luaAnalyzer = null)
+        ILuaAnalyzerStarter? luaAnalyzer = null,
+        IBaselineBootstrapper? baseline = null)
     {
         var fileHelper = new FileHelper(new MockFileSystem());
         return new ModProjectReloadService(
@@ -55,7 +56,8 @@ public sealed class ModProjectReloadServiceTest
             status ?? new ServerStatusRecorder(),
             heapTrimmer ?? new RecordingHeapTrimmer(),
             luaAnalyzer ?? new RecordingAnalyzerStarter(),
-            ResxMessageCatalog.Server("en"));
+            ResxMessageCatalog.Server("en"),
+            baseline ?? new RecordingBaselineBootstrapper());
     }
 
     private sealed class DecliningPrompt : IPgprojMigrationPrompt
@@ -102,6 +104,33 @@ public sealed class ModProjectReloadServiceTest
 
         Assert.True(status.ProjectDetected);
         Assert.Equal(ProjectProblem.BaselineRefused, status.ProjectProblem);
+    }
+
+    // The project names the game, and the baseline is the game's: a project switched to EaW must
+    // not be indexed against the expansion's objects.
+    [Fact]
+    public async Task LoadAsync_LoadsTheBaselineOfTheProjectsGame()
+    {
+        var baseline = new RecordingBaselineBootstrapper();
+        var service = Create(
+            new FakeResolver(SampleConfig with { Game = TargetGame.EAW }), new RecordingIndexer(),
+            new NullLocalisationLoader(), new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(),
+            new ListLogger(), baseline: baseline);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal([TargetGame.EAW], baseline.Games);
+    }
+
+    private sealed class RecordingBaselineBootstrapper : IBaselineBootstrapper
+    {
+        public List<TargetGame> Games { get; } = [];
+
+        public Task LoadAsync(TargetGame game, CancellationToken ct)
+        {
+            Games.Add(game);
+            return Task.CompletedTask;
+        }
     }
 
     // ── heap trim ────────────────────────────────────────────────────────────

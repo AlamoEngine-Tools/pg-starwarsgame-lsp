@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -13,17 +14,20 @@ public sealed class ModProjectResolver
     private readonly ProjectDependencyGraph _graph;
     private readonly ModProjectLoader _loader;
     private readonly ILogger<ModProjectResolver> _logger;
+    private readonly IMessageCatalog _messages;
 
     public ModProjectResolver(
         IFileHelper fileHelper,
         ModProjectLoader loader,
         ProjectDependencyGraph graph,
-        ILogger<ModProjectResolver> logger)
+        ILogger<ModProjectResolver> logger,
+        IMessageCatalog messages)
     {
         FileHelper = fileHelper;
         _loader = loader;
         _graph = graph;
         _logger = logger;
+        _messages = messages;
     }
 
     /// <summary>The file system this resolver reads project files through; shared with the configuration resolver.</summary>
@@ -32,6 +36,7 @@ public sealed class ModProjectResolver
     public WorkspaceConfiguration Resolve(string rootPath, ModProjectFile root)
     {
         var ordered = _graph.Build(rootPath, root, LoadReference, out var dependencies);
+        ThrowIfGamesConflict(rootPath, root, ordered);
 
         var xml = new List<string>();
         var scripts = new List<string>();
@@ -86,8 +91,26 @@ public sealed class ModProjectResolver
             // Root project only - a mega texture replaces rather than merges, so a dependency's
             // icon configuration has no say in which one the root project ships.
             Icons = root.Icons,
-            Dependencies = dependencies
+            Dependencies = dependencies,
+            Game = root.Game
         };
+    }
+
+    /// <summary>
+    ///     Refuses an Empire at War project built on a Forces of Corruption one. The expansion reads
+    ///     the base game's data beneath its own, so the other direction is an ordinary layering; the
+    ///     base game cannot load the expansion's data, so this one describes a game that does not exist.
+    /// </summary>
+    private void ThrowIfGamesConflict(string rootPath, ModProjectFile root,
+        IReadOnlyList<(string Path, ModProjectFile File)> ordered)
+    {
+        if (root.Game != TargetGame.EAW) return;
+
+        var expansion = ordered.FirstOrDefault(p => p.File.Game == TargetGame.FOC);
+        if (expansion.File is null) return;
+
+        throw new ModProjectLoadException(_messages.Format("ModProject_EawProjectReferencesFocProject",
+            FileHelper.FileSystem.Path.GetFileName(rootPath), expansion.File.Name));
     }
 
     private ModProjectFile? LoadReference(string absolutePath)

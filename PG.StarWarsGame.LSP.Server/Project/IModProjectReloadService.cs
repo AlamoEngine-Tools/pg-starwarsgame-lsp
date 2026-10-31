@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
 
@@ -17,6 +18,12 @@ public interface IModProjectReloadService
 
     // The workspace roots passed to the most recent LoadAsync call. Null until the first load.
     IReadOnlyList<string>? LastWorkspaceRoots { get; }
+
+    /// <summary>
+    ///     The game the loaded project targets; FoC before a project has loaded, as for a project that
+    ///     names none.
+    /// </summary>
+    TargetGame Game => LastWorkspaceConfig?.Game ?? TargetGame.FOC;
 
     /// <summary>
     ///     Whether a load attempt has FINISHED - whether or not it found a project file.

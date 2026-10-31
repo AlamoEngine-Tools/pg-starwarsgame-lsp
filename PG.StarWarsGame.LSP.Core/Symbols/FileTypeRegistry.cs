@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 public sealed class FileTypeRegistry : IFileTypeRegistry
 {
-    private readonly ConcurrentDictionary<string, ImmutableArray<string>> _map =
+    private volatile ConcurrentDictionary<string, ImmutableArray<string>> _map =
         new(StringComparer.OrdinalIgnoreCase);
 
     public ImmutableArray<string> GetTypesForFile(string fileUri)
@@ -24,6 +24,11 @@ public sealed class FileTypeRegistry : IFileTypeRegistry
     public void UnregisterFile(string fileUri)
     {
         _map.TryRemove(fileUri, out _);
+    }
+
+    public void Replace(IReadOnlyDictionary<string, ImmutableArray<string>> files)
+    {
+        _map = new ConcurrentDictionary<string, ImmutableArray<string>>(files, StringComparer.OrdinalIgnoreCase);
     }
 
     public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;

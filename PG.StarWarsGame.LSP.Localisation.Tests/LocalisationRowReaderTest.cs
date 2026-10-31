@@ -4,10 +4,10 @@
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using PG.StarWarsGame.LSP.Localisation.Rows;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Localisation.Tests;
 
@@ -26,14 +26,14 @@ public sealed class LocalisationRowReaderTest
 
     private const string XmlDoc = """
                                   <?xml version="1.0" encoding="utf-8"?>
-                                  <Localisations xmlns="urn:alamoenginetools:localisation:v1">
-                                    <Localisation key="TEXT_A">
+                                  <Localisations>
+                                    <Localisation Key="TEXT_A">
                                       <TranslationData>
                                         <Translation Language="ENGLISH">Alpha</Translation>
                                         <Translation Language="GERMAN">Alfa</Translation>
                                       </TranslationData>
                                     </Localisation>
-                                    <Localisation key="TEXT_B">
+                                    <Localisation Key="TEXT_B">
                                       <TranslationData>
                                         <Translation Language="ENGLISH">Beta</Translation>
                                       </TranslationData>
@@ -221,11 +221,11 @@ public sealed class LocalisationRowReaderTest
     public void Xml_DuplicateKeys_BecomeSeparateRows()
     {
         const string xml = """
-                           <Localisations xmlns="urn:alamoenginetools:localisation:v1">
-                             <Localisation key="CREDIT_ROLE">
+                           <Localisations>
+                             <Localisation Key="CREDIT_ROLE">
                                <TranslationData><Translation Language="ENGLISH">Director</Translation></TranslationData>
                              </Localisation>
-                             <Localisation key="CREDIT_ROLE">
+                             <Localisation Key="CREDIT_ROLE">
                                <TranslationData><Translation Language="ENGLISH">Producer</Translation></TranslationData>
                              </Localisation>
                            </Localisations>
@@ -236,6 +236,24 @@ public sealed class LocalisationRowReaderTest
         Assert.Equal(2, doc.Rows.Count);
         Assert.Equal("Director", Value(doc.Rows[0], "ENGLISH"));
         Assert.Equal("Producer", Value(doc.Rows[1], "ENGLISH"));
+    }
+
+    // The shape earlier builds wrote: a namespace and a lower-case key.
+    [Fact]
+    public void Xml_TheNamespacedShape_IsRead()
+    {
+        const string xml = """
+                           <LocalisationData xmlns="urn:alamoenginetools:localisation:v1">
+                             <Localisation key="TEXT_A">
+                               <TranslationData><Translation Language="ENGLISH">Alpha</Translation></TranslationData>
+                             </Localisation>
+                           </LocalisationData>
+                           """;
+
+        var row = Assert.Single(Reader().Read(xml, ".xml").Rows);
+
+        Assert.Equal("TEXT_A", row.Key);
+        Assert.Equal("Alpha", Value(row, "ENGLISH"));
     }
 
     // ── .properties ──────────────────────────────────────────────────────────

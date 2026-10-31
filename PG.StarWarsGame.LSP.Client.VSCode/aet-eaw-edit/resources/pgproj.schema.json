@@ -179,6 +179,14 @@
         }
       }
     },
+    "game": {
+      "description": "The game this mod is built for: eaw for Empire at War, foc for Forces of Corruption. It decides which shipped game the project is checked against. A project without it targets foc. An eaw project cannot reference a foc project, since the base game cannot load the expansion's data.",
+      "type": "string",
+      "enum": [
+        "eaw",
+        "foc"
+      ]
+    },
     "projectReferences": {
       "type": "array",
       "items": {

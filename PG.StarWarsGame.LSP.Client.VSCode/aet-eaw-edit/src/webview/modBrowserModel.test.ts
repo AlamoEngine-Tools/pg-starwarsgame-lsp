@@ -19,6 +19,7 @@ import {
     pageLabel,
     previewLayout,
     noteLabel,
+    opensOutline,
     propertyLabel,
     propertyValue,
     reasonLabel,
@@ -512,5 +513,18 @@ describe("fileSize", () => {
         assert.equal(fileSize(512), "512 B");
         assert.equal(fileSize(1536), "1.5 KB");
         assert.equal(fileSize(5 * 1024 * 1024), "5 MB");
+    });
+});
+
+// Picking the outline already shown reset the browser and asked for nothing, so it stayed on
+// "Loading..." for good.
+describe("opensOutline", () => {
+    it("opens an outline the browser does not show", () => {
+        assert.equal(opensOutline(null, "scripts"), true);
+        assert.equal(opensOutline("assets", "scripts"), true);
+    });
+
+    it("keeps the browser as it is for the outline it shows", () => {
+        assert.equal(opensOutline("scripts", "scripts"), false);
     });
 });

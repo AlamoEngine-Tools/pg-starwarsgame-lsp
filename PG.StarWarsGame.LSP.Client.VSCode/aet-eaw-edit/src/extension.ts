@@ -70,7 +70,7 @@ import {
 import { logLine, setLogChannel } from "./log";
 import { directoriesNeedingOwnWatcher } from "./dependencyWatchers";
 import { LspGateway } from "./lsp/lspGateway";
-import { RoutedLspGateway } from "./lsp/routedLspGateway";
+import { RouteChanges, RoutedLspGateway } from "./lsp/routedLspGateway";
 import { stopClient } from "./lsp/stopClient";
 import { discoverProjects } from "./projectDiscovery";
 import { isModFolder, projectOfferDue } from "./modLayout";
@@ -410,13 +410,31 @@ function routedProject(): ProjectClient | undefined {
  * process. Built once at module scope because the panels and navigators are handed it at
  * construction and outlive any single client.
  */
+/**
+ * Fired whenever the set of running servers changes. Every routed gateway is built on it, so none
+ * can be left waiting for a route that is already back (#318).
+ */
+const routeChanges = new RouteChanges();
+
 const lsp = new RoutedLspGateway(
     () => routedProject()?.gateway,
     vscodeMessageSink,
+    routeChanges,
 );
 
 /** Gateways bound to one project each, by key. */
 const projectGateways = new Map<string, RoutedLspGateway>();
+
+/**
+ * The gateway of a panel opened while no project runs: it binds to the one project that starts,
+ * and with several it stays offline rather than follow the editor in front - a panel that did
+ * showed one project's data through another's server, the shape #276 closed.
+ */
+const pendingProjectGateway = new RoutedLspGateway(
+    () => (clients.size === 1 ? primaryClient()?.gateway : undefined),
+    vscodeMessageSink,
+    routeChanges,
+);
 
 /**
  * The key a request or a panel is for: the key given, or - for "", which the navigators use for
@@ -447,6 +465,7 @@ function gatewayFor(key: string | undefined): LspGateway {
         gateway = new RoutedLspGateway(
             () => clients.get(key)?.gateway,
             vscodeMessageSink,
+            routeChanges,
         );
         projectGateways.set(key, gateway);
     }
@@ -462,7 +481,7 @@ function panelProject(key: string | undefined): PanelProject {
     return {
         key: resolved,
         name: clients.get(resolved)?.spec.name ?? "",
-        gateway: gatewayFor(resolved),
+        gateway: resolved ? gatewayFor(resolved) : pendingProjectGateway,
     };
 }
 
@@ -1209,7 +1228,7 @@ async function stopProjectClient(project: ProjectClient): Promise<void> {
 async function stopAllClients(): Promise<void> {
     const running = [...clients.values()];
     clients.clear();
-    lsp.routesChanged();
+    routeChanges.fire();
     WebviewPanelHost.setProjectCount(clients.size);
     await Promise.all(running.map((project) => stopProjectClient(project)));
 }
@@ -1320,7 +1339,7 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
     for (const [key, project] of ordered) {
         clients.set(key, project);
     }
-    lsp.routesChanged();
+    routeChanges.fire();
     WebviewPanelHost.setProjectCount(clients.size);
     storyNavigatorProvider?.projectsChanged();
     localisationNavigatorProvider?.projectsChanged();

@@ -5,14 +5,11 @@ using System.IO.Abstractions.TestingHelpers;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Localisation;
 
 namespace PG.StarWarsGame.LSP.Localisation.Tests;
 
 public sealed class LocalisationEntryWriterTest
 {
-    private const string XmlNs = "urn:alamoenginetools:localisation:v1";
-
     // ── ExistsAsync ──────────────────────────────────────────────────────────
 
     [Theory]
@@ -91,11 +88,36 @@ public sealed class LocalisationEntryWriterTest
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var entries = xdoc.Root!.Elements(ns + "Localisation").ToList();
         Assert.Equal(2, entries.Count);
-        var newEntry = entries.Single(e => e.Attribute("key")?.Value == "TEXT_B");
+        var newEntry = entries.Single(e => e.Attribute("Key")?.Value == "TEXT_B");
         Assert.Equal("World", newEntry.Descendants(ns + "Translation").First().Value);
+    }
+
+    // A file in the namespaced shape is saved in the text editor's format, the only one it opens.
+    [Fact]
+    public async Task UpsertAsync_Xml_TheNamespacedShape_IsSavedInTheTextEditorsFormat()
+    {
+        const string path = "/mod/f.xml";
+        var (writer, fs) = Build(path, """
+                                       <LocalisationData xmlns="urn:alamoenginetools:localisation:v1">
+                                         <Localisation key="TEXT_A">
+                                           <TranslationData><Translation Language="ENGLISH">Hello</Translation></TranslationData>
+                                         </Localisation>
+                                       </LocalisationData>
+                                       """);
+
+        await writer.UpsertAsync(path, "TEXT_B", new Dictionary<string, string> { ["ENGLISH"] = "World" },
+            CancellationToken.None);
+
+        var saved = fs.File.ReadAllText(path);
+        Assert.DoesNotContain("urn:", saved, StringComparison.Ordinal);
+        var entries = XDocument.Parse(saved).Root!.Elements("Localisation").ToList();
+        Assert.Equal(["TEXT_A", "TEXT_B"], entries.Select(e => e.Attribute("Key")?.Value));
+        Assert.Equal("Hello", entries[0].Descendants("Translation").First().Value);
+        Assert.Equal("World", entries[1].Descendants("Translation").First().Value);
+        Assert.True(await writer.ExistsAsync(path, "TEXT_B", CancellationToken.None));
     }
 
     // ── UpsertAsync: existing key (update) ───────────────────────────────────
@@ -139,7 +161,7 @@ public sealed class LocalisationEntryWriterTest
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var entries = xdoc.Root!.Elements(ns + "Localisation").ToList();
         Assert.Single(entries);
         Assert.Equal("New", entries[0].Descendants(ns + "Translation").First().Value);
@@ -153,11 +175,11 @@ public sealed class LocalisationEntryWriterTest
 
     private static string BuildXml(params (string Key, string Lang, string Value)[] entries)
     {
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var root = new XElement(ns + "LocalisationData");
         foreach (var (key, lang, value) in entries)
             root.Add(new XElement(ns + "Localisation",
-                new XAttribute("key", key),
+                new XAttribute("Key", key),
                 new XElement(ns + "TranslationData",
                     new XElement(ns + "Translation", new XAttribute("Language", lang), value))));
         return new XDocument(root).ToString();

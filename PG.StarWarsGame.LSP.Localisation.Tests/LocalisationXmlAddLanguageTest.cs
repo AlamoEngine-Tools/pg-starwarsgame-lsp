@@ -5,11 +5,11 @@ using System.IO.Abstractions;
 using System.Xml.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using PG.StarWarsGame.LSP.Localisation.Rows;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Localisation.Tests;
 
@@ -30,17 +30,15 @@ namespace PG.StarWarsGame.LSP.Localisation.Tests;
 /// </remarks>
 public sealed class LocalisationXmlAddLanguageTest
 {
-    private const string Ns = "urn:alamoenginetools:localisation:v1";
-
     private const string Xml = """
                                <?xml version="1.0" encoding="utf-8"?>
-                               <Localisations xmlns="urn:alamoenginetools:localisation:v1">
-                                 <Localisation key="TEXT_A">
+                               <Localisations>
+                                 <Localisation Key="TEXT_A">
                                    <TranslationData>
                                      <Translation Language="ENGLISH">Alpha</Translation>
                                    </TranslationData>
                                  </Localisation>
-                                 <Localisation key="TEXT_B">
+                                 <Localisation Key="TEXT_B">
                                    <TranslationData>
                                      <Translation Language="ENGLISH">Beta</Translation>
                                    </TranslationData>
@@ -69,10 +67,10 @@ public sealed class LocalisationXmlAddLanguageTest
 
     private static string ValueOf(string text, string key, string language)
     {
-        var ns = XNamespace.Get(Ns);
+        var ns = XNamespace.None;
         return XDocument.Parse(text).Root!
             .Elements(ns + "Localisation")
-            .First(e => e.Attribute("key")?.Value == key)
+            .First(e => e.Attribute("Key")?.Value == key)
             .Elements(ns + "TranslationData")
             .Elements(ns + "Translation")
             .First(t => t.Attribute("Language")?.Value == language)
@@ -113,9 +111,9 @@ public sealed class LocalisationXmlAddLanguageTest
             new LocEditCommandDto("addLanguage", Language: "GERMAN"),
             new LocEditCommandDto("setCell", 0, Language: "GERMAN", Value: "Alfa"));
 
-        var ns = XNamespace.Get(Ns);
+        var ns = XNamespace.None;
         var second = XDocument.Parse(result.NewText!).Root!
-            .Elements(ns + "Localisation").First(e => e.Attribute("key")?.Value == "TEXT_B");
+            .Elements(ns + "Localisation").First(e => e.Attribute("Key")?.Value == "TEXT_B");
 
         Assert.DoesNotContain(
             second.Elements(ns + "TranslationData").Elements(ns + "Translation"),
@@ -153,9 +151,9 @@ public sealed class LocalisationXmlAddLanguageTest
 
         Assert.Equal("Changed", ValueOf(result.NewText!, "TEXT_A", "ENGLISH"));
 
-        var ns = XNamespace.Get(Ns);
+        var ns = XNamespace.None;
         var first = XDocument.Parse(result.NewText!).Root!
-            .Elements(ns + "Localisation").First(e => e.Attribute("key")?.Value == "TEXT_A");
+            .Elements(ns + "Localisation").First(e => e.Attribute("Key")?.Value == "TEXT_A");
         Assert.Single(first.Elements(ns + "TranslationData").Elements(ns + "Translation"));
     }
 }

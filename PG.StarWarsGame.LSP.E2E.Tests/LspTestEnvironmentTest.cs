@@ -19,18 +19,20 @@ public sealed class LspTestEnvironmentTest
         var path = LspTestEnvironment.BaselineLocalPath;
 
         Assert.NotNull(path);
-        Assert.True(File.Exists(path), $"Baseline file does not exist: {path}");
-        Assert.EndsWith(".aet", path, StringComparison.OrdinalIgnoreCase);
+        Assert.True(Directory.Exists(path), $"Baseline folder does not exist: {path}");
     }
 
-    [Fact]
-    public void BaselineLocalPath_IsTheFocBaseline_MatchingTheWorkspaceTheFixturesOpen()
+    // The folder, not one game's file: the server reads the file of the game each fixture's project
+    // targets from it, so the foc/ workspace is checked against the FoC baseline and eaw/ against
+    // the EaW one, with no download in between.
+    [Theory]
+    [InlineData("foc")]
+    [InlineData("eaw")]
+    public void BaselineLocalPath_HoldsEachGamesBaseline(string game)
     {
-        // The default workspace is <repo>/foc, so the default baseline has to be the FoC one or the
-        // suite would validate FoC data against the EaW index.
         var path = LspTestEnvironment.BaselineLocalPath;
 
         Assert.NotNull(path);
-        Assert.Contains("foc", path, StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(Path.Combine(path, game, $"aet-pg-swg-lsp-{game}-baseline.aet")));
     }
 }

@@ -50,7 +50,7 @@ public sealed class LocalisationSeedFileWriter : ILocalisationSeedFileWriter
         var content = format.ToLowerInvariant() switch
         {
             "csv" => _csvExporter.Export(db),
-            "xml" => _xmlExporter.Export(db).ToString(),
+            "xml" => _xmlExporter.Export(db, omitNamespace: true).ToString(),
             "nls" => _nlsExporter.Export(db, language),
             _ => null
         };

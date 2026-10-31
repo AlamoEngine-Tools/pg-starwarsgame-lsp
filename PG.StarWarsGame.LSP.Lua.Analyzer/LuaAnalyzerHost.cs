@@ -190,7 +190,9 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzerProcess
         }
         catch (OperationCanceledException)
         {
-            _logger.LogDebug("Lua analyzer request timed out after {Timeout}", timeout ?? _options.RequestTimeout);
+            // The editor cancels a request it no longer needs - a hover the pointer left - and that is no timeout.
+            if (ct.IsCancellationRequested) _logger.LogDebug("Lua analyzer request cancelled by the caller");
+            else _logger.LogDebug("Lua analyzer request timed out after {Timeout}", timeout ?? _options.RequestTimeout);
             return null;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)

@@ -72,7 +72,7 @@ public sealed class ModProjectResolverTest
             new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var resolver = new ModProjectResolver(fileHelper, loader,
             new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
-            NullLogger<ModProjectResolver>.Instance);
+            NullLogger<ModProjectResolver>.Instance, ResxMessageCatalog.Server("en"));
 
         var config = resolver.Resolve(path, loader.Load(path));
 
@@ -101,7 +101,7 @@ public sealed class ModProjectResolverTest
             new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var resolver = new ModProjectResolver(fileHelper, loader,
             new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
-            NullLogger<ModProjectResolver>.Instance);
+            NullLogger<ModProjectResolver>.Instance, ResxMessageCatalog.Server("en"));
 
         var config = resolver.Resolve(path, loader.Load(path));
 
@@ -413,6 +413,61 @@ public sealed class ModProjectResolverTest
         Assert.Equal("XML", config.Layers[1].TextResourceType);
     }
 
+    // ── the target game ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void Resolve_CarriesTheRootProjectsGame()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new("""{ "name": "Root", "game": "eaw" }""")
+        });
+        var (resolver, root) = Build(fs);
+
+        Assert.Equal(TargetGame.EAW, resolver.Resolve(RootPath, root).Game);
+    }
+
+    // The base game cannot load the expansion's data, so an EaW mod built on a FoC project
+    // describes a game that does not exist.
+    [Fact]
+    public void Resolve_EawProjectReferencingAFocProject_RefusesNamingTheDependency()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new("""
+                             { "name": "Root", "game": "eaw",
+                               "projectReferences": [ { "path": "../dep/dep.pgproj" } ] }
+                             """),
+            [DepPath] = new("""{ "name": "Expansion Library", "game": "foc" }""")
+        });
+        var (resolver, root) = Build(fs);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => resolver.Resolve(RootPath, root));
+
+        Assert.Contains("Expansion Library", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(ProjectProblem.Invalid, ex.Problem);
+    }
+
+    // The expansion reads the base game's data, so a FoC mod may build on an EaW project.
+    [Fact]
+    public void Resolve_FocProjectReferencingAnEawProject_Resolves()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new("""
+                             { "name": "Root", "game": "foc",
+                               "projectReferences": [ { "path": "../dep/dep.pgproj" } ] }
+                             """),
+            [DepPath] = new("""{ "name": "Base Library", "game": "eaw" }""")
+        });
+        var (resolver, root) = Build(fs);
+
+        var config = resolver.Resolve(RootPath, root);
+
+        Assert.Equal(TargetGame.FOC, config.Game);
+        Assert.Equal(2, config.Layers.Count);
+    }
+
     private static (ModProjectResolver Resolver, ModProjectFile Root) Build(MockFileSystem fs)
     {
         var fileHelper = new FileHelper(fs);
@@ -420,7 +475,7 @@ public sealed class ModProjectResolverTest
             new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var graph = new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance);
         var resolver = new ModProjectResolver(
-            fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance);
+            fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance, ResxMessageCatalog.Server("en"));
         var root = loader.Load(RootPath);
         return (resolver, root);
     }

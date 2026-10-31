@@ -156,6 +156,14 @@ public sealed class FakeGameIndexService : IGameIndexService
         }
     }
 
+    public void ApplyLoadOrder(LoadOrder order)
+    {
+        lock (_gate)
+        {
+            Replace(_current with { LoadOrder = order });
+        }
+    }
+
     public void ApplyLocalisation(ILocalisationIndex index)
     {
         lock (_gate)

@@ -42,7 +42,7 @@ public static class PgprojFormat
     ///     The highest format this build understands, and the one both writers stamp. A file that
     ///     declares nothing is this version: every <c>.pgproj</c> written so far predates the fields.
     /// </summary>
-    public static readonly TypeVersion Current = TypeVersion.Of("aetswg", 1);
+    public static readonly TypeVersion Current = TypeVersion.Of("aetswg", 1, 1);
 
     public static PgprojFormatCheck Check(string? declaredVersion, string? declaredType, IMessageCatalog messages)
     {

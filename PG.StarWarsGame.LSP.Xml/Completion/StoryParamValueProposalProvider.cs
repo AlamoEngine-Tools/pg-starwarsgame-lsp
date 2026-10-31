@@ -47,7 +47,7 @@ public sealed class StoryParamValueProposalProvider
         ParamDefinition def, string partialValue, GameIndex index)
     {
         var workspace = index.WorkspaceDefinitions.Values.SelectMany(arr => arr);
-        var baseline = index.Baseline.Symbols.Values;
+        var baseline = index.ShippedSymbols.Values;
 
         // A referenceType naming a KIND is a predicate over the object's content, not a type name:
         // 58 story slots ask for a planet, and a planet is whatever carries the PLANET behaviour

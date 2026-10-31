@@ -548,7 +548,7 @@ export function SimInventory(props: {
                         >
                             <span className="sim-row-name">{planet.name}</span>
                             <span className="sim-row-value">
-                                {planet.owner ?? "Neutral"}
+                                {planet.owner ?? l10n.t("Neutral")}
                             </span>
                         </button>
                     ))}
@@ -691,7 +691,7 @@ function DecisionRow(props: {
             </button>
             <IconButton
                 icon="check"
-                title={quick?.title ?? "No one-press answer"}
+                title={quick?.title ?? l10n.t("No one-press answer")}
                 disabled={quick === null}
                 disabledReason={l10n.t("No one-press answer - open the row")}
                 onClick={() => quick?.run()}
@@ -1233,7 +1233,7 @@ function EventDialog(
                             (nodeState?.lifecycle ?? "Inactive")
                         }
                     >
-                        {nodeState?.lifecycle ?? "Inactive"}
+                        {nodeState?.lifecycle ?? l10n.t("Inactive")}
                     </span>
                 </div>
                 <div className="sim-row static">
@@ -1657,7 +1657,7 @@ function ScriptDialog(
                 <div className="sim-row static">
                     <span className="sim-row-name">{l10n.t("Current")}</span>
                     <span className="sim-row-value">
-                        {script.current ?? "not started"}
+                        {script.current ?? l10n.t("not started")}
                     </span>
                 </div>
                 <div className="sim-row static">
@@ -1759,14 +1759,14 @@ export function SimTransport(props: {
                     icon="firstFrame"
                     title={l10n.t("Restart")}
                     disabled={state.tick === 0 || frozen !== null}
-                    disabledReason={frozen ?? "Already at tick 0"}
+                    disabledReason={frozen ?? l10n.t("Already at tick 0")}
                     onClick={actions.restart}
                 />
                 <IconButton
                     icon="previousClip"
                     title={l10n.t("Back one tick")}
                     disabled={state.tick === 0 || frozen !== null}
-                    disabledReason={frozen ?? "Already at tick 0"}
+                    disabledReason={frozen ?? l10n.t("Already at tick 0")}
                     onClick={actions.back}
                 />
                 <IconButton

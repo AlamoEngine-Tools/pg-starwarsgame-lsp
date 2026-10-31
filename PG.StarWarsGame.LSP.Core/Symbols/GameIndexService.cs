@@ -159,6 +159,18 @@ public sealed class GameIndexService : IGameIndexService
         DynamicEnumChanged?.Invoke(afterBaseline);
     }
 
+    public void ApplyLoadOrder(LoadOrder order)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { LoadOrder = order };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
     public void ApplyLocalisation(ILocalisationIndex index)
     {
         GameIndex snapshot, updated;

@@ -38,7 +38,7 @@ public sealed class WorkspaceIndexerTest
         var ctx = new EaWXmlContext(fh);
         return new WorkspaceIndexer(svc,
             new MetafileRegistrar(fh, registry, schema, ctx, new StoryChainProblemStore(),
-                NullLogger<MetafileRegistrar>.Instance),
+                new RegistryWalkStore(), NullLogger<MetafileRegistrar>.Instance),
             new DocumentIndexer(fh, svc, new NullProjectIndexCache(), new ParseableFiles(fh, [], ctx),
                 new IndexFingerprints(schema, new LuaApiSchemaProvider([]), registry, fh),
                 NullLogger<DocumentIndexer>.Instance),
@@ -72,6 +72,37 @@ public sealed class WorkspaceIndexerTest
 
         Assert.Equal(["GameObjectType"],
             registry.GetTypesForFile(new FileHelper(fs).PathToFileUri(Path.Combine(xmlDir, "units.xml"))).ToArray());
+    }
+
+    /// <summary>
+    ///     The metafile stage publishes what the game loads: a shipped object in a file the project's
+    ///     registry leaves out stops resolving once the stage has run.
+    /// </summary>
+    [Fact]
+    public void PreScanMetafiles_PublishesTheLoadOrder_SoAnUnlistedShippedObjectStopsResolving()
+    {
+        var xmlDir = Path.Combine(Root("ws"), "data", "xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "gameobjectfiles.xml")] =
+                new("<Game_Object_Files><File>Units.xml</File></Game_Object_Files>")
+        });
+        var svc = new FakeGameIndexService();
+        var indexer = Build(fs, svc, new FileTypeRegistry(), new SchemaProviderBuilder().WithMetafiles(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"])
+            {
+                DuplicateNames = DuplicateNameRule.FIRST_WINS
+            }).Build());
+        svc.ApplyBaseline(BaselineIndex.Empty with
+        {
+            Symbols = ImmutableDictionary<string, GameSymbol>.Empty
+                .Add("Executor", new GameSymbol("Executor", GameSymbolKind.XmlObject, "GameObjectType",
+                    new FileOrigin(@"DATA\XML\Units_Underworld.xml", 1, null), null))
+        });
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [Root("ws")]);
+
+        Assert.Null(svc.Current.Resolve("Executor"));
     }
 
     [Fact]

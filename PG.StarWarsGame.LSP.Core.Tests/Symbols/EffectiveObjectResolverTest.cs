@@ -296,6 +296,111 @@ public sealed class EffectiveObjectResolverTest
         Assert.Equal("A, B, C", merged.Value);
     }
 
+    // ── a repeat outside the variant overlay ─────────────────────────────────
+
+    // The game parses one object's tags in order with the overlay off: a list field keeps the
+    // entries of every occurrence, whatever the tag does on a variant.
+    [Fact]
+    public void Resolve_AListTagRepeatedInOneObject_KeepsBothOccurrencesEntries()
+    {
+        var index = WorkspaceIndex(Sym("U"));
+        var source = new FakeTagSource().With("U", Tag("Tags", "A, B"), Tag("Tags", "C"));
+        var schema = new FakeSchema().WithRepeat("Tags", RepeatMode.ADD);
+
+        var result = Resolver(index, source, schema).Resolve("U");
+
+        Assert.Equal("A, B, C", TagNamed(result, "Tags").Value);
+        Assert.Equal(VariantProvenance.Own, TagNamed(result, "Tags").Provenance);
+    }
+
+    [Fact]
+    public void Resolve_AScalarTagRepeatedInOneObject_KeepsTheLaterValue()
+    {
+        var index = WorkspaceIndex(Sym("U"));
+        var source = new FakeTagSource().With("U", Tag("Speed", "1"), Tag("Speed", "2"));
+
+        var result = Resolver(index, source).Resolve("U");
+
+        Assert.Equal("2", TagNamed(result, "Speed").Value);
+    }
+
+    // A tag that may appear several times holds one entry per occurrence - each Death_Clone is its
+    // own damage type and clone - so a repeat adds an occurrence rather than joining the values.
+    [Fact]
+    public void Resolve_AMultipleAllowedListTagRepeatedInOneObject_KeepsEachOccurrence()
+    {
+        var index = WorkspaceIndex(Sym("U"));
+        var source = new FakeTagSource().With("U", Tag("Death_Clone", "Damage_Cable_Attack, Clone_A"),
+            Tag("Death_Clone", "Damage_Normal, Clone_B"));
+        var schema = new FakeSchema().WithRepeat("Death_Clone", RepeatMode.ADD).WithMultiple("Death_Clone");
+
+        var result = Resolver(index, source, schema).Resolve("U");
+
+        Assert.Equal(["Damage_Cable_Attack, Clone_A", "Damage_Normal, Clone_B"],
+            result.Tags.Where(t => t.TagName == "Death_Clone").Select(t => t.Value));
+    }
+
+    // The overlay still clears such a list: a variant's own occurrences replace the base's, and add
+    // to each other.
+    [Fact]
+    public void Resolve_AVariantsRepeatedListTag_ReplacesTheBasesList_AndAddsWithinItself()
+    {
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Tags", "A"))
+            .With("V", Tag("Tags", "C"), Tag("Tags", "D"));
+        var schema = new FakeSchema().WithRepeat("Tags", RepeatMode.ADD);
+
+        var tag = TagNamed(Resolver(index, source, schema).Resolve("V"), "Tags");
+
+        Assert.Equal("C, D", tag.Value);
+        Assert.Equal(VariantProvenance.Overridden, tag.Provenance);
+        Assert.Equal("A", tag.BaseValue);
+    }
+
+    // ── a targeting set defined twice ────────────────────────────────────────
+
+    // The game parses a second set of an existing name into the first: lists gain the second's
+    // entries, single values take the second's, and an empty value writes nothing.
+    [Fact]
+    public void Resolve_ATargetingSetDefinedTwice_IsBothDefinitionsParsedInLoadOrder()
+    {
+        const string registry = "data/xml/targetingprioritysetfiles.xml";
+        var first = new GameSymbol("Set", GameSymbolKind.XmlObject, "TargetingPrioritySet",
+            new FileOrigin("file:///c:/mod/data/xml/a.xml", 1, null), null);
+        var second = new GameSymbol("Set", GameSymbolKind.XmlObject, "TargetingPrioritySet",
+            new FileOrigin("file:///c:/mod/data/xml/b.xml", 1, null), null);
+        var order = LoadOrder.From(
+            [
+                new RegistryWalk(registry, null,
+                [
+                    new RegistryWalkEntry("a.xml", "file:///c:/mod/data/xml/a.xml"),
+                    new RegistryWalkEntry("b.xml", "file:///c:/mod/data/xml/b.xml")
+                ])
+            ],
+            [
+                new MetafileDefinition(registry, MetafileType.FileRegistry, ["TargetingPrioritySet"])
+                {
+                    DuplicateNames = DuplicateNameRule.MERGE
+                }
+            ], []);
+        var index = WorkspaceIndex(second, first) with { LoadOrder = order };
+        var source = new FakeTagSource()
+            .With(first, Tag("Attack_Priorities", "Infantry, 1.0"), Tag("Category_Exclusions", "Fighter"),
+                Tag("Unit_Exclusions", "Tie_Fighter"))
+            .With(second, Tag("Attack_Priorities", "Vehicle, 2.0"), Tag("Category_Exclusions", "Bomber"),
+                Tag("Unit_Exclusions", ""));
+        var schema = new FakeSchema()
+            .WithRepeat("Attack_Priorities", RepeatMode.ADD)
+            .WithRepeat("Unit_Exclusions", RepeatMode.ADD);
+
+        var result = Resolver(index, source, schema).Resolve("Set", "TargetingPrioritySet");
+
+        Assert.Equal("Infantry, 1.0, Vehicle, 2.0", TagNamed(result, "Attack_Priorities").Value);
+        Assert.Equal("Bomber", TagNamed(result, "Category_Exclusions").Value);
+        Assert.Equal("Tie_Fighter", TagNamed(result, "Unit_Exclusions").Value);
+    }
+
     /// <summary>
     ///     An additive tag APPENDS. A value the base already has is contributed again, not dropped.
     /// </summary>
@@ -635,6 +740,14 @@ public sealed class EffectiveObjectResolverTest
         public FakeSchema WithMode(string tag, VariantMode mode)
         {
             _tags[tag] = new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.NameReference, VariantMode = mode };
+            return this;
+        }
+
+        public FakeSchema WithRepeat(string tag, RepeatMode mode)
+        {
+            var existing = _tags.GetValueOrDefault(tag)
+                           ?? new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.NameReference };
+            _tags[tag] = existing with { RepeatMode = mode };
             return this;
         }
 

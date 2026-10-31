@@ -192,6 +192,52 @@ public sealed class YamlSchemaParserTest
         Assert.Equal(VariantMode.Replace, tag.VariantMode);
     }
 
+    // A repeat of a list tag inside one object adds its entries; a repeat of a single value replaces
+    // it. The schema names the list tags.
+    [Theory]
+    [InlineData("add", RepeatMode.ADD)]
+    [InlineData("replace", RepeatMode.REPLACE)]
+    [InlineData("ADD", RepeatMode.ADD)]
+    public void ParseTagFile_RepeatMode_MappedCorrectly(string written, RepeatMode expected)
+    {
+        var yaml = $"""
+                    tags:
+                      - tag: Attack_Priorities
+                        type: CategoryToFloatMap
+                        repeatMode: {written}
+                    """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(expected, tag.RepeatMode);
+    }
+
+    [Fact]
+    public void ParseTagFile_NoRepeatMode_DefaultsToReplace()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Speed
+                                type: Float
+                            """;
+
+        Assert.Equal(RepeatMode.REPLACE, Assert.Single(YamlSchemaParser.ParseTagFile(yaml)).RepeatMode);
+    }
+
+    // Lenient like variantMode: a schema newer than the server must still load.
+    [Fact]
+    public void ParseTagFile_UnknownRepeatMode_DefaultsToReplace()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Foo
+                                type: Float
+                                repeatMode: bogus
+                            """;
+
+        Assert.Equal(RepeatMode.REPLACE, Assert.Single(YamlSchemaParser.ParseTagFile(yaml)).RepeatMode);
+    }
+
     [Fact]
     public void ParseTagFile_SemanticType_VariantParent_Parsed()
     {
@@ -478,6 +524,7 @@ public sealed class YamlSchemaParserTest
                             metafiles:
                               - path: data/xml/gameobjectfiles.xml
                                 metaFileType: fileRegistry
+                                duplicateNames: firstWins
                                 types:
                                   - GameObjectType
                             """;
@@ -488,6 +535,68 @@ public sealed class YamlSchemaParserTest
         Assert.Equal("data/xml/gameobjectfiles.xml", entry.Path);
         Assert.Equal(MetafileType.FileRegistry, entry.MetafileType);
         Assert.Equal(["GameObjectType"], entry.Types);
+        Assert.Equal(DuplicateNameRule.FIRST_WINS, entry.DuplicateNames);
+    }
+
+    [Theory]
+    [InlineData("firstWins", DuplicateNameRule.FIRST_WINS)]
+    [InlineData("lastWins", DuplicateNameRule.LAST_WINS)]
+    [InlineData("merge", DuplicateNameRule.MERGE)]
+    [InlineData("firstByName", DuplicateNameRule.FIRST_BY_NAME)]
+    public void ParseMetafileFile_DuplicateNames_MapsEachRule(string value, DuplicateNameRule expected)
+    {
+        var yaml = $"""
+                    metafiles:
+                      - path: data/xml/traderoutefiles.xml
+                        metaFileType: fileRegistry
+                        duplicateNames: {value}
+                    """;
+
+        Assert.Equal(expected, Assert.Single(YamlSchemaParser.ParseMetafileFile(yaml)).DuplicateNames);
+    }
+
+    // The rule decides which of two same-named definitions the game uses; a registry without one
+    // would leave every lookup in its files guessing, so the schema refuses rather than defaults.
+    [Fact]
+    public void ParseMetafileFile_RegistryWithoutDuplicateNames_RefusesNamingThePath()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/traderoutefiles.xml
+                                metaFileType: fileRegistry
+                            """;
+
+        var ex = Assert.Throws<InvalidOperationException>(() => YamlSchemaParser.ParseMetafileFile(yaml));
+
+        Assert.Contains("data/xml/traderoutefiles.xml", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParseMetafileFile_UnknownDuplicateNames_RefusesNamingTheValue()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/traderoutefiles.xml
+                                metaFileType: fileRegistry
+                                duplicateNames: lastOneStanding
+                            """;
+
+        var ex = Assert.Throws<InvalidOperationException>(() => YamlSchemaParser.ParseMetafileFile(yaml));
+
+        Assert.Contains("lastOneStanding", ex.Message, StringComparison.Ordinal);
+    }
+
+    // A file that holds its objects itself has no list of files to repeat a name across.
+    [Fact]
+    public void ParseMetafileFile_DirectContentWithoutDuplicateNames_HasNone()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/movies.xml
+                                metaFileType: directContent
+                            """;
+
+        Assert.Null(Assert.Single(YamlSchemaParser.ParseMetafileFile(yaml)).DuplicateNames);
     }
 
     [Fact]
@@ -583,6 +692,7 @@ public sealed class YamlSchemaParserTest
                             metafiles:
                               - path: DATA\XML\GameObjectFiles.xml
                                 metaFileType: fileRegistry
+                                duplicateNames: firstWins
                                 types:
                                   - GameObjectType
                             """;
@@ -751,6 +861,7 @@ public sealed class YamlSchemaParserTest
                             metafiles:
                               - path: data/xml/gameobjectfiles.xml
                                 metaFileType: fileRegistry
+                                duplicateNames: firstWins
                                 types:
                                   - GameObjectType
                               - path: data/xml/movies.xml

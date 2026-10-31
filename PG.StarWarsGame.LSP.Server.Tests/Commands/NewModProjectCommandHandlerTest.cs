@@ -168,8 +168,9 @@ public sealed class NewModProjectCommandHandlerTest
 
     private static NewModProjectCommandHandler Build(MockFileSystem fs, RecordingUserNotifier notifier)
     {
-        return new NewModProjectCommandHandler(new FileHelper(fs), notifier, ResxMessageCatalog.Server("en"),
-            new ListLogger<NewModProjectCommandHandler>());
+        var fileHelper = new FileHelper(fs);
+        return new NewModProjectCommandHandler(fileHelper, new ModLayout(fileHelper), notifier,
+            ResxMessageCatalog.Server("en"), new ListLogger<NewModProjectCommandHandler>());
     }
 
     // The client announced "created" whenever the command returned, and a refusal returned like a
@@ -198,6 +199,96 @@ public sealed class NewModProjectCommandHandlerTest
 
         var info = Assert.Single(notifier.Infos);
         Assert.Contains("My Mod", info);
+        Assert.Empty(notifier.Errors);
+    }
+
+    // The adopt handler refuses any project file in the folder; this one refused only a project file
+    // of the same name, and wrote a second one beside a differently named one - then announced it.
+    [Fact]
+    public async Task ADifferentlyNamedProjectFile_IsRefused_AndNothingWritten()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile("/mods/mymod/Other.pgproj", new MockFileData("existing"));
+        var notifier = new RecordingUserNotifier();
+
+        await Build(fs, notifier).Handle(Params("My Mod", "/mods/mymod"), CancellationToken.None);
+
+        Assert.False(fs.File.Exists("/mods/mymod/My_Mod.pgproj"));
+        Assert.False(fs.File.Exists("/mods/mymod/modinfo.json"));
+        var error = Assert.Single(notifier.Errors);
+        Assert.Contains("Other.pgproj", error);
+        Assert.Empty(notifier.Infos);
+    }
+
+    // The game's own install folder is not a mod; the adopt handler knew, this one did not.
+    [Theory]
+    [InlineData("swfoc.exe")]
+    [InlineData("SWEAW.EXE")]
+    public async Task TheGamesOwnFolder_IsRefused_AndNothingWritten(string executable)
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile($"/game/{executable}", new MockFileData(string.Empty));
+        var notifier = new RecordingUserNotifier();
+
+        await Build(fs, notifier).Handle(Params("My Mod", "/game"), CancellationToken.None);
+
+        Assert.Empty(fs.Directory.GetFiles("/game", "*.pgproj"));
+        Assert.False(fs.File.Exists("/game/modinfo.json"));
+        Assert.False(fs.Directory.Exists("/game/Data"));
+        var error = Assert.Single(notifier.Errors);
+        Assert.Contains("/game", error.Replace('\\', '/'));
+        Assert.Empty(notifier.Infos);
+    }
+
+    // Three refusals logged a warning and returned like a success; the client, which no longer
+    // announces anything itself, showed nothing.
+    [Fact]
+    public async Task AMissingName_IsAnnounced()
+    {
+        var notifier = new RecordingUserNotifier();
+
+        await Build(new MockFileSystem(), notifier).Handle(Params("  ", "/mods/mymod"), CancellationToken.None);
+
+        Assert.Single(notifier.Errors);
+        Assert.Empty(notifier.Infos);
+    }
+
+    [Fact]
+    public async Task AMissingPath_IsAnnounced()
+    {
+        var notifier = new RecordingUserNotifier();
+
+        await Build(new MockFileSystem(), notifier).Handle(Params("My Mod", ""), CancellationToken.None);
+
+        Assert.Single(notifier.Errors);
+        Assert.Empty(notifier.Infos);
+    }
+
+    [Fact]
+    public async Task MissingArguments_AreAnnounced()
+    {
+        var notifier = new RecordingUserNotifier();
+
+        await Build(new MockFileSystem(), notifier)
+            .Handle(new ExecuteCommandParams { Arguments = new JArray() }, CancellationToken.None);
+
+        Assert.Single(notifier.Errors);
+        Assert.Empty(notifier.Infos);
+    }
+
+    // An existing mod keeps its own modinfo.json and gets a project file; a plain folder gets both.
+    // The refusals above must not take these two paths with them.
+    [Fact]
+    public async Task AFolderLaidOutLikeAMod_WithoutAProjectFile_GetsOne()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile("/mods/mymod/Data/XML/a.xml", new MockFileData(string.Empty));
+        var notifier = new RecordingUserNotifier();
+
+        await Build(fs, notifier).Handle(Params("My Mod", "/mods/mymod"), CancellationToken.None);
+
+        Assert.True(fs.File.Exists("/mods/mymod/My_Mod.pgproj"));
+        Assert.Single(notifier.Infos);
         Assert.Empty(notifier.Errors);
     }
 

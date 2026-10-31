@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -94,6 +95,40 @@ public sealed class WorkspaceVariantTagSourceTest
     }
 
     // ── open-document resolution ─────────────────────────────────────────────
+
+    /// <summary>
+    ///     When the game keeps the shipped definition - the mod's file loads after it - the object's
+    ///     tags are the baseline's to answer, not the losing workspace definition's.
+    /// </summary>
+    [Fact]
+    public void TryGetTags_ById_WhenTheShippedDefinitionWins_IsNotTheWorkspaces()
+    {
+        var (source, index, host, _) = Build();
+        const string modUri = "file:///c:/mod/data/xml/mod_units.xml";
+        host.AddOrUpdate(modUri,
+            """<GameObjectFiles><SpaceUnit Name="A"><Mass>1</Mass></SpaceUnit></GameObjectFiles>""", 1);
+        var shipped = new GameSymbol("A", GameSymbolKind.XmlObject, "SpaceUnit",
+            new FileOrigin(@"DATA\XML\Units.xml", 1, null), null);
+        var objects = new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["SpaceUnit"])
+        {
+            DuplicateNames = DuplicateNameRule.FIRST_WINS
+        };
+        index.Current = IndexWith(("A", modUri, 1, 1)) with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add("A", shipped)
+            },
+            LoadOrder = LoadOrder.From(
+                [
+                    new RegistryWalk("data/xml/gameobjectfiles.xml", null,
+                        [new RegistryWalkEntry("units.xml", null), new RegistryWalkEntry("mod_units.xml", modUri)])
+                ],
+                [objects], [])
+        };
+
+        Assert.Null(source.TryGetTags("A"));
+    }
 
     [Fact]
     public void TryGetTags_ReturnsDirectChildTagsOfObject()

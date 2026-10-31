@@ -74,7 +74,7 @@ public sealed class XmlStructureRepairCodeActionProviderTest
     [Fact]
     public void UnrelatedDiagnostic_OffersNothing()
     {
-        Assert.Empty(Actions(Build(Broken), At(DiagnosticIds.DuplicateSymbol, 2, 5, 9)));
+        Assert.Empty(Actions(Build(Broken), At(DiagnosticIds.DefinitionNotUsed, 2, 5, 9)));
     }
 
     [Fact]

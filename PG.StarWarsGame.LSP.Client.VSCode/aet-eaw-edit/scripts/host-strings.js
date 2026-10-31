@@ -12,11 +12,18 @@ const fs = require("node:fs");
 const path = require("node:path");
 const ts = require("typescript");
 
-/** Calls whose every string argument is shown: the message and the buttons. */
+/**
+ * Calls whose every string argument is shown: a notification's message and its buttons, and the
+ * status setters that feed the slot a webview's reader watches - the story graph's `setStatus`
+ * (the React state setter) and `reportStatus` (the module-level alias that reaches it from outside
+ * the component).
+ */
 const SHOWN_ARGUMENTS = new Set([
     "showInformationMessage",
     "showWarningMessage",
     "showErrorMessage",
+    "setStatus",
+    "reportStatus",
 ]);
 
 /** Properties that are shown wherever they are written: options, items, progress reports. */
@@ -35,7 +42,10 @@ const SHOWN_PROPERTIES = new Set([
 /** Whether written text carries words - a format such as `${a} - ${b}` gives a translator nothing. */
 const hasWords = (text) => /[A-Za-z]/.test(text);
 
-/** Whether an expression is text written in place: a literal, a template, or one joined in. */
+/**
+ * Whether an expression is text written in place: a literal, a template, or one joined in - by
+ * `+`, by a conditional, or as the fallback of `??` / `||`.
+ */
 function isRaw(node) {
     if (ts.isParenthesizedExpression(node)) {
         return isRaw(node.expression);
@@ -51,7 +61,9 @@ function isRaw(node) {
     }
     if (
         ts.isBinaryExpression(node) &&
-        node.operatorToken.kind === ts.SyntaxKind.PlusToken
+        (node.operatorToken.kind === ts.SyntaxKind.PlusToken ||
+            node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+            node.operatorToken.kind === ts.SyntaxKind.BarBarToken)
     ) {
         return isRaw(node.left) || isRaw(node.right);
     }

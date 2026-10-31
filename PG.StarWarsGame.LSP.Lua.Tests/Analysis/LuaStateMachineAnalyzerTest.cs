@@ -147,6 +147,27 @@ public sealed class LuaStateMachineAnalyzerTest
         Assert.Contains("2", diagnostic.Message);
     }
 
+    // The parameter list of a handler taking none is "()", too small to see: the name is marked.
+    [Fact]
+    public void AHandlerNotTakingOneParameter_IsMarkedAtItsName()
+    {
+        var diagnostic = Single("Define_State(\"A\", State_A)\nfunction State_A() end",
+            DiagnosticIds.LuaStateHandlerParameters);
+
+        Assert.Equal((1, 9, 16), (diagnostic.Range.Start.Line, diagnostic.Range.Start.Character,
+            diagnostic.Range.End.Character));
+    }
+
+    // An inline handler has no name: its parameter list is marked, not its whole body.
+    [Fact]
+    public void AnInlineHandlerNotTakingOneParameter_IsMarkedAtItsParameterList()
+    {
+        var diagnostic = Single("Define_State(\"A\", function() end)", DiagnosticIds.LuaStateHandlerParameters);
+
+        Assert.Equal((0, 26, 28), (diagnostic.Range.Start.Line, diagnostic.Range.Start.Character,
+            diagnostic.Range.End.Character));
+    }
+
     [Fact]
     public void TheMessageComparedWithAnythingElse_IsAWarning()
     {

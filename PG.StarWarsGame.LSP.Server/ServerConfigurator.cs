@@ -273,6 +273,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
+                services.AddSingleton<IRegistryWalkStore, RegistryWalkStore>();
                 // Live chain problems (open-buffer-first, invalidated per document version); the
                 // startup snapshot it also accepts only answers until the first real scan.
                 services.AddSingleton<IStoryChainProblemStore>(sp =>
@@ -367,6 +368,10 @@ public static class ServerConfigurator
                 services.AddSingleton<ModProjectResolver>();
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();
                 services.AddSingleton<IProjectConfigurationResolver, ProjectConfigurationResolver>();
+                services.AddSingleton<ITargetGameProbe, TargetGameProbe>();
+                // One reading of what a folder is to the game, shared by New Mod Project and Adopt
+                // Project, so the two refuse the same folders (#317).
+                services.AddSingleton<ModLayout>();
                 services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
 
                 // The Lua analyzer sidecar (emmylua_ls): one process per open script, holding that
@@ -376,10 +381,12 @@ public static class ServerConfigurator
                 // each with its configuration in a directory of its own. Absent executable: never
                 // started, every call a no-op.
                 services.AddSingleton<LuaStubLocation>();
-                // The annotations this server knows, inserted above the functions in the text the
-                // analyzer reads - an open script's and every file of a script's require tree.
+                // The annotations this server knows - stub types, state handler messages, a plan's
+                // task forces - inserted into the text the analyzer reads: an open script's and
+                // every file of a script's require tree.
                 services.AddSingleton<ILuaAnnotationSource, StubOverrideAnnotations>();
                 services.AddSingleton<ILuaAnnotationSource, StateHandlerAnnotations>();
+                services.AddSingleton<ILuaAnnotationSource, TaskForceAnnotations>();
                 services.AddSingleton<LuaGeneratedTexts>();
                 services.AddSingleton(sp =>
                 {
@@ -393,7 +400,8 @@ public static class ServerConfigurator
                         sp.GetRequiredService<LuaStubLocation>(),
                         sp.GetRequiredService<LuaGeneratedTexts>(),
                         LuaAnalyzerDirectory,
-                        sp.GetRequiredService<ILogger<LuaAnalyzerInstances>>());
+                        sp.GetRequiredService<ILogger<LuaAnalyzerInstances>>(),
+                        timing: LuaAnalyzerInstanceTiming.Editor);
                 });
                 services.AddSingleton(sp => new LuaAnalyzerHost(new LuaAnalyzerOptions
                 {

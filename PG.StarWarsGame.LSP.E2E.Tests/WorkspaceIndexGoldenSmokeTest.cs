@@ -74,7 +74,8 @@ public sealed class WorkspaceIndexGoldenSmokeTest
         }));
         await Task.WhenAll(
             provider.GetRequiredService<ISchemaBootstrapper>().LoadAsync(cts.Token),
-            provider.GetRequiredService<IBaselineBootstrapper>().LoadAsync(cts.Token));
+            provider.GetRequiredService<IBaselineBootstrapper>().LoadAsync(
+                provider.GetRequiredService<ITargetGameProbe>().Probe([workspace]), cts.Token));
         await provider.GetRequiredService<IModProjectReloadService>().LoadAsync([workspace], cts.Token);
 
         var actual = Scrub(JsonSerializer.Serialize(Record(

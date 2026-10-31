@@ -15,7 +15,7 @@ public sealed class SchemaHttpCacheTest
     private const string HardcodedYaml = "name: TestModule\nvalues:\n  - name: TEST_VALUE\n";
 
     private const string MetaYaml =
-        "metafiles:\n  - path: data/xml/test.xml\n    metaFileType: fileRegistry\n    types:\n      - GameObjectType\n";
+        "metafiles:\n  - path: data/xml/test.xml\n    metaFileType: fileRegistry\n    duplicateNames: firstWins\n    types:\n      - GameObjectType\n";
 
     private static readonly string CacheDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),

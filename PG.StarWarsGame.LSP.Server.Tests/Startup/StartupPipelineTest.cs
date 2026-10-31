@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -18,11 +19,13 @@ public sealed class StartupPipelineTest
         IPgprojMigrationOffer? migrationOffer = null,
         IEnumerable<IDiagnosticsRepublisher>? republishers = null,
         bool workspaceDiagnosticsOnStartup = false,
-        ServerStatusRecorder? status = null)
+        ServerStatusRecorder? status = null,
+        RecordingBaselineBootstrapper? baseline = null,
+        TargetGame probedGame = TargetGame.FOC)
     {
         return new StartupPipeline(
             new RecordingSchemaBootstrapper(log),
-            new RecordingBaselineBootstrapper(log),
+            baseline ?? new RecordingBaselineBootstrapper(log),
             reloadService,
             gate,
             new RecordingProgress(log),
@@ -31,7 +34,31 @@ public sealed class StartupPipelineTest
             migrationOffer ?? new RecordingMigrationOffer(log),
             republishers ?? [],
             new StubConfigurationProvider(workspaceDiagnosticsOnStartup),
-            status ?? new ServerStatusRecorder(), TestCatalogues.English);
+            status ?? new ServerStatusRecorder(), TestCatalogues.English,
+            new FixedGameProbe(probedGame));
+    }
+
+    // The baseline loads beside the schema, before the project does, so it starts from the game
+    // the project file names; the project load corrects it if the guess was wrong.
+    [Fact]
+    public async Task RunAsync_LoadsTheBaselineOfTheProbedGame()
+    {
+        var log = new Log();
+        var baseline = new RecordingBaselineBootstrapper(log);
+
+        await Build(log, new RecordingReloadService(log), new RecordingGate(log), baseline: baseline,
+                probedGame: TargetGame.EAW)
+            .RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal([TargetGame.EAW], baseline.Games);
+    }
+
+    private sealed class FixedGameProbe(TargetGame game) : ITargetGameProbe
+    {
+        public TargetGame Probe(IReadOnlyList<string> roots)
+        {
+            return game;
+        }
     }
 
     // ── what the bug report is told ──────────────────────────────────────────
@@ -166,7 +193,8 @@ public sealed class StartupPipelineTest
             new RecordingMigrationOffer(log),
             [],
             new StubConfigurationProvider(false),
-            new ServerStatusRecorder(), TestCatalogues.English);
+            new ServerStatusRecorder(), TestCatalogues.English,
+            new FixedGameProbe(TargetGame.FOC));
 
         var pipelineTask = pipeline.RunAsync(["/ws"], CancellationToken.None);
         var timeout = Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -291,8 +319,11 @@ public sealed class StartupPipelineTest
             _log = log;
         }
 
-        public Task LoadAsync(CancellationToken ct)
+        public List<TargetGame> Games { get; } = [];
+
+        public Task LoadAsync(TargetGame game, CancellationToken ct)
         {
+            Games.Add(game);
             _log.Add("baseline");
             return Task.CompletedTask;
         }
@@ -494,7 +525,7 @@ public sealed class StartupPipelineTest
             _signal = signal;
         }
 
-        public Task LoadAsync(CancellationToken ct)
+        public Task LoadAsync(TargetGame game, CancellationToken ct)
         {
             _log.Add("baseline");
             _signal.TrySetResult();

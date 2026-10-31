@@ -228,7 +228,7 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
             setName ? "folder-library" : "folder",
         );
         item.description = setSummary(members, setName !== undefined);
-        item.tooltip = setName ?? "No Campaign_Set";
+        item.tooltip = setName ?? vscode.l10n.t("No Campaign_Set");
         item.contextValue = setName
             ? "aetCampaignSet"
             : "aetCampaignSetUngrouped";

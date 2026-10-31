@@ -28,7 +28,7 @@
     <value>cannot absorb fire from any source</value>
   </data>
   <data name="AdoptModProject_NotAMod" xml:space="preserve">
-    <value>Not laid out like a mod: No game folder or MEG archive under Data, no modinfo.json - {0}</value>
+    <value>Not a mod - {0} holds none of the Data folders XML, Scripts, Art, Audio or Text, no MEG archive under Data and no modinfo.json</value>
   </data>
   <data name="AdoptModProject_GameFolder" xml:space="preserve">
     <value>The game's own folder, not a mod - {0}</value>
@@ -38,6 +38,15 @@
   </data>
   <data name="NewModProject_ProjectExists" xml:space="preserve">
     <value>Mod project not created: A project file already exists - {0}</value>
+  </data>
+  <data name="NewModProject_GameFolder" xml:space="preserve">
+    <value>Mod project not created: The game's own folder, not a mod - {0}</value>
+  </data>
+  <data name="NewModProject_NameRequired" xml:space="preserve">
+    <value>Mod project not created: A mod name is required</value>
+  </data>
+  <data name="NewModProject_PathRequired" xml:space="preserve">
+    <value>Mod project not created: A target folder is required</value>
   </data>
   <data name="NewModProject_Created" xml:space="preserve">
     <value>Mod project '{0}' created - {1}</value>
@@ -206,9 +215,6 @@
   </data>
   <data name="CreditsCoverage_EmptyHeading" xml:space="preserve">
     <value>In {0}, '{1}' is a heading with nothing under it. The crawl reads it out and moves straight on, which is valid - a credits key is a formatting directive, not an entry. Usually it means the label was translated and the names under it were not; leaving the heading itself empty skips the whole section.</value>
-  </data>
-  <data name="CrossLayerShadow_OverridesADefinitionFromIf" xml:space="preserve">
-    <value>'{0}' overrides a definition from '{1}'. If that is intended, declare it: &lt;!-- &lt;Override Name="{2}"/&gt; --&gt;</value>
   </data>
   <data name="DamageAbsorbsNothing_BothAre" xml:space="preserve">
     <value>Both are {0}</value>
@@ -381,11 +387,26 @@
   <data name="DocumentMigrator_Overshoot" xml:space="preserve">
     <value>the chain ended at {0}, past the {1} this build writes</value>
   </data>
-  <data name="DuplicateSymbol_DuplicateSymbolAlsoDefinedIn" xml:space="preserve">
-    <value>Duplicate symbol '{0}': Also defined in {1}.</value>
+  <data name="DuplicateDefinition_AlsoDefinedIn" xml:space="preserve">
+    <value>'{0}' is also defined in {1}.</value>
   </data>
-  <data name="DuplicateSymbol_OtherDefinition" xml:space="preserve">
+  <data name="DuplicateDefinition_OtherDefinition" xml:space="preserve">
     <value>Other definition of '{0}'</value>
+  </data>
+  <data name="DuplicateDefinition_KeptDefinition" xml:space="preserve">
+    <value>Definition of '{0}' the game keeps</value>
+  </data>
+  <data name="DefinitionNotUsed_FirstWins" xml:space="preserve">
+    <value>'{0}' is not used: The first definition wins, and {1} loads the one in {2} first.</value>
+  </data>
+  <data name="DefinitionNotUsed_LastWins" xml:space="preserve">
+    <value>'{0}' is not used: The last definition wins, and {1} loads the one in {2} later.</value>
+  </data>
+  <data name="DefinitionNotUsed_FirstByName" xml:space="preserve">
+    <value>'{0}' is not found by name: A lookup finds the first definition, and {1} loads the one in {2} first. Both stay in the faction list.</value>
+  </data>
+  <data name="DefinitionMerged_IntoEarlier" xml:space="preserve">
+    <value>'{0}' is merged into the definition in {2}: Every definition of one name in {1} is parsed into one set.</value>
   </data>
   <data name="DynamicEnumValue_ExpectsASingleEnumIdentifier" xml:space="preserve">
     <value>&lt;{0}&gt; expects a single enum identifier; '|' is not allowed here.</value>
@@ -1378,6 +1399,12 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="ModProject_FileNotValidJSONDoes" xml:space="preserve">
     <value>The file is not valid JSON or does not match the .pgproj schema.</value>
   </data>
+  <data name="ModProject_GameMustBeOneOf" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'game' must be one of eaw, foc (got '{1}').</value>
+  </data>
+  <data name="ModProject_EawProjectReferencesFocProject" xml:space="preserve">
+    <value>Could not load mod project '{0}': It targets Empire at War and references '{1}', which targets Forces of Corruption. The base game cannot load the expansion's data.</value>
+  </data>
   <data name="ModProject_ProjectReferencesMustBeArrayReferences" xml:space="preserve">
     <value>'projectReferences' must be an array of references - either path strings or {{ "path": "..." }} objects, e.g. [ {{ "path": "../core/core.pgproj" }} ].</value>
   </data>
@@ -1485,6 +1512,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="PgprojMigrationOffer_UpdatedPreviousFileAt" xml:space="preserve">
     <value>'{0}' updated. The previous file is at '{1}'.</value>
+  </data>
+  <data name="PgprojMigrations_TargetsForcesOfCorruption" xml:space="preserve">
+    <value>The project now names the game it is checked against with "game": "foc". An Empire at War mod sets it to "eaw".</value>
   </data>
   <data name="PlanetModeExclusionList_HasNoModeIsA" xml:space="preserve">
     <value>'{0}' has no mode. &lt;{1}&gt; is a flat list of (planet, mode) pairs, so every planet must be followed by the mode it is excluded in.</value>

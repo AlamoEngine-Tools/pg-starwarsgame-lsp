@@ -337,6 +337,19 @@
 - **New Mod Project in an existing mod** - leaves the mod's `modinfo.json`, dependencies included, as it was; only a
   folder without one gets a new one; a folder that already has the project file is refused with its path, where
   "created" was reported ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+- **New Mod Project and Adopt Project refuse the same folders** - any project file in the folder, whatever its name,
+  and the game's own folder; every refusal is shown, where an empty name or folder returned silently; `modinfo.json` is
+  found in any spelling; the not-a-mod refusal names the folders it looked for
+  ([#317](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/317))
+- **A panel no longer waits out the timeout after a client restart** - every project's gateway hears a route change,
+  where only the window's did, so a preview opened while its server restarted sat blank for 30 seconds; a panel opened
+  while no project runs binds to the one project that starts, never to the editor in front
+  ([#318](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/318))
+- **Every status text and every fallback text comes from the catalogue** - the story graph's status slot wrote its
+  texts in place, and a text standing in for a missing value (`No model`, `Nothing selected`, `Neutral`) escaped the
+  lint everywhere; the lint now checks `setStatus` and `reportStatus` and looks through `??` and `||`, and the
+  nineteen texts it found are catalogued
+  ([#319](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/319))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))

@@ -160,8 +160,10 @@ internal static class LuaStateMachineAnalyzer
         var parameters = handler.Parameters.Parameters;
         if (parameters.Count != 1)
         {
+            // At the name: an empty list is "()", too small to see. An inline handler has none, and
+            // its location is its whole body.
             diagnostics.Add(Diagnostic(DiagnosticIds.LuaStateHandlerParameters, LspDiagnosticSeverity.Warning,
-                handler.Parameters.GetLocation(),
+                handler.Name is null ? handler.Parameters.GetLocation() : handler.NameLocation,
                 messages.Format("LuaStateMachine_HandlerParameters",
                     handler.Name ?? messages.Format("LuaStateMachine_AnonymousHandler"), parameters.Count)));
             if (parameters.Count == 0) return;

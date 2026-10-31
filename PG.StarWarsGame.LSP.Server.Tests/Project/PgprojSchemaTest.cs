@@ -61,6 +61,27 @@ public sealed class PgprojSchemaTest
         Assert.False(Evaluate("""{ "_type": "aetswg.StoryLayout", "name": "Mod" }""").IsValid);
     }
 
+    // ── game ─────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("eaw")]
+    [InlineData("foc")]
+    public void Game_TheTwoGamesAreAccepted(string game)
+    {
+        var result = Evaluate($$"""{ "name": "Mod", "game": "{{game}}" }""");
+
+        Assert.True(result.IsValid, DescribeErrors("game", result));
+    }
+
+    [Theory]
+    [InlineData("\"FOC\"")]
+    [InlineData("\"swgb\"")]
+    [InlineData("1")]
+    public void Game_AnythingElseIsRefused(string value)
+    {
+        Assert.False(Evaluate($$"""{ "name": "Mod", "game": {{value}} }""").IsValid);
+    }
+
     // It is the document's format, not the mod's version: a two-part or free-text value is the
     // typo that would otherwise surface as "unreadable format version" on every open.
     // It is the document's format, not the mod's version, and it carries its namespace: a bare

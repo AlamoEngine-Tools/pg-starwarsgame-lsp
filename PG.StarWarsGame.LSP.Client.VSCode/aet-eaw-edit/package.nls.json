@@ -76,7 +76,7 @@
   "config.lsp.schema.source.markdownDescription": "Where the XML schema is read from: `http` fetches the newest compatible release from GitHub, `local` reads a copy on disk.",
   "config.lsp.schema.url.markdownDescription": "Custom HTTP URL for the XML schema index. Empty, the newest compatible schema release is read.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `http`.",
   "config.lsp.source.baseGameDirectory.markdownDescription": "Install directory of **Star Wars: Empire at War** - the folder holding its `Data`, `GameData` on Steam.\n\nAssets that ship with the game - models, textures, the string table - are read from it. Empty, the install is found in the Steam library or the Windows registry.",
-  "config.lsp.source.baseline.localPath.markdownDescription": "Path to a local baseline `.aet` file.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `local`.",
+  "config.lsp.source.baseline.localPath.markdownDescription": "Path to a local baseline `.aet` file, or to a folder laid out like the baseline repository with an `eaw` and a `foc` folder. A folder serves each project the baseline of the game it targets; a file is used for every project.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `local`.",
   "config.lsp.source.baseline.type.enumItemLabels.0": "Download automatically (recommended)",
   "config.lsp.source.baseline.type.enumItemLabels.1": "Local file",
   "config.lsp.source.baseline.type.markdownDescription": "Where the baseline index is read from: `http` downloads the newest release this server supports, `local` reads a file.",

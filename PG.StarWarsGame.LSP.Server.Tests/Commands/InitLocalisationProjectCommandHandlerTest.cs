@@ -127,6 +127,20 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         Assert.NotEmpty(xdoc.Root.Elements());
     }
 
+    // Only a file without the namespace opens in the EaW text editor.
+    [Fact]
+    public async Task Handle_RootLayerConfigured_XmlContent_IsInTheTextEditorsFormat()
+    {
+        var (handler, fs, _, _, _) = BuildHandler(ConfiguredLayer("Xml", "/mod/data/text"));
+
+        await handler.Handle(NoArgsRequest(), CancellationToken.None);
+
+        var root = XDocument.Parse(fs.File.ReadAllText("/mod/data/text/mastertextfile.xml")).Root!;
+        Assert.Equal(XName.Get("LocalisationData"), root.Name);
+        Assert.NotEmpty(root.Elements("Localisation"));
+        Assert.All(root.Elements("Localisation"), e => Assert.NotNull(e.Attribute("Key")));
+    }
+
     [Fact]
     public async Task Handle_RootLayerConfigured_UnsupportedFormat_NoFileCreated()
     {

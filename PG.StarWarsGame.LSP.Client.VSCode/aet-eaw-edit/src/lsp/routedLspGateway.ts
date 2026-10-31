@@ -10,18 +10,44 @@
 
 import { LspGateway, type LspMessageSink, type LspOutcome } from "./lspGateway";
 
+/**
+ * The one event every routed gateway hears when the set of servers changes (#318).
+ *
+ * It used to be a method called by hand on the window's gateway alone, so a project's own gateway
+ * - whose client was between stopping and starting when a panel asked - never heard that its route
+ * was back and sat out the whole timeout. A gateway built on the shared routes cannot be missed.
+ */
+export class RouteChanges {
+    private readonly _listeners = new Set<() => void>();
+
+    /** Calls `listener` on every change, for the life of the window. */
+    onChanged(listener: () => void): void {
+        this._listeners.add(listener);
+    }
+
+    /** The set of servers changed: every gateway looks at its route again. */
+    fire(): void {
+        for (const listener of this._listeners) {
+            listener();
+        }
+    }
+}
+
 export class RoutedLspGateway extends LspGateway {
     private readonly _waitingForRoute = new Set<() => void>();
 
     /**
      * @param _route The gateway of the server a call goes to now, or undefined when there is none.
      * @param sink Where the helpers' messages go when no server is there to answer.
+     * @param routes The shared routes event; every change releases whoever waits for a route here.
      */
     constructor(
         private readonly _route: () => LspGateway | undefined,
         sink?: LspMessageSink,
+        routes?: RouteChanges,
     ) {
         super(() => undefined, sink);
+        routes?.onChanged(() => this.routesChanged());
     }
 
     override get isRunning(): boolean {

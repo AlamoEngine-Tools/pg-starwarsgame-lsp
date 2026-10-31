@@ -12,6 +12,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Commands;
@@ -23,14 +24,16 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private readonly IFileHelper _fileHelper;
+    private readonly ModLayout _layout;
     private readonly ILogger<NewModProjectCommandHandler> _logger;
     private readonly IMessageCatalog _messages;
     private readonly IUserNotifier _notifier;
 
-    public NewModProjectCommandHandler(IFileHelper fileHelper, IUserNotifier notifier, IMessageCatalog messages,
-        ILogger<NewModProjectCommandHandler> logger)
+    public NewModProjectCommandHandler(IFileHelper fileHelper, ModLayout layout, IUserNotifier notifier,
+        IMessageCatalog messages, ILogger<NewModProjectCommandHandler> logger)
     {
         _fileHelper = fileHelper;
+        _layout = layout;
         _notifier = notifier;
         _messages = messages;
         _logger = logger;
@@ -38,9 +41,12 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
 
     public override Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
+        // Every refusal is shown: the client announces nothing of its own, so a logged warning
+        // and a silent return read as success.
         if (request.Arguments?.FirstOrDefault() is not JObject args)
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without arguments; nothing created.");
+            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without arguments; nothing created");
+            _notifier.ShowError(_messages.Format("NewModProject_NameRequired"));
             return Unit.Task;
         }
 
@@ -49,13 +55,15 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without a mod name; nothing created.");
+            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without a mod name; nothing created");
+            _notifier.ShowError(_messages.Format("NewModProject_NameRequired"));
             return Unit.Task;
         }
 
         if (string.IsNullOrWhiteSpace(path))
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without a target path; nothing created.");
+            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without a target path; nothing created");
+            _notifier.ShowError(_messages.Format("NewModProject_PathRequired"));
             return Unit.Task;
         }
 
@@ -63,11 +71,22 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
         var sanitized = SanitizeModName(name);
         var pgprojPath = fs.Path.Combine(path, sanitized + ".pgproj");
 
-        if (fs.File.Exists(pgprojPath))
+        // The same rule as Adopt Project: any project file, whatever its name, and the game's own
+        // folder refuse the command - a second project file beside a differently named one, or a
+        // project file written into the game's install, is not a mod project.
+        var folder = _layout.Inspect(path);
+        if (folder.ProjectFile is { } existing)
         {
             _logger.LogWarning(
-                "aet-eaw-edit.lsp.newModProject: project file '{Path}' already exists; nothing created.", pgprojPath);
-            _notifier.ShowError(_messages.Format("NewModProject_ProjectExists", pgprojPath));
+                "aet-eaw-edit.lsp.newModProject: project file '{Path}' already exists; nothing created", existing);
+            _notifier.ShowError(_messages.Format("NewModProject_ProjectExists", existing));
+            return Unit.Task;
+        }
+
+        if (folder.IsGame)
+        {
+            _logger.LogWarning("aet-eaw-edit.lsp.newModProject: '{Path}' is the game's folder; nothing created", path);
+            _notifier.ShowError(_messages.Format("NewModProject_GameFolder", path));
             return Unit.Task;
         }
 
@@ -75,11 +94,10 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
         WritePgproj(pgprojPath, name);
         // An existing mod's modinfo.json - its dependencies included - is the mod's, not ours to
         // replace; only a folder without one gets a new one.
-        var modinfoPath = fs.Path.Combine(path, "modinfo.json");
-        if (!fs.File.Exists(modinfoPath))
-            WriteModinfo(modinfoPath, name);
+        if (folder.Modinfo is null)
+            WriteModinfo(fs.Path.Combine(path, ModLayout.ModinfoFileName), name);
 
-        _logger.LogInformation("aet-eaw-edit.lsp.newModProject: created mod project '{Name}' at '{Path}'.", name, path);
+        _logger.LogInformation("aet-eaw-edit.lsp.newModProject: created mod project '{Name}' at '{Path}'", name, path);
         _notifier.ShowInfo(_messages.Format("NewModProject_Created", name, pgprojPath));
         return Unit.Task;
     }

@@ -83,7 +83,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         // reference for each object they index (the enclosing object's type is only known here).
         var references = CollectReferences(doc, canonicalUri, lineIndex, ct);
         var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, lineIndex, registeredTypes, references, ct);
-        symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, lineIndex, references, ct));
+        // The game reads a nested ability only from a file it loads, and it loads only the files a
+        // registry types.
+        if (!registeredTypes.IsEmpty)
+            symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, lineIndex, references, ct));
         symbols.AddRange(CollectWorkspaceFileSymbols(canonicalUri, registeredTypes));
 
         if (registeredTypes.Contains(StoryReferenceTypes.ThreadFileTypeName, StringComparer.OrdinalIgnoreCase))

@@ -59,8 +59,8 @@ public sealed class LocalisationServerFixture : LspServerFixture
         File.WriteAllText(XmlTextPath,
             """
             <?xml version="1.0" encoding="utf-8"?>
-            <Localisations xmlns="urn:alamoenginetools:localisation:v1">
-              <Localisation key="TEXT_E2E_XML">
+            <Localisations>
+              <Localisation Key="TEXT_E2E_XML">
                 <TranslationData>
                   <Translation Language="ENGLISH">Alpha</Translation>
                 </TranslationData>

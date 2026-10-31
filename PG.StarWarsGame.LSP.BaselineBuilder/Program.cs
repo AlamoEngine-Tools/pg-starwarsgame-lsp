@@ -431,6 +431,8 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     var fileTypeMapBuilder =
         ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+    var registryListsBuilder =
+        ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
     if (schemaProvider is not null)
         foreach (var def in schemaProvider.AllMetafiles)
         {
@@ -461,11 +463,10 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
                     try
                     {
                         var xmlContent = await new StreamReader(stream).ReadToEndAsync();
-                        foreach (var filename in MetafileReader.ReadFileList(xmlContent))
-                        {
-                            var normalizedPath = GamePaths.Key(filename);
+                        var listed = MetafileReader.ReadFileKeys(xmlContent);
+                        registryListsBuilder[GamePaths.Key(def.Path)] = [.. listed];
+                        foreach (var normalizedPath in listed)
                             fileTypeMapBuilder[normalizedPath] = [.. def.Types];
-                        }
                     }
                     catch (Exception ex)
                     {
@@ -478,8 +479,12 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
             }
         }
 
-    baseline = baseline with { FileTypeMap = fileTypeMapBuilder.ToImmutable() };
+    baseline = baseline with
+    {
+        FileTypeMap = fileTypeMapBuilder.ToImmutable(), RegistryLists = registryListsBuilder.ToImmutable()
+    };
     Console.WriteLine($"File type registry: {baseline.FileTypeMap.Count} file(s) registered");
+    Console.WriteLine($"Registry lists: {baseline.RegistryLists.Count} in load order");
 
     // ── Asset catalog (MEG + loose) ───────────────────────────────────────────
 

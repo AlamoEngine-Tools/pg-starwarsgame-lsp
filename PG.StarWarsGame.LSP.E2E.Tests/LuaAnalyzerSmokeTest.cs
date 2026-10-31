@@ -55,9 +55,21 @@ public sealed class LuaAnalyzerSmokeTest
             new { textDocument = new { uri } }, TimeSpan.FromSeconds(10)))!);
         var resolved = await session.RequestAsync("codeLens/resolve", lens, TimeSpan.FromSeconds(10));
         Assert.Equal("aet-eaw-edit.lsp.showReferences", (string?)resolved?["command"]?["command"]);
+
+        // The outline (Ctrl+Shift+O): the editor asks only a server that offers it.
+        Assert.True(Capabilities(session, "documentSymbolProvider"), "no documentSymbolProvider offered");
+        var symbols = (JArray?)await session.RequestAsync("textDocument/documentSymbol",
+            new { textDocument = new { uri } }, TimeSpan.FromSeconds(10));
+        Assert.Contains(symbols ?? [], s => (string?)s["name"] == "helper");
     }
 
-    private static string? FindAnalyzer(string repoRoot)
+    private static bool Capabilities(RawLspSession session, string provider)
+    {
+        return session.Capabilities[provider] is { } offered && offered.Type != JTokenType.Null &&
+               !(offered.Type == JTokenType.Boolean && !offered.Value<bool>());
+    }
+
+    internal static string? FindAnalyzer(string repoRoot)
     {
         var configured = Environment.GetEnvironmentVariable("AET_EMMYLUA_LS");
         if (!string.IsNullOrEmpty(configured) && File.Exists(configured)) return configured;
@@ -66,7 +78,7 @@ public sealed class LuaAnalyzerSmokeTest
         return File.Exists(staged) ? staged : null;
     }
 
-    private static async Task<JToken?> PollAsync(Func<Task<JToken?>> request)
+    internal static async Task<JToken?> PollAsync(Func<Task<JToken?>> request)
     {
         var deadline = DateTime.UtcNow.AddSeconds(90);
         while (DateTime.UtcNow < deadline)
