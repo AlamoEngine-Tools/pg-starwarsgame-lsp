@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Targeting_Priority_Sets>
+	<TargetingPrioritySet Name="E2E_LoadOrder_Set">
+		<Attack_Priorities>Infantry, 1.0</Attack_Priorities>
+		<Category_Exclusions>Fighter</Category_Exclusions>
+	</TargetingPrioritySet>
+</Targeting_Priority_Sets>

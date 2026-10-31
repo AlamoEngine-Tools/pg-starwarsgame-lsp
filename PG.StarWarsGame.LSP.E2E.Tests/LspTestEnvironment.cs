@@ -49,6 +49,13 @@ public static class LspTestEnvironment
         ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace") : null);
 
     /// <summary>
+    ///     The authored FoC mod that ships its own registries over the shipped game, for the load-order
+    ///     rules: <c>e2e-workspace-load-order/</c> in the repository.
+    /// </summary>
+    public static string? E2eLoadOrderWorkspacePath =>
+        ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace-load-order") : null);
+
+    /// <summary>
     ///     The authored base project the two-project window puts beneath the mod (#280). Prefers
     ///     <c>LSP_E2E_MULTI_ROOT_WORKSPACE_PATH</c>; falls back to <c>e2e-workspace-multi-root/</c> in
     ///     the repository. Tracked for the same reason as <c>e2e-workspace/</c>.

@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Authored for the load-order check. The game opens each file from the first place it finds it:
+     this mod first, then the shipped game. A shipped file this list leaves out never loads. -->
+<Game_Object_Files>
+	<!-- Shipped, and not in this mod: the shipped copy loads, so X-Wing resolves. -->
+	<File>SpaceUnitsFighters.xml</File>
+	<!-- This mod ships its own copy: it replaces the shipped file whole, so Scout_Trooper is gone. -->
+	<File>GroundInfantry.xml</File>
+	<!-- Loads last: a name it defines again loses to the earlier definition. -->
+	<File>E2E_LoadOrder_Appended.xml</File>
+</Game_Object_Files>
