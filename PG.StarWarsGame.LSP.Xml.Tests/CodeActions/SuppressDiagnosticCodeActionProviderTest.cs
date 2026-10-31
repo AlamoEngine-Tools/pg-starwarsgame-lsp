@@ -112,6 +112,20 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
         Assert.Contains(titles, t => t.Contains("this file"));
     }
 
+    // aetswg-015-0001 fires only on a declaration that does not end in '?>', so the declaration's end
+    // is its first '>': a line directive above it is still above the declaration.
+    [Fact]
+    public void AFindingOnADeclarationThatDoesNotEndInQuestionMark_IsOfferedNoLineScope()
+    {
+        const string malformed = "<?xml version=\"1.0\">\n<Units>\n  <Unit Name=\"A\"/>\n</Units>";
+
+        var titles = BuildProvider(malformed).Handle(Ctx("aetswg-015-0001", 0))
+            .Select(a => a.CodeAction!.Title).Where(t => t.StartsWith("Suppress")).ToList();
+
+        Assert.DoesNotContain(titles, t => t.Contains("this line"));
+        Assert.Contains(titles, t => t.Contains("this file"));
+    }
+
     [Fact]
     public void AFindingBelowTheDeclaration_KeepsItsLineScope()
     {
