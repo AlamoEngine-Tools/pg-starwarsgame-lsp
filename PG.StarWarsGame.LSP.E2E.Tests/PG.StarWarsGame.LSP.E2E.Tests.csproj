@@ -35,6 +35,7 @@
         <Compile Include="..\PG.StarWarsGame.LSP.Lua.Debug.Tests\Session\FakeGameDebugServer.cs"
                  Link="LuaDebug\FakeGameDebugServer.cs"/>
         <Compile Include="..\PG.StarWarsGame.LSP.Lua.Debug.Tests\TestServices.cs" Link="LuaDebug\TestServices.cs"/>
+        <Compile Remove="Protocol\ZzStartupProbe.cs" />
     </ItemGroup>
 
     <ItemGroup>

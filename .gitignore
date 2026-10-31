@@ -529,3 +529,7 @@ lua_debugger/
 
 # The executables the VSIX bundles, staged by scripts/stage-bundled-executables.ps1
 /PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/server/
+
+# The test protocol is tracked whole: its setup scripts write the fixtures, and a fixture is the file a
+# test reads, whatever its name - a .ps1, a .code-workspace, a Docs folder
+!/test-protocol/**
