@@ -14,13 +14,15 @@ internal static class LuaProtocol
 
     public static string Workspace(ProtocolWorkspaceFixture fixture)
     {
-        return fixture.Root ?? throw new Exception("$XunitDynamicSkip$The test's workspace is not there; run the setup script.");
+        return fixture.Root ??
+               throw new Exception("$XunitDynamicSkip$The test's workspace is not there; run the setup script.");
     }
 
     public static void RequireAnalyzer()
     {
         if (ProtocolWorkspaceFixture.Analyzer is null)
-            throw new Exception("$XunitDynamicSkip$No emmylua_ls: set AET_EMMYLUA_LS, or stage the bundled executables.");
+            throw new Exception(
+                "$XunitDynamicSkip$No emmylua_ls: set AET_EMMYLUA_LS, or stage the bundled executables.");
     }
 
     /// <summary>Whether the server log of this test run holds a line containing <paramref name="text" />.</summary>
@@ -29,7 +31,8 @@ internal static class LuaProtocol
         foreach (var log in Directory.EnumerateFiles(AppContext.BaseDirectory, "aetswg-*.log")
                      .Where(f => File.GetLastWriteTime(f) >= since.AddMinutes(-1)))
         {
-            using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var stream =
+                new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(stream);
             while (reader.ReadLine() is { } line)
                 if (line.Contains(text, StringComparison.Ordinal))
@@ -61,13 +64,15 @@ public sealed class LuaXmlrefProtocolTest(EawXmlrefSchemaFixture fixture) : ICla
     {
         if (!Directory.Exists(@"C:\temp\aet-test-lua25\schema\eaw"))
             throw new Exception("$XunitDynamicSkip$The LUA-25 schema copy is not there; run the setup script.");
-        var path = ProtocolDocument.Find(LuaProtocol.Workspace(fixture), @"Data\Scripts\Miscellaneous\AetTest_Players.lua");
+        var path = ProtocolDocument.Find(LuaProtocol.Workspace(fixture),
+            @"Data\Scripts\Miscellaneous\AetTest_Players.lua");
         var players = await ProtocolDocument.OpenAsync(fixture, path, null, "lua");
         await Task.Delay(TimeSpan.FromSeconds(3));
         await players.UntilAsync(_ => true, TimeSpan.FromSeconds(1));
 
         Assert.Empty(players.WithCode("aetswg-001-0021"));
-        Assert.DoesNotContain("Faction", await players.HoverAsync(players.At(6, "Empire", 1, 2)), StringComparison.Ordinal);
+        Assert.DoesNotContain("Faction", await players.HoverAsync(players.At(6, "Empire", 1, 2)),
+            StringComparison.Ordinal);
         Assert.DoesNotContain(await LuaProtocol.CompleteInEmptied(players, 6, "Empire"),
             i => i.Label == "Empire" || i.Label == "Rebel");
         players.Close();
@@ -82,7 +87,8 @@ public sealed class LuaAetrefProtocolTest(EawLuaFixture fixture) : IClassFixture
     [Fact]
     public async Task LUA_25_TheAetrefTag_IsRead()
     {
-        var path = ProtocolDocument.Find(LuaProtocol.Workspace(fixture), @"Data\Scripts\Miscellaneous\AetTest_Players.lua");
+        var path = ProtocolDocument.Find(LuaProtocol.Workspace(fixture),
+            @"Data\Scripts\Miscellaneous\AetTest_Players.lua");
         var players = await ProtocolDocument.OpenAsync(fixture, path, null, "lua");
 
         var unresolved = Assert.Single(players.WithCode("aetswg-001-0021"));
@@ -129,7 +135,8 @@ public sealed class LuaWithoutAnalyzerProtocolTest(EawWithoutAnalyzerFixture fix
             Position = interdictor.At(94, "Under_Missile_Attack", 1, 2)
         }, cts.Token);
         var target = Assert.Single(definition ?? []);
-        Assert.Equal(110, target.IsLocation ? target.Location!.Range.Start.Line : target.LocationLink!.TargetRange.Start.Line);
+        Assert.Equal(110,
+            target.IsLocation ? target.Location!.Range.Start.Line : target.LocationLink!.TargetRange.Start.Line);
 
         var items = await LuaProtocol.CompleteInEmptied(interdictor, 72, "Marauder_Missile_Cruiser");
         Assert.Contains(items, i => i.Detail == "GameObjectType");
@@ -161,7 +168,8 @@ public sealed class LuaMissingScriptsFolderProtocolTest(Lua32Fixture fixture) : 
             var document = await ProtocolDocument.OpenAsync(fixture, script, text, "lua");
             Assert.True(await document.UntilAsync(ds => ds.Any(d => d.Code?.String == "aetswg-016-0001" &&
                                                                     d.Range.Start.Line == 3), LuaProtocol.Analyzer),
-                "No aetswg-016-0001 on aet_unused: " + string.Join("; ", document.Diagnostics.Select(d => d.Code?.String)));
+                "No aetswg-016-0001 on aet_unused: " +
+                string.Join("; ", document.Diagnostics.Select(d => d.Code?.String)));
             Assert.True(LuaProtocol.Logged(@"for C:\temp\AetTest-LUA32\data\scripts", _started),
                 @"The log has no 'Lua analyzer started ... for C:\temp\AetTest-LUA32\data\scripts'.");
             document.Close();
@@ -191,8 +199,9 @@ public sealed class LuaOwnStateMachineProtocolTest(Lua33Fixture fixture) : IClas
         var libraryPath = ProtocolDocument.Find(root, @"Data\Scripts\Library\PGStateMachine.lua");
         var stripped = await File.ReadAllTextAsync(libraryPath);
         var machine = await ProtocolDocument.OpenAsync(fixture, machinePath, null, "lua");
-        Assert.True(await machine.UntilAsync(ds => ds.Any(d => d.Code?.String == "aetswg-011-0016" && d.Range.Start.Line == 0) &&
-                                                   ds.Any(d => d.Code?.String == "aetswg-011-0017" && d.Range.Start.Line == 0),
+        Assert.True(await machine.UntilAsync(ds =>
+                ds.Any(d => d.Code?.String == "aetswg-011-0016" && d.Range.Start.Line == 0) &&
+                ds.Any(d => d.Code?.String == "aetswg-011-0017" && d.Range.Start.Line == 0),
             LuaProtocol.Analyzer), "No aetswg-011-0016 and -0017 at line 1 with the stripped library.");
         Assert.Empty(machine.WithCode("aetswg-011-0008"));
         Assert.DoesNotContain("initial state", await machine.HoverAsync(machine.At(4, "\"State_Init\"", 1, 2)),
@@ -206,7 +215,8 @@ public sealed class LuaOwnStateMachineProtocolTest(Lua33Fixture fixture) : IClas
             var original = machine.Text;
             await machine.ReplaceLineAsync(9, machine.Lines[8] + " ");
             await machine.ReplaceAsync(original);
-            Assert.True(await machine.UntilAsync(ds => ds.Any(d => d.Code?.String == "aetswg-011-0008"), LuaProtocol.Analyzer),
+            Assert.True(
+                await machine.UntilAsync(ds => ds.Any(d => d.Code?.String == "aetswg-011-0008"), LuaProtocol.Analyzer),
                 "No aetswg-011-0008 once the library has the contract: " +
                 string.Join("; ", machine.Diagnostics.Select(d => $"{d.Code?.String}@{d.Range.Start.Line + 1}")));
             var unregistered = Assert.Single(machine.WithCode("aetswg-011-0008"));

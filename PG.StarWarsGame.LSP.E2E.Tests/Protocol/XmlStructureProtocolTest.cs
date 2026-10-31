@@ -144,7 +144,8 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         var open = One(document, "aetswg-012-3002", 4);
         Assert.Equal("<Max_Speed> is never closed: The game reads </SpaceUnit> where it expects </Max_Speed> and " +
                      "drops the whole file", open.Message.TrimEnd('.'));
-        await document.ApplyAsync(Assert.Single(await document.CodeActionsAsync(open), a => a.Title == "Close <Max_Speed>"));
+        await document.ApplyAsync(Assert.Single(await document.CodeActionsAsync(open),
+            a => a.Title == "Close <Max_Speed>"));
         Assert.Equal("\t\t<Max_Speed>1.0</Max_Speed>", document.Lines[3]);
         Assert.Empty(Structure(document));
         document.Close();
@@ -159,7 +160,8 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         var d = One(document, "aetswg-012-3002", 3);
         Assert.Equal("<SpaceUnit> is never closed: The game reads </SpaceUnits> where it expects </SpaceUnit> and " +
                      "drops the whole file", d.Message.TrimEnd('.'));
-        await document.ApplyAsync(Assert.Single(await document.CodeActionsAsync(d), a => a.Title == "Close <SpaceUnit>"));
+        await document.ApplyAsync(
+            Assert.Single(await document.CodeActionsAsync(d), a => a.Title == "Close <SpaceUnit>"));
         Assert.Equal(["\t\t<Max_Speed>1.0</Max_Speed>", "\t</SpaceUnit>", "\t<SpaceUnit Name=\"Scratch_B\">"],
             document.Lines[3..6]);
         Assert.Empty(Structure(document));
@@ -168,7 +170,8 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
                                     "\t\t<Max_Speed>1.0</Max_Speed>\n\t</SpaceUnit>\n\t<SpaceUnit Name=\"Scratch_B\">\n" +
                                     "\t<Max_Speed>2.0</Max_Speed>\n</SpaceUnits>\n");
         var e = One(document, "aetswg-012-3002", 6);
-        await document.ApplyAsync(Assert.Single(await document.CodeActionsAsync(e), a => a.Title == "Close <SpaceUnit>"));
+        await document.ApplyAsync(
+            Assert.Single(await document.CodeActionsAsync(e), a => a.Title == "Close <SpaceUnit>"));
         Assert.Equal(["\t<Max_Speed>2.0</Max_Speed>", "\t</SpaceUnit>", "</SpaceUnits>"], document.Lines[6..9]);
         Assert.Empty(Structure(document));
 
@@ -176,7 +179,8 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
                                     "\t\t<Max_Speed>1.0</Max_Speed>\n\t</SpaceUnit>\n");
         var f = One(document, "aetswg-012-3009", 2);
         Assert.Equal("<SpaceUnits> is never closed: The game drops the whole file", f.Message.TrimEnd('.'));
-        await document.ApplyAsync(Assert.Single(await document.CodeActionsAsync(f), a => a.Title == "Close <SpaceUnits>"));
+        await document.ApplyAsync(Assert.Single(await document.CodeActionsAsync(f),
+            a => a.Title == "Close <SpaceUnits>"));
         Assert.Equal("</SpaceUnits>", document.Lines.Last(l => l.Length > 0));
         Assert.Empty(Structure(document));
         document.Close();
@@ -328,9 +332,10 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
     [Fact]
     public async Task XML_11_FixAll_RepeatsUntilNothingRepairableIsLeft()
     {
-        const string original = "<?xml version=\"1.0\">\n<SpaceUnits>\n\t<!-- aetswg:suppress-file aetswg-015-0004 -->\n" +
-                                "\t<SpaceUnit Name=\"Scratch_Fix_All\">\n\t\t<Max_Speed>1.<!-- joined -->5</Max_Speed> stray\n" +
-                                "\t</SpaceUnit>\n\t<!-- a -- b -->\n</SpaceUnits>\n";
+        const string original =
+            "<?xml version=\"1.0\">\n<SpaceUnits>\n\t<!-- aetswg:suppress-file aetswg-015-0004 -->\n" +
+            "\t<SpaceUnit Name=\"Scratch_Fix_All\">\n\t\t<Max_Speed>1.<!-- joined -->5</Max_Speed> stray\n" +
+            "\t</SpaceUnit>\n\t<!-- a -- b -->\n</SpaceUnits>\n";
         var document = await OpenTestFile(original);
         var hyphens = One(document, "aetswg-012-3008", 7);
         var titles = (await document.CodeActionsAsync(hyphens)).Select(a => a.Title).ToList();

@@ -66,8 +66,10 @@ public sealed class XmlEditorProtocolTest(XmlScratchFixture fixture) : IClassFix
         var lines = document.Lines;
         if (range.Start.Line == range.End.Line)
             return lines[range.Start.Line][range.Start.Character..range.End.Character];
-        return string.Join("\n", [lines[range.Start.Line][range.Start.Character..],
-            .. lines[(range.Start.Line + 1)..range.End.Line], lines[range.End.Line][..range.End.Character]]);
+        return string.Join("\n", [
+            lines[range.Start.Line][range.Start.Character..],
+            .. lines[(range.Start.Line + 1)..range.End.Line], lines[range.End.Line][..range.End.Character]
+        ]);
     }
 
     [Fact]
@@ -231,8 +233,8 @@ public sealed class XmlEditorProtocolTest(XmlScratchFixture fixture) : IClassFix
                 () => units.ReplaceLineAsync(10, units.Lines[9].Replace("TURBO", "ROCKET_ATTACK")),
                 TimeSpan.FromSeconds(30)),
             "The open Scratch_Hardpoints.xml was not diagnosed again after the unit file changed.");
-        Assert.Empty(hardpoints.WithCode("aetswg-007-0032").Where(d => d.Range.Start.Line == 9));
-        Assert.Empty(hardpoints.WithCode("aetswg-007-0031").Where(d => d.Range.Start.Line == 13));
+        Assert.DoesNotContain(hardpoints.WithCode("aetswg-007-0032"), d => d.Range.Start.Line == 9);
+        Assert.DoesNotContain(hardpoints.WithCode("aetswg-007-0031"), d => d.Range.Start.Line == 13);
         Assert.Contains("has FULL_SALVO in slot 3 of unit abilities DEFEND, ROCKET_ATTACK, FULL_SALVO",
             On(5, "aetswg-007-0031").Message, StringComparison.Ordinal);
         On(20, "aetswg-007-0032");

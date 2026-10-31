@@ -29,7 +29,8 @@ internal static class ProjectProtocol
         foreach (var log in Directory.EnumerateFiles(AppContext.BaseDirectory, "aetswg-*.log")
                      .OrderBy(File.GetLastWriteTime))
         {
-            using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var stream =
+                new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(stream);
             while (reader.ReadLine() is { } line)
                 if (line.Contains(text, StringComparison.Ordinal))
@@ -58,7 +59,8 @@ internal static class ProjectProtocol
     {
         fixture.Client.DidChangeWatchedFiles(new DidChangeWatchedFilesParams
         {
-            Changes = new Container<FileEvent>(new FileEvent { Uri = DocumentUri.FromFileSystemPath(path), Type = change })
+            Changes = new Container<FileEvent>(new FileEvent
+                { Uri = DocumentUri.FromFileSystemPath(path), Type = change })
         });
     }
 
@@ -77,7 +79,8 @@ public sealed class LoadOrderProtocolTest(LoadOrderCopyFixture fixture) : IClass
 {
     private string Xml(string file)
     {
-        return Path.Combine(ProjectProtocol.Required(fixture.Root ?? @"C:\temp\aet-test-load-order"), "Data", "XML", file);
+        return Path.Combine(ProjectProtocol.Required(fixture.Root ?? @"C:\temp\aet-test-load-order"), "Data", "XML",
+            file);
     }
 
     private static List<string> Unresolved(ProtocolDocument document)
@@ -103,7 +106,8 @@ public sealed class LoadOrderProtocolTest(LoadOrderCopyFixture fixture) : IClass
             Assert.Contains(unresolved, m => m.Contains($"'{name}'", StringComparison.Ordinal));
         Assert.DoesNotContain(unresolved, m => m.Contains("'X-Wing'") || m.Contains("E2E_LoadOrder_Copy_Trooper"));
 
-        var probe = appended.Lines.Select((l, i) => (l, i)).First(x => x.l.Contains("X-Wing, E2E_LoadOrder_Copy_Trooper")).i + 1;
+        var probe = appended.Lines.Select((l, i) => (l, i))
+            .First(x => x.l.Contains("X-Wing, E2E_LoadOrder_Copy_Trooper")).i + 1;
         var hover = await appended.HoverAsync(appended.At(probe, "X-Wing", 1, 2));
         Assert.False(string.IsNullOrEmpty(hover), "No hover on X-Wing in the probe.");
         Assert.DoesNotContain("E2E_LoadOrder_Appended.xml", hover, StringComparison.OrdinalIgnoreCase);
@@ -117,7 +121,8 @@ public sealed class LoadOrderProtocolTest(LoadOrderCopyFixture fixture) : IClass
         second.Close();
 
         var set = await ProjectProtocol.EffectiveXmlAsync(fixture, "E2E_LoadOrder_Set", "TargetingPrioritySet");
-        Assert.Contains("<Attack_Priorities>Infantry, 1.0, Vehicle, 2.0</Attack_Priorities>", set, StringComparison.Ordinal);
+        Assert.Contains("<Attack_Priorities>Infantry, 1.0, Vehicle, 2.0</Attack_Priorities>", set,
+            StringComparison.Ordinal);
         Assert.Contains("<Category_Exclusions>Bomber</Category_Exclusions>", set, StringComparison.Ordinal);
     }
 
@@ -161,11 +166,13 @@ public sealed class LoadOrderProtocolTest(LoadOrderCopyFixture fixture) : IClass
             Assert.True(await appended.UntilAsync(ds => XwingNotUsed(ds, "SPACEUNITSFIGHTERS.XML"), within),
                 "The warning on X-Wing did not come back after the registry was restored.");
 
-            await File.WriteAllTextAsync(copy, "<?xml version=\"1.0\"?>\n<SpaceUnits><SpaceUnit Name=\"X-Wing\"/></SpaceUnits>\n");
+            await File.WriteAllTextAsync(copy,
+                "<?xml version=\"1.0\"?>\n<SpaceUnits><SpaceUnit Name=\"X-Wing\"/></SpaceUnits>\n");
             ProjectProtocol.Watched(fixture, copy, FileChangeType.Created);
             Assert.True(await appended.UntilAsync(ds => XwingNotUsed(ds, "SpaceUnitsFighters.xml") &&
                                                         Unresolves(ds, "A-Wing"), within),
-                "With the mod's own SpaceUnitsFighters.xml: " + string.Join("; ", appended.Diagnostics.Select(d => d.Message)));
+                "With the mod's own SpaceUnitsFighters.xml: " +
+                string.Join("; ", appended.Diagnostics.Select(d => d.Message)));
 
             File.Delete(copy);
             ProjectProtocol.Watched(fixture, copy, FileChangeType.Deleted);
@@ -295,7 +302,8 @@ public sealed class ProjectStartsProtocolTest
         var error = await ErrorShownStarting(@"C:\temp\aet-test-SET-29\OldMod");
         Assert.StartsWith("Could not load mod project '", error, StringComparison.Ordinal);
         Assert.Contains("': 'directories.text' and 'directories.textResourceType' were removed in 0.2.0. Move the " +
-                        "localisation directory into a top-level 'localisation' node instead", error, StringComparison.Ordinal);
+                        "localisation directory into a top-level 'localisation' node instead", error,
+            StringComparison.Ordinal);
         Assert.EndsWith("See the extension's 'Upgrading from 0.1.x' README section for the full migration steps.",
             error, StringComparison.Ordinal);
     }
@@ -312,7 +320,8 @@ public sealed class ProjectStartsProtocolTest
 
     private static int ShippedDefinitions(string game)
     {
-        var file = Path.Combine(LspTestEnvironment.RepositoryRoot!, "baseline", game, $"aet-pg-swg-lsp-{game}-baseline.aet");
+        var file = Path.Combine(LspTestEnvironment.RepositoryRoot!, "baseline", game,
+            $"aet-pg-swg-lsp-{game}-baseline.aet");
         return BaselineSerializer.Deserialize(File.ReadAllBytes(ProjectProtocol.Required(file)))!.Symbols.Count;
     }
 

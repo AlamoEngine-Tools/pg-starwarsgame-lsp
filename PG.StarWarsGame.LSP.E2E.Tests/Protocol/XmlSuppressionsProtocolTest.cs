@@ -14,6 +14,7 @@ namespace PG.StarWarsGame.LSP.E2E.Tests.Protocol;
 public sealed class XmlSuppressionsProtocolTest
 {
     private const string Workspace = @"C:\temp\aet-test-xml";
+
     private const string Joined = "<?xml version=\"1.0\"?>\n<SpaceUnits>\n\t<SpaceUnit Name=\"Scratch_A\">\n" +
                                   "\t\t<Max_Speed>1.<!-- joined -->5</Max_Speed>\n\t</SpaceUnit>\n</SpaceUnits>\n";
 
@@ -55,7 +56,8 @@ public sealed class XmlSuppressionsProtocolTest
     public async Task XML_12_ACommentInsideAValue_IsTurnedOnByAFileWithoutItsEntry()
     {
         Prepare();
-        const string optedIn = "{ \"_type\": \"aetswg.Suppressions\", \"_typeVersion\": \"aetswg-2.0.0\", \"entries\": [] }";
+        const string optedIn =
+            "{ \"_type\": \"aetswg.Suppressions\", \"_typeVersion\": \"aetswg-2.0.0\", \"entries\": [] }";
         WriteSuppressions(optedIn);
         try
         {
@@ -94,8 +96,9 @@ public sealed class XmlSuppressionsProtocolTest
         Prepare();
         try
         {
-            WriteSuppressions("{ \"_type\": \"aetswg.Suppressions\", \"_typeVersion\": \"aetswg-1.0.0\", \"entries\": " +
-                              "[ { \"id\": \"aetswg-010-0001\" } ] }");
+            WriteSuppressions(
+                "{ \"_type\": \"aetswg.Suppressions\", \"_typeVersion\": \"aetswg-1.0.0\", \"entries\": " +
+                "[ { \"id\": \"aetswg-010-0001\" } ] }");
             var (first, _, server) = await OpenJoined();
             await using (server)
             {

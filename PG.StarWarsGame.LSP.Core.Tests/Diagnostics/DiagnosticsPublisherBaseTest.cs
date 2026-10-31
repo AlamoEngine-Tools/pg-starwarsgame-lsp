@@ -366,10 +366,16 @@ public sealed class DiagnosticsPublisherBaseTest
     private static (GameIndex Before, GameIndex After) RelatedEdit(bool editedReferencesTheOther)
     {
         var unit = new DocumentIndex("file:///units.xml", 1,
-            [new GameSymbol("Frigate", GameSymbolKind.XmlObject, "Unit", new FileOrigin("file:///units.xml", 1, null), null)],
+            [
+                new GameSymbol("Frigate", GameSymbolKind.XmlObject, "Unit",
+                    new FileOrigin("file:///units.xml", 1, null), null)
+            ],
             [new GameReference("HP_Salvo", null, null, "file:///units.xml", 2, 0, 8)]);
         var hardpoints = new DocumentIndex("file:///hardpoints.xml", 1,
-            [new GameSymbol("HP_Salvo", GameSymbolKind.XmlObject, "HardPoint", new FileOrigin("file:///hardpoints.xml", 1, null), null)],
+            [
+                new GameSymbol("HP_Salvo", GameSymbolKind.XmlObject, "HardPoint",
+                    new FileOrigin("file:///hardpoints.xml", 1, null), null)
+            ],
             []);
         var before = GameIndex.Empty with
         {

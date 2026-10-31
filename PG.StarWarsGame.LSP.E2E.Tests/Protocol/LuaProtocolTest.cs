@@ -26,7 +26,8 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
     private static void RequireAnalyzer()
     {
         if (ProtocolWorkspaceFixture.Analyzer is null)
-            throw new Exception("$XunitDynamicSkip$No emmylua_ls: set AET_EMMYLUA_LS, or stage the bundled executables.");
+            throw new Exception(
+                "$XunitDynamicSkip$No emmylua_ls: set AET_EMMYLUA_LS, or stage the bundled executables.");
     }
 
     private Task<ProtocolDocument> OpenLua(string relative, string? text = null)
@@ -109,7 +110,8 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
     {
         var script = await OpenLua(@"Data\Scripts\Miscellaneous\AetTest_Lua51.lua");
         Assert.True(await script.UntilAsync(ds => ds.Count(d => d.Code?.String == "aetswg-012-3011") >= 5, Analyzer),
-            "AetTest_Lua51.lua: " + string.Join("; ", script.Diagnostics.Select(d => $"{d.Code?.String}@{d.Range.Start.Line + 1}")));
+            "AetTest_Lua51.lua: " + string.Join("; ",
+                script.Diagnostics.Select(d => $"{d.Code?.String}@{d.Range.Start.Line + 1}")));
         var errors = script.WithCode("aetswg-012-3011").OrderBy(d => d.Range.Start.Line).ToList();
         Assert.Equal(5, errors.Count);
         Assert.All(errors, e => Assert.Equal(DiagnosticSeverity.Error, e.Severity));
@@ -189,8 +191,12 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
 
         List<Diagnostic> OnLine13()
         {
-            return [.. units.Diagnostics.Where(d => d.Range.Start.Line == 12 &&
-                                                    d.Code?.String?.StartsWith("aetswg-004-00", StringComparison.Ordinal) == true)];
+            return
+            [
+                .. units.Diagnostics.Where(d => d.Range.Start.Line == 12 &&
+                                                d.Code?.String?.StartsWith("aetswg-004-00", StringComparison.Ordinal) ==
+                                                true)
+            ];
         }
 
         Assert.Empty(OnLine13());
@@ -205,8 +211,9 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
         Assert.Equal(DiagnosticSeverity.Error, missing.Severity);
         Assert.Equal("Lua script 'AetNoSuchScript' was not found: No 'AetNoSuchScript.lua' or 'AetNoSuchScript.lc' " +
                      "in any script directory. The object runs without a script.", missing.Message);
-        Assert.Equal("Lua script 'GameObject\\SpeederBike' contains a backslash. The game reads the name inside a Lua " +
-                     "string, where a backslash is an escape, so the script never loads. '/' separates directories.",
+        Assert.Equal(
+            "Lua script 'GameObject\\SpeederBike' contains a backslash. The game reads the name inside a Lua " +
+            "string, where a backslash is an escape, so the script never loads. '/' separates directories.",
             (await With("GameObject\\SpeederBike", "aetswg-004-0017")).Message);
         Assert.Equal("Lua script '../GameObject/SpeederBike' climbs out of the script directory with '..'. That " +
                      "resolves for a loose file on Windows only, never inside a MEG archive.",
@@ -240,7 +247,10 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
             {
                 TextDocument = new TextDocumentIdentifier(story.Uri)
             }, cts.Token);
-            names = [.. (symbols ?? []).Select(s => s.IsDocumentSymbol ? s.DocumentSymbol!.Name : s.SymbolInformation!.Name)];
+            names =
+            [
+                .. (symbols ?? []).Select(s => s.IsDocumentSymbol ? s.DocumentSymbol!.Name : s.SymbolInformation!.Name)
+            ];
             if (!names.Contains("Story_Handle_Esc")) await Task.Delay(2000);
         }
 

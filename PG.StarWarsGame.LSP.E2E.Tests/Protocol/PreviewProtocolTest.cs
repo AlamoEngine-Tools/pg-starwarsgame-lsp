@@ -228,8 +228,10 @@ public sealed class FocPreviewProtocolTest(FocVanillaFixture fixture) : IClassFi
     {
         var problems = await ProblemsView.RevalidateAsync(fixture);
         var skipped = ProblemsView.WithCodes(problems, "aetswg-014-0022");
-        Assert.Equal(["Emitter 0 - property 0x49 not read by the game, skipped",
-                         "Emitter 1 - property 0x49 not read by the game, skipped"],
+        Assert.Equal([
+                "Emitter 0 - property 0x49 not read by the game, skipped",
+                "Emitter 1 - property 0x49 not read by the game, skipped"
+            ],
             skipped["P_tactical_corrupt.alo"].Select(d => d.Message).Order());
         Assert.Equal("Emitter 0 - property 0x49 not read by the game, skipped",
             Assert.Single(skipped["P_icon_corrupt.alo"]).Message);
