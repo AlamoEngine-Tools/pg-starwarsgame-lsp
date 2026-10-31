@@ -99,6 +99,16 @@ public sealed record BaselineIndex(
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    ///     Each shipped registry's entries in the order the game loads them, keyed by the registry's
+    ///     path (<c>data/xml/gameobjectfiles.xml</c>), each entry in <see cref="Workspace.GamePaths.Key" />
+    ///     form as the registry writes it, a repeat kept. <see cref="FileTypeMap" /> types the same files
+    ///     but loses the order, which decides the winner of a name defined twice. Empty in a baseline
+    ///     built before it, whose registries fall back to <see cref="FileTypeMap" />.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<string>> RegistryLists { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     ///     Full child-tag tree of each shipped GameObject, keyed case-insensitively by object id. Built
     ///     offline by the BaselineBuilder; consumed by the effective-object merge engine so that variants
     ///     (<c>Variant_Of_Existing_Type</c>) whose base is a shipped object can be resolved. Empty for

@@ -42,6 +42,7 @@ public static class BaselineSerializer
             ModelTextures = ToSerializedArray(baseline.ModelTextures),
             ParticleSystems = [.. baseline.ParticleSystems.Order(StringComparer.Ordinal)],
             ModelProxies = ToSerializedArray(baseline.ModelProxies),
+            RegistryLists = ToSerializedArray(baseline.RegistryLists),
             ObjectTags = ToSerializedObjectTags(baseline.ObjectTags),
             SchemaVersion = SerializedBaseline.CurrentSchemaVersion
         };
@@ -99,6 +100,9 @@ public static class BaselineSerializer
             ParticleSystems = (dto.ParticleSystems ?? []).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
             // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
             ModelProxies = (dto.ModelProxies ?? []).ToImmutableDictionary(
+                e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase),
+            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract - deserialized data; the declared type is not the payload's contract
+            RegistryLists = (dto.RegistryLists ?? []).ToImmutableDictionary(
                 e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase),
             ObjectTags = objectTags
         };
