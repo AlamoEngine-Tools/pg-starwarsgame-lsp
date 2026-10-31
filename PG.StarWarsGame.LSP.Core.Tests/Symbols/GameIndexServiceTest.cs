@@ -80,6 +80,24 @@ public sealed class GameIndexServiceTest
         Assert.NotNull(fired);
     }
 
+    // ── ApplyLoadOrder ───────────────────────────────────────────────────────
+
+    // The load order decides which shipped definitions count, so publishing it changes what every
+    // lookup answers, and every consumer of the index is told.
+    [Fact]
+    public void ApplyLoadOrder_PublishesTheOrder_AndFiresIndexChanged()
+    {
+        var svc = Build();
+        GameIndex? fired = null;
+        svc.IndexChanged += idx => fired = idx;
+        var order = LoadOrder.From([], [], ["musicevents.xml"]);
+
+        svc.ApplyLoadOrder(order);
+
+        Assert.Same(order, svc.Current.LoadOrder);
+        Assert.Same(order, fired?.LoadOrder);
+    }
+
     // ── ApplyModelBones ──────────────────────────────────────────────────────
 
     [Fact]

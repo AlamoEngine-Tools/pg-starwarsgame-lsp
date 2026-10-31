@@ -50,9 +50,10 @@ public sealed class MetafileRegistrar
     /// <summary>
     ///     Registers every metafile's files for <paramref name="config" />, falling back to
     ///     <paramref name="baseline" /> for a metafile no layer ships, and replaces the registration,
-    ///     the registry walks and the story chain's problems with this scan's.
+    ///     the registry walks and the story chain's problems with this scan's. Returns the load order
+    ///     the scan found, for the index.
     /// </summary>
-    public void Register(WorkspaceConfiguration config, IReadOnlyList<string> roots, BaselineIndex baseline)
+    public LoadOrder Register(WorkspaceConfiguration config, IReadOnlyList<string> roots, BaselineIndex baseline)
     {
         _logger.LogDebug("PreScanMetafiles started");
         if (config.XmlDirectories.Count > 0)
@@ -69,6 +70,7 @@ public sealed class MetafileRegistrar
         // reload had shadowed it or its registry had dropped it.
         var typed = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
         var walks = new List<RegistryWalk>();
+        var shadowedShipped = new List<string>();
         var storyProblems = new List<StoryChainProblem>();
         foreach (var def in _schema.AllMetafiles)
         {
@@ -114,6 +116,7 @@ public sealed class MetafileRegistrar
             else // DirectContent: the file itself carries the type
             {
                 typed[_fileHelper.PathToFileUri(winner)] = [.. def.Types];
+                shadowedShipped.Add(LoadOrder.XmlKey(def.Path));
             }
         }
 
@@ -121,6 +124,7 @@ public sealed class MetafileRegistrar
         _walks.Replace(walks);
         // Replace-all also clears stale problems when a rescan yields none.
         _storyChainProblems.Replace(storyProblems);
+        return LoadOrder.From(walks, _schema.AllMetafiles, shadowedShipped);
     }
 
     /// <summary>

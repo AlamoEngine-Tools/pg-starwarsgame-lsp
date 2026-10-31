@@ -199,6 +199,34 @@ public sealed class MetafileRegistrarTest
             registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(xmlDir, "New.xml"))).ToArray());
     }
 
+    /// <summary>
+    ///     A layer's copy of a direct-content file replaces the shipped one, so the shipped
+    ///     definitions in it stop counting.
+    /// </summary>
+    [Fact]
+    public void Register_ADirectContentFileALayerShips_HidesTheShippedDefinitionsInIt()
+    {
+        var xmlDir = Path.Combine(Root("ws"), "data", "xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "MusicEvents.xml")] = new("<MusicEvents/>")
+        });
+        var schema = new SchemaProviderBuilder().WithMetafiles(
+            new MetafileDefinition("data/xml/musicevents.xml", MetafileType.DirectContent, ["MusicEvent"])).Build();
+        var (registrar, _) = Build(fs, new FileTypeRegistry(), schema);
+        var baseline = BaselineIndex.Empty with
+        {
+            Symbols = ImmutableDictionary<string, GameSymbol>.Empty
+                .Add("Theme", new GameSymbol("Theme", GameSymbolKind.XmlObject, "MusicEvent",
+                    new FileOrigin(@"DATA\XML\MusicEvents.xml", 1, null), null))
+        };
+
+        var order = registrar.Register(new WorkspaceConfiguration([xmlDir], [], [], [], null), [Root("ws")],
+            baseline);
+
+        Assert.Empty(order.VisibleOf(baseline));
+    }
+
 
     /// <summary>
     ///     The registry file is read by the game too - by a name compiled into it - so it is

@@ -68,6 +68,7 @@ public sealed record GameIndex(
         ModelProxies = original.ModelProxies;
         WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
         WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
+        LoadOrder = original.LoadOrder;
     }
 
     /// <summary>How many things consumers have derived from this snapshot so far - the status report's number.</summary>
@@ -133,6 +134,18 @@ public sealed record GameIndex(
     /// <summary>The shipped game objects by name hash, built once when the baseline is applied.</summary>
     public ImmutableDictionary<uint, ImmutableArray<GameSymbol>> BaselineNameHashes { get; init; } =
         ImmutableDictionary<uint, ImmutableArray<GameSymbol>>.Empty;
+
+    /// <summary>
+    ///     The files the game loads and in which order, from the last metafile scan. Decides which
+    ///     shipped definitions count and which of two definitions of one name wins.
+    /// </summary>
+    public LoadOrder LoadOrder { get; init; } = LoadOrder.Unknown;
+
+    /// <summary>
+    ///     The shipped definitions the game loads under <see cref="LoadOrder" />. Every lookup reads the
+    ///     baseline through this, never through <see cref="BaselineIndex.Symbols" />.
+    /// </summary>
+    public ImmutableDictionary<string, GameSymbol> ShippedSymbols => LoadOrder.VisibleOf(Baseline);
 
     /// <summary>
     ///     Merged (baseline ∪ workspace) localisation key set. Used by
@@ -259,12 +272,14 @@ public sealed record GameIndex(
     {
         var byName = new Dictionary<string, GameSymbol>(StringComparer.OrdinalIgnoreCase) { [symbol.Id] = symbol };
         var others = new List<GameSymbol>();
+        var shipped = ShippedSymbols;
         foreach (var table in (ImmutableDictionary<uint, ImmutableArray<GameSymbol>>[])
                  [WorkspaceNameHashes, BaselineNameHashes])
         {
             if (!table.TryGetValue(hash, out var named)) continue;
             foreach (var other in named)
-                if (byName.TryAdd(other.Id, other))
+                if ((ReferenceEquals(table, WorkspaceNameHashes) || shipped.ContainsKey(other.Id)) &&
+                    byName.TryAdd(other.Id, other))
                     others.Add(other);
         }
 
@@ -274,7 +289,7 @@ public sealed record GameIndex(
     private ImmutableHashSet<string> ComputeIndexedTypeNames()
     {
         var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var symbol in Baseline.Symbols.Values)
+        foreach (var symbol in ShippedSymbols.Values)
             if (symbol.TypeName is { } baselineType)
                 builder.Add(baselineType);
         foreach (var symbols in WorkspaceDefinitions.Values)
@@ -346,7 +361,7 @@ public sealed record GameIndex(
 
         foreach (var (id, symbols) in WorkspaceDefinitions)
             Add(id, symbols);
-        foreach (var (id, symbol) in Baseline.Symbols)
+        foreach (var (id, symbol) in ShippedSymbols)
             Add(id, [symbol]);
 
         return builder.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.ToImmutableArray(),
@@ -393,7 +408,7 @@ public sealed record GameIndex(
 
     /// <summary>
     ///     The definition of <paramref name="id" /> for a caller that does not know its type: the
-    ///     highest project layer's.
+    ///     winner in the id space of the type the highest project layer defines it as.
     /// </summary>
     /// <remarks>
     ///     Every type is an id space of its own - the metafile that lists a file decides its type - so
@@ -405,22 +420,22 @@ public sealed record GameIndex(
     public GameSymbol? Resolve(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)
-            return ws.Length == 1 ? ws[0] : InPrecedence(ws).First();
-        return Baseline.Symbols.GetValueOrDefault(id);
+        {
+            var type = ws.Length == 1 ? ws[0].TypeName : InPrecedence(ws).First().TypeName;
+            return InLoadOrder(id, type).First();
+        }
+
+        return ShippedSymbols.GetValueOrDefault(id);
     }
 
     /// <summary>
-    ///     The definition of <paramref name="id" /> in the id space of <paramref name="typeName" /> -
-    ///     the highest layer's of that type, else the baseline's when it is of that type - or null
-    ///     when that type defines no such object, whatever other types do.
+    ///     The definition of <paramref name="id" /> in the id space of <paramref name="typeName" /> that
+    ///     the game keeps (see <see cref="InLoadOrder" />), or null when that type defines no such
+    ///     object, whatever other types do.
     /// </summary>
     public GameSymbol? ResolveOfType(string id, string typeName)
     {
-        if (WorkspaceDefinitions.TryGetValue(id, out var ws)
-            && InPrecedence(ws).FirstOrDefault(s => IsOfType(s, typeName)) is { } typed)
-            return typed;
-
-        return Baseline.Symbols.TryGetValue(id, out var b) && IsOfType(b, typeName) ? b : null;
+        return InLoadOrder(id, typeName).FirstOrDefault();
     }
 
     /// <summary>
@@ -472,7 +487,7 @@ public sealed record GameIndex(
         if (WorkspaceDefinitions.TryGetValue(id, out var ws))
             foreach (var s in InPrecedence(ws))
                 yield return s;
-        if (Baseline.Symbols.TryGetValue(id, out var b))
+        if (ShippedSymbols.TryGetValue(id, out var b))
             yield return b;
     }
 
@@ -483,12 +498,17 @@ public sealed record GameIndex(
 
     /// <summary>
     ///     The winning definition in the id space of <paramref name="typeName" /> - by id alone when
-    ///     it is null - and the definition of the same type it overrides.
+    ///     it is null - and the definition of the same type it overrides: the next the registry's rule
+    ///     drops, or with no load order the next layer below.
     /// </summary>
     public (GameSymbol Winner, GameSymbol? Shadowed)? ResolveWithShadow(string id, string? typeName)
     {
         var winner = typeName is null ? Resolve(id) : ResolveOfType(id, typeName);
         if (winner is null) return null;
+
+        var candidates = Candidates(id, winner.TypeName);
+        if (ByLoadOrder(candidates) is { } ordered)
+            return (winner, ordered.FirstOrDefault(s => !ReferenceEquals(s, winner)));
 
         // The shadowed definition is the next layer below the winner IN THE WINNER'S TYPE: a
         // lower-ranked workspace definition if one exists, otherwise the baseline symbol. A
@@ -501,7 +521,7 @@ public sealed record GameIndex(
                 LayerRankOf(s) < winnerRank && IsOfType(s, winner.TypeName));
         }
 
-        if (shadowed is null && Baseline.Symbols.TryGetValue(id, out var b) && IsOfType(b, winner.TypeName))
+        if (shadowed is null && ShippedSymbols.TryGetValue(id, out var b) && IsOfType(b, winner.TypeName))
             shadowed = b;
 
         // Only report a shadow when it is a different object than the winner.
@@ -578,6 +598,52 @@ public sealed record GameIndex(
     private static bool IsOfType(GameSymbol symbol, string? typeName)
     {
         return string.Equals(symbol.TypeName, typeName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Every definition of <paramref name="id" /> in the id space of <paramref name="typeName" />, the
+    ///     one the game keeps first. When the load order places them all in one registry, they are in
+    ///     the order the game reads them - by list place, then line - and the registry's rule picks:
+    ///     the first for first wins and first by name, the last for last wins, the first as the base
+    ///     of a merge. Otherwise the highest layer comes first and the shipped definition last.
+    /// </summary>
+    private List<GameSymbol> InLoadOrder(string id, string? typeName)
+    {
+        var candidates = Candidates(id, typeName);
+        return candidates.Count <= 1 ? candidates : ByLoadOrder(candidates) ?? candidates;
+    }
+
+    // The workspace definitions of the type in layer precedence, then the shipped one if it counts.
+    private List<GameSymbol> Candidates(string id, string? typeName)
+    {
+        var candidates = WorkspaceDefinitions.TryGetValue(id, out var ws)
+            ? InPrecedence(ws).Where(s => IsOfType(s, typeName)).ToList()
+            : [];
+        if (ShippedSymbols.TryGetValue(id, out var shipped) && IsOfType(shipped, typeName))
+            candidates.Add(shipped);
+        return candidates;
+    }
+
+    // The candidates the way the registry's rule ranks them, or null when the load order does not
+    // place every one of them in the same registry.
+    private List<GameSymbol>? ByLoadOrder(List<GameSymbol> candidates)
+    {
+        if (candidates.Count < 2) return null;
+
+        var placed = new List<(GameSymbol Symbol, LoadPosition Position)>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            if (LoadOrder.PositionOf(candidate) is not { } position) return null;
+            if (placed.Count > 0 && placed[0].Position.Registry != position.Registry) return null;
+            placed.Add((candidate, position));
+        }
+
+        var line = (Func<(GameSymbol Symbol, LoadPosition Position), int>)(p =>
+            (p.Symbol.Origin as FileOrigin)?.Line ?? 0);
+        var ranked = LoadOrder.RuleOf(placed[0].Position) == Schema.DuplicateNameRule.LAST_WINS
+            ? placed.OrderByDescending(p => p.Position.Last).ThenByDescending(line)
+            : placed.OrderBy(p => p.Position.First).ThenBy(line);
+        return [.. ranked.Select(p => p.Symbol)];
     }
 
     /// <summary>

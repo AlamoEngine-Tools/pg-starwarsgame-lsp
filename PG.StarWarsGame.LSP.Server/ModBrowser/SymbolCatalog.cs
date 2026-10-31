@@ -263,7 +263,7 @@ public sealed class SymbolCatalog
     private static IEnumerable<SymbolRow> XmlRows(GameIndex index, IReadOnlyList<ObjectKindDefinition> kinds)
     {
         var ids = new HashSet<string>(index.WorkspaceDefinitions.Keys, StringComparer.Ordinal);
-        ids.UnionWith(index.Baseline.Symbols.Keys);
+        ids.UnionWith(index.ShippedSymbols.Keys);
 
         foreach (var id in ids)
         {
@@ -275,7 +275,7 @@ public sealed class SymbolCatalog
                     .OrderByDescending(index.LayerRankOf)
                     .ToList()
                 : [];
-            var shipped = index.Baseline.Symbols.TryGetValue(id, out var s) && s.Kind == GameSymbolKind.XmlObject
+            var shipped = index.ShippedSymbols.TryGetValue(id, out var s) && s.Kind == GameSymbolKind.XmlObject
                 ? s
                 : null;
             // One row per type: the metafile that lists a file types it, and every type is an id space

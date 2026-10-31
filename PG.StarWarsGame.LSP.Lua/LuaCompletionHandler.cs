@@ -277,7 +277,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             break;
         }
 
-        foreach (var (id, sym) in index.Baseline.Symbols)
+        foreach (var (id, sym) in index.ShippedSymbols)
         {
             if (index.WorkspaceDefinitions.ContainsKey(id)) continue;
             if (expectedTypeName is not null &&
