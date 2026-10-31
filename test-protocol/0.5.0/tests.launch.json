@@ -1,0 +1,519 @@
+{
+  "SET-01": {
+    "open": null
+  },
+  "SET-02": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-03": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-04": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "*": null
+    }
+  },
+  "SET-05": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-06": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-07": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-08": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-09": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storySimulator": true
+    }
+  },
+  "SET-10": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-11": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-12": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.lsp.source.baseline.type": null,
+      "aet-eaw-edit.lsp.source.baseline.localPath": null
+    }
+  },
+  "SET-13": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.lsp.source.baseline.type": null,
+      "aet-eaw-edit.lsp.source.baseline.localPath": null
+    }
+  },
+  "SET-14": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-15": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-16": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-17": {
+    "open": "{repo}\\foc"
+  },
+  "SET-18": {
+    "open": "{repo}\\foc"
+  },
+  "SET-19": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "SET-20": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-21": {
+    "open": null
+  },
+  "SET-22": {
+    "open": null
+  },
+  "SET-23": {
+    "open": null
+  },
+  "SET-24": {
+    "open": null
+  },
+  "SET-25": {
+    "open": null
+  },
+  "SET-26": {
+    "open": null
+  },
+  "SET-27": {
+    "open": null
+  },
+  "SET-28": {
+    "open": "D:\\temp\\aet-test-SET-28\\RefMod",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "SET-29": {
+    "open": null
+  },
+  "PRJ-01": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.lsp.debug.traceServer": "verbose"
+    }
+  },
+  "PRJ-02": {
+    "open": "{repo}\\eaw"
+  },
+  "PRJ-03": {
+    "open": "{repo}\\eaw"
+  },
+  "PRJ-04": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "PRJ-05": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "PRJ-06": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "PRJ-07": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "PRJ-08": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "PRJ-09": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "PRJ-10": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "PRJ-11": {
+    "open": "C:\\temp\\aet-test-PRJ-multi\\prj.code-workspace"
+  },
+  "PRJ-12": {
+    "open": "C:\\temp\\aet-test-PRJ-multi\\prj.code-workspace"
+  },
+  "PRJ-13": {
+    "open": "C:\\temp\\aet-test-PRJ-multi\\prj.code-workspace"
+  },
+  "PRJ-14": {
+    "open": "C:\\temp\\aet-test-PRJ-multi\\prj.code-workspace"
+  },
+  "PRJ-15": {
+    "open": "C:\\temp\\aet-test-PRJ-multi\\prj.code-workspace"
+  },
+  "PRJ-16": {
+    "open": "C:\\temp\\aet-test-PRJ-nest"
+  },
+  "PRJ-17": {
+    "open": "C:\\temp\\aet-test-PRJ-meg",
+    "settings": {
+      "aet-eaw-edit.lsp.source.expansionDirectory": "{foc}"
+    }
+  },
+  "PRJ-18": {
+    "open": "C:\\temp\\aet-test-PRJ-preview"
+  },
+  "PRJ-19": {
+    "open": "c:\\dev\\EaWX\\FotR",
+    "settings": {
+      "aet-eaw-edit.lsp.source.expansionDirectory": "{foc}",
+      "aet-eaw-edit.lsp.source.baseGameDirectory": "{eaw}"
+    }
+  },
+  "PRJ-20": {
+    "open": "c:\\dev\\EaWX\\FotR"
+  },
+  "PRJ-21": {
+    "open": "c:\\dev\\EaWX"
+  },
+  "PRJ-22": {
+    "open": "c:\\dev\\EaWX"
+  },
+  "XML-01": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-02": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-03": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-04": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-05": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-06": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-07": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-08": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-09": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-10": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-11": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-12": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-13": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-14": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-15": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-16": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-17": {
+    "open": "C:\\temp\\aet-test-xml",
+    "settings": {
+      "editor.linkedEditing": true
+    }
+  },
+  "XML-18": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-19": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-20": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-21": {
+    "open": "C:\\temp\\aet-test-xml"
+  },
+  "XML-22": {
+    "open": "{repo}\\eaw"
+  },
+  "XML-23": {
+    "open": "{repo}\\eaw"
+  },
+  "XML-24": {
+    "open": "{repo}\\eaw"
+  },
+  "XML-25": {
+    "open": "{repo}\\eaw"
+  },
+  "XML-26": {
+    "open": "{repo}\\foc"
+  },
+  "XML-27": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "XML-28": {
+    "open": "c:\\dev\\EaWX\\FotR"
+  },
+  "LUA-01": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-02": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-03": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-04": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-05": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-06": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-07": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-08": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-09": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-10": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-11": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-12": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-13": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-14": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-15": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-16": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-17": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-18": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-19": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-20": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-21": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-22": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-23": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-24": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-25": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.lsp.schema.localPath": "C:\\temp\\aet-test-lua25\\schema\\eaw"
+    }
+  },
+  "LUA-26": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-27": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-28": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-29": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-30": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-31": {
+    "open": "{repo}\\eaw"
+  },
+  "LUA-32": {
+    "open": "C:\\temp\\AetTest-LUA32"
+  },
+  "LUA-33": {
+    "open": "C:\\temp\\aet-test-lua33"
+  },
+  "LUA-34": {
+    "open": null,
+    "extension": false
+  },
+  "LUA-35": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-01": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-02": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-03": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-04": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-05": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-06": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-07": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-08": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-09": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.shaders.directory": "{shaders}"
+    }
+  },
+  "PRV-10": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-11": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-12": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-13": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-14": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-15": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-16": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-17": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-18": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-19": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-20": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-21": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-22": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-23": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-24": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-25": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-26": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-27": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-28": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-29": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-30": {
+    "open": "c:\\dev\\EaWX",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "PRV-31": {
+    "open": "{repo}\\foc"
+  },
+  "PRV-32": {
+    "open": "{repo}\\foc"
+  },
+  "PRV-33": {
+    "open": "c:\\dev\\EaWX\\FotR"
+  },
+  "PRV-34": {
+    "open": "c:\\dev\\EaWX\\FotR"
+  },
+  "PRV-35": {
+    "open": "C:\\temp\\aet-prv-ovr\\mod"
+  },
+  "PRV-36": {
+    "open": "C:\\temp\\aet-prv-pe"
+  },
+  "PRJ-23": {
+    "open": "C:\\temp\\aet-test-PRJ-game"
+  },
+  "PRJ-24": {
+    "open": "C:\\temp\\aet-test-load-order"
+  },
+  "PRJ-25": {
+    "open": "C:\\temp\\aet-test-load-order"
+  },
+  "PRJ-26": {
+    "open": "C:\\temp\\aet-test-PRJ-mixed\\eaw-mod"
+  },
+  "PRJ-27": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-30": {
+    "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "XML-29": {
+    "open": "C:\\temp\\aet-test-load-order"
+  },
+  "XML-30": {
+    "open": "C:\\temp\\aet-test-load-order"
+  },
+  "PRV-37": {
+    "open": "{repo}\\foc"
+  }
+}
