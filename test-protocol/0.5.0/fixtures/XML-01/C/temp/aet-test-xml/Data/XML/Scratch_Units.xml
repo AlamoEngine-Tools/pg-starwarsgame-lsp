@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<SpaceUnits>
+	<SpaceUnit Name="Scratch_Frigate">
+		<HardPoints>HP_Scratch_Salvo, HP_Scratch_Rocket_Only, HP_Scratch_Rocket_Row, HP_Scratch_Dead</HardPoints>
+		<Unit_Abilities_Data SubObjectList="Yes">
+			<Unit_Ability>
+				<Type>DEFEND</Type>
+			</Unit_Ability>
+			<Unit_Ability>
+				<Type>TURBO</Type>
+			</Unit_Ability>
+			<Unit_Ability>
+				<Type>FULL_SALVO</Type>
+			</Unit_Ability>
+		</Unit_Abilities_Data>
+	</SpaceUnit>
+	<SpaceUnit Name="Scratch_Bone_Test">
+		<Space_Model_Name>EV_StarDestroyer.ALO</Space_Model_Name>
+		<HardPoints>HP_Scratch_NoBone_Targetable, HP_Scratch_NoBone_FireBone</HardPoints>
+	</SpaceUnit>
+</SpaceUnits>

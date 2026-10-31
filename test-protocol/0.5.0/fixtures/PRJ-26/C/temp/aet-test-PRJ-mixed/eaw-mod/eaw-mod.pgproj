@@ -1,0 +1,8 @@
+﻿{
+  "name": "EaW Mod",
+  "game": "eaw",
+  "directories": { "xml": ["data/xml"] },
+  "projectReferences": [ { "path": "../foc-lib/foc-lib.pgproj" } ],
+  "_type": "aetswg.ModProject",
+  "_typeVersion": "aetswg-1.1.0"
+}

@@ -1,0 +1,1 @@
+{ "name": "Old Shape", "directories": { "xml": ["data/xml"], "text": ["data/text"], "textResourceType": "Csv" }, "projectReferences": [] }

@@ -1,0 +1,1 @@
+{"name": "PRV Mod", "directories": {"xml": ["data/xml"]}, "projectReferences": [{"path": "../base/base.pgproj"}], "_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.1.0", "game": "foc"}

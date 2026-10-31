@@ -20,4 +20,13 @@
 	<GroundCompany Name="E2E_LoadOrder_Probe">
 		<Company_Units>X-Wing, E2E_LoadOrder_Copy_Trooper, Scout_Trooper, Executor_Super_Star_Destroyer, Bossk</Company_Units>
 	</GroundCompany>
+
+	<!-- A tag repeated in one object: the list keeps both occurrences' entries (X-Wing, A-Wing), the
+	     single value takes the later one (2). Read with Show Effective Object. -->
+	<GroundCompany Name="E2E_LoadOrder_Repeat">
+		<Company_Units>X-Wing</Company_Units>
+		<Company_Units>A-Wing</Company_Units>
+		<Max_Speed>1</Max_Speed>
+		<Max_Speed>2</Max_Speed>
+	</GroundCompany>
 </SpaceUnit_Objects>

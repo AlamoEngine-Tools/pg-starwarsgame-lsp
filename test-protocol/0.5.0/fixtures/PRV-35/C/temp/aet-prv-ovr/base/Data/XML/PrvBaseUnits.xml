@@ -1,0 +1,9 @@
+﻿<?xml version="1.0"?>
+<PrvBaseUnits>
+<SpaceUnit Name="Acclamator_Assault_Ship">
+<Text_ID>TEXT_UNIT_ACCLAMATOR</Text_ID>
+</SpaceUnit>
+<SpaceUnit Name="Prv_Base_Only">
+<Text_ID>TEXT_UNIT_ACCLAMATOR</Text_ID>
+</SpaceUnit>
+</PrvBaseUnits>

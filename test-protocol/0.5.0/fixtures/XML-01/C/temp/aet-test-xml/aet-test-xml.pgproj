@@ -1,0 +1,8 @@
+{
+  "name": "XML Test",
+  "directories": { "xml": ["Data/XML"] },
+  "localisation": { "type": "CSV", "directory": "Data/Text" },
+  "projectReferences": [],
+  "_type": "aetswg.ModProject",
+  "_typeVersion": "aetswg-1.1.0", "game": "foc"
+}
