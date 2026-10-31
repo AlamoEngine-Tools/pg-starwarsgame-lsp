@@ -367,6 +367,7 @@ public static class ServerConfigurator
                 services.AddSingleton<ModProjectResolver>();
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();
                 services.AddSingleton<IProjectConfigurationResolver, ProjectConfigurationResolver>();
+                services.AddSingleton<ITargetGameProbe, TargetGameProbe>();
                 // One reading of what a folder is to the game, shared by New Mod Project and Adopt
                 // Project, so the two refuse the same folders (#317).
                 services.AddSingleton<ModLayout>();

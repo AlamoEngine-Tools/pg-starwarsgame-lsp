@@ -10,12 +10,10 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
-using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -125,14 +123,10 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         }
 
         var languages = _langService.OfficiallySupported();
-        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
-        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
-
         var merged = _factory.CreateKeyed(languages);
-        foreach (var entry in eawDb)
-        foreach (var kv in entry.Translations)
-            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
-        foreach (var entry in focDb)
+        // Seeded from the shipped text of the project's game only, the base game's first.
+        foreach (var game in BaselineMasterTexts.Contexts(_reloadService.Game))
+        foreach (var entry in _baselineProvider.GetMasterText(game, languages))
         foreach (var kv in entry.Translations)
             merged.SetTranslation(entry.Key, kv.Key, kv.Value);
 
@@ -144,7 +138,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             return Unit.Value;
         }
 
-        _logger.LogInformation("aet-eaw-edit.lsp.initLocalisationProject: created '{Path}'.", writtenPath);
+        _logger.LogInformation("aet-eaw-edit.lsp.initLocalisationProject: created '{Path}'", writtenPath);
 
         if (bootstrapDirectory is not null)
         {

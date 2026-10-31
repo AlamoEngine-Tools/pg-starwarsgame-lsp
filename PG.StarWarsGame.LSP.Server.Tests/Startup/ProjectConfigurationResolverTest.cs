@@ -35,7 +35,8 @@ public sealed class ProjectConfigurationResolverTest
         var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance,
             new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var graph = new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance);
-        var resolver = new ModProjectResolver(fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance);
+        var resolver = new ModProjectResolver(fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance,
+            ResxMessageCatalog.Server("en"));
         var detector = new ModProjectDetector(fileHelper, NullLogger<ModProjectDetector>.Instance);
         notifier = new RecordingUserNotifier();
         return new ProjectConfigurationResolver(detector, loader, resolver, notifier,

@@ -4,6 +4,7 @@
 using System.Text.Json.Nodes;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
+using PG.StarWarsGame.LSP.Core.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
 
@@ -17,7 +18,10 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 /// </summary>
 public static class PgprojMigrations
 {
-    public static readonly IReadOnlyList<IDocumentMigration> All = [new StampInitialIdentity()];
+    public static readonly IReadOnlyList<IDocumentMigration> All = [new StampInitialIdentity(), new NameTheGame()];
+
+    /// <summary>The version the files written before the target game carried.</summary>
+    private static readonly TypeVersion IdentityOnly = TypeVersion.Of(PgprojFormat.Current.Namespace, 1);
 
     /// <summary>
     ///     Gives a project file written before any of this the identity it now needs, and changes
@@ -47,7 +51,7 @@ public static class PgprojMigrations
     {
         public string TypeName => PgprojFormat.TypeName;
         public TypeVersion From => TypeVersion.Zero(PgprojFormat.Current.Namespace);
-        public TypeVersion To => PgprojFormat.Current;
+        public TypeVersion To => IdentityOnly;
 
         /// <summary>
         ///     Nothing is asked of the user beyond agreeing to the write: no setting moves, no path
@@ -60,7 +64,35 @@ public static class PgprojMigrations
             if (document is not JsonObject root) return document;
 
             root["_type"] = PgprojFormat.TypeName;
-            root["_typeVersion"] = PgprojFormat.Current.ToString();
+            root["_typeVersion"] = To.ToString();
+            return root;
+        }
+    }
+
+    /// <summary>
+    ///     Writes the game a project is built for into every file that predates the field: FoC, the
+    ///     more modded game and the one every such project was checked against until now.
+    /// </summary>
+    /// <remarks>
+    ///     It only fills a gap. A value already there - written by hand ahead of the format - is the
+    ///     author's and stays, so running it twice is running it once.
+    /// </remarks>
+    private sealed class NameTheGame : IDocumentMigration
+    {
+        public string TypeName => PgprojFormat.TypeName;
+        public TypeVersion From => IdentityOnly;
+        public TypeVersion To => PgprojFormat.Current;
+
+        /// <summary>An Empire at War mod has to change the value, so the proposal says how.</summary>
+        public CatalogueText UserNotice => new("PgprojMigrations_TargetsForcesOfCorruption");
+
+        public JsonNode Migrate(JsonNode document)
+        {
+            if (document is not JsonObject root) return document;
+
+            if (!root.ContainsKey("game"))
+                root["game"] = TargetGameNames.Of(TargetGame.FOC);
+            root["_typeVersion"] = To.ToString();
             return root;
         }
     }

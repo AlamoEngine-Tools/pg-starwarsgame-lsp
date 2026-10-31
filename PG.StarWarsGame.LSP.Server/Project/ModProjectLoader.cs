@@ -154,6 +154,7 @@ public sealed class ModProjectLoader
 
         var localisation = ParseLocalisation(dto.Localisation, fileName);
         var icons = ParseIcons(dto.Icons, fileName);
+        var game = ParseGame(dto.Game, fileName);
 
         var references = new List<ProjectReference>();
         foreach (var reference in dto.ProjectReferences ?? [])
@@ -168,7 +169,21 @@ public sealed class ModProjectLoader
             references.Add(new ProjectReference(NormalizePath(raw)));
         }
 
-        return new ModProjectFile(name, modinfo, directories, references, localisation, icons);
+        return new ModProjectFile(name, modinfo, directories, references, localisation, icons, game);
+    }
+
+    // Absent is FoC: the migration writes it into every older file, and a file that predates the
+    // version fields reaches here through that same migration. Present, it must be one of exactly
+    // the schema's two spellings, so the editor and the server never disagree on a file.
+    private TargetGame ParseGame(JsonElement? value, string fileName)
+    {
+        if (value is not { } element) return TargetGame.FOC;
+
+        var text = element.ValueKind == JsonValueKind.String ? element.GetString() : null;
+        if (TargetGameNames.TryParse(text, out var game)) return game;
+
+        throw new ModProjectLoadException(
+            _messages.Format("ModProject_GameMustBeOneOf", fileName, text ?? element.GetRawText()));
     }
 
     // Absence means "use the engine convention", not "no icons" - unlike localisation there is a
@@ -411,6 +426,10 @@ public sealed class ModProjectLoader
         [JsonPropertyName("_typeVersion")] public string? TypeVersion { get; init; }
 
         public string? Name { get; init; }
+
+        /// <summary>The game the mod is built for; see <see cref="TargetGameNames" />.</summary>
+        public JsonElement? Game { get; init; }
+
         public JsonElement? Modinfo { get; init; }
         public DirectoryMapDto? Directories { get; init; }
         public List<ProjectReferenceDto>? ProjectReferences { get; init; }

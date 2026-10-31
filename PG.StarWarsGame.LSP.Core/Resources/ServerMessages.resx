@@ -1387,6 +1387,12 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="ModProject_FileNotValidJSONDoes" xml:space="preserve">
     <value>The file is not valid JSON or does not match the .pgproj schema.</value>
   </data>
+  <data name="ModProject_GameMustBeOneOf" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'game' must be one of eaw, foc (got '{1}').</value>
+  </data>
+  <data name="ModProject_EawProjectReferencesFocProject" xml:space="preserve">
+    <value>Could not load mod project '{0}': It targets Empire at War and references '{1}', which targets Forces of Corruption. The base game cannot load the expansion's data.</value>
+  </data>
   <data name="ModProject_ProjectReferencesMustBeArrayReferences" xml:space="preserve">
     <value>'projectReferences' must be an array of references - either path strings or {{ "path": "..." }} objects, e.g. [ {{ "path": "../core/core.pgproj" }} ].</value>
   </data>
@@ -1494,6 +1500,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="PgprojMigrationOffer_UpdatedPreviousFileAt" xml:space="preserve">
     <value>'{0}' updated. The previous file is at '{1}'.</value>
+  </data>
+  <data name="PgprojMigrations_TargetsForcesOfCorruption" xml:space="preserve">
+    <value>The project now names the game it is checked against with "game": "foc". An Empire at War mod sets it to "eaw".</value>
   </data>
   <data name="PlanetModeExclusionList_HasNoModeIsA" xml:space="preserve">
     <value>'{0}' has no mode. &lt;{1}&gt; is a flat list of (planet, mode) pairs, so every planet must be followed by the mode it is excluded in.</value>

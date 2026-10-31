@@ -24,7 +24,11 @@ public sealed class LuaEngineMemberRenameSmokeTest
 
         await using var session = await RawLspSession.StartAsync(
             new { textDocument = new { rename = new { prepareSupport = true } } },
-            new { workspaceRoot = workspace, schemaLocalPath = LspTestEnvironment.SchemaLocalPath },
+            new
+            {
+                workspaceRoot = workspace, schemaLocalPath = LspTestEnvironment.SchemaLocalPath,
+                baselineLocalPath = LspTestEnvironment.BaselineLocalPath
+            },
             workspace,
             new Dictionary<string, string?> { ["AET_EMMYLUA_LS"] = analyzer });
 

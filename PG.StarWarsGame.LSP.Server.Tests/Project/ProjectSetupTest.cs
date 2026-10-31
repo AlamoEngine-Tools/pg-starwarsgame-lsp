@@ -27,7 +27,7 @@ public sealed class ProjectSetupTest
             new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var resolver = new ModProjectResolver(fileHelper, loader,
             new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
-            NullLogger<ModProjectResolver>.Instance);
+            NullLogger<ModProjectResolver>.Instance, ResxMessageCatalog.Server("en"));
         var leaf = setup.ProjectFileOf(setup.LeafRank);
 
         var configuration = resolver.Resolve(leaf, loader.Load(leaf));

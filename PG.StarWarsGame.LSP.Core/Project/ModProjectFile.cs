@@ -9,4 +9,5 @@ public sealed record ModProjectFile(
     DirectoryMap Directories,
     IReadOnlyList<ProjectReference> ProjectReferences,
     LocalisationProjectSettings? Localisation = null,
-    IconProjectSettings? Icons = null);
+    IconProjectSettings? Icons = null,
+    TargetGame Game = TargetGame.FOC);

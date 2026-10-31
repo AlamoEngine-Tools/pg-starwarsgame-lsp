@@ -27,6 +27,7 @@ public sealed class StartupPipeline
 {
     private readonly IBaselineBootstrapper _baseline;
     private readonly ILspConfigurationProvider _configProvider;
+    private readonly ITargetGameProbe _gameProbe;
     private readonly IMessageCatalog _messages;
     private readonly IStartupGate _gate;
     private readonly ILogger<StartupPipeline> _logger;
@@ -50,8 +51,10 @@ public sealed class StartupPipeline
         IEnumerable<IDiagnosticsRepublisher> republishers,
         ILspConfigurationProvider configProvider,
         ServerStatusRecorder status,
-        IMessageCatalog messages)
+        IMessageCatalog messages,
+        ITargetGameProbe gameProbe)
     {
+        _gameProbe = gameProbe;
         _status = status;
         _configProvider = configProvider;
         _messages = messages;
@@ -73,9 +76,12 @@ public sealed class StartupPipeline
         try
         {
             _progress.Report(_messages.Format("StartupPipeline_LoadingSchemaBaseline"), 5);
+            // The baseline is the project's game's, and the project has not loaded yet: the probe
+            // reads the game from the project file so the download still runs beside the schema's.
+            // The project load below asks again with the resolved game and corrects a wrong guess.
             await Task.WhenAll(
                 _schema.LoadAsync(ct),
-                _baseline.LoadAsync(ct));
+                _baseline.LoadAsync(_gameProbe.Probe(scanRoots), ct));
 
             _progress.Report(_messages.Format("StartupPipeline_IndexingWorkspace"), 30);
             await _reloadService.LoadAsync(scanRoots, ct);

@@ -984,6 +984,72 @@ public sealed class ModProjectLoaderTest
         Assert.Equal("../BaseMod/BaseMod.pgproj", model.ProjectReferences[0].Path);
     }
 
+    // ── the target game ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void Load_GameEaw_TargetsEaw()
+    {
+        var loader = Build(
+            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "eaw" }""", out _);
+
+        Assert.Equal(TargetGame.EAW, loader.Load(ProjectPath).Game);
+    }
+
+    // Exactly the schema's two spellings, so the editor and the server never disagree on a file.
+    [Theory]
+    [InlineData("swgb")]
+    [InlineData("FOC")]
+    public void Load_GameOutsideTheSchema_RefusesNamingTheValue(string value)
+    {
+        var loader = Build(
+            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "{{value}}" }""", out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+
+        Assert.Contains(value, ex.Message, StringComparison.Ordinal);
+        Assert.Equal(ProjectProblem.Invalid, ex.Problem);
+    }
+
+    // Every project written before the field targets FoC: the more modded game, and the one the
+    // server assumed for all of them.
+    [Fact]
+    public void Load_UnstampedProject_TargetsFoc()
+    {
+        var loader = Build("""{ "name": "Mod" }""", out _);
+
+        Assert.Equal(TargetGame.FOC, loader.Load(ProjectPath).Game);
+    }
+
+    [Fact]
+    public void Load_VersionOneZero_IsMigratedToTargetFocAndSaysSo()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            """{ "_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.0.0", "name": "Mod" }""", out _, sink,
+            [.. PgprojMigrations.All]);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Equal(TargetGame.FOC, model.Game);
+        var (_, migrated, notices) = Assert.Single(sink.Calls);
+        Assert.Equal("foc", (string?)migrated["game"]);
+        Assert.Equal(PgprojFormat.Current.ToString(), (string?)migrated["_typeVersion"]);
+        Assert.Contains(notices, n => n.Contains("\"game\"", StringComparison.Ordinal));
+    }
+
+    // The step only fills a gap: a value someone already wrote is theirs.
+    [Fact]
+    public void Load_VersionOneZeroAlreadyNamingAGame_KeepsIt()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            """{ "_typeVersion": "aetswg-1.0.0", "name": "Mod", "game": "eaw" }""", out _, sink,
+            [.. PgprojMigrations.All]);
+
+        Assert.Equal(TargetGame.EAW, loader.Load(ProjectPath).Game);
+        Assert.Equal("eaw", (string?)Assert.Single(sink.Calls).Migrated["game"]);
+    }
+
     private static ModProjectLoader Build(string json, out ListLogger logger)
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>

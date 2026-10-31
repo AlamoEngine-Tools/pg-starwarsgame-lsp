@@ -63,15 +63,17 @@ public static class LspTestEnvironment
         Environment.GetEnvironmentVariable("LSP_GAME_PATH");
 
     /// <summary>
-    ///     Shipped-game baseline index. Prefers <c>LSP_BASELINE_LOCAL_PATH</c>; falls back to the
-    ///     FoC baseline checked in under <c>baseline/</c>, matching the <c>foc/</c> workspace the
-    ///     fixtures open by default. Returns <c>null</c> if neither exists.
+    ///     Shipped-game baseline index. Prefers <c>LSP_BASELINE_LOCAL_PATH</c>, a file or a folder;
+    ///     falls back to the <c>baseline/</c> checkout, a folder the server reads the file of each
+    ///     project's game from. Returns <c>null</c> if neither exists.
     /// </summary>
     public static string? BaselineLocalPath =>
         ExistingFile(Environment.GetEnvironmentVariable("LSP_BASELINE_LOCAL_PATH"))
-        ?? ExistingFile(SolutionRoot is not null
-            ? Path.Combine(SolutionRoot, "baseline", "foc", "aet-pg-swg-lsp-foc-baseline.aet")
-            : null);
+        ?? ExistingPath(Environment.GetEnvironmentVariable("LSP_BASELINE_LOCAL_PATH"))
+        ?? (SolutionRoot is not null
+            && File.Exists(Path.Combine(SolutionRoot, "baseline", "foc", "aet-pg-swg-lsp-foc-baseline.aet"))
+                ? Path.Combine(SolutionRoot, "baseline")
+                : null);
 
     public static string Locale =>
         Environment.GetEnvironmentVariable("LSP_LOCALE") ?? "en";

@@ -14,12 +14,12 @@ using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Languages;
+using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -41,6 +41,7 @@ public sealed class ExportLocalisationToDatHandler
     private readonly IPropertiesTranslationImporter _nlsImporter;
     private readonly ILocalisationProjectRegistry _projectRegistry;
     private readonly IXmlTranslationImporter _xmlImporter;
+    private readonly IModProjectReloadService _project;
 
     public ExportLocalisationToDatHandler(
         ICsvTranslationImporter csvImporter,
@@ -57,8 +58,10 @@ public sealed class ExportLocalisationToDatHandler
         ILogger<ExportLocalisationToDatHandler> logger,
         ILspConfigurationProvider config,
         IProjectLayerMap layers,
-        IMessageCatalog messages)
+        IMessageCatalog messages,
+        IModProjectReloadService project)
     {
+        _project = project;
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
         _nlsImporter = nlsImporter;
@@ -110,15 +113,14 @@ public sealed class ExportLocalisationToDatHandler
         }
         else
         {
-            var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
-            var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
-
             // Seed with baseline + every dependency layer below the exported file's own layer, so a
             // patch mod's export includes translations it inherits from a base-translation dependency,
             // not just the shipped game text - then the selected file is imported on top below.
+            // The shipped text is the project's game's only: the base game ships none of the expansion's.
             var keyed = _factory.CreateKeyed(languages);
             LocalisationLayerMerge.MergeBaselineAndLowerLayers(
-                keyed, [eawDb, focDb], _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
+                keyed, [.. BaselineMasterTexts.Contexts(_project.Game).Select(g => _baselineProvider.GetMasterText(g, languages))],
+                _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
             merged = keyed;
         }
 
@@ -157,7 +159,7 @@ public sealed class ExportLocalisationToDatHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load workspace file '{Path}'.", request.ProjectFilePath);
+            _logger.LogError(ex, "Failed to load workspace file '{Path}'", request.ProjectFilePath);
             return Task.FromResult(new ExportLocalisationToDatResult([],
                 _messages.Format("LocExportDat_FailedLoadFile", ex.Message)));
         }
@@ -179,7 +181,7 @@ public sealed class ExportLocalisationToDatHandler
             written.Add(outPath);
         }
 
-        _logger.LogInformation("Exported {Count} DAT files from '{Path}'.", written.Count, request.ProjectFilePath);
+        _logger.LogInformation("Exported {Count} DAT files from '{Path}'", written.Count, request.ProjectFilePath);
         return Task.FromResult(new ExportLocalisationToDatResult(written, null));
     }
 

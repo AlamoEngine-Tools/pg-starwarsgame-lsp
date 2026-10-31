@@ -6,10 +6,9 @@ using PG.StarWarsGame.LSP.Localisation.Rows;
 using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
-using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Server.Localisation.Rows;
+using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -22,6 +21,7 @@ public sealed class GetBaselineEntriesHandler
     private readonly ILanguageService _langService;
     private readonly ILocalisationLayerRegistry _layerRegistry;
     private readonly ILocalisationProjectRegistry _projectRegistry;
+    private readonly IModProjectReloadService _project;
 
     public GetBaselineEntriesHandler(
         IBaselineTranslationProvider baselineProvider,
@@ -29,7 +29,8 @@ public sealed class GetBaselineEntriesHandler
         ITranslationDatabaseFactory factory,
         IFileHelper fileHelper,
         ILocalisationProjectRegistry projectRegistry,
-        ILocalisationLayerRegistry layerRegistry)
+        ILocalisationLayerRegistry layerRegistry,
+        IModProjectReloadService project)
     {
         _baselineProvider = baselineProvider;
         _langService = langService;
@@ -37,12 +38,15 @@ public sealed class GetBaselineEntriesHandler
         _fileHelper = fileHelper;
         _projectRegistry = projectRegistry;
         _layerRegistry = layerRegistry;
+        _project = project;
     }
 
     public Task<GetBaselineEntriesResult> Handle(
         GetBaselineEntriesParams request, CancellationToken ct)
     {
         var languages = _langService.OfficiallySupported();
+        // The shipped text of the project's game only: the base game ships none of the expansion's.
+        var games = BaselineMasterTexts.Contexts(_project.Game);
 
         // A credits file gets the game's own credits, not its MasterText. The two share nothing: a
         // credits "key" is a formatting directive repeated on hundreds of rows, so the caller
@@ -55,11 +59,7 @@ public sealed class GetBaselineEntriesHandler
                 _projectRegistry, _fileHelper, request.ProjectFilePath) == LocCategory.Credits)
         {
             var credits = new List<BaselineEntry>();
-            foreach (var db in new[]
-                     {
-                         _baselineProvider.GetCreditsText(GameContext.EaW, languages),
-                         _baselineProvider.GetCreditsText(GameContext.FoC, languages)
-                     })
+            foreach (var db in games.Select(g => _baselineProvider.GetCreditsText(g, languages)))
             foreach (var entry in db)
                 credits.Add(new BaselineEntry(
                     entry.Key,
@@ -68,12 +68,10 @@ public sealed class GetBaselineEntriesHandler
             return Task.FromResult(new GetBaselineEntriesResult(credits));
         }
 
-        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
-        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
-
         var merged = _factory.CreateKeyed(languages);
         LocalisationLayerMerge.MergeBaselineAndLowerLayers(
-            merged, [eawDb, focDb], _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
+            merged, [.. games.Select(g => _baselineProvider.GetMasterText(g, languages))], _layerRegistry.Layers,
+            ResolveBelowRank(request.ProjectFilePath));
 
         var entries = merged
             .Select(e => new BaselineEntry(
