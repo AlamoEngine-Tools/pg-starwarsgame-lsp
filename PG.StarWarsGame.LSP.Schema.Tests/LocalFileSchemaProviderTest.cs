@@ -423,6 +423,7 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
                                 metafiles:
                                   - path: data/xml/gameobjectfiles.xml
                                     metaFileType: fileRegistry
+                                    duplicateNames: firstWins
                                     types:
                                       - GameObjectType
                                   - path: data/xml/movies.xml

@@ -10,4 +10,10 @@ public sealed record MetafileDefinition(
 {
     /// <summary>What is worth saying about this metafile. See <see cref="SchemaNote" />.</summary>
     public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
+
+    /// <summary>
+    ///     What the game does with a name two of the registry's files both define. Set for every
+    ///     <see cref="MetafileType.FileRegistry" />; null for a file that holds its own objects.
+    /// </summary>
+    public DuplicateNameRule? DuplicateNames { get; init; }
 }
