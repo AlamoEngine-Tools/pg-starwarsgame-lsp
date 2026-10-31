@@ -17,11 +17,11 @@ public sealed class DiagnosticCodeWiringTest
     {
         var fact = new ProbeFact("file:///x.xml", 3, 4, 5);
         var result = new XmlDiagnosticResult(
-            XmlDiagnosticSeverity.Error, "boom", Id: DiagnosticIds.DuplicateSymbol);
+            XmlDiagnosticSeverity.Error, "boom", Id: DiagnosticIds.DefinitionNotUsed);
 
         var diagnostic = XmlDiagnosticsPublisher.ToLspDiagnosticForTest(fact, result);
 
-        Assert.Equal("aetswg-010-0001", diagnostic.Code?.String);
+        Assert.Equal("aetswg-010-0006", diagnostic.Code?.String);
     }
 
     // Until every handler carries an id (#68), an id-less result must still publish - just

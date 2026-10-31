@@ -265,9 +265,9 @@ A scope with no target covers its own line only. Project-wide suppressions live 
 
 Only the bad entry is rejected.
 
-### `<Override>` is not a suppression
+### A name defined twice
 
-`<!-- <Override Name="..."/> -->` declares intended shadowing of a lower layer, a claim the server checks.
+The game has no layers: which definition counts follows from the order each registry lists its files in, and from the registry's rule. Game objects and SFX events keep the first definition, trade routes, campaigns, hardpoints, command bar components and mouse pointers keep the last, factions keep both but find the first by name, and targeting sets merge. The definition the game drops is reported (`aetswg-010-0006`, `aetswg-010-0007` for a merged targeting set). Where no registry orders two definitions, both are reported (`aetswg-010-0008`). The `<!-- <Override Name="..."/> -->` comment of earlier versions no longer does anything.
 
 ---
 

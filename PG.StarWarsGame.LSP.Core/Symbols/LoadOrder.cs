@@ -21,10 +21,11 @@ public sealed class LoadOrder
     /// <summary>No scan yet: every shipped definition counts and the layers decide, as before.</summary>
     public static readonly LoadOrder Unknown = new(
         ImmutableDictionary.Create<string, LoadPosition>(DocumentUris.Comparer),
-        ImmutableDictionary<string, LoadPosition>.Empty, [],
+        ImmutableDictionary<string, LoadPosition>.Empty, [], [],
         ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase), ImmutableHashSet<string>.Empty);
 
     private readonly ImmutableDictionary<string, LoadPosition> _layerFiles;
+    private readonly ImmutableArray<string> _registries;
     private readonly ImmutableArray<DuplicateNameRule> _rules;
     private readonly ImmutableHashSet<string> _shadowedShipped;
     private readonly ImmutableDictionary<string, LoadPosition> _shippedFiles;
@@ -33,11 +34,13 @@ public sealed class LoadOrder
 
     private LoadOrder(ImmutableDictionary<string, LoadPosition> layerFiles,
         ImmutableDictionary<string, LoadPosition> shippedFiles, ImmutableArray<DuplicateNameRule> rules,
-        ImmutableHashSet<string> walkedTypes, ImmutableHashSet<string> shadowedShipped)
+        ImmutableArray<string> registries, ImmutableHashSet<string> walkedTypes,
+        ImmutableHashSet<string> shadowedShipped)
     {
         _layerFiles = layerFiles;
         _shippedFiles = shippedFiles;
         _rules = rules;
+        _registries = registries;
         _walkedTypes = walkedTypes;
         _shadowedShipped = shadowedShipped;
     }
@@ -60,6 +63,7 @@ public sealed class LoadOrder
         var layerFiles = ImmutableDictionary.CreateBuilder<string, LoadPosition>(DocumentUris.Comparer);
         var shippedFiles = ImmutableDictionary.CreateBuilder<string, LoadPosition>(StringComparer.Ordinal);
         var rules = ImmutableArray.CreateBuilder<DuplicateNameRule>();
+        var registryPaths = ImmutableArray.CreateBuilder<string>();
         var walkedTypes = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var walk in walks)
         {
@@ -67,6 +71,7 @@ public sealed class LoadOrder
 
             var registry = rules.Count;
             rules.Add(def.DuplicateNames ?? DuplicateNameRule.FIRST_WINS);
+            registryPaths.Add(walk.RegistryPath);
             walkedTypes.UnionWith(def.Types);
             for (var i = 0; i < walk.Entries.Length; i++)
             {
@@ -79,7 +84,7 @@ public sealed class LoadOrder
         }
 
         return new LoadOrder(layerFiles.ToImmutable(), shippedFiles.ToImmutable(), rules.ToImmutable(),
-            walkedTypes.ToImmutable(), [.. shadowedShippedFiles]);
+            registryPaths.ToImmutable(), walkedTypes.ToImmutable(), [.. shadowedShippedFiles]);
     }
 
     // A file listed twice loads twice, so it spans its first and its last place. A file two
@@ -109,6 +114,12 @@ public sealed class LoadOrder
     public DuplicateNameRule RuleOf(LoadPosition position)
     {
         return _rules[position.Registry];
+    }
+
+    /// <summary>The game path, in key form, of the registry a <see cref="LoadPosition" /> lies in.</summary>
+    public string RegistryOf(LoadPosition position)
+    {
+        return _registries[position.Registry];
     }
 
     /// <summary>

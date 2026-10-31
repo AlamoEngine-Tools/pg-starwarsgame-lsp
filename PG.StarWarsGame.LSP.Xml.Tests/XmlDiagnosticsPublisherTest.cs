@@ -90,7 +90,7 @@ public sealed class XmlDiagnosticsPublisherTest
         [
             new XmlDuplicateTagHandler(),
             new XmlNotesHandler(),
-            new DuplicateSymbolHandler(),
+            new DuplicateDefinitionHandler(),
             new UnresolvedReferenceHandler(),
             new TypeMismatchHandler(),
             new DeprecatedEventTypeHandler(),
@@ -509,7 +509,7 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         // Symbol is at line 1; suppression comment is at line 0.
-        const string xml = "<!-- aetswg:suppress aetswg-010-0001 -->\n<Unit Name=\"Default\"/>";
+        const string xml = "<!-- aetswg:suppress aetswg-010-0008 -->\n<Unit Name=\"Default\"/>";
         workspaceHost.With("file:///a.xml", xml);
         workspaceHost.With("file:///b.xml", "<Unit Name=\"Default\"/>");
         var index = IndexWithDuplicateAtLine("Default", "file:///a.xml", "file:///b.xml", 1);
@@ -518,14 +518,14 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///a.xml");
         Assert.NotNull(pub);
-        Assert.DoesNotContain(pub.Diagnostics, d => d.Message.Contains("Duplicate"));
+        Assert.DoesNotContain(pub.Diagnostics, d => d.Message.Contains("also defined"));
     }
 
     [Fact]
     public void OnIndexChanged_SuppressAnnotation_Only_Suppresses_That_File()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        const string xmlA = "<!-- aetswg:suppress aetswg-010-0001 -->\n<Unit Name=\"Default\"/>";
+        const string xmlA = "<!-- aetswg:suppress aetswg-010-0008 -->\n<Unit Name=\"Default\"/>";
         const string xmlB = "<Unit Name=\"Default\"/>";
         workspaceHost.With("file:///a.xml", xmlA);
         workspaceHost.With("file:///b.xml", xmlB);
@@ -535,7 +535,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var pubB = published.FirstOrDefault(p => p.Uri.ToString() == "file:///b.xml");
         Assert.NotNull(pubB);
-        Assert.Contains(pubB.Diagnostics, d => d.Message.Contains("Duplicate"));
+        Assert.Contains(pubB.Diagnostics, d => d.Message.Contains("also defined"));
     }
 
     // ── closed-file suppression ──────────────────────────────────────────────
@@ -580,7 +580,7 @@ public sealed class XmlDiagnosticsPublisherTest
         indexService.Raise(index);
 
         var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
-        Assert.Equal("[DuplicateSymbol_DuplicateSymbolAlsoDefinedIn]", diagnostic.Message);
+        Assert.Equal("[DuplicateDefinition_AlsoDefinedIn]", diagnostic.Message);
     }
 
     [Fact]
