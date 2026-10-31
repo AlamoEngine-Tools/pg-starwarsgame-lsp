@@ -462,6 +462,19 @@ public sealed record GameIndex(
     }
 
     /// <summary>
+    ///     The definitions the game parses into one object for <paramref name="symbol" />: every
+    ///     definition of its name and type in load order when its registry merges them - the
+    ///     targeting sets - otherwise the symbol alone.
+    /// </summary>
+    public IReadOnlyList<GameSymbol> MergedDefinitionsOf(GameSymbol symbol)
+    {
+        if (LoadOrder.PositionOf(symbol) is not { } position ||
+            LoadOrder.RuleOf(position) != Schema.DuplicateNameRule.MERGE)
+            return [symbol];
+        return InLoadOrder(symbol.Id, symbol.TypeName);
+    }
+
+    /// <summary>
     ///     The workspace references that mean the object <paramref name="id" /> of
     ///     <paramref name="typeName" />: those its tag types so, and those whose tag names no type and
     ///     whose id resolves to that type. Every reference to the id when the type is null.

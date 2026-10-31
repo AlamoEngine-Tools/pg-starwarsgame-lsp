@@ -152,6 +152,7 @@ public sealed class SchemaIndex
             Notes = raw.Notes,
             MultipleAllowed = raw.MultipleAllowed,
             VariantMode = raw.VariantMode,
+            RepeatMode = raw.RepeatMode,
             ValidationOverride = raw.ValidationOverride,
             Slots = raw.Slots.Select(ResolveSlot).ToList()
         };

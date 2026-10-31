@@ -68,6 +68,9 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
         {
             var layer = chain[i];
             var isRootLayer = i == chain.Count - 1;
+            // The tags this layer has already written: a second occurrence is parsed without the
+            // overlay, so it follows the tag's repeat rule, not its variant rule.
+            var written = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var tag in TagsFor(layer))
             {
                 var schemaTag = _schema.GetTag(tag.TagName);
@@ -95,7 +98,16 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
                     continue;
                 }
 
-                ApplyTag(state, order, layer.Id, tag, mode, isRootLayer);
+                if (!written.Add(tag.TagName))
+                {
+                    if (mode != VariantMode.Ignored || isRootLayer)
+                        ApplyRepeat(state, tag, schemaTag?.RepeatMode ?? RepeatMode.REPLACE,
+                            schemaTag?.MultipleAllowed ?? false);
+                }
+                else
+                {
+                    ApplyTag(state, order, layer.Id, tag, mode, isRootLayer);
+                }
             }
         }
 
@@ -129,6 +141,14 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
     }
 
     private IReadOnlyList<VariantTag> TagsFor(GameSymbol symbol)
+    {
+        // A registry that merges - the targeting sets - parses every definition of the name into one
+        // object, in load order, as if they were one definition's tags.
+        var definitions = _index.MergedDefinitionsOf(symbol);
+        return definitions.Count == 1 ? OwnTagsOf(symbol) : [.. definitions.SelectMany(OwnTagsOf)];
+    }
+
+    private IReadOnlyList<VariantTag> OwnTagsOf(GameSymbol symbol)
     {
         var workspace = _workspaceSource.TryGetTags(symbol);
         if (workspace is not null)
@@ -209,6 +229,37 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
 
         state[tag.TagName] = new Accum(tag.TagName, value, fragment, layerId, tag.Origin, mode,
             hadPrev || (prev?.EverInBase ?? false), displaced);
+    }
+
+    /// <summary>
+    ///     A second occurrence of a tag in one layer: a list field gains its entries, a single value is
+    ///     replaced by it. What the occurrence displaced from a base, and its provenance, stay those of
+    ///     the layer's first occurrence. A list tag that may appear several times keeps each occurrence
+    ///     as an entry of its own, since each carries its own tuple.
+    /// </summary>
+    private static void ApplyRepeat(Dictionary<string, Accum> state, VariantTag tag, RepeatMode repeatMode,
+        bool multipleAllowed)
+    {
+        if (!state.TryGetValue(tag.TagName, out var earlier))
+            return;
+
+        if (repeatMode == RepeatMode.ADD && multipleAllowed)
+        {
+            var occurrence = earlier with { Value = tag.Value, Fragment = tag.Fragment, Origin = tag.Origin };
+            if (earlier.Occurrences is { } occurrences)
+                occurrences.Add(occurrence with { Occurrences = null });
+            else
+                state[tag.TagName] = earlier with { Occurrences = [earlier, occurrence] };
+            return;
+        }
+
+        state[tag.TagName] = repeatMode == RepeatMode.ADD
+            ? earlier with
+            {
+                Value = MergeValues(earlier.Value, tag.Value),
+                Fragment = $"<{tag.TagName}>{MergeValues(earlier.Value, tag.Value)}</{tag.TagName}>"
+            }
+            : earlier with { Value = tag.Value, Fragment = tag.Fragment, Origin = tag.Origin };
     }
 
     private static EffectiveTag ToEffectiveTag(Accum a, string topId, bool single)

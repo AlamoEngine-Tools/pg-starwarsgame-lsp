@@ -220,9 +220,8 @@ public sealed class DamageSectionBuilder(
     /// </summary>
     /// <remarks>
     ///     Straight off <c>effective.Tags</c>, with no <c>RepeatedTagReader</c>: <c>Death_Clone</c>
-    ///     is the one tag in the schema with <c>variantMode: merge</c> plus <c>multipleAllowed</c>,
-    ///     so the resolver already keeps every occurrence - and keeps a variant's base clones too,
-    ///     which the schema calls out as deliberate.
+    ///     is <c>multipleAllowed</c> with <c>repeatMode: add</c>, so the resolver keeps every
+    ///     occurrence an object declares, each as its own entry.
     /// </remarks>
     public List<PreviewDeathClone> DeathClones(GameIndex index,
         EffectiveObjectResolver resolver, EffectiveObject effective, List<PreviewProblem> problems)

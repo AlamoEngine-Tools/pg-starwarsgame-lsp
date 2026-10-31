@@ -192,6 +192,52 @@ public sealed class YamlSchemaParserTest
         Assert.Equal(VariantMode.Replace, tag.VariantMode);
     }
 
+    // A repeat of a list tag inside one object adds its entries; a repeat of a single value replaces
+    // it. The schema names the list tags.
+    [Theory]
+    [InlineData("add", RepeatMode.ADD)]
+    [InlineData("replace", RepeatMode.REPLACE)]
+    [InlineData("ADD", RepeatMode.ADD)]
+    public void ParseTagFile_RepeatMode_MappedCorrectly(string written, RepeatMode expected)
+    {
+        var yaml = $"""
+                    tags:
+                      - tag: Attack_Priorities
+                        type: CategoryToFloatMap
+                        repeatMode: {written}
+                    """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(expected, tag.RepeatMode);
+    }
+
+    [Fact]
+    public void ParseTagFile_NoRepeatMode_DefaultsToReplace()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Speed
+                                type: Float
+                            """;
+
+        Assert.Equal(RepeatMode.REPLACE, Assert.Single(YamlSchemaParser.ParseTagFile(yaml)).RepeatMode);
+    }
+
+    // Lenient like variantMode: a schema newer than the server must still load.
+    [Fact]
+    public void ParseTagFile_UnknownRepeatMode_DefaultsToReplace()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Foo
+                                type: Float
+                                repeatMode: bogus
+                            """;
+
+        Assert.Equal(RepeatMode.REPLACE, Assert.Single(YamlSchemaParser.ParseTagFile(yaml)).RepeatMode);
+    }
+
     [Fact]
     public void ParseTagFile_SemanticType_VariantParent_Parsed()
     {

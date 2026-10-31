@@ -92,6 +92,14 @@ internal static class YamlSchemaParser
                 variantMode = VariantMode.Replace;
             }
 
+            var repeatMode = RepeatMode.REPLACE;
+            if (entry.RepeatMode is not null && !Enum.TryParse(entry.RepeatMode, true, out repeatMode))
+            {
+                logger?.LogWarning("Unknown repeatMode '{RepeatMode}' for tag '{Tag}' - defaulting to replace",
+                    entry.RepeatMode, entry.Tag);
+                repeatMode = RepeatMode.REPLACE;
+            }
+
             TagValidationOverride? validationOverride = null;
             if (entry.ValidationOverride is { } vo && !string.IsNullOrEmpty(vo.ValidationId))
             {
@@ -135,6 +143,7 @@ internal static class YamlSchemaParser
                 Notes = ReadNotes(entry.Notes),
                 MultipleAllowed = entry.MultipleAllowed,
                 VariantMode = variantMode,
+                RepeatMode = repeatMode,
                 ValidationOverride = validationOverride,
                 Slots = ReadSlots(entry, logger)
             });
