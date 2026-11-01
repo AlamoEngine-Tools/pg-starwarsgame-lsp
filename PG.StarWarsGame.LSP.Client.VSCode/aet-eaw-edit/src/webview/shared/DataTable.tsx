@@ -23,6 +23,9 @@ export interface DataColumn<R> {
 
 export type RowSeverity = "error" | "warning" | "info";
 
+/** How a row came to be selected: clicked, or reached with the keys. */
+export type SelectedVia = "click" | "keys";
+
 export interface DataTableProps<R> {
     /** What the table holds, for a screen reader. */
     label: string;
@@ -39,8 +42,11 @@ export interface DataTableProps<R> {
     sortable?: readonly string[];
     sort?: SortState | null;
     onSort?: (next: SortState | null) => void;
-    /** A click, or the keys arriving on a row. Never called for an inert row. */
-    onSelect?: (row: R) => void;
+    /**
+     * A click, or the keys arriving on a row, and which of the two it was: a click is a choice of
+     * that row, the keys only pass over it. Never called for an inert row.
+     */
+    onSelect?: (row: R, via: SelectedVia) => void;
     /** A double click or Enter. */
     onOpen?: (row: R) => void;
     /** Any other key on a row; true when it was handled. */
@@ -184,7 +190,7 @@ export function DataTable<R>({
             target?.focus();
             target?.scrollIntoView({ block: "nearest" });
             if (inert?.(rows[to]) === undefined) {
-                onSelect?.(rows[to]);
+                onSelect?.(rows[to], "keys");
             }
         } else if (e.key === "Enter" && onOpen) {
             e.preventDefault();
@@ -282,7 +288,8 @@ export function DataTable<R>({
                                     title={reason}
                                     aria-selected={key === selected}
                                     onClick={() =>
-                                        reason === undefined && onSelect?.(row)
+                                        reason === undefined &&
+                                        onSelect?.(row, "click")
                                     }
                                     onDoubleClick={() =>
                                         reason === undefined && onOpen?.(row)

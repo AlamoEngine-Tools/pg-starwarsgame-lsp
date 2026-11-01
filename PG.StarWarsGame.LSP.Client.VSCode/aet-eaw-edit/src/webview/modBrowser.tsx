@@ -44,7 +44,12 @@ import {
 import { pickShipName } from "../shipNamePick";
 import { EncyclopediaCard } from "./encyclopediaCard";
 import { factionModes, factionSlotOf } from "./encyclopediaModes";
-import { ColumnFilter, DataColumn, DataTable } from "./shared/DataTable";
+import {
+    ColumnFilter,
+    DataColumn,
+    DataTable,
+    SelectedVia,
+} from "./shared/DataTable";
 import { menuAction, RowMenuFrame } from "./shared/RowMenu";
 import { TabStrip } from "./shared/TabStrip";
 import {
@@ -1109,7 +1114,16 @@ function App(): React.JSX.Element {
                         selectedId={selectedRow}
                         nodeOf={(row) => nodes[entryOf(list, row).key]}
                         onHover={(row) => void fetchNode(entryOf(list, row))}
-                        onSelect={(row) => select(entryOf(list, row))}
+                        onSelect={(row, via) => {
+                            const entry = entryOf(list, row);
+                            select(entry);
+                            // A click is a choice of that entry, so its relations open beneath it in
+                            // the rail; the keys only pass over rows, and opening every one they pass
+                            // would unfold the whole list.
+                            if (via === "click") {
+                                expand(entry, true);
+                            }
+                        }}
                         onAct={(action, row) =>
                             void act(action, entryOf(list, row))
                         }
@@ -1316,7 +1330,7 @@ function ListPage({
     /** The row's entry as the server opened it, once it has. */
     nodeOf: (row: SymbolRow) => GetSymbolNodeResult | undefined;
     onHover: (row: SymbolRow) => void;
-    onSelect: (row: SymbolRow) => void;
+    onSelect: (row: SymbolRow, via: SelectedVia) => void;
     onAct: (action: string, row: SymbolRow) => void;
     onMenu: (x: number, y: number, row: SymbolRow, index: number) => void;
     onMore: () => void;
