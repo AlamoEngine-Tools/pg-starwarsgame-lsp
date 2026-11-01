@@ -1357,7 +1357,7 @@ function PlanetDialog(props: {
         <Modal
             form
             title={props.name}
-            confirmLabel="OK"
+            confirmLabel={l10n.t("OK")}
             canConfirm={changed}
             disabledReason={
                 draft ? l10n.t("Owner unchanged") : l10n.t("Owner required")
@@ -1452,7 +1452,7 @@ function FlagDialog(props: {
             title={
                 existing ? l10n.t("Set {0}", existing.name) : l10n.t("Set flag")
             }
-            confirmLabel="OK"
+            confirmLabel={l10n.t("OK")}
             canConfirm={valid}
             disabledReason={
                 name.trim()
@@ -1516,7 +1516,7 @@ function DecisionDialog(props: {
         <Modal
             form
             title={picker.title}
-            confirmLabel="OK"
+            confirmLabel={l10n.t("OK")}
             canConfirm={value.length > 0}
             disabledReason={l10n.t("{0} required", picker.noun)}
             onConfirm={() => {

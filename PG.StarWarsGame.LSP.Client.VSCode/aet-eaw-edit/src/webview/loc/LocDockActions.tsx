@@ -263,7 +263,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                               "until it is saved."
                     }
                     title={l10n.t("Add a language")}
-                    confirmLabel="Add"
+                    confirmLabel={l10n.t("Add")}
                     canConfirm={language !== ""}
                     onCancel={close}
                     onConfirm={addLanguage}
@@ -349,7 +349,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                 <Modal
                     dialogId={DIALOG_IDS.fillLanguage}
                     title={l10n.t("Fill in a language")}
-                    confirmLabel="Fill"
+                    confirmLabel={l10n.t("Fill")}
                     canConfirm={copyCount > 0}
                     onCancel={close}
                     onConfirm={() => {
@@ -518,7 +518,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         "The new file is written beside this one and the original is kept."
                     }
                     title={l10n.t("Convert to another format")}
-                    confirmLabel="Convert"
+                    confirmLabel={l10n.t("Convert")}
                     onCancel={close}
                     onConfirm={() => {
                         props.onConvertFormat(format);
@@ -551,7 +551,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                 <Modal
                     dialogId={DIALOG_IDS.exportDat}
                     title={l10n.t("Export to DAT")}
-                    confirmLabel="Export"
+                    confirmLabel={l10n.t("Export")}
                     onCancel={close}
                     onConfirm={() => {
                         props.onExportDat();

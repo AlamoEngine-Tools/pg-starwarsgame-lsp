@@ -89,6 +89,13 @@ describe("host strings", () => {
         );
     });
 
+    it("finds a dialog's button labels", () => {
+        assert.deepEqual(
+            jsx('const t = <Modal confirmLabel="Export" cancelLabel="Keep" title={l10n.t("Export to DAT")} />;'),
+            ['"Export"', '"Keep"'],
+        );
+    });
+
     /** Every text the extension host shows a reader comes from the l10n bundle. */
     it("finds no text written in place in the extension host", () => {
         const found = hostFiles(path.join(__dirname, "..", "src")).flatMap(

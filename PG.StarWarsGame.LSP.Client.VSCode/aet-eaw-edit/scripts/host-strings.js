@@ -139,6 +139,9 @@ const SHOWN_ATTRIBUTES = new Set([
     // A disabled control's tooltip: the story graph's Save said "nothing is staged" outside every catalogue.
     "disabledReason",
     "caption",
+    // A dialog's buttons: the localisation editor's Export said "Export" outside every catalogue.
+    "confirmLabel",
+    "cancelLabel",
 ]);
 
 /** The raw texts in one file, each with its line and source text. */
