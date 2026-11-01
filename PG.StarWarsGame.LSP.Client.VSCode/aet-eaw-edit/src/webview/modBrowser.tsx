@@ -1362,27 +1362,37 @@ function ListPage({
             label={label}
             columns={(
                 [
-                    { key: "name", label: l10n.t("Name"), cell: (r) => r.name },
+                    // Shares of the width: the name and the origin run longest.
+                    {
+                        key: "name",
+                        label: l10n.t("Name"),
+                        cell: (r) => r.name,
+                        share: 3,
+                    },
                     {
                         key: "value",
                         label: l10n.t("Value"),
                         cell: (r) => r.value ?? "",
+                        share: 2,
                     },
                     {
                         key: "type",
                         label: l10n.t("Type"),
                         cell: (r) => rowTypeLabel(r),
                         dim: true,
+                        share: 2,
                     },
                     {
                         key: "kinds",
                         label: l10n.t("Behaves like"),
                         cell: (r) => r.kinds.join(", "),
                         dim: true,
+                        share: 2,
                     },
                     {
                         key: "origin",
                         label: l10n.t("Origin"),
+                        share: 3,
                         cell: (r) => (
                             <>
                                 {originLabel(r.origin, r.originName, layers)}

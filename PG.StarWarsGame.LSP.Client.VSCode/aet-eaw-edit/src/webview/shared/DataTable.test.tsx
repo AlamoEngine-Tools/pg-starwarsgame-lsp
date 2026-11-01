@@ -46,7 +46,7 @@ describe("DataTable", () => {
 
         assert.match(
             html,
-            /<table class="data-table" aria-label="Game objects"/,
+            /<table class="data-table fixed" aria-label="Game objects"/,
         );
         assert.equal(html.match(/<th[ >]/g)?.length, 2);
         assert.equal(html.match(/<tr data-row-index/g)?.length, 3);
@@ -123,5 +123,33 @@ describe("DataTable", () => {
             /class="data-table-foot"><span>Showing 3 of 3/,
         );
         assert.equal(/data-table-foot/.test(table()), false);
+    });
+
+    // Sized to what they held, the columns jumped whenever a filter or a sort changed the rows shown.
+    it("keeps its columns at fixed shares of its width, whatever rows it shows", () => {
+        const shares = (html: string): string[] =>
+            [...html.matchAll(/<col style="width:([\d.]+%)"/g)].map(
+                (m) => m[1],
+            );
+
+        assert.match(table(), /<table class="data-table fixed"/);
+        assert.deepEqual(shares(table()), ["50%", "50%"]);
+        assert.deepEqual(shares(table({ rows: [ROWS[1]] })), ["50%", "50%"]);
+        assert.deepEqual(
+            shares(
+                table({
+                    columns: [
+                        {
+                            key: "name",
+                            label: "Name",
+                            cell: (r) => r.name,
+                            share: 3,
+                        },
+                        { key: "type", label: "Type", cell: (r) => r.type },
+                    ],
+                }),
+            ),
+            ["75%", "25%"],
+        );
     });
 });
