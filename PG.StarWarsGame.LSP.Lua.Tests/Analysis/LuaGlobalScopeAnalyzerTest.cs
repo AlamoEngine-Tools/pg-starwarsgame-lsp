@@ -1242,4 +1242,39 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         Assert.Equal(warns, result.Any(d => d.Message.Contains("Definitions")));
     }
+
+    // The usual holder is a script of its own, not a shared file: vanilla's PGStateMachine calls
+    // Definitions(), which DarthVader and every other requiring script defines, while an unrelated
+    // shared file (GalacticHeroFreeStore, which never requires the state machine) defines one too.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Analyze_ALibrarysHook_IsInScopeWhereARequiringScriptDefinesIt(bool scriptDefinesIt, bool warns)
+    {
+        const string library = "file:///scripts/library/pgstatemachine.lua";
+        const string script = "file:///scripts/gameobject/darthvader.lua";
+        const string unrelated = "file:///scripts/freestore/galacticherofreestore.lua";
+        const string itsRequirer = "file:///scripts/freestore/galacticfreestore.lua";
+        var shared = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(unrelated, 0, null), null);
+        var own = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null, new FileOrigin(script, 0, null),
+            null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(library, new DocumentIndex(library, 1, [], []))
+                .Add(script, new DocumentIndex(script, 1, scriptDefinesIt ? [own] : [], [],
+                    ImmutableArray.Create("pgstatemachine")))
+                .Add(unrelated, new DocumentIndex(unrelated, 1, [shared], []))
+                .Add(itsRequirer,
+                    new DocumentIndex(itsRequirer, 1, [], [], ImmutableArray.Create("galacticherofreestore"))),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Definitions",
+                scriptDefinesIt ? [shared, own] : [shared])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(library, "if Definitions then Definitions() end", index,
+            EmptySchema, s_fileHelper, TestCatalogues.English);
+
+        Assert.Equal(warns, result.Any(d => d.Message.Contains("Definitions")));
+    }
 }
