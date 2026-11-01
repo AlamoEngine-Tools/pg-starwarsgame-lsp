@@ -1,0 +1,7 @@
+{
+    "settings": {
+        "aet-eaw-edit.features.lua.codeLens": false,
+        "aet-eaw-edit.features.lua.inlayHints": false,
+        "aet-eaw-edit.features.lua.analyzer": false
+    }
+}
