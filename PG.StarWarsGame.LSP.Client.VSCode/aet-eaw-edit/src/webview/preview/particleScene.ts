@@ -359,11 +359,15 @@ export function groupState(
 /** What switches this group on, in words. Empty when nothing does. */
 export function describeGate(gate: string, hardpointId: string | null): string {
     if (gate === PREVIEW_PARTICLE_GATE.hardpointDestroyed) {
-        return `when ${hardpointId ?? "its hardpoint"} is destroyed`;
+        return hardpointId === null
+            ? l10n.t("when its hardpoint is destroyed")
+            : l10n.t("when {0} is destroyed", hardpointId);
     }
 
     if (gate === PREVIEW_PARTICLE_GATE.hardpointAlive) {
-        return `until ${hardpointId ?? "its hardpoint"} is destroyed`;
+        return hardpointId === null
+            ? l10n.t("until its hardpoint is destroyed")
+            : l10n.t("until {0} is destroyed", hardpointId);
     }
 
     return "";

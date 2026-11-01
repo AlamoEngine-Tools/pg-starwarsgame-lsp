@@ -32,6 +32,8 @@
 // looking at a black scene and a tree full of ticks had nothing to go on. Every row can now name
 // the rule that decided it.
 
+import * as l10n from "@vscode/l10n";
+
 /** The reader's word on one row. Absent means they have not said anything about it. */
 export type RowOverride = "shown" | "hidden";
 
@@ -352,11 +354,17 @@ export function clearedForPlayback(): Map<string, RowOverride> {
  */
 export function becauseText(because: string): string {
     if (because.startsWith("master:")) {
-        return `Hidden by the ${because.slice("master:".length)} switch`;
+        return l10n.t(
+            "Hidden by the {0} switch",
+            because.slice("master:".length),
+        );
     }
 
     if (because.startsWith("ancestor:")) {
-        return `Hidden with ${because.slice("ancestor:".length)}, above it`;
+        return l10n.t(
+            "Hidden with {0}, above it",
+            because.slice("ancestor:".length),
+        );
     }
 
     // One clause each. These are read standing over a row in a tree that can be a hundred deep,
@@ -367,15 +375,15 @@ export function becauseText(because: string): string {
     // why it reads as a sibling of `animation` rather than as a pose.
     switch (because) {
         case "you":
-            return "Set by hand";
+            return l10n.t("Set by hand");
         case "idle":
-            return "Set by the idle animation";
+            return l10n.t("Set by the idle animation");
         case "animation":
-            return "Set by the animation playing";
+            return l10n.t("Set by the animation playing");
         case "level":
-            return "Not in this damage or detail level";
+            return l10n.t("Not in this damage or detail level");
         default:
-            return "As the model draws it";
+            return l10n.t("As the model draws it");
     }
 }
 

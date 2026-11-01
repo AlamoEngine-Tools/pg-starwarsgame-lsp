@@ -244,7 +244,7 @@ const DESTROYED_COLOUR = "var(--vscode-disabledForeground, #5a5a5a)";
  * reads, and two rows both called Muzzle B would be worse than an honest C.
  */
 export function muzzleLabel(index: number): string {
-    return `Muzzle ${String.fromCharCode(65 + index)}`;
+    return l10n.t("Muzzle {0}", String.fromCharCode(65 + index));
 }
 
 /**

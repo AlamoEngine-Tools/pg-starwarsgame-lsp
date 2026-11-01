@@ -466,8 +466,11 @@ function num(value: number): string {
  */
 export function gotoDefinitionTitle(row: AbilityRow): string {
     return row.definition === null
-        ? `${row.type} names no ability block, so there is nothing to open`
-        : `Open where ${row.definition} is defined`;
+        ? l10n.t(
+              "{0} names no ability block, so there is nothing to open",
+              row.type,
+          )
+        : l10n.t("Open where {0} is defined", row.definition);
 }
 
 /**

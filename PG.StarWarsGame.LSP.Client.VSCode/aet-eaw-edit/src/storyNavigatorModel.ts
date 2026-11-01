@@ -9,6 +9,8 @@
 // AI_Player_Control's type "Human" (any casing) removes the AI; every other type creates one, and
 // "None" is a real AI player type (Ai/Players/Player_none.xml), not the absence of one.
 
+import * as l10n from "@vscode/l10n";
+
 import type { StoryCampaignDto, StoryFactionDto } from "./protocol";
 
 export type FactionRole =
@@ -48,11 +50,13 @@ export function factionRole(
 export function roleLabel(role: FactionRole): string | undefined {
     switch (role.kind) {
         case "player":
-            return role.aiType ? `Player, AI - ${role.aiType}` : "Player";
+            return role.aiType
+                ? l10n.t("Player, AI - {0}", role.aiType)
+                : l10n.t("Player");
         case "human":
-            return "Human";
+            return l10n.t("Human");
         case "ai":
-            return `AI - ${role.type}`;
+            return l10n.t("AI - {0}", role.type);
         default:
             return undefined;
     }

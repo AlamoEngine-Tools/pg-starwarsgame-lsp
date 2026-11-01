@@ -7,6 +7,8 @@
  * the wire types; the components in SimDock.tsx render them and storyGraph.tsx owns the state.
  */
 
+import * as l10n from "@vscode/l10n";
+
 import {
     StoryGraphEdgeDto,
     StoryGraphNodeDto,
@@ -374,50 +376,64 @@ export function pickerCandidates(
 
 // ── Change text ──────────────────────────────────────────────────────────────
 
-/** A world change as the author reads it - the label of a suggested action. */
+/**
+ * A world change as the author reads it - the label of a suggested action. One whole message per
+ * case and per optional part, so each reads right in any language; a missing value reads "?".
+ */
 export function describeChange(change: StorySimWorldChangeDto): string {
     const who = change.faction ?? "";
+    const planet = change.planet ?? "?";
+    const unit = change.unitType ?? "?";
+    const name = change.name ?? "?";
     switch (change.kind) {
         case "capturePlanet":
-            return `${who} captures ${change.planet ?? "?"}`;
+            return l10n.t("{0} captures {1}", who, planet);
         case "buildUnit":
-            return `${who} builds ${change.unitType ?? "?"}`;
+            return l10n.t("{0} builds {1}", who, unit);
         case "destroyUnit":
-            return `${change.unitType ?? "?"} destroyed`;
+            return l10n.t("{0} destroyed", unit);
         case "destroyAll":
-            return `All ${change.unitType ?? "units"} of ${who} destroyed`;
+            return change.unitType
+                ? l10n.t("All {0} of {1} destroyed", change.unitType, who)
+                : l10n.t("All units of {0} destroyed", who);
         case "captureUnit":
-            return `${who} captures ${change.unitType ?? "?"}`;
+            return l10n.t("{0} captures {1}", who, unit);
         case "setTech":
-            return `${who} tech level ${change.amount ?? 1}`;
+            return l10n.t("{0} tech level {1}", who, change.amount ?? 1);
         case "addCredits":
-            return `${who} credits +${change.amount ?? 0}`;
+            return l10n.t("{0} credits +{1}", who, change.amount ?? 0);
         case "battleWon":
-            return `${who} wins${change.planet ? " at " + change.planet : ""}`;
+            return change.planet
+                ? l10n.t("{0} wins at {1}", who, change.planet)
+                : l10n.t("{0} wins", who);
         case "battleLost":
-            return `${who} loses${change.name ? " " + change.name : ""}`;
+            return change.name
+                ? l10n.t("{0} loses {1}", who, change.name)
+                : l10n.t("{0} loses", who);
         case "battleStarted":
-            return `${change.mode ?? "a"} battle at ${change.planet ?? "?"}`;
+            return change.mode
+                ? l10n.t("{0} battle at {1}", change.mode, planet)
+                : l10n.t("A battle at {0}", planet);
         case "enterPlanet":
-            return `${who} enters ${change.planet ?? "?"}`;
+            return l10n.t("{0} enters {1}", who, planet);
         case "bounced":
-            return `${who} bounced at ${change.planet ?? "?"}`;
+            return l10n.t("{0} bounced at {1}", who, planet);
         case "moveUnit":
-            return `${change.unitType ?? "?"} to ${change.planet ?? "?"}`;
+            return l10n.t("{0} to {1}", unit, planet);
         case "clickGui":
-            return `Click ${change.name ?? "?"}`;
+            return l10n.t("Click {0}", name);
         case "selectPlanet":
-            return `Select ${change.planet ?? "?"}`;
+            return l10n.t("Select {0}", planet);
         case "corrupt":
-            return `Corrupt ${change.planet ?? "?"}`;
+            return l10n.t("Corrupt {0}", planet);
         case "beginEra":
-            return `Era ${change.amount ?? 1}`;
+            return l10n.t("Era {0}", change.amount ?? 1);
         case "planetDestroyed":
-            return `${change.planet ?? "?"} destroyed`;
+            return l10n.t("{0} destroyed", planet);
         case "generic":
-            return `Trigger ${change.name ?? "?"}`;
+            return l10n.t("Trigger {0}", name);
         case "assumeMet":
-            return "Assume the trigger met";
+            return l10n.t("Assume the trigger met");
         default:
             return change.kind;
     }
@@ -505,7 +521,7 @@ export const DEFAULT_PACE: SimPace = { mode: "custom", ticksPerSecond: 1 };
 
 /** A stop's readout: `Step`, or ticks per second. */
 export function speedLabel(pace: SimPace): string {
-    return pace.mode === "step" ? "Step" : `${pace.ticksPerSecond}/s`;
+    return pace.mode === "step" ? l10n.t("Step") : `${pace.ticksPerSecond}/s`;
 }
 
 /** The stop a pace sits on - step, or the nearest rate. */

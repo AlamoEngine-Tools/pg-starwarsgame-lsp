@@ -100,6 +100,23 @@ describe("host strings", () => {
         assert.deepEqual(texts('return [this._info("No Lua debug session")];'), ['"No Lua debug session"']);
     });
 
+    // A label or a reason a function builds reaches its sink through the return, where the walk loses it.
+    it("finds a text a function returns, and leaves returned ids, values and marked texts alone", () => {
+        assert.deepEqual(
+            texts(
+                'function a(s) { if (s) { return "Not started"; } return `Running - t${s}`; }\n' +
+                    'const b = (x) => { return x ? "Won" : "Lost"; };\n' +
+                    'function c() { return "aet/getStoryPlots"; }\n' +
+                    'function d() { return "game"; }\n' +
+                    'function e(n) { return `${n} - ${n}`; }\n' +
+                    'function f() { return l10n.t("Not started"); }\n' +
+                    "function g(c) {\n    // l10n-exempt: a CSS value\n    return `color-mix(in srgb, ${c} 20%)`;\n}\n" +
+                    'function h(o) { return o ? "LSP server is not running." : `${o} names no ability block`; }',
+            ),
+            ['"Not started"', "`Running - t${s}`", '"Won"', '"Lost"', '"LSP server is not running."', "`${o} names no ability block`"],
+        );
+    });
+
     /** Every text the extension host shows a reader comes from the l10n bundle. */
     it("finds no text written in place in the extension host", () => {
         const found = hostFiles(path.join(__dirname, "..", "src")).flatMap(

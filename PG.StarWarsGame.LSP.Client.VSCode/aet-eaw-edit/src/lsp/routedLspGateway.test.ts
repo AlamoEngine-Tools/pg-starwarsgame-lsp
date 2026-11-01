@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { LspGateway, SERVER_NOT_RUNNING } from "./lspGateway";
+import { LspGateway, serverNotRunning } from "./lspGateway";
 import { RouteChanges, RoutedLspGateway } from "./routedLspGateway";
 
 /** A gateway over a fake server that answers every request with its own name. */
@@ -42,7 +42,7 @@ describe("RoutedLspGateway", () => {
         assert.deepEqual(await routed.request("aet/listModels"), {
             ok: false,
             reason: "offline",
-            message: SERVER_NOT_RUNNING,
+            message: serverNotRunning(),
         });
     });
 

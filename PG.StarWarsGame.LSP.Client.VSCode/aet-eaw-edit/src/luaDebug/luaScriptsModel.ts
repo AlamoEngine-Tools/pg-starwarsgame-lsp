@@ -161,13 +161,20 @@ export function breakAvailability(
 export function sessionSummary(result: LuaScriptsResult): string {
     const count =
         result.scripts.length === 1
-            ? "1 script"
-            : `${result.scripts.length} scripts`;
+            ? l10n.t("1 script")
+            : l10n.t("{0} scripts", result.scripts.length);
     if (result.runState === "suspended") {
         const stopped = result.scripts.find((s) => s.isSuspended);
         return stopped
-            ? `${count} - stopped in ${stopped.name} [${stopped.scriptId}]`
-            : `${count} - stopped`;
+            ? l10n.t(
+                  "{0} - stopped in {1} [{2}]",
+                  count,
+                  stopped.name,
+                  stopped.scriptId,
+              )
+            : l10n.t("{0} - stopped", count);
     }
-    return `${count} - ${result.runState === "breakArmed" ? "break armed" : "running"}`;
+    return result.runState === "breakArmed"
+        ? l10n.t("{0} - break armed", count)
+        : l10n.t("{0} - running", count);
 }

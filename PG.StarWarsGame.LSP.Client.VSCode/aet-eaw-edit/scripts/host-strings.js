@@ -46,10 +46,13 @@ const SHOWN_PROPERTIES = new Set([
 ]);
 
 /**
- * Calls with one shown argument, by its index: the gateway prefixes a failed request's message with
- * the context it was given, so that context is read.
+ * Calls with one shown argument, by its index: the gateway prefixes a failed request's or command's
+ * message with the context it was given, so that context is read.
  */
-const SHOWN_ARGUMENT_AT = new Map([["requestOrReport", 2]]);
+const SHOWN_ARGUMENT_AT = new Map([
+    ["requestOrReport", 2],
+    ["executeCommand", 2],
+]);
 
 /** The values a function hands back: a concise body, or each `return` of a block. */
 function returnedValues(fn) {
@@ -84,6 +87,50 @@ function shownParts(node) {
 
 /** Whether written text carries words - a format such as `${a} - ${b}` gives a translator nothing. */
 const hasWords = (text) => /[A-Za-z]/.test(text);
+
+/**
+ * Whether a returned text reads as words for a reader: it opens on a capital word (an acronym too), or a
+ * template carries two lower-case words in a row. A function's return reaches a sink the walk cannot
+ * follow, so this is the test instead - ids, keys and values (`aet/getStoryPlots`, `game`) are lower
+ * case single words or have no words, and are left alone.
+ */
+function readsAsWords(node) {
+    if (ts.isParenthesizedExpression(node)) {
+        return readsAsWords(node.expression);
+    }
+    const opensOnWord = (text) => /^[A-Z][A-Za-z0-9]*(?:[ -]|$)/.test(text.trim()) && /[a-z]/.test(text);
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+        return opensOnWord(node.text);
+    }
+    if (ts.isTemplateExpression(node)) {
+        const parts = [node.head.text, ...node.templateSpans.map((span) => span.literal.text)];
+        return opensOnWord(node.head.text) || parts.some((part) => /\b[a-z]{2,} [a-z]{2,}\b/.test(part));
+    }
+    return false;
+}
+
+/** The texts a returned value shows, each branch of a conditional on its own. */
+function returnedTexts(node) {
+    if (ts.isParenthesizedExpression(node)) {
+        return returnedTexts(node.expression);
+    }
+    if (ts.isConditionalExpression(node)) {
+        return [...returnedTexts(node.whenTrue), ...returnedTexts(node.whenFalse)];
+    }
+    return readsAsWords(node) ? [node] : [];
+}
+
+/**
+ * The mark that a returned text reaches no reader - a CSS value, the markup of a page around its texts.
+ * Written as a comment directly above the `return`, with the reason: `// l10n-exempt: a CSS value`.
+ */
+const EXEMPT = /\/\/\s*l10n-exempt:\s*\S/;
+
+function isExempt(statement, source) {
+    return (ts.getLeadingCommentRanges(source, statement.getFullStart()) ?? []).some((range) =>
+        EXEMPT.test(source.slice(range.pos, range.end)),
+    );
+}
 
 /**
  * Whether an expression is text written in place: a literal, a template, or one joined in - by
@@ -156,7 +203,13 @@ function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
         file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
     const found = [];
+    // A text two rules catch - a validator's return is a return as well - is reported once.
+    const seen = new Set();
     const report = (node) => {
+        if (seen.has(node.getStart(tree))) {
+            return;
+        }
+        seen.add(node.getStart(tree));
         const {line} = tree.getLineAndCharacterOfPosition(
             node.getStart(tree),
         );
@@ -238,6 +291,10 @@ function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
             for (const value of returnedValues(node.initializer)) {
                 shownParts(value).forEach(report);
             }
+        }
+        // A label or a reason built by a function: the walk loses it at the return, so it is caught there.
+        if (ts.isReturnStatement(node) && node.expression !== undefined && !isExempt(node, source)) {
+            returnedTexts(node.expression).forEach(report);
         }
         if (
             ts.isBinaryExpression(node) &&

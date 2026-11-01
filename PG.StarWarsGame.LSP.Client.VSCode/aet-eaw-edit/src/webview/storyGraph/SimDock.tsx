@@ -98,10 +98,13 @@ export type SimSelection =
 /** Why a session takes no command right now, or null: the reason every transport control shows. */
 export function frozenReason(state: StorySimStateDto): string | null {
     if (state.pausedFor) {
-        return `Galaxy paused - battle ${state.pausedFor}`;
+        return l10n.t("Galaxy paused - battle {0}", state.pausedFor);
+    }
+    if (state.outcome === "won") {
+        return l10n.t("Battle won - re-enter Simulation to replay");
     }
     if (state.outcome) {
-        return `Battle ${state.outcome} - re-enter Simulation to replay`;
+        return l10n.t("Battle lost - re-enter Simulation to replay");
     }
     return null;
 }
@@ -110,19 +113,19 @@ export function frozenReason(state: StorySimStateDto): string | null {
 export function battleStatusLabel(battle: StorySimBattleDto): string {
     switch (battle.status) {
         case "pending":
-            return "Pending - fight or auto-resolve";
+            return l10n.t("Pending - fight or auto-resolve");
         case "fight":
-            return "Starting";
+            return l10n.t("Starting");
         case "autoResolve":
-            return "Auto-resolve - decide the outcome";
+            return l10n.t("Auto-resolve - decide the outcome");
         case "running":
-            return `Running - t${battle.tick}`;
+            return l10n.t("Running - t{0}", battle.tick);
         case "won":
-            return "Won";
+            return l10n.t("Won");
         case "lost":
-            return "Lost";
+            return l10n.t("Lost");
         default:
-            return "Not started";
+            return l10n.t("Not started");
     }
 }
 

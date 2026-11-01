@@ -303,11 +303,11 @@ class EffectiveObjectContentProvider
 
         if (!outcome.ok) {
             return outcome.reason === "offline"
-                ? "<!-- EaWEdit: LSP server is not running. -->"
-                : `<!-- EaWEdit: Failed to resolve effective object '${objectId}' - ${outcome.message} -->`;
+                ? `<!-- ${l10n.t("EaWEdit: LSP server is not running.")} -->`
+                : `<!-- ${l10n.t("EaWEdit: Failed to resolve effective object '{0}' - {1}", objectId, outcome.message)} -->`;
         }
         if (!outcome.value.found) {
-            return `<!-- EaWEdit: No object named '${objectId}' was found in the workspace. -->`;
+            return `<!-- ${l10n.t("EaWEdit: No object named '{0}' was found in the workspace.", objectId)} -->`;
         }
         return effectiveObjectBanner(objectId) + outcome.value.xml;
     }
@@ -2596,7 +2596,7 @@ export async function activate(
                         gatewayFor(key).executeCommand(
                             "aet-eaw-edit.lsp.revalidateWorkspace",
                             [],
-                            "could not revalidate the workspace",
+                            l10n.t("could not revalidate the workspace"),
                         ),
                     ),
                 );
@@ -2659,7 +2659,7 @@ export async function activate(
                 await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.reloadProject",
                     [],
-                    "could not reload the project",
+                    l10n.t("could not reload the project"),
                 );
             },
         ),
@@ -2680,7 +2680,7 @@ export async function activate(
                 await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.suppressDiagnosticGlobally",
                     args,
-                    "could not suppress the diagnostic",
+                    l10n.t("could not suppress the diagnostic"),
                 );
             },
         ),
@@ -2707,7 +2707,7 @@ export async function activate(
                 await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.revalidateDocument",
                     [target],
-                    "could not revalidate the document",
+                    l10n.t("could not revalidate the document"),
                 );
             },
         ),
@@ -2793,7 +2793,10 @@ export async function activate(
                 await lsp.executeCommand(
                     "aet-eaw-edit.lsp.createLocalisationKey",
                     [keyName, picked.filePath, { ENGLISH: english }],
-                    `could not create the localisation key '${keyName}'`,
+                    l10n.t(
+                        "could not create the localisation key '{0}'",
+                        keyName,
+                    ),
                 );
             },
         ),
@@ -2844,7 +2847,7 @@ export async function activate(
                     await lsp.executeCommand(
                         "aet-eaw-edit.lsp.initLocalisationProject",
                         [{}],
-                        "could not initialise the localisation project",
+                        l10n.t("could not initialise the localisation project"),
                     );
                     return;
                 }
@@ -2916,7 +2919,7 @@ export async function activate(
                 await lsp.executeCommand(
                     "aet-eaw-edit.lsp.initLocalisationProject",
                     [{ format: formatItem.label, directory: directory.trim() }],
-                    "could not initialise the localisation project",
+                    l10n.t("could not initialise the localisation project"),
                 );
             },
         ),
@@ -3101,7 +3104,7 @@ export async function activate(
                                 : {}),
                         },
                     ],
-                    "could not import the localisation files",
+                    l10n.t("could not import the localisation files"),
                 );
                 // No message here: executeCommand returns nothing to check, so anything said at this
                 // point is a guess. The server reports the outcome - what it wrote, or why it did not.

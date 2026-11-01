@@ -291,24 +291,30 @@ function meshPanel(
             : detail?.meshes.find((entry) => entry.index === source.meshIndex);
 
     const mesh: InspectorRow[] = [
-        text("Name", source.name),
+        text(l10n.t("Name"), source.name),
         text(
-            "Attached to bone",
-            source.boneName === "" ? "none" : source.boneName,
+            l10n.t("Attached to bone"),
+            source.boneName === "" ? l10n.t("none") : source.boneName,
         ),
-        text("Drawn", drawnValue(source, spec.hidden)),
-        text("Collidable", extras.alamoCollidable === true ? "yes" : "no"),
+        text(l10n.t("Drawn"), drawnValue(source, spec.hidden)),
+        text(l10n.t("Collidable"), yesNo(extras.alamoCollidable === true)),
 
         // "Untagged" and "level 0" are different statements about the file, and a defaulted 0 would
         // read as the author having pinned the mesh to the undamaged state.
         text(
-            "Damage state",
-            extras.alamoAlt === undefined ? "none" : String(extras.alamoAlt),
+            l10n.t("Damage state"),
+            extras.alamoAlt === undefined
+                ? l10n.t("none")
+                : String(extras.alamoAlt),
         ),
         text(
-            "LOD",
-            extras.alamoLod === undefined ? "none" : String(extras.alamoLod),
-            "Level of detail the sub-mesh is tagged for. 0 is the lowest in EaW.",
+            l10n.t("LOD"),
+            extras.alamoLod === undefined
+                ? l10n.t("none")
+                : String(extras.alamoLod),
+            l10n.t(
+                "Level of detail the sub-mesh is tagged for. 0 is the lowest in EaW.",
+            ),
         ),
         {
             label: l10n.t("Triangles"),
@@ -334,9 +340,9 @@ function meshPanel(
                 // by its Scale_Factor, and these are the file's own numbers. A reader comparing
                 // the two on a scaled object would otherwise find a disagreement with no
                 // explanation attached to either side.
-                hint:
-                    "Model units, as the file stores them. The viewport draws the subject at " +
-                    "its Scale_Factor, so they differ from what the viewport shows.",
+                hint: l10n.t(
+                    "Model units, as the file stores them. The viewport draws the subject at its Scale_Factor, so they differ from what the viewport shows.",
+                ),
             },
             {
                 label: l10n.t("Bounds max"),
@@ -347,23 +353,32 @@ function meshPanel(
                 label: l10n.t("Sub-meshes"),
                 value: String(stored.subMeshCount),
                 kind: "number",
-                hint:
-                    "Each sub-mesh binds its own shader and parameters. This panel describes one " +
-                    "of them.",
+                hint: l10n.t(
+                    "Each sub-mesh binds its own shader and parameters. This panel describes one of them.",
+                ),
             },
         );
     }
 
     const material: InspectorRow[] = [
-        text("Shader", extras.alamoShader ?? "none"),
-        text("Vertex format", extras.alamoVertexFormat ?? "unknown"),
-        text("Skinning", extras.alamoSkinning ?? "unknown"),
-        text("Archetype", spec.archetype, archetypeHint(spec.archetype)),
-        text("Blend", spec.blend),
+        text(l10n.t("Shader"), extras.alamoShader ?? l10n.t("none")),
         text(
-            "Faction colour",
-            spec.colorize ? "yes" : "no",
-            "Whether the team colour reaches this sub-mesh, from a *Colorize shader or an FC_ mesh name.",
+            l10n.t("Vertex format"),
+            extras.alamoVertexFormat ?? l10n.t("unknown"),
+        ),
+        text(l10n.t("Skinning"), extras.alamoSkinning ?? l10n.t("unknown")),
+        text(
+            l10n.t("Archetype"),
+            spec.archetype,
+            archetypeHint(spec.archetype),
+        ),
+        text(l10n.t("Blend"), spec.blend),
+        text(
+            l10n.t("Faction colour"),
+            yesNo(spec.colorize),
+            l10n.t(
+                "Whether the team colour reaches this sub-mesh, from a *Colorize shader or an FC_ mesh name.",
+            ),
         ),
     ];
 
@@ -400,7 +415,9 @@ function parameterSection(extras: MaterialExtras): InspectorSection {
         rows,
         note:
             rows.length === 0
-                ? "This sub-mesh binds no parameters, so its shader draws with whatever its own header declares."
+                ? l10n.t(
+                      "This sub-mesh binds no parameters, so its shader draws with whatever its own header declares.",
+                  )
                 : undefined,
     };
 }
@@ -415,15 +432,15 @@ function bonePanel(
     );
 
     const rows: InspectorRow[] = [
-        text("Name", source.name),
+        text(l10n.t("Name"), source.name),
         { label: l10n.t("Index"), value: String(source.index), kind: "number" },
         text(
-            "Parent",
+            l10n.t("Parent"),
             source.parentIndex < 0
-                ? "none (root)"
+                ? l10n.t("none (root)")
                 : `${source.parentName} (${source.parentIndex})`,
         ),
-        text("Visible", source.visible ? "yes" : "no"),
+        text(l10n.t("Visible"), yesNo(source.visible)),
     ];
 
     // Only when it declares one: `Disable` is the overwhelming majority and a row saying so on every
@@ -437,7 +454,7 @@ function bonePanel(
             : source.billboard;
 
     if (billboard !== null) {
-        rows.push(text("Billboard", billboard));
+        rows.push(text(l10n.t("Billboard"), billboard));
     }
 
     // In the FILE's axes. The client's own matrices have been through the Z-up to Y-up correction
@@ -465,22 +482,25 @@ function bonePanel(
         sections.push({
             title: l10n.t("Proxy"),
             rows: [
-                text("Name", proxy.name),
-                text("Visible", proxy.visible ? "yes" : "no"),
+                text(l10n.t("Name"), proxy.name),
+                text(l10n.t("Visible"), yesNo(proxy.visible)),
                 text(
-                    "Damage state",
-                    proxy.alt === null ? "none" : String(proxy.alt),
+                    l10n.t("Damage state"),
+                    proxy.alt === null ? l10n.t("none") : String(proxy.alt),
                 ),
                 text(
-                    "LOD",
-                    proxy.lod === null ? "none" : String(proxy.lod),
-                    "Level of detail the effect is tagged for. 0 is the lowest in EaW.",
+                    l10n.t("LOD"),
+                    proxy.lod === null ? l10n.t("none") : String(proxy.lod),
+                    l10n.t(
+                        "Level of detail the effect is tagged for. 0 is the lowest in EaW.",
+                    ),
                 ),
                 text(
-                    "Stays hidden when repaired",
-                    proxy.altDecreaseStayHidden ? "yes" : "no",
-                    "When set, dropping back to a lower damage state leaves this effect off rather " +
-                        "than restoring it.",
+                    l10n.t("Stays hidden when repaired"),
+                    yesNo(proxy.altDecreaseStayHidden),
+                    l10n.t(
+                        "When set, dropping back to a lower damage state leaves this effect off rather than restoring it.",
+                    ),
                 ),
             ],
         });
@@ -496,17 +516,19 @@ function particlePanel(source: ParticleInspection): InspectorPanel {
             {
                 title: l10n.t("Particle system"),
                 rows: [
-                    text("Name", source.name),
+                    text(l10n.t("Name"), source.name),
                     text(
-                        "Attached to bone",
-                        source.boneName === "" ? "none" : source.boneName,
+                        l10n.t("Attached to bone"),
+                        source.boneName === ""
+                            ? l10n.t("none")
+                            : source.boneName,
                     ),
                     {
                         label: l10n.t("Emitters"),
                         value: String(source.emitterCount),
                         kind: "number",
                     },
-                    text("Playing", source.playing ? "yes" : "no"),
+                    text(l10n.t("Playing"), yesNo(source.playing)),
                 ],
             },
         ],
@@ -515,33 +537,48 @@ function particlePanel(source: ParticleInspection): InspectorPanel {
 
 function drawnValue(source: MeshInspection, nonVisual: boolean): string {
     if (source.drawn) {
-        return "yes";
+        return l10n.t("yes");
     }
 
     if (source.extras.alamoHidden === true) {
-        return "no - hidden in the file";
+        return l10n.t("no - hidden in the file");
     }
 
     if (nonVisual) {
-        return "no - the engine consumes this geometry rather than showing it";
+        return l10n.t(
+            "no - the engine consumes this geometry rather than showing it",
+        );
     }
 
-    return "no - switched off, or gated by the current damage state or detail level";
+    return l10n.t(
+        "no - switched off, or gated by the current damage state or detail level",
+    );
 }
 
 function archetypeHint(archetype: string): string | undefined {
     switch (archetype) {
         case "collision":
-            return "A collision hull. The engine uses it for hit testing and never draws it.";
+            return l10n.t(
+                "A collision hull. The engine uses it for hit testing and never draws it.",
+            );
         case "shadow-volume":
-            return "A shadow volume. The engine extrudes it and never draws it.";
+            return l10n.t(
+                "A shadow volume. The engine extrudes it and never draws it.",
+            );
         case "non-visual":
-            return "Geometry the engine consumes rather than shows.";
+            return l10n.t("Geometry the engine consumes rather than shows.");
         case "unknown":
-            return "No shader is bound, so the preview cannot tell what this should look like.";
+            return l10n.t(
+                "No shader is bound, so the preview cannot tell what this should look like.",
+            );
         default:
             return undefined;
     }
+}
+
+/** A flag's value as the panel says it. */
+function yesNo(on: boolean): string {
+    return on ? l10n.t("yes") : l10n.t("no");
 }
 
 function text(label: string, value: string, hint?: string): InspectorRow {

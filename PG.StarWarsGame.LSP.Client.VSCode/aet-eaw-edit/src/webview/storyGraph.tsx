@@ -3852,13 +3852,13 @@ const { RefSocket } = Presets.classic;
 function battleStatusText(battle: { status: string; tick: number }): string {
     switch (battle.status) {
         case "running":
-            return `Running - t${battle.tick}`;
+            return l10n.t("Running - t{0}", battle.tick);
         case "won":
-            return "Won";
+            return l10n.t("Won");
         case "lost":
-            return "Lost";
+            return l10n.t("Lost");
         default:
-            return "Not started";
+            return l10n.t("Not started");
     }
 }
 
@@ -8662,6 +8662,7 @@ function stepColor(category: string, name: string | null): string {
 
 /** A tile/badge background: its family colour washed into the widget background (matches the palette). */
 function fadedBg(color: string): string {
+    // l10n-exempt: a CSS colour value
     return `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
 }
 

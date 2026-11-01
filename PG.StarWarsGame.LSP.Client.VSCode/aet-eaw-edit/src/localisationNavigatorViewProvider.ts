@@ -54,7 +54,16 @@ export class LocalisationNavigatorViewProvider extends LspTreeDataProvider<
     public static readonly viewId = "aet-eaw-edit.lsp.localisationNavigator";
 
     protected readonly method = "aet/getLocalisationProjects";
-    protected readonly subject = "localisation files";
+
+    protected noneFound(): string {
+        return vscode.l10n.t("No localisation files found in this workspace.");
+    }
+
+    protected readFailed(): string {
+        return vscode.l10n.t(
+            "Could not read localisation files from the server.",
+        );
+    }
 
     constructor(lsp: LspGateway) {
         super(lsp);

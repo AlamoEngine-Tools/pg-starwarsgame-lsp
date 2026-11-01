@@ -11,6 +11,8 @@
 //
 // Kept out of the viewport so the wording has tests without a GPU in the room.
 
+import * as l10n from "@vscode/l10n";
+
 /** An attachment a caller asked for by name. */
 export interface AttachmentRequest {
     partId: string;
@@ -43,20 +45,33 @@ export function attachmentProblem(
     found: AttachmentFound,
 ): string | null {
     if (!found.part) {
-        return `'${request.partId}' has not loaded, so nothing can attach to ${describe(request)}.`;
+        // Whole sentences, one per case: a clause glued into another gives a translator nothing to work with.
+        return request.bone === undefined
+            ? l10n.t(
+                  "'{0}' has not loaded, so nothing can attach to it.",
+                  request.partId,
+              )
+            : l10n.t(
+                  "'{0}' has not loaded, so nothing can attach to its bone '{1}'.",
+                  request.partId,
+                  request.bone,
+              );
     }
 
     if (request.bone !== undefined && !found.bone) {
-        return (
-            `'${request.partId}' has no bone '${request.bone}'` +
-            `${request.boneIndex === undefined ? "" : ` (index ${request.boneIndex})`}` +
-            ", so nothing can attach to it."
-        );
+        return request.boneIndex === undefined
+            ? l10n.t(
+                  "'{0}' has no bone '{1}', so nothing can attach to it.",
+                  request.partId,
+                  request.bone,
+              )
+            : l10n.t(
+                  "'{0}' has no bone '{1}' (index {2}), so nothing can attach to it.",
+                  request.partId,
+                  request.bone,
+                  request.boneIndex,
+              );
     }
 
     return null;
-}
-
-function describe(request: AttachmentRequest): string {
-    return request.bone === undefined ? "it" : `its bone '${request.bone}'`;
 }
