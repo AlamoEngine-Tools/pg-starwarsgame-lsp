@@ -106,8 +106,7 @@ public static class ServerConfigurator
         (bool Document, bool Range) formattingAfterStart = (false, false);
 
         return options
-            .ConfigureLogging(x => x
-                    .SetMinimumLevel(logLevel ?? ServerLogLevel.Default)
+            .ConfigureLogging(x => ServerLogLevel.Apply(x, logLevel ?? ServerLogLevel.Default)
                     .AddLanguageProtocolLogging()
 #if DEBUG
                     .AddSerilog(dispose: true)

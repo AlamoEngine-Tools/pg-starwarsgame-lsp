@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -83,5 +84,57 @@ public sealed class ServerLogLevelTest
     public void TheDefault_IsTheLevelTheClientLeavesUnsaid()
     {
         Assert.Equal(LogLevel.Information, ServerLogLevel.Default);
+    }
+
+    /// <summary>
+    ///     The language server library lowers the logging minimum to the client's trace setting -
+    ///     Warning while it is off - so the level set here held only until the trace arrived.
+    /// </summary>
+    [Theory]
+    [InlineData(LogLevel.Warning)]
+    [InlineData(LogLevel.Trace)]
+    public void TheLevel_HoldsWhateverMinimumTheTraceSets(LogLevel traceMinimum)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging(b =>
+        {
+            b.AddProvider(new EverythingProvider());
+            ServerLogLevel.Apply(b, LogLevel.Debug);
+        });
+        services.PostConfigure<LoggerFilterOptions>(o => o.MinLevel = traceMinimum);
+        var logger = services.BuildServiceProvider().GetRequiredService<ILogger<ServerLogLevelTest>>();
+
+        Assert.True(logger.IsEnabled(LogLevel.Debug));
+        Assert.False(logger.IsEnabled(LogLevel.Trace));
+    }
+
+    private sealed class EverythingProvider : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName)
+        {
+            return new Everything();
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private sealed class Everything : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+            {
+                return null;
+            }
+
+            public bool IsEnabled(LogLevel logLevel)
+            {
+                return true;
+            }
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+            }
+        }
     }
 }

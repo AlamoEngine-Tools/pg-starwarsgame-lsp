@@ -42,4 +42,19 @@ public static class ServerLogLevel
             ? level
             : Default;
     }
+
+    /// <summary>
+    ///     Makes <paramref name="level" /> the server's logging level, whatever the client's trace says.
+    /// </summary>
+    /// <remarks>
+    ///     The language server library post-configures the logging minimum from the client's
+    ///     <c>$/setTrace</c> - Warning while the trace is off, Trace while it is verbose - which
+    ///     overrode a minimum set here: the level setting did nothing, and the trace setting decided
+    ///     how much the server logged. A filter rule for every category takes precedence over the
+    ///     minimum, so the trace is left to say what is traced, and this what is logged.
+    /// </remarks>
+    public static ILoggingBuilder Apply(ILoggingBuilder builder, LogLevel level)
+    {
+        return builder.SetMinimumLevel(level).AddFilter((string?)null, level);
+    }
 }
