@@ -391,13 +391,16 @@ public sealed class ModProjectLoader
         // finding out later that every icon came from the base game. Outside the migration chain
         // because it needs the PATH: a migration step sees only the tree, so it could not tell
         // whether the folder it would name is really there. See PgprojIconProposal.
+        // The node goes on a COPY that only the diff sees: until the author accepts it the project
+        // has no icons node, and reading it with one hid the notice that says so.
         var notices = migration.Notices;
+        var proposed = (JsonObject)migrated.DeepClone();
         var directory = _fileHelper.FileSystem.Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory)
-            && PgprojIconProposal.TryPropose(migrated, directory, _fileHelper.FileSystem, _messages) is { } icons)
+            && PgprojIconProposal.TryPropose(proposed, directory, _fileHelper.FileSystem, _messages) is { } icons)
             notices = [.. notices, icons];
 
-        _migrationSink.Migrated(path, migrated, notices);
+        _migrationSink.Migrated(path, proposed, notices);
         return migrated;
     }
 

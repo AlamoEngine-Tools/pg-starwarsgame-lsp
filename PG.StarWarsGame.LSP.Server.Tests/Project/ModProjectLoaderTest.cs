@@ -1063,6 +1063,25 @@ public sealed class ModProjectLoaderTest
         Assert.Equal("eaw", (string?)Assert.Single(sink.Calls).Migrated["game"]);
     }
 
+    // The icons node a migration proposes is a PROPOSAL: it goes in the diff for a yes, and the
+    // project is read without it until the author accepts. Read with it, a project with loose
+    // icons and no node counted as configured, and the encyclopedia's "no icon sources" notice
+    // never showed.
+    [Fact]
+    public void Load_VersionOneZeroWithLooseIcons_ProposesTheNode_ButIsReadWithout()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            """{ "_typeVersion": "aetswg-1.0.0", "name": "Mod", "directories": { "art": ["data/art"] } }""",
+            out var fs, sink, [.. PgprojMigrations.All]);
+        fs.AddFile("/workspace/data/art/textures/icons/i_button.tga", new MockFileData([1, 2, 3]));
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Null(model.Icons);
+        Assert.NotNull(Assert.Single(sink.Calls).Migrated["icons"]);
+    }
+
     private static ModProjectLoader Build(string json, out ListLogger logger)
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
