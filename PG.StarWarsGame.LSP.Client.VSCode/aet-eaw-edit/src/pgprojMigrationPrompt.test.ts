@@ -3,10 +3,11 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import * as l10n from "@vscode/l10n";
 
 import {
-    ACCEPT,
-    DECLINE,
+    acceptLabel,
+    declineLabel,
     declinedMessage,
     diffTitle,
     outcomeOf,
@@ -59,14 +60,14 @@ describe("the proposal message", () => {
 
 describe("the answer", () => {
     it("accepts only the explicit yes", () => {
-        assert.equal(outcomeOf(ACCEPT), "accept");
+        assert.equal(outcomeOf(acceptLabel()), "accept");
     });
 
     // Dismissing is not "ask me later". Treating it as consent would rewrite somebody's project
     // file because they pressed Escape.
     it("treats a dismissal as a decline", () => {
         assert.equal(outcomeOf(undefined), "decline");
-        assert.equal(outcomeOf(DECLINE), "decline");
+        assert.equal(outcomeOf(declineLabel()), "decline");
         assert.equal(outcomeOf("something else entirely"), "decline");
     });
 });
@@ -88,5 +89,39 @@ describe("the message after stopping", () => {
         assert.match(message, /unchanged/);
         assert.match(message, /stopped/);
         assert.match(message, /reload the window/i);
+    });
+});
+
+describe("the texts", () => {
+    // The question, its buttons and the tab read in the editor's language: they come from the
+    // catalogue, and the answer is still told apart in a translated editor.
+    it("come from the catalogue", () => {
+        l10n.config({
+            contents: {
+                "Update project file": "TRANSLATED ACCEPT",
+                "Discard and stop": "TRANSLATED DECLINE",
+                "{0} - on disk <-> updated format": "TRANSLATED TITLE {0}",
+                "'{0}' uses an older project format.{1} Review the changes and update the file? Comments in it are not preserved, and a backup is written next to it first. Declining stops the language server.":
+                    "TRANSLATED QUESTION {0}{1}",
+                "'{0}' was left unchanged, so aet-eaw-edit has stopped. Update the project file, or reload the window to be asked again.":
+                    "TRANSLATED STOPPED {0}",
+            },
+        });
+        try {
+            assert.equal(acceptLabel(), "TRANSLATED ACCEPT");
+            assert.equal(declineLabel(), "TRANSLATED DECLINE");
+            assert.equal(outcomeOf("TRANSLATED ACCEPT"), "accept");
+            assert.equal(diffTitle("m.pgproj"), "TRANSLATED TITLE m.pgproj");
+            assert.equal(
+                proposalMessage({ ...proposal, notices: ["A note."] }),
+                "TRANSLATED QUESTION mymod.pgproj A note.",
+            );
+            assert.equal(
+                declinedMessage("m.pgproj"),
+                "TRANSLATED STOPPED m.pgproj",
+            );
+        } finally {
+            l10n.config({ contents: {} });
+        }
     });
 });

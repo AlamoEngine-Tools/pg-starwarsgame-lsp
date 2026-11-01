@@ -129,8 +129,8 @@ import {
     StoryTreeItem,
 } from "./storyNavigatorViewProvider";
 import {
-    ACCEPT,
-    DECLINE,
+    acceptLabel,
+    declineLabel,
     declinedMessage,
     diffTitle,
     outcomeOf,
@@ -1098,8 +1098,8 @@ function startProjectClient(
             const answer = await vscode.window.showInformationMessage(
                 proposalMessage(proposal),
                 { modal: true },
-                ACCEPT,
-                DECLINE,
+                acceptLabel(),
+                declineLabel(),
             );
             const outcome = outcomeOf(answer);
             if (proposedUri) {
