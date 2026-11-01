@@ -249,7 +249,7 @@ public sealed class ProjectStartsProtocolTest
             await Task.Delay(TimeSpan.FromSeconds(2));
             var missing = document.WithCode("aetswg-004-0016").Any(d => d.Range.Start.Line == 3);
             if (missing)
-                Assert.Equal("Lua script 'TacticalSwap' was not found: No 'TacticalSwap.lua' or 'TacticalSwap.lc' in " +
+                Assert.Equal("Lua script 'ScratchSwap' was not found: No 'ScratchSwap.lua' or 'ScratchSwap.lc' in " +
                              "any script directory. The object runs without a script.",
                     document.WithCode("aetswg-004-0016").Single().Message);
             return (missing, ProjectProtocol.LastLogged("Asset catalog:"));
@@ -258,20 +258,20 @@ public sealed class ProjectStartsProtocolTest
         try
         {
             var listed = await Start();
-            Assert.False(listed.Missing, "TacticalSwap is unresolved with the mod's archive listed.");
+            Assert.False(listed.Missing, "ScratchSwap is unresolved with the mod's archive listed.");
             var packed = ProjectProtocol.FromArchives(listed.Catalog);
             Assert.True(packed > 0, listed.Catalog);
 
             await File.WriteAllTextAsync(megaFiles, (await File.ReadAllTextAsync(megaFiles))
                 .Replace("ScratchScripts.meg", "NotThere.meg"));
             var unlisted = await Start();
-            Assert.True(unlisted.Missing, "TacticalSwap resolves although no list names its archive.");
+            Assert.True(unlisted.Missing, "ScratchSwap resolves although no list names its archive.");
             Assert.Equal(0, ProjectProtocol.FromArchives(unlisted.Catalog));
 
             File.Delete(megaFiles);
             File.Move(Path.Combine(root, "Data", "ScratchScripts.meg"), Path.Combine(root, "Data", "Config.meg"));
             var replacing = await Start();
-            Assert.False(replacing.Missing, "TacticalSwap is unresolved with the mod's Config.meg.");
+            Assert.False(replacing.Missing, "ScratchSwap is unresolved with the mod's Config.meg.");
             Assert.Equal(packed, ProjectProtocol.FromArchives(replacing.Catalog));
         }
         finally

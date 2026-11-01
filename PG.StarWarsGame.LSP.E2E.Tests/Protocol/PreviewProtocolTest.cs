@@ -90,10 +90,11 @@ public sealed class ParticleEditorFixture : ProtocolWorkspaceFixture
     protected override string SetupTest => "PRV-36";
 }
 
-/// <summary>The EaWX Fall of the Republic mod.</summary>
-public sealed class EawxFotrFixture : ProtocolWorkspaceFixture
+/// <summary>A unit on a game model whose bones include one named with a dot (<c>Spot01.Target</c>).</summary>
+public sealed class DottedBoneFixture : ProtocolWorkspaceFixture
 {
-    protected override string Workspace => @"c:\dev\EaWX\FotR";
+    protected override string Workspace => @"C:\temp\aet-test-XML-28";
+    protected override string SetupTest => "XML-28";
 }
 
 /// <summary>The 18 particle files whose emitters carry property 0x06, the same in both games.</summary>
@@ -271,30 +272,30 @@ public sealed class ParticleEditorProtocolTest(ParticleEditorFixture fixture) : 
     }
 }
 
-/// <summary>XML-28 on EaWX Fall of the Republic.</summary>
+/// <summary>XML-28 on a hardpoint attached to a game model's dotted bone.</summary>
 [Trait("Category", "E2E")]
 [Trait("Category", "Protocol")]
-public sealed class EawxProtocolTest(EawxFotrFixture fixture) : IClassFixture<EawxFotrFixture>
+public sealed class DottedBoneProtocolTest(DottedBoneFixture fixture) : IClassFixture<DottedBoneFixture>
 {
     [Fact]
     public async Task XML_28_ABoneNameWithADot_ResolvesInAHardpointCheck()
     {
         var path = ProtocolDocument.Find(ProjectProtocol.Required(fixture.Root!),
-            Path.Combine("Data", "XML", "Hardpoints", "HardPoints_FotR_Ground.xml"));
+            Path.Combine("Data", "XML", "Scratch_Bone_Hardpoints.xml"));
         var document = await ProtocolDocument.OpenAsync(fixture, path);
-        const int line = 1517;
-        Assert.Contains("<Attachment_Bone>GUN.L</Attachment_Bone>", document.Lines[line]);
+        const int line = 4;
+        Assert.Contains("<Attachment_Bone>Spot01.Target</Attachment_Bone>", document.Lines[line]);
         var original = document.Text;
         Assert.DoesNotContain(document.WithCode("aetswg-007-0004"), d => d.Range.Start.Line == line);
 
-        await document.ReplaceLineAsync(line + 1, document.Lines[line].Replace("GUN.L", "GUN_L"));
-        Assert.Contains(">GUN_L<", document.Lines[line]);
+        await document.ReplaceLineAsync(line + 1, document.Lines[line].Replace("Spot01.Target", "Spot01_Target"));
+        Assert.Contains(">Spot01_Target<", document.Lines[line]);
         Assert.True(await document.UntilAsync(
             all => all.Any(d => d.Code?.String == "aetswg-007-0004" && d.Range.Start.Line == line),
             TimeSpan.FromSeconds(60)), ProtocolDocument.Near(document, line));
         var missing = Assert.Single(document.WithCode("aetswg-007-0004"), d => d.Range.Start.Line == line);
-        Assert.StartsWith("<Attachment_Bone> names bone 'GUN_L', which does not exist on 'TF_PAC.ALO', the model of " +
-                          "'PAC' which attaches it", missing.Message);
+        Assert.StartsWith("<Attachment_Bone> names bone 'Spot01_Target', which does not exist on 'Ev_bike.alo', the " +
+                          "model of 'Scratch_Dotted_Bone' which attaches it", missing.Message);
 
         await document.ReplaceAsync(original);
         Assert.DoesNotContain(document.WithCode("aetswg-007-0004"), d => d.Range.Start.Line == line);

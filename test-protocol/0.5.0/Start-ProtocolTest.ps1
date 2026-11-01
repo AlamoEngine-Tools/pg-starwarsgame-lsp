@@ -67,7 +67,19 @@ if ($id -eq 'LUA-31') {
     if (Test-Path $analyzer) { Remove-Item "$analyzer.off" -Recurse -Force } else { Move-Item "$analyzer.off" $analyzer }
 }
 
-$open = if ($entry.open) { $entry.open.Replace('{repo}', $repo) } else { $null }
+# A test on a multi-project mod opens the maintainer's own checkout, which the repository names
+# nowhere: local.json beside this script (ignored by git) says where it is.
+function Resolve-Mod([string] $value) {
+    if ($value -notmatch '\{mod(Leaf)?\}') { return $value }
+    $local = Join-Path $here 'local.json'
+    if (-not (Test-Path $local)) {
+        throw "$id runs on a multi-project mod: write $local as { ""mod"": ""<its folder>"", ""modLeaf"": ""<one leaf project's folder>"" }."
+    }
+    $paths = Get-Content $local -Raw | ConvertFrom-Json
+    return $value.Replace('{modLeaf}', $paths.modLeaf).Replace('{mod}', $paths.mod)
+}
+
+$open = if ($entry.open) { Resolve-Mod $entry.open.Replace('{repo}', $repo) } else { $null }
 
 if (-not $KeepFiles) {
     $setup = Join-Path $here 'Setup-TestProtocol.ps1'

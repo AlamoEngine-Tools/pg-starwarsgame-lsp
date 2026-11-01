@@ -536,3 +536,5 @@ lua_debugger/
 
 # The UI protocol tests' VS Code download and its driver (ui-test/wdio.conf.ts)
 /.wdio-vscode-service/
+# Where the maintainer's multi-project mod lives, for the protocol tests that run on one
+/test-protocol/**/local.json

@@ -24,17 +24,13 @@
 .PARAMETER EawGameData
     The Empire at War install's GameData folder, for the archives PRJ-18 copies.
 
-.PARAMETER FotrData
-    The FotR mod's Data folder, for the archive PRJ-17 copies.
-
 .EXAMPLE
     pwsh ./test-protocol/0.5.0/Setup-TestProtocol.ps1
     pwsh ./test-protocol/0.5.0/Setup-TestProtocol.ps1 -Test LUA-27
 #>
 param(
     [string] $Test,
-    [string] $EawGameData = 'G:\Games\SteamLibrary\steamapps\common\Star Wars Empire at War\GameData',
-    [string] $FotrData = 'C:\dev\EaWX\FotR\Data'
+    [string] $EawGameData = 'G:\Games\SteamLibrary\steamapps\common\Star Wars Empire at War\GameData'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -98,9 +94,7 @@ function Invoke-Extra([string] $testId) {
             if (Test-Path $beta) { Move-Item $beta "$beta.off" -Force }
         }
         'PRJ-17' {
-            $source = Join-Path $FotrData 'config.meg'
-            if (Test-Path $source) { Copy-Item $source 'C:\temp\aet-test-PRJ-meg\Data\ScratchScripts.meg' -Force }
-            else { Write-Warning "PRJ-17: $source not found; Data\ScratchScripts.meg is missing." }
+            python (Join-Path $here 'make_archive.py') 'C:\temp\aet-test-PRJ-meg\Data\ScratchScripts.meg'
         }
         'PRJ-18' {
             # Named as MegaFiles.xml lists them.

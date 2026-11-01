@@ -24,15 +24,15 @@ function serverNamed(name: string): LspGateway {
  */
 describe("RoutedLspGateway", () => {
     it("sends each request to the server the route names at that moment", async () => {
-        let current = serverNamed("rev");
+        let current = serverNamed("alpha");
         const routed = new RoutedLspGateway(() => current);
 
         const first = await routed.request<string>("aet/getStoryPlots");
-        current = serverNamed("fotr");
+        current = serverNamed("beta");
         const second = await routed.request<string>("aet/getStoryPlots");
 
-        assert.deepEqual(first, { ok: true, value: "rev:aet/getStoryPlots" });
-        assert.deepEqual(second, { ok: true, value: "fotr:aet/getStoryPlots" });
+        assert.deepEqual(first, { ok: true, value: "alpha:aet/getStoryPlots" });
+        assert.deepEqual(second, { ok: true, value: "beta:aet/getStoryPlots" });
     });
 
     it("is offline with no server to route to", async () => {
@@ -57,7 +57,7 @@ describe("RoutedLspGateway", () => {
     });
 
     it("waits on the routed server's readiness", async () => {
-        const server = serverNamed("rev");
+        const server = serverNamed("alpha");
         const routed = new RoutedLspGateway(() => server);
 
         const waiting = routed.whenReady(1000);
@@ -71,7 +71,7 @@ describe("RoutedLspGateway", () => {
         const routed = new RoutedLspGateway(() => current);
 
         const waiting = routed.whenReady(1000);
-        current = serverNamed("rev");
+        current = serverNamed("alpha");
         routed.routesChanged();
         current.markReady();
 
@@ -105,7 +105,7 @@ describe("RoutedLspGateway", () => {
         const windowWaits = windowGateway.whenReady(1000);
         const projectWaits = projectGateway.whenReady(1000);
         window = serverNamed("window");
-        project = serverNamed("rev");
+        project = serverNamed("alpha");
         routes.fire();
         window.markReady();
         project.markReady();
@@ -126,7 +126,7 @@ describe("RoutedLspGateway", () => {
 
         const waiting = projectGateway.whenReady(2000);
         // The restart: the old client is gone, the new one registers and comes up.
-        current = serverNamed("rev");
+        current = serverNamed("alpha");
         routes.fire();
         current.markReady();
 
@@ -144,7 +144,7 @@ describe("RoutedLspGateway", () => {
 
         const waiting = gateway.whenReady(1000);
         routes.fire();
-        current = serverNamed("rev");
+        current = serverNamed("alpha");
         routes.fire();
         current.markReady();
 

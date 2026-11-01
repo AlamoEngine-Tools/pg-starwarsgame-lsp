@@ -53,24 +53,24 @@ public sealed class MetafileRegistrarTest
     [Fact]
     public void Register_ListedFileShippedByModAndDependency_TypesOnlyTheModCopy()
     {
-        var revXml = Path.Combine(Root("rev"), "data", "xml");
+        var leafXml = Path.Combine(Root("leaf"), "data", "xml");
         var coreXml = Path.Combine(Root("core"), "data", "xml");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [Path.Combine(revXml, "gameobjectfiles.xml")] =
+            [Path.Combine(leafXml, "gameobjectfiles.xml")] =
                 new("<Game_Object_Files><File>Units.xml</File></Game_Object_Files>"),
-            [Path.Combine(revXml, "Units.xml")] = new("<Units/>"),
+            [Path.Combine(leafXml, "Units.xml")] = new("<Units/>"),
             [Path.Combine(coreXml, "Units.xml")] = new("<Units/>")
         });
         var registry = new FileTypeRegistry();
         var (registrar, _) = Build(fs, registry, ObjectRegistrySchema());
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [Root("rev")],
+        registrar.Register(new WorkspaceConfiguration([coreXml, leafXml], [], [], [], null), [Root("leaf")],
             BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         Assert.Equal(["GameObjectType"],
-            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Units.xml"))).ToArray());
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(leafXml, "Units.xml"))).ToArray());
         Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Units.xml"))));
     }
 
@@ -81,23 +81,23 @@ public sealed class MetafileRegistrarTest
     [Fact]
     public void Register_ListedFileNoLayerShips_TypesOnlyTheLeafPath()
     {
-        var revXml = Path.Combine(Root("rev"), "data", "xml");
+        var leafXml = Path.Combine(Root("leaf"), "data", "xml");
         var coreXml = Path.Combine(Root("core"), "data", "xml");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [Path.Combine(revXml, "gameobjectfiles.xml")] =
+            [Path.Combine(leafXml, "gameobjectfiles.xml")] =
                 new("<Game_Object_Files><File>Units.xml</File></Game_Object_Files>")
         });
         fs.AddDirectory(coreXml);
         var registry = new FileTypeRegistry();
         var (registrar, _) = Build(fs, registry, ObjectRegistrySchema());
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [Root("rev")],
+        registrar.Register(new WorkspaceConfiguration([coreXml, leafXml], [], [], [], null), [Root("leaf")],
             BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         Assert.Equal(["GameObjectType"],
-            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Units.xml"))).ToArray());
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(leafXml, "Units.xml"))).ToArray());
         Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Units.xml"))));
     }
 
@@ -108,20 +108,20 @@ public sealed class MetafileRegistrarTest
     [Fact]
     public void Register_RecordsTheWalk_InListOrder_WithEachEntrysWinningCopy()
     {
-        var revXml = Path.Combine(Root("rev"), "data", "xml");
+        var leafXml = Path.Combine(Root("leaf"), "data", "xml");
         var coreXml = Path.Combine(Root("core"), "data", "xml");
-        var registryPath = Path.Combine(revXml, "gameobjectfiles.xml");
+        var registryPath = Path.Combine(leafXml, "gameobjectfiles.xml");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [registryPath] = new(@"<Game_Object_Files><File>Zeta.xml</File><File>Units\Alpha.xml</File>" +
                                  "<File>Shipped.xml</File><File>ZETA.XML</File></Game_Object_Files>"),
-            [Path.Combine(revXml, "Zeta.xml")] = new("<Units/>"),
+            [Path.Combine(leafXml, "Zeta.xml")] = new("<Units/>"),
             [Path.Combine(coreXml, "Units", "Alpha.xml")] = new("<Units/>")
         });
         var walks = new RegistryWalkStore();
         var (registrar, _) = Build(fs, new FileTypeRegistry(), ObjectRegistrySchema(), walks: walks);
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [Root("rev")],
+        registrar.Register(new WorkspaceConfiguration([coreXml, leafXml], [], [], [], null), [Root("leaf")],
             BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
@@ -131,10 +131,10 @@ public sealed class MetafileRegistrarTest
         Assert.Equal(["zeta.xml", "units/alpha.xml", "shipped.xml", "zeta.xml"], walk.Entries.Select(e => e.Key));
         Assert.Equal(
         [
-            fh.PathToFileUri(Path.Combine(revXml, "Zeta.xml")),
+            fh.PathToFileUri(Path.Combine(leafXml, "Zeta.xml")),
             fh.PathToFileUri(Path.Combine(coreXml, "Units", "Alpha.xml")),
             null,
-            fh.PathToFileUri(Path.Combine(revXml, "Zeta.xml"))
+            fh.PathToFileUri(Path.Combine(leafXml, "Zeta.xml"))
         ], walk.Entries.Select(e => e.LayerUri));
     }
 
@@ -309,13 +309,13 @@ public sealed class MetafileRegistrarTest
     [Fact]
     public void Register_SubdirEntry_TypesTheDependencyCopy_PreservingSubdir()
     {
-        // Real case: the mod (rev) ships GameObjectFiles.xml listing subdirectory paths that resolve
+        // Real case: the mod (leaf) ships GameObjectFiles.xml listing subdirectory paths that resolve
         // to object files in its dependency (core). The type is registered at the subdir path of the
         // copy the game opens - not stripped to a bare filename under the metafile's own directory.
-        var revRoot = Root("rev");
-        var revXml = Path.Combine(revRoot, "data", "xml");
+        var leafRoot = Root("leaf");
+        var leafXml = Path.Combine(leafRoot, "data", "xml");
         var coreXml = Path.Combine(Root("core"), "data", "xml");
-        var metafilePath = Path.Combine(revXml, "gameobjectfiles.xml");
+        var metafilePath = Path.Combine(leafXml, "gameobjectfiles.xml");
 
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -330,23 +330,23 @@ public sealed class MetafileRegistrarTest
         var (registrar, _) = Build(fs, registry, schema);
 
         // config.XmlDirectories spans both projects (dependency first, root last).
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot],
+        registrar.Register(new WorkspaceConfiguration([coreXml, leafXml], [], [], [], null), [leafRoot],
             BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         var coreKey = fh.PathToFileUri(Path.Combine(coreXml, "Units", "Death_Clones.xml"));
-        var revKey = fh.PathToFileUri(Path.Combine(revXml, "Units", "Death_Clones.xml"));
+        var leafKey = fh.PathToFileUri(Path.Combine(leafXml, "Units", "Death_Clones.xml"));
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(coreKey).ToArray());
-        Assert.Empty(registry.GetTypesForFile(revKey));
+        Assert.Empty(registry.GetTypesForFile(leafKey));
     }
 
     [Fact]
     public void Register_MetafileShippedByDependency_IsFoundAndRegistersTypes()
     {
-        // The metafile lives in the dependency (core), not in the open workspace (rev). It must still
+        // The metafile lives in the dependency (core), not in the open workspace (leaf). It must still
         // be discovered via the declared xml roots, and its (subdir) entries registered.
-        var revRoot = Root("rev");
-        var revXml = Path.Combine(revRoot, "data", "xml");
+        var leafRoot = Root("leaf");
+        var leafXml = Path.Combine(leafRoot, "data", "xml");
         var coreXml = Path.Combine(Root("core"), "data", "xml");
         var metafilePath = Path.Combine(coreXml, "hardpointdatafiles.xml"); // shipped by core
 
@@ -362,7 +362,7 @@ public sealed class MetafileRegistrarTest
             .Build();
         var (registrar, _) = Build(fs, registry, schema);
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot],
+        registrar.Register(new WorkspaceConfiguration([coreXml, leafXml], [], [], [], null), [leafRoot],
             BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
@@ -374,18 +374,18 @@ public sealed class MetafileRegistrarTest
     public void Register_MetafileShippedByBothLayers_OnlyTopmostCopyIsRead()
     {
         // The engine resolves a file by name, first-found-wins - it never merges two copies of
-        // GameObjectFiles.xml. When the mod (rev) ships its own, the dependency's (core) copy is
+        // GameObjectFiles.xml. When the mod (leaf) ships its own, the dependency's (core) copy is
         // shadowed entirely, which is why modders copy the base list into their own registry.
-        var revRoot = Root("rev");
-        var revXml = Path.Combine(revRoot, "data", "xml");
+        var leafRoot = Root("leaf");
+        var leafXml = Path.Combine(leafRoot, "data", "xml");
         var coreXml = Path.Combine(Root("core"), "data", "xml");
 
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [Path.Combine(coreXml, "gameobjectfiles.xml")] =
                 new("<Game_Object_Files><File>Core_Only.xml</File></Game_Object_Files>"),
-            [Path.Combine(revXml, "gameobjectfiles.xml")] =
-                new("<Game_Object_Files><File>Rev_Only.xml</File></Game_Object_Files>")
+            [Path.Combine(leafXml, "gameobjectfiles.xml")] =
+                new("<Game_Object_Files><File>Leaf_Only.xml</File></Game_Object_Files>")
         });
         var registry = new FileTypeRegistry();
         var schema = new SchemaProviderBuilder().WithMetafiles(
@@ -393,15 +393,15 @@ public sealed class MetafileRegistrarTest
             .Build();
         var (registrar, _) = Build(fs, registry, schema);
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot],
+        registrar.Register(new WorkspaceConfiguration([coreXml, leafXml], [], [], [], null), [leafRoot],
             BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         Assert.Equal(["GameObjectType"],
-            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Rev_Only.xml"))).ToArray());
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(leafXml, "Leaf_Only.xml"))).ToArray());
         // The shadowed registry's entry must not be typed under ANY root.
         Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Core_Only.xml"))));
-        Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Core_Only.xml"))));
+        Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(leafXml, "Core_Only.xml"))));
     }
 
     [Fact]
@@ -534,16 +534,16 @@ public sealed class MetafileRegistrarTest
     [Fact]
     public void Register_SpecialDef_ChainSpansXmlRoots_AndTypesTheCopyTheGameOpens()
     {
-        // The campaign lives in the mod (rev); the manifest and thread ship with the dependency
+        // The campaign lives in the mod (leaf); the manifest and thread ship with the dependency
         // (core). Resolution searches every xml root, and only the copy the game opens is typed,
         // as with file-registry entries.
-        var revXml = Path.Combine(Root("rev"), "data", "xml");
+        var leafXml = Path.Combine(Root("leaf"), "data", "xml");
         var coreXml = Path.Combine(Root("core"), "data", "xml");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [Path.Combine(revXml, "campaignfiles.xml")] =
+            [Path.Combine(leafXml, "campaignfiles.xml")] =
                 new("<Campaign_Files><File>Campaigns_Mod.xml</File></Campaign_Files>"),
-            [Path.Combine(revXml, "Campaigns_Mod.xml")] = new(
+            [Path.Combine(leafXml, "Campaigns_Mod.xml")] = new(
                 "<Campaigns><Campaign Name=\"T\">" +
                 "<Rebel_Story_Name>Story_Plots_Core.xml</Rebel_Story_Name>" +
                 "</Campaign></Campaigns>"),
@@ -555,13 +555,13 @@ public sealed class MetafileRegistrarTest
         var (registrar, _) = Build(fs, registry,
             new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [Root("rev")],
+        registrar.Register(new WorkspaceConfiguration([coreXml, leafXml], [], [], [], null), [Root("leaf")],
             BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         Assert.Equal(["StoryPlotManifest"],
             registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Story_Plots_Core.xml"))).ToArray());
-        Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Story_Plots_Core.xml"))));
+        Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(leafXml, "Story_Plots_Core.xml"))));
         Assert.Equal(["StoryParser"],
             registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Story_Core_Act.xml"))).ToArray());
     }
@@ -572,8 +572,8 @@ public sealed class MetafileRegistrarTest
         // Same override rule as any other metafile: the mod's campaignfiles.xml shadows the
         // dependency's, so only the campaigns it lists exist. The winning registry may still point
         // at files that live in the dependency - that is covered by ChainSpansXmlRoots above.
-        var revRoot = Root("rev");
-        var revXml = Path.Combine(revRoot, "data", "xml");
+        var leafRoot = Root("leaf");
+        var leafXml = Path.Combine(leafRoot, "data", "xml");
         var coreXml = Path.Combine(Root("core"), "data", "xml");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -585,24 +585,24 @@ public sealed class MetafileRegistrarTest
                 "</Campaign></Campaigns>"),
             [Path.Combine(coreXml, "Story_Plots_Core.xml")] = new("<Story_Mode_Plots/>"),
 
-            [Path.Combine(revXml, "campaignfiles.xml")] =
+            [Path.Combine(leafXml, "campaignfiles.xml")] =
                 new("<Campaign_Files><File>Campaigns_Mod.xml</File></Campaign_Files>"),
-            [Path.Combine(revXml, "Campaigns_Mod.xml")] = new(
+            [Path.Combine(leafXml, "Campaigns_Mod.xml")] = new(
                 "<Campaigns><Campaign Name=\"M\">" +
                 "<Rebel_Story_Name>Story_Plots_Mod.xml</Rebel_Story_Name>" +
                 "</Campaign></Campaigns>"),
-            [Path.Combine(revXml, "Story_Plots_Mod.xml")] = new("<Story_Mode_Plots/>")
+            [Path.Combine(leafXml, "Story_Plots_Mod.xml")] = new("<Story_Mode_Plots/>")
         });
         var registry = new FileTypeRegistry();
         var (registrar, _) = Build(fs, registry,
             new SchemaProviderBuilder().WithMetafiles(StorySpecialDef()).Build());
 
-        registrar.Register(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot],
+        registrar.Register(new WorkspaceConfiguration([coreXml, leafXml], [], [], [], null), [leafRoot],
             BaselineIndex.Empty);
 
         var fh = new FileHelper(fs);
         Assert.Equal(["StoryPlotManifest"],
-            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Story_Plots_Mod.xml"))).ToArray());
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(leafXml, "Story_Plots_Mod.xml"))).ToArray());
         Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Story_Plots_Core.xml"))));
     }
 

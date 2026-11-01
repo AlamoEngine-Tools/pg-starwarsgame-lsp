@@ -26,5 +26,14 @@ const OPENED_BY_THE_TEST: Record<string, string> = {
 
 export function uiOpen(id: string, launch: { open?: string | null }): string | null {
     const open = OPENED_BY_THE_TEST[id] ?? launch.open ?? null;
-    return open === null ? null : open.replace("{repo}", repo);
+    if (open === null) {
+        return null;
+    }
+    if (!/\{mod(Leaf)?\}/.test(open)) {
+        return open.replace("{repo}", repo);
+    }
+    // The multi-project mod's whereabouts, written by its owner; Start-ProtocolTest.ps1 -DryRun
+    // has already refused a test that needs it when the file is missing.
+    const local = readJson(path.join(protocolDir, "local.json"));
+    return open.replace("{modLeaf}", local.modLeaf).replace("{mod}", local.mod);
 }

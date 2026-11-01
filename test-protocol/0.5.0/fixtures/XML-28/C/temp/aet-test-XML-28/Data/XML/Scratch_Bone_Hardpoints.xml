@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<HardPoints>
+	<HardPoint Name="HP_Scratch_Dotted">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Attachment_Bone>Spot01.Target</Attachment_Bone>
+	</HardPoint>
+</HardPoints>

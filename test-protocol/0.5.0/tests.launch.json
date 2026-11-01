@@ -164,20 +164,20 @@
     "open": "C:\\temp\\aet-test-PRJ-preview"
   },
   "PRJ-19": {
-    "open": "c:\\dev\\EaWX\\FotR",
+    "open": "{modLeaf}",
     "settings": {
       "aet-eaw-edit.lsp.source.expansionDirectory": "{foc}",
       "aet-eaw-edit.lsp.source.baseGameDirectory": "{eaw}"
     }
   },
   "PRJ-20": {
-    "open": "c:\\dev\\EaWX\\FotR"
+    "open": "{modLeaf}"
   },
   "PRJ-21": {
-    "open": "c:\\dev\\EaWX"
+    "open": "{mod}"
   },
   "PRJ-22": {
-    "open": "c:\\dev\\EaWX"
+    "open": "{mod}"
   },
   "XML-01": {
     "open": "C:\\temp\\aet-test-xml"
@@ -264,7 +264,7 @@
     "open": "{repo}\\eaw-foc.code-workspace"
   },
   "XML-28": {
-    "open": "c:\\dev\\EaWX\\FotR"
+    "open": "C:\\temp\\aet-test-XML-28"
   },
   "LUA-01": {
     "open": "{repo}\\eaw"
@@ -466,7 +466,7 @@
     "open": "{repo}\\eaw"
   },
   "PRV-30": {
-    "open": "c:\\dev\\EaWX",
+    "open": "{mod}",
     "settings": {
       "aet-eaw-edit.experimental.storyEditing": true
     }
@@ -478,10 +478,10 @@
     "open": "{repo}\\foc"
   },
   "PRV-33": {
-    "open": "c:\\dev\\EaWX\\FotR"
+    "open": "{modLeaf}"
   },
   "PRV-34": {
-    "open": "c:\\dev\\EaWX\\FotR"
+    "open": "{modLeaf}"
   },
   "PRV-35": {
     "open": "C:\\temp\\aet-prv-ovr\\mod"
