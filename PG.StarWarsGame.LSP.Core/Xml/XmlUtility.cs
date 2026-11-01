@@ -312,7 +312,7 @@ public static class XmlUtility
         {
             if (node.StreamPosition >= offset) continue;
             var end = node.EndNode is not null && !ReferenceEquals(node.EndNode, node)
-                                                && node.EndNode.Line >= node.Line
+                                               && node.EndNode.Line >= node.Line
                 ? node.EndNode.StreamPosition // explicit, valid closing tag
                 : ReferenceEquals(node.EndNode, node)
                     ? node.StreamPosition // self-closing

@@ -119,7 +119,8 @@ public sealed class LuaHoverHandlerTest
     {
         var text = await HoverWithAsync("Find_Player(\"Empire\")", 3,
             new ScriptedLuaAnalyzer().Answer("textDocument/hover",
-                Theirs("```lua\nfunction Find_Player(name: string)\n```\n\n---\n\nTHEIRS: its own comment\n\n Finds a player.")));
+                Theirs(
+                    "```lua\nfunction Find_Player(name: string)\n```\n\n---\n\nTHEIRS: its own comment\n\n Finds a player.")));
 
         Assert.NotNull(text);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "Finds a player"));

@@ -210,7 +210,8 @@ public sealed class XmlHoverHandlerTest
         host.AddOrUpdate(TestUri.ToString(), OneLine, 1);
         schema.Add(MakeTag());
 
-        var result = await handler.HoverAsync(At(0, OneLine.IndexOf(tag, StringComparison.Ordinal) + tag.IndexOf('M') + 1),
+        var result = await handler.HoverAsync(
+            At(0, OneLine.IndexOf(tag, StringComparison.Ordinal) + tag.IndexOf('M') + 1),
             CancellationToken.None);
 
         Assert.NotNull(result);
