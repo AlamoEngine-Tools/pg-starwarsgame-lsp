@@ -106,7 +106,7 @@
   "PRJ-01": {
     "open": "{repo}\\eaw",
     "settings": {
-      "aet-eaw-edit.lsp.debug.traceServer": "verbose"
+      "aet-eaw-edit.lsp.debug.trace.server": "verbose"
     }
   },
   "PRJ-02": {

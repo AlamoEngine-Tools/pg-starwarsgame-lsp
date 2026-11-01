@@ -523,6 +523,9 @@
   the extension keeps it off in a workspace
 - **More settings removed** - `aet-eaw-edit.lsp.locale` (no translation existed), `aet-eaw-edit.modVerify.enabled` and
   `aet-eaw-edit.modVerify.executable` (read by nothing), `aet-eaw-edit.shaders.sourceUrl`
+- **`aet-eaw-edit.lsp.debug.traceServer` is `aet-eaw-edit.lsp.debug.trace.server`** - the trace now covers the
+  handshake: `initialize` and its result are traced at the level set, where they were traced as bare message names
+  before the level applied; a value under the old name is not read
 - **Story simulator options moved into the simulator** - `aet-eaw-edit.storySimulator.autoResume` is *Resume after
   an answer* and `aet-eaw-edit.storySimulator.assumeMediaCompletes` is *Speech and movies finish on their own*, two
   toggles beside *Break on gates* in the transport. Resume is kept per viewer; the media option belongs to the run,

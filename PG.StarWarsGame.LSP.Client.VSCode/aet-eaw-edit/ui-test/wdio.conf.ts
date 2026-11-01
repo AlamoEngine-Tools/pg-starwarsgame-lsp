@@ -32,7 +32,7 @@ export const config: WebdriverIO.Config = {
                 extensionPath: client,
                 ...(open === null ? {} : { workspacePath: open }),
                 // Traced always: a failure is read from the profile's logs afterwards (see protocol.ts).
-                userSettings: { ...readJson(userSettingsFile(id)), "aet-eaw-edit.lsp.debug.traceServer": "verbose" },
+                userSettings: { ...readJson(userSettingsFile(id)), "aet-eaw-edit.lsp.debug.trace.server": "verbose" },
                 storagePath,
                 verboseLogging: false,
             },

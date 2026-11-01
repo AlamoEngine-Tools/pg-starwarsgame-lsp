@@ -1,7 +1,6 @@
 // PRJ-01: a single project behaves as before - one server, no project level, diagnostics name the
-// project. Two of the protocol's checks are not here: the server's file log is written by a Debug
-// server only and the staged server is Release; and the initialize result never reaches the trace,
-// since the client sets the trace level once start() has resolved.
+// project. The server's file log is written by a Debug server only and the staged server is Release,
+// so that check stays a hand check.
 import fs from "node:fs";
 import path from "node:path";
 import { browser, expect } from "@wdio/globals";
@@ -36,6 +35,9 @@ describe("PRJ-01", () => {
         expect([...logChannels().keys()]).toEqual(["Alamo Engine Tools - Empire at War Edit"]);
         const output = outputChannels();
         expect([...output.keys()].sort()).toEqual(["EaWEdit", "EaWEdit LSP Trace"]);
+        // The server's capabilities in the initialize result; "supported": false is left out, which
+        // the protocol reads as false.
+        expect(output.get("EaWEdit LSP Trace")).toMatch(/"workspaceFolders": \{\s*"changeNotifications": false\s*\}/);
         expect(output.get("EaWEdit")!.split(/\r?\n/).filter((l) => /^\[[^\]]+\] Projects:/.test(l))).toEqual([]);
     });
 

@@ -13,7 +13,6 @@ import {
     LanguageClientOptions,
     ServerOptions,
     StaticFeature,
-    Trace,
 } from "vscode-languageclient/node";
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
 import {
@@ -139,7 +138,10 @@ import {
     proposalMessage,
 } from "./pgprojMigrationPrompt";
 
-const CLIENT_ID = "aet.pg.swg.lsp";
+// vscode-languageclient reads `<id>.trace.server` itself: when it sends initialize and on every
+// change. Named so that is aet-eaw-edit.lsp.debug.trace.server, the handshake is traced at the level
+// the setting asks for rather than only what follows it.
+const CLIENT_ID = "aet-eaw-edit.lsp.debug";
 const CLIENT_NAME = "Alamo Engine Tools - Empire at War Edit";
 const REQUIRED_SERVER_VERSION = "0.4.1";
 
@@ -679,24 +681,50 @@ let log: vscode.OutputChannel | undefined;
 /**
  * vscode-languageclient v10 types `traceOutputChannel` as `LogOutputChannel` and writes protocol
  * trace via its `trace()` method - which a real `LogOutputChannel` hides unless its (user-controlled)
- * log level is set to Trace, and which prefixes every line with a level/timestamp. That breaks the
- * LSP trace view, where the `traceServer` setting (via `setTrace`) is meant to control visibility and
- * the JSON should appear verbatim. Adapt a plain `OutputChannel` to the `LogOutputChannel` shape so
- * every level writes through unchanged.
+ * log level is set to Trace, and which prefixes every line with a level/timestamp. Adapt a plain
+ * `OutputChannel` to the `LogOutputChannel` shape so every level writes through unchanged, the JSON
+ * verbatim.
+ *
+ * The library traces nothing below log level Trace, and reads the verbosity from the trace.server
+ * setting above it - lifting `off` to `messages`. So the level stands for the setting's on/off: Off
+ * when it is off, Trace otherwise, and the library is told when that changes.
  */
 function createTraceChannel(name: string): vscode.LogOutputChannel {
     const channel = vscode.window.createOutputChannel(name);
     const logLevelEmitter = new vscode.EventEmitter<vscode.LogLevel>();
+    const level = () =>
+        cfg("lsp.debug").get<string>("trace.server", "off") === "off"
+            ? vscode.LogLevel.Off
+            : vscode.LogLevel.Trace;
+    let current = level();
+    const watch = vscode.workspace.onDidChangeConfiguration((e) => {
+        if (!e.affectsConfiguration("aet-eaw-edit.lsp.debug.trace.server")) {
+            return;
+        }
+        const next = level();
+        if (next !== current) {
+            current = next;
+            logLevelEmitter.fire(next);
+        }
+    });
     const write = (message: string, ..._args: unknown[]): void =>
         channel.appendLine(message);
+    const dispose = channel.dispose.bind(channel);
     return Object.assign(channel, {
-        logLevel: vscode.LogLevel.Trace,
+        get logLevel() {
+            return current;
+        },
         onDidChangeLogLevel: logLevelEmitter.event,
         trace: write,
         debug: write,
         info: write,
         warn: write,
         error: write,
+        dispose: () => {
+            watch.dispose();
+            logLevelEmitter.dispose();
+            dispose();
+        },
     }) as unknown as vscode.LogOutputChannel;
 }
 
@@ -973,20 +1001,9 @@ function startProjectClient(
 
     updateStatus();
 
-    const traceLevel = cfg("lsp.debug").get<string>("traceServer", "off");
-    const traceMap: Record<string, Trace> = {
-        off: Trace.Off,
-        messages: Trace.Messages,
-        verbose: Trace.Verbose,
-    };
-    const resolvedTrace = traceMap[traceLevel] ?? Trace.Off;
-
     lspClient
         .start()
         .then(async () => {
-            // setTrace must be called after start() resolves: before that, activeConnection()
-            // returns undefined and the trace level is stored but never applied to the transport.
-            await lspClient.setTrace(resolvedTrace);
             logLine(`${label}LSP server started and initialized.`);
 
             // The handshake is done and the server is answering; what remains is the workspace scan,
@@ -1029,22 +1046,6 @@ function startProjectClient(
                           ),
                 );
             }
-
-            // vscode-languageclient's hookConfigurationChanged reads aet.pg.swg.lsp.trace.server
-            // (the CLIENT_ID namespace), which is not in settings, so it resets trace to Off on
-            // every VS Code config change. Register our own listener - after hookConfigurationChanged's
-            // listener, so it fires last and wins - to re-apply the user's actual setting.
-            context.subscriptions.push(
-                vscode.workspace.onDidChangeConfiguration(() => {
-                    const level = cfg("lsp.debug").get<string>(
-                        "traceServer",
-                        "off",
-                    );
-                    if (project.client === lspClient) {
-                        void lspClient.setTrace(traceMap[level] ?? Trace.Off);
-                    }
-                }),
-            );
         })
         .catch((e: unknown) => {
             // Stopped on purpose while starting - the project went, or the window restarts it.

@@ -772,7 +772,7 @@
             ],
             "markdownDescription": "%config.lsp.source.baseline.localPath.markdownDescription%"
           },
-          "aet-eaw-edit.lsp.debug.traceServer": {
+          "aet-eaw-edit.lsp.debug.trace.server": {
             "order": 11,
             "type": "string",
             "default": "off",
@@ -782,14 +782,14 @@
               "verbose"
             ],
             "enumItemLabels": [
-              "%config.lsp.debug.traceServer.enumItemLabels.0%",
-              "%config.lsp.debug.traceServer.enumItemLabels.1%",
-              "%config.lsp.debug.traceServer.enumItemLabels.2%"
+              "%config.lsp.debug.trace.server.enumItemLabels.0%",
+              "%config.lsp.debug.trace.server.enumItemLabels.1%",
+              "%config.lsp.debug.trace.server.enumItemLabels.2%"
             ],
             "tags": [
               "advanced"
             ],
-            "markdownDescription": "%config.lsp.debug.traceServer.markdownDescription%"
+            "markdownDescription": "%config.lsp.debug.trace.server.markdownDescription%"
           },
           "aet-eaw-edit.lsp.debug.logLevel": {
             "order": 12,
