@@ -43,14 +43,14 @@ describe("SET-04", () => {
 
     it("fills the Campaign Editor, the Localisation Editor and the Mod Browser", async () => {
         const campaigns = await viewItems("Campaign Editor");
-        expect(campaigns).toContain("Main_Campaign_Rebel");
-        expect(campaigns).toContain("Main_Campaign_Empire");
+        expect(campaigns).toContain("Story_Campaign_Rebel");
+        expect(campaigns).toContain("Story_Campaign_Empire");
         expect(await viewItems("Localisation Editor")).toContain("Text files");
         expect(await viewItems("Mod Browser")).toEqual(expect.arrayContaining(["Game Data", "Assets", "Scripts", "Schema"]));
     });
 
     it("offers the story graph in View only", async () => {
-        expect(await storyModes("Main_Campaign_Empire", "Empire")).toEqual(["View"]);
+        expect(await storyModes("Full_Story_Campaign_Empire", "Empire")).toEqual(["View"]);
     });
 
     it("reports both experimental modes off", async () => {

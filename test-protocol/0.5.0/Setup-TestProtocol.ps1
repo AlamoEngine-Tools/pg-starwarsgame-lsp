@@ -130,6 +130,18 @@ function Invoke-Extra([string] $testId) {
                 python (Join-Path $here 'make_particles.py') $source 'C:\temp\aet-prv-pe\Data\Art\Models\P_prv'
             } else { Write-Warning "PRV-36: $source not found; the particle files are missing." }
         }
+        'PRV-35' {
+            # The game loads an object file only when its registry lists it, and of two definitions the
+            # first read counts: the mod's list names its file, then the base's, then the game's own.
+            # Written from the local game workspace, so no game file is part of the fixture.
+            $source = Join-Path $repo 'foc\Data\Xml\Gameobjectfiles.xml'
+            $dest = 'C:\temp\aet-prv-ovr\mod\Data\XML\GameObjectFiles.xml'
+            if (Test-Path $source) {
+                $list = [System.IO.File]::ReadAllText($source) -replace '<Game_Object_Files>',
+                    "<Game_Object_Files>`r`n`t<File>PrvModUnits.xml</File>`r`n`t<File>PrvBaseUnits.xml</File>"
+                [System.IO.File]::WriteAllText($dest, $list)
+            } else { Write-Warning "PRV-35: $source not found; $dest is missing and no object file loads." }
+        }
     }
 }
 

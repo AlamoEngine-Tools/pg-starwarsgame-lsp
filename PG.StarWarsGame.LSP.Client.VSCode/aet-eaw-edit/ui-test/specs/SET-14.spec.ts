@@ -78,7 +78,7 @@ describe("SET-14", () => {
     });
 
     it("words the story graph's tooltips without a placeholder", async () => {
-        await openStoryGraph("Main_Campaign_Empire", "Empire");
+        await openStoryGraph("Full_Story_Campaign_Empire", "Empire");
         const titles = await inNewestWebview(async () => {
             await (await browser.$("button.rotary-pos")).waitForExist({ timeout: 90_000 });
             return browser.execute(() =>

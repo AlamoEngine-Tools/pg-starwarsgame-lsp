@@ -376,6 +376,41 @@ export async function viewItems(section: string): Promise<string[]> {
     return labels;
 }
 
+/**
+ * Clicks an item of a section in the Empire at War Edit container, as a reader does. Several labels are
+ * a path: the parents are expanded on the way, as under a project's row when several run.
+ */
+export async function clickViewItem(section: string, ...labels: string[]): Promise<void> {
+    const workbench = await browser.getWorkbench();
+    const container = await workbench.getActivityBar().getViewControl("Empire at War Edit");
+    const view = await container!.openView();
+    const pane = await view.getContent().getSection(section);
+    await pane.expand();
+    if (labels.length > 1) {
+        await browser.waitUntil(async () => (await pane.getVisibleItems()).length > 0, {
+            timeout: 60_000,
+            timeoutMsg: `'${section}' lists nothing`,
+        });
+        await (pane as any).openItem(...labels);
+        return;
+    }
+    const [label] = labels;
+    let item: any;
+    await browser.waitUntil(
+        async () => {
+            for (const candidate of await pane.getVisibleItems()) {
+                if ((await (candidate as any).getLabel()) === label) {
+                    item = candidate;
+                    return true;
+                }
+            }
+            return false;
+        },
+        { timeout: 60_000, interval: 1000, timeoutMsg: `'${section}' has no item '${label}'` },
+    );
+    await item.select();
+}
+
 /** Answers an input box with text. */
 export async function answerInput(text: string): Promise<void> {
     const input = await browser.$(".quick-input-widget .quick-input-box input");
@@ -574,6 +609,9 @@ export async function logLine(pattern: RegExp, channel = "EaWEdit", timeout = 12
 
 /** The settings editor's count for a search, e.g. 10 for '10 Settings Found'. */
 export async function settingsFound(query: string): Promise<number> {
+    // The widget says 'No Settings Found' rather than a count of nought.
+    const countOf = (text: string): number =>
+        /No Settings Found/i.test(text) ? 0 : Number(/(\d+) Settings? Found/.exec(text)?.[1] ?? -1);
     // A second search in an open editor would read the count of the first one.
     await browser.executeWorkbench((vscode) => vscode.commands.executeCommand("workbench.action.closeAllEditors"));
     await command("workbench.action.openSettings", query);
@@ -585,8 +623,7 @@ export async function settingsFound(query: string): Promise<number> {
                 (document.querySelector(".settings-editor .suggest-input-container .view-lines") as HTMLElement | null)
                     ?.innerText ?? "",
             ])) as [string, string];
-            const match = /(\d+) Settings? Found/.exec(text);
-            count = match ? Number(match[1]) : -1;
+            count = countOf(text);
             return count >= 0 && search.replace(/\s+/g, " ").trim() === query;
         },
         { timeout: 20_000, timeoutMsg: `No settings count for '${query}'` },
@@ -594,8 +631,7 @@ export async function settingsFound(query: string): Promise<number> {
     // The count follows the search after a debounce.
     await browser.pause(1_500);
     const text: string = await browser.execute(() => document.querySelector(".settings-count-widget")?.textContent ?? "");
-    count = Number(/(\d+) Settings? Found/.exec(text)?.[1] ?? -1);
-    return count;
+    return countOf(text);
 }
 
 /** The labels and values the settings editor shows for its current search. */

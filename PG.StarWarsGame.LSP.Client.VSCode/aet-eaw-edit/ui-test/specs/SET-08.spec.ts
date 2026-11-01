@@ -21,7 +21,7 @@ describe("SET-08", () => {
     });
 
     it("offers View and Edit, and Edit shows the Save button with nothing staged", async () => {
-        await openStoryGraph("Main_Campaign_Empire", "Empire");
+        await openStoryGraph("Full_Story_Campaign_Empire", "Empire");
         const save = await inNewestWebview(async () => {
             await (await browser.$("button.rotary-pos")).waitForExist({ timeout: 90_000 });
             const modes = await browser.execute(() =>
@@ -39,6 +39,6 @@ describe("SET-08", () => {
 
     it("restarts again when it is unticked, and a new graph offers View only", async () => {
         await toggleRestarts(false);
-        expect(await storyModes("Main_Campaign_Empire", "Empire")).toEqual(["View"]);
+        expect(await storyModes("Full_Story_Campaign_Empire", "Empire")).toEqual(["View"]);
     });
 });

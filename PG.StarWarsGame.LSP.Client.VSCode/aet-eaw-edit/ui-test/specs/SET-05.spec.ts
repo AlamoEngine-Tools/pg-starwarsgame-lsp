@@ -23,7 +23,7 @@ describe("SET-05", () => {
 
     it("enables no editing under the old flag name", async () => {
         await restartServer();
-        expect(await storyModes("Main_Campaign_Empire", "Empire")).toEqual(["View"]);
+        expect(await storyModes("Full_Story_Campaign_Empire", "Empire")).toEqual(["View"]);
     });
 
     it("still answers the Lua hover", async () => {
