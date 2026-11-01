@@ -36,11 +36,12 @@ describe("PRV-16", () => {
         expect((await rowsFor("P_asteroid_field")).filter((r) => /^P_asteroid_field/i.test(r.label))).toEqual([]);
 
         const shuttles = await rowsFor("Ev_lambdashuttle");
-        // As the files are spelled on disk, not as the game's archives spell them.
+        // In lower case: the asset catalog keys every path so, and neither the game nor the tool tells two
+        // spellings apart.
         expect(shuttles.map((r) => r.label).sort()).toEqual([
-            "Ev_lambdashuttle.alo",
-            "Ev_lambdashuttle_space.alo",
-            "Ev_lambdashuttle_space_d.alo",
+            "ev_lambdashuttle.alo",
+            "ev_lambdashuttle_space.alo",
+            "ev_lambdashuttle_space_d.alo",
         ]);
         for (const row of shuttles) {
             expect(["Project", "Base game"]).toContain(row.description);
