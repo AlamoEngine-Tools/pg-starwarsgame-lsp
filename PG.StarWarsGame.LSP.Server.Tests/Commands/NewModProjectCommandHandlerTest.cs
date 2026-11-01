@@ -74,6 +74,7 @@ public sealed class NewModProjectCommandHandlerTest
         var written = JsonNode.Parse(fs.File.ReadAllText("/mods/mymod/My_Mod.pgproj"))!.AsObject();
         Assert.Equal(PgprojFormat.TypeName, (string?)written["_type"]);
         Assert.Equal(PgprojFormat.Current.ToString(), (string?)written["_typeVersion"]);
+        Assert.Equal("foc", (string?)written["game"]);
     }
 
     [Fact]

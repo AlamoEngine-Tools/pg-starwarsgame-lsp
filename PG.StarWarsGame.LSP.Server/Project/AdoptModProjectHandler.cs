@@ -7,6 +7,7 @@ using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
+using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -73,6 +74,7 @@ public sealed class AdoptModProjectHandler(IFileHelper fileHelper, ModLayout lay
             ["_type"] = PgprojFormat.TypeName,
             ["_typeVersion"] = PgprojFormat.Current.ToString(),
             ["name"] = name,
+            ["game"] = TargetGameNames.Of(TargetGames.Default),
             ["directories"] = directories
         };
         if (folder.DataChild("Text") is { } text && TextFormat(text) is { } type)

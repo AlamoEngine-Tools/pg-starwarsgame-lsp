@@ -13,6 +13,17 @@ public enum TargetGame
     FOC
 }
 
+/// <summary>The game a project file is given when nothing else decides it.</summary>
+public static class TargetGames
+{
+    /// <summary>
+    ///     FoC, the more modded game. It is WRITTEN - by the migration into older files and by every
+    ///     project we create - and never read into a file that names none: from the format that
+    ///     introduced the field, a project file without it is refused.
+    /// </summary>
+    public const TargetGame Default = TargetGame.FOC;
+}
+
 /// <summary>How a project file spells a <see cref="TargetGame" />: exactly the schema's two values.</summary>
 public static class TargetGameNames
 {

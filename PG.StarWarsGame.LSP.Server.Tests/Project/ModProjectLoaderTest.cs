@@ -32,7 +32,7 @@ public sealed class ModProjectLoaderTest
     public void Load_CurrentIdentity_Loads()
     {
         var loader = Build(
-            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""",
+            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "foc" }""",
             out _);
 
         Assert.Equal("Mod", loader.Load(ProjectPath).Name);
@@ -85,7 +85,7 @@ public sealed class ModProjectLoaderTest
     public void Load_OlderVersion_IsMigratedInMemory()
     {
         var loader = BuildWith(
-            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""", out _,
+            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past", "game": "foc" }""", out _,
             migrations: new RenameToName());
 
         Assert.Equal("From The Past", loader.Load(ProjectPath).Name);
@@ -95,7 +95,7 @@ public sealed class ModProjectLoaderTest
     [Fact]
     public void Load_OlderVersion_LeavesTheFileAlone()
     {
-        const string original = """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""";
+        const string original = """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past", "game": "foc" }""";
         var loader = BuildWith(original, out var fs, migrations: new RenameToName());
 
         loader.Load(ProjectPath);
@@ -108,7 +108,7 @@ public sealed class ModProjectLoaderTest
     {
         var sink = new RecordingSink();
         var loader = BuildWith(
-            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""", out _, sink,
+            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past", "game": "foc" }""", out _, sink,
             new RenameToName());
 
         loader.Load(ProjectPath);
@@ -125,7 +125,7 @@ public sealed class ModProjectLoaderTest
     {
         var sink = new RecordingSink();
         var loader = BuildWith(
-            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""", out _, sink,
+            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "foc" }""", out _, sink,
             new RenameToName());
 
         loader.Load(ProjectPath);
@@ -199,7 +199,7 @@ public sealed class ModProjectLoaderTest
     {
         var sink = new RecordingSink();
         var loader = BuildWith(
-            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""",
+            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "foc" }""",
             out _, sink, PgprojMigrations.All.ToArray());
 
         loader.Load(ProjectPath);
@@ -1007,6 +1007,19 @@ public sealed class ModProjectLoaderTest
         var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
 
         Assert.Contains(value, ex.Message, StringComparison.Ordinal);
+        Assert.Equal(ProjectProblem.Invalid, ex.Problem);
+    }
+
+    // The field is explicit from the format that introduced it: only the migration fills it in, and
+    // only for a file older than that format.
+    [Fact]
+    public void Load_CurrentFormatWithoutAGame_RefusesNamingTheField()
+    {
+        var loader = Build($$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""", out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+
+        Assert.Contains("'game'", ex.Message, StringComparison.Ordinal);
         Assert.Equal(ProjectProblem.Invalid, ex.Problem);
     }
 

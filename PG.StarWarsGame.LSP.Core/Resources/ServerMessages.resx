@@ -1402,6 +1402,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="ModProject_GameMustBeOneOf" xml:space="preserve">
     <value>Could not load mod project '{0}': 'game' must be one of eaw, foc (got '{1}').</value>
   </data>
+  <data name="ModProject_GameRequired" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'game' is required - eaw or foc.</value>
+  </data>
   <data name="ModProject_EawProjectReferencesFocProject" xml:space="preserve">
     <value>Could not load mod project '{0}': It targets Empire at War and references '{1}', which targets Forces of Corruption. The base game cannot load the expansion's data.</value>
   </data>

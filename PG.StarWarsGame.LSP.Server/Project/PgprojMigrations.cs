@@ -91,7 +91,7 @@ public static class PgprojMigrations
             if (document is not JsonObject root) return document;
 
             if (!root.ContainsKey("game"))
-                root["game"] = TargetGameNames.Of(TargetGame.FOC);
+                root["game"] = TargetGameNames.Of(TargetGames.Default);
             root["_typeVersion"] = To.ToString();
             return root;
         }

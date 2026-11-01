@@ -169,15 +169,17 @@ public sealed class ModProjectLoader
             references.Add(new ProjectReference(NormalizePath(raw)));
         }
 
-        return new ModProjectFile(name, modinfo, directories, references, localisation, icons, game);
+        return new ModProjectFile(name, modinfo, directories, references, game, localisation, icons);
     }
 
-    // Absent is FoC: the migration writes it into every older file, and a file that predates the
-    // version fields reaches here through that same migration. Present, it must be one of exactly
-    // the schema's two spellings, so the editor and the server never disagree on a file.
+    // Required: the migration writes it into every older file, and a file that predates the version
+    // fields reaches here through that same migration, so a file without it here claims a format it
+    // does not follow. It must be one of exactly the schema's two spellings, so the editor and the
+    // server never disagree on a file.
     private TargetGame ParseGame(JsonElement? value, string fileName)
     {
-        if (value is not { } element) return TargetGame.FOC;
+        if (value is not { } element)
+            throw new ModProjectLoadException(_messages.Format("ModProject_GameRequired", fileName));
 
         var text = element.ValueKind == JsonValueKind.String ? element.GetString() : null;
         if (TargetGameNames.TryParse(text, out var game)) return game;

@@ -139,6 +139,7 @@ public sealed class AdoptModProjectHandlerTest
 
         Assert.Equal(PgprojFormat.TypeName, (string?)written["_type"]);
         Assert.Equal(PgprojFormat.Current.ToString(), (string?)written["_typeVersion"]);
+        Assert.Equal("foc", (string?)written["game"]);
         var model = new ModProjectLoader(new FileHelper(fs),
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<ModProjectLoader>.Instance,
                 new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"))

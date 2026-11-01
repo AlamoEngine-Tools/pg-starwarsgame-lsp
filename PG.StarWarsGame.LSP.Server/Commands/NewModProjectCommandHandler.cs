@@ -11,6 +11,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
+using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -135,6 +136,7 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
             // unstamped one instead of guessing.
             ["_type"] = PgprojFormat.TypeName,
             ["_typeVersion"] = PgprojFormat.Current.ToString(),
+            ["game"] = TargetGameNames.Of(TargetGames.Default),
             ["modinfo"] = new
             {
                 name,

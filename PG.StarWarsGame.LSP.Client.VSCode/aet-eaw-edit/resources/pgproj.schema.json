@@ -3,6 +3,23 @@
   "title": "PG StarWarsGame Mod Project",
   "type": "object",
   "additionalProperties": false,
+  "if": {
+    "required": [
+      "_typeVersion"
+    ],
+    "properties": {
+      "_typeVersion": {
+        "not": {
+          "pattern": "^aetswg-(0|1\\.0)\\."
+        }
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "game"
+    ]
+  },
   "properties": {
     "$schema": {
       "type": "string"
@@ -180,7 +197,7 @@
       }
     },
     "game": {
-      "description": "The game this mod is built for: eaw for Empire at War, foc for Forces of Corruption. It decides which shipped game the project is checked against. A project without it targets foc. An eaw project cannot reference a foc project, since the base game cannot load the expansion's data.",
+      "description": "The game this mod is built for: eaw for Empire at War, foc for Forces of Corruption. It decides which shipped game the project is checked against. Required from format aetswg-1.1.0; an older project file is given foc when it is updated. An eaw project cannot reference a foc project, since the base game cannot load the expansion's data.",
       "type": "string",
       "enum": [
         "eaw",
