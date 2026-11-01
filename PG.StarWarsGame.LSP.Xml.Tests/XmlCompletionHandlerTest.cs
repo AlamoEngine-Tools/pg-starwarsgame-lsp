@@ -564,6 +564,50 @@ public sealed class XmlCompletionHandlerTest
         Assert.Equal("", capturing.LastPartialValue);
     }
 
+    // ── a document written on one line ───────────────────────────────────────
+    // The element the cursor is in is found by its position, not by being the deepest on its line.
+
+    [Fact]
+    public async Task Handle_ValueCompletion_OneLine_AsksForTheElementTheCursorIsIn()
+    {
+        var capturing = new CapturingCompletionProvider();
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, _) = Build(registry, completion: capturing);
+        schema.Add(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "Behavior", ValueType = XmlValueType.TypeReferenceList, ReferenceKind = ReferenceKind.HardcodedSet
+        });
+        schema.AddForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "Armor_Type", ValueType = XmlValueType.TypeReferenceList, ReferenceKind = ReferenceKind.HardcodedSet
+        });
+
+        const string text =
+            "<Root><SpaceUnit Name=\"X\"><Behavior>A</Behavior><Armor_Type>B</Armor_Type></SpaceUnit></Root>";
+        host.AddOrUpdate(TestUri.ToString(), text, 1);
+
+        await handler.Handle(At(0, text.IndexOf(">B<", StringComparison.Ordinal) + 2), CancellationToken.None);
+
+        Assert.Equal("Armor_Type", capturing.LastTagDef?.Tag);
+    }
+
+    [Fact]
+    public async Task Handle_TagNameContext_OneLine_AfterAClosedSibling_OffersTheParentsTags()
+    {
+        var (handler, host, schema, _) = Build();
+        schema.Add(MakeType("Faction"));
+        schema.AddForType("Faction", MakeTag("SFXEvent_Attack", true));
+
+        const string text = "<Faction><SFXEvent_Attack>Sfx_A</SFXEvent_Attack><</Faction>";
+        host.AddOrUpdate(TestUri.ToString(), text, 1);
+        var result = await handler.Handle(At(0, text.IndexOf("<</", StringComparison.Ordinal) + 1),
+            CancellationToken.None);
+
+        Assert.Contains("SFXEvent_Attack", result.Items.Select(i => i.Label));
+    }
+
     // ── StoryParser value completions ─────────────────────────────────────────
 
     [Fact]

@@ -199,33 +199,6 @@ public sealed class XmlUtilityTest
         Assert.False(XmlUtility.IsOnTagName(node!, 2, 0));
     }
 
-    // ── TryFindNodeByClosingLine ──────────────────────────────────────────────
-
-    [Fact]
-    public void TryFindNodeByClosingLine_MultilineElement_FindsCorrectElement()
-    {
-        // </Foo> is on line 3
-        var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Foo>\nbar\n</Foo>\n</Root>");
-        var found = XmlUtility.TryFindNodeByClosingLine(doc, 3, out var node);
-        Assert.True(found);
-        Assert.Equal("foo", node!.Name, StringComparer.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void TryFindNodeByClosingLine_ContentLine_ReturnsFalse()
-    {
-        var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Foo>\nbar\n</Foo>\n</Root>");
-        Assert.False(XmlUtility.TryFindNodeByClosingLine(doc, 2, out _));
-    }
-
-    [Fact]
-    public void TryFindNodeByClosingLine_SelfClosingTag_ReturnsFalse()
-    {
-        // Self-closing has no separate EndNode
-        var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Foo/>\n</Root>");
-        Assert.False(XmlUtility.TryFindNodeByClosingLine(doc, 1, out _));
-    }
-
     // ── GetValuePosition (highlight the value, not the tag) ───────────────────
 
     [Fact]

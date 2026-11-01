@@ -197,6 +197,39 @@ public sealed class XmlHoverHandlerTest
         Assert.NotNull(result);
     }
 
+    // The game reads a file written on one line like any other: the element under the cursor is found
+    // by its position, not by being the first element on its line - which here is the root.
+    private const string OneLine = "<?xml version=\"1.0\"?><Root><Unit><Max_Speed>500</Max_Speed></Unit></Root>";
+
+    [Theory]
+    [InlineData("<Max_Speed>")]
+    [InlineData("</Max_Speed>")]
+    public async Task Handle_TagNameInADocumentOnOneLine_ReturnsTagHover(string tag)
+    {
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), OneLine, 1);
+        schema.Add(MakeTag());
+
+        var result = await handler.HoverAsync(At(0, OneLine.IndexOf(tag, StringComparison.Ordinal) + tag.IndexOf('M') + 1),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains("Max_Speed", result.Contents.MarkupContent!.Value);
+    }
+
+    [Fact]
+    public async Task Handle_RootElementInADocumentOnOneLine_ReturnsNull()
+    {
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), OneLine, 1);
+        schema.Add(MakeTag());
+
+        var result = await handler.HoverAsync(At(0, OneLine.IndexOf("<Root>", StringComparison.Ordinal) + 2),
+            CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
     [Fact]
     public async Task Handle_DeprecatedTag_HoverContainsDeprecatedMarker()
     {

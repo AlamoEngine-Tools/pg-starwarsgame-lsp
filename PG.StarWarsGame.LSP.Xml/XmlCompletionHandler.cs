@@ -87,8 +87,9 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         {
             var prefix = ExtractPartialTagName(line, character);
             var anglePos = character - prefix.Length - 1;
-            var truncatedDoc = XmlUtility.CreateHtmlDocument(BuildTruncatedText(lines, lineIndex, anglePos));
-            var enclosingNode = XmlUtility.FindEnclosingElement(truncatedDoc, lineIndex);
+            var truncated = BuildTruncatedText(lines, lineIndex, anglePos);
+            var truncatedDoc = XmlUtility.CreateHtmlDocument(truncated);
+            var enclosingNode = XmlUtility.FindEnclosingElementAt(truncatedDoc, truncated.Length);
             if (enclosingNode is null)
                 return Task.FromResult(new CompletionList());
 
@@ -107,7 +108,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
         // Value completion: cursor is inside an element body
         var valueDoc = parsed.Html;
-        var enclosingValueNode = XmlUtility.FindEnclosingElement(valueDoc, lineIndex);
+        var enclosingValueNode = XmlUtility.FindEnclosingElementAt(valueDoc,
+            XmlUtility.PositionToOffset(text, lineIndex, character));
         var enclosingTag = enclosingValueNode?.Name;
         var enclosingDepth = enclosingValueNode is null ? 0 : XmlUtility.GetDepth(enclosingValueNode);
         if (enclosingTag is null)

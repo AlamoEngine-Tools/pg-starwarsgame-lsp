@@ -85,4 +85,30 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
         Assert.Equal(new Position(5, 0), edit.Range.Start);
         Assert.Equal(new Position(6, 0), edit.Range.End);
     }
+
+    // A file the game reads on one line: the fix removes the element it was raised on and nothing
+    // else - by line it would have removed the whole file.
+    [Fact]
+    public void Quick_fix_on_a_file_written_on_one_line_removes_only_the_element()
+    {
+        const string oneLine = "<Units><Unit Name=\"Base\"><Max_Speed>1.0</Max_Speed></Unit>" +
+                               "<Unit Name=\"Derived\" Variant_Of_Existing_Type=\"Base\"><Max_Speed>1.0</Max_Speed>" +
+                               "</Unit></Units>";
+        const string redundant = "<Max_Speed>1.0</Max_Speed></Unit></Units>";
+        var start = oneLine.IndexOf(redundant, StringComparison.Ordinal);
+        var data = new JObject { ["removeRedundantOverride"] = true };
+        var ctx = new XmlCodeActionContext(DocumentUri.From(Uri),
+            new Diagnostic
+            {
+                Range = new LspRange(new Position(0, start + 1), new Position(0, start + 10)),
+                Message = "redundant", Data = data
+            }) { Messages = TestCatalogues.English };
+
+        var action = BuildProvider(oneLine).Handle(ctx).Single();
+        var edit = Assert.Single(action.CodeAction!.Edit!.Changes!.Values.First());
+
+        Assert.Equal("", edit.NewText);
+        Assert.Equal(new Position(0, start), edit.Range.Start);
+        Assert.Equal(new Position(0, start + "<Max_Speed>1.0</Max_Speed>".Length), edit.Range.End);
+    }
 }
