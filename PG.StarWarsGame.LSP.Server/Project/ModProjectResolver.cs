@@ -110,7 +110,7 @@ public sealed class ModProjectResolver
         if (expansion.File is null) return;
 
         throw new ModProjectLoadException(_messages.Format("ModProject_EawProjectReferencesFocProject",
-            FileHelper.FileSystem.Path.GetFileName(rootPath), expansion.File.Name));
+            FileHelper.FileSystem.Path.GetFileName(rootPath), FileHelper.FileSystem.Path.GetFileName(expansion.Path)));
     }
 
     private ModProjectFile? LoadReference(string absolutePath)

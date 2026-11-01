@@ -313,7 +313,8 @@ public sealed class ProjectStartsProtocolTest
     {
         ProtocolWorkspaceFixture.RunSetup("PRJ-26");
         var error = await ErrorShownStarting(@"C:\temp\aet-test-PRJ-mixed\eaw-mod");
-        Assert.Contains("It targets Empire at War and references", error, StringComparison.Ordinal);
+        Assert.Contains("'eaw-mod.pgproj': It targets Empire at War and references 'foc-lib.pgproj',", error,
+            StringComparison.Ordinal);
         Assert.Contains("which targets Forces of Corruption. The base game cannot load the expansion's data.", error,
             StringComparison.Ordinal);
     }

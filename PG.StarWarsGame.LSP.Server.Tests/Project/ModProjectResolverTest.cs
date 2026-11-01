@@ -428,7 +428,8 @@ public sealed class ModProjectResolverTest
     }
 
     // The base game cannot load the expansion's data, so an EaW mod built on a FoC project
-    // describes a game that does not exist.
+    // describes a game that does not exist. Both projects are named the same way - by file, as
+    // every 'Could not load mod project' message names one.
     [Fact]
     public void Resolve_EawProjectReferencingAFocProject_RefusesNamingTheDependency()
     {
@@ -444,7 +445,8 @@ public sealed class ModProjectResolverTest
 
         var ex = Assert.Throws<ModProjectLoadException>(() => resolver.Resolve(RootPath, root));
 
-        Assert.Contains("Expansion Library", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("'root.pgproj': It targets Empire at War and references 'dep.pgproj',", ex.Message,
+            StringComparison.Ordinal);
         Assert.Equal(ProjectProblem.Invalid, ex.Problem);
     }
 
