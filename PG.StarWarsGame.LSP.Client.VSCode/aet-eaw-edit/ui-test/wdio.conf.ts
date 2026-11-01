@@ -58,4 +58,11 @@ export const config: WebdriverIO.Config = {
     mochaOpts: { ui: "bdd", timeout: 300_000 },
     logLevel: "warn",
     waitforTimeout: 60_000,
+    // What the window showed when a test failed, beside the profile's logs.
+    afterTest: async (test, _context, { passed }) => {
+        if (passed) return;
+        const dir = path.join(storagePath, "failures");
+        fs.mkdirSync(dir, { recursive: true });
+        await browser.saveScreenshot(path.join(dir, `${test.title.replace(/[^\w-]+/g, "_")}.png`)).catch(() => undefined);
+    },
 };

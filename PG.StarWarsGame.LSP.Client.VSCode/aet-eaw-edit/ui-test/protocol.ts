@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { browser, expect } from "@wdio/globals";
+import { repo } from "./paths.js";
 
 /** The extension's status bar item as its text is set, icon included: `$(check) EaWEdit LSP`. */
 export async function lspStatus(): Promise<string | null> {
@@ -37,6 +38,29 @@ export async function serverReady(timeout = 240_000): Promise<void> {
         },
         { timeout, interval: 1000, timeoutMsg: `The server did not get ready; status ${last}` },
     );
+}
+
+/** Starts recording every text the EaWEdit status item shows, however briefly. */
+export async function recordStatus(): Promise<void> {
+    await browser.execute(() => {
+        const w = window as any;
+        w.__aetStatus = [];
+        const read = () => {
+            for (const item of Array.from(document.querySelectorAll(".statusbar-item"))) {
+                const text = (item.textContent ?? "").trim();
+                if (text.startsWith("EaWEdit LSP") && w.__aetStatus.at(-1) !== text) w.__aetStatus.push(text);
+            }
+        };
+        w.__aetStatusObserver?.disconnect();
+        w.__aetStatusObserver = new MutationObserver(read);
+        w.__aetStatusObserver.observe(document.body, { subtree: true, childList: true, characterData: true });
+        read();
+    });
+}
+
+/** The status texts recorded since recordStatus, in order. */
+export async function statusHistory(): Promise<string[]> {
+    return (await browser.execute(() => [...((window as any).__aetStatus ?? [])])) as unknown as string[];
 }
 
 /** The extension host's log folder of this session in the test's profile. */
@@ -177,6 +201,67 @@ export async function createProjectFile(folder: string, file: string): Promise<R
     return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+/** How many times the EaWEdit channel says a server was started. */
+export function serverStarts(): number {
+    return (outputChannels().get("EaWEdit") ?? "").split(/\r?\n/).filter((l) => l.includes("Starting LSP server")).length;
+}
+
+/** Restarts the server and waits until it is ready again. */
+export async function restartServer(): Promise<void> {
+    const before = serverStarts();
+    await command("aet-eaw-edit.lsp.restartServer");
+    await browser.waitUntil(async () => serverStarts() > before, {
+        timeout: 60_000,
+        timeoutMsg: "The server was not started again",
+    });
+    await serverReady();
+}
+
+/** The repository's vanilla EaW folder. */
+export const eaw = path.join(repo, "eaw");
+
+/** The labels a section of the 'Empire at War Edit' view container shows at its top level. */
+export async function viewItems(section: string): Promise<string[]> {
+    const workbench = await browser.getWorkbench();
+    const container = await workbench.getActivityBar().getViewControl("Empire at War Edit");
+    const view = await container!.openView();
+    const pane = await view.getContent().getSection(section);
+    await pane.expand();
+    let labels: string[] = [];
+    await browser.waitUntil(
+        async () => {
+            labels = await Promise.all((await pane.getVisibleItems()).map((i: any) => i.getLabel()));
+            return labels.length > 0;
+        },
+        { timeout: 60_000, interval: 1000, timeoutMsg: `'${section}' lists nothing` },
+    );
+    return labels;
+}
+
+/** Answers an input box with text. */
+export async function answerInput(text: string): Promise<void> {
+    const input = await browser.$(".quick-input-widget .quick-input-box input");
+    await input.waitForDisplayed({ timeout: 15_000 });
+    await input.setValue(text);
+    await browser.keys("Enter");
+}
+
+/** Answers VS Code's own folder dialog (the simple one, a quick input) with a folder. */
+export async function answerFolderDialog(folder: string, button: string): Promise<void> {
+    const input = await browser.$(".quick-input-widget .quick-input-box input");
+    await input.waitForDisplayed({ timeout: 15_000 });
+    await input.setValue(folder.endsWith("\\") ? folder : `${folder}\\`);
+    await browser.pause(1_500);
+    // A folder typed in full is taken with Enter; failing that, its OK button - which carries the
+    // command's own label - is clicked as a person clicks it.
+    await browser.keys("Enter");
+    await browser.pause(2_000);
+    if (!(await input.isDisplayed())) return;
+    const ok = await browser.$(`//*[contains(@class,'quick-input-widget')]//*[contains(@class,'monaco-button') and normalize-space(.)='${button}']`);
+    await ok.waitForClickable({ timeout: 10_000, timeoutMsg: `No '${button}' in the folder dialog` });
+    await ok.click();
+}
+
 /** Picks an item of the quick pick that is open, by its label. */
 export async function pickQuickItem(label: string): Promise<void> {
     const input = await browser.$(".quick-input-widget .quick-input-box input");
@@ -249,27 +334,26 @@ export function editUserSettingsJson(values: Record<string, unknown>): void {
     fs.writeFileSync(file, JSON.stringify(settings, null, 4));
 }
 
-/** The keys VS Code marks 'Unknown Configuration Setting' in the open user settings file. */
-export async function unknownSettings(): Promise<string[]> {
-    const file = userSettingsJson();
-    await browser.executeWorkbench(async (vscode, file: string) => {
-        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(vscode.Uri.file(file)));
-    }, file);
-    let unknown: string[] = [];
-    await browser.waitUntil(
-        async () => {
-            unknown = await browser.executeWorkbench(async (vscode, file: string) => {
-                const document = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
-                return vscode.languages
-                    .getDiagnostics(document.uri)
-                    .filter((d: any) => d.message.includes("Unknown Configuration Setting"))
-                    .map((d: any) => document.getText(d.range).replace(/"/g, ""));
-            }, file);
-            return unknown.length > 0;
-        },
-        { timeout: 20_000, interval: 1000, timeoutMsg: "No setting is marked unknown" },
-    ).catch(() => undefined);
-    return unknown;
+/**
+ * The keys of the user settings file VS Code calls 'Unknown Configuration Setting': those no extension
+ * declares. Only this one declares aet-eaw-edit.* keys, and the workbench's own mark is a marker the
+ * extension API does not read, so the declaration is asked directly.
+ */
+export function unknownSettings(): string[] {
+    const declared = new Set(
+        Object.keys(
+            readManifest().contributes.configuration.flatMap((c: any) => Object.keys(c.properties ?? {})).reduce(
+                (all: Record<string, true>, key: string) => ({ ...all, [key]: true }),
+                {},
+            ),
+        ),
+    );
+    const settings = JSON.parse(fs.readFileSync(userSettingsJson(), "utf8"));
+    return Object.keys(settings).filter((k) => k.startsWith("aet-eaw-edit.") && !declared.has(k));
+}
+
+function readManifest(): any {
+    return JSON.parse(fs.readFileSync(path.join(repo, "PG.StarWarsGame.LSP.Client.VSCode", "aet-eaw-edit", "package.json"), "utf8"));
 }
 
 /** Opens a file in an editor. */
@@ -352,19 +436,27 @@ export async function logLine(pattern: RegExp, channel = "EaWEdit", timeout = 12
 
 /** The settings editor's count for a search, e.g. 10 for '10 Settings Found'. */
 export async function settingsFound(query: string): Promise<number> {
+    // A second search in an open editor would read the count of the first one.
+    await browser.executeWorkbench((vscode) => vscode.commands.executeCommand("workbench.action.closeAllEditors"));
     await command("workbench.action.openSettings", query);
     let count = -1;
     await browser.waitUntil(
         async () => {
-            const text: string = await browser.execute(
-                () => document.querySelector(".settings-count-widget")?.textContent ?? "",
-            );
+            const [text, search] = (await browser.execute(() => [
+                document.querySelector(".settings-count-widget")?.textContent ?? "",
+                (document.querySelector(".settings-editor .suggest-input-container .view-lines") as HTMLElement | null)
+                    ?.innerText ?? "",
+            ])) as [string, string];
             const match = /(\d+) Settings? Found/.exec(text);
             count = match ? Number(match[1]) : -1;
-            return count >= 0;
+            return count >= 0 && search.replace(/\s+/g, " ").trim() === query;
         },
         { timeout: 20_000, timeoutMsg: `No settings count for '${query}'` },
     );
+    // The count follows the search after a debounce.
+    await browser.pause(1_500);
+    const text: string = await browser.execute(() => document.querySelector(".settings-count-widget")?.textContent ?? "");
+    count = Number(/(\d+) Settings? Found/.exec(text)?.[1] ?? -1);
     return count;
 }
 
