@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { browser, expect } from "@wdio/globals";
-import { extensionLog, lspStatus, notifications, serverReady, takeNotificationAction } from "../protocol.js";
+import { lspStatus, notifications, projectScans, serverReady, takeNotificationAction } from "../protocol.js";
 
 const mod = "C:\\temp\\aet-test-SET-21\\AdoptMod";
 const offer = "EaWEdit: Mod without a project file - c:\\temp\\aet-test-SET-21\\AdoptMod";
@@ -13,14 +13,6 @@ const project = path.join(mod, "Adopt_Test_Mod.pgproj");
 
 function hash(file: string): string {
     return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
-}
-
-/** The server's [initialized] lines: whether each start found a project file, and which. */
-function projectScans(): string[] {
-    return extensionLog()
-        .split(/\r?\n/)
-        .filter((l) => l.includes("[initialized] scanRoots="))
-        .map((l) => /\.pgproj present=(\w+) path=(\S+)/.exec(l)?.slice(1).join(" ") ?? l);
 }
 
 describe("SET-21", () => {
