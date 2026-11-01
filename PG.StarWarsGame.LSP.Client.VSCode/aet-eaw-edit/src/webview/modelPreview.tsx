@@ -7087,7 +7087,14 @@ function ModelPreview(): React.JSX.Element {
     const severity = worstSeverity(notices);
     const handoff =
         scene === null ? null : handoffFor(scene.kind, scene.sourceFile);
-    const problemWord = notices.length === 1 ? "note" : "notes";
+    // One catalogue text per number and state: a word joined into a sentence cannot be translated.
+    const problemsTitle = problemsOpen
+        ? notices.length === 1
+            ? l10n.t("Hide 1 note")
+            : l10n.t("Hide {0} notes", notices.length)
+        : notices.length === 1
+          ? l10n.t("Read 1 note")
+          : l10n.t("Read {0} notes", notices.length);
 
     /**
      * Everything the viewport can be asked to draw or not draw, as one strip of pills.
@@ -10631,10 +10638,7 @@ function ModelPreview(): React.JSX.Element {
                                     disabledReason={l10n.t(
                                         "Nothing to report about this model",
                                     )}
-                                    title={
-                                        `${problemsOpen ? "Hide" : "Read"} ` +
-                                        `${notices.length} ${problemWord}`
-                                    }
+                                    title={problemsTitle}
                                     onClick={() =>
                                         setProblemsOpen((open) => !open)
                                     }

@@ -95,9 +95,12 @@ function isRaw(node) {
         return hasWords(node.text);
     }
     if (ts.isTemplateExpression(node)) {
+        // Words joined in through an expression are as written in place as the template's own.
         return (
             hasWords(node.head.text) ||
-            node.templateSpans.some((span) => hasWords(span.literal.text))
+            node.templateSpans.some(
+                (span) => hasWords(span.literal.text) || isRaw(span.expression),
+            )
         );
     }
     if (

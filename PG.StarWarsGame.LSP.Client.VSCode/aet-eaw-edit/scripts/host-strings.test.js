@@ -82,6 +82,13 @@ describe("host strings", () => {
         );
     });
 
+    it("finds words inside a template's expressions", () => {
+        assert.equal(
+            jsx('const t = <b title={`${open ? "Hide" : "Read"} ${count}`} />;').length,
+            1,
+        );
+    });
+
     /** Every text the extension host shows a reader comes from the l10n bundle. */
     it("finds no text written in place in the extension host", () => {
         const found = hostFiles(path.join(__dirname, "..", "src")).flatMap(

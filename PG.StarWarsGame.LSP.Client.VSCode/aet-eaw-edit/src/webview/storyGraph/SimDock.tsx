@@ -541,7 +541,15 @@ export function SimInventory(props: {
                                     : "") +
                                 (planet.destroyed ? " gone" : "")
                             }
-                            title={`${planet.name} - ${planet.owner ?? "Neutral"}${planet.corrupted ? ", corrupted" : ""}`}
+                            title={
+                                planet.corrupted
+                                    ? l10n.t(
+                                          "{0} - {1}, corrupted",
+                                          planet.name,
+                                          planet.owner ?? l10n.t("Neutral"),
+                                      )
+                                    : `${planet.name} - ${planet.owner ?? l10n.t("Neutral")}`
+                            }
                             onClick={() =>
                                 pick({ kind: "planet", name: planet.name })
                             }
@@ -622,7 +630,7 @@ export function SimInventory(props: {
                                 : "")
                         }
                         title={
-                            `${script.scriptName} - ${script.current ?? "not started"}` +
+                            `${script.scriptName} - ${script.current ?? l10n.t("not started")}` +
                             (script.next ? ` -> ${script.next}` : "")
                         }
                         onClick={() =>
@@ -681,7 +689,7 @@ function DecisionRow(props: {
             <button
                 type="button"
                 className="sim-row-main"
-                title={`${item.eventName} - ${item.eventType ?? "unknown type"}`}
+                title={`${item.eventName} - ${item.eventType ?? l10n.t("unknown type")}`}
                 onClick={props.onSelect}
             >
                 <span className="sim-row-name">
