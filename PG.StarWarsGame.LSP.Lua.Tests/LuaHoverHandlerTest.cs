@@ -112,6 +112,21 @@ public sealed class LuaHoverHandlerTest
         Assert.Equal("THEIRS: local abc: integer", text);
     }
 
+    // The analyzer reads our stubs too and ends its card with the stub's description, which our
+    // card already opens with (measured on Define_State, emmylua 0.25.1).
+    [Fact]
+    public async Task BothAnswer_TheAnalyzerRepeatingOurDescription_SaysItOnce()
+    {
+        var text = await HoverWithAsync("Find_Player(\"Empire\")", 3,
+            new ScriptedLuaAnalyzer().Answer("textDocument/hover",
+                Theirs("```lua\nfunction Find_Player(name: string)\n```\n\n---\n\nTHEIRS: its own comment\n\n Finds a player.")));
+
+        Assert.NotNull(text);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "Finds a player"));
+        Assert.Contains("THEIRS: its own comment", text);
+        Assert.Contains("function Find_Player(name: string)", text);
+    }
+
     [Fact]
     public async Task TheAnalyzerSilent_OursAlone()
     {

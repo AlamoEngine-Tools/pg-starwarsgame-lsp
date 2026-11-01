@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Text.RegularExpressions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -164,6 +165,8 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
                      "function_value function - The function that will process all messages associated with the given state"
                  })
             Assert.True(hover.Contains(part, StringComparison.Ordinal), $"Hover lacks '{part}':\n{hover}");
+        // The analyzer reads the stub too; its card does not repeat the description.
+        Assert.Single(Regex.Matches(hover, Regex.Escape("Defines a new state in the state machine table.")));
         interdictor.Close();
 
         // Last, so the hover's outcome is recorded whatever the libraries show.
