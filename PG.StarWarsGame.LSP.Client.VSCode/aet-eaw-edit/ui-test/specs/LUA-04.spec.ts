@@ -1,4 +1,4 @@
-// LUA-04: the analyzer's findings are folded under LuaAnalyzer ids; type rules are dropped; a surplus argument kept.
+﻿// LUA-04: the analyzer's findings are folded under LuaAnalyzer ids; type rules are dropped; a surplus argument kept.
 import { expect } from "@wdio/globals";
 import { serverReady } from "../protocol.js";
 import { diagnostics, diagnosticsWhen } from "./xmlEditor.js";
@@ -31,15 +31,12 @@ describe("LUA-04", () => {
         expect(at(14)).toContain("aetswg-016-0006");
         expect(at(19)).toContain("aetswg-016-0002");
         expect(all.find((d) => d.line === 20 && d.code === "aetswg-016-0011")?.severity).toBe(1);
-        // Sleep's arity is not published; its missing require is - the fixture requires no PGBase. That
-        // warning carries no id by design (LUA-22), an open question.
+        // Sleep's arity is not published; its missing require is - the fixture requires no PGBase.
         expect(all.filter((d) => d.line === 21).map((d) => [d.code, d.message])).toEqual([
-            ["", "Global 'Sleep' is defined in 'Pgbase' which is not required."],
+            ["aetswg-006-0019", "Global 'Sleep' is defined in 'Pgbase' which is not required."],
         ]);
         expect(at(23)).toEqual([]);
-        expect(all.filter((d) => !d.message.includes("which is not required")).every((d) => d.code.startsWith("aetswg-"))).toBe(
-            true,
-        );
+        expect(all.every((d) => d.code.startsWith("aetswg-"))).toBe(true);
         expect(all.filter((d) => /undefined-field|param-type-mismatch|missing-parameter|need-check-nil/.test(d.code))).toEqual([]);
 
         // A hint is not listed in the Problems view; the hover shows it.

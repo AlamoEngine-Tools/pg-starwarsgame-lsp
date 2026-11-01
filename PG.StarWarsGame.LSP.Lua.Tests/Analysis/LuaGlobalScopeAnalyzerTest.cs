@@ -112,6 +112,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var diagnostic = Assert.Single(result);
         Assert.Contains("Sleep", diagnostic.Message);
         Assert.Contains("not required", diagnostic.Message);
+        // An id like every other finding of ours, so it shows a code and can be suppressed.
+        Assert.Equal(DiagnosticIds.LuaGlobalNotRequired.ToString(), diagnostic.Code?.String);
     }
 
     [Fact]
@@ -470,6 +472,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
             d.Severity == DiagnosticSeverity.Error).ToList();
         Assert.Single(errors);
         Assert.Contains("cyclic", errors[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(DiagnosticIds.LuaCyclicRequire.ToString(), errors[0].Code?.String);
     }
 
     [Fact]

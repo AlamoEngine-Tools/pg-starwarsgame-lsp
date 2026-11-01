@@ -160,6 +160,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Warning,
+                Code = new LspDiagnosticCode(DiagnosticIds.LuaGlobalNotRequired.ToString()),
                 Message = messages.Format("LuaGlobalScope_DefinedInNotRequired", name, filename),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
@@ -315,6 +316,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Error,
+                Code = new LspDiagnosticCode(DiagnosticIds.LuaCyclicRequire.ToString()),
                 Message = messages.Format("LuaGlobalScope_CyclicRequire", arg),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),

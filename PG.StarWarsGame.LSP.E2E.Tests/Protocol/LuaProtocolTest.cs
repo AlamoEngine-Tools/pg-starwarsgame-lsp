@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests.Protocol;
 
@@ -145,7 +146,7 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
         var warning = Assert.Single(script.Diagnostics, d => d.Message.Contains("which is not required"));
         Assert.Equal(notRequired, warning.Message);
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
-        Assert.Null(warning.Code);
+        Assert.Equal(DiagnosticIds.LuaGlobalNotRequired.ToString(), warning.Code?.String);
 
         var lines = script.Lines.ToList();
         lines.Insert(1, "require(\"PGStateMachine\")");

@@ -437,6 +437,11 @@ public static class DiagnosticIds
     public static readonly DiagnosticId LuaRedundantRequire = new(DiagnosticGroup.Structure, 9);
     public static readonly DiagnosticId LuaDuplicateRequire = new(DiagnosticGroup.Structure, 10);
 
+    // The two Lua import findings that carried no id, so they showed no code and could not be
+    // suppressed. Appended after 18, the highest this group had used.
+    public static readonly DiagnosticId LuaGlobalNotRequired = new(DiagnosticGroup.Structure, 19);
+    public static readonly DiagnosticId LuaCyclicRequire = new(DiagnosticGroup.Structure, 20);
+
     /// <summary>A dialog command that works but has not been verified against the engine.</summary>
     public static readonly DiagnosticId DialogUntestedCommand = new(DiagnosticGroup.Structure, 11);
 

@@ -495,6 +495,9 @@
   (`aetswg-007-0032`, a hardpoint that never fires)
 - **New, Lua_Script** - `Assets16` to `Assets20` (`aetswg-004-0016` to `aetswg-004-0020`: missing, backslash,
   `..`, extension, outside GameObject)
+- **New, Lua imports** - `Structure19` (`aetswg-006-0019`, a library global the script does not require) and
+  `Structure20` (`aetswg-006-0020`, a cyclic require); both were reported without an id, so they showed no code
+  and could not be suppressed
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 - **Retired** - `Symbols3` (`aetswg-010-0003`), one name defined in two types: every lookup names its type now,
   so that is two objects, as it is to the game, and nothing to warn about; the number is never reused
