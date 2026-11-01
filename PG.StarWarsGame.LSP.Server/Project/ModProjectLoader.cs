@@ -62,7 +62,24 @@ public sealed class ModProjectLoader
         _migrations = migrations;
     }
 
+    /// <summary>Reads a project the server works on, offering to update its file when it is older.</summary>
     public ModProjectFile Load(string path)
+    {
+        return Load(path, true);
+    }
+
+    /// <summary>
+    ///     Reads a project another one builds on: in the current shape, like any other, but its file
+    ///     is never offered for updating. A project speaks for its own file and not for what it
+    ///     builds on; offered from every project over it, one file was asked about several times, and
+    ///     a second yes copied the updated file over the backup of the original.
+    /// </summary>
+    public ModProjectFile LoadDependency(string path)
+    {
+        return Load(path, false);
+    }
+
+    private ModProjectFile Load(string path, bool offer)
     {
         var text = _fileHelper.FileSystem.File.ReadAllText(path);
         var fileName = _fileHelper.FileSystem.Path.GetFileName(path);
@@ -100,7 +117,7 @@ public sealed class ModProjectLoader
                 _messages.Format("ModProject_CouldNotLoadModProject12", fileName, refusal.Message),
                 problem: ProjectProblem.UnsupportedVersion);
 
-        document = BringForward(document, declaredVersion, path, fileName);
+        document = BringForward(document, declaredVersion, path, fileName, offer);
 
         ModProjectFileDto? dto;
         try
@@ -357,7 +374,7 @@ public sealed class ModProjectLoader
     ///     tell whoever can ask the user that there is something to persist.
     /// </remarks>
     private JsonObject BringForward(
-        JsonObject document, string? declaredVersion, string path, string fileName)
+        JsonObject document, string? declaredVersion, string path, string fileName, bool offer)
     {
         // No version and no initial migration means we cannot say which shape it holds, so there is
         // nothing to bring forward - it is read as it is, which for a project file is version one.
@@ -385,6 +402,8 @@ public sealed class ModProjectLoader
 
         migrated["_type"] = PgprojFormat.TypeName;
         migrated["_typeVersion"] = PgprojFormat.Current.ToString();
+
+        if (!offer) return migrated;
 
         // The diff is the one moment the author is already being asked to change this file, so a
         // project with icon sources it has no way to reach is offered the node here rather than

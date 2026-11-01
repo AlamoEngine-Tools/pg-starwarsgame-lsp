@@ -117,7 +117,7 @@ public sealed class ModProjectResolver
     {
         try
         {
-            return _loader.Load(absolutePath);
+            return _loader.LoadDependency(absolutePath);
         }
         catch (Exception ex)
         {
