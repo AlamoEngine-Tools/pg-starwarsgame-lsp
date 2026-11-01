@@ -220,6 +220,144 @@ export async function restartServer(): Promise<void> {
 /** The repository's vanilla EaW folder. */
 export const eaw = path.join(repo, "eaw");
 
+/** The repository's vanilla FoC folder. */
+export const foc = path.join(repo, "foc");
+
+/** The two vanilla projects' names. */
+export const EAW = "Empire at War - Vanilla";
+export const FOC = "Forces of Corruption - Vanilla";
+
+/** Waits for the status of a window serving several projects to read them all indexed. */
+export async function projectsReady(count: number, timeout = 300_000): Promise<void> {
+    let status: string | null = null;
+    await browser.waitUntil(
+        async () => (status = await lspStatus()) === `$(check) EaWEdit LSP: ${count} projects indexed`,
+        { timeout, interval: 2000, timeoutMsg: `Status ${status}` },
+    );
+}
+
+/** The status item's tooltip, as hovering it shows it. */
+export async function statusTooltip(): Promise<string> {
+    const item = await browser.$("//*[contains(@class,'statusbar-item')][contains(normalize-space(.),'EaWEdit LSP')]");
+    await item.moveTo();
+    const hover = await browser.$(".workbench-hover, .monaco-hover:not(.hidden)");
+    await hover.waitForDisplayed({ timeout: 10_000, timeoutMsg: "No tooltip on the status item" });
+    const text = await hover.getText();
+    await browser.keys("Escape");
+    return text;
+}
+
+/** The labels of every open tab, in every group. */
+export async function tabLabels(): Promise<string[]> {
+    return browser.executeWorkbench((vscode) =>
+        vscode.window.tabGroups.all.flatMap((g: any) => g.tabs.map((t: any) => t.label)),
+    );
+}
+
+/** The label of the active tab. */
+export async function activeTab(): Promise<string | undefined> {
+    return browser.executeWorkbench((vscode) => vscode.window.tabGroups.activeTabGroup.activeTab?.label);
+}
+
+/** The open quick pick: its title, its placeholder and its rows. */
+export async function quickPick(): Promise<{ title: string; placeholder: string; rows: { label: string; description: string }[] }> {
+    await browser.$(".quick-input-widget .quick-input-box input").waitForDisplayed({ timeout: 15_000 });
+    await browser.waitUntil(
+        async () => (await browser.execute(() => document.querySelectorAll(".quick-input-widget .monaco-list-row").length)) > 0,
+        { timeout: 15_000, timeoutMsg: "The quick pick lists nothing" },
+    );
+    return browser.execute(() => {
+        const widget = document.querySelector(".quick-input-widget")!;
+        return {
+            title: (widget.querySelector(".quick-input-title")?.textContent ?? "").trim(),
+            placeholder: (widget.querySelector(".quick-input-box input") as HTMLInputElement).placeholder,
+            rows: Array.from(widget.querySelectorAll(".monaco-list-row")).map((r) => ({
+                label: (r.querySelector(".label-name")?.textContent ?? "").trim(),
+                description: (r.querySelector(".label-description")?.textContent ?? "").trim(),
+            })),
+        };
+    });
+}
+
+/** A modal question (VS Code's own dialog): its message and detail, and its buttons. */
+export async function dialog(timeout = 120_000): Promise<{ message: string; detail: string; buttons: string[] }> {
+    const box = await browser.$(".monaco-dialog-box");
+    await box.waitForDisplayed({ timeout, timeoutMsg: "No dialog appeared" });
+    return browser.execute(() => {
+        const b = document.querySelector(".monaco-dialog-box")!;
+        return {
+            message: (b.querySelector(".dialog-message-text")?.textContent ?? "").trim(),
+            detail: (b.querySelector(".dialog-message-detail")?.textContent ?? "").trim(),
+            buttons: Array.from(b.querySelectorAll(".dialog-buttons .monaco-button")).map((x) => (x.textContent ?? "").trim()),
+        };
+    });
+}
+
+/** Presses a button of the open dialog. */
+export async function pressDialogButton(label: string): Promise<void> {
+    const button = await browser.$(
+        `//*[contains(@class,'monaco-dialog-box')]//*[contains(@class,'monaco-button') and normalize-space(.)='${label}']`,
+    );
+    await button.click();
+}
+
+/** Inserts a line after a 0-based line of a file, unsaved, as typing it would; returns the line before it. */
+export async function insertLineAfter(file: string, line: number, text: string): Promise<string> {
+    return browser.executeWorkbench(
+        async (vscode, file: string, line: number, text: string) => {
+            const document = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+            await vscode.window.showTextDocument(document);
+            const edit = new vscode.WorkspaceEdit();
+            edit.insert(document.uri, new vscode.Position(line + 1, 0), text + "\n");
+            await vscode.workspace.applyEdit(edit);
+            return document.lineAt(line).text as string;
+        },
+        file,
+        line,
+        text,
+    );
+}
+
+/** Reverts and closes a file. */
+export async function revertAndClose(file: string): Promise<void> {
+    await browser.executeWorkbench(async (vscode, file: string) => {
+        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(vscode.Uri.file(file)));
+        await vscode.commands.executeCommand("workbench.action.files.revert");
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    }, file);
+}
+
+/** Waits for a finding on a 0-based line with a code; returns it with its related rows. */
+export async function findingOn(
+    file: string,
+    line: number,
+    code: string,
+    timeout = 90_000,
+): Promise<Finding & { related: string[] }> {
+    let found: (Finding & { related: string[] }) | undefined;
+    await browser.waitUntil(
+        async () => {
+            const all: (Finding & { related: string[] })[] = await browser.executeWorkbench(
+                (vscode, file: string) =>
+                    vscode.languages.getDiagnostics(vscode.Uri.file(file)).map((d: any) => ({
+                        code: String(typeof d.code === "object" ? d.code.value : (d.code ?? "")),
+                        message: d.message,
+                        source: d.source ?? "",
+                        line: d.range.start.line,
+                        severity: d.severity,
+                        related: (d.relatedInformation ?? []).map((r: any) => r.message),
+                    })),
+                file,
+            );
+            const here = all.filter((d) => d.line === line && d.code === code);
+            found = here[0];
+            return here.length > 0;
+        },
+        { timeout, interval: 1000, timeoutMsg: `No ${code} on line ${line + 1} of ${file}` },
+    );
+    return found!;
+}
+
 /** The labels a section of the 'Empire at War Edit' view container shows at its top level. */
 export async function viewItems(section: string): Promise<string[]> {
     const workbench = await browser.getWorkbench();
