@@ -30,9 +30,9 @@ export const CONVERTIBLE_FORMATS = ["CSV", "XML", "NLS"] as const;
 export type ConvertibleFormat = (typeof CONVERTIBLE_FORMATS)[number];
 
 const FORMAT_DESCRIPTIONS: Record<ConvertibleFormat, string> = {
-    CSV: "Comma-separated values (.csv)",
-    XML: "eaw-translation v1 XML (.xml)",
-    NLS: "Java-style properties (.properties)",
+    CSV: l10n.t("Comma-separated values (.csv)"),
+    XML: l10n.t("eaw-translation v1 XML (.xml)"),
+    NLS: l10n.t("Java-style properties (.properties)"),
 };
 
 export interface LocDockActionsProps {
@@ -257,10 +257,12 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     // format writes a whole new file on the spot.
                     footnote={
                         props.addLanguageCreatesFile
-                            ? "A new file is written beside this one, carrying every key from it, " +
-                              "ready to translate."
-                            : "The column is added to every row, and nothing reaches the file " +
-                              "until it is saved."
+                            ? l10n.t(
+                                  "A new file is written beside this one, carrying every key from it, ready to translate.",
+                              )
+                            : l10n.t(
+                                  "The column is added to every row, and nothing reaches the file until it is saved.",
+                              )
                     }
                     title={l10n.t("Add a language")}
                     confirmLabel={l10n.t("Add")}
@@ -514,9 +516,9 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
             {dialog === "convert" && (
                 <Modal
                     dialogId={DIALOG_IDS.convertFormat}
-                    footnote={
-                        "The new file is written beside this one and the original is kept."
-                    }
+                    footnote={l10n.t(
+                        "The new file is written beside this one and the original is kept.",
+                    )}
                     title={l10n.t("Convert to another format")}
                     confirmLabel={l10n.t("Convert")}
                     onCancel={close}

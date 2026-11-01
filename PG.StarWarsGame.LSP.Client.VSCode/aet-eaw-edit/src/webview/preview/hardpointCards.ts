@@ -260,16 +260,16 @@ export function muzzleLabel(index: number): string {
  */
 export function weaponFacts(weapon: WeaponRow): [string, string][] {
     const rows: [string, string | null][] = [
-        ["Reach", weapon.reach],
-        ["Cone", weapon.cone],
-        ["Cadence", weapon.cadence],
-        ["Damage", weapon.damage],
+        [l10n.t("Reach"), weapon.reach],
+        [l10n.t("Cone"), weapon.cone],
+        [l10n.t("Cadence"), weapon.cadence],
+        [l10n.t("Damage"), weapon.damage],
         // Under Damage rather than beside Cone: it is about where a shot LANDS, which is the same
         // question as how much it does, and not about where the weapon may point.
-        ["Spread", weapon.inaccuracy],
-        ["Projectile", weapon.projectileId],
+        [l10n.t("Spread"), weapon.inaccuracy],
+        [l10n.t("Projectile"), weapon.projectileId],
         [
-            "Fires when",
+            l10n.t("Fires when"),
             weapon.fireModes.length > 0 ? weapon.fireModes.join(", ") : null,
         ],
     ];

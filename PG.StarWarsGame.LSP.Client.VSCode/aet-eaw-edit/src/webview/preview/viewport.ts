@@ -10,6 +10,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import * as l10n from "@vscode/l10n";
 
 import {
     type BoundingSphere,
@@ -2043,18 +2044,37 @@ export class PreviewViewport {
                 return;
             }
 
-            const shader =
-                (mesh.userData.alamo as MaterialExtras | undefined)
-                    ?.alamoShader ?? "a shader";
+            const shader = (mesh.userData.alamo as MaterialExtras | undefined)
+                ?.alamoShader;
 
             for (const { sampler, file } of mesh.material.unboundSamplers()) {
                 problems.add(
-                    `${shader}: Sampler '${sampler}' is still waiting for '${file}'.`,
+                    shader === undefined
+                        ? l10n.t(
+                              "A shader: Sampler '{0}' is still waiting for '{1}'.",
+                              sampler,
+                              file,
+                          )
+                        : l10n.t(
+                              "{0}: Sampler '{1}' is still waiting for '{2}'.",
+                              shader,
+                              sampler,
+                              file,
+                          ),
                 );
             }
             for (const sampler of mesh.material.unnamedSamplers) {
                 problems.add(
-                    `${shader}: Sampler '${sampler}' has no texture on this sub-mesh.`,
+                    shader === undefined
+                        ? l10n.t(
+                              "A shader: Sampler '{0}' has no texture on this sub-mesh.",
+                              sampler,
+                          )
+                        : l10n.t(
+                              "{0}: Sampler '{1}' has no texture on this sub-mesh.",
+                              shader,
+                              sampler,
+                          ),
                 );
             }
         });
@@ -6267,7 +6287,7 @@ export class PreviewViewport {
             override: this.rowOverrides.get(rowId),
             ancestorHidden:
                 parentResolution?.visible === false
-                    ? (this.rowNames.get(parent ?? "") ?? "a bone above it")
+                    ? (this.rowNames.get(parent ?? "") ?? "")
                     : undefined,
 
             // The ancestor as the MODEL leaves it, which is a different question: a bone the reader
@@ -6275,7 +6295,7 @@ export class PreviewViewport {
             // the whole subtree claimed the model did not draw it and went italic on one tick.
             ancestorHiddenAuthored:
                 parentResolution?.authored === false
-                    ? (this.rowNames.get(parent ?? "") ?? "a bone above it")
+                    ? (this.rowNames.get(parent ?? "") ?? "")
                     : undefined,
         };
 

@@ -1686,7 +1686,8 @@ async function openDiagnosticReport(
     chosen?: { extended: boolean },
 ): Promise<void> {
     const tier =
-        chosen ?? (await pickReportTier(`Open report for ${report.id}`));
+        chosen ??
+        (await pickReportTier(vscode.l10n.t("Open report for {0}", report.id)));
     if (!tier) {
         return;
     }
@@ -2131,24 +2132,41 @@ export async function activate(
                 const orphans =
                     result.projectFormatChanged &&
                     result.otherFilesInOldFormat > 0
-                        ? ` ${result.otherFilesInOldFormat} other file(s) are still in the previous format` +
-                          " and are no longer loaded."
-                        : "";
+                        ? result.otherFilesInOldFormat
+                        : 0;
                 // A single-language target (NLS) writes one file per language rather than dropping
                 // all but one, so the message has to be able to report more than a single path.
                 const written =
                     result.writtenPaths ??
                     (result.writtenPath ? [result.writtenPath] : []);
-                const wrote =
+                // Whole sentences, one per case: clauses glued into one give a translator nothing to work with.
+                const names = written.map((p) => path.basename(p)).join(", ");
+                const message =
                     written.length > 1
-                        ? `wrote ${written.length} files, one per language: ${written.map((p) => path.basename(p)).join(", ")}`
-                        : `wrote ${written[0]}`;
+                        ? orphans > 0
+                            ? vscode.l10n.t(
+                                  "EaWEdit: Wrote {0} files, one per language: {1}. The original file was kept. {2} other file(s) are still in the previous format and are no longer loaded.",
+                                  written.length,
+                                  names,
+                                  orphans,
+                              )
+                            : vscode.l10n.t(
+                                  "EaWEdit: Wrote {0} files, one per language: {1}. The original file was kept.",
+                                  written.length,
+                                  names,
+                              )
+                        : orphans > 0
+                          ? vscode.l10n.t(
+                                "EaWEdit: Wrote {0}. The original file was kept. {1} other file(s) are still in the previous format and are no longer loaded.",
+                                written[0],
+                                orphans,
+                            )
+                          : vscode.l10n.t(
+                                "EaWEdit: Wrote {0}. The original file was kept.",
+                                written[0],
+                            );
                 const choice = await vscode.window.showInformationMessage(
-                    vscode.l10n.t(
-                        "EaWEdit: {0}. The original file was kept.{1}",
-                        wrote,
-                        orphans,
-                    ),
+                    message,
                     vscode.l10n.t("Open"),
                 );
                 localisationNavigatorProvider?.refresh();
@@ -2994,9 +3012,10 @@ export async function activate(
                         canSelectFiles: true,
                         canSelectMany: false,
                         defaultUri,
-                        filters: { "DAT files": ["dat"] },
-                        openLabel:
+                        filters: { [vscode.l10n.t("DAT files")]: ["dat"] },
+                        openLabel: vscode.l10n.t(
                             "Select a MasterTextFile_<LANGUAGE>.dat file",
+                        ),
                         title: vscode.l10n.t(
                             "Select one DAT file - its siblings in the same folder are imported too",
                         ),
@@ -3014,7 +3033,9 @@ export async function activate(
                         canSelectFiles: false,
                         canSelectMany: false,
                         defaultUri,
-                        openLabel: "Select folder with existing files",
+                        openLabel: vscode.l10n.t(
+                            "Select folder with existing files",
+                        ),
                         title: vscode.l10n.t(
                             "Folder containing the {0} files",
                             sourceFormatItem.label,
@@ -3174,7 +3195,9 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.copyBugReportInfo",
             async () => {
-                const tier = await pickReportTier("Copy Bug Report Info");
+                const tier = await pickReportTier(
+                    vscode.l10n.t("Copy Bug Report Info"),
+                );
                 if (!tier) {
                     return;
                 }

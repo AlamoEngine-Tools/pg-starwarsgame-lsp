@@ -528,7 +528,7 @@ function App(): React.JSX.Element {
             languages={languages}
             error={rowFilter.error}
             placeholders={PLACEHOLDERS}
-            keyScopeLabel="Key only"
+            keyScopeLabel={l10n.t("Key only")}
         >
             <label
                 className="inherited-toggle"
@@ -584,7 +584,9 @@ function App(): React.JSX.Element {
                 problems.length > 0 && problemsOpen ? (
                     <LocProblemsBar
                         problems={problems}
-                        labelOf={(problem) => problem.key ?? "This file"}
+                        labelOf={(problem) =>
+                            problem.key ?? l10n.t("This file")
+                        }
                         jumpTo={jumpToProblem}
                         onClose={() => setProblemsOpen(false)}
                     />

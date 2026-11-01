@@ -834,13 +834,13 @@ function BattleControls(props: {
     const label = battle?.label ?? battleKey;
     const status = inside
         ? state.outcome === "won"
-            ? "Won"
+            ? l10n.t("Won")
             : state.outcome === "lost"
-              ? "Lost"
-              : `Running - t${state.tick}`
+              ? l10n.t("Lost")
+              : l10n.t("Running - t{0}", state.tick)
         : battle
           ? battleStatusLabel(battle)
-          : "Unknown";
+          : l10n.t("Unknown");
     const resolved = inside
         ? !!state.outcome
         : battle?.status === "won" || battle?.status === "lost";
@@ -1383,7 +1383,7 @@ function PlanetDialog(props: {
                         value={owner}
                         onChange={setOwner}
                         placeholder={l10n.t("Owner")}
-                        ariaLabel="Owner"
+                        ariaLabel={l10n.t("Owner")}
                         icon="search"
                         options={factions.map((f) => ({ value: f }))}
                         autoFocus
@@ -1476,7 +1476,7 @@ function FlagDialog(props: {
                         value={name}
                         onChange={setName}
                         placeholder={l10n.t("Flag name")}
-                        ariaLabel="Flag name"
+                        ariaLabel={l10n.t("Flag name")}
                         icon="search"
                         options={state.flags.map((f) => ({
                             value: f.name,
@@ -1488,7 +1488,7 @@ function FlagDialog(props: {
                 <IntegerField
                     value={value}
                     onChange={setValue}
-                    ariaLabel="Value"
+                    ariaLabel={l10n.t("Value")}
                     autoFocus={!!existing}
                 />
             </div>
@@ -1612,10 +1612,10 @@ function decisionPicker(
                   : l10n.t("Enter a name"),
         noun:
             kind === "planet"
-                ? "Planet"
+                ? l10n.t("Planet")
                 : kind === "unit"
-                  ? "Unit type"
-                  : "Name",
+                  ? l10n.t("Unit type")
+                  : l10n.t("Name"),
         initial:
             (kind === "planet"
                 ? base.planet

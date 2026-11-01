@@ -4,6 +4,8 @@
 // Pure shape of the localisation Files tree, kept free of `vscode` so the grouping rules can be
 // unit-tested on their own. The view provider is then a thin mapping from these nodes to TreeItems.
 
+import * as l10n from "@vscode/l10n";
+
 import { LOC_CATEGORY, LocProjectInfo } from "../protocol";
 
 // Re-exported so a consumer of the tree model does not need a second import for the thing every
@@ -52,10 +54,10 @@ export function groupProjects(projects: LocProjectInfo[]): LocTreeNode[] {
 
     const groups: LocTreeNode[] = [];
     if (text.length > 0) {
-        groups.push(group("Text files", "text", text));
+        groups.push(group(l10n.t("Text files"), "text", text));
     }
     if (credits.length > 0) {
-        groups.push(group("Credits files", CREDITS_CATEGORY, credits));
+        groups.push(group(l10n.t("Credits files"), CREDITS_CATEGORY, credits));
     }
     return groups;
 }

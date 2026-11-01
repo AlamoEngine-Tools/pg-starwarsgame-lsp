@@ -24,13 +24,13 @@ export interface CaptureSize {
     iconPrefix?: string;
 }
 
-function square(side: number, what: string): CaptureSize {
+function square(side: number, title: string): CaptureSize {
     return {
         id: String(side),
         width: side,
         height: side,
         label: String(side),
-        title: `${side} - ${what}`,
+        title,
     };
 }
 
@@ -41,10 +41,10 @@ function square(side: number, what: string): CaptureSize {
  * of 52 or more doubles the slot that way, so a large icon is 100x50 or 100x100.
  */
 export const CAPTURE_SIZES: readonly CaptureSize[] = [
-    square(24, "passive ability icon"),
-    square(26, "special ability icon"),
-    square(40, "upgrade icon"),
-    { ...square(50, "build icon"), iconPrefix: "" },
+    square(24, l10n.t("24 - passive ability icon")),
+    square(26, l10n.t("26 - special ability icon")),
+    square(40, l10n.t("40 - upgrade icon")),
+    { ...square(50, l10n.t("50 - build icon")), iconPrefix: "" },
     {
         id: "100x50",
         width: 100,
@@ -53,7 +53,10 @@ export const CAPTURE_SIZES: readonly CaptureSize[] = [
         title: l10n.t("100x50 - large icon, double width"),
         iconPrefix: "big_",
     },
-    { ...square(100, "large icon, double both ways"), iconPrefix: "big_" },
+    {
+        ...square(100, l10n.t("100 - large icon, double both ways")),
+        iconPrefix: "big_",
+    },
 ];
 
 /** The build icon: the size most captures are for. */

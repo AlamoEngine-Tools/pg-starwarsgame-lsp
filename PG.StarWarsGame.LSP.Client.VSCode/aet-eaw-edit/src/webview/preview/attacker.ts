@@ -345,7 +345,9 @@ export function fireAtHardpoint(
             hardpointHealth,
             destroyed: true,
             workings: [
-                "Discarded - hardpoint already destroyed, hull not offered it",
+                l10n.t(
+                    "Discarded - hardpoint already destroyed, hull not offered it",
+                ),
             ],
         };
     }
@@ -383,8 +385,12 @@ function applyHit(
     if (attacker.energy) {
         after.energy = drop(after.energy, attacker.damage);
         workings.push(
-            `Energy ${round(energy)} -> ${round(after.energy)}` +
-                ` - ${round(attacker.damage)}, unscaled`,
+            l10n.t(
+                "Energy {0} -> {1} - {2}, unscaled",
+                round(energy),
+                round(after.energy),
+                round(attacker.damage),
+            ),
         );
     }
 
@@ -398,13 +404,30 @@ function applyHit(
         after.shield = drop(after.shield, scaled);
 
         workings.push(
-            `Shield factor: ${round(attacker.damage)} x ${round(shieldFactor)}` +
-                ` = ${round(scaled)} - ${attacker.damageType} vs ` +
-                `${defence.shieldArmorType ?? "no shield armor"}`,
+            defence.shieldArmorType
+                ? l10n.t(
+                      "Shield factor: {0} x {1} = {2} - {3} vs {4}",
+                      round(attacker.damage),
+                      round(shieldFactor),
+                      round(scaled),
+                      attacker.damageType,
+                      defence.shieldArmorType,
+                  )
+                : l10n.t(
+                      "Shield factor: {0} x {1} = {2} - {3} vs no shield armor",
+                      round(attacker.damage),
+                      round(shieldFactor),
+                      round(scaled),
+                      attacker.damageType,
+                  ),
         );
         workings.push(
-            `Shield ${round(shield)} -> ${round(after.shield)}` +
-                ` - absorbed ${round(absorbed)}`,
+            l10n.t(
+                "Shield {0} -> {1} - absorbed {2}",
+                round(shield),
+                round(after.shield),
+                round(absorbed),
+            ),
         );
 
         // The surplus carries on, but only when a hull switch is set too - a shield-only weapon
@@ -422,12 +445,27 @@ function applyHit(
 
             if (spare > 0) {
                 workings.push(
-                    `Spare through the shield: ${round(spare)} x ${round(hullFactor)}` +
-                        ` = ${round(spare * hullFactor)} - vs ` +
-                        `${defence.armorType ?? "no armor"}`,
+                    defence.armorType
+                        ? l10n.t(
+                              "Spare through the shield: {0} x {1} = {2} - vs {3}",
+                              round(spare),
+                              round(hullFactor),
+                              round(spare * hullFactor),
+                              defence.armorType,
+                          )
+                        : l10n.t(
+                              "Spare through the shield: {0} x {1} = {2} - vs no armor",
+                              round(spare),
+                              round(hullFactor),
+                              round(spare * hullFactor),
+                          ),
                 );
                 workings.push(
-                    `Health ${round(hullLike)} -> ${round(after.hullLike)}`,
+                    l10n.t(
+                        "Health {0} -> {1}",
+                        round(hullLike),
+                        round(after.hullLike),
+                    ),
                 );
             }
         }
@@ -448,15 +486,36 @@ function applyHit(
         after.hullLike = drop(after.hullLike, scaled);
 
         workings.push(
-            `Armor factor: ${round(attacker.damage)} x ${round(hullFactor)}` +
-                ` = ${round(scaled)} - ${attacker.damageType} vs ` +
-                `${defence.armorType ?? "no armor"}`,
+            defence.armorType
+                ? l10n.t(
+                      "Armor factor: {0} x {1} = {2} - {3} vs {4}",
+                      round(attacker.damage),
+                      round(hullFactor),
+                      round(scaled),
+                      attacker.damageType,
+                      defence.armorType,
+                  )
+                : l10n.t(
+                      "Armor factor: {0} x {1} = {2} - {3} vs no armor",
+                      round(attacker.damage),
+                      round(hullFactor),
+                      round(scaled),
+                      attacker.damageType,
+                  ),
         );
         workings.push(
-            `Health ${round(hullLike)} -> ${round(after.hullLike)}` +
-                (scaled > hullLike
-                    ? ` - ${round(scaled - hullLike)} overkill lost`
-                    : ""),
+            scaled > hullLike
+                ? l10n.t(
+                      "Health {0} -> {1} - {2} overkill lost",
+                      round(hullLike),
+                      round(after.hullLike),
+                      round(scaled - hullLike),
+                  )
+                : l10n.t(
+                      "Health {0} -> {1}",
+                      round(hullLike),
+                      round(after.hullLike),
+                  ),
         );
     }
 
@@ -800,14 +859,24 @@ export function fireBlast(
 
     if (hits.length > 1 || blastTotal > 0) {
         workings.push(
-            `Blast ${round(blastTotal)} split across ${hits.length} in range` +
-                ` - ${round(hits.length > 0 ? blastTotal / hits.length : 0)} each`,
+            l10n.t(
+                "Blast {0} split across {1} in range - {2} each",
+                round(blastTotal),
+                hits.length,
+                round(hits.length > 0 ? blastTotal / hits.length : 0),
+            ),
         );
 
         if (wasted.length > 0) {
             workings.push(
-                `Wreckage in range: ${wasted.length} of ${hits.length}` +
-                    ` - ${round(wasted.reduce((sum, hit) => sum + hit.blastDamage, 0))} lost`,
+                l10n.t(
+                    "Wreckage in range: {0} of {1} - {2} lost",
+                    wasted.length,
+                    hits.length,
+                    round(
+                        wasted.reduce((sum, hit) => sum + hit.blastDamage, 0),
+                    ),
+                ),
             );
         }
     }
@@ -825,7 +894,10 @@ export function fireBlast(
         // the discard case, reached through splash rather than through aim.
         if (hit.wasted || current <= 0) {
             perVictim[hit.id] = [
-                `Discarded ${round(hit.directDamage + hit.blastDamage)} - already destroyed`,
+                l10n.t(
+                    "Discarded {0} - already destroyed",
+                    round(hit.directDamage + hit.blastDamage),
+                ),
             ];
             continue;
         }
@@ -846,7 +918,11 @@ export function fireBlast(
         perVictim[hit.id] =
             hit.directDamage > 0 && hit.blastDamage > 0
                 ? [
-                      `Direct ${round(hit.directDamage)} + blast share ${round(hit.blastDamage)}`,
+                      l10n.t(
+                          "Direct {0} + blast share {1}",
+                          round(hit.directDamage),
+                          round(hit.blastDamage),
+                      ),
                       ...resolved.workings,
                   ]
                 : resolved.workings;
@@ -896,27 +972,41 @@ export function poolSummary(
     }
 
     const parts = [
-        `Hull ${round(hull?.current ?? hullMax)} of ${round(hullMax)}`,
+        l10n.t(
+            "Hull {0} of {1}",
+            round(hull?.current ?? hullMax),
+            round(hullMax),
+        ),
     ];
-    const facts = ["Hull: Tactical_Health, the pool that dies."];
+    const facts = [l10n.t("Hull: Tactical_Health, the pool that dies.")];
 
     if ((hardpoints?.max ?? 0) > 0) {
         parts.push(
-            `Hardpoints ${round(hardpoints?.current ?? 0)}` +
-                ` of ${round(hardpoints?.max ?? 0)}`,
+            l10n.t(
+                "Hardpoints {0} of {1}",
+                round(hardpoints?.current ?? 0),
+                round(hardpoints?.max ?? 0),
+            ),
         );
         facts.push(
-            "Hardpoints: the combined Health of every destroyable hardpoint.",
+            l10n.t(
+                "Hardpoints: The combined Health of every destroyable hardpoint.",
+            ),
         );
         facts.push(
-            `Leash: ${defence.hullVsHardpointsConstraint}, the maximum lead of either pool` +
-                " (Hull_Vs_Hard_Points_Health_Constraint).",
+            l10n.t(
+                "Leash: {0}, the maximum lead of either pool (Hull_Vs_Hard_Points_Health_Constraint).",
+                defence.hullVsHardpointsConstraint,
+            ),
         );
         facts.push(
             defence.diesWithHardpoints
-                ? "Dies with hardpoints: the last one destroyed sets the hull to 0."
-                : "Dies with hardpoints: no" +
-                      " (Should_Be_Destroyed_When_All_Hardpoints_Destroyed).",
+                ? l10n.t(
+                      "Dies with hardpoints: The last one destroyed sets the hull to 0.",
+                  )
+                : l10n.t(
+                      "Dies with hardpoints: No (Should_Be_Destroyed_When_All_Hardpoints_Destroyed).",
+                  ),
         );
     }
 

@@ -54,9 +54,11 @@ export const SHADER_ARCHIVE_BYTES = 190933;
  * a licence to fetch from there and emphatically not one to re-host: the extension only ever points
  * at their download.
  */
-export const SHADER_LICENCE_NOTE =
-    "The base game shader sources are published by Petroglyph for mod tooling. " +
-    "EaWEdit never redistributes them - it only reads a copy you supply.";
+export function shaderLicenceNote(): string {
+    return vscode.l10n.t(
+        "The base game shader sources are published by Petroglyph for mod tooling. EaWEdit never redistributes them - it only reads a local copy.",
+    );
+}
 
 /** The managed directory, or undefined when the user has not supplied one. */
 /** The download prompt's buttons, one wrapped text each, so the choice compares against it. */
@@ -107,7 +109,7 @@ export async function offerShaderSources(
     const choice = await vscode.window.showInformationMessage(
         vscode.l10n.t(
             "EaWEdit: The preview can use the base game's shader sources for a closer match. {0} They are fetched from Petroglyph's own published download and checked against a pinned SHA-256.",
-            SHADER_LICENCE_NOTE,
+            shaderLicenceNote(),
         ),
         ...choices,
     );
@@ -130,7 +132,7 @@ export async function offerShaderSources(
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
-        openLabel: "Use these shaders",
+        openLabel: vscode.l10n.t("Use these shaders"),
     });
 
     if (picked === undefined || picked.length === 0) {
@@ -273,7 +275,7 @@ export async function downloadShaderSources(
                 vscode.l10n.t(
                     "EaWEdit: {0} shader sources ready. {1}",
                     written,
-                    SHADER_LICENCE_NOTE,
+                    shaderLicenceNote(),
                 ),
             );
 

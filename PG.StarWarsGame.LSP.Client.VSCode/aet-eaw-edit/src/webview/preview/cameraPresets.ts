@@ -14,6 +14,8 @@
 // different shot on every one of them. It is resolved back to world units at the moment it is
 // written out as Lua, which is the only place the engine's own units are wanted.
 
+import * as l10n from "@vscode/l10n";
+
 import { type BoundingSphere, type Vec3 } from "./framing";
 
 /** A saved shot. */
@@ -140,7 +142,7 @@ function round(value: number): number {
 export function nextPresetName(presets: readonly CameraPreset[]): string {
     const taken = new Set(presets.map((p) => p.name.trim().toLowerCase()));
     for (let n = 1; ; n++) {
-        const name = `Camera preset ${n}`;
+        const name = l10n.t("Camera preset {0}", n);
         if (!taken.has(name.toLowerCase())) {
             return name;
         }

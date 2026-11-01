@@ -400,9 +400,9 @@ const KIND_LABELS = TREE_KIND_LABELS;
  * that state - so saying it again bought nothing and pushed the half that matters to the end.
  */
 const GROUP_STATE_TITLES: Record<GroupState, string> = {
-    all: "Switch particle systems off",
-    none: "Switch particle systems on",
-    some: "Switch the rest on",
+    all: l10n.t("Switch particle systems off"),
+    none: l10n.t("Switch particle systems on"),
+    some: l10n.t("Switch the rest on"),
 };
 
 /** What a row IS, as a picture - the shared tree row's, so the filter chips match the rows. */
@@ -440,17 +440,19 @@ const LOAD_IDLE_LIMIT = 8000;
  * not casting either, and the same colour reaches the hull through that pass with no ground at all.
  */
 const SHADOW_TINT_TITLE: Record<ShadowTintReach, string> = {
-    ground: "What the ground tints a cast shadow",
-    model: "What this hull tints its own shadowing - switch the ground on for the cast shadow too",
-    both: "What the ground and this hull tint a shadow",
-    none:
-        "Nothing can show it: switch the ground on, or the Game renderer on a model that " +
-        "authors a shadow volume",
+    ground: l10n.t("What the ground tints a cast shadow"),
+    model: l10n.t(
+        "What this hull tints its own shadowing - switch the ground on for the cast shadow too",
+    ),
+    both: l10n.t("What the ground and this hull tint a shadow"),
+    none: l10n.t(
+        "Nothing can show it: Switch the ground on, or the Game renderer on a model that authors a shadow volume",
+    ),
 };
 
-const NOTHING_DRAWN =
-    "This model has no visible mesh at the current damage and detail level. " +
-    "Every sub-mesh is either tagged for another level, hidden in the file, or on a hidden bone.";
+const NOTHING_DRAWN = l10n.t(
+    "This model has no visible mesh at the current damage and detail level. Every sub-mesh is either tagged for another level, hidden in the file, or on a hidden bone.",
+);
 
 const Shell = styled.div`
     ${dockChromeCss}
@@ -5136,7 +5138,7 @@ function ModelPreview(): React.JSX.Element {
                 if (bolt === null) {
                     setProjectileNote(
                         message.result.error ??
-                            `${message.name} could not be read.`,
+                            l10n.t("{0} could not be read.", message.name),
                     );
                 } else {
                     setAttacker((current) =>
@@ -5226,8 +5228,10 @@ function ModelPreview(): React.JSX.Element {
                     // also catches one the server resolved and the client could not decode.
                     const missing =
                         message.result.error ??
-                        `Texture '${message.name}' was not ` +
-                            "found. Anything that draws with it shows the AET logo instead.";
+                        l10n.t(
+                            "Texture '{0}' was not found. Anything that draws with it shows the AET logo instead.",
+                            message.name,
+                        );
 
                     setProblems((current) =>
                         current.some((p) => p.message === missing)
@@ -6071,8 +6075,10 @@ function ModelPreview(): React.JSX.Element {
                             pool: "hull",
                             destroyed: false,
                             workings: [
-                                `Hull ${before} -> ${full.hull}`,
-                                "Hardpoints restored to their declared Health",
+                                l10n.t("Hull {0} -> {1}", before, full.hull),
+                                l10n.t(
+                                    "Hardpoints restored to their declared Health",
+                                ),
                             ],
                         },
                     ]),
@@ -8016,7 +8022,7 @@ function ModelPreview(): React.JSX.Element {
                                             value={
                                                 <>
                                                     {l10n.t(
-                                                        "{0}{1}deg, from {2}",
+                                                        "{0}{1}deg, {2}",
                                                         lights[editing].azimuth,
                                                         " ",
                                                         bearing.from,
@@ -9037,7 +9043,7 @@ function ModelPreview(): React.JSX.Element {
                                             <span className="view-row capture-custom">
                                                 <IntegerField
                                                     value={customCapture.width}
-                                                    ariaLabel="Width"
+                                                    ariaLabel={l10n.t("Width")}
                                                     disabled={
                                                         captureSizeId !==
                                                         "custom"
@@ -9057,7 +9063,7 @@ function ModelPreview(): React.JSX.Element {
                                                 {l10n.t("x")}
                                                 <IntegerField
                                                     value={customCapture.height}
-                                                    ariaLabel="Height"
+                                                    ariaLabel={l10n.t("Height")}
                                                     disabled={
                                                         captureSizeId !==
                                                         "custom"
@@ -9883,11 +9889,9 @@ function ModelPreview(): React.JSX.Element {
                                                     label={l10n.t(
                                                         "Damage type",
                                                     )}
-                                                    valueTitle={
-                                                        "What the damage table says against this " +
-                                                        "target's armor. A pair the table does not name is " +
-                                                        "1.0, which is over half of them."
-                                                    }
+                                                    valueTitle={l10n.t(
+                                                        "What the damage table says against this target's armor. A pair the table does not name is 1.0, which is over half of them.",
+                                                    )}
                                                     value={
                                                         <>
                                                             {/* Off the LIVE defence: a ship whose generators are

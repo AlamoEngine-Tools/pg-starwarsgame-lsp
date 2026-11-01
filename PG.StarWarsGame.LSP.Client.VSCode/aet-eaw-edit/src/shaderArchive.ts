@@ -10,6 +10,8 @@
 import { createHash } from "node:crypto";
 import * as path from "node:path";
 
+import * as l10n from "@vscode/l10n";
+
 /** What an archive entry is allowed to become, or why it was refused. */
 export type EntryVerdict =
     { keep: true; relativePath: string } | { keep: false; reason: string };
@@ -89,13 +91,17 @@ export function checkArchive(
     expectedBytes?: number,
 ): ArchiveCheck {
     if (bytes.length === 0) {
-        return { ok: false, problem: "the download was empty" };
+        return { ok: false, problem: l10n.t("the download was empty") };
     }
 
     if (expectedBytes !== undefined && bytes.length !== expectedBytes) {
         return {
             ok: false,
-            problem: `expected ${expectedBytes} bytes but got ${bytes.length}`,
+            problem: l10n.t(
+                "expected {0} bytes but got {1}",
+                expectedBytes,
+                bytes.length,
+            ),
         };
     }
 
@@ -103,9 +109,11 @@ export function checkArchive(
     if (actual.toLowerCase() !== expectedSha256.toLowerCase()) {
         return {
             ok: false,
-            problem:
-                "the checksum did not match. The archive may have been re-published, or " +
-                `something on the network replaced it. Expected ${expectedSha256}, got ${actual}`,
+            problem: l10n.t(
+                "the checksum did not match. The archive may have been re-published, or something on the network replaced it. Expected {0}, got {1}",
+                expectedSha256,
+                actual,
+            ),
         };
     }
 
@@ -122,5 +130,5 @@ export function checkArchive(
 export function extractionVerdict(written: number): ArchiveCheck {
     return written > 0
         ? { ok: true }
-        : { ok: false, problem: "the archive held no .fx files" };
+        : { ok: false, problem: l10n.t("the archive held no .fx files") };
 }

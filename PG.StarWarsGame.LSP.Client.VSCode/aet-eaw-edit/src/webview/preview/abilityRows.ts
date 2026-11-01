@@ -384,7 +384,11 @@ function detailOf(
     const parts: string[] = [];
 
     if (proxyCount > 0) {
-        parts.push(`${proxyCount} effect${proxyCount === 1 ? "" : "s"}`);
+        parts.push(
+            proxyCount === 1
+                ? l10n.t("1 effect")
+                : l10n.t("{0} effects", proxyCount),
+        );
     }
 
     if ((ability.particleEffect ?? "") !== "") {
@@ -392,11 +396,11 @@ function detailOf(
     }
 
     if ((ability.ownerAttachmentBone ?? "") !== "") {
-        parts.push(`on ${ability.ownerAttachmentBone}`);
+        parts.push(l10n.t("on {0}", ability.ownerAttachmentBone!));
     }
 
     if (revealsShield(ability.type)) {
-        parts.push("shows the shield mesh");
+        parts.push(l10n.t("shows the shield mesh"));
     }
 
     // ONLY, because that is the whole of what a cloak draws - the hull, the effects and the
@@ -404,13 +408,15 @@ function detailOf(
     // `TIE_Phantom`'s STEALTH is a type and an icon, so without this the row read
     // "no effects, bones or clips declared" beside a key that cloaks the ship.
     if (revealsStealth(ability.type)) {
-        parts.push("shows the stealth mesh only");
+        parts.push(l10n.t("shows the stealth mesh only"));
     }
 
     if (deployClip !== null) {
         // Named rather than counted: which clip plays is the thing a reader is checking.
         parts.push(
-            undeployClip === null ? "deploy only" : "deploy and undeploy",
+            undeployClip === null
+                ? l10n.t("deploy only")
+                : l10n.t("deploy and undeploy"),
         );
     }
 
@@ -424,18 +430,18 @@ function detailOf(
         ability.rechargeSeconds !== null &&
         ability.rechargeSeconds !== undefined
     ) {
-        parts.push(`${num(ability.rechargeSeconds)}s recharge`);
+        parts.push(l10n.t("{0}s recharge", num(ability.rechargeSeconds)));
     }
 
     if (
         ability.expirationSeconds !== null &&
         ability.expirationSeconds !== undefined
     ) {
-        parts.push(`lasts ${num(ability.expirationSeconds)}s`);
+        parts.push(l10n.t("lasts {0}s", num(ability.expirationSeconds)));
     }
 
     return parts.length === 0
-        ? "no effects, bones or clips declared"
+        ? l10n.t("no effects, bones or clips declared")
         : parts.join(" - ");
 }
 
@@ -521,21 +527,21 @@ export function abilityFacts(row: AbilityRow): [string, string][] {
         value === null ? null : `${value}s`;
 
     const rows: [string, string | null][] = [
-        ["Recharge", seconds(row.rechargeSeconds)],
-        ["Lasts", seconds(row.expirationSeconds)],
-        ["Defined by", row.guiName],
-        ["Effect", row.particleEffect],
-        ["On bone", row.ownerAttachmentBone],
+        [l10n.t("Recharge"), seconds(row.rechargeSeconds)],
+        [l10n.t("Lasts"), seconds(row.expirationSeconds)],
+        [l10n.t("Defined by"), row.guiName],
+        [l10n.t("Effect"), row.particleEffect],
+        [l10n.t("On bone"), row.ownerAttachmentBone],
         [
-            "Effects driven",
+            l10n.t("Effects driven"),
             row.proxyCount === 0 ? null : String(row.proxyCount),
         ],
-        ["Deploy clip", row.deployClip],
-        ["Undeploy clip", row.undeployClip],
+        [l10n.t("Deploy clip"), row.deployClip],
+        [l10n.t("Undeploy clip"), row.undeployClip],
         // As the game writes them - `speed x0.8` - so a reader can match the line against the XML
         // without translating it first.
         [
-            "Modifiers",
+            l10n.t("Modifiers"),
             row.modifiers.length === 0
                 ? null
                 : row.modifiers

@@ -71,15 +71,15 @@ export interface ThreadNode {
 export function scriptRows(result: LuaScriptsResult): ScriptNode[] {
     return result.scripts.map((script) => {
         const state = script.isSuspended
-            ? "stopped"
+            ? l10n.t("stopped")
             : script.isContext
-              ? "context"
+              ? l10n.t("context")
               : script.attached
-                ? "attached"
+                ? l10n.t("attached")
                 : null;
         const location =
             script.path === null
-                ? `${script.gamePath}\nThis file is not under any source root, so breakpoints cannot be mapped to it`
+                ? `${script.gamePath}\n${l10n.t("This file is not under any source root, so breakpoints cannot be mapped to it")}`
                 : script.path;
         return {
             kind: "script",

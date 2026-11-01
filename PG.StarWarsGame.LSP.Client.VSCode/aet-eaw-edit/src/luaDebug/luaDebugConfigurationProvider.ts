@@ -38,12 +38,12 @@ export class LuaDebugConfigurationProvider
             {
                 type: LUA_DEBUG_TYPE,
                 request: "attach",
-                name: "Attach to Empire at War (Lua)",
+                name: vscode.l10n.t("Attach to Empire at War (Lua)"),
             },
             {
                 type: LUA_DEBUG_TYPE,
                 request: "launch",
-                name: "Launch Empire at War (Lua)",
+                name: vscode.l10n.t("Launch Empire at War (Lua)"),
                 program: "",
             },
         ];
@@ -58,7 +58,7 @@ export class LuaDebugConfigurationProvider
             config = {
                 type: LUA_DEBUG_TYPE,
                 request: "attach",
-                name: "Attach to Empire at War (Lua)",
+                name: vscode.l10n.t("Attach to Empire at War (Lua)"),
             };
         }
 

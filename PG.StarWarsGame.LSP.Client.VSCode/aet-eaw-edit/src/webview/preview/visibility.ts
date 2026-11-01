@@ -361,10 +361,11 @@ export function becauseText(because: string): string {
     }
 
     if (because.startsWith("ancestor:")) {
-        return l10n.t(
-            "Hidden with {0}, above it",
-            because.slice("ancestor:".length),
-        );
+        // A bone the tree has no name for still hides what is under it: said without the name.
+        const ancestor = because.slice("ancestor:".length);
+        return ancestor === ""
+            ? l10n.t("Hidden with a bone above it")
+            : l10n.t("Hidden with {0}, above it", ancestor);
     }
 
     // One clause each. These are read standing over a row in a tree that can be a hundred deep,

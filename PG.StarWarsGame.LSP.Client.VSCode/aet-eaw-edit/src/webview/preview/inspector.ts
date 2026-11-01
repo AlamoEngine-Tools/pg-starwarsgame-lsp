@@ -150,8 +150,8 @@ export function formatParameter(name: string, value: unknown): InspectorRow {
     // A mod's own exporter can write anything into extras. Saying so costs this one row; throwing
     // would cost the whole panel.
     return row({
-        value: "unreadable value",
-        hint: "This parameter is not a number, vector or texture name.",
+        value: l10n.t("unreadable value"),
+        hint: l10n.t("This parameter is not a number, vector or texture name."),
     });
 }
 
@@ -174,15 +174,15 @@ export function geometryTable(page: SubMeshGeometryPage): GeometryTableView {
         return {
             columns: [
                 "#",
-                "Position",
-                "Normal",
+                l10n.t("Position"),
+                l10n.t("Normal"),
                 "UV0",
                 "UV1",
-                "Tangent",
-                "Binormal",
-                "Colour",
-                "Bone indices",
-                "Bone weights",
+                l10n.t("Tangent"),
+                l10n.t("Binormal"),
+                l10n.t("Colour"),
+                l10n.t("Bone indices"),
+                l10n.t("Bone weights"),
             ],
             rows: page.vertices.map((row) => [
                 String(row.index),
@@ -216,7 +216,7 @@ export function geometryTable(page: SubMeshGeometryPage): GeometryTableView {
 
     if (page.table === "boneMapping") {
         return {
-            columns: ["Slot", "Bone", "Name"],
+            columns: [l10n.t("Slot"), l10n.t("Bone"), l10n.t("Name")],
             rows: page.boneMapping.map((row) => [
                 String(row.slot),
                 String(row.boneIndex),
@@ -228,8 +228,9 @@ export function geometryTable(page: SubMeshGeometryPage): GeometryTableView {
             // that failed.
             note:
                 page.boneMapping.length === 0
-                    ? "This sub-mesh is not skinned, so it has no bone mapping - every vertex rides the " +
-                      "bone the mesh is attached to."
+                    ? l10n.t(
+                          "This sub-mesh is not skinned, so it has no bone mapping - every vertex rides the bone the mesh is attached to.",
+                      )
                     : undefined,
         };
     }

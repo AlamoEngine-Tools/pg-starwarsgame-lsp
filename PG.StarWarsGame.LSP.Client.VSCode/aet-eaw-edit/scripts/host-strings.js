@@ -43,6 +43,9 @@ const SHOWN_PROPERTIES = new Set([
     "tooltip",
     "message",
     "text",
+    // A disabled option's reason, a file dialog's button: both written in place before this rule.
+    "disabledReason",
+    "openLabel",
 ]);
 
 /**
@@ -191,6 +194,12 @@ const SHOWN_ATTRIBUTES = new Set([
     // A dialog's buttons: the localisation editor's Export said "Export" outside every catalogue.
     "confirmLabel",
     "cancelLabel",
+    // The localisation grids' key-scope toggle said "Key only" outside every catalogue.
+    "keyScopeLabel",
+    // A dialog's footnote and a field's accessible name: both were written in place.
+    "footnote",
+    "ariaLabel",
+    "valueTitle",
 ]);
 
 /** The raw texts in one file, each with its line and source text. */
@@ -353,7 +362,9 @@ function isLabelSite(site, tree) {
         return LABEL_PROPERTIES.has(parent.name.getText(tree));
     }
     if (ts.isJsxExpression(parent) && ts.isJsxAttribute(parent.parent)) {
-        return SHOWN_ATTRIBUTES.has(parent.parent.name.getText(tree));
+        // A dialog's footnote is prose under the dialog, not a label: its sentences keep their stops.
+        const name = parent.parent.name.getText(tree);
+        return SHOWN_ATTRIBUTES.has(name) && name !== "footnote";
     }
     if (ts.isCallExpression(parent)) {
         const index = parent.arguments.indexOf(site);

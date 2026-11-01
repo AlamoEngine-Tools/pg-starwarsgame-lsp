@@ -31,8 +31,9 @@ export function factionModes(
                 id: "0",
                 label: l10n.t("None"),
                 disabled: true,
-                disabledReason:
+                disabledReason: l10n.t(
                     "This card declares no faction frame, so there is none to draw.",
+                ),
             },
         ];
     }
@@ -45,8 +46,10 @@ export function factionModes(
         title: `${frame.slotName ?? l10n.t("Slot {0}", frame.slot)} - ${frame.textureName}`,
         disabled: lone,
         disabledReason: lone
-            ? `Only one faction frame is declared (${frame.textureName}), so there is nothing to ` +
-              "switch to."
+            ? l10n.t(
+                  "Only one faction frame is declared ({0}), so there is nothing to switch to.",
+                  frame.textureName,
+              )
             : undefined,
     }));
 }
