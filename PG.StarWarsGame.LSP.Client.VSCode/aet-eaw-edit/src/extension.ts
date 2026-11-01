@@ -2640,6 +2640,13 @@ export async function activate(
                 if (projectKey === null) {
                     return;
                 }
+                // The reload indexes the project again; the status says so until the server's
+                // $/workspaceScanComplete, which ends a reload as it ends startup.
+                const project = clients.get(projectKey);
+                if (project?.state === "ready") {
+                    project.state = "indexing";
+                    updateStatus();
+                }
                 await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.reloadProject",
                     [],

@@ -38,6 +38,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly IUserNotifier _notifier;
     private readonly IClientRefreshNotifier _refresh;
     private readonly IProjectConfigurationResolver _resolver;
+    private readonly IStartupNotifier _scans;
     private readonly ServerStatusRecorder _status;
     private List<string>? _lastRoots;
 
@@ -62,8 +63,10 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         IHeapTrimmer heapTrimmer,
         ILuaAnalyzerStarter luaAnalyzer,
         IMessageCatalog messages,
-        IBaselineBootstrapper baseline)
+        IBaselineBootstrapper baseline,
+        IStartupNotifier scans)
     {
+        _scans = scans;
         _baseline = baseline;
         _messages = messages;
         _status = status;
@@ -120,6 +123,11 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         {
             _logger.LogError(ex, "Mod project reload failed.");
         }
+
+        // A reload indexes the workspace again, so it ends as startup ends: the client leaves its
+        // indexing state and rebuilds what it took from the old index - watchers, navigators, panels.
+        // Startup's own load is followed by the same notification from the startup pipeline.
+        _scans.NotifyScanComplete();
 
         // After the reload rather than inside the load: the question is the same one startup asks,
         // and it must not hold the index path open while the user reads a diff. A reload has no

@@ -44,7 +44,8 @@ public sealed class ModProjectReloadServiceTest
         ServerStatusRecorder? status = null,
         IHeapTrimmer? heapTrimmer = null,
         ILuaAnalyzerStarter? luaAnalyzer = null,
-        IBaselineBootstrapper? baseline = null)
+        IBaselineBootstrapper? baseline = null,
+        IStartupNotifier? scans = null)
     {
         var fileHelper = new FileHelper(new MockFileSystem());
         return new ModProjectReloadService(
@@ -57,7 +58,8 @@ public sealed class ModProjectReloadServiceTest
             heapTrimmer ?? new RecordingHeapTrimmer(),
             luaAnalyzer ?? new RecordingAnalyzerStarter(),
             ResxMessageCatalog.Server("en"),
-            baseline ?? new RecordingBaselineBootstrapper());
+            baseline ?? new RecordingBaselineBootstrapper(),
+            scans ?? new RecordingStartupNotifier());
     }
 
     private sealed class DecliningPrompt : IPgprojMigrationPrompt
@@ -306,6 +308,33 @@ public sealed class ModProjectReloadServiceTest
 
         Assert.Equal(2, indexer.IndexCallCount);
         Assert.Equal(["/ws/a", "/ws/b"], indexer.LastRoots);
+    }
+
+    // A reload indexes the workspace again as startup does, so it ends as startup does: the client is
+    // told the scan is complete, and refreshes what it built from the old index.
+    [Fact]
+    public async Task ReloadAsync_TellsTheClientTheScanIsComplete()
+    {
+        var scans = new RecordingStartupNotifier();
+        var service = Create(new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
+            new RecordingLayerMap(), new FakeGameIndexService(IndexWithBaseline(true)), new RecordingUserNotifier(),
+            new ListLogger(), scans: scans);
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+        Assert.Equal(0, scans.CallCount);
+
+        await service.ReloadAsync(CancellationToken.None);
+
+        Assert.Equal(1, scans.CallCount);
+    }
+
+    private sealed class RecordingStartupNotifier : IStartupNotifier
+    {
+        public int CallCount { get; private set; }
+
+        public void NotifyScanComplete()
+        {
+            CallCount++;
+        }
     }
 
     [Fact]
