@@ -170,9 +170,6 @@
       "aet-eaw-edit.lsp.source.baseGameDirectory": "{eaw}"
     }
   },
-  "PRJ-20": {
-    "open": "{modLeaf}"
-  },
   "PRJ-21": {
     "open": "{mod}"
   },
@@ -466,9 +463,10 @@
     "open": "{repo}\\eaw"
   },
   "PRV-30": {
-    "open": "{mod}",
+    "open": "{modLeaf}",
     "settings": {
-      "aet-eaw-edit.experimental.storyEditing": true
+      "aet-eaw-edit.experimental.storyEditing": true,
+      "aet-eaw-edit.experimental.storySimulator": true
     }
   },
   "PRV-31": {
@@ -476,9 +474,6 @@
   },
   "PRV-32": {
     "open": "{repo}\\foc"
-  },
-  "PRV-33": {
-    "open": "{modLeaf}"
   },
   "PRV-34": {
     "open": "{modLeaf}"

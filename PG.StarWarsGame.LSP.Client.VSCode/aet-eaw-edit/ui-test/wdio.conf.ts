@@ -27,7 +27,7 @@ if (process.env.AET_UI_FIRST !== "") {
 }
 const partFile = path.join(import.meta.dirname, "specs", spec.replace(/\.spec\.ts$/, ".json"));
 const part: { open?: string; settings?: Record<string, unknown> } = fs.existsSync(partFile) ? readJson(partFile) : {};
-const open = part.open ?? uiOpen(launch);
+const open = part.open !== undefined ? uiOpen({ open: part.open }) : uiOpen(launch);
 
 export const config: WebdriverIO.Config = {
     runner: "local",

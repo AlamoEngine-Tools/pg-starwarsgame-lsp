@@ -93,7 +93,8 @@ export async function rail(): Promise<RailNode[]> {
 export async function railClick(label: string, depth = 0): Promise<void> {
     const node = await browser.$(railNode(label, depth));
     await node.waitForExist({ timeout: 30_000 });
-    await node.click();
+    // By script: the workbench's own labels over the panel's top edge took a pointer click meant for it.
+    await browser.execute((el: HTMLElement) => el.click(), node as unknown as HTMLElement);
 }
 
 function railNode(label: string, depth?: number): string {
