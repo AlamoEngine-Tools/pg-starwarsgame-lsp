@@ -523,7 +523,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             await this.project.gateway.requestOrReport<CreateLocalisationLanguageFileResult>(
                 "aet/createLocalisationLanguageFile",
                 { projectFilePath: this._filePath, language },
-                `could not create the ${language} file`,
+                vscode.l10n.t("Could not create the {0} file", language),
             );
         if (result === undefined) {
             return;

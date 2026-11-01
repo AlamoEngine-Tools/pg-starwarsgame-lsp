@@ -26,10 +26,14 @@ const SHOWN_ARGUMENTS = new Set([
     "reportStatus",
 ]);
 
-/** Properties that are shown wherever they are written: options, items, progress reports. */
+/**
+ * Properties that are shown wherever they are written: options, items, progress reports. A quick pick
+ * built with `createQuickPick` spells its hint `placeholder`; the options object `placeHolder`.
+ */
 const SHOWN_PROPERTIES = new Set([
     "title",
     "placeHolder",
+    "placeholder",
     "prompt",
     "label",
     "description",
@@ -38,6 +42,43 @@ const SHOWN_PROPERTIES = new Set([
     "message",
     "text",
 ]);
+
+/**
+ * Calls with one shown argument, by its index: the gateway prefixes a failed request's message with
+ * the context it was given, so that context is read.
+ */
+const SHOWN_ARGUMENT_AT = new Map([["requestOrReport", 2]]);
+
+/** The values a function hands back: a concise body, or each `return` of a block. */
+function returnedValues(fn) {
+    if (!ts.isBlock(fn.body)) {
+        return [fn.body];
+    }
+    const values = [];
+    const visit = (node) => {
+        // A nested function's returns are its own.
+        if (ts.isFunctionLike(node)) {
+            return;
+        }
+        if (ts.isReturnStatement(node) && node.expression !== undefined) {
+            values.push(node.expression);
+        }
+        ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(fn.body, visit);
+    return values;
+}
+
+/** The written-in-place texts of a value, each branch of a conditional on its own. */
+function shownParts(node) {
+    if (ts.isParenthesizedExpression(node)) {
+        return shownParts(node.expression);
+    }
+    if (ts.isConditionalExpression(node)) {
+        return [...shownParts(node.whenTrue), ...shownParts(node.whenFalse)];
+    }
+    return isRaw(node) ? [node] : [];
+}
 
 /** Whether written text carries words - a format such as `${a} - ${b}` gives a translator nothing. */
 const hasWords = (text) => /[A-Za-z]/.test(text);
@@ -145,6 +186,10 @@ function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
             if (SHOWN_ARGUMENTS.has(name)) {
                 node.arguments.filter(isRaw).forEach(report);
             }
+            const at = SHOWN_ARGUMENT_AT.get(name);
+            if (at !== undefined && node.arguments[at] && isRaw(node.arguments[at])) {
+                report(node.arguments[at]);
+            }
             if (
                 name === "createWebviewPanel" &&
                 node.arguments[1] &&
@@ -175,6 +220,16 @@ function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
             isRaw(node.initializer)
         ) {
             report(node.initializer);
+        }
+        // An input box shows what its validator returns, under the field.
+        if (
+            ts.isPropertyAssignment(node) &&
+            node.name.getText(tree) === "validateInput" &&
+            (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+        ) {
+            for (const value of returnedValues(node.initializer)) {
+                shownParts(value).forEach(report);
+            }
         }
         if (
             ts.isBinaryExpression(node) &&

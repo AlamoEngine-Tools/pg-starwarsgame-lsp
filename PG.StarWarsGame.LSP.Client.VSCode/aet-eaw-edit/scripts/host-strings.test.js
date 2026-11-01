@@ -59,6 +59,29 @@ describe("host strings", () => {
         );
     });
 
+    it("finds a quick pick's placeholder, an input box's verdict and a request's failure context", () => {
+        assert.deepEqual(
+            texts(
+                'pick.placeholder = "Model file name";\n' +
+                'vscode.window.showInputBox({ validateInput: (v) => (v?.trim() ? null : "Object name is required") });\n' +
+                'vscode.window.showInputBox({ validateInput: (v) => { if (!v) { return "A name is required"; } return undefined; } });\n' +
+                'await gateway.requestOrReport("aet/listModels", {}, "Could not list models");',
+            ),
+            ['"Model file name"', '"Object name is required"', '"A name is required"', '"Could not list models"'],
+        );
+    });
+
+    it("accepts them wrapped", () => {
+        assert.deepEqual(
+            texts(
+                'pick.placeholder = vscode.l10n.t("Model file name");\n' +
+                'vscode.window.showInputBox({ validateInput: (v) => (v ? null : vscode.l10n.t("A name is required")) });\n' +
+                'await gateway.requestOrReport("aet/listModels", {}, vscode.l10n.t("Could not list models"));',
+            ),
+            [],
+        );
+    });
+
     /** Every text the extension host shows a reader comes from the l10n bundle. */
     it("finds no text written in place in the extension host", () => {
         const found = hostFiles(path.join(__dirname, "..", "src")).flatMap(

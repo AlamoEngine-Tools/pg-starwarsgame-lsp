@@ -1718,7 +1718,7 @@ async function pickModel(gateway: LspGateway): Promise<string | null> {
     const result = await gateway.requestOrReport<ListModelsResult>(
         "aet/listModels",
         {},
-        "Could not list models",
+        vscode.l10n.t("Could not list models"),
     );
     if (!result) {
         return null;
@@ -1726,7 +1726,9 @@ async function pickModel(gateway: LspGateway): Promise<string | null> {
 
     const pick = vscode.window.createQuickPick<ModelPickItem>();
     pick.title = vscode.l10n.t("Preview Model");
-    pick.placeholder = "Model file name, e.g. EV_StarDestroyer.ALO";
+    pick.placeholder = vscode.l10n.t(
+        "Model file name, e.g. EV_StarDestroyer.ALO",
+    );
     pick.matchOnDescription = true;
     pick.items = modelPickItems(result.models);
 
@@ -1893,7 +1895,7 @@ export async function activate(
                         await lsp.requestOrReport<GetLocalisationProjectsResult>(
                             "aet/getLocalisationProjects",
                             {},
-                            "could not list localisation files",
+                            vscode.l10n.t("Could not list localisation files"),
                         );
                     if (!result) {
                         return;
@@ -2029,7 +2031,7 @@ export async function activate(
                         await lsp.requestOrReport<GetLocalisationProjectsResult>(
                             "aet/getLocalisationProjects",
                             {},
-                            "could not list localisation files",
+                            vscode.l10n.t("Could not list localisation files"),
                         );
                     if (!result) {
                         return;
@@ -2107,7 +2109,11 @@ export async function activate(
                     await lsp.requestOrReport<ConvertLocalisationFormatResult>(
                         "aet/convertLocalisationFormat",
                         { projectFilePath: filePath, targetFormat },
-                        `could not convert ${path.basename(filePath)} to ${targetFormat}`,
+                        vscode.l10n.t(
+                            "Could not convert {0} to {1}",
+                            path.basename(filePath),
+                            targetFormat,
+                        ),
                     );
                 if (!result) {
                     return;
@@ -2198,7 +2204,10 @@ export async function activate(
                     await lsp.requestOrReport<SetLocalisationProjectFormatResult>(
                         "aet/setLocalisationProjectFormat",
                         { format: picked.format },
-                        `could not set the localisation format to ${picked.format}`,
+                        vscode.l10n.t(
+                            "Could not set the localisation format to {0}",
+                            picked.format,
+                        ),
                     );
                 if (!result) {
                     return;
@@ -2244,7 +2253,7 @@ export async function activate(
                     await lsp.requestOrReport<ExportLocalisationToDatResult>(
                         "aet/exportLocalisationToDat",
                         { projectFilePath: filePath },
-                        "DAT export failed",
+                        vscode.l10n.t("DAT export failed"),
                     );
                 if (!result) {
                     return;
@@ -2372,7 +2381,7 @@ export async function activate(
                         await lsp.requestOrReport<GetStoryPlotsResult>(
                             "aet/getStoryPlots",
                             {},
-                            "cannot load story campaigns",
+                            vscode.l10n.t("Cannot load story campaigns"),
                         );
                     if (!result) {
                         return;
@@ -2896,7 +2905,9 @@ export async function activate(
                         "Where the localisation project files will live",
                     ),
                     validateInput: (v) =>
-                        v?.trim() ? null : "A directory is required",
+                        v?.trim()
+                            ? null
+                            : vscode.l10n.t("A directory is required"),
                 });
                 if (!directory) {
                     return;
@@ -3069,7 +3080,9 @@ export async function activate(
                             targetFormatItem.label,
                         ),
                         validateInput: (v) =>
-                            v?.trim() ? null : "A directory is required",
+                            v?.trim()
+                                ? null
+                                : vscode.l10n.t("A directory is required"),
                     });
                     if (!targetDirectory) {
                         return;
@@ -3252,7 +3265,9 @@ export async function activate(
                             "Name of the GameObject to assemble, e.g. Generic_Star_Destroyer",
                         ),
                         validateInput: (v) =>
-                            v?.trim() ? null : "Object name is required",
+                            v?.trim()
+                                ? null
+                                : vscode.l10n.t("Object name is required"),
                     });
                 }
                 if (!objectId?.trim()) {
@@ -3291,7 +3306,9 @@ export async function activate(
                             "Name of the GameObject whose popup to preview",
                         ),
                         validateInput: (v) =>
-                            v?.trim() ? null : "Object name is required",
+                            v?.trim()
+                                ? null
+                                : vscode.l10n.t("Object name is required"),
                     });
                 }
                 if (!objectId?.trim()) {
@@ -3313,7 +3330,9 @@ export async function activate(
                                 multiplayer,
                                 ...encyclopediaScreenParams(),
                             },
-                            "load the encyclopedia entry",
+                            vscode.l10n.t(
+                                "Could not load the encyclopedia entry",
+                            ),
                         );
                     if (entry === undefined) {
                         return;
@@ -3373,7 +3392,9 @@ export async function activate(
                             "Name of the variant GameObject to resolve",
                         ),
                         validateInput: (v) =>
-                            v?.trim() ? null : "Object name is required",
+                            v?.trim()
+                                ? null
+                                : vscode.l10n.t("Object name is required"),
                     });
                 }
                 if (!objectId?.trim()) {
