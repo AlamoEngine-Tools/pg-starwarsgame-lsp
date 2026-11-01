@@ -105,11 +105,17 @@ function railNode(label: string, depth?: number): string {
     );
 }
 
-/** Expands a rail node by its twisty, and waits for what it holds. */
+/**
+ * Expands a rail node by its twisty, and waits for what it holds. A node a table click has already opened
+ * is left as it is.
+ */
 export async function railExpand(label: string, depth?: number): Promise<void> {
-    const twisty = await browser.$(`${railNode(label, depth)}//span[contains(@class,'twisty') and @title='Expand']`);
-    await twisty.waitForExist({ timeout: 30_000 });
-    await twisty.click();
+    const twisty = `${railNode(label, depth)}//span[contains(@class,'twisty')]`;
+    await (await browser.$(twisty)).waitForExist({ timeout: 30_000 });
+    const closed = await browser.$(`${twisty}[@title='Expand']`);
+    if (await closed.isExisting()) {
+        await closed.click();
+    }
     await browser.waitUntil(
         async () => {
             const nodes = await rail();
