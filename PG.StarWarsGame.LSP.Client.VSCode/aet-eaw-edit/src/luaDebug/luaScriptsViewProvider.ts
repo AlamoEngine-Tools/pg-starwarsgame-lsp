@@ -158,7 +158,9 @@ export class LuaScriptsViewProvider
         if (this._session === undefined) {
             return [
                 this._info(
-                    "No Lua debug session. Start one from Run and Debug (Attach to Empire at War)",
+                    vscode.l10n.t(
+                        "No Lua debug session. Start one from Run and Debug (Attach to Empire at War)",
+                    ),
                 ),
             ];
         }
@@ -170,7 +172,9 @@ export class LuaScriptsViewProvider
             if (outcome === undefined) {
                 return [
                     this._info(
-                        "The debug adapter did not answer; use Refresh to try again",
+                        vscode.l10n.t(
+                            "The debug adapter did not answer; use Refresh to try again",
+                        ),
                     ),
                 ];
             }
@@ -178,7 +182,11 @@ export class LuaScriptsViewProvider
         }
         const rows = scriptRows(this._result!);
         if (rows.length === 0) {
-            return [this._info("The game reports no running scripts")];
+            return [
+                this._info(
+                    vscode.l10n.t("The game reports no running scripts"),
+                ),
+            ];
         }
         return rows.map((row) => this._scriptItem(row));
     }
@@ -195,7 +203,11 @@ export class LuaScriptsViewProvider
             );
             if (outcome === undefined) {
                 return [
-                    this._info("The game did not list this script's threads"),
+                    this._info(
+                        vscode.l10n.t(
+                            "The game did not list this script's threads",
+                        ),
+                    ),
                 ];
             }
             this._apply(outcome, false);

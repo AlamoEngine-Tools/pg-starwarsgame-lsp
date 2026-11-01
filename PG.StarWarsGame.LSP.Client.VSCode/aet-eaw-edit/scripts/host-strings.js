@@ -24,6 +24,8 @@ const SHOWN_ARGUMENTS = new Set([
     "showErrorMessage",
     "setStatus",
     "reportStatus",
+    // The Lua Scripts view's placeholder row: 'No Lua debug session...' was written in place.
+    "_info",
 ]);
 
 /**

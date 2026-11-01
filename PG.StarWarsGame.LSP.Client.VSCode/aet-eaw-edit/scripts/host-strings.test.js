@@ -96,6 +96,10 @@ describe("host strings", () => {
         );
     });
 
+    it("finds a tree view's placeholder row", () => {
+        assert.deepEqual(texts('return [this._info("No Lua debug session")];'), ['"No Lua debug session"']);
+    });
+
     /** Every text the extension host shows a reader comes from the l10n bundle. */
     it("finds no text written in place in the extension host", () => {
         const found = hostFiles(path.join(__dirname, "..", "src")).flatMap(
