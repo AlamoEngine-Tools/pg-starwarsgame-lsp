@@ -524,6 +524,43 @@ public sealed class LuaHoverHandlerTest
         Assert.Null(await HoverInMachineAsync(4, 12, withLibrary: false));
     }
 
+    // A StoryModeEvents key is a state and a StoryEvent reference at once - every vanilla key names an
+    // event the story XML defines. The state card comes first, the reference's card below it.
+    [Fact]
+    public async Task AStoryEventKey_ShowsItsStateCardAndItsReference()
+    {
+        const string storyLibraryUri = "file:///data/scripts/library/pgstorymode.lua";
+        const string script = "require(\"PGStateMachine\")\n" + // 0
+                              "require(\"PGStoryMode\")\n" + // 1
+                              "function Definitions()\n" + // 2
+                              "  StoryModeEvents = { Event_A = State_A }\n" + // 3
+                              "end\n" + // 4
+                              "function State_A(message) end\n"; // 5
+        var host = new FakeGameWorkspaceHost();
+        host.AddOrUpdate(LuaUri, script, 1);
+        host.AddOrUpdate(MachineLibraryUri, MachineLibrary, 1);
+        host.AddOrUpdate(storyLibraryUri,
+            "function PG_Story_Mode_Init() for k, v in pairs(StoryModeEvents) do Define_State(k, v) end end\n", 1);
+        var eventRef = new GameReference("Event_A", GameSymbolKind.XmlObject, "StoryEvent", LuaUri, 3, 22, 7);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [eventRef], ["PGStateMachine", "PGStoryMode"]))
+                .Add(MachineLibraryUri, new DocumentIndex(MachineLibraryUri, 1, [], []))
+                .Add(storyLibraryUri, new DocumentIndex(storyLibraryUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var result = await BuildHandler(index, new LuaApiSchemaProvider([]), host)
+            .HoverAsync(HoverAt(3, 24), CancellationToken.None);
+
+        var text = GetMarkdown(Assert.IsType<Hover>(result));
+        Assert.Contains("A story event: Entered when the event fires", text);
+        Assert.Contains("`State_A`", text);
+        Assert.Contains("StoryEvent", text);
+        Assert.True(text.IndexOf("A story event", StringComparison.Ordinal) <
+                    text.IndexOf("StoryEvent", StringComparison.Ordinal), text);
+    }
+
     // ── richer hover content ──────────────────────────────────────────────────
 
     [Fact]
