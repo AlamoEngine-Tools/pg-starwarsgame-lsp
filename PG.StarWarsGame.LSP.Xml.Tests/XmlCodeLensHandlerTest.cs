@@ -126,6 +126,26 @@ public sealed class XmlCodeLensHandlerTest
         Assert.Equal("aet-eaw-edit.lsp.showReferences", lens.Command.Name);
     }
 
+    // The same file under another spelling of its path - an editor opened as Data/XML what the disk
+    // spells Data/Xml - is the same document, as it is to every other lookup by URI.
+    [Fact]
+    public async Task Handle_DynamicEnumValue_DefinedUnderAnotherSpellingOfThePath_GetsItsLens()
+    {
+        const string onDisk = "file:///c:/mod/Data/Xml/Enum/Armortype.xml";
+        const string asOpened = "file:///c:/mod/Data/XML/Enum/Armortype.xml";
+        var index = GameIndex.Empty with
+        {
+            WorkspaceEnumValueDefinitions = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>
+                .Empty
+                .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
+                    .Add("Armor_Fighter", new FileOrigin(onDisk, 5, 8)))
+        };
+
+        var result = await BuildHandler(index).Handle(ForDoc(asOpened), CancellationToken.None);
+
+        Assert.Equal(5, Assert.Single(result!).Range.Start.Line);
+    }
+
     [Fact]
     public async Task Handle_DocumentWithSymbolAndZeroRefs_ReturnsLensWithZeroCount()
     {

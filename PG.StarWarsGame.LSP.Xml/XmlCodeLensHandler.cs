@@ -81,13 +81,16 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
 
     // One lens per dynamic enum value this document defines - in an enum file, or a GameConstants list -
     // counting its uses: references to enum:<Enum>/<Value>, as the parser records them and rename edits them.
+    // Matched by the documents' own comparer: a path spelled differently on a case-insensitive file system
+    // is the same file, and lost every value lens under a plain string compare.
     private IEnumerable<LspCodeLens> EnumValueLenses(string uri, GameIndex index)
     {
         var messages = _messages;
         foreach (var (enumName, values) in index.WorkspaceEnumValueDefinitions)
         foreach (var (value, origin) in values)
         {
-            if (!origin.IsNavigable || _fileHelper.NormalizeUri(origin.Uri) != uri) continue;
+            if (!origin.IsNavigable ||
+                !DocumentUris.Comparer.Equals(_fileHelper.NormalizeUri(origin.Uri), uri)) continue;
             var refs = index.WorkspaceReferences.TryGetValue($"enum:{enumName}/{value}", out var found)
                 ? found
                 : [];
