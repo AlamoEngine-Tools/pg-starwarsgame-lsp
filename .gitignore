@@ -533,3 +533,6 @@ lua_debugger/
 # The test protocol is tracked whole: its setup scripts write the fixtures, and a fixture is the file a
 # test reads, whatever its name - a .ps1, a .code-workspace, a Docs folder
 !/test-protocol/**
+
+# The UI protocol tests' VS Code download and its driver (ui-test/wdio.conf.ts)
+/.wdio-vscode-service/

@@ -23,6 +23,8 @@
   "exclude": [
     "src/webview",
     "node_modules",
+    /* The UI protocol tests run under WebdriverIO with their own tsconfig - see ui-test. */
+    "ui-test",
     /* The shader rig's probe is browser code bundled by the rig itself - see scripts/shader-rig. */
     "scripts/shader-rig"
   ]
