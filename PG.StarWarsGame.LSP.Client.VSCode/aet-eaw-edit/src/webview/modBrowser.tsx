@@ -1273,14 +1273,15 @@ function Separator(): React.JSX.Element {
     );
 }
 
-/** Why a node opens nothing: a name nothing defines, a place rather than an entry, or an empty list. */
+/**
+ * Why a node opens nothing: an empty list's reason, or the row's own - the table's rule, so a packed
+ * definition reads the same in the rail as in the table.
+ */
 function inertReason(node: RailNode): string {
     if (node.kind === "list") {
         return reasonLabel(node.reason);
     }
-    return node.row.origin === "missing"
-        ? l10n.t("Nothing defines this name")
-        : l10n.t("Not an entry of its own");
+    return rowInertReason(node.row) ?? "";
 }
 
 /** A list's rows as the shared table: a click selects, a double click or Enter opens, F12 goes to the definition. */
