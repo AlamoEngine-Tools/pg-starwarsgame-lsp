@@ -8,7 +8,7 @@ import { inNewestWebview } from "./storyGraph.js";
 import { openOutline, railChildren, railClick, railExpand, rows, search, selectRow, tableReady } from "./modBrowser.js";
 import { TAG_RELATIONS } from "./PRV-34.relations.js";
 
-const mod = localValues<{ modOnly: string }>("PRV-34");
+const mod = localValues<{ modOnly: string; leafName: string }>("PRV-34");
 
 describe("PRV-34", () => {
     before(async () => {
@@ -22,7 +22,7 @@ describe("PRV-34", () => {
             await railClick("Game Objects");
             await tableReady();
             await search(mod.modOnly);
-            expect((await rows()).find((r) => r.cells[0] === mod.modOnly)?.cells[3]).toBe("This mod");
+            expect((await rows()).find((r) => r.cells[0] === mod.modOnly)?.cells[3]).toBe(mod.leafName);
             await selectRow(mod.modOnly);
             await railExpand(mod.modOnly, 1);
             const own = await railChildren(mod.modOnly);

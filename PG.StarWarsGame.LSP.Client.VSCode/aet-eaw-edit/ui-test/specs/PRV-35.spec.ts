@@ -42,7 +42,7 @@ describe("PRV-35", () => {
             await tableReady();
             await search("Acclamator");
             const row = (await rows()).find((r) => r.cells[0] === "Acclamator_Assault_Ship")!;
-            expect(row.cells[3]).toBe("This mod");
+            expect(row.cells[3]).toBe("PRV Mod");
             expect(row.tags).toEqual(["Overrides - PRV Base"]);
 
             await selectRow("Acclamator_Assault_Ship");

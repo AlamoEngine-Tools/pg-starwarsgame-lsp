@@ -189,29 +189,31 @@ export function relationLabel(relation: string): string {
 }
 
 /**
- * Where an entry comes from, as the panel names it: the root project is this mod, a dependency is
- * named, then the game. The word "layer" is the plan's, never the panel's.
+ * Where an entry comes from, as the panel names it: every project by its own name - the root one
+ * too, so a workspace of several reads the same as one - then the game. The word "layer" is the
+ * plan's, never the panel's.
  */
 export function originLabel(
     origin: string,
     originName: string | null | undefined,
     layers: readonly SymbolLayer[],
 ): string {
+    const root = layers.reduce<SymbolLayer | undefined>(
+        (top, l) => (top === undefined || l.rank > top.rank ? l : top),
+        undefined,
+    );
     switch (origin) {
         case "game":
             return l10n.t("Game");
         case "project":
-            return l10n.t("This project");
+            // A file no project declares the folder of: it is in the workspace, so the root's.
+            return root?.name ?? l10n.t("This project");
         case "missing":
             return l10n.t("Not found");
         case "schema":
             return l10n.t("Schema");
     }
     const rank = Number(origin.slice("layer:".length));
-    const leaf = Math.max(-1, ...layers.map((l) => l.rank));
-    if (layers.length > 1 && rank === leaf) {
-        return l10n.t("This mod");
-    }
     return originName ?? layers.find((l) => l.rank === rank)?.name ?? origin;
 }
 

@@ -245,6 +245,43 @@ public sealed class AssetCatalogBuilderTest
         Assert.True(svc.Current.AssetFiles.Contains("data/art/textures/shared.tga"));
         Assert.True(svc.Current.AssetFiles.Contains("data/art/models/leaf.alo"));
         Assert.False(svc.Current.AssetFiles.Contains("data/art/models/replaced.alo"));
+        // A packed entry belongs to the project whose folder holds its archive.
+        Assert.Equal(0, svc.Current.AssetFiles.LayerRankOf("data/art/textures/shared.tga"));
+        Assert.Equal(1, svc.Current.AssetFiles.LayerRankOf("data/art/models/leaf.alo"));
+    }
+
+    /// <summary>
+    ///     A loose asset is catalogued with the project it comes from, so the Mod Browser can name it;
+    ///     of two projects shipping one path, the higher one's copy is the one the game reads.
+    /// </summary>
+    [Fact]
+    public void Apply_RemembersWhichProjectALooseAssetComesFrom()
+    {
+        var leaf = Root("leaf");
+        var dependency = Root("dependency");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(dependency, "Data", "Art", "Models", "Core.alo")] = new(""),
+            [Path.Combine(dependency, "Data", "Art", "Models", "Shared.alo")] = new(""),
+            [Path.Combine(leaf, "Data", "Art", "Models", "Shared.alo")] = new(""),
+            [Path.Combine(leaf, "Data", "Art", "Models", "Leaf.alo")] = new("")
+        });
+        var svc = new FakeGameIndexService(GameIndex.Empty);
+        var builder = Build(fs, svc);
+        var config = new WorkspaceConfiguration([], [], [], [], null)
+        {
+            Layers =
+            [
+                AssetLayer(0, dependency, Path.Combine(dependency, "Data", "Art")),
+                AssetLayer(1, leaf, Path.Combine(leaf, "Data", "Art"))
+            ]
+        };
+
+        builder.Apply(config);
+
+        Assert.Equal(0, svc.Current.AssetFiles.LayerRankOf("data/art/models/core.alo"));
+        Assert.Equal(1, svc.Current.AssetFiles.LayerRankOf("data/art/models/shared.alo"));
+        Assert.Equal(1, svc.Current.AssetFiles.LayerRankOf("data/art/models/leaf.alo"));
     }
 
     /// <summary>
