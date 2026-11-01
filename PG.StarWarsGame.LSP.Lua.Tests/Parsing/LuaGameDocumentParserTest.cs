@@ -147,6 +147,36 @@ public sealed class LuaGameDocumentParserTest
         Assert.Equal("        \"".Length, origin.Column);
     }
 
+    // A use of a force by its name is a reference to the global the table defines - what definition,
+    // references and rename answer from. The analyzer's own definition lands on a line generated for it
+    // alone, which maps to nothing in the script.
+    [Fact]
+    public async Task ParseAsync_TaskForceUsedByName_IsAReferenceToTheForce()
+    {
+        const string text = """
+                            function Definitions()
+                                TaskForce = {
+                                { "MainForce", "Air = 1, 5" }
+                                }
+                            end
+                            function MainForce_Thread()
+                                AssembleForce(MainForce)
+                                MainForce.Produce_Force()
+                            end
+                            """;
+
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, TestContext.Current.CancellationToken);
+
+        var uses = result.References.Where(r => r.TargetId == "MainForce").ToList();
+        Assert.Equal([(6, 18), (7, 4)], uses.Select(r => (r.Line, r.Column)));
+        Assert.All(uses, r =>
+        {
+            Assert.Equal(GameSymbolKind.LuaGlobal, r.ExpectedKind);
+            Assert.Equal("TaskForce", r.ExpectedTypeName);
+            Assert.Equal("MainForce".Length, r.Length);
+        });
+    }
+
     [Fact]
     public async Task ParseAsync_TaskForceTable_IgnoresLaterStringsOfAnEntry()
     {

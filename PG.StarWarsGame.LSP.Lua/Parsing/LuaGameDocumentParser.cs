@@ -108,10 +108,20 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
     private List<GameReference> CollectReferences(SyntaxNode root, string documentUri)
     {
         var references = new List<GameReference>();
+        // The script's own task forces: a use by name is a reference to the global its table defines.
+        var forces = LuaTaskForceTable.Forces(root).Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
 
         foreach (var node in root.DescendantNodes())
             switch (node)
             {
+                case IdentifierNameSyntax force when forces.Contains(force.Name) &&
+                                                     force.Parent is not FunctionCallExpressionSyntax:
+                {
+                    var at = force.GetLocation().GetLineSpan().StartLinePosition;
+                    references.Add(new GameReference(force.Name, GameSymbolKind.LuaGlobal,
+                        LuaTaskForceTable.WrapperTypeName, documentUri, at.Line, at.Character, force.Name.Length));
+                    break;
+                }
                 case FunctionCallExpressionSyntax { Expression: IdentifierNameSyntax callee } call:
                 {
                     var functionName = callee.Name;
