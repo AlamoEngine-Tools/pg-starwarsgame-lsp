@@ -156,7 +156,11 @@ import {
     type LightRig,
     type Wind,
 } from "./viewerSettings";
-import { HEAT_LAYER, ParticleSystemInstance } from "./particleRenderer";
+import {
+    type EmitterProbe,
+    HEAT_LAYER,
+    ParticleSystemInstance,
+} from "./particleRenderer";
 import {
     alamoBoneName,
     alamoNodeName,
@@ -1449,6 +1453,70 @@ export class PreviewViewport {
         };
     }
 
+    /**
+     * Every running particle system's emitters as their last frame left them, and where the camera
+     * stands. For the UI tests, through the page's debug handle: whether a field is full, drifts,
+     * stays frozen or is drawn back to front is a question about the simulation, not the pixels.
+     */
+    particleProbe(): {
+        camera: Vector3Like;
+        systems: { id: string; emitters: EmitterProbe[] }[];
+    } {
+        return {
+            camera: this.cameraPosition,
+            systems: [...this.particleSystems.values()].map((entry) => ({
+                id: entry.id,
+                emitters: entry.instance.probe(),
+            })),
+        };
+    }
+
+    /**
+     * Renders one frame and counts the canvas pixels that differ from its dominant colour, for the UI
+     * tests. With the heat Debug view on, the dominant colour is the neutral field and the rest is the
+     * heat the camera sees - whether a hull in front of a haze hides it is a depth test on the GPU, so
+     * the pixels are the only place to read it. Read in the same task as the render, so the drawing
+     * buffer still holds the frame.
+     */
+    canvasCoverage(): { lit: number; total: number } {
+        this.renderFrame();
+        const gl = this.renderer.getContext();
+        const width = gl.drawingBufferWidth;
+        const height = gl.drawingBufferHeight;
+        const pixels = new Uint8Array(width * height * 4);
+        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const counts = new Map<number, number>();
+        for (let i = 0; i < pixels.length; i += 4) {
+            const key =
+                (pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2];
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        let dominant = 0;
+        let most = -1;
+        for (const [key, count] of counts) {
+            if (count > most) {
+                most = count;
+                dominant = key;
+            }
+        }
+        const [r, g, b] = [
+            (dominant >> 16) & 255,
+            (dominant >> 8) & 255,
+            dominant & 255,
+        ];
+        let lit = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+            const departure =
+                Math.abs(pixels[i] - r) +
+                Math.abs(pixels[i + 1] - g) +
+                Math.abs(pixels[i + 2] - b);
+            if (departure > 3) {
+                lit++;
+            }
+        }
+        return { lit, total: width * height };
+    }
+
     /** The bounding sphere a preset is resolved against, so the caller sizes the shot correctly. */
     get subjectSphere(): { center: Vector3Like; radius: number } {
         return this.boundingSphere();
@@ -1552,7 +1620,8 @@ export class PreviewViewport {
      * Sets the one wind the scene has.
      *
      * Read by the foliage shaders through their own semantics and by the 484 emitters that set
-     * `affectedByWind`, which take it into their initial speed at birth.
+     * `affectedByWind`: an ordinary one gains half of it as speed every frame, a weather field
+     * drifts with five times it - see `stepParticle` and the weather step.
      */
     setWind(headingDegrees: number, speed: number): void {
         this.wind = { heading: headingDegrees, speed };
