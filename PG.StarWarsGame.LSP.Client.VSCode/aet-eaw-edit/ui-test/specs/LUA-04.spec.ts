@@ -1,4 +1,5 @@
-﻿// LUA-04: the analyzer's findings are folded under LuaAnalyzer ids; type rules are dropped; a surplus argument kept.
+﻿// LUA-04: the analyzer's findings are folded under LuaAnalyzer ids; type rules are dropped; a surplus argument and a
+// member an engine type does not have are kept.
 import { expect } from "@wdio/globals";
 import { serverReady } from "../protocol.js";
 import { diagnostics, diagnosticsWhen } from "./xmlEditor.js";
@@ -19,6 +20,7 @@ describe("LUA-04", () => {
             [14, "aetswg-016-0006"],
             [19, "aetswg-016-0002"],
             [20, "aetswg-016-0011"],
+            [23, "aetswg-016-0012"],
         ];
         let all = await diagnostics(file);
         try {
@@ -35,7 +37,8 @@ describe("LUA-04", () => {
         expect(all.filter((d) => d.line === 21).map((d) => [d.code, d.message])).toEqual([
             ["aetswg-006-0019", "Global 'Sleep' is defined in 'Pgbase' which is not required."],
         ]);
-        expect(at(23)).toEqual([]);
+        // An engine type defines all of its members: Find_Player's Player has no No_Such_Method.
+        expect(at(23)).toEqual(["aetswg-016-0012"]);
         expect(all.every((d) => d.code.startsWith("aetswg-"))).toBe(true);
         expect(all.filter((d) => /undefined-field|param-type-mismatch|missing-parameter|need-check-nil/.test(d.code))).toEqual([]);
 

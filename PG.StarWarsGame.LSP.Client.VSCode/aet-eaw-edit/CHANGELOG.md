@@ -488,6 +488,8 @@
 - **New, reused script state** - `Engine14` to `Engine17` (`aetswg-011-0014` to `aetswg-011-0017`)
 - **New, Lua calls** - `Engine18` (`aetswg-011-0018`, a call fitting none of an engine function's call forms) and
   `LuaAnalyzer11` (`aetswg-016-0011`, an argument past a Lua function's parameters)
+- **New, engine members** - `LuaAnalyzer12` (`aetswg-016-0012`, a member an engine type does not have, such as
+  `Is_Evil` on a player)
 - **New, Lua 5.1 syntax** - `Syntax3011` (`aetswg-012-3011`)
 - **New, particle files** - `Preview22` (`aetswg-014-0022`, data the game's reader has no case for) and
   `Preview23` (`aetswg-014-0023`, editor data the game leaves unapplied)

@@ -273,8 +273,9 @@ analyzer and merges both answers.
   both offer; a rename of an engine name or a game object stays this server's, and an analyzer rename that would edit
   a file outside the project's scripts is refused
 - **Diagnostics** - one list per script. Kept from the analyzer: rules that hold for any Lua, as `LuaAnalyzer1` to
-  `LuaAnalyzer10` (`aetswg-016-*`); a syntax error is `Syntax3010`. Dropped: rules that depend on the stubs being
-  complete (missing or mismatched parameters, undefined fields), and every rule a future analyzer version adds
+  `LuaAnalyzer11` (`aetswg-016-*`), and a member an engine type does not have as `LuaAnalyzer12` - the engine defines
+  all of its members; a syntax error is `Syntax3010`. Dropped: rules that depend on the stubs being complete
+  (missing or mismatched parameters, a field of a Lua table), and every rule a future analyzer version adds
 - **Not bundled** - on a platform without the bundled analyzer, string-argument completion, engine hover, navigation
   and rename remain
 

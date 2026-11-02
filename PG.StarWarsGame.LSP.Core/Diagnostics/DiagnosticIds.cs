@@ -1139,4 +1139,7 @@ public static class DiagnosticIds
 
     /// <summary>An argument past the parameters of the Lua function called, which Lua drops.</summary>
     public static readonly DiagnosticId LuaAnalyzerRedundantParameter = new(DiagnosticGroup.LuaAnalyzer, 11);
+
+    /// <summary>A member an engine type does not have: the engine defines all of its members.</summary>
+    public static readonly DiagnosticId LuaAnalyzerUndefinedField = new(DiagnosticGroup.LuaAnalyzer, 12);
 }
