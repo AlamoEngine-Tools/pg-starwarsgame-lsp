@@ -140,3 +140,51 @@ export async function emitters(): Promise<string[]> {
     );
     return names;
 }
+
+export interface Note {
+    /** The row's severity mark: error, warning or info. */
+    tone: string;
+    /** The diagnostic id the row ends with, or "". */
+    id: string;
+    text: string;
+}
+
+/**
+ * The preview's notes as the severity tag in the dock header opens them, once it holds `count` of them.
+ * Run inside the preview's webview.
+ */
+export async function previewNotes(count: number, timeout = 120_000): Promise<Note[]> {
+    let tag = "";
+    try {
+        await browser.waitUntil(
+            async () => {
+                tag = await browser.execute(() =>
+                    Array.from(document.querySelectorAll(".validate-btn"))
+                        .map((b) => b.getAttribute("title") ?? "")
+                        .join(" | "),
+                );
+                return tag === (count === 1 ? "Read 1 note" : `Read ${count} notes`);
+            },
+            { timeout, interval: 250 },
+        );
+    } catch {
+        const buttons = await browser.execute(() =>
+            Array.from(document.querySelectorAll("button"))
+                .map((b) => `${b.className}=${b.getAttribute("title") ?? ""}`)
+                .join("; "),
+        );
+        throw new Error(`The severity tag never offered ${count} notes; it said '${tag}'. Buttons: ${buttons}`);
+    }
+    await press(".validate-btn");
+    await browser.$(".preview-problems .problem-row").waitForExist({ timeout: 10_000 });
+    const rows = await browser.execute(() =>
+        Array.from(document.querySelectorAll(".preview-problems .problem-row")).map((row) => ({
+            tone: (row.querySelector('[class*="sev-"]')?.className.match(/sev-(\w+)/) ?? [])[1] ?? "",
+            text: ((row as HTMLElement).innerText ?? "").replace(/\s+/g, " ").trim(),
+        })),
+    );
+    return rows.map((row) => {
+        const id = / (aetswg-\d{3}-\d{4})$/.exec(row.text)?.[1] ?? "";
+        return { tone: row.tone, id, text: id === "" ? row.text : row.text.slice(0, -(id.length + 1)) };
+    });
+}
