@@ -249,8 +249,11 @@
   - A **Mod Browser** view with the outlines Game Data, Assets, Scripts and Schema; one panel per project
   - A rail drawn as VS Code's tree, with its keys and a picture per kind, of lists, their entries and each entry's
     relations, whose path is the breadcrumb; the rail and the search form are resized by dragging
+  - A click on a list's row opens the entry's relations in the rail; the keys select without opening
   - A table paged and sorted on the server, with a search form - name, what it behaves like with its count,
-    origin - and a filter in each column header writing into it; column widths and order kept per list
+    origin - and a filter in each column header writing into it; column widths and order kept per list, and
+    left as they are by filtering and sorting
+  - An entry's origin names the project or dependency that defines it, or `Game`
   - Previews as tiles on a fixed grid per type: a game object's problems, encyclopedia card and references; a
     model's counts, tree of bones, meshes and effects, textures, particle systems and animations; a script's
     size, lines, loaders and requires; a schema tag's documentation. A type with nothing to show has none

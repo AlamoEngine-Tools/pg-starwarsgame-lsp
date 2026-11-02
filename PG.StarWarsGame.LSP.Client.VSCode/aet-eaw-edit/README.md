@@ -608,12 +608,14 @@ Read-only.
   path to the open one is the breadcrumb
   - Keys: up and down, `Page Up`, `Page Down`, `Home`, `End`; right opens a row, then goes to its first child;
     left closes it, then goes to its parent; `Enter` opens, `Space` selects, `F12` goes to the definition
+  - A click on a list's row opens that entry's relations in the rail; the keys select without opening
   - Width dragged by its right edge, and kept
-- **Lists** - each entry once, as the definition the game uses, with its origin and what it overrides
+- **Lists** - each entry once, as the definition the game uses, with its origin - the project or dependency
+  that defines it, by name, or `Game` - and what it overrides
   - Paged on the server, 200 at a time, and sorted there by a header click: name, type, behaves like, origin
   - Search form: name, what it behaves like with its count, origin; its height dragged by its top edge
   - A filter in each column header, writing into the same search
-  - Column widths and order dragged in the header, kept per list
+  - Column widths and order dragged in the header, kept per list; filtering and sorting leave them as they are
 - **Relations** - computed for one entry, when it opens; an empty one counted zero, with the reason
   - Game objects: models, particle systems, particles, SFX and speech events, hardpoints, other references,
     textures, Lua script, references, overrides - the definitions the one the game uses replaces, each opening
