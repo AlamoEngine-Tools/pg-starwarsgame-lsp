@@ -1,0 +1,7 @@
+{
+    "name": "aet-ui-no-extension",
+    "description": "Stands in for the extension under development when a UI test runs the installed VSIX instead.",
+    "publisher": "aet-ui",
+    "version": "0.0.0",
+    "engines": { "vscode": "*" }
+}

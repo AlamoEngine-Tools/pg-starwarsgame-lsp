@@ -85,7 +85,7 @@ if (-not $KeepFiles) {
     $setup = Join-Path $here 'Setup-TestProtocol.ps1'
     $fixtures = Join-Path $here 'fixtures'
     $own = Test-Path (Join-Path $fixtures $id)
-    $extra = @('LUA-25', 'LUA-26', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRJ-24', 'PRJ-25', 'XML-29', 'XML-30') -contains $id
+    $extra = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRJ-24', 'PRJ-25', 'XML-29', 'XML-30') -contains $id
     # A test that writes no files of its own runs in another test's folder: that test writes it clean.
     if (-not $own -and $open -and $open -match '^([CD]):\\temp\\([^\\]+)') {
         $drive, $folder = $Matches[1], $Matches[2]

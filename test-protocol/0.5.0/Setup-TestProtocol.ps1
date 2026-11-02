@@ -12,7 +12,8 @@
     On demand only, because they are another state of files other tests use: XML-14 (the XML-01 files with
     stray backticks), XML-15 (Xml_Test.xml as XML-12's first step leaves it), PRJ-15 (beta\beta.pgproj
     renamed to beta.pgproj.off), LUA-26 (no launch.json in eaw\.vscode - an existing one is renamed to
-    launch.json.aet-off), LUA-27 and LUA-28 (their launch.json).
+    launch.json.aet-off), LUA-27 and LUA-28 (their launch.json), LUA-34 (stages the bundled executables and
+    packs the win32-x64 VSIX to C:\temp\aet-vscode\LUA-34-vsix - minutes, so not part of a full set-up).
 
     Also done here: PRJ-17 and PRJ-18 copy the archives they read, LUA-25 copies the schema and edits its
     Find_Player annotation, PRV-36 generates its two particle files, and PRJ-24, PRJ-25, XML-29 and
@@ -37,9 +38,9 @@ $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $repo = (Resolve-Path (Join-Path $here '..\..')).Path
 $fixtures = Join-Path $here 'fixtures'
-$onDemand = @('XML-14', 'XML-15', 'PRJ-15', 'LUA-26', 'LUA-27', 'LUA-28')
+$onDemand = @('XML-14', 'XML-15', 'PRJ-15', 'LUA-26', 'LUA-27', 'LUA-28', 'LUA-34')
 $loadOrderTests = @('PRJ-24', 'PRJ-25', 'XML-29', 'XML-30')
-$extras = @('LUA-25', 'LUA-26', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36') + $loadOrderTests
+$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36') + $loadOrderTests
 
 function Get-RootOf([string] $root) {
     switch ($root) {
@@ -95,6 +96,18 @@ function Invoke-Extra([string] $testId) {
         }
         'PRJ-17' {
             python (Join-Path $here 'make_archive.py') 'C:\temp\aet-test-PRJ-meg\Data\ScratchScripts.meg'
+        }
+        'LUA-34' {
+            # The shipped package: the bundled server and analyzer staged beside the client, then packed.
+            $dest = 'C:\temp\aet-vscode\LUA-34-vsix'
+            New-Item -ItemType Directory -Force $dest | Out-Null
+            & (Join-Path $repo 'scripts\stage-bundled-executables.ps1')
+            Push-Location (Join-Path $repo 'PG.StarWarsGame.LSP.Client.VSCode\aet-eaw-edit')
+            try {
+                npx --yes @vscode/vsce package --no-dependencies --target win32-x64 -o (Join-Path $dest 'aet-eaw-edit.vsix')
+                if ($LASTEXITCODE -ne 0) { throw "LUA-34: packaging the VSIX failed." }
+            }
+            finally { Pop-Location }
         }
         'PRJ-18' {
             # Named as MegaFiles.xml lists them.
