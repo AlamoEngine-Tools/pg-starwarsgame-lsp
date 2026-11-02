@@ -39,6 +39,11 @@ describe("LUA-03", () => {
         await insertLine(interdictor, 108, "\tFind_Player(");
         const help = await signatureHelp(interdictor, { line, text: "Find_Player(", offset: 12 });
         expect(help?.label).toMatch(/faction_name: \(?string\|"local"\)?/);
+        // The reported failure: the completion there offered every local and global of the file. Before the
+        // quotes it offers the values quoted - "local" and the factions - and nothing else.
+        const offered = (await completions(interdictor, { line, text: "Find_Player(", offset: 12 })).map((c) => c.label);
+        expect(offered).toEqual(expect.arrayContaining(['"local"', '"Empire"', '"Rebel"']));
+        expect(offered.filter((l) => !l.startsWith('"'))).toEqual([]);
         await revert(interdictor);
     });
 

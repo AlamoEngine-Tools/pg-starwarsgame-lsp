@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<LocalisationData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Localisation Key="TEXT_AET_SET17_UNIT">
+    <TranslationData>
+      <Translation Language="GERMAN"><![CDATA[Testeinheit aus XML]]></Translation>
+      <Translation Language="ENGLISH"><![CDATA[Test unit from XML]]></Translation>
+    </TranslationData>
+  </Localisation>
+</LocalisationData>

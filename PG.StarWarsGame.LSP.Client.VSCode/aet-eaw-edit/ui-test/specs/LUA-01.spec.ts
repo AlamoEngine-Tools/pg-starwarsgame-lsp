@@ -6,11 +6,20 @@ import { documentSymbols, hoverWhen, plain, script } from "./luaEditor.js";
 
 const SERVER = "Alamo Engine Tools - Empire at War Edit";
 const interdictor = script("Gameobject", "Interdictor.lua");
+const story = script("Story", "Story_campaign_empire_act_i.lua");
 const USAGES = /^\d+ usages?$/;
 
 describe("LUA-01", () => {
     before(async () => {
         await serverReady();
+    });
+
+    // The reported failure: Ctrl+Shift+O right after a script opened said "No editor symbols". Asked once, at
+    // once, on a script nothing has touched yet - the outline starts the analyzer and waits for it.
+    it("lists a script's functions when its outline is asked for as it opens", async () => {
+        expect(await documentSymbols(story)).toEqual(
+            expect.arrayContaining(["Definitions", "State_ActI_Fondor_Rebels_00", "Story_Mode_Service"]),
+        );
     });
 
     it("starts the analyzer for the project's scripts and merges its hover under this server's", async () => {

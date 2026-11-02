@@ -32,4 +32,13 @@ describe("LUA-16", () => {
         const edits = (await rename(interdictor, { line: 47, text: '"State_Init"', offset: 2 }, "State_Start")).edits;
         expect(edits.map((p) => p.replace(/^.*[\\/]/, ""))).toEqual(["Interdictor.lua:47"]);
     });
+
+    // The reported failure: renaming the handler left Define_State's argument behind, and the argument could not
+    // be renamed at all. Either one now renames both, and the quoted state name stays as it is.
+    it("renames a handler and its Define_State argument together, from either one", async () => {
+        const fromFunction = (await rename(interdictor, { line: 51, text: "State_Init" }, "State_Begin")).edits;
+        expect(fromFunction.map((p) => p.replace(/^.*[\\/]/, "")).sort()).toEqual(["Interdictor.lua:47", "Interdictor.lua:51"]);
+        const fromArgument = (await rename(interdictor, { line: 47, text: "State_Init", nth: 2 }, "State_Begin")).edits;
+        expect(fromArgument.map((p) => p.replace(/^.*[\\/]/, "")).sort()).toEqual(["Interdictor.lua:47", "Interdictor.lua:51"]);
+    });
 });

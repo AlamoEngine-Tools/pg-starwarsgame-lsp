@@ -20,6 +20,13 @@ describe("LUA-05", () => {
 
         await replaceLine(file, 4, '    local s = "unterminated"');
         await diagnosticsWhen(file, (d) => !d.some((x) => x.code === "aetswg-012-3010"), 60_000, "The syntax errors stay");
+
+        // The reported failure: an error took a while to show. Broken again, it is reported within moments of the
+        // edit - about half a second measured; the bound leaves room for a busy machine.
+        const broken = Date.now();
+        await replaceLine(file, 4, '    local s = "unterminated');
+        await diagnosticsWhen(file, (d) => d.some((x) => x.code === "aetswg-012-3010"), 10_000, "The error did not come back");
+        expect(Date.now() - broken).toBeLessThan(3_000);
         await revert(file);
     });
 

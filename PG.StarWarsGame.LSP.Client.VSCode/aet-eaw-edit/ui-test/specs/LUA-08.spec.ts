@@ -2,7 +2,7 @@
 import { expect } from "@wdio/globals";
 import { serverReady } from "../protocol.js";
 import { diagnostics, diagnosticsWhen, replaceLine } from "./xmlEditor.js";
-import { definition, hoverWhen, revert, script } from "./luaEditor.js";
+import { completions, definition, hoverWhen, insertLine, plain, revert, script } from "./luaEditor.js";
 
 const file = script("AI", "Raidplan.lua");
 
@@ -29,5 +29,17 @@ describe("LUA-08", () => {
         ]);
         await revert(file);
         await diagnosticsWhen(file, (d) => !d.some((x) => x.code === "aetswg-011-0007"), 60_000, "The error stays after the undo");
+    });
+
+    // The reported failure: RaidForce was no TaskForce to the analyzer. A member it does not have is NOT
+    // reported: the analyzer's undefined-field rule is dropped server-wide (LuaAnalyzerRulePolicy) - an open
+    // question in the protocol.
+    it("knows RaidForce as a TaskForce: its hover and its members", async () => {
+        expect(plain(await hoverWhen(file, { line: 68, text: "RaidForce" }, (c) => c.join("\n").includes("TaskForce")))).toContain(
+            "TaskForce",
+        );
+        const line = await insertLine(file, 68, "\tRaidForce.");
+        expect((await completions(file, { line, text: "RaidForce.", offset: 10 })).map((c) => c.label)).toContain("Produce_Force");
+        await revert(file);
     });
 });
