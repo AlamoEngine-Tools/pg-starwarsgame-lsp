@@ -289,6 +289,10 @@
   `Find_Player("Rebel")` in a project with no faction file of its own was reported as naming an object that
   does not exist. The finding now says the check cannot be made, as the XML side already did, and the error
   stays for a name that is missing where its type is indexed
+- **The baseline builder reads the game's factions** - no shipped baseline held a faction, so vanilla's Rebel,
+  Empire and Underworld resolved only through a Factions.xml the mod ships itself, and a library project
+  whose consumers supply that file saw every faction name as missing. A rebuilt baseline carries the eight
+  shipped factions
 - **A missing story file says where a file of that name sits** - the game opens a listed plot or story file at
   the listed path and nowhere else, so a mission plot filed one folder down never loads. The finding now names
   every file of that name in the project's layers, instead of leaving the author to search the tree

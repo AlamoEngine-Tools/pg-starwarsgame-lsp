@@ -166,6 +166,25 @@ public sealed class GameSymbolProjectorTest
         Assert.Contains("SHADOWBLOBMATERIALS", origin.Uri, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ── Factions ───────────────────────────────────────────────────────────────
+
+    // The engine keeps factions in a manager of their own that PG.StarWarsGame.Engine does not
+    // expose, so until 2026-11-07 no baseline carried one and vanilla's Rebel and Empire resolved
+    // nowhere a mod shipped no Factions.xml of its own.
+    [Fact]
+    public void Project_Faction_TypeNameIsFaction()
+    {
+        var entry = Entry("Rebel", "FACTION", "DATA\\XML\\FACTIONS.XML", 8);
+        var result = Build().Project([], [], "hash", factions: [entry]);
+
+        var symbol = result.Symbols["Rebel"];
+        Assert.Equal("Faction", symbol.TypeName);
+        Assert.Equal(GameSymbolKind.XmlObject, symbol.Kind);
+        var origin = Assert.IsType<FileOrigin>(symbol.Origin);
+        Assert.Contains("FACTIONS", origin.Uri, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(8, origin.Line);
+    }
+
     // ── Symbol fields ──────────────────────────────────────────────────────────
 
     [Fact]

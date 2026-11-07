@@ -23,7 +23,8 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         string sourceManifestHash,
         IEnumerable<ProjectableEntry>? musicEvents = null,
         IEnumerable<ProjectableEntry>? shadowBlobMaterials = null,
-        IEnumerable<ProjectableEntry>? singletons = null)
+        IEnumerable<ProjectableEntry>? singletons = null,
+        IEnumerable<ProjectableEntry>? factions = null)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, GameSymbol>();
         var objectTags = ImmutableDictionary.CreateBuilder<string, ImmutableArray<BaselineTag>>(
@@ -70,6 +71,17 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         foreach (var entry in shadowBlobMaterials ?? [])
         {
             var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, "ShadowBlobMaterial",
+                ResolveOrigin(entry.Location), null);
+            builder[sym.Id] = sym;
+        }
+
+        // Same stopgap again: the engine keeps factions in a manager of their own that
+        // PG.StarWarsGame.Engine does not expose - entries come from FactionReader over the files the
+        // FactionFiles registry lists. Without them no baseline carried a faction, and a project that
+        // ships no Factions.xml of its own had vanilla's Rebel and Empire reported as missing.
+        foreach (var entry in factions ?? [])
+        {
+            var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, GameTypeNames.Faction,
                 ResolveOrigin(entry.Location), null);
             builder[sym.Id] = sym;
         }
