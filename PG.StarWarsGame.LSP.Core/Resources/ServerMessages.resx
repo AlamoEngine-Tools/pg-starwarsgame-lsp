@@ -2146,9 +2146,6 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="StoryGraph_SuspendedNeverActivated" xml:space="preserve">
     <value>This plot is suspended in campaign '{0}' and no STORY_ELEMENT reward activates it.</value>
   </data>
-  <data name="StoryGraph_TagOrder" xml:space="preserve">
-    <value>'{0}' appears after '{1}' - the engine expects the documented event tag order.</value>
-  </data>
   <data name="StoryHandlers_ApplyStoryChangeS" xml:space="preserve">
     <value>Apply story changes ({0})</value>
   </data>

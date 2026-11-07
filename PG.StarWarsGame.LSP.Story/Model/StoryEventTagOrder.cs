@@ -4,9 +4,12 @@
 namespace PG.StarWarsGame.LSP.Story.Model;
 
 /// <summary>
-///     The documented event block child-tag order ("Story Mode and Tutorial Scripting System").
-///     Tags not listed carry no order constraint. Param slots share their prefix's rank. Shared
-///     by the tag-order diagnostics and the canonical writer so both always agree.
+///     The event block child-tag order of the scripting document ("Story Mode and Tutorial
+///     Scripting System"), which the canonical writer follows when it inserts a tag. It is a
+///     tidiness convention, not a rule the game applies: the game reads each tag by name into its
+///     own slot and builds the event from the slots afterwards, so a file in any order runs the
+///     same, and hundreds of the shipped events are in another. Tags not listed carry no rank.
+///     Param slots share their prefix's rank.
 /// </summary>
 public static class StoryEventTagOrder
 {
