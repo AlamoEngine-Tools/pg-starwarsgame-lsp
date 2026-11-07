@@ -288,6 +288,19 @@
 - **A missing story file says where a file of that name sits** - the game opens a listed plot or story file at
   the listed path and nowhere else, so a mission plot filed one folder down never loads. The finding now names
   every file of that name in the project's layers, instead of leaving the author to search the tree
+- **Opening the campaign navigator and saving a story file take seconds on a large mod, not minutes** - a
+  story model was built per campaign and faction and cached under the campaign's name, so a mod with 1,077
+  campaign variants and 13 factions built 13,469 models from 98 manifest files, each parsing its story files
+  again: 135 seconds for the navigator on start, and the same work again for a story file's diagnostics on
+  every save. One build now serves every campaign that lists the same manifests, a story file is parsed once
+  per text, and the navigator's feed is built off the request thread, so the localisation views and the Mod
+  Browser no longer wait behind it. Measured on that mod: 3.4 seconds and 124 builds for the navigator, 3
+  seconds for a save
+- **The status bar is ready when the views are** - its check mark appeared the moment the index opened,
+  while the campaign navigator, the localisation views and the Mod Browser still said they were loading. The
+  bar now reads `Indexing symbols...`, then `Parsing campaigns...`, `Loading translations...` and
+  `Cataloguing assets...` as each feed is asked for, and several projects count as `ready` only once their
+  last feed has answered
 - **No warning for the order of an event's tags** - the story graph warned when an event's tags left the
   order of the scripting document, `'Prereq' appears after 'Story_Dialog_Popup'`. The game reads each tag by
   name into its own slot and builds the event from the slots afterwards, so the order in the file changes

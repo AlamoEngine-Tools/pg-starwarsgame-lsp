@@ -207,16 +207,58 @@ export function isInside(path: string, directory: string): boolean {
     return target === d || target.startsWith(d + "/");
 }
 
-/** Where one client stands. */
+/**
+ * Where one client stands. "loading" follows the index: the server's gate is open, and the feeds
+ * the views draw from - campaigns, translations, the Mod Browser's lists - are being asked for.
+ * A project is "ready" only once the last of them has answered, so the bar's check mark never
+ * precedes a view that still says it is loading.
+ */
 export type ClientState =
-    "starting" | "indexing" | "ready" | "failed" | "stopped";
+    "starting" | "indexing" | "loading" | "ready" | "failed" | "stopped";
+
+/** Which feed a loading project waits for, in the order they are asked. */
+export type LoadingPhase = "campaigns" | "translations" | "assets";
+
+export const LOADING_PHASES: readonly LoadingPhase[] = [
+    "campaigns",
+    "translations",
+    "assets",
+];
+
+/** What a project in a busy state is doing, as the bar says it. */
+export function phaseText(client: {
+    state: ClientState;
+    phase?: LoadingPhase;
+}): string | undefined {
+    switch (client.state) {
+        case "starting":
+            return l10n.t("Starting...");
+        case "indexing":
+            return l10n.t("Indexing symbols...");
+        case "loading":
+            switch (client.phase) {
+                case "translations":
+                    return l10n.t("Loading translations...");
+                case "assets":
+                    return l10n.t("Cataloguing assets...");
+                default:
+                    return l10n.t("Parsing campaigns...");
+            }
+        default:
+            return undefined;
+    }
+}
 
 /**
- * The status bar text. One client reads exactly as the single client always has; several count the
- * projects indexed and name any that failed or stopped.
+ * The status bar text. One client names its own phase; several count the projects ready, name
+ * the phase of the first one still busy, and name any that failed or stopped.
  */
 export function statusText(
-    clients: readonly { name: string; state: ClientState }[],
+    clients: readonly {
+        name: string;
+        state: ClientState;
+        phase?: LoadingPhase;
+    }[],
 ): string {
     if (clients.length === 1) {
         switch (clients[0].state) {
@@ -225,7 +267,12 @@ export function statusText(
             case "indexing":
                 return (
                     "$(loading~spin) " +
-                    l10n.t("EaWEdit LSP: Indexing workspace...")
+                    l10n.t("EaWEdit LSP: Indexing symbols...")
+                );
+            case "loading":
+                return (
+                    "$(loading~spin) " +
+                    l10n.t("EaWEdit LSP: {0}", phaseText(clients[0]) ?? "")
                 );
             case "failed":
                 return "$(error) " + l10n.t("EaWEdit LSP: Failed to start");
@@ -241,7 +288,13 @@ export function statusText(
     const ready = count("ready");
     const failed = count("failed");
     const stopped = count("stopped");
-    const busy = count("starting") + count("indexing");
+    const busyClients = clients.filter(
+        (c) =>
+            c.state === "starting" ||
+            c.state === "indexing" ||
+            c.state === "loading",
+    );
+    const busy = busyClients.length;
 
     const problems = [
         failed > 0 ? l10n.t("{0} failed", failed) : undefined,
@@ -249,15 +302,24 @@ export function statusText(
     ].filter((p) => p !== undefined);
     const icon =
         failed > 0 ? "$(error)" : busy > 0 ? "$(loading~spin)" : "$(check)";
-    const indexed =
+    // The first busy project's phase, so a reader sees what the wait is for.
+    const phase = busy > 0 ? phaseText(busyClients[0]) : undefined;
+    const counted =
         ready === clients.length
-            ? l10n.t("EaWEdit LSP: {0} projects indexed", ready)
-            : l10n.t(
-                  "EaWEdit LSP: {0} of {1} projects indexed",
-                  ready,
-                  clients.length,
-              );
-    return [`${icon} ${indexed}`, ...problems].join(", ");
+            ? l10n.t("EaWEdit LSP: {0} projects ready", ready)
+            : phase !== undefined
+              ? l10n.t(
+                    "EaWEdit LSP: {0} of {1} projects ready - {2}",
+                    ready,
+                    clients.length,
+                    phase,
+                )
+              : l10n.t(
+                    "EaWEdit LSP: {0} of {1} projects ready",
+                    ready,
+                    clients.length,
+                );
+    return [`${icon} ${counted}`, ...problems].join(", ");
 }
 
 function withSignature(spec: Omit<ClientSpec, "signature">): ClientSpec {

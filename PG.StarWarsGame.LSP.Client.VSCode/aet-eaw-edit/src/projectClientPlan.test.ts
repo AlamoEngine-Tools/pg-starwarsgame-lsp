@@ -369,7 +369,7 @@ describe("statusText", () => {
         l10n.config({
             contents: {
                 "EaWEdit LSP: Stopped": "TRANSLATED STOPPED",
-                "EaWEdit LSP: {0} projects indexed": "TRANSLATED {0}",
+                "EaWEdit LSP: {0} projects ready": "TRANSLATED {0}",
             },
         });
         try {
@@ -396,7 +396,7 @@ describe("statusText", () => {
         );
         assert.equal(
             statusText([{ name: "M", state: "indexing" }]),
-            "$(loading~spin) EaWEdit LSP: Indexing workspace...",
+            "$(loading~spin) EaWEdit LSP: Indexing symbols...",
         );
         assert.equal(
             statusText([{ name: "M", state: "ready" }]),
@@ -408,6 +408,45 @@ describe("statusText", () => {
         );
     });
 
+    // The bar showed its check mark the moment the index gate opened, while the campaign
+    // navigator, the localisation views and the Mod Browser were still loading their feeds -
+    // two minutes apart on a large mod. A project is ready when those feeds have answered, and
+    // until then the bar says which one it is waiting for.
+    it("names the feed it is loading after the index, and is ready only after the last", () => {
+        assert.equal(
+            statusText([{ name: "M", state: "loading", phase: "campaigns" }]),
+            "$(loading~spin) EaWEdit LSP: Parsing campaigns...",
+        );
+        assert.equal(
+            statusText([
+                { name: "M", state: "loading", phase: "translations" },
+            ]),
+            "$(loading~spin) EaWEdit LSP: Loading translations...",
+        );
+        assert.equal(
+            statusText([{ name: "M", state: "loading", phase: "assets" }]),
+            "$(loading~spin) EaWEdit LSP: Cataloguing assets...",
+        );
+    });
+
+    it("names the phase of the first project still loading among several", () => {
+        assert.equal(
+            statusText([
+                { name: "Rev", state: "ready" },
+                { name: "FotR", state: "loading", phase: "translations" },
+                { name: "TR", state: "indexing" },
+            ]),
+            "$(loading~spin) EaWEdit LSP: 1 of 3 projects ready - Loading translations...",
+        );
+        assert.equal(
+            statusText([
+                { name: "Rev", state: "ready" },
+                { name: "TR", state: "indexing" },
+            ]),
+            "$(loading~spin) EaWEdit LSP: 1 of 2 projects ready - Indexing symbols...",
+        );
+    });
+
     /** A declined project migration stops the server; the bar must not keep reading as running. */
     it("says a stopped server is stopped", () => {
         assert.equal(
@@ -416,21 +455,21 @@ describe("statusText", () => {
         );
     });
 
-    it("counts the projects indexed when there are several", () => {
+    it("counts the projects ready when there are several", () => {
         assert.equal(
             statusText([
                 { name: "Rev", state: "ready" },
                 { name: "FotR", state: "indexing" },
                 { name: "TR", state: "starting" },
             ]),
-            "$(loading~spin) EaWEdit LSP: 1 of 3 projects indexed",
+            "$(loading~spin) EaWEdit LSP: 1 of 3 projects ready - Indexing symbols...",
         );
         assert.equal(
             statusText([
                 { name: "Rev", state: "ready" },
                 { name: "FotR", state: "ready" },
             ]),
-            "$(check) EaWEdit LSP: 2 projects indexed",
+            "$(check) EaWEdit LSP: 2 projects ready",
         );
     });
 
@@ -440,7 +479,7 @@ describe("statusText", () => {
                 { name: "Rev", state: "ready" },
                 { name: "FotR", state: "failed" },
             ]),
-            "$(error) EaWEdit LSP: 1 of 2 projects indexed, 1 failed",
+            "$(error) EaWEdit LSP: 1 of 2 projects ready, 1 failed",
         );
     });
 });

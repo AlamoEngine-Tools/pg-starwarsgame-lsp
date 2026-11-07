@@ -76,12 +76,14 @@ import { isModFolder, projectOfferDue } from "./modLayout";
 import {
     type ClientSpec,
     type ClientState,
+    type LoadingPhase,
     clientSpecs,
     diagnosticCollectionNameFor,
     documentSelectorFor,
     isInside,
     ownerKey,
     ownsPath,
+    phaseText,
     planChanges,
     statusText,
 } from "./projectClientPlan";
@@ -332,6 +334,8 @@ interface ProjectClient {
     /** Requests to this project's server; offline once it failed or stopped. */
     gateway: LspGateway;
     state: ClientState;
+    /** Which feed a "loading" project waits for; cleared with every other state. */
+    phase?: LoadingPhase;
     /** This server's watchers over directories outside the workspace folders. */
     dependencyWatchers: vscode.Disposable[];
     /** Disposed with the client: a project's own trace channel, when it has one. */
@@ -1140,19 +1144,46 @@ function startProjectClient(
         },
     );
 
-    lspClient.onNotification("$/workspaceScanComplete", () => {
+    lspClient.onNotification("$/workspaceScanComplete", async () => {
         logLine(`${label}Workspace scan complete.`);
-        project.state = "ready";
-        updateStatus();
         // Only now does the server know which projects the workspace resolved to, so this is the
         // first moment the dependency directories can be asked for. The notification fires on
         // startup only, which is why a .pgproj change rebuilds them separately.
         void refreshDependencyWatchers(project);
-        // Both navigators fetch now rather than when they are first opened. A tree view only asks
-        // for its children on reveal, so without this the first click on either paid for a round
-        // trip - and until the scan finished they had nothing to show but a "loading" line.
-        void storyNavigatorProvider?.preload(viewKey(project));
-        void localisationNavigatorProvider?.preload(viewKey(project));
+        // The index is open, but the views draw from feeds the server builds on request: the
+        // campaigns, the translations, the Mod Browser's lists. The bar used to show its check
+        // mark here while all three still said they were loading - two minutes apart on a large
+        // mod. The project is "loading" until each has answered once, in this order, and the bar
+        // names the one it waits for. A tree view only asks for its children on reveal, so this is
+        // also what spares the first click on a navigator its round trip.
+        const phases: [LoadingPhase, () => Promise<void> | undefined][] = [
+            [
+                "campaigns",
+                () => storyNavigatorProvider?.preload(viewKey(project)),
+            ],
+            [
+                "translations",
+                () => localisationNavigatorProvider?.preload(viewKey(project)),
+            ],
+            ["assets", () => modBrowserProvider?.preload(viewKey(project))],
+        ];
+        for (const [phase, load] of phases) {
+            project.state = "loading";
+            project.phase = phase;
+            updateStatus();
+            try {
+                await load();
+            } catch (e) {
+                logLine(`${label}Loading ${phase} failed: ${e}`);
+            }
+        }
+        // A reload or a stop that happened meanwhile owns the state now.
+        if (project.state !== "loading") {
+            return;
+        }
+        project.phase = undefined;
+        project.state = "ready";
+        updateStatus();
         // An encyclopedia card opened during the scan was answered from the baseline alone and kept
         // that answer: measured on EaWX, the popup width came back as vanilla's 262 before the scan
         // and the mod's own 340 after it. Nothing re-asked, so the card stayed vanilla all session.
@@ -1267,20 +1298,27 @@ function updateStatus(): void {
     }
 
     statusItem.text = statusText(
-        running.map((p) => ({ name: p.spec.name, state: p.state })),
+        running.map((p) => ({
+            name: p.spec.name,
+            state: p.state,
+            phase: p.phase,
+        })),
     );
     if (running.length === 1) {
         const state = running[0].state;
-        if (state === "indexing") {
+        if (state === "indexing" || state === "loading") {
             statusItem.tooltip = vscode.l10n.t(
-                "The server is connected. Language features become complete when the scan finishes.",
+                "The server is connected. Language features and the views become complete when loading finishes.",
             );
         } else if (state === "ready") {
             statusItem.tooltip = undefined;
         }
     } else {
         statusItem.tooltip = running
-            .map((p) => `${p.spec.name} - ${p.state}`)
+            .map(
+                (p) =>
+                    `${p.spec.name} - ${phaseText({ state: p.state, phase: p.phase }) ?? p.state}`,
+            )
             .join("\n");
     }
     statusItem.show();
@@ -2332,7 +2370,7 @@ export async function activate(
 
     modBrowserProvider = new ProjectGroupedTree<ModBrowserOutlineItem>(
         navigatorProjects,
-        () => new ModBrowserViewProvider(),
+        (key) => new ModBrowserViewProvider(gatewayFor(key)),
     );
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider(
@@ -2689,8 +2727,12 @@ export async function activate(
                 // The reload indexes the project again; the status says so until the server's
                 // $/workspaceScanComplete, which ends a reload as it ends startup.
                 const project = clients.get(projectKey);
-                if (project?.state === "ready") {
+                if (
+                    project?.state === "ready" ||
+                    project?.state === "loading"
+                ) {
                     project.state = "indexing";
+                    project.phase = undefined;
                     updateStatus();
                 }
                 await gatewayFor(projectKey).executeCommand(
