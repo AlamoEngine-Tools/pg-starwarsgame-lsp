@@ -227,9 +227,10 @@ export function readImageAsDataUri(
     }
 }
 
-const REPOSITORY = "https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp";
-
-/** What the webview draws. Markdown throughout; the page renders it. */
+/**
+ * What the webview draws. Markdown throughout; the page renders it. The page's links are not
+ * here: it builds them itself from constants, so that no URL reaches an `href` through a message.
+ */
 export interface WhatsNewPayload {
     readonly type: "notes";
     /** The installed version, for the title and the release link. */
@@ -247,11 +248,6 @@ export interface WhatsNewPayload {
         readonly version: string;
         readonly markdown: string;
     }[];
-    readonly links: {
-        readonly release: string;
-        readonly issues: string;
-        readonly discussions: string;
-    };
 }
 
 /**
@@ -309,10 +305,5 @@ export function buildWhatsNewPayload(
         preview,
         current,
         older,
-        links: {
-            release: `${REPOSITORY}/releases/tag/v${version}`,
-            issues: `${REPOSITORY}/issues`,
-            discussions: `${REPOSITORY}/discussions`,
-        },
     };
 }

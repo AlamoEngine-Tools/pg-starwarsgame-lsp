@@ -18,6 +18,7 @@ import { createRoot } from "react-dom/client";
 import styled from "styled-components";
 
 import { tokensCss } from "./shared/tokens";
+import { DISCUSSIONS_URL, ISSUES_URL, releaseUrl } from "./whatsNewLinks";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
@@ -36,7 +37,6 @@ interface Payload {
     preview: boolean;
     current?: Section;
     older: { version: string; markdown: string }[];
-    links: { release: string; issues: string; discussions: string };
 }
 
 const markdown = new MarkdownIt({
@@ -303,7 +303,7 @@ function App(): React.JSX.Element {
         );
     }
 
-    const { current, older, links, version, preview } = payload;
+    const { current, older, version, preview } = payload;
     return (
         // Links need no handler: the webview host opens every web link in the browser itself,
         // and a handler of our own opened each one a second time.
@@ -324,11 +324,11 @@ function App(): React.JSX.Element {
                         )}
                     </h1>
                     <nav>
-                        <a href={links.release}>
+                        <a href={releaseUrl(version)}>
                             {l10n.t("Release on GitHub")}
                         </a>
-                        <a href={links.issues}>{l10n.t("Report a problem")}</a>
-                        <a href={links.discussions}>{l10n.t("Discussions")}</a>
+                        <a href={ISSUES_URL}>{l10n.t("Report a problem")}</a>
+                        <a href={DISCUSSIONS_URL}>{l10n.t("Discussions")}</a>
                     </nav>
                 </header>
                 {current === undefined ? (

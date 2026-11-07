@@ -194,19 +194,6 @@ describe("buildWhatsNewPayload", () => {
         assert.match(older.markdown, /### Features\n/);
     });
 
-    it("links the installed version's release, the issues and the discussions", () => {
-        assert.deepEqual(
-            buildWhatsNewPayload(changelog, "0.5.0", noImages).links,
-            {
-                release:
-                    "https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases/tag/v0.5.0",
-                issues: "https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues",
-                discussions:
-                    "https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/discussions",
-            },
-        );
-    });
-
     it("carries the manifest's preview flag, off unless given", () => {
         assert.equal(
             buildWhatsNewPayload(changelog, "0.5.0", noImages).preview,
