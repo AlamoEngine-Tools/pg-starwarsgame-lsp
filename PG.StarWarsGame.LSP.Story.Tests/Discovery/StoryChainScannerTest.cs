@@ -430,6 +430,42 @@ public sealed class StoryChainScannerTest
 
     // The same hint on a tactical manifest reference (Reward_Param7), which is where the mission
     // plots of a large mod are listed.
+    // A missing file is a problem at EVERY place that names it. The first reference used to claim
+    // the path for the scan, so the second file naming the same missing plot showed nothing - the
+    // author fixed one of two campaigns and the other stayed broken in silence.
+    [Fact]
+    public void Scan_SameMissingFileNamedTwice_IsReportedAtBothOrigins()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                "<Campaigns><Campaign Name=\"T\">" +
+                "<Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>" +
+                "<Empire_Story_Name>Story_Plots_Empire.xml</Empire_Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Story_Plots_Rebel.xml",
+                "<Story_Mode_Plots><Active_Plot>Story_Rebel.xml</Active_Plot></Story_Mode_Plots>")
+            .Add("Story_Plots_Empire.xml",
+                "<Story_Mode_Plots><Active_Plot>Story_Empire.xml</Active_Plot></Story_Mode_Plots>")
+            .Add("Story_Rebel.xml",
+                "<Story_Episode><Event Name=\"E\">" +
+                "<Reward_Type>LINK_TACTICAL</Reward_Type>" +
+                "<Reward_Param7>StoryEvents\\MissionPlot_Gone.xml</Reward_Param7>" +
+                "</Event></Story_Episode>")
+            .Add("Story_Empire.xml",
+                "<Story_Episode><Event Name=\"E\">" +
+                "<Reward_Type>LINK_TACTICAL</Reward_Type>" +
+                "<Reward_Param7>StoryEvents\\MissionPlot_Gone.xml</Reward_Param7>" +
+                "</Event></Story_Episode>");
+
+        var problems = Scan(resolver).Problems;
+
+        Assert.Equal(2, problems.Count);
+        Assert.Equal(["Story_Empire.xml", "Story_Rebel.xml"],
+            problems.Select(p => p.SourceFile).Order(StringComparer.Ordinal).ToList());
+        Assert.All(problems, p => Assert.Equal(StoryChainProblemKind.UnresolvedTacticalReference, p.Kind));
+    }
+
     [Fact]
     public void Scan_UnresolvableTacticalReference_NamesAFileOfThatNameFiledElsewhere()
     {
