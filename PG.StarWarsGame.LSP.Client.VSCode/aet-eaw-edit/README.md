@@ -48,7 +48,8 @@ By hand, the `.pgproj` goes at the root of the mod workspace:
 ```json
 {
   "_type": "aetswg.ModProject",
-  "_typeVersion": "aetswg-1.0.0",
+  "_typeVersion": "aetswg-1.1.0",
+  "game": "foc",
   "name": "My Mod",
   "directories": {
     "xml":     ["data/xml"],
@@ -66,11 +67,17 @@ By hand, the `.pgproj` goes at the root of the mod workspace:
 
 - `_type` and `_typeVersion` - the file's format, written and maintained by the extension. A file without them loads as
   format 1.0.0; a newer format than the extension understands is refused.
+- `game` - `eaw` or `foc`, the game the mod is checked against. Required from format 1.1.0; an older file is offered an
+  update that writes `foc`. An `eaw` project cannot reference a `foc` project.
 - Paths are relative to the `.pgproj`.
 - `projectReferences` - other `.pgproj` files whose symbols the mod inherits, e.g. a base game project.
 - `localisation.type` - `CSV`, `DAT`, `XML` or `NLS`.
 - `icons` (optional) - `megaTexture` (atlas pair without extension, e.g. `data/art/textures/mt_commandbar`) and
   `sourceRoots` (loose icon folders). Omitted: engine convention.
+- No `$schema` line. The extension validates every `.pgproj` with the schema it ships, which matches the installed
+  version; a `$schema` URL replaces it with a copy from elsewhere that can be a format behind or ahead. Another editor
+  may point `$schema` at the release's copy:
+  `https://raw.githubusercontent.com/AlamoEngine-Tools/pg-starwarsgame-lsp/refs/tags/v<version>/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/resources/pgproj.schema.json`.
 
 ### Several projects in one window
 
