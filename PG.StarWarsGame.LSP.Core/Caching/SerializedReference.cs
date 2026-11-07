@@ -17,6 +17,7 @@ public sealed class SerializedReference
     [Key(5)] public int Column { get; set; }
     [Key(6)] public int Length { get; set; }
     [Key(7)] public string? LookupType { get; set; }
+    [Key(8)] public bool ExactCase { get; set; }
 
     public static SerializedReference FromRuntime(GameReference r)
     {
@@ -29,7 +30,8 @@ public sealed class SerializedReference
             Line = r.Line,
             Column = r.Column,
             Length = r.Length,
-            LookupType = r.LookupType
+            LookupType = r.LookupType,
+            ExactCase = r.ExactCase
         };
     }
 
@@ -37,7 +39,8 @@ public sealed class SerializedReference
     {
         return new GameReference(TargetId, ExpectedKind, ExpectedTypeName, DocumentUri, Line, Column, Length)
         {
-            LookupType = LookupType
+            LookupType = LookupType,
+            ExactCase = ExactCase
         };
     }
 }

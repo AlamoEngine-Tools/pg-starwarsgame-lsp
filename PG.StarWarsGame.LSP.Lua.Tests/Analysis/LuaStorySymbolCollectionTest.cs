@@ -37,6 +37,9 @@ public sealed class LuaStorySymbolCollectionTest
         Assert.Equal(2, refs[0].Line);
         Assert.Equal(4, refs[0].Column);
         Assert.Equal("Rebel_M01_Start".Length, refs[0].Length);
+        // The shipped story-mode library indexes this table with the event's name as written, so
+        // the key must match the XML name byte for byte - unlike every other story name lookup.
+        Assert.All(refs, r => Assert.True(r.ExactCase));
     }
 
     [Fact]

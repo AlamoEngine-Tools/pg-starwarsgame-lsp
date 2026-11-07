@@ -121,6 +121,13 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId ListMapReplacedInVariant = new(DiagnosticGroup.References, 35);
 
+    /// <summary>
+    ///     A name the game matches as written resolves to a definition that differs from it only
+    ///     by case, so it never matches in the game. A Lua <c>StoryModeEvents</c> key against its
+    ///     XML event: the shipped story-mode library indexes the table with the event's name.
+    /// </summary>
+    public static readonly DiagnosticId CaseOnlyMatch = new(DiagnosticGroup.References, 36);
+
     // ── Enums ──
     public static readonly DiagnosticId AbilityModFlag = new(DiagnosticGroup.Enums, 1);
     public static readonly DiagnosticId Audio3DProviderName = new(DiagnosticGroup.Enums, 2);

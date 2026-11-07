@@ -1705,6 +1705,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="ReferenceResolution_CannotVerify" xml:space="preserve">
     <value>Cannot verify reference '{0}': Checking {1} references is not supported yet.</value>
   </data>
+  <data name="ReferenceResolution_CaseOnlyMatch" xml:space="preserve">
+    <value>'{0}' never matches '{1}': The game looks this name up as written, and the case differs.</value>
+  </data>
   <data name="ReferenceResolution_KindMismatch" xml:space="preserve">
     <value>Type mismatch for '{0}': Expected a {1}{2}.</value>
   </data>

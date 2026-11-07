@@ -272,16 +272,18 @@ public sealed class LuaDiagnosticsPublisherTest
 
     private static GameIndex IndexWithLuaRef(string documentUri, string targetId,
         string? expectedTypeName = null, GameSymbol? resolvedSymbol = null,
-        GameSymbolKind kind = GameSymbolKind.XmlObject, ILocalisationIndex? localisation = null)
+        GameSymbolKind kind = GameSymbolKind.XmlObject, ILocalisationIndex? localisation = null,
+        bool exactCase = false)
     {
         var reference = new GameReference(targetId, kind, expectedTypeName,
-            documentUri, 0, 20, targetId.Length);
+            documentUri, 0, 20, targetId.Length) { ExactCase = exactCase };
         var doc = new DocumentIndex(documentUri, 1, [], [reference]);
 
+        // Keyed as the index keys definitions: by the symbol's own id, case folded.
         var definitions = resolvedSymbol is not null
-            ? ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
-                .Add(targetId, [resolvedSymbol])
-            : ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty;
+            ? ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+                .Add(resolvedSymbol.Id, [resolvedSymbol])
+            : ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
 
         var index = new GameIndex(
             BaselineIndex.Empty,
@@ -438,6 +440,41 @@ public sealed class LuaDiagnosticsPublisherTest
     }
 
     // ── unresolved XML references ─────────────────────────────────────────────
+
+    // A StoryModeEvents key is reached by the game through a plain table index with the event's
+    // name as written, so a key that differs from the XML event only by case never runs. The
+    // index resolves it all the same, and said nothing. Silent on the shipped games: of 105 (EaW)
+    // and 750 (FoC) handler keys, none matches its event by case alone.
+    [Fact]
+    public void OnIndexChanged_HandlerKeyDiffersFromTheEventOnlyByCase_Warns()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.With(LuaUri, "StoryModeEvents = { rebel_m01_start = State_Start }");
+        var symbol = new GameSymbol("Rebel_M01_Start", GameSymbolKind.XmlObject, "StoryEvent",
+            new FileOrigin("file:///c:/mod/data/xml/story.xml", 3, 10), null);
+        var index = IndexWithLuaRef(LuaUri, "rebel_m01_start", "StoryEvent", symbol, exactCase: true);
+
+        indexService.Raise(index);
+
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
+        Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
+        Assert.Equal(DiagnosticIds.CaseOnlyMatch.ToString(), diag.Code?.String);
+        Assert.Contains("Rebel_M01_Start", diag.Message);
+    }
+
+    [Fact]
+    public void OnIndexChanged_HandlerKeyMatchesTheEventExactly_SaysNothing()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.With(LuaUri, "StoryModeEvents = { Rebel_M01_Start = State_Start }");
+        var symbol = new GameSymbol("Rebel_M01_Start", GameSymbolKind.XmlObject, "StoryEvent",
+            new FileOrigin("file:///c:/mod/data/xml/story.xml", 3, 10), null);
+        var index = IndexWithLuaRef(LuaUri, "Rebel_M01_Start", "StoryEvent", symbol, exactCase: true);
+
+        indexService.Raise(index);
+
+        Assert.Empty(Assert.Single(published).Diagnostics);
+    }
 
     [Fact]
     public void OnIndexChanged_UnresolvedXmlRef_EmitsErrorDiagnostic()

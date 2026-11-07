@@ -250,7 +250,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
                 {
                     var resolved = index.ResolveReference(reference);
                     var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName,
-                        resolved, messages: messages);
+                        resolved, messages: messages, exactCase: reference.ExactCase);
                     if (eval is null) continue;
 
                     diagnostics.Add(new LspDiagnostic

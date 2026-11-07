@@ -22,4 +22,13 @@ public sealed record GameReference(
 
     /// <summary>Where the target is looked up: <see cref="LookupType" />, else the expected type.</summary>
     public string? IdSpace => LookupType ?? ExpectedTypeName;
+
+    /// <summary>
+    ///     The game reaches this target by the name exactly as written, so a definition that
+    ///     matches only by case is no match. Set for a Lua <c>StoryModeEvents</c> key, which the
+    ///     shipped story-mode library reaches by indexing the table with the event's name; every
+    ///     other story lookup folds case, and the index resolves this one like the rest, so the
+    ///     judgement is the evaluator's.
+    /// </summary>
+    public bool ExactCase { get; init; }
 }

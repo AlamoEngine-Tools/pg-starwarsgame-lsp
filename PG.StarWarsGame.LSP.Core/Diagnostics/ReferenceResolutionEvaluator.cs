@@ -37,10 +37,14 @@ public static class ReferenceResolutionEvaluator
     ///     an error on data we cannot read is the one outcome the author cannot act on.
     /// </param>
     /// <param name="messages">The catalogue the message is taken from.</param>
+    /// <param name="exactCase">
+    ///     The game reaches this target by the name as written (a Lua <c>StoryModeEvents</c> key),
+    ///     so a definition that matches only by case is reported rather than accepted.
+    /// </param>
     public static (XmlDiagnosticSeverity Severity, string Message, DiagnosticId Id)? Evaluate(
         string targetId, string? expectedTypeName, GameSymbol? resolved, IMessageCatalog messages,
         IReadOnlySet<string>? indexedTypeNames = null,
-        ObjectKindDefinition? expectedKind = null, GameIndex? index = null)
+        ObjectKindDefinition? expectedKind = null, GameIndex? index = null, bool exactCase = false)
     {
         // Scoped ability IDs are stored as "OWNER$name"; show only the bare name to the user.
         var displayId = StripOwnerPrefix(targetId);
@@ -62,6 +66,13 @@ public static class ReferenceResolutionEvaluator
                 messages.Format("ReferenceResolution_CannotResolve", displayId),
                 DiagnosticIds.UnresolvedReference);
         }
+
+        // The index folds case, as the game does for almost every name. Where the game does not,
+        // a definition found only by case is one the game never finds.
+        if (exactCase && !string.Equals(resolved.Id, targetId, StringComparison.Ordinal))
+            return (XmlDiagnosticSeverity.Warning,
+                messages.Format("ReferenceResolution_CaseOnlyMatch", displayId, resolved.Id),
+                DiagnosticIds.CaseOnlyMatch);
 
         // A kind is judged by what the object IS, so it is answered here and the type name below is
         // never consulted: the index types a planet "GameObjectType" like everything else in its

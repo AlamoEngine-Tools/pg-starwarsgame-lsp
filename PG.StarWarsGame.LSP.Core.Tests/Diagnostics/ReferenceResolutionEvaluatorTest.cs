@@ -10,6 +10,40 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
 
 public sealed class ReferenceResolutionEvaluatorTest
 {
+    // ── exact-case references ──────────────────────────────────────────────
+    //
+    // The game looks most names up case-insensitively, a story event among them: the XML-side
+    // lookup uppercases the name before hashing it. One place does not: the shipped story-mode
+    // library dispatches an event into a script's StoryModeEvents table by indexing it with the
+    // event's name as written, so a key that differs from the XML name only by case is never
+    // reached. The index still resolves such a key, which is why this is a judgement of its own.
+    [Fact]
+    public void ExactCase_ResolvedOnlyByCase_WarnsThatTheNameNeverMatches()
+    {
+        var result = ReferenceResolutionEvaluator.Evaluate("rebel_m01_start", "StoryEvent",
+            Symbol("Rebel_M01_Start", "StoryEvent"), TestCatalogues.English, exactCase: true);
+
+        Assert.NotNull(result);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, result.Value.Severity);
+        Assert.Equal(DiagnosticIds.CaseOnlyMatch, result.Value.Id);
+        Assert.Contains("rebel_m01_start", result.Value.Message);
+        Assert.Contains("Rebel_M01_Start", result.Value.Message);
+    }
+
+    [Fact]
+    public void ExactCase_SameSpelling_IsValid()
+    {
+        Assert.Null(ReferenceResolutionEvaluator.Evaluate("Rebel_M01_Start", "StoryEvent",
+            Symbol("Rebel_M01_Start", "StoryEvent"), TestCatalogues.English, exactCase: true));
+    }
+
+    [Fact]
+    public void OrdinaryReference_DifferentCase_IsValid()
+    {
+        Assert.Null(ReferenceResolutionEvaluator.Evaluate("rebel_m01_start", "StoryEvent",
+            Symbol("Rebel_M01_Start", "StoryEvent"), TestCatalogues.English));
+    }
+
     // ── kind references ───────────────────────────────────────────────────────
     //
     // A planet slot asks what the object IS. The index types a planet "GameObjectType" like

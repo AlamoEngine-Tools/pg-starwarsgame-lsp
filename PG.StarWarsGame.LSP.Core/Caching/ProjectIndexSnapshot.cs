@@ -37,6 +37,8 @@ public sealed class ProjectIndexSnapshot
     // would replay the old parser's references.
     // 10 = 0.5.0 (2026-10-28): a reference records the id space it is looked up in (LookupType) -
     // GameObjectType for a tag or slot that names an object kind; it used to resolve by id alone.
+    // Still 10 (2026-11-07): a reference records whether the game matches it by the name as written
+    // (ExactCase, SerializedReference key 8). Appended, so an older snapshot reads it as false.
     // One bump per release, not per change: within a cycle, clear local caches when parser output
     // changes; only the difference between two releases reaches anyone.
     public const int CurrentSchemaVersion = 10;

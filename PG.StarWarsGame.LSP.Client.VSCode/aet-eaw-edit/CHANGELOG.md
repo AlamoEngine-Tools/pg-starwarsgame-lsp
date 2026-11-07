@@ -308,6 +308,11 @@
   and typed `Check_Story_Flag` against it, so every such name read as missing, the shipped campaigns' included.
   TRIGGER_AI now defines an AI story trigger, the Lua reference goes to it and finds it, and a script that checks
   a name only `SET_FLAG` ever sets is still reported, since the game would not see it either
+- **A story handler key off by case is reported** - the game matches almost every name regardless of case, a
+  story event's included: its lookup uppercases the name first. The one exception is a script's `StoryModeEvents`
+  table, which the shipped story-mode library indexes with the event's name as the XML writes it, so a key that
+  differs from the event only by case never runs. The index found it anyway and said nothing; it now warns
+  (`aetswg-001-0036`), naming the event as written
 - **One place for a repeated key in the localisation editor** - the editor counted repeated keys itself and
   showed the count among its actions, beside the header badge and the Problems bar that already report the
   same key with the row it repeats. The count is gone; the badge and the bar remain
@@ -542,6 +547,8 @@
 - **New, Lua imports** - `Structure19` (`aetswg-006-0019`, a library global the script does not require) and
   `Structure20` (`aetswg-006-0020`, a cyclic require); both were reported without an id, so they showed no code
   and could not be suppressed
+- **New, story handlers** - `References36` (`aetswg-001-0036`, a `StoryModeEvents` key that matches its event only
+  by case, which the game never reaches)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 - **Retired** - `Symbols3` (`aetswg-010-0003`), one name defined in two types: every lookup names its type now,
   so that is two objects, as it is to the game, and nothing to warn about; the number is never reused

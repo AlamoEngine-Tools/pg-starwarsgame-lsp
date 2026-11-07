@@ -66,7 +66,12 @@ internal static class LuaStorySymbolCollector
             var position = field.Identifier.GetLocation().GetLineSpan().StartLinePosition;
             references.Add(new GameReference(name, GameSymbolKind.XmlObject,
                 StoryReferenceTypes.EventSymbol, documentUri,
-                position.Line, position.Character, name.Length));
+                position.Line, position.Character, name.Length)
+            {
+                // Pgstorymode.lua's Story_Event_Trigger indexes this table with the event's name
+                // as the XML writes it, so a key off by case is never reached.
+                ExactCase = true
+            });
         }
     }
 
