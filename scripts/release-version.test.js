@@ -10,7 +10,8 @@ const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {readVersions, checkVersion, setVersion, FILES} = require('./release-version');
 
-function repo(props = '0.4.0', pkg = '0.4.0', ext = '0.4.0') {
+// extension.ts is formatted by prettier, which writes double quotes - the fixture does the same.
+function repo(props = '0.4.0', pkg = '0.4.0', ext = '0.4.0', quote = '"') {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'relver-'));
     const write = (rel, text) => {
         fs.mkdirSync(path.dirname(path.join(root, rel)), {recursive: true});
@@ -18,12 +19,32 @@ function repo(props = '0.4.0', pkg = '0.4.0', ext = '0.4.0') {
     };
     write(FILES.props, `<Project>\n  <PropertyGroup>\n    <Version>${props}</Version>\n  </PropertyGroup>\n</Project>\n`);
     write(FILES.pkg, `{\n  "name": "aet-eaw-edit",\n  "version": "${pkg}",\n  "dependencies": { "x": { "version": "9.9.9" } }\n}\n`);
-    write(FILES.ext, `const A = 1;\nconst REQUIRED_SERVER_VERSION = '${ext}';\nconst B = 2;\n`);
+    write(FILES.ext, `const A = 1;\nconst REQUIRED_SERVER_VERSION = ${quote}${ext}${quote};\nconst B = 2;\n`);
     return root;
 }
 
 test('readVersions reads all three files', () => {
     assert.deepEqual(readVersions(repo('1.2.3', '1.2.3', '1.2.3')), {props: '1.2.3', pkg: '1.2.3', ext: '1.2.3'});
+});
+
+test('readVersions accepts a single-quoted REQUIRED_SERVER_VERSION as well', () => {
+    assert.equal(readVersions(repo('1.2.3', '1.2.3', '1.2.3', "'")).ext, '1.2.3');
+});
+
+test('setVersion keeps the quote style extension.ts uses', () => {
+    const root = repo('0.4.0', '0.4.0', '0.4.0', '"');
+    setVersion(root, '0.4.1');
+    assert.match(fs.readFileSync(path.join(root, FILES.ext), 'utf8'), /REQUIRED_SERVER_VERSION = "0\.4\.1";/);
+});
+
+// The fixtures above imitate the real files; this one reads them. It is what fails when a
+// formatter or a refactor moves a marker, before the release workflow does.
+test('the repository files carry every version marker', () => {
+    const root = path.resolve(__dirname, '..');
+    const versions = readVersions(root);
+    for (const [key, version] of Object.entries(versions)) {
+        assert.match(version ?? '', /^\d+\.\d+\.\d+$/, `${FILES[key]} has no version marker`);
+    }
 });
 
 test('checkVersion returns the version when all three agree', () => {
