@@ -300,8 +300,7 @@
   while the campaign navigator, the localisation views and the Mod Browser still said they were loading. The
   bar now reads `Indexing symbols...`, then `Parsing campaigns...`, `Loading translations...` and
   `Cataloguing assets...` as each feed is asked for, and several projects count as `ready` only once their
-  last feed has answered. Now and then a phase shows a line from elsewhere in the galaxy for a second: one
-  draw in twenty as it starts, and another every half minute it lasts
+  last feed has answered
 - **No warning for the order of an event's tags** - the story graph warned when an event's tags left the
   order of the scripting document, `'Prereq' appears after 'Story_Dialog_Popup'`. The game reads each tag by
   name into its own slot and builds the event from the slots afterwards, so the order in the file changes
