@@ -22,6 +22,8 @@
 // `setRow`, which stores the reader's word only where it disagrees with the model, so showing a
 // mesh you had hidden gives the row back rather than pinning it the other way.
 
+import * as l10n from "@vscode/l10n";
+
 import { type VisibilityLink } from "./visibility";
 
 /** What the eye shows. */
@@ -73,10 +75,10 @@ export function rowEye(facts: EyeFacts): RowEye {
  */
 function titleFor(state: EyeState): string {
     if (state === "inherited") {
-        return "State inherited from parent";
+        return l10n.t("State inherited from parent");
     }
 
     return state === "shown"
-        ? "Hide this and everything under it"
-        : "Show this and everything under it";
+        ? l10n.t("Hide this and everything under it")
+        : l10n.t("Show this and everything under it");
 }

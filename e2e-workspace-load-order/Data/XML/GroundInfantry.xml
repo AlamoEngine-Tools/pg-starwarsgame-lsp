@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- This mod's copy of a shipped file name. Authored, not copied: it holds one object of its own, and
+     none of the shipped file's objects - the game reads only this copy. -->
+<GroundInfantry_Objects>
+	<GroundInfantry Name="E2E_LoadOrder_Copy_Trooper">
+		<Max_Health>100</Max_Health>
+	</GroundInfantry>
+</GroundInfantry_Objects>

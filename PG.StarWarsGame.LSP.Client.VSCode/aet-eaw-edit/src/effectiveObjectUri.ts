@@ -10,6 +10,8 @@
 //
 // Pure, so it is testable without a VS Code host.
 
+import * as l10n from "@vscode/l10n";
+
 /** The object a document shows and the project whose server resolves it. */
 export interface EffectiveObjectRef {
     readonly objectId: string;
@@ -60,5 +62,6 @@ export function effectiveObjectPath(
         projectCount > 1 && projectName
             ? `${objectId} - ${projectName}`
             : objectId;
-    return `/${subject} (effective preview, read-only).xml`;
+    // The tab's name, so in the editor's language; the object and project travel in the query.
+    return `/${l10n.t("{0} (effective preview, read-only)", subject)}.xml`;
 }

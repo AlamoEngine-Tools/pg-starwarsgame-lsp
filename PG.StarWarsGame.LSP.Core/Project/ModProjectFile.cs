@@ -8,5 +8,6 @@ public sealed record ModProjectFile(
     ModinfoData? Modinfo,
     DirectoryMap Directories,
     IReadOnlyList<ProjectReference> ProjectReferences,
+    TargetGame Game,
     LocalisationProjectSettings? Localisation = null,
     IconProjectSettings? Icons = null);

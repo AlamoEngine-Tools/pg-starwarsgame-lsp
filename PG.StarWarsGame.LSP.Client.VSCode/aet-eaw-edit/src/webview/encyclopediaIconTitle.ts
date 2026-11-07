@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
+
 import { EncyclopediaIcon } from "../protocol/encyclopedia";
 
 /**
@@ -17,19 +19,28 @@ export function encyclopediaIconTitle(
     icon: EncyclopediaIcon | null | undefined,
 ): string {
     if (!icon) {
-        return "No icon resolved for this object";
+        return l10n.t("No icon resolved for this object");
     }
     if (icon.isMegaTextureStale) {
-        return `${icon.name} - from a source image; this project's mega texture does not contain it yet, so the game will not show it`;
+        return l10n.t(
+            "{0} - from a source image; this project's mega texture does not contain it yet, so the game will not show it",
+            icon.name,
+        );
     }
     switch (icon.source) {
         case "WorkspaceMegaTexture":
-            return `${icon.name} - from this project's mega texture`;
+            return l10n.t("{0} - from this project's mega texture", icon.name);
         case "LooseSource":
-            return `${icon.name} - from a source image in this project`;
+            return l10n.t(
+                "{0} - from a source image in this project",
+                icon.name,
+            );
         case "Fallback":
-            return `${icon.name} - not found in any mega texture or source folder; showing a placeholder`;
+            return l10n.t(
+                "{0} - not found in any mega texture or source folder; showing a placeholder",
+                icon.name,
+            );
         default:
-            return `${icon.name} - from the base game`;
+            return l10n.t("{0} - from the base game", icon.name);
     }
 }

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Xml;
 
@@ -35,5 +36,14 @@ public static class MetafileReader
         }
 
         return files;
+    }
+
+    /// <summary>
+    ///     <see cref="ReadFileList" /> in <see cref="GamePaths.Key" /> form, in list order, a repeated
+    ///     entry kept: the list as the game loads it.
+    /// </summary>
+    public static IReadOnlyList<string> ReadFileKeys(string xml)
+    {
+        return [.. ReadFileList(xml).Select(GamePaths.Key)];
     }
 }

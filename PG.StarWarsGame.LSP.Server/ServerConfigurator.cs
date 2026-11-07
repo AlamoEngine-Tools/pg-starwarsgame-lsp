@@ -106,8 +106,7 @@ public static class ServerConfigurator
         (bool Document, bool Range) formattingAfterStart = (false, false);
 
         return options
-            .ConfigureLogging(x => x
-                    .SetMinimumLevel(logLevel ?? ServerLogLevel.Default)
+            .ConfigureLogging(x => ServerLogLevel.Apply(x, logLevel ?? ServerLogLevel.Default)
                     .AddLanguageProtocolLogging()
 #if DEBUG
                     .AddSerilog(dispose: true)
@@ -273,6 +272,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
+                services.AddSingleton<IRegistryWalkStore, RegistryWalkStore>();
                 // Live chain problems (open-buffer-first, invalidated per document version); the
                 // startup snapshot it also accepts only answers until the first real scan.
                 services.AddSingleton<IStoryChainProblemStore>(sp =>
@@ -367,6 +367,10 @@ public static class ServerConfigurator
                 services.AddSingleton<ModProjectResolver>();
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();
                 services.AddSingleton<IProjectConfigurationResolver, ProjectConfigurationResolver>();
+                services.AddSingleton<ITargetGameProbe, TargetGameProbe>();
+                // One reading of what a folder is to the game, shared by New Mod Project and Adopt
+                // Project, so the two refuse the same folders (#317).
+                services.AddSingleton<ModLayout>();
                 services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
 
                 // The Lua analyzer sidecar (emmylua_ls): one process per open script, holding that
@@ -376,10 +380,12 @@ public static class ServerConfigurator
                 // each with its configuration in a directory of its own. Absent executable: never
                 // started, every call a no-op.
                 services.AddSingleton<LuaStubLocation>();
-                // The annotations this server knows, inserted above the functions in the text the
-                // analyzer reads - an open script's and every file of a script's require tree.
+                // The annotations this server knows - stub types, state handler messages, a plan's
+                // task forces - inserted into the text the analyzer reads: an open script's and
+                // every file of a script's require tree.
                 services.AddSingleton<ILuaAnnotationSource, StubOverrideAnnotations>();
                 services.AddSingleton<ILuaAnnotationSource, StateHandlerAnnotations>();
+                services.AddSingleton<ILuaAnnotationSource, TaskForceAnnotations>();
                 services.AddSingleton<LuaGeneratedTexts>();
                 services.AddSingleton(sp =>
                 {
@@ -393,7 +399,8 @@ public static class ServerConfigurator
                         sp.GetRequiredService<LuaStubLocation>(),
                         sp.GetRequiredService<LuaGeneratedTexts>(),
                         LuaAnalyzerDirectory,
-                        sp.GetRequiredService<ILogger<LuaAnalyzerInstances>>());
+                        sp.GetRequiredService<ILogger<LuaAnalyzerInstances>>(),
+                        timing: LuaAnalyzerInstanceTiming.Editor);
                 });
                 services.AddSingleton(sp => new LuaAnalyzerHost(new LuaAnalyzerOptions
                 {
@@ -571,6 +578,14 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IStartupGate>(),
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<PreviewSceneChangeNotifier>>()));
+                // The Mod Browser lists the index; one debounced notification per burst of writes
+                // (edits, reloads, a re-globbed asset catalog) tells its panels to ask again.
+                services.AddSingleton<ModBrowserChangeNotifier>(sp =>
+                    new ModBrowserChangeNotifier(
+                        sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStartupGate>(),
+                        method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
+                        sp.GetRequiredService<ILogger<ModBrowserChangeNotifier>>()));
 
                 // GameHoverHandler hands a request to the first of these that handles the document.
                 // Registered as the provider interface only so DryIoc does not see them as competing
@@ -667,6 +682,7 @@ public static class ServerConfigurator
                 server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
                 server.Services.GetRequiredService<StoryGraphChangeNotifier>();
                 server.Services.GetRequiredService<PreviewSceneChangeNotifier>();
+                server.Services.GetRequiredService<ModBrowserChangeNotifier>();
                 // StartupPipeline rather than the same stages written out again here: this copy had
                 // already drifted from it - it ran schema and baseline one after the other, skipped
                 // progress reporting entirely, and had no place to put the project-migration

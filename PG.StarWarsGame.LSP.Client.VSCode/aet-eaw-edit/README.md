@@ -48,7 +48,8 @@ By hand, the `.pgproj` goes at the root of the mod workspace:
 ```json
 {
   "_type": "aetswg.ModProject",
-  "_typeVersion": "aetswg-1.0.0",
+  "_typeVersion": "aetswg-1.1.0",
+  "game": "foc",
   "name": "My Mod",
   "directories": {
     "xml":     ["data/xml"],
@@ -66,11 +67,17 @@ By hand, the `.pgproj` goes at the root of the mod workspace:
 
 - `_type` and `_typeVersion` - the file's format, written and maintained by the extension. A file without them loads as
   format 1.0.0; a newer format than the extension understands is refused.
+- `game` - `eaw` or `foc`, the game the mod is checked against. Required from format 1.1.0; an older file is offered an
+  update that writes `foc`. An `eaw` project cannot reference a `foc` project.
 - Paths are relative to the `.pgproj`.
 - `projectReferences` - other `.pgproj` files whose symbols the mod inherits, e.g. a base game project.
 - `localisation.type` - `CSV`, `DAT`, `XML` or `NLS`.
 - `icons` (optional) - `megaTexture` (atlas pair without extension, e.g. `data/art/textures/mt_commandbar`) and
   `sourceRoots` (loose icon folders). Omitted: engine convention.
+- No `$schema` line. The extension validates every `.pgproj` with the schema it ships, which matches the installed
+  version; a `$schema` URL replaces it with a copy from elsewhere that can be a format behind or ahead. Another editor
+  may point `$schema` at the release's copy:
+  `https://raw.githubusercontent.com/AlamoEngine-Tools/pg-starwarsgame-lsp/refs/tags/v<version>/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/resources/pgproj.schema.json`.
 
 ### Several projects in one window
 
@@ -273,8 +280,9 @@ analyzer and merges both answers.
   both offer; a rename of an engine name or a game object stays this server's, and an analyzer rename that would edit
   a file outside the project's scripts is refused
 - **Diagnostics** - one list per script. Kept from the analyzer: rules that hold for any Lua, as `LuaAnalyzer1` to
-  `LuaAnalyzer10` (`aetswg-016-*`); a syntax error is `Syntax3010`. Dropped: rules that depend on the stubs being
-  complete (missing or mismatched parameters, undefined fields), and every rule a future analyzer version adds
+  `LuaAnalyzer11` (`aetswg-016-*`), and a member an engine type does not have as `LuaAnalyzer12` - the engine defines
+  all of its members; a syntax error is `Syntax3010`. Dropped: rules that depend on the stubs being complete
+  (missing or mismatched parameters, a field of a Lua table), and every rule a future analyzer version adds
 - **Not bundled** - on a platform without the bundled analyzer, string-argument completion, engine hover, navigation
   and rename remain
 
@@ -607,12 +615,14 @@ Read-only.
   path to the open one is the breadcrumb
   - Keys: up and down, `Page Up`, `Page Down`, `Home`, `End`; right opens a row, then goes to its first child;
     left closes it, then goes to its parent; `Enter` opens, `Space` selects, `F12` goes to the definition
+  - A click on a list's row opens that entry's relations in the rail; the keys select without opening
   - Width dragged by its right edge, and kept
-- **Lists** - each entry once, as the definition the game uses, with its origin and what it overrides
+- **Lists** - each entry once, as the definition the game uses, with its origin - the project or dependency
+  that defines it, by name, or `Game` - and what it overrides
   - Paged on the server, 200 at a time, and sorted there by a header click: name, type, behaves like, origin
   - Search form: name, what it behaves like with its count, origin; its height dragged by its top edge
   - A filter in each column header, writing into the same search
-  - Column widths and order dragged in the header, kept per list
+  - Column widths and order dragged in the header, kept per list; filtering and sorting leave them as they are
 - **Relations** - computed for one entry, when it opens; an empty one counted zero, with the reason
   - Game objects: models, particle systems, particles, SFX and speech events, hardpoints, other references,
     textures, Lua script, references, overrides - the definitions the one the game uses replaces, each opening
@@ -789,7 +799,7 @@ For development and troubleshooting. Hidden from the settings page; `@tag:advanc
 
 | Setting                                            | Default       | Meaning                                                                                                                                                                                                                                                                                                                                                                |
 |----------------------------------------------------|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `aet-eaw-edit.lsp.debug.traceServer`               | `off`         | `messages` or `verbose`: LSP traffic in the EaWEdit output channel                                                                                                                                                                                                                                                                                                     |
+| `aet-eaw-edit.lsp.debug.trace.server`              | `off`         | `messages` or `verbose`: LSP traffic in the EaWEdit output channel                                                                                                                                                                                                                                                                                                     |
 | `aet-eaw-edit.lsp.debug.logLevel`                  | `Information` | `Trace`, `Debug`, `Information`, `Warning` or `Error`: detail in the server's own log file; `Debug` records whether a document reached a sync handler                                                                                                                                                                                                                                                                      |
 | `aet-eaw-edit.lsp.debug.waitForDebugger`           | `false`       | Start the server with `--wait-for-debugger`                                                                                                                                                                                                                                                                                                                            |
 | `aet-eaw-edit.lsp.executable`                      | _(empty)_     | A server to run instead of the bundled one; empty = bundled                                                                                                                                                                                                                                                                                                            |
@@ -845,7 +855,7 @@ script directories; move it, or add its root to `sourceRoots`.
 **Launch refused: layer not runnable.** Declared directories under `Data/` and no space in the path, or pass the folders
 via `modPaths`. See [Lua debugger](#lua-debugger).
 
-**Raw server output.** `aet-eaw-edit.lsp.debug.traceServer` = `messages`; **EaWEdit** output channel.
+**Raw server output.** `aet-eaw-edit.lsp.debug.trace.server` = `messages`; **EaWEdit** output channel.
 
 **No diagnostics at all, for any file.** `aet-eaw-edit.lsp.debug.logLevel` = `Debug`, then restart the server and read
 the **EaWEdit** output channel (a Debug build of the server also writes `aetswg-*.log` in each project's folder): it

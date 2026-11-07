@@ -1,18 +1,18 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Text;
 using System.Globalization;
 using System.Text;
 using System.Xml.Linq;
 using CsvHelper;
 using CsvHelper.Configuration;
 using PG.StarWarsGame.Files.DAT.Services;
-using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Properties;
+using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Text;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Localisation.Rows;
@@ -20,8 +20,6 @@ namespace PG.StarWarsGame.LSP.Localisation.Rows;
 /// <inheritdoc />
 public sealed class LocalisationRowReader : ILocalisationRowReader
 {
-    private const string XmlNs = "urn:alamoenginetools:localisation:v1";
-
     private readonly ILspConfigurationProvider _configProvider;
 
     private readonly IDatService _datFileService;
@@ -153,16 +151,16 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     {
         var lineEnding = LineEndings.Detect(text);
         var document = XDocument.Parse(text, LoadOptions.PreserveWhitespace);
-        var ns = XNamespace.Get(XmlNs);
+        var format = XmlTranslationFormat.Of(document);
 
-        var elements = document.Root?.Elements(ns + "Localisation").ToList() ?? [];
+        var elements = document.Root?.Elements(format.Localisation).ToList() ?? [];
 
         // Declared union in first-seen order: a language present on one element but not another is
         // still a column, and must be an editable empty cell on the rows that lack it.
         var languages = elements
-            .Elements(ns + "TranslationData")
-            .Elements(ns + "Translation")
-            .Select(e => e.Attribute("Language")?.Value)
+            .Elements(format.TranslationData)
+            .Elements(format.Translation)
+            .Select(e => e.Attribute(format.Language)?.Value)
             .Where(l => !string.IsNullOrEmpty(l))
             .Select(l => l!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -172,10 +170,10 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
         foreach (var element in elements)
         {
             var byLanguage = element
-                .Elements(ns + "TranslationData")
-                .Elements(ns + "Translation")
-                .Where(e => e.Attribute("Language")?.Value is { Length: > 0 })
-                .GroupBy(e => e.Attribute("Language")!.Value, StringComparer.OrdinalIgnoreCase)
+                .Elements(format.TranslationData)
+                .Elements(format.Translation)
+                .Where(e => e.Attribute(format.Language)?.Value is { Length: > 0 })
+                .GroupBy(e => e.Attribute(format.Language)!.Value, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First().Value, StringComparer.OrdinalIgnoreCase);
 
             var values = languages
@@ -184,7 +182,7 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
 
             rows.Add(new LocRowDto(
                 rows.Count,
-                element.Attribute("key")?.Value ?? string.Empty,
+                element.Attribute(format.Key)?.Value ?? string.Empty,
                 values,
                 element.ToString(SaveOptions.DisableFormatting)));
         }

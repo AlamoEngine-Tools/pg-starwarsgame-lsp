@@ -121,4 +121,34 @@ public sealed class RemoveEarlierDuplicatesCodeActionProviderTest
         Assert.Contains(edits, e => e.Range.Start == new Position(4, 0) && e.Range.End == new Position(5, 0));
         Assert.DoesNotContain(edits, e => e.Range.Start.Line == 3); // the winner stays
     }
+
+    // A file the game reads on one line: each earlier occurrence goes and nothing else - by line the
+    // fix would have removed the whole file.
+    [Fact]
+    public void Fix_on_a_file_written_on_one_line_removes_only_the_earlier_elements()
+    {
+        const string first = "<Icon_Name>first.tga</Icon_Name>";
+        const string second = "<Icon_Name>second.tga</Icon_Name>";
+        const string oneLine = "<Units><Unit Name=\"A\">" + first + "<Max_Speed>1.0</Max_Speed>" + second +
+                               "<Icon_Name>winner.tga</Icon_Name></Unit></Units>";
+        var winner = oneLine.IndexOf("<Icon_Name>winner", StringComparison.Ordinal);
+        var data = new JObject { ["removeEarlierDuplicates"] = true };
+        var ctx = new XmlCodeActionContext(DocumentUri.From(Uri),
+            new Diagnostic
+            {
+                Range = new LspRange(new Position(0, winner + 1), new Position(0, winner + 10)),
+                Message = "duplicate", Data = data
+            }) { Messages = TestCatalogues.English };
+
+        var action = Assert.Single(BuildProvider(oneLine).Handle(ctx));
+        var edits = action.CodeAction!.Edit!.Changes!.Values.First().ToList();
+
+        Assert.Equal(2, edits.Count);
+        foreach (var element in new[] { first, second })
+        {
+            var at = oneLine.IndexOf(element, StringComparison.Ordinal);
+            Assert.Contains(edits, e => e.Range.Start == new Position(0, at) &&
+                                        e.Range.End == new Position(0, at + element.Length));
+        }
+    }
 }

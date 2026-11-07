@@ -236,6 +236,8 @@ function cacheEntry(
         : `${cache.name} ${cache.entries} (${details.join(", ")})`;
 }
 
+// A report for the maintainers, pasted into an issue and read in English: none of its lines go through the
+// catalogue, so one report never mixes two languages.
 function workspaceShape(client: BugReportClientInfo): string {
     const shape =
         client.workspaceFolders === 0
@@ -243,5 +245,6 @@ function workspaceShape(client: BugReportClientInfo): string {
             : client.workspaceFolders === 1
               ? "Single folder"
               : `Multi-root (${client.workspaceFolders} folders)`;
+    // l10n-exempt: the bug report, read by the maintainers in English
     return client.workspaceFile ? `${shape}, workspace file` : shape;
 }

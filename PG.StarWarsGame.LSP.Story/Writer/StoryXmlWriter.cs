@@ -15,7 +15,7 @@ public sealed record StoryTextEdit(StorySourceRange Range, string NewText);
 ///     lines stays byte-identical — comments, blank lines, and the file's original indentation
 ///     style are preserved. Tags the writer inserts land at their canonical position
 ///     (<see cref="StoryEventTagOrder" />); existing tags are never reordered (that would fight
-///     minimality — the tag-order diagnostic already reports legacy violations).
+///     minimality, and the game reads the tags by name, so their order changes nothing).
 ///     The writer is deliberately dumb: existence checks, duplicate-name rules and layer guards
 ///     are the command handler's business. All operations assume the ranges on the given
 ///     <see cref="StoryEvent" />/<see cref="StoryThread" /> were parsed from exactly the given

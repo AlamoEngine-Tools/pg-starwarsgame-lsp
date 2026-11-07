@@ -23,18 +23,23 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
     // of entries.
     private readonly Lazy<ImmutableDictionary<string, ImmutableArray<string>>> _byFileName;
 
+    // The project each workspace path comes from; empty for a catalog merged without projects.
+    private readonly ImmutableDictionary<string, int> _layerOf;
     private readonly ImmutableHashSet<string> _packedPaths;
     private readonly ImmutableHashSet<string> _paths;
 
     public MergedAssetFileIndex(IEnumerable<string> paths)
-        : this(paths.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase), ImmutableHashSet<string>.Empty)
+        : this(paths.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase), ImmutableHashSet<string>.Empty,
+            ImmutableDictionary<string, int>.Empty)
     {
     }
 
-    private MergedAssetFileIndex(ImmutableHashSet<string> all, ImmutableHashSet<string> packed)
+    private MergedAssetFileIndex(ImmutableHashSet<string> all, ImmutableHashSet<string> packed,
+        ImmutableDictionary<string, int> layerOf)
     {
         _paths = all;
         _packedPaths = packed;
+        _layerOf = layerOf;
         _byExtension = BucketByExtension(all);
         _byFileName = new Lazy<ImmutableDictionary<string, ImmutableArray<string>>>(
             () => BucketByFileName(all), LazyThreadSafetyMode.ExecutionAndPublication);
@@ -60,6 +65,11 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
     public bool IsPackedAsset(string normalisedPath)
     {
         return _packedPaths.Contains(normalisedPath);
+    }
+
+    public int? LayerRankOf(string normalisedPath)
+    {
+        return _layerOf.TryGetValue(normalisedPath, out var rank) ? rank : null;
     }
 
     /// <summary>
@@ -119,12 +129,29 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
     public static MergedAssetFileIndex Merge(
         IEnumerable<string> baselineFiles, IEnumerable<string> workspaceFiles)
     {
-        var workspace = workspaceFiles.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        return MergeLayered(baselineFiles, workspaceFiles.Select(path => (path, (int?)null)));
+    }
+
+    /// <summary>
+    ///     <see cref="Merge(IEnumerable{string}, IEnumerable{string})" /> over workspace paths that
+    ///     carry the precedence rank of the project they come from, or null where no project
+    ///     declares their folder. Of two projects shipping one path the higher one's copy is the one
+    ///     read, so that rank is the one kept.
+    /// </summary>
+    public static MergedAssetFileIndex MergeLayered(
+        IEnumerable<string> baselineFiles, IEnumerable<(string Path, int? Rank)> workspaceFiles)
+    {
+        var files = workspaceFiles.ToList();
+        var workspace = files.Select(f => f.Path).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        var layerOf = files
+            .Where(f => f.Rank is not null)
+            .GroupBy(f => f.Path, StringComparer.OrdinalIgnoreCase)
+            .ToImmutableDictionary(g => g.Key, g => g.Max(f => f.Rank!.Value), StringComparer.OrdinalIgnoreCase);
         var baseline = baselineFiles.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
         // Paths that also exist as loose workspace files are not "packed" - workspace overrides baseline.
         var packed = baseline
             .Where(p => !workspace.Contains(p))
             .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
-        return new MergedAssetFileIndex(baseline.Union(workspace), packed);
+        return new MergedAssetFileIndex(baseline.Union(workspace), packed, layerOf);
     }
 }

@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Loads after SpaceUnitsFighters.xml. Game objects keep the first definition of a name. -->
+<SpaceUnit_Objects>
+	<!-- Expected: aetswg-010-0006 - the shipped X-Wing in SpaceUnitsFighters.xml loads first and wins. -->
+	<SpaceUnit Name="X-Wing">
+		<Max_Speed>9</Max_Speed>
+	</SpaceUnit>
+
+	<!-- Expected: no diagnostic here, aetswg-010-0006 on the second one below - in one file the earlier line wins. -->
+	<SpaceUnit Name="E2E_LoadOrder_Twice">
+		<Max_Speed>1</Max_Speed>
+	</SpaceUnit>
+	<SpaceUnit Name="E2E_LoadOrder_Twice">
+		<Max_Speed>2</Max_Speed>
+	</SpaceUnit>
+
+	<!-- One reference per case. Expected: X-Wing and E2E_LoadOrder_Copy_Trooper resolve; Scout_Trooper
+	     (its file is replaced by this mod's copy), Executor_Super_Star_Destroyer and Bossk (their files
+	     are not in this mod's list) are unresolved. Hover on X-Wing shows the shipped definition. -->
+	<GroundCompany Name="E2E_LoadOrder_Probe">
+		<Company_Units>X-Wing, E2E_LoadOrder_Copy_Trooper, Scout_Trooper, Executor_Super_Star_Destroyer, Bossk</Company_Units>
+	</GroundCompany>
+
+	<!-- A tag repeated in one object: the list keeps both occurrences' entries (X-Wing, A-Wing), the
+	     single value takes the later one (2). Read with Show Effective Object. -->
+	<GroundCompany Name="E2E_LoadOrder_Repeat">
+		<Company_Units>X-Wing</Company_Units>
+		<Company_Units>A-Wing</Company_Units>
+		<Max_Speed>1</Max_Speed>
+		<Max_Speed>2</Max_Speed>
+	</GroundCompany>
+</SpaceUnit_Objects>

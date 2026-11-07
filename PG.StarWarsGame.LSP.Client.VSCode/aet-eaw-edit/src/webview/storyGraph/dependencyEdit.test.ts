@@ -20,7 +20,7 @@ describe("the read-only reasons", () => {
             contents: {
                 "Read-only: '{0}' is a referenced project. Edit this thread in '{0}' itself":
                     "TRANSLATED {0}",
-                "Every thread here belongs to {0}, which this workspace only references. Open the graph in that project to edit it":
+                "Every thread here belongs to {0}, which this workspace only references. Open the graph in that project to edit it.":
                     "TRANSLATED ALL {0}",
             },
         });

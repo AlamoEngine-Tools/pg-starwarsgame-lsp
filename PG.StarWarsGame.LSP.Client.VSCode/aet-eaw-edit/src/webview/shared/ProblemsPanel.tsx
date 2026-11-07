@@ -27,12 +27,20 @@ export interface ProblemFilterControl {
 
 function filterTitle(filter: ProblemFilterControl): string {
     if (!filter.filterable) {
-        return "Every problem is in view, so there is nothing to filter.";
+        return l10n.t(
+            "Every problem is in view, so there is nothing to filter.",
+        );
     }
 
     return filter.showingAll
-        ? `Showing all problems. ${filter.hidden} are not in the current view.`
-        : `Showing only problems in the current view. ${filter.hidden} hidden.`;
+        ? l10n.t(
+              "Showing all problems. {0} are not in the current view.",
+              filter.hidden,
+          )
+        : l10n.t(
+              "Showing only problems in the current view. {0} hidden.",
+              filter.hidden,
+          );
 }
 
 export function ProblemsPanel(props: {

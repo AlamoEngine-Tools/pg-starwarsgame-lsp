@@ -26,6 +26,7 @@ public sealed class LuaRenameHandlerAnalyzerFallbackTest
 {
     private const string ModScript = "file:///c:/mods/mymod/data/scripts/story/a.lua";
     private const string BaseScript = "file:///c:/games/eaw/data/scripts/library/pgbase.lua";
+    private const string Stub = "file:///c:/schema/lua/api.d.lua";
 
     /// <summary>The cursor at (1, 7) sits on the local - nothing this server renames.</summary>
     private const string LocalScript = "local abc = 1\nprint(abc)";
@@ -67,7 +68,8 @@ public sealed class LuaRenameHandlerAnalyzerFallbackTest
             new FakeGameIndexService(),
             analyzer,
             layers ?? new ProjectLayerMap(fileHelper),
-            TestCatalogues.English);
+            TestCatalogues.English,
+            new LuaStubLocation { Directory = "c:/schema/lua" });
     }
 
     private static ProjectLayerMap Layers()
@@ -116,6 +118,35 @@ public sealed class LuaRenameHandlerAnalyzerFallbackTest
         var result = await handler.PrepareAsync(PrepareAt(ModScript), CancellationToken.None);
 
         Assert.Same(range, result);
+    }
+
+    // An engine member - fett.Move_To - is no name of ours: the analyzer that renames it edits the
+    // stub declaring it, and the engine binds it, so a rename breaks every script calling it.
+    [Fact]
+    public async Task NotOurs_ANameWhoseRenameEditsTheStubs_IsNotPrepared()
+    {
+        var analyzer = new ScriptedLuaAnalyzer()
+            .Answer("textDocument/prepareRename", new RangeOrPlaceholderRange(new Range(1, 6, 1, 9)))
+            .Answer("textDocument/rename", EditOf(ModScript, Stub));
+        var handler = Handler(analyzer, scripts: [(ModScript, LocalScript)]);
+
+        var result = await handler.PrepareAsync(PrepareAt(ModScript), CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    // The analyzer's rename of an engine member edits the stub and every script calling it; the
+    // scripts of other states go, and the stub must not go with them unnoticed.
+    [Fact]
+    public async Task TheAnalyzersRename_EditingTheStubs_IsRefused_BeforeTheStateIsKept()
+    {
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/rename", EditOf(ModScript, Stub));
+        var handler = Handler(analyzer, Layers(), scripts: [(ModScript, LocalScript)]);
+
+        var refusal = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.RenameAsync(RenameAt(ModScript), CancellationToken.None));
+
+        Assert.Equal("Rename refused: It edits api.d.lua, which is not one of this project's scripts", refusal.Message);
     }
 
     /// <summary>Nothing parsed is still ours: the refusal stands and the analyzer is not asked.</summary>

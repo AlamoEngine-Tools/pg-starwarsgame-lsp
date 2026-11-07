@@ -38,4 +38,13 @@ public interface IAssetFileIndex
     ///     for loose workspace files or when the path is not in the catalog.
     /// </summary>
     bool IsPackedAsset(string normalisedPath);
+
+    /// <summary>
+    ///     The precedence rank of the project a workspace asset comes from, or <see langword="null" />
+    ///     for a packed game asset, a path not in the catalog, or a catalog built without projects.
+    /// </summary>
+    int? LayerRankOf(string normalisedPath)
+    {
+        return null;
+    }
 }

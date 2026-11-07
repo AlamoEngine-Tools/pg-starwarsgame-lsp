@@ -32,7 +32,7 @@ public sealed class ModProjectLoaderTest
     public void Load_CurrentIdentity_Loads()
     {
         var loader = Build(
-            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""",
+            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "foc" }""",
             out _);
 
         Assert.Equal("Mod", loader.Load(ProjectPath).Name);
@@ -85,7 +85,7 @@ public sealed class ModProjectLoaderTest
     public void Load_OlderVersion_IsMigratedInMemory()
     {
         var loader = BuildWith(
-            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""", out _,
+            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past", "game": "foc" }""", out _,
             migrations: new RenameToName());
 
         Assert.Equal("From The Past", loader.Load(ProjectPath).Name);
@@ -95,7 +95,7 @@ public sealed class ModProjectLoaderTest
     [Fact]
     public void Load_OlderVersion_LeavesTheFileAlone()
     {
-        const string original = """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""";
+        const string original = """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past", "game": "foc" }""";
         var loader = BuildWith(original, out var fs, migrations: new RenameToName());
 
         loader.Load(ProjectPath);
@@ -108,7 +108,7 @@ public sealed class ModProjectLoaderTest
     {
         var sink = new RecordingSink();
         var loader = BuildWith(
-            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""", out _, sink,
+            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past", "game": "foc" }""", out _, sink,
             new RenameToName());
 
         loader.Load(ProjectPath);
@@ -125,7 +125,7 @@ public sealed class ModProjectLoaderTest
     {
         var sink = new RecordingSink();
         var loader = BuildWith(
-            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""", out _, sink,
+            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "foc" }""", out _, sink,
             new RenameToName());
 
         loader.Load(ProjectPath);
@@ -199,7 +199,7 @@ public sealed class ModProjectLoaderTest
     {
         var sink = new RecordingSink();
         var loader = BuildWith(
-            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""",
+            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "foc" }""",
             out _, sink, PgprojMigrations.All.ToArray());
 
         loader.Load(ProjectPath);
@@ -982,6 +982,104 @@ public sealed class ModProjectLoaderTest
 
         Assert.Equal(new[] { "Data/XML" }, model.Directories.Xml);
         Assert.Equal("../BaseMod/BaseMod.pgproj", model.ProjectReferences[0].Path);
+    }
+
+    // ── the target game ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void Load_GameEaw_TargetsEaw()
+    {
+        var loader = Build(
+            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "eaw" }""", out _);
+
+        Assert.Equal(TargetGame.EAW, loader.Load(ProjectPath).Game);
+    }
+
+    // Exactly the schema's two spellings, so the editor and the server never disagree on a file.
+    [Theory]
+    [InlineData("swgb")]
+    [InlineData("FOC")]
+    public void Load_GameOutsideTheSchema_RefusesNamingTheValue(string value)
+    {
+        var loader = Build(
+            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod", "game": "{{value}}" }""", out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+
+        Assert.Contains(value, ex.Message, StringComparison.Ordinal);
+        Assert.Equal(ProjectProblem.Invalid, ex.Problem);
+    }
+
+    // The field is explicit from the format that introduced it: only the migration fills it in, and
+    // only for a file older than that format.
+    [Fact]
+    public void Load_CurrentFormatWithoutAGame_RefusesNamingTheField()
+    {
+        var loader = Build($$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""", out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+
+        Assert.Contains("'game'", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(ProjectProblem.Invalid, ex.Problem);
+    }
+
+    // Every project written before the field targets FoC: the more modded game, and the one the
+    // server assumed for all of them.
+    [Fact]
+    public void Load_UnstampedProject_TargetsFoc()
+    {
+        var loader = Build("""{ "name": "Mod" }""", out _);
+
+        Assert.Equal(TargetGame.FOC, loader.Load(ProjectPath).Game);
+    }
+
+    [Fact]
+    public void Load_VersionOneZero_IsMigratedToTargetFocAndSaysSo()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            """{ "_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.0.0", "name": "Mod" }""", out _, sink,
+            [.. PgprojMigrations.All]);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Equal(TargetGame.FOC, model.Game);
+        var (_, migrated, notices) = Assert.Single(sink.Calls);
+        Assert.Equal("foc", (string?)migrated["game"]);
+        Assert.Equal(PgprojFormat.Current.ToString(), (string?)migrated["_typeVersion"]);
+        Assert.Contains(notices, n => n.Contains("\"game\"", StringComparison.Ordinal));
+    }
+
+    // The step only fills a gap: a value someone already wrote is theirs.
+    [Fact]
+    public void Load_VersionOneZeroAlreadyNamingAGame_KeepsIt()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            """{ "_typeVersion": "aetswg-1.0.0", "name": "Mod", "game": "eaw" }""", out _, sink,
+            [.. PgprojMigrations.All]);
+
+        Assert.Equal(TargetGame.EAW, loader.Load(ProjectPath).Game);
+        Assert.Equal("eaw", (string?)Assert.Single(sink.Calls).Migrated["game"]);
+    }
+
+    // The icons node a migration proposes is a PROPOSAL: it goes in the diff for a yes, and the
+    // project is read without it until the author accepts. Read with it, a project with loose
+    // icons and no node counted as configured, and the encyclopedia's "no icon sources" notice
+    // never showed.
+    [Fact]
+    public void Load_VersionOneZeroWithLooseIcons_ProposesTheNode_ButIsReadWithout()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            """{ "_typeVersion": "aetswg-1.0.0", "name": "Mod", "directories": { "art": ["data/art"] } }""",
+            out var fs, sink, [.. PgprojMigrations.All]);
+        fs.AddFile("/workspace/data/art/textures/icons/i_button.tga", new MockFileData([1, 2, 3]));
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Null(model.Icons);
+        Assert.NotNull(Assert.Single(sink.Calls).Migrated["icons"]);
     }
 
     private static ModProjectLoader Build(string json, out ListLogger logger)

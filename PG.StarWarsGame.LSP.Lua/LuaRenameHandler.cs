@@ -36,6 +36,7 @@ public sealed class LuaRenameHandler : IRenameProvider
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaSandboxProvider _sandbox;
     private readonly ISchemaProvider _schema;
+    private readonly LuaStubLocation _stubs;
     private readonly IDocumentTextSource _textSource;
 
     // textSource stays alongside the parse cache: XmlObjectRenameBuilder edits XML documents,
@@ -43,7 +44,8 @@ public sealed class LuaRenameHandler : IRenameProvider
     // binds, so the analyzer never renames them; the sandbox scopes a Lua global's rename to the
     // script's own state; the file helper decides whether the script's state machine library is
     // the game's. What we do not claim (locals, fields) is the analyzer's to rename - within the
-    // script's own state, and within the project only, checked against the layers.
+    // script's own state, and within the project only, checked against the layers - unless the
+    // analyzer defines it in the stubs: an engine member, which the game binds.
     public LuaRenameHandler(
         ILuaParseCache parseCache,
         IDocumentTextSource textSource,
@@ -55,7 +57,8 @@ public sealed class LuaRenameHandler : IRenameProvider
         IGameIndexService indexService,
         ILuaAnalyzer analyzer,
         IProjectLayerMap layers,
-        IMessageCatalog messages)
+        IMessageCatalog messages,
+        LuaStubLocation stubs)
     {
         _parseCache = parseCache;
         _textSource = textSource;
@@ -68,6 +71,7 @@ public sealed class LuaRenameHandler : IRenameProvider
         _analyzer = analyzer;
         _layers = layers;
         _messages = messages;
+        _stubs = stubs;
     }
 
     public bool Handles(string documentUri)
@@ -84,6 +88,8 @@ public sealed class LuaRenameHandler : IRenameProvider
 
         var edit = await _analyzer.RequestAsync<WorkspaceEdit>("textDocument/rename", request, ct);
         if (edit is null) return null;
+        // The stubs before the state: an engine member's rename edits them, and they are no state's.
+        LuaAnalyzerRename.EnsureNoStubEdited(edit, _stubs, _messages);
         // Another script's state first: its file is no part of this rename, wherever it lives.
         edit = LuaAnalyzerRename.KeepWithinState(edit, _sandbox.Current, uri);
         LuaAnalyzerRename.EnsureWithinProject(edit, _layers, _messages);
@@ -97,8 +103,19 @@ public sealed class LuaRenameHandler : IRenameProvider
         var (line, character) = (request.Position.Line, request.Position.Character);
         if (Claims(uri, line, character, index))
             return HandlePrepare(uri, line, character, index);
-        return await _analyzer.RequestAsync<RangeOrPlaceholderRange>("textDocument/prepareRename", request, ct);
+        var range = await _analyzer.RequestAsync<RangeOrPlaceholderRange>("textDocument/prepareRename", request, ct);
+        if (range is null || _stubs.Directory is null) return range;
+
+        // An engine member - fett.Move_To - is no name of ours, and only its rename tells: the analyzer
+        // that renames it edits the stub declaring it. Asked of that analyzer, it costs one rename.
+        var probe = await _analyzer.RequestAsync<WorkspaceEdit>("textDocument/rename", new RenameParams
+        {
+            TextDocument = request.TextDocument, Position = request.Position, NewName = RenameProbeName
+        }, ct);
+        return probe is not null && LuaAnalyzerRename.StubEdited(probe, _stubs) is not null ? null : range;
     }
+
+    private const string RenameProbeName = "aet_rename_probe";
 
     public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
     {
@@ -226,6 +243,17 @@ public sealed class LuaRenameHandler : IRenameProvider
         var parsed = _parseCache.GetOrParse(uri);
         if (parsed is null) return null;
 
+        // A global function named by value - the handler handed to Define_State - is no call site the
+        // index holds: it is read from the script itself.
+        if (LuaGlobalRenameBuilder.GlobalAt(parsed.Tree, line, character) is { } use &&
+            IsKnownLuaGlobal(use.Name, index))
+        {
+            if (IsEngineEntryPoint(use.Name)) return null;
+            return LuaGlobalRenameBuilder.IsLeafOwned(use.Name, index, InScope(uri, use.Name, index))
+                ? new RangeOrPlaceholderRange(use.Range)
+                : null;
+        }
+
         return FindXmlObjectStringRange(parsed.Tree, line, character, index);
     }
 
@@ -307,11 +335,9 @@ public sealed class LuaRenameHandler : IRenameProvider
     {
         var root = tree.GetRoot();
 
-        foreach (var id in root.DescendantNodes().OfType<IdentifierNameSyntax>())
-        {
-            if (!LocationContainsPosition(id.GetLocation(), line, character)) continue;
-            if (IsKnownLuaGlobal(id.Name, index)) return id.Name;
-        }
+        // A local of a global's name is not the global.
+        if (LuaGlobalRenameBuilder.GlobalAt(tree, line, character) is { } use && IsKnownLuaGlobal(use.Name, index))
+            return use.Name;
 
         foreach (var funcDecl in root.DescendantNodes().OfType<FunctionDeclarationStatementSyntax>())
         {

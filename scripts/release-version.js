@@ -18,12 +18,14 @@ const FILES = {
     ext: 'PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/src/extension.ts',
 };
 
-// Group 1 is everything before the value, group 2 the value. The package.json pattern only
-// matches the top-level key (two-space indent), never a dependency's "version".
+// Group 1 is everything before the value, the named group the value. The package.json pattern
+// only matches the top-level key (two-space indent), never a dependency's "version".
+// extension.ts is formatted by prettier, so its quote is whatever the formatter writes - the
+// pattern takes either and keeps it.
 const PATTERNS = {
-    props: /(<Version>)([^<]*)(?=<\/Version>)/,
-    pkg: /^(\s{2}"version":\s*")([^"]*)(?=")/m,
-    ext: /(const REQUIRED_SERVER_VERSION = ')([^']*)(?=')/,
+    props: /(<Version>)(?<value>[^<]*)(?=<\/Version>)/,
+    pkg: /^(\s{2}"version":\s*")(?<value>[^"]*)(?=")/m,
+    ext: /(const REQUIRED_SERVER_VERSION = (['"]))(?<value>[^'"]*)(?=\2)/,
 };
 
 const VERSION = /^\d+\.\d+\.\d+$/;
@@ -32,7 +34,7 @@ function readVersions(root) {
     const result = {};
     for (const [key, rel] of Object.entries(FILES)) {
         const match = PATTERNS[key].exec(fs.readFileSync(path.join(root, rel), 'utf8'));
-        result[key] = match ? match[2] : null;
+        result[key] = match ? match.groups.value : null;
     }
     return result;
 }

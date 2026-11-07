@@ -12,6 +12,8 @@
 // point at in the tree. The master holds no opinion about which weapons are on - switch it off and
 // back on and your picks are still there.
 
+import * as l10n from "@vscode/l10n";
+
 import type {
     PreviewHardpoint,
     PreviewTurret,
@@ -186,19 +188,24 @@ export function visibleArcs(
  */
 export function weaponTitle(row: WeaponRow): string {
     if (row.destroyed) {
-        return "This hardpoint has been shot away, so it no longer fires";
+        return l10n.t(
+            "This hardpoint has been shot away, so it no longer fires",
+        );
     }
 
     return row.arcs.length > 0
-        ? "Draw this weapon's cone"
-        : "This weapon declares no range, so there is no cone to draw";
+        ? l10n.t("Draw this weapon's cone")
+        : l10n.t("This weapon declares no range, so there is no cone to draw");
 }
 
 /** Same, for the fire-bone buttons: a bone off the hardpoint's model is not in the hull's tree. */
 export function fireBoneTitle(bone: string, inTree: boolean): string {
     return inTree
-        ? `Select ${bone} on the model`
-        : `${bone} is a bone of this hardpoint's own model, not of the hull`;
+        ? l10n.t("Select {0} on the model", bone)
+        : l10n.t(
+              "{0} is a bone of this hardpoint's own model, not of the hull",
+              bone,
+          );
 }
 
 /**
@@ -387,7 +394,7 @@ function coneText(weapon: PreviewWeapon): string | null {
  */
 function inaccuracyText(weapon: PreviewWeapon): string | null {
     if (weapon.firesForward) {
-        return "None - Fires_Forward skips spread and target leading";
+        return l10n.t("None - Fires_Forward skips spread and target leading");
     }
 
     // Defended rather than trusted, though the type says it is always there: a scene from an older

@@ -59,9 +59,10 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatist
         if (!index.WorkspaceDefinitions.TryGetValue(objectId, out var defs) || defs.Length == 0)
             return null;
 
-        // The definition GameIndex.Resolve picks, so a lookup by id alone reads the same object here.
-        var winner = defs.Length == 1 ? defs[0] : index.Resolve(objectId)!;
-        if (winner.Origin is not FileOrigin origin)
+        // The definition GameIndex.Resolve picks, so a lookup by id alone reads the same object here;
+        // when the game keeps the shipped one, the baseline answers.
+        var winner = index.Resolve(objectId);
+        if (winner?.Origin is not FileOrigin origin || !defs.Contains(winner))
             return null;
 
         var map = GetOrBuildDocumentMap(origin.Uri, index);

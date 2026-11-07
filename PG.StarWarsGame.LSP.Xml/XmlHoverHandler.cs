@@ -69,34 +69,37 @@ public sealed class XmlHoverHandler : IHoverProvider
             return Task.FromResult<Hover?>(null);
         var hapDoc = parsed.Html;
 
-        if (!XmlUtility.TryGetRootNode(hapDoc, out var rootNode) ||
-            XmlUtility.GetLine(rootNode) == request.Position.Line)
-            return Task.FromResult<Hover?>(null);
-
         var lineIndex = request.Position.Line;
         var charPos = request.Position.Character;
 
-        if (!XmlUtility.TryFindNode(hapDoc, lineIndex, out var node) &&
-            !XmlUtility.TryFindNodeByClosingLine(hapDoc, lineIndex, out node))
+        if (!XmlUtility.TryGetRootNode(hapDoc, out var rootNode))
+            return Task.FromResult<Hover?>(null);
+
+        var node = parsed.ElementAt(lineIndex, charPos);
+        if (node is null)
         {
             // Expected outside element content (comments, whitespace, prolog) - not a failure worth warning about.
             _logger.LogDebug(
-                "Hover request at {Line}:{Character} produced no result, because no tag was found at that position.",
+                "Hover request at {Line}:{Character} produced no result: no tag at that position",
                 lineIndex, charPos);
             return Task.FromResult<Hover?>(null);
         }
 
-        var isOnTagName = XmlUtility.IsOnTagName(node!, lineIndex, charPos);
+        // The root element names the file's kind and has nothing of its own to say.
+        if (ReferenceEquals(node, rootNode))
+            return Task.FromResult<Hover?>(null);
+
+        var isOnTagName = XmlUtility.IsOnTagName(node, lineIndex, charPos);
         var locale = _config.Current.Locale;
         var index = _indexService.Current;
 
-        var ctx = new HoverContext(uri, index, _schema, hapDoc, rootNode!, node!, isOnTagName,
+        var ctx = new HoverContext(uri, index, _schema, hapDoc, rootNode!, node, isOnTagName,
             lineIndex, charPos, locale, _messages);
 
         var hover = _strategies.Select(s => s.Handle(ctx)).FirstOrDefault(h => h is not null);
         if (hover is null)
             _logger.LogWarning(
-                "Hover request at {Line}:{Character} produced no result, because the tag could not be found.",
+                "Hover request at {Line}:{Character} produced no result: no strategy answered for the tag",
                 lineIndex, charPos);
         else
             _logger.LogDebug("Hover resolved at {Line}:{Character}", lineIndex, charPos);

@@ -87,6 +87,18 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
     private readonly IGameIndexService _indexService;
     private readonly ILogger<StoryModelService> _logger;
     private readonly Dictionary<StoryModelKey, ModelCache> _models = new();
+
+    // A model is built from the faction's manifest files; the campaign only names it. One build
+    // serves every campaign that lists the same manifests - on a large mod 1,077 campaign variants
+    // and 13 factions came to 13,469 models from 98 manifests, built one by one for the navigator
+    // feed on start (135 s) and again for a thread's diagnostics on every save.
+    private readonly Dictionary<BuildKey, ModelCache> _builds = new();
+
+    // One parse per thread document and one extraction per script, shared by every build that
+    // lists the file; keyed by the text itself, so an edit the index has not versioned yet still
+    // parses fresh.
+    private readonly Dictionary<string, ParsedThread> _threads = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ParsedMachine> _machines = new(StringComparer.Ordinal);
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
@@ -157,9 +169,29 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
                 return cached.Model;
         }
 
+        var manifests = StoryCampaignAssembler.FactionManifestsOf(chain.Result, campaignName, faction);
+        if (manifests.Count == 0) return null;
+        var buildKey = BuildKey.Of(faction, manifests);
+        var seed = chain.Result.Campaigns
+            .First(c => c.Name.Equals(campaignName, StringComparison.OrdinalIgnoreCase)).Seed;
+
+        lock (_gate)
+        {
+            if (_builds.TryGetValue(buildKey, out var shared)
+                && ReferenceEquals(shared.Chain, chain)
+                && VersionsMatch(shared.DocumentVersions))
+            {
+                // The same threads, graph and battles under this campaign's name and seed.
+                var derived = shared.Model with { CampaignName = campaignName, Seed = seed };
+                _models[key] = shared with { Model = derived };
+                return derived;
+            }
+        }
+
         var reader = new RecordingReader(this);
         var model = new StoryCampaignAssembler(_schema)
-            .Assemble(campaignName, faction, chain.Result, reader.ReadThread, reader.ReadLuaMachine);
+            .Assemble(campaignName, faction, chain.Result, reader.ReadThread, reader.ReadLuaMachine,
+                reader.ParseThread);
         if (model is null) return null;
 
         _logger.LogDebug("Story model for {Key} built: {Threads} thread(s)",
@@ -167,7 +199,9 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
 
         lock (_gate)
         {
-            _models[key] = new ModelCache(model, chain, reader.Versions);
+            var entry = new ModelCache(model, chain, reader.Versions);
+            _models[key] = entry;
+            _builds[buildKey] = entry;
         }
 
         return model;
@@ -319,6 +353,9 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
         {
             _chain = chain;
             _models.Clear();
+            _builds.Clear();
+            _threads.Clear();
+            _machines.Clear();
             _servedIncompleteScan = false;
         }
 
@@ -366,9 +403,25 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
         ChainCache Chain,
         IReadOnlyDictionary<string, int?> DocumentVersions);
 
+    /// <summary>What a build depends on besides the chain: the faction and its manifest files.</summary>
+    private sealed record BuildKey(string Faction, string Manifests)
+    {
+        public static BuildKey Of(string faction, IReadOnlyList<string> manifests)
+        {
+            return new BuildKey(faction.ToUpperInvariant(),
+                string.Join("|", manifests.Select(m => GamePaths.Key(m))));
+        }
+    }
+
+    private sealed record ParsedThread(string Text, StoryThread Thread);
+
+    private sealed record ParsedMachine(string Text, LuaStoryMachine? Machine);
+
     /// <summary>Chain-scan resolver over the workspace, recording every read for invalidation.</summary>
     private sealed class RecordingResolver(StoryModelService service) : IStoryChainFileResolver
     {
+        private readonly XmlFileNameIndex _byName = new(service._fileHelper, service.XmlRootsHighestFirst());
+
         public Dictionary<string, int?> Versions { get; } = new(StringComparer.Ordinal);
 
         public StoryChainFile? ReadFile(string xmlRelativePath)
@@ -384,6 +437,11 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
             var normalized = GamePaths.Key(xmlRelativePath);
             var map = service._indexService.Current.Baseline.FileTypeMap;
             return map.ContainsKey(normalized) || map.ContainsKey("data/xml/" + normalized);
+        }
+
+        public IReadOnlyList<string> FindByFileName(string fileName)
+        {
+            return _byName.Find(fileName);
         }
     }
 
@@ -404,6 +462,25 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
             return read;
         }
 
+        /// <summary>The document's parse, made once and shared while its text is the same.</summary>
+        public StoryThread ParseThread(string text, string uri)
+        {
+            lock (service._gate)
+            {
+                if (service._threads.TryGetValue(uri, out var kept)
+                    && (ReferenceEquals(kept.Text, text) || string.Equals(kept.Text, text, StringComparison.Ordinal)))
+                    return kept.Thread;
+            }
+
+            var thread = StoryThreadParser.Parse(text, uri);
+            lock (service._gate)
+            {
+                service._threads[uri] = new ParsedThread(text, thread);
+            }
+
+            return thread;
+        }
+
         /// <summary>
         ///     The attached script (manifest name, extensionless) as a state machine: the indexed
         ///     .lua document of that file name, read open-buffer-first and extracted statically.
@@ -418,7 +495,21 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
             var text = service._textSource.GetText(uri);
             if (text is null) return null;
             Versions[uri] = service.CurrentVersionOf(uri);
-            return LuaStoryMachineExtractor.Extract(text.Text, uri);
+            lock (service._gate)
+            {
+                if (service._machines.TryGetValue(uri, out var kept)
+                    && (ReferenceEquals(kept.Text, text.Text)
+                        || string.Equals(kept.Text, text.Text, StringComparison.Ordinal)))
+                    return kept.Machine;
+            }
+
+            var machine = LuaStoryMachineExtractor.Extract(text.Text, uri);
+            lock (service._gate)
+            {
+                service._machines[uri] = new ParsedMachine(text.Text, machine);
+            }
+
+            return machine;
         }
     }
 }

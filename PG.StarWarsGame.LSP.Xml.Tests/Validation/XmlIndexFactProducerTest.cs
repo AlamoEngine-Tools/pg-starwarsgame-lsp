@@ -89,6 +89,59 @@ public sealed class XmlIndexFactProducerTest
         Assert.Equal(2, facts[0].AllDefinitions.Count);
     }
 
+    // ── by load order ────────────────────────────────────────────────────────
+
+    private const string ModUnits = "file:///c:/mod/data/xml/mod_units.xml";
+
+    private static GameIndex Ordered(GameSymbol shipped, GameSymbol mod, params string[] listed)
+    {
+        var index = BuildIndex([mod], [], ModUnits);
+        var objects = new Core.Schema.MetafileDefinition("data/xml/gameobjectfiles.xml",
+            Core.Schema.MetafileType.FileRegistry, ["SpaceUnit"])
+        {
+            DuplicateNames = Core.Schema.DuplicateNameRule.FIRST_WINS
+        };
+        return index with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add(shipped.Id, shipped)
+            },
+            LoadOrder = LoadOrder.From(
+                [
+                    new RegistryWalk("data/xml/gameobjectfiles.xml", null,
+                        [.. listed.Select(f => new RegistryWalkEntry(f, f == "units.xml" ? null : ModUnits))])
+                ],
+                [objects], [])
+        };
+    }
+
+    // The game keeps the shipped object, loaded first: the mod's definition is the one to tell.
+    [Fact]
+    public void ADefinitionTheRuleDrops_GetsAFactNamingTheKeptOne()
+    {
+        var shipped = MakeSym("X_Wing", "DATA\\XML\\Units.xml", 9);
+        var mod = MakeSym("X_Wing", ModUnits, 4);
+
+        var fact = Assert.Single(Sut.Produce(ModUnits, Ordered(shipped, mod, "units.xml", "mod_units.xml"))
+            .OfType<XmlSymbolFact>());
+
+        Assert.Same(shipped, fact.Kept);
+        Assert.Equal(Core.Schema.DuplicateNameRule.FIRST_WINS, fact.Rule);
+        Assert.Equal("gameobjectfiles.xml", fact.Registry);
+    }
+
+    // The definition the game keeps has nothing wrong with it, though another layer defines the name.
+    [Fact]
+    public void TheDefinitionTheRuleKeeps_GetsNoFact()
+    {
+        var shipped = MakeSym("X_Wing", "DATA\\XML\\Units.xml", 9);
+        var mod = MakeSym("X_Wing", ModUnits, 4);
+
+        Assert.DoesNotContain(Sut.Produce(ModUnits, Ordered(shipped, mod, "mod_units.xml", "units.xml")),
+            f => f is XmlSymbolFact);
+    }
+
     [Fact]
     public void StoryParserSymbols_SameNameAcrossCampaignThreads_EmitsNoDuplicateFact()
     {

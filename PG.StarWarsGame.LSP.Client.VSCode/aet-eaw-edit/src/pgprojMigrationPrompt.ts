@@ -7,6 +7,8 @@
 // driven from the unit harness, but the text a user reads and the decision taken from their answer
 // are exactly the parts worth pinning.
 
+import * as l10n from "@vscode/l10n";
+
 /** The server's proposal - the migrated project file, and why it changed. */
 export interface PgprojMigrationProposal {
     path: string;
@@ -15,13 +17,18 @@ export interface PgprojMigrationProposal {
     notices: string[];
 }
 
-/** The two answers, as they appear on the buttons. */
-export const ACCEPT = "Update project file";
-export const DECLINE = "Discard and stop";
+/** The two answers, as they appear on the buttons. Read per call, so they follow the catalogue. */
+export function acceptLabel(): string {
+    return l10n.t("Update project file");
+}
+
+export function declineLabel(): string {
+    return l10n.t("Discard and stop");
+}
 
 /** Title of the diff tab: which file, and which direction the change runs. */
 export function diffTitle(fileName: string): string {
-    return `${fileName} - on disk <-> updated format`;
+    return l10n.t("{0} - on disk <-> updated format", fileName);
 }
 
 /**
@@ -35,10 +42,10 @@ export function diffTitle(fileName: string): string {
 export function proposalMessage(proposal: PgprojMigrationProposal): string {
     const notices =
         proposal.notices.length > 0 ? ` ${proposal.notices.join(" ")}` : "";
-    return (
-        `'${proposal.fileName}' uses an older project format.${notices}` +
-        " Review the changes and update the file? Comments in it are not preserved, and a backup" +
-        " is written next to it first. Declining stops the language server."
+    return l10n.t(
+        "'{0}' uses an older project format.{1} Review the changes and update the file? Comments in it are not preserved, and a backup is written next to it first. Declining stops the language server.",
+        proposal.fileName,
+        notices,
     );
 }
 
@@ -53,13 +60,13 @@ export type ProposalOutcome = "accept" | "decline";
  * project file because somebody pressed Escape.
  */
 export function outcomeOf(answer: string | undefined): ProposalOutcome {
-    return answer === ACCEPT ? "accept" : "decline";
+    return answer === acceptLabel() ? "accept" : "decline";
 }
 
 /** What the user is told once the server has stopped, so the state is not a mystery. */
 export function declinedMessage(fileName: string): string {
-    return (
-        `'${fileName}' was left unchanged, so aet-eaw-edit has stopped. ` +
-        "Update the project file, or reload the window to be asked again."
+    return l10n.t(
+        "'{0}' was left unchanged, so aet-eaw-edit has stopped. Update the project file, or reload the window to be asked again.",
+        fileName,
     );
 }

@@ -189,7 +189,7 @@ public sealed class HttpSchemaProviderTest
         const string kindsYaml = "kinds:\n  - kind: Planet\n    behaviors: [PLANET]\n";
         const string hardcodedYaml = "name: BehaviorModule\nvalues:\n  - name: TEST_VALUE\n";
         const string metaYaml =
-            "metafiles:\n  - path: data/xml/test.xml\n    metaFileType: fileRegistry\n    types:\n      - GameObjectType\n";
+            "metafiles:\n  - path: data/xml/test.xml\n    metaFileType: fileRegistry\n    duplicateNames: firstWins\n    types:\n      - GameObjectType\n";
 
         var (provider, fake) = Build(req =>
         {

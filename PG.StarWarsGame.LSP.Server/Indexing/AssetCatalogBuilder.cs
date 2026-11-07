@@ -67,28 +67,41 @@ public sealed class AssetCatalogBuilder
         // The catalogue's own predicate rather than a third copy of its list: the workspace's
         // loose `.ala` files are exactly what a model preview needs enumerated, and a list that
         // drifts from the catalogue's leaves them out silently.
-        var workspace = config.AssetRoots.Concat(config.ScriptRoots)
-            .Where(_fileHelper.FileSystem.Directory.Exists)
-            .SelectMany(root => _fileHelper.FileSystem.Directory
-                .EnumerateFiles(root, "*", SearchOption.AllDirectories)
+        //
+        // Each root with the project it belongs to, so the Mod Browser can name where an asset comes
+        // from; a root no project declares (a workspace without project files) carries none.
+        var layered = config.Layers
+            .SelectMany(layer => layer.AssetRoots.Concat(layer.ScriptRoots)
+                .Select(root => (Root: root, Rank: (int?)layer.Rank)))
+            .ToList();
+        var undeclared = config.AssetRoots.Concat(config.ScriptRoots)
+            .Where(root => !layered.Any(l => string.Equals(l.Root, root, StringComparison.OrdinalIgnoreCase)))
+            .Select(root => (Root: root, Rank: (int?)null));
+        var workspace = layered.Concat(undeclared)
+            .Where(r => _fileHelper.FileSystem.Directory.Exists(r.Root))
+            .SelectMany(r => _fileHelper.FileSystem.Directory
+                .EnumerateFiles(r.Root, "*", SearchOption.AllDirectories)
                 .Where(file => MegAssetCatalogBuilder.IsAssetExtension(
                     _fileHelper.FileSystem.Path.GetExtension(file)))
-                .Select(file => GameRelativePath(file, root)))
+                .Select(file => (Path: GameRelativePath(file, r.Root), r.Rank)))
             .ToList();
 
         var archives = _megLoadOrder.SearchOrder(MegArchiveRoots.For(config, _configProvider.Current));
         foreach (var archive in archives.Where(a => a.Source == MegArchiveSource.Mod))
-        foreach (var entry in _megEntries.EnumerateEntryPaths(archive.Path))
         {
-            // Through the baseline builder's own rules, so a packed asset is spelled the same
-            // whether it reached the catalog from the shipped game or from the workspace.
-            var normalized = MegAssetCatalogBuilder.ApplySfxConventions(
-                MegAssetCatalogBuilder.NormalizeMegPath(entry),
-                _fileHelper.FileSystem.Path.GetFileName(archive.Path));
-            if (!MegAssetCatalogBuilder.IsAssetExtension(Path.GetExtension(normalized)))
-                continue;
-            workspace.Add(normalized);
-            packed++;
+            var rank = RankOfFolderHolding(config, archive.Path);
+            foreach (var entry in _megEntries.EnumerateEntryPaths(archive.Path))
+            {
+                // Through the baseline builder's own rules, so a packed asset is spelled the same
+                // whether it reached the catalog from the shipped game or from the workspace.
+                var normalized = MegAssetCatalogBuilder.ApplySfxConventions(
+                    MegAssetCatalogBuilder.NormalizeMegPath(entry),
+                    _fileHelper.FileSystem.Path.GetFileName(archive.Path));
+                if (!MegAssetCatalogBuilder.IsAssetExtension(Path.GetExtension(normalized)))
+                    continue;
+                workspace.Add((normalized, rank));
+                packed++;
+            }
         }
 
         if (_logger.IsEnabled(LogLevel.Information))
@@ -96,7 +109,19 @@ public sealed class AssetCatalogBuilder
                 "Asset catalog: {Workspace} workspace asset(s) ({Packed} from MEG archives) merged with {Baseline} baseline asset(s)",
                 workspace.Count, packed, baseline.Count);
 
-        _indexService.ApplyAssetFiles(MergedAssetFileIndex.Merge(baseline, workspace));
+        _indexService.ApplyAssetFiles(MergedAssetFileIndex.MergeLayered(baseline, workspace));
+    }
+
+    /// <summary>The rank of the project whose folder holds <paramref name="path" />, the deepest one first.</summary>
+    private static int? RankOfFolderHolding(WorkspaceConfiguration config, string path)
+    {
+        var file = GamePaths.Forward(path);
+        return config.Layers
+            .Where(l => l.ProjectDirectory is { } dir &&
+                        file.StartsWith(dir.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(l => l.ProjectDirectory!.Length)
+            .Select(l => (int?)l.Rank)
+            .FirstOrDefault();
     }
 
     /// <summary>Whether a watched file's change touches this catalog.</summary>

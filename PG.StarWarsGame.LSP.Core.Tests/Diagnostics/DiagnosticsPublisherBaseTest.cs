@@ -360,6 +360,71 @@ public sealed class DiagnosticsPublisherBaseTest
         Assert.Equal(2, published.Count);
     }
 
+    // A rule may read another document's tags: a hardpoint file is checked against the units that
+    // attach it, a variant against its base. A content-only edit of one of them changes nothing the
+    // index shares, yet the other's findings change with it.
+    private static (GameIndex Before, GameIndex After) RelatedEdit(bool editedReferencesTheOther)
+    {
+        var unit = new DocumentIndex("file:///units.xml", 1,
+            [
+                new GameSymbol("Frigate", GameSymbolKind.XmlObject, "Unit",
+                    new FileOrigin("file:///units.xml", 1, null), null)
+            ],
+            [new GameReference("HP_Salvo", null, null, "file:///units.xml", 2, 0, 8)]);
+        var hardpoints = new DocumentIndex("file:///hardpoints.xml", 1,
+            [
+                new GameSymbol("HP_Salvo", GameSymbolKind.XmlObject, "HardPoint",
+                    new FileOrigin("file:///hardpoints.xml", 1, null), null)
+            ],
+            []);
+        var before = GameIndex.Empty with
+        {
+            Documents = ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(unit.DocumentUri, unit).Add(hardpoints.DocumentUri, hardpoints).Add("file:///other.xml",
+                    new DocumentIndex("file:///other.xml", 1, [], []))
+        };
+        var edited = editedReferencesTheOther ? unit : hardpoints;
+        return (before, before with
+        {
+            Documents = before.Documents.SetItem(edited.DocumentUri, edited with { Version = 2 })
+        });
+    }
+
+    [Theory]
+    [InlineData(true, "file:///hardpoints.xml")]
+    [InlineData(false, "file:///units.xml")]
+    public void IndexChanged_AContentOnlyEdit_AlsoRepublishesTheDocumentsItIsRelatedTo(bool editUnits, string other)
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.With("file:///units.xml", "content");
+        workspaceHost.With("file:///hardpoints.xml", "content");
+        workspaceHost.With("file:///other.xml", "content");
+        var (before, after) = RelatedEdit(editUnits);
+        indexService.Raise(before);
+        published.Clear();
+
+        indexService.Raise(after);
+
+        Assert.Contains(published, p => p.Uri.ToString() == other);
+        Assert.DoesNotContain(published, p => p.Uri.ToString() == "file:///other.xml");
+    }
+
+    // The load order decides which definition counts: a new one changes findings anywhere.
+    [Fact]
+    public void IndexChanged_LoadOrderChanged_RepublishesAllOpenDocuments()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.With("file:///a.xml", "content");
+        workspaceHost.With("file:///b.xml", "content");
+        var index = IndexWithDoc("file:///a.xml");
+        indexService.Raise(index);
+        published.Clear();
+
+        indexService.Raise(index with { LoadOrder = LoadOrder.From([], [], ["musicevents.xml"]) });
+
+        Assert.Equal(2, published.Count);
+    }
+
     [Fact]
     public void IndexChanged_NewlyOpenedDocument_PublishedEvenWhenIndexIsIdentical()
     {

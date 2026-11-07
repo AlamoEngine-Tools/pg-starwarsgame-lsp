@@ -98,7 +98,8 @@ public sealed class LuaRenameHandlerTest
             new FakeGameIndexService(),
             new ScriptedLuaAnalyzer(),
             new ProjectLayerMap(fileHelper),
-            TestCatalogues.English);
+            TestCatalogues.English,
+            new LuaStubLocation());
     }
 
     // ── Claims: what is ours to rename (#154) ────────────────────────────────
@@ -570,6 +571,61 @@ public sealed class LuaRenameHandlerTest
 
         Assert.Null(handler.HandleRename(LuaUri, RenameAt(0, 22, "Begin"), index));
         Assert.Null(handler.HandlePrepare(LuaUri, 0, 22, index));
+    }
+
+    // The handler handed to Define_State by name is a use of the function: renamed without it, the
+    // state's handler no longer exists. The state's name, the string, is the machine's and stays. The
+    // index holds call sites only; a use by value is found in the parsed script when renaming, and a
+    // local of the same name is not the global.
+    private static (LuaRenameHandler Handler, GameIndex Index) HandlerRegistered()
+    {
+        const string script = "Define_State(\"State_Init\", State_Init)\nfunction State_Init(message) end\n" +
+                              "function Other()\n    local State_Init = 2\n    return State_Init\nend";
+        var host = new FakeGameWorkspaceHost();
+        host.AddOrUpdate(LuaUri, script, 1);
+        host.AddOrUpdate(MachineLibraryUri, "function Define_State(s, f) end\n" +
+                                            "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
+                                            "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end",
+            1);
+        var handler = new GameSymbol("State_Init", GameSymbolKind.LuaGlobal, null, new FileOrigin(LuaUri, 1, 9), null);
+        var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [handler], [], ["PGStateMachine"]))
+                .Add(MachineLibraryUri, new DocumentIndex(MachineLibraryUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("State_Init", [handler]));
+        return (MakeHandler(host), index);
+    }
+
+    [Fact]
+    public void AStateHandlerRenamed_MovesItsRegistrationToo()
+    {
+        var (handler, index) = HandlerRegistered();
+
+        var edit = handler.HandleRename(LuaUri, RenameAt(1, 12, "State_Start"), index);
+
+        var edits = edit!.Changes![DocumentUri.From(LuaUri)].ToList();
+        Assert.Equal([(0, 27), (1, 9)], edits.Select(e => (e.Range.Start.Line, e.Range.Start.Character)).Order());
+    }
+
+    [Fact]
+    public void AStateHandler_IsRenamedFromItsRegistration()
+    {
+        var (handler, index) = HandlerRegistered();
+
+        var range = handler.HandlePrepare(LuaUri, 0, 30, index);
+        var edit = handler.HandleRename(LuaUri, RenameAt(0, 30, "State_Start"), index);
+
+        Assert.Equal((0, 27, 37), (range!.Range!.Start.Line, range.Range.Start.Character, range.Range.End.Character));
+        Assert.Equal(2, edit!.Changes![DocumentUri.From(LuaUri)].Count());
+    }
+
+    // A local of the handler's name is the analyzer's to rename: claimed as the global, renaming it
+    // renamed the function and its registration instead.
+    [Fact]
+    public void ALocalOfAGlobalsName_IsNotTheGlobal()
+    {
+        var (handler, index) = HandlerRegistered();
+
+        Assert.False(handler.Claims(LuaUri, 4, 13, index));
     }
 
     // An XML object is the game's, not a script's: its rename reaches every script naming it (#249).

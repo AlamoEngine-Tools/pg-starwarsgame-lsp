@@ -8,8 +8,10 @@ import {
     actionChoices,
     factLabel,
     fileSize,
+    filterActive,
     kindChoices,
     listColumns,
+    NO_FILTER,
     problemMessage,
     locationLabel,
     menuChoices,
@@ -19,6 +21,7 @@ import {
     pageLabel,
     previewLayout,
     noteLabel,
+    opensOutline,
     propertyLabel,
     propertyValue,
     reasonLabel,
@@ -197,11 +200,17 @@ describe("originLabel", () => {
         { rank: 2, name: "Mod" },
     ];
 
-    it("names the root project this mod, a dependency by its name, and the game", () => {
-        assert.equal(originLabel("layer:2", "Mod", layers), "This mod");
+    it("names every project by its name, the root one too, and the game", () => {
+        assert.equal(originLabel("layer:2", "Mod", layers), "Mod");
+        assert.equal(originLabel("layer:2", null, layers), "Mod");
         assert.equal(originLabel("layer:1", "Core", layers), "Core");
         assert.equal(originLabel("game", null, layers), "Game");
         assert.equal(originLabel("missing", null, layers), "Not found");
+    });
+
+    it("names a file no project declares by the root project, when there is one", () => {
+        assert.equal(originLabel("project", null, layers), "Mod");
+        assert.equal(originLabel("project", null, []), "This project");
     });
 
     it("names a layer by the outline's list when the row carries no name", () => {
@@ -512,5 +521,35 @@ describe("fileSize", () => {
         assert.equal(fileSize(512), "512 B");
         assert.equal(fileSize(1536), "1.5 KB");
         assert.equal(fileSize(5 * 1024 * 1024), "5 MB");
+    });
+});
+
+// Picking the outline already shown reset the browser and asked for nothing, so it stayed on
+// "Loading..." for good.
+describe("opensOutline", () => {
+    it("opens an outline the browser does not show", () => {
+        assert.equal(opensOutline(null, "scripts"), true);
+        assert.equal(opensOutline("assets", "scripts"), true);
+    });
+
+    it("keeps the browser as it is for the outline it shows", () => {
+        assert.equal(opensOutline("scripts", "scripts"), false);
+    });
+});
+
+// The table's clear-filters control is disabled, and says why, while nothing holds rows back.
+describe("filterActive", () => {
+    it("is false for the empty search", () => {
+        assert.equal(filterActive(NO_FILTER), false);
+        assert.equal(
+            filterActive({ query: "", kinds: [], origins: [] }),
+            false,
+        );
+    });
+
+    it("is true once a name, a kind or an origin narrows the rows", () => {
+        assert.equal(filterActive({ ...NO_FILTER, query: "Star" }), true);
+        assert.equal(filterActive({ ...NO_FILTER, kinds: ["HeroUnit"] }), true);
+        assert.equal(filterActive({ ...NO_FILTER, origins: ["game"] }), true);
     });
 });

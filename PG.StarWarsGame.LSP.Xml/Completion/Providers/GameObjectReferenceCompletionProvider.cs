@@ -21,7 +21,7 @@ public sealed class GameObjectReferenceCompletionProvider : IXmlCompletionProvid
         if (typeName is null && kind is null) return [];
 
         var workspaceSymbols = index.WorkspaceDefinitions.Values.SelectMany(arr => arr);
-        var baselineSymbols = index.Baseline.Symbols.Values;
+        var baselineSymbols = index.ShippedSymbols.Values;
         var isWildcard = string.Equals(typeName, "GameObjectType", StringComparison.OrdinalIgnoreCase);
 
         return workspaceSymbols.Concat(baselineSymbols)

@@ -27,4 +27,11 @@ public interface IFileTypeRegistry
 
     void RegisterFile(string fileUri, ImmutableArray<string> typeNames);
     void UnregisterFile(string fileUri);
+
+    /// <summary>Replaces every registration with <paramref name="files" /> in one step.</summary>
+    void Replace(IReadOnlyDictionary<string, ImmutableArray<string>> files)
+    {
+        foreach (var uri in All.Keys.ToList()) UnregisterFile(uri);
+        foreach (var (uri, types) in files) RegisterFile(uri, types);
+    }
 }

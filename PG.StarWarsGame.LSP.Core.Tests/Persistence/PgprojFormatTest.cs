@@ -73,8 +73,8 @@ public sealed class PgprojFormatTest
     // Any increase, not just a major one - the same rule the sidecars migrate by. A minor or patch
     // bump means somebody's newer extension wrote something this build does not know about.
     [Theory]
-    [InlineData("aetswg-1.1.0")]
-    [InlineData("aetswg-1.0.1")]
+    [InlineData("aetswg-1.2.0")]
+    [InlineData("aetswg-1.1.1")]
     public void Check_AnyHigherVersion_IsRefused(string declared)
     {
         Assert.False(PgprojFormat.Check(declared, null, TestCatalogues.English).CanLoad);

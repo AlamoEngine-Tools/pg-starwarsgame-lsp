@@ -1202,7 +1202,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(Type("LuckyShotAttackAbility"));
         schema.Add(VariantTag());
 
-        var result = await Build(schema).ParseAsync("file:///f.xml",
+        var result = await BuildListed(schema).ParseAsync("file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"><Variant_Of_Existing_Type>Base_Ability</Variant_Of_Existing_Type></Lucky_Shot_Attack_Ability></Abilities></U>""",
             1, TestContext.Current.CancellationToken);
 
@@ -1734,6 +1734,31 @@ public sealed class XmlGameDocumentParserTest
         };
     }
 
+    // A file a registry lists, as an object file is: the game reads the abilities nested in it.
+    private static XmlGameDocumentParser BuildListed(FakeSchemaProvider schema)
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.RegisterFile("file:///f.xml", ["GameObjectType"]);
+        return Build(schema, registry);
+    }
+
+    // The game reads a nested ability only from a file it loads, and it loads only the files a
+    // registry lists. Collecting them from every XML file resolved abilities the game never sees.
+    [Fact]
+    public async Task ParseAsync_AbilityDefinitionSubObjectList_InAFileNoRegistryLists_IsNotIndexed()
+    {
+        var schema = new SchemaProviderBuilder().Build();
+        schema.Add(SubObjectListTag("Abilities"));
+        schema.Add(Type("LuckyShotAttackAbility"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></U>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Symbols);
+    }
+
     [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_Child_With_NameAttribute_Is_Indexed_As_Symbol()
     {
@@ -1741,7 +1766,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(SubObjectListTag("Abilities"));
         schema.Add(Type("LuckyShotAttackAbility"));
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></U>""",
             1, TestContext.Current.CancellationToken);
@@ -1760,7 +1785,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(Type("LuckyShotAttackAbility"));
         schema.Add(Type("ForceCloakAbility"));
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="Ability_A"/><Force_Cloak_Ability Name="Ability_B"/></Abilities></U>""",
             1, TestContext.Current.CancellationToken);
@@ -1777,7 +1802,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(SubObjectListTag("Abilities"));
         // No type registered for BasePowerAbility
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Base_Power_Ability Name="My_Ability"/></Abilities></U>""",
             1, TestContext.Current.CancellationToken);
@@ -1792,7 +1817,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(SubObjectListTag("Abilities"));
         schema.Add(Type("LuckyShotAttackAbility"));
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability/></Abilities></U>""",
             1, TestContext.Current.CancellationToken);
@@ -1809,7 +1834,7 @@ public sealed class XmlGameDocumentParserTest
 
         // Line 2 (0-based): "<Combat_Bonus_Ability Name="MY_BONUS"/>"
         // "<Combat_Bonus_Ability Name=\"" = 28 chars (0-27) → value at col 28
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             "<U>\n<Abilities SubObjectList=\"Yes\">\n<Combat_Bonus_Ability Name=\"MY_BONUS\"/>\n</Abilities>\n</U>",
             1, TestContext.Current.CancellationToken);
@@ -1854,7 +1879,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(Type("LuckyShotAttackAbility"));
         schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """<GameObjectType Name="MY_UNIT"><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></GameObjectType>""",
             1, TestContext.Current.CancellationToken);
@@ -1875,7 +1900,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(SubObjectListTag("Abilities"));
         schema.Add(Type("LuckyShotAttackAbility"));
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """<SpaceUnit Name="MY_UNIT"><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></SpaceUnit>""",
             1, TestContext.Current.CancellationToken);
@@ -1891,7 +1916,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(SubObjectListTag("Abilities"));
         schema.Add(Type("SystemSpyAbility"));
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """
             <SpecialStructures>
@@ -1914,7 +1939,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(Type("LuckyShotAttackAbility"));
         // No GameObjectType registered, so parent has no known NameTag
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></U>""",
             1, TestContext.Current.CancellationToken);
@@ -1936,7 +1961,7 @@ public sealed class XmlGameDocumentParserTest
         schema.Add(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
         schema.Add(VariantTag());
 
-        var result = await Build(schema).ParseAsync(
+        var result = await BuildListed(schema).ParseAsync(
             "file:///f.xml",
             """<GameObjectType Name="MY_UNIT"><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"><Variant_Of_Existing_Type>Base_Ability</Variant_Of_Existing_Type></Lucky_Shot_Attack_Ability></Abilities></GameObjectType>""",
             1, TestContext.Current.CancellationToken);

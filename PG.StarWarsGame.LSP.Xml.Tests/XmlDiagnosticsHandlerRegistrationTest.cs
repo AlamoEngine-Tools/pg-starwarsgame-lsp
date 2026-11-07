@@ -329,7 +329,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // their diagnostics itself, are facts with handlers like every other rule.
         // 162 -> 161: CrossTypeShadowHandler retired. Every type is an id space of its own and every
         // lookup names the type it means, so a name shared across types is nothing to warn about.
-        const int expectedHandlerCount = 161;
+        // 161 -> 160: CrossLayerShadowHandler retired. The game has no layers: a definition wins or
+        // loses by load order and its registry's rule, which DuplicateDefinitionHandler reports.
+        const int expectedHandlerCount = 160;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
@@ -355,7 +357,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         Assert.Equal(
         [
             typeof(XmlDocumentFactProducer), typeof(XmlIndexFactProducer), typeof(XmlVariantFactProducer),
-            typeof(XmlLayerShadowFactProducer), typeof(XmlHardpointFactProducer), typeof(XmlDamageStageFactProducer),
+            typeof(XmlHardpointFactProducer), typeof(XmlDamageStageFactProducer),
             typeof(StoryFactProducer), typeof(HardcodedSetValueFactProducer), typeof(DamageTypeTailFactProducer)
         ], producers);
     }

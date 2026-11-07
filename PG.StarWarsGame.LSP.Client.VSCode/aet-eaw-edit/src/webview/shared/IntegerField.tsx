@@ -22,7 +22,7 @@ export function IntegerField(props: {
     autoFocus?: boolean;
 }): React.JSX.Element {
     const valid = parseInteger(props.value) !== null;
-    const reason = props.disabledReason ?? "Read-only";
+    const reason = props.disabledReason ?? l10n.t("Read-only");
     return (
         <div className="integer-field">
             <IconButton

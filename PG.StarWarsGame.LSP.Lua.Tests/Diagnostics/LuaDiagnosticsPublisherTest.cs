@@ -250,6 +250,26 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Equal(1, Assert.Single(kept).Range.Start.Line);
     }
 
+    // An engine type defines all of its members: anything else on one is invalid. A Lua table's
+    // fields are the script's own business, and the analyzer's view of them is noise (census, #279).
+    [Fact]
+    public void AnUndefinedField_ReachesTheEditor_OnlyOnAnEngineType()
+    {
+        var (published, host, analyzer, _) = BuildWithAnalyzer(
+            schema: new LuaApiSchemaProvider(["---@class Player: LuaUserVar\nlocal Player = {}\n"]));
+        host.With(LuaUri, "PlayerObject.Is_Evil()\nft.combat_power = 1");
+        analyzer.Hovers[new Position(0, 0)] = "```lua\n(global) PlayerObject: Player {\n}\n```";
+        analyzer.Hovers[new Position(1, 0)] = "```lua\n(global) ft: never\n```";
+
+        analyzer.Raise(LuaUri,
+            AnalyzerFinding("undefined-field") with { Range = new Range(0, 13, 0, 20) },
+            AnalyzerFinding("undefined-field", 1) with { Range = new Range(1, 3, 1, 15) });
+
+        var kept = published.Last().Diagnostics
+            .Where(d => d.Code?.String == DiagnosticIds.LuaAnalyzerUndefinedField.ToString()).ToList();
+        Assert.Equal(0, Assert.Single(kept).Range.Start.Line);
+    }
+
     private static GameIndex IndexWithLuaRef(string documentUri, string targetId,
         string? expectedTypeName = null, GameSymbol? resolvedSymbol = null,
         GameSymbolKind kind = GameSymbolKind.XmlObject, ILocalisationIndex? localisation = null)
@@ -767,6 +787,9 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         public bool IsRunning { get; set; }
 
+        // The hover markdown the analyzer gives at a position.
+        public Dictionary<Position, string> Hovers { get; } = [];
+
         public event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
 
         public void DidOpen(string uri, string text, int version)
@@ -779,7 +802,13 @@ public sealed class LuaDiagnosticsPublisherTest
 
         public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class?
         {
-            return Task.FromResult<T?>(null);
+            if (method != "textDocument/hover" || parameters is not HoverParams { Position: var at } ||
+                !Hovers.TryGetValue(at, out var markdown)) return Task.FromResult<T?>(null);
+            return Task.FromResult((T?)(object)new Hover
+            {
+                Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                    { Kind = MarkupKind.Markdown, Value = markdown })
+            });
         }
 
         public void DidClose(string uri)

@@ -19,9 +19,14 @@ export interface DataColumn<R> {
     cell: (row: R) => ReactNode;
     /** A quieter column - what a row is, beside the name that says which. */
     dim?: boolean;
+    /** The column's part of the table's width while the reader has sized none; 1 when not given. */
+    share?: number;
 }
 
 export type RowSeverity = "error" | "warning" | "info";
+
+/** How a row came to be selected: clicked, or reached with the keys. */
+export type SelectedVia = "click" | "keys";
 
 export interface DataTableProps<R> {
     /** What the table holds, for a screen reader. */
@@ -39,8 +44,11 @@ export interface DataTableProps<R> {
     sortable?: readonly string[];
     sort?: SortState | null;
     onSort?: (next: SortState | null) => void;
-    /** A click, or the keys arriving on a row. Never called for an inert row. */
-    onSelect?: (row: R) => void;
+    /**
+     * A click, or the keys arriving on a row, and which of the two it was: a click is a choice of
+     * that row, the keys only pass over it. Never called for an inert row.
+     */
+    onSelect?: (row: R, via: SelectedVia) => void;
     /** A double click or Enter. */
     onOpen?: (row: R) => void;
     /** Any other key on a row; true when it was handled. */
@@ -56,7 +64,7 @@ export interface DataTableProps<R> {
     foot?: ReactNode;
     /**
      * The reader's arrangement of the columns. Without it the columns keep the table's order and
-     * size to what they hold; with widths for every column, they keep those.
+     * their shares of its width; with widths for every column, they keep those.
      */
     layout?: ColumnLayout;
     /** Every column's width, once one is dragged by its header's edge: the rest keep the width drawn. */
@@ -114,7 +122,12 @@ export function DataTable<R>({
         ? layout.order.flatMap((key) => columns.filter((c) => c.key === key))
         : [...columns];
     const widths = layout?.widths ?? {};
-    const fixed = shown.every((c) => widths[c.key] !== undefined);
+    const sized = shown.every((c) => widths[c.key] !== undefined);
+    // Never sized to the rows: a filter or a sort that changes what is shown must not move the
+    // columns. Until the reader drags one, each keeps its share of the table's width.
+    const shareTotal = shown.reduce((sum, c) => sum + (c.share ?? 1), 0);
+    const width = (c: DataColumn<R>): string | number =>
+        sized ? widths[c.key] : `${((c.share ?? 1) / shareTotal) * 100}%`;
 
     // A drag by a header's edge: every column's width as drawn is taken when it starts, so the
     // others keep theirs once the table lays out at fixed widths.
@@ -184,7 +197,7 @@ export function DataTable<R>({
             target?.focus();
             target?.scrollIntoView({ block: "nearest" });
             if (inert?.(rows[to]) === undefined) {
-                onSelect?.(rows[to]);
+                onSelect?.(rows[to], "keys");
             }
         } else if (e.key === "Enter" && onOpen) {
             e.preventDefault();
@@ -205,10 +218,10 @@ export function DataTable<R>({
         <div className="data-table-frame">
             <div className="data-table-scroll">
                 <table
-                    className={fixed ? "data-table fixed" : "data-table"}
+                    className="data-table fixed"
                     aria-label={label}
                     style={
-                        fixed
+                        sized
                             ? {
                                   width: shown.reduce(
                                       (sum, c) => sum + widths[c.key],
@@ -218,17 +231,12 @@ export function DataTable<R>({
                             : undefined
                     }
                 >
-                    {fixed && (
-                        <colgroup>
-                            {shown.map((c) => (
-                                <col
-                                    key={c.key}
-                                    style={{ width: widths[c.key] }}
-                                />
-                            ))}
-                            {actions && <col style={{ width: 0 }} />}
-                        </colgroup>
-                    )}
+                    <colgroup>
+                        {shown.map((c) => (
+                            <col key={c.key} style={{ width: width(c) }} />
+                        ))}
+                        {actions && <col style={{ width: 0 }} />}
+                    </colgroup>
                     <thead>
                         <tr ref={head}>
                             {shown.map((c) => (
@@ -282,7 +290,8 @@ export function DataTable<R>({
                                     title={reason}
                                     aria-selected={key === selected}
                                     onClick={() =>
-                                        reason === undefined && onSelect?.(row)
+                                        reason === undefined &&
+                                        onSelect?.(row, "click")
                                     }
                                     onDoubleClick={() =>
                                         reason === undefined && onOpen?.(row)

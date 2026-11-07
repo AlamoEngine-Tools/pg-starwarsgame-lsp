@@ -70,6 +70,34 @@ public sealed class BaselineSerializerTest
             result.ModelProxies["EV_STARDESTROYER.ALO"].ToArray());
     }
 
+    // Each shipped registry's files in the order the game loads them. The order decides which of
+    // two definitions of one name wins, so it survives the round trip as written, a repeat included.
+    [Fact]
+    public void RoundTrip_RegistryLists_KeepListOrder()
+    {
+        var baseline = BaselineIndex.Empty with
+        {
+            RegistryLists = ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase)
+                .Add("data/xml/gameobjectfiles.xml", ["zeta.xml", "alpha.xml", "units/mike.xml", "zeta.xml"])
+        };
+
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(["zeta.xml", "alpha.xml", "units/mike.xml", "zeta.xml"],
+            result.RegistryLists["DATA/XML/GAMEOBJECTFILES.XML"].ToArray());
+    }
+
+    // A baseline written before the lists has none, and every registry falls back to the file type
+    // map, as before - so the field needs no version.
+    [Fact]
+    public void Deserialize_BaselineWrittenBeforeRegistryLists_ReadsAsNone()
+    {
+        var dto = RawDto(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        dto.RegistryLists = null!;
+
+        Assert.Empty(Deserialize(SerializeRawDto(dto)).RegistryLists);
+    }
+
     [Fact]
     public void RoundTrip_Behaviors()
     {
@@ -539,6 +567,7 @@ public sealed class BaselineSerializerTest
             ModelBones = map,
             ModelTextures = map,
             ModelProxies = map,
+            RegistryLists = map,
             ParticleSystems = names.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
             GroupMemberships = names.ToImmutableDictionary(n => n, _ => ImmutableArray<GroupMembership>.Empty,
                 StringComparer.OrdinalIgnoreCase),
@@ -557,7 +586,7 @@ public sealed class BaselineSerializerTest
         foreach (var entries in new[]
                  {
                      dto.DynamicEnumValues, dto.HardcodedEnumValues, dto.FileTypeMap, dto.ModelBones,
-                     dto.ModelTextures, dto.ModelProxies
+                     dto.ModelTextures, dto.ModelProxies, dto.RegistryLists
                  })
             Assert.Equal(sorted, entries.Select(e => e.Name));
     }

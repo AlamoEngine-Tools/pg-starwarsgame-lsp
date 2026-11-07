@@ -98,6 +98,12 @@ public record XmlTagDefinition
     public VariantMode VariantMode { get; init; }
 
     /// <summary>
+    ///     What a second occurrence of this tag does outside the variant overlay - repeated inside one
+    ///     object, or parsed again into a merged definition. Defaults to <see cref="RepeatMode.REPLACE" />.
+    /// </summary>
+    public RepeatMode RepeatMode { get; init; }
+
+    /// <summary>
     ///     Optional override that controls how custom named validation handlers compose with the default type handler.
     ///     <c>null</c> means "run all registered handlers for this fact type" (default behaviour).
     /// </summary>

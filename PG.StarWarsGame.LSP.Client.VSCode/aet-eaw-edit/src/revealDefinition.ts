@@ -35,7 +35,7 @@ export async function revealDefinition(
     const result = await lsp.requestOrReport<ResolveReferenceResult>(
         method,
         { value, referenceType },
-        `cannot open the definition of '${value}'`,
+        vscode.l10n.t("Cannot open the definition of '{0}'", value),
     );
     if (result === undefined) {
         return;

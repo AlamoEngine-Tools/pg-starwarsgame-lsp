@@ -50,7 +50,6 @@ public sealed class LuaAnalyzerRulePolicyTest
     [Theory]
     [InlineData("param-type-mismatch")]
     [InlineData("missing-parameter")]
-    [InlineData("undefined-field")]
     [InlineData("need-check-nil")]
     [InlineData("call-non-callable")]
     [InlineData("unnecessary-if")]
@@ -115,6 +114,60 @@ public sealed class LuaAnalyzerRulePolicyTest
     {
         // Ids are a suppression contract; a rule a later analyzer adds gets one by hand, or none.
         Assert.Null(LuaAnalyzerRulePolicy.Map(Finding("some-future-rule")));
+    }
+
+    [Fact]
+    public void AnUndefinedField_IsMapped()
+    {
+        var mapped = LuaAnalyzerRulePolicy.Map(Finding("undefined-field"));
+
+        Assert.Equal(DiagnosticIds.LuaAnalyzerUndefinedField.ToString(), mapped!.Code!.Value.String);
+    }
+
+    // The receiver is the expression before the dot or colon; it is hovered at its last token.
+    [Theory]
+    [InlineData("if PlayerObject.Is_Evil() then end", 16, 0, 3)]
+    [InlineData("RaidForce:No_Such_Member()", 10, 0, 0)]
+    [InlineData("x = a.b.c", 8, 0, 6)]
+    public void TheReceiver_OfAFieldFinding_IsHoveredAtItsLastToken(string text, int character, int line,
+        int receiverCharacter)
+    {
+        var tree = Loretta.CodeAnalysis.Lua.LuaSyntaxTree.ParseText(text,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var finding = Finding("undefined-field") with { Range = new Range(0, character, 0, character + 3) };
+
+        Assert.Equal(new Position(line, receiverCharacter), LuaAnalyzerRulePolicy.ReceiverPosition(finding, tree));
+    }
+
+    [Fact]
+    public void AFindingOnNoMember_HasNoReceiver()
+    {
+        var tree = Loretta.CodeAnalysis.Lua.LuaSyntaxTree.ParseText("Foo()",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Null(LuaAnalyzerRulePolicy.ReceiverPosition(Finding("undefined-field") with
+        {
+            Range = new Range(0, 0, 0, 3)
+        }, tree));
+    }
+
+    // Measured (emmylua_ls 0.25.1): the hover's code block opens with the name and its type.
+    [Theory]
+    [InlineData("```lua\n(global) PlayerObject: Player {\n    Get_ID: function,\n}\n```\n\n---\n\nThe AI player.",
+        "Player")]
+    [InlineData("```lua\n(global) GameRandom: GameRandom {\n    Get_Float: function,\n}\n```", "GameRandom")]
+    [InlineData("```lua\nlocal unit: GameObject\n```", "GameObject")]
+    [InlineData("```lua\n(global) ft: never\n```", "never")]
+    [InlineData("no code block", null)]
+    public void TheReceiversType_IsReadFromItsHover(string markdown, string? type)
+    {
+        var hover = new Hover
+        {
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                { Kind = MarkupKind.Markdown, Value = markdown })
+        };
+
+        Assert.Equal(type, LuaAnalyzerRulePolicy.ReceiverTypeOf(hover));
     }
 
     [Fact]

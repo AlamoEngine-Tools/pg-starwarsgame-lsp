@@ -1,0 +1,6 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "type": "eaw-lua", "request": "attach", "name": "Attach to Empire at War (Lua)" }
+  ]
+}

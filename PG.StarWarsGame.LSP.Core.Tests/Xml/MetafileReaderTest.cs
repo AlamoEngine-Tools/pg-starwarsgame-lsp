@@ -73,4 +73,23 @@ public sealed class MetafileReaderTest
     {
         Assert.Empty(MetafileReader.ReadFileList(""));
     }
+
+    // The game opens a registry's files in list order and applies the registry's duplicate-name
+    // rule in that order, so the baseline keeps the list as the game reads it: keyed, in order, a
+    // repeated entry kept.
+    [Fact]
+    public void ReadFileKeys_KeysEveryEntryInListOrder_KeepingARepeat()
+    {
+        const string xml = """
+                           <Game_Object_Files>
+                             <File>Zeta.xml</File>
+                             <File>Units\Alpha.xml</File>
+                             <File>Data\XML\Mike.xml</File>
+                             <File>ZETA.XML</File>
+                           </Game_Object_Files>
+                           """;
+
+        Assert.Equal(["zeta.xml", "units/alpha.xml", "data/xml/mike.xml", "zeta.xml"],
+            MetafileReader.ReadFileKeys(xml));
+    }
 }

@@ -1,0 +1,7 @@
+﻿{
+  "name": "Old Game",
+  "directories": { "xml": ["data/xml"] },
+  "projectReferences": [],
+  "_type": "aetswg.ModProject",
+  "_typeVersion": "aetswg-1.0.0"
+}

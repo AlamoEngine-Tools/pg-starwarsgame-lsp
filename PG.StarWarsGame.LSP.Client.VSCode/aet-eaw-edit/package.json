@@ -772,7 +772,7 @@
             ],
             "markdownDescription": "%config.lsp.source.baseline.localPath.markdownDescription%"
           },
-          "aet-eaw-edit.lsp.debug.traceServer": {
+          "aet-eaw-edit.lsp.debug.trace.server": {
             "order": 11,
             "type": "string",
             "default": "off",
@@ -782,14 +782,14 @@
               "verbose"
             ],
             "enumItemLabels": [
-              "%config.lsp.debug.traceServer.enumItemLabels.0%",
-              "%config.lsp.debug.traceServer.enumItemLabels.1%",
-              "%config.lsp.debug.traceServer.enumItemLabels.2%"
+              "%config.lsp.debug.trace.server.enumItemLabels.0%",
+              "%config.lsp.debug.trace.server.enumItemLabels.1%",
+              "%config.lsp.debug.trace.server.enumItemLabels.2%"
             ],
             "tags": [
               "advanced"
             ],
-            "markdownDescription": "%config.lsp.debug.traceServer.markdownDescription%"
+            "markdownDescription": "%config.lsp.debug.trace.server.markdownDescription%"
           },
           "aet-eaw-edit.lsp.debug.logLevel": {
             "order": 12,
@@ -861,10 +861,11 @@
     "vscode:prepublish": "npm run check-types && npm run bundle -- --production",
     "bundle": "node esbuild.js",
     "compile": "tsc -p ./",
-    "check-types": "tsc -p ./ --noEmit && tsc -p ./src/webview --noEmit && tsc -p ./src/webview/tsconfig.test.json --noEmit",
+    "check-types": "tsc -p ./ --noEmit && tsc -p ./src/webview --noEmit && tsc -p ./src/webview/tsconfig.test.json --noEmit && tsc -p ./ui-test --noEmit",
     "watch": "node esbuild.js --watch",
     "watch:tsc": "tsc -p ./ --noEmit --watch",
     "test:unit": "node esbuild.test.js && node --test \"out/test-unit/**/*.test.js\" && node --test \"scripts/**/*.test.js\"",
+    "test:ui": "node ui-test/run.mjs",
     "rig:translate": "node scripts/shader-rig/translate.js",
     "rig:glcheck": "node scripts/shader-rig/translate.js > scripts/shader-rig/out/translate.txt && node scripts/shader-rig/glcheck.js",
     "rig:render": "node scripts/shader-rig/render.js",
@@ -899,10 +900,16 @@
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "^3.5.0",
+    "@wdio/cli": "^9.32.0",
+    "@wdio/local-runner": "^9.32.0",
+    "@wdio/mocha-framework": "^9.32.0",
+    "@wdio/spec-reporter": "^9.32.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "prettier": "3.9.10",
-    "typescript": "^6.0.0"
+    "typescript": "^6.0.0",
+    "wdio-vscode-service": "^8.0.0",
+    "webdriverio": "^9.32.0"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.46.0",

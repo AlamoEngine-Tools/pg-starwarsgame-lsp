@@ -10,6 +10,8 @@
 // The rules mirror what the server checks when it validates a batch. They are deliberately not
 // stricter: inventing a shape rule here would reject keys the engine accepts.
 
+import * as l10n from "@vscode/l10n";
+
 import { LocValue } from "./loc/locRow";
 
 export interface NewRowDraft {
@@ -63,7 +65,9 @@ export function validateNewKey(
     const candidate = normaliseKey(key);
 
     if (candidate.length === 0) {
-        return "A key is required - it is how the game refers to this text.";
+        return l10n.t(
+            "A key is required - it is how the game refers to this text.",
+        );
     }
 
     // Compared on the folded form, and case-sensitively - which is what the engine does. A
@@ -79,9 +83,16 @@ export function validateNewKey(
     }
 
     return clash === candidate
-        ? `'${clash}' is already in this file. Only one row per key is ever read.`
-        : `'${clash}' is already in this file, and the game cannot tell it apart from ` +
-              `'${candidate}' - it reads keys as ASCII, so both become '${folded}'.`;
+        ? l10n.t(
+              "'{0}' is already in this file. Only one row per key is ever read.",
+              clash,
+          )
+        : l10n.t(
+              "'{0}' is already in this file, and the game cannot tell it apart from '{1}' - it reads keys as ASCII, so both become '{2}'.",
+              clash,
+              candidate,
+              folded,
+          );
 }
 
 /**

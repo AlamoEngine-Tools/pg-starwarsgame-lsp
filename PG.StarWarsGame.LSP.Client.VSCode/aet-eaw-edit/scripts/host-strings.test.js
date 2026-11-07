@@ -59,6 +59,64 @@ describe("host strings", () => {
         );
     });
 
+    it("finds a quick pick's placeholder, an input box's verdict and a request's failure context", () => {
+        assert.deepEqual(
+            texts(
+                'pick.placeholder = "Model file name";\n' +
+                'vscode.window.showInputBox({ validateInput: (v) => (v?.trim() ? null : "Object name is required") });\n' +
+                'vscode.window.showInputBox({ validateInput: (v) => { if (!v) { return "A name is required"; } return undefined; } });\n' +
+                'await gateway.requestOrReport("aet/listModels", {}, "Could not list models");',
+            ),
+            ['"Model file name"', '"Object name is required"', '"A name is required"', '"Could not list models"'],
+        );
+    });
+
+    it("accepts them wrapped", () => {
+        assert.deepEqual(
+            texts(
+                'pick.placeholder = vscode.l10n.t("Model file name");\n' +
+                'vscode.window.showInputBox({ validateInput: (v) => (v ? null : vscode.l10n.t("A name is required")) });\n' +
+                'await gateway.requestOrReport("aet/listModels", {}, vscode.l10n.t("Could not list models"));',
+            ),
+            [],
+        );
+    });
+
+    it("finds words inside a template's expressions", () => {
+        assert.equal(
+            jsx('const t = <b title={`${open ? "Hide" : "Read"} ${count}`} />;').length,
+            1,
+        );
+    });
+
+    it("finds a dialog's button labels", () => {
+        assert.deepEqual(
+            jsx('const t = <Modal confirmLabel="Export" cancelLabel="Keep" title={l10n.t("Export to DAT")} />;'),
+            ['"Export"', '"Keep"'],
+        );
+    });
+
+    it("finds a tree view's placeholder row", () => {
+        assert.deepEqual(texts('return [this._info("No Lua debug session")];'), ['"No Lua debug session"']);
+    });
+
+    // A label or a reason a function builds reaches its sink through the return, where the walk loses it.
+    it("finds a text a function returns, and leaves returned ids, values and marked texts alone", () => {
+        assert.deepEqual(
+            texts(
+                'function a(s) { if (s) { return "Not started"; } return `Running - t${s}`; }\n' +
+                    'const b = (x) => { return x ? "Won" : "Lost"; };\n' +
+                    'function c() { return "aet/getStoryPlots"; }\n' +
+                    'function d() { return "game"; }\n' +
+                    'function e(n) { return `${n} - ${n}`; }\n' +
+                    'function f() { return l10n.t("Not started"); }\n' +
+                    "function g(c) {\n    // l10n-exempt: a CSS value\n    return `color-mix(in srgb, ${c} 20%)`;\n}\n" +
+                    'function h(o) { return o ? "LSP server is not running." : `${o} names no ability block`; }',
+            ),
+            ['"Not started"', "`Running - t${s}`", '"Won"', '"Lost"', '"LSP server is not running."', "`${o} names no ability block`"],
+        );
+    });
+
     /** Every text the extension host shows a reader comes from the l10n bundle. */
     it("finds no text written in place in the extension host", () => {
         const found = hostFiles(path.join(__dirname, "..", "src")).flatMap(
@@ -92,6 +150,36 @@ describe("host strings", () => {
                 "</div>;",
             ),
             ["`Open ${name}`", 'ready ? "Ready" : l10n.t("Waiting")'],
+        );
+    });
+
+    /** A status setter feeds the slot a reader watches, so its text is shown like a notification's. */
+    it("finds text fed to a status setter, and looks through a fallback", () => {
+        assert.deepEqual(
+            jsx(
+                'setStatus("No events match the current filters.");\n' +
+                'reportStatus("Warning: " + String(msg.message));\n' +
+                "setStatus(null);\n" +
+                'const a = <span>{status ?? "Arranging layout..."}</span>;\n' +
+                'const b = <span>{status || "Idle"}</span>;',
+            ),
+            [
+                '"No events match the current filters."',
+                '"Warning: " + String(msg.message)',
+                'status ?? "Arranging layout..."',
+                'status || "Idle"',
+            ],
+        );
+    });
+
+    it("accepts a catalogued status text", () => {
+        assert.deepEqual(
+            jsx(
+                'setStatus(l10n.t("No events match the current filters."));\n' +
+                'reportStatus(l10n.t("Warning: {0}", String(msg.message)));\n' +
+                'const a = <span>{status ?? l10n.t("Arranging layout...")}</span>;',
+            ),
+            [],
         );
     });
 

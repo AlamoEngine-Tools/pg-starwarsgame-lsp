@@ -65,13 +65,27 @@ public sealed class XmlIndexFactProducer : IXmlFactProducer
                         others));
             }
 
-            if (!index.WorkspaceDefinitions.TryGetValue(sym.Id, out var all) || all.Length <= 1)
+            if (!index.WorkspaceDefinitions.TryGetValue(sym.Id, out var all))
                 continue;
 
-            // Only a collision WITHIN the same project layer AND same TypeName is a duplicate.
-            // Cross-layer definitions are valid overrides (surfaced as code lens, not diagnostic).
-            // Cross-type definitions (same ID, different TypeName) are shadows, not duplicates —
-            // the engine allows distinct types to share an ID; they are warned separately.
+            // Where the load order places this definition and the one the game keeps in one
+            // registry, the registry's rule decides and only the dropped definition is told.
+            if (index.ResolveOfType(sym.Id, sym.TypeName ?? string.Empty) is { } kept && !kept.Equals(sym) &&
+                index.LoadOrder.PositionOf(sym) is { } mine && index.LoadOrder.PositionOf(kept) is { } theirs &&
+                mine.Registry == theirs.Registry)
+            {
+                facts.Add(new XmlSymbolFact(documentUri, fo.Line, fo.Column ?? 0, 0, sym.Id, [sym, kept], kept,
+                    index.LoadOrder.RuleOf(mine), Path.GetFileName(index.LoadOrder.RegistryOf(mine))));
+                continue;
+            }
+
+            if (all.Length <= 1 || index.LoadOrder.PositionOf(sym) is not null)
+                continue;
+
+            // Nothing orders them: a collision WITHIN the same project layer AND same TypeName is a
+            // duplicate whose winner is not measured. Across layers a copy of the file shadows the
+            // other, so only one is typed. Cross-type definitions (same ID, different TypeName) are
+            // separate id spaces, not duplicates.
             var myRank = index.LayerRankOf(sym);
             var sameLayer = all.Where(s => index.LayerRankOf(s) == myRank).ToList();
             var sameTypeSameLayer = sameLayer

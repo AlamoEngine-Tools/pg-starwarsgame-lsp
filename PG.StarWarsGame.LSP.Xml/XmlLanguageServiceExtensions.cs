@@ -140,7 +140,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, XmlNotesHandler>();
 
         // XmlSymbolFact + XmlReferenceFact handlers (index-level)
-        services.AddSingleton<IXmlDiagnosticsHandler, DuplicateSymbolHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DuplicateDefinitionHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, NameCrcCollisionHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnnamedObjectHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnknownTagHandler>();
@@ -289,7 +289,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlFactProducer, XmlDocumentFactProducer>();
         services.AddSingleton<IXmlFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IXmlFactProducer, XmlVariantFactProducer>();
-        services.AddSingleton<IXmlFactProducer, XmlLayerShadowFactProducer>();
         services.AddSingleton<IXmlFactProducer, XmlHardpointFactProducer>();
         services.AddSingleton<IXmlFactProducer, XmlDamageStageFactProducer>();
         services.AddSingleton<IXmlFactProducer, StoryFactProducer>();
@@ -374,7 +373,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, VariantAdditiveMergeHandler>();
 
         // Layer-shadow and cross-type shadow warnings
-        services.AddSingleton<IXmlDiagnosticsHandler, CrossLayerShadowHandler>();
 
         return services;
     }

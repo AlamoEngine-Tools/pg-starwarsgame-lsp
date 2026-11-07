@@ -10,6 +10,8 @@
 //
 // The same shape the story graph uses for its events and rewards.
 
+import * as l10n from "@vscode/l10n";
+
 import { type HardpointCard } from "./hardpointCards";
 
 /** One heading and the cards under it. */
@@ -80,7 +82,7 @@ export function groupHardpoints(
  */
 export function typeLabel(type: string | null | undefined): string {
     if (type === null || type === undefined || type.trim() === "") {
-        return "No type declared";
+        return l10n.t("No type declared");
     }
 
     const words = type

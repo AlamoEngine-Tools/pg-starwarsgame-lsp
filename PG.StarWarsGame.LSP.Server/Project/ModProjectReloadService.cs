@@ -25,6 +25,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
 {
     private readonly IHeapTrimmer _heapTrimmer;
 
+    private readonly IBaselineBootstrapper _baseline;
     private readonly IIconCatalogProvider _icons;
     private readonly IGameIndexService _index;
     private readonly IWorkspaceIndexer _indexer;
@@ -37,6 +38,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly IUserNotifier _notifier;
     private readonly IClientRefreshNotifier _refresh;
     private readonly IProjectConfigurationResolver _resolver;
+    private readonly IStartupNotifier _scans;
     private readonly ServerStatusRecorder _status;
     private List<string>? _lastRoots;
 
@@ -60,8 +62,12 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         ServerStatusRecorder status,
         IHeapTrimmer heapTrimmer,
         ILuaAnalyzerStarter luaAnalyzer,
-        IMessageCatalog messages)
+        IMessageCatalog messages,
+        IBaselineBootstrapper baseline,
+        IStartupNotifier scans)
     {
+        _scans = scans;
+        _baseline = baseline;
         _messages = messages;
         _status = status;
         _heapTrimmer = heapTrimmer;
@@ -118,6 +124,11 @@ public sealed class ModProjectReloadService : IModProjectReloadService
             _logger.LogError(ex, "Mod project reload failed.");
         }
 
+        // A reload indexes the workspace again, so it ends as startup ends: the client leaves its
+        // indexing state and rebuilds what it took from the old index - watchers, navigators, panels.
+        // Startup's own load is followed by the same notification from the startup pipeline.
+        _scans.NotifyScanComplete();
+
         // After the reload rather than inside the load: the question is the same one startup asks,
         // and it must not hold the index path open while the user reads a diff. A reload has no
         // gate in front of it, so this is simply the first moment the workspace is settled again.
@@ -159,6 +170,11 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         if (config is null)
             // No project file (the resolver already told the user); nothing to index.
             return;
+
+        // The baseline is the project's game's. Startup loaded the game the project file named
+        // before it was resolved, so this is a no-op then; it switches when the file was edited to
+        // name the other game, and retries a baseline that failed to load.
+        await _baseline.LoadAsync(config.Game, ct);
 
         // A mod project is a mod OVER the shipped game. Without the baseline every object the game
         // defines reads as missing, so the answers would not be incomplete - they would be wrong,

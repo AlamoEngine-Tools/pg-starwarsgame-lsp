@@ -129,8 +129,9 @@ internal static class LuaGlobalScopeAnalyzer
         var luaGlobalsByName = BuildLuaGlobalsMap(index, documentUri, sharedUris);
         // A shared file runs in the state of every script requiring it, so a name one of those
         // states holds - a hook such as Definitions, which the library calls and the script defines -
-        // is in scope there.
+        // is in scope there. The holder is most often a script of its own, never in the map above.
         var holders = sharedUris.Contains(documentUri) ? requirers.OfOrSelf(documentUri) : null;
+        HashSet<string>? heldNames = null;
 
         // Track names already warned about to deduplicate across occurrences.
         var warned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -147,6 +148,7 @@ internal static class LuaGlobalScopeAnalyzer
             // No warning if at least one defining file is in the transitive require closure.
             if (defUris.Any(uri => requiredUris.Contains(uri))) continue;
             if (holders is not null && defUris.Any(uri => holders.Overlaps(requirers.OfOrSelf(uri)))) continue;
+            if (holders is not null && (heldNames ??= NamesDefinedIn(index, holders)).Contains(name)) continue;
 
             if (!warned.Add(name)) continue;
 
@@ -158,6 +160,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Warning,
+                Code = new LspDiagnosticCode(DiagnosticIds.LuaGlobalNotRequired.ToString()),
                 Message = messages.Format("LuaGlobalScope_DefinedInNotRequired", name, filename),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
@@ -165,6 +168,17 @@ internal static class LuaGlobalScopeAnalyzer
                 Source = AppProperties.LspServerId
             });
         }
+    }
+
+    /// <summary>The Lua globals the given files define, whether shared or not.</summary>
+    private static HashSet<string> NamesDefinedIn(GameIndex index, HashSet<string> files)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, symbols) in index.WorkspaceDefinitions)
+            if (symbols.Any(s => s.Kind == GameSymbolKind.LuaGlobal && s.Origin is FileOrigin fo &&
+                                 files.Contains(fo.Uri)))
+                names.Add(id);
+        return names;
     }
 
     /// <summary>The files requiring a file, transitively: the states that hold it are theirs.</summary>
@@ -302,6 +316,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Error,
+                Code = new LspDiagnosticCode(DiagnosticIds.LuaCyclicRequire.ToString()),
                 Message = messages.Format("LuaGlobalScope_CyclicRequire", arg),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),

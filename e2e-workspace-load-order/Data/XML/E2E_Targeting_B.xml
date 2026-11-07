@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Expected: aetswg-010-0007 on the set below - the game parses it into the one in E2E_Targeting_A.xml.
+     The merged set's priorities hold both files' entries; its category exclusion is Bomber. -->
+<Targeting_Priority_Sets>
+	<TargetingPrioritySet Name="E2E_LoadOrder_Set">
+		<Attack_Priorities>Vehicle, 2.0</Attack_Priorities>
+		<Category_Exclusions>Bomber</Category_Exclusions>
+	</TargetingPrioritySet>
+</Targeting_Priority_Sets>

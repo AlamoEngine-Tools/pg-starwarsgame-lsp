@@ -73,12 +73,17 @@ internal sealed class SuppressDiagnosticCodeActionProvider : IXmlCodeActionProvi
         return root is null ? 0 : XmlUtility.GetLine(root) + 1;
     }
 
-    /// <summary>The 0-based line the file's leading XML declaration ends on, or -1 without one.</summary>
+    /// <summary>
+    ///     The 0-based line the file's leading XML declaration ends on, or -1 without one. A declaration
+    ///     that does not end in '?>' - the one aetswg-015-0001 reports - ends at its first '>'.
+    /// </summary>
     private static int DeclarationEndLine(string text)
     {
         var start = text.Length - text.TrimStart().Length;
         if (!text.AsSpan(start).StartsWith("<?xml", StringComparison.OrdinalIgnoreCase)) return -1;
         var end = text.IndexOf("?>", start, StringComparison.Ordinal);
+        var close = text.IndexOf('>', start);
+        if (end < 0 || (close >= 0 && close < end)) end = close;
         return end < 0 ? -1 : text.AsSpan(0, end).Count('\n');
     }
 

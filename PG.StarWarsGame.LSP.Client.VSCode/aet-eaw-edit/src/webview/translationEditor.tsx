@@ -58,7 +58,7 @@ import {
     coalesce,
     TranslationCommand,
 } from "./translationStaging";
-import { countDuplicateKeys, sortRows } from "./translationView";
+import { sortRows } from "./translationView";
 import { nextSort, SortState } from "./shared/tableSort";
 import { Button } from "./shared/Button";
 import { Field } from "./shared/Field";
@@ -312,7 +312,6 @@ function App(): React.JSX.Element {
         return <LocGridMessage>{l10n.t("Loading...")}</LocGridMessage>;
     }
 
-    const duplicateCount = countDuplicateKeys(rows);
     // Two things can hold rows back here, and the footer says how many are doing so.
     const activeFilters =
         (filter.trim().length > 0 ? 1 : 0) +
@@ -504,16 +503,6 @@ function App(): React.JSX.Element {
                 }
                 onExportDat={() => post({ type: "exportDat" })}
             />
-
-            {/* A repeated key is an error the validator reports: only one of the two would ever be
-                read. Row counts live under the table, where they describe it. */}
-            {duplicateCount > 0 && (
-                <div className="counts">
-                    <div className="warn">
-                        {l10n.t("{0} duplicate keys", duplicateCount)}
-                    </div>
-                </div>
-            )}
         </>
     );
 
@@ -528,7 +517,7 @@ function App(): React.JSX.Element {
             languages={languages}
             error={rowFilter.error}
             placeholders={PLACEHOLDERS}
-            keyScopeLabel="Key only"
+            keyScopeLabel={l10n.t("Key only")}
         >
             <label
                 className="inherited-toggle"
@@ -584,7 +573,9 @@ function App(): React.JSX.Element {
                 problems.length > 0 && problemsOpen ? (
                     <LocProblemsBar
                         problems={problems}
-                        labelOf={(problem) => problem.key ?? "This file"}
+                        labelOf={(problem) =>
+                            problem.key ?? l10n.t("This file")
+                        }
                         jumpTo={jumpToProblem}
                         onClose={() => setProblemsOpen(false)}
                     />
@@ -903,7 +894,9 @@ function AddTranslationDialog(props: {
                         submit
                         className="primary"
                         disabled={error !== null}
-                        disabledReason={error ?? "Fill in the fields above"}
+                        disabledReason={
+                            error ?? l10n.t("Fill in the fields above")
+                        }
                     >
                         {l10n.t("Add")}
                     </Button>

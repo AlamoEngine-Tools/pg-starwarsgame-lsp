@@ -1,0 +1,9 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "type": "eaw-lua", "request": "attach", "name": "Aet attach" },
+    { "type": "eaw-lua", "request": "launch", "name": "Aet no program", "program": "" },
+    { "type": "eaw-lua", "request": "launch", "name": "Aet space", "program": "C:\\Windows\\System32\\whoami.exe", "modPaths": ["C:\\My Mods\\X"] },
+    { "type": "eaw-lua", "request": "launch", "name": "Aet early exit", "program": "C:\\Windows\\System32\\whoami.exe", "attachTimeoutSeconds": 5 }
+  ]
+}

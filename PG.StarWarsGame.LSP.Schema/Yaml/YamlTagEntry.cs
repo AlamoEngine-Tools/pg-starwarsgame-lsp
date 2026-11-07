@@ -21,6 +21,7 @@ internal sealed class YamlTagEntry
     public List<YamlNote> Notes { get; set; } = [];
     public bool MultipleAllowed { get; set; }
     public string? VariantMode { get; set; }
+    public string? RepeatMode { get; set; }
     public YamlTagValidationOverride? ValidationOverride { get; set; }
     public List<YamlTupleSlot>? Slots { get; set; }
 }

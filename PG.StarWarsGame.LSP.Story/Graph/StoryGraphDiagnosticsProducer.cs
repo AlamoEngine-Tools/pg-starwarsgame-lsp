@@ -44,7 +44,6 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema, IMessa
             var cycleMembers = AddPrereqCycles(diagnostics, model, evaluator, documentUri);
             AddUnreachableEvents(diagnostics, model, evaluator, documentUri, cycleMembers);
             AddSuspendedNeverActivated(diagnostics, model, documentUri);
-            AddTagOrderViolations(diagnostics, thread);
             AddOverlongFlagNames(diagnostics, thread);
         }
 
@@ -133,31 +132,6 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema, IMessa
         diagnostics.Add(new StoryGraphDiagnostic(0, 0, 0, 1,
             _messages.Format("StoryGraph_SuspendedNeverActivated", model.CampaignName),
             XmlDiagnosticSeverity.Information));
-    }
-
-    private void AddTagOrderViolations(List<StoryGraphDiagnostic> diagnostics, StoryThread thread)
-    {
-        foreach (var storyEvent in thread.Events)
-        {
-            var maxRank = -1;
-            var maxTag = string.Empty;
-            foreach (var tag in storyEvent.Tags)
-            {
-                var rank = StoryEventTagOrder.RankOf(tag.Name);
-                if (rank is null) continue;
-                if (rank < maxRank)
-                {
-                    diagnostics.Add(At(tag.ValueRange,
-                        _messages.Format("StoryGraph_TagOrder", tag.Name, maxTag),
-                        XmlDiagnosticSeverity.Warning));
-                }
-                else
-                {
-                    maxRank = rank.Value;
-                    maxTag = tag.Name;
-                }
-            }
-        }
     }
 
     private void AddOverlongFlagNames(List<StoryGraphDiagnostic> diagnostics, StoryThread thread)

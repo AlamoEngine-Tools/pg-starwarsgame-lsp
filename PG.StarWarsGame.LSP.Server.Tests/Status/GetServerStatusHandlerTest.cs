@@ -256,6 +256,9 @@ public sealed class GetServerStatusHandlerTest
     [Fact]
     public async Task Extended_ReportsTheProcessMemoryFigures()
     {
+        // The heap figures describe the last collection and are all zero before the process's first:
+        // a test process may ask before one has run, a server never does.
+        GC.Collect();
         var memory = (await Extended(HealthyRecorder(), LayeredIndex())).Extended!.Memory;
 
         Assert.True(memory.HeapBytes > 0);

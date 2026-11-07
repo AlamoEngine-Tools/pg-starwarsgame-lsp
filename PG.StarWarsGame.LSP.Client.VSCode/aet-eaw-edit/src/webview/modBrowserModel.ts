@@ -12,6 +12,7 @@ import type {
     SymbolKindCount,
     SymbolLayer,
     SymbolLocation,
+    SymbolOutline,
     SymbolRow,
 } from "../protocol/modBrowser";
 import type { IconName } from "./shared/Icon";
@@ -19,6 +20,17 @@ import type { IconName } from "./shared/Icon";
 const XML_PREFIX = "xml:";
 /** A Scripts outline list: the scripts in one folder under Data/Scripts. */
 const SCRIPTS_PREFIX = "scripts:";
+
+/**
+ * Whether a picked outline opens afresh. The one already shown keeps the browser as it was left:
+ * its lists, tabs and searches.
+ */
+export function opensOutline(
+    shown: SymbolOutline | null,
+    picked: SymbolOutline,
+): boolean {
+    return picked !== shown;
+}
 
 /** A list's name: the game objects' list by what it holds, every other XML type by its own name. */
 export function pageLabel(page: string): string {
@@ -177,29 +189,31 @@ export function relationLabel(relation: string): string {
 }
 
 /**
- * Where an entry comes from, as the panel names it: the root project is this mod, a dependency is
- * named, then the game. The word "layer" is the plan's, never the panel's.
+ * Where an entry comes from, as the panel names it: every project by its own name - the root one
+ * too, so a workspace of several reads the same as one - then the game. The word "layer" is the
+ * plan's, never the panel's.
  */
 export function originLabel(
     origin: string,
     originName: string | null | undefined,
     layers: readonly SymbolLayer[],
 ): string {
+    const root = layers.reduce<SymbolLayer | undefined>(
+        (top, l) => (top === undefined || l.rank > top.rank ? l : top),
+        undefined,
+    );
     switch (origin) {
         case "game":
             return l10n.t("Game");
         case "project":
-            return l10n.t("This project");
+            // A file no project declares the folder of: it is in the workspace, so the root's.
+            return root?.name ?? l10n.t("This project");
         case "missing":
             return l10n.t("Not found");
         case "schema":
             return l10n.t("Schema");
     }
     const rank = Number(origin.slice("layer:".length));
-    const leaf = Math.max(-1, ...layers.map((l) => l.rank));
-    if (layers.length > 1 && rank === leaf) {
-        return l10n.t("This mod");
-    }
     return originName ?? layers.find((l) => l.rank === rank)?.name ?? origin;
 }
 
@@ -577,4 +591,22 @@ function actionReasonLabel(reason: string): string {
         default:
             return reason;
     }
+}
+
+/** A list's search: the name to match, the kinds and the origins that narrow its rows. */
+export interface SearchFilter {
+    query: string;
+    kinds: string[];
+    origins: string[];
+}
+
+export const NO_FILTER: SearchFilter = { query: "", kinds: [], origins: [] };
+
+/** Whether the search holds any row back - what the table's clear-filters control acts on. */
+export function filterActive(filter: SearchFilter): boolean {
+    return (
+        filter.query !== "" ||
+        filter.kinds.length > 0 ||
+        filter.origins.length > 0
+    );
 }

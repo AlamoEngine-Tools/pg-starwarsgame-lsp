@@ -64,6 +64,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         var globalTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var globalAnnotations = new Dictionary<string, LuaGlobalAnnotation>(StringComparer.OrdinalIgnoreCase);
         var engineFunctions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var engineClasses = new HashSet<string>(StringComparer.Ordinal);
         foreach (var stub in stubs)
         {
             // A library stub's typed globals and functions are documentation; only the engine's
@@ -71,7 +72,8 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
             var isEngine = EngineStubFiles.Contains(stub.Name);
             var found = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
             ParseContent(stub.Content, found, memberRefs, isEngine ? declaredGlobals : [],
-                isEngine ? globalTypes : new Dictionary<string, string>(), globalAnnotations);
+                isEngine ? globalTypes : new Dictionary<string, string>(), globalAnnotations,
+                isEngine ? engineClasses : []);
             foreach (var (name, entry) in found)
             {
                 functions[name] = entry;
@@ -91,6 +93,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         AllFunctionNames = new HashSet<string>(functions.Keys, StringComparer.OrdinalIgnoreCase);
         declaredGlobals.UnionWith(engineFunctions);
         DeclaredGlobalNames = declaredGlobals;
+        EngineClassNames = engineClasses;
         _globalTypes = globalTypes;
         _globalAnnotations = globalAnnotations;
     }
@@ -98,6 +101,8 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     public IReadOnlySet<string> AllFunctionNames { get; }
 
     public IReadOnlySet<string> DeclaredGlobalNames { get; }
+
+    public IReadOnlySet<string> EngineClassNames { get; }
 
     public string Fingerprint { get; }
 
@@ -148,7 +153,8 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         Dictionary<string, List<XmlRefEntry>> memberRefs,
         HashSet<string> declaredGlobals,
         Dictionary<string, string> globalTypes,
-        Dictionary<string, LuaGlobalAnnotation> globalAnnotations)
+        Dictionary<string, LuaGlobalAnnotation> globalAnnotations,
+        HashSet<string> classes)
     {
         // Accumulate comment lines (--- stripped) for EmmyLuaAnnotationParser.
         var commentLines = new List<string>();
@@ -186,6 +192,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
             else if (line.StartsWith("---@class", StringComparison.Ordinal))
             {
                 className = line[9..].Trim().Split(' ', ':')[0];
+                classes.Add(className);
             }
             else if (line.StartsWith("---@type", StringComparison.Ordinal))
             {

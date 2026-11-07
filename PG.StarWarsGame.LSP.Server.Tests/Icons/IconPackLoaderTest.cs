@@ -7,6 +7,7 @@ using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Schema.Versioning;
 using PG.StarWarsGame.LSP.Server.Icons;
@@ -96,6 +97,30 @@ public sealed class IconPackLoaderTest
                 CancellationToken.None);
 
         Assert.Equal(StatusAssetSource.Local, recorder.IconPackSource);
+    }
+
+    // A local folder laid out like the baseline repository serves each game the pack beside its own
+    // baseline, so an EaW project's previews show no expansion icon.
+    [Theory]
+    [InlineData(TargetGame.EAW, "eaw_pack")]
+    [InlineData(TargetGame.FOC, "foc_pack")]
+    public async Task Local_Folder_ReadsThePackBesideTheGamesBaseline(TargetGame game, string expected)
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile(@"C:\baselines\eaw\aet-pg-swg-lsp-eaw-baseline.aet.icons", new MockFileData(Pack("eaw_pack")));
+        fs.AddFile(@"C:\baselines\foc\aet-pg-swg-lsp-foc-baseline.aet.icons", new MockFileData(Pack("foc_pack")));
+        var source = new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = @"C:\baselines" };
+
+        var pack = await Build(fs, _ => new HttpResponseMessage(HttpStatusCode.NotFound), new ServerStatusRecorder())
+            .LoadAsync(source.ForGame(game), CancellationToken.None);
+
+        Assert.Equal([expected], pack.Icons.Keys);
+    }
+
+    private static byte[] Pack(string icon)
+    {
+        return IconPackSerializer.Serialize(
+            ImmutableDictionary<string, byte[]>.Empty.Add(icon, [1, 2, 3]), "ab12", DateTimeOffset.UnixEpoch);
     }
 
     private sealed class FakeHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> respond)

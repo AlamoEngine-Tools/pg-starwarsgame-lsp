@@ -8,6 +8,7 @@ using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -45,6 +46,21 @@ public sealed class GetBaselineEntriesHandlerTest
         Assert.All(result.Entries, e => Assert.True(
             e.Translations.ContainsKey("ENGLISH"),
             $"Entry '{e.Key}' is missing an ENGLISH translation"));
+    }
+
+    // The base game ships no expansion text, so an EaW project is offered none of it.
+    [Fact]
+    public async Task Handle_EawProject_OffersNoExpansionOnlyKey()
+    {
+        var focKeys = (await BuildHandler().Handle(new GetBaselineEntriesParams(), CancellationToken.None))
+            .Entries.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var (eawHandler, _, _, _, _) = BuildHandlerWithRegistries(TargetGame.EAW);
+
+        var eawKeys = (await eawHandler.Handle(new GetBaselineEntriesParams(), CancellationToken.None))
+            .Entries.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert.NotEmpty(eawKeys);
+        Assert.True(eawKeys.IsProperSubsetOf(focKeys));
     }
 
     [Fact]
@@ -167,7 +183,7 @@ public sealed class GetBaselineEntriesHandlerTest
 
     private static (GetBaselineEntriesHandler Handler, LocalisationProjectRegistry ProjectRegistry,
         LocalisationLayerRegistry LayerRegistry, ITranslationDatabaseFactory Factory,
-        ILanguageService LangService) BuildHandlerWithRegistries()
+        ILanguageService LangService) BuildHandlerWithRegistries(TargetGame game = TargetGame.FOC)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
@@ -186,7 +202,8 @@ public sealed class GetBaselineEntriesHandlerTest
             factory,
             new FileHelper(sp.GetRequiredService<IFileSystem>()),
             projectRegistry,
-            layerRegistry);
+            layerRegistry,
+            new ProjectOfGame(game));
 
         return (handler, projectRegistry, layerRegistry, factory, langService);
     }

@@ -20,6 +20,7 @@ public sealed class WorkspaceStoryChainFileResolver(
     BaselineIndex baseline) : IStoryChainFileResolver
 {
     private readonly IReadOnlyList<string> _rootsHighestRankFirst = xmlRoots.Reverse().ToList();
+    private readonly XmlFileNameIndex _byName = new(fileHelper, xmlRoots.Reverse().ToList());
 
     public StoryChainFile? ReadFile(string xmlRelativePath)
     {
@@ -50,5 +51,10 @@ public sealed class WorkspaceStoryChainFileResolver(
         var normalized = GamePaths.Key(xmlRelativePath);
         return baseline.FileTypeMap.ContainsKey(normalized)
                || baseline.FileTypeMap.ContainsKey("data/xml/" + normalized);
+    }
+
+    public IReadOnlyList<string> FindByFileName(string fileName)
+    {
+        return _byName.Find(fileName);
     }
 }
