@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Authored for the load-order check: two files that each define the same targeting set. -->
+<Targeting_Priority_Set_Files>
+	<File>E2E_Targeting_A.xml</File>
+	<File>E2E_Targeting_B.xml</File>
+</Targeting_Priority_Set_Files>

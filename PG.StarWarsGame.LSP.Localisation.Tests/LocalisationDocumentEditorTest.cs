@@ -4,11 +4,11 @@
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using PG.StarWarsGame.LSP.Localisation.Rows;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Localisation.Tests;
 
@@ -29,13 +29,13 @@ public sealed class LocalisationDocumentEditorTest
 
     private const string Xml = """
                                <?xml version="1.0" encoding="utf-8"?>
-                               <Localisations xmlns="urn:alamoenginetools:localisation:v1">
-                                 <Localisation key="TEXT_A">
+                               <Localisations>
+                                 <Localisation Key="TEXT_A">
                                    <TranslationData>
                                      <Translation Language="ENGLISH">Alpha</Translation>
                                    </TranslationData>
                                  </Localisation>
-                                 <Localisation key="TEXT_B">
+                                 <Localisation Key="TEXT_B">
                                    <TranslationData>
                                      <Translation Language="ENGLISH">Beta</Translation>
                                    </TranslationData>
@@ -354,7 +354,7 @@ public sealed class LocalisationDocumentEditorTest
     public void Xml_Save_KeepsTheFilesOwnLineEndings(string lineEnding)
     {
         var text = string.Join(lineEnding, "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
-            "<Localisations xmlns=\"urn:alamoenginetools:localisation:v1\">", "  <Localisation key=\"TEXT_A\">",
+            "<Localisations>", "  <Localisation Key=\"TEXT_A\">",
             "    <TranslationData>", "      <Translation Language=\"ENGLISH\">Alpha</Translation>",
             "    </TranslationData>", "  </Localisation>", "</Localisations>");
 
@@ -380,6 +380,30 @@ public sealed class LocalisationDocumentEditorTest
 
         Assert.DoesNotContain("TEXT_A", result, StringComparison.Ordinal);
         Assert.Contains("TEXT_B", result, StringComparison.Ordinal);
+    }
+
+    // A file in the namespaced shape is saved in the text editor's format, the only one it opens.
+    [Fact]
+    public void Xml_TheNamespacedShape_IsSavedInTheTextEditorsFormat()
+    {
+        const string xml = """
+                           <LocalisationData xmlns="urn:alamoenginetools:localisation:v1">
+                             <Localisation key="TEXT_A">
+                               <TranslationData><Translation Language="ENGLISH">Alpha</Translation></TranslationData>
+                             </Localisation>
+                           </LocalisationData>
+                           """;
+
+        var result = Apply(xml, ".xml", SetCell(0, "ENGLISH", "Changed", "TEXT_A"), SetCell(0, "GERMAN", "Alfa"));
+
+        Assert.Equal(
+            xml.Replace(" xmlns=\"urn:alamoenginetools:localisation:v1\"", "", StringComparison.Ordinal)
+                .Replace("key=", "Key=", StringComparison.Ordinal)
+                .Replace(">Alpha<", ">Changed<", StringComparison.Ordinal)
+                .Replace("</Translation></TranslationData>",
+                    "</Translation><Translation Language=\"GERMAN\">Alfa</Translation></TranslationData>",
+                    StringComparison.Ordinal),
+            result);
     }
 
     // ── the reference model ──────────────────────────────────────────────────

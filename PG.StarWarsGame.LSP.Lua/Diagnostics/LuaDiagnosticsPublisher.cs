@@ -21,9 +21,12 @@ using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.Di
 using LspDiagnosticContainer = OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<
     OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
+using LspHover = OmniSharp.Extensions.LanguageServer.Protocol.Models.Hover;
+using LspHoverParams = OmniSharp.Extensions.LanguageServer.Protocol.Models.HoverParams;
 using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using LspPublishParams = OmniSharp.Extensions.LanguageServer.Protocol.Models.PublishDiagnosticsParams;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using LspTextDocumentIdentifier = OmniSharp.Extensions.LanguageServer.Protocol.Models.TextDocumentIdentifier;
 
 namespace PG.StarWarsGame.LSP.Lua.Diagnostics;
 
@@ -34,6 +37,10 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
     // The analyzer's latest findings per document, already mapped to this server's ids.
     private readonly ConcurrentDictionary<string, IReadOnlyList<LspDiagnostic>> _analyzerFindings =
         new(DocumentUris.Comparer);
+
+    // How many reports each document has had: a report whose receivers are still being hovered is
+    // stored only if no later one arrived meanwhile.
+    private readonly ConcurrentDictionary<string, int> _analyzerReports = new(DocumentUris.Comparer);
 
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaDiagnosticsPublisher> _logger;
@@ -96,11 +103,48 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
                     uri, finding.Range.Start.Line + 1, finding.Message);
         }
 
-        _analyzerFindings[uri] = p.Diagnostics
+        var mapped = p.Diagnostics
             .Select(LuaAnalyzerRulePolicy.Map)
             .OfType<LspDiagnostic>()
             .ToList();
-        RepublishDocument(uri);
+        var report = _analyzerReports.AddOrUpdate(uri, 1, (_, n) => n + 1);
+        _ = StoreAsync(uri, report, mapped);
+    }
+
+    // An undefined member holds only on an engine type, which defines all of its members; the
+    // analyzer's hover names the receiver's type. Awaited, never waited on: the event is raised on
+    // the analyzer's reader thread, which also reads the hovers' answers.
+    private async Task StoreAsync(string uri, int report, List<LspDiagnostic> mapped)
+    {
+        try
+        {
+            var kept = new List<LspDiagnostic>(mapped.Count);
+            foreach (var finding in mapped)
+                if (!LuaAnalyzerRulePolicy.IsUndefinedField(finding) || await IsOnEngineTypeAsync(uri, finding))
+                    kept.Add(finding);
+            if (_analyzerReports.GetValueOrDefault(uri) != report) return;
+            _analyzerFindings[uri] = kept;
+            RepublishDocument(uri);
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning(e, "Analyzer report {Uri} not stored", uri);
+        }
+    }
+
+    private async Task<bool> IsOnEngineTypeAsync(string uri, LspDiagnostic finding)
+    {
+        var document = _workspaceHost.All.FirstOrDefault(d => DocumentUris.Same(d.Uri, uri));
+        if (document is null) return false;
+        var tree = _parseCache.GetOrParse(_fileHelper.NormalizeUri(uri), document.Text).Tree;
+        if (LuaAnalyzerRulePolicy.ReceiverPosition(finding, tree) is not { } at) return false;
+        var hover = await _analyzer.RequestAsync<LspHover>("textDocument/hover", new LspHoverParams
+        {
+            TextDocument = new LspTextDocumentIdentifier(DocumentUri.From(uri)),
+            Position = at
+        }, CancellationToken.None);
+        return LuaAnalyzerRulePolicy.ReceiverTypeOf(hover) is { } type &&
+               _schemaProvider.EngineClassNames.Contains(type);
     }
 
     protected override void PublishForDocument(string uri, string text, GameIndex index)
@@ -206,7 +250,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
                 {
                     var resolved = index.ResolveReference(reference);
                     var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName,
-                        resolved, messages: messages);
+                        resolved, messages: messages, exactCase: reference.ExactCase);
                     if (eval is null) continue;
 
                     diagnostics.Add(new LspDiagnostic

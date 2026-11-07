@@ -79,7 +79,6 @@ internal static class XmlPublisherFixture
             new XmlDocumentFactProducer(fileHelper, schema, fileTypeRegistry, new XmlStructuralValidator()),
             new XmlIndexFactProducer(DistinctObjectNameHash.Instance),
             new XmlVariantFactProducer(schema, tagSource),
-            new XmlLayerShadowFactProducer(),
             new XmlHardpointFactProducer(schema, tagSource),
             new XmlDamageStageFactProducer(schema, tagSource),
             new StoryFactProducer(schema, fileTypeRegistry, fileHelper),

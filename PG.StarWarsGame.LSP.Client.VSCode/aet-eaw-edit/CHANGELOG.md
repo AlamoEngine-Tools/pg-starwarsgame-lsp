@@ -202,9 +202,9 @@
   ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
   - Every asteroid, junk and planet-destruction field is a bump emitter: lit, normal-mapped rocks instead of flat
     cut-outs
-  - `PrimAlpha`, `PrimAdditive`, `PrimDiffuseAlpha`, `PrimOpaque` and `PrimAlphaScanlines` ship fixed-function only
-    (their programmable technique is commented out in the sources), so they keep the preview's own shader, which is
-    that path; heat sprites keep the distortion pass; tailed emitters keep the preview's shader for now
+  - `PrimAlpha`, `PrimAdditive`, `PrimDiffuseAlpha`, `PrimOpaque` and `PrimAlphaScanlines` ship fixed-function only,
+    so they keep the preview's own shader, which is that path; heat sprites keep the distortion pass; tailed
+    emitters keep the preview's shader for now
   - A depth sprite (`PrimDepthSprite*`) is drawn through its effect too: the emitter's own depth map, read from
     the same chunk as a bump emitter's normal map, is bound as the effect's second texture, and the pixel
     shader's depth output reaches the depth buffer, so a chunk sinks into or stands off the hull as the game
@@ -218,13 +218,13 @@
     rest of the effect scaffolding - the bump effect's tangent rotation and the depth sprites' PS1.x fallbacks
     were each a compile error that left the preview's own shader drawing in silence
   - The whole shipped set was then compiled the same way, and the translator learned what the rest of the corpus
-    writes: brace initialisers (`float4 TexU = { 0.01, 0, 0, 0 };`, flat array lists, matrices), `int4` and
-    `D3DCOLORtoUBYTE4`, a swizzled literal (`0.5.xx`), a scalar assigned to a vector (`Out.Diff = 0;`), an
-    integer compared with a float, `lerp` over mismatched widths, a `mul` of a float3 by a float4x4 kept at
-    HLSL's float4 result, a comment inside an expression, a sampler with both register and state block or with
-    neither, an annotation block after a semantic, a DX8 `asm` handle, and a `//` comment after a scaled integer.
-    60 of the 69 translatable effects compile, up from 41; the 9 left are development effects that name a
-    function, globals or a header the shipped sources do not have, and fail for an HLSL compiler the same way
+    writes: brace initialisers of vectors, flat arrays and matrices, `int4` and `D3DCOLORtoUBYTE4`, a swizzle on
+    a literal, a scalar assigned to a vector, an integer compared with a float, `lerp` over mismatched widths, a
+    `mul` of a float3 by a float4x4 kept at HLSL's float4 result, a comment inside an expression, a sampler with
+    both register and state block or with neither, an annotation block after a semantic, a DX8 `asm` handle, and
+    a `//` comment after a scaled integer. 60 of the 69 translatable effects compile, up from 41; the 9 left are
+    development effects that name something the shipped set does not define, and fail for an HLSL compiler the
+    same way
   - The shader resolver looks in the shaders' `Engine/` folder, where the particle effects live, and a header is
     asked for by its bare name whatever path the include wrote
   - An emitter with a skip time is pre-simulated through it before its first frame, in tenths of a second as the
@@ -249,8 +249,12 @@
   - A **Mod Browser** view with the outlines Game Data, Assets, Scripts and Schema; one panel per project
   - A rail drawn as VS Code's tree, with its keys and a picture per kind, of lists, their entries and each entry's
     relations, whose path is the breadcrumb; the rail and the search form are resized by dragging
+  - A click on a list's row opens the entry's relations in the rail; the keys select without opening
   - A table paged and sorted on the server, with a search form - name, what it behaves like with its count,
-    origin - and a filter in each column header writing into it; column widths and order kept per list
+    origin - and a filter in each column header writing into it; column widths and order kept per list, and
+    left as they are by filtering and sorting. A line between the columns and a lighter every other row; the
+    foot clears every filter at once, and says when there is none to clear
+  - An entry's origin names the project or dependency that defines it, or `Game`
   - Previews as tiles on a fixed grid per type: a game object's problems, encyclopedia card and references; a
     model's counts, tree of bones, meshes and effects, textures, particle systems and animations; a script's
     size, lines, loaders and requires; a schema tag's documentation. A type with nothing to show has none
@@ -281,6 +285,49 @@
 
 ### Fixes
 
+- **A missing story file says where a file of that name sits** - the game opens a listed plot or story file at
+  the listed path and nowhere else, so a mission plot filed one folder down never loads. The finding now names
+  every file of that name in the project's layers, instead of leaving the author to search the tree
+- **Opening the campaign navigator and saving a story file take seconds on a large mod, not minutes** - a
+  story model was built per campaign and faction and cached under the campaign's name, so a mod with many
+  campaign variants of a few plot sets built over thirteen thousand models, each parsing its story files
+  again: 135 seconds for the navigator on start, and the same work again for a story file's diagnostics on
+  every save. One build now serves every campaign that lists the same manifests, a story file is parsed once
+  per text, and the navigator's feed is built off the request thread, so the localisation views and the Mod
+  Browser no longer wait behind it. Measured on that mod: 3.4 seconds and 124 builds for the navigator, 3
+  seconds for a save
+- **The status bar is ready when the views are** - its check mark appeared the moment the index opened,
+  while the campaign navigator, the localisation views and the Mod Browser still said they were loading. The
+  bar now reads `Indexing symbols...`, then `Parsing campaigns...`, `Loading translations...` and
+  `Cataloguing assets...` as each feed is asked for, and several projects count as `ready` only once their
+  last feed has answered
+- **A name the TRIGGER_AI reward sets is a symbol** - the reward's first parameter sets an AI story trigger on the
+  faction's AI player, and Lua's `Check_Story_Flag` reads those triggers and nothing else; the flags `SET_FLAG`
+  creates are a separate store the game never shows that function. The index defined a flag from `SET_FLAG` alone
+  and typed `Check_Story_Flag` against it, so every such name read as missing, the shipped campaigns' included.
+  TRIGGER_AI now defines an AI story trigger, the Lua reference goes to it and finds it, and a script that checks
+  a name only `SET_FLAG` ever sets is still reported, since the game would not see it either
+- **A story handler key off by case is reported** - the game matches almost every name regardless of case, a
+  story event's included: its lookup uppercases the name first. The one exception is a script's `StoryModeEvents`
+  table, which the shipped story-mode library indexes with the event's name as the XML writes it, so a key that
+  differs from the event only by case never runs. The index found it anyway and said nothing; it now warns
+  (`aetswg-001-0036`), naming the event as written
+- **One place for a repeated key in the localisation editor** - the editor counted repeated keys itself and
+  showed the count among its actions, beside the header badge and the Problems bar that already report the
+  same key with the row it repeats. The count is gone; the badge and the bar remain
+- **No warning for the order of an event's tags** - the story graph warned when an event's tags left the
+  order of the scripting document, `'Prereq' appears after 'Story_Dialog_Popup'`. The game reads each tag by
+  name into its own slot and builds the event from the slots afterwards, so the order in the file changes
+  nothing; 216 of Empire at War's 5,390 shipped events and 263 of Forces of Corruption's 9,873 are in another
+  order and run as written. The warning is gone; the story editor still inserts a new tag at the documented
+  position
+- **A texture, model, animation or sound added to the workspace is known at once** - the server re-globs its
+  asset catalog when a loose asset appears or goes, but no asset extension was watched, so the file stayed
+  unknown until the project was reloaded. The watched globs now carry every extension the catalog records
+- **The Mod Browser follows the index** - its tree, table and counts were refreshed on the scan-complete
+  signal alone, so an edit, a reload or a texture dropped into the workspace reached it only when a sort or a
+  node switch asked the server again. The server now sends one notification per burst of index writes, as it
+  does for the preview and the story graph, and every open browser of that project re-reads
 - **One name in two types is two objects** - the metafile that lists a file types it, and every type is an
   id space of its own: the shipped game has a Sarlacc faction and a Sarlacc unit, and SFX and speech events
   of one name. Where an id alone was looked up, whichever definition the index listed first answered, and
@@ -337,6 +384,19 @@
 - **New Mod Project in an existing mod** - leaves the mod's `modinfo.json`, dependencies included, as it was; only a
   folder without one gets a new one; a folder that already has the project file is refused with its path, where
   "created" was reported ([#295](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/295))
+- **New Mod Project and Adopt Project refuse the same folders** - any project file in the folder, whatever its name,
+  and the game's own folder; every refusal is shown, where an empty name or folder returned silently; `modinfo.json` is
+  found in any spelling; the not-a-mod refusal names the folders it looked for
+  ([#317](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/317))
+- **A panel no longer waits out the timeout after a client restart** - every project's gateway hears a route change,
+  where only the window's did, so a preview opened while its server restarted sat blank for 30 seconds; a panel opened
+  while no project runs binds to the one project that starts, never to the editor in front
+  ([#318](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/318))
+- **Every status text and every fallback text comes from the catalogue** - the story graph's status slot wrote its
+  texts in place, and a text standing in for a missing value (`No model`, `Nothing selected`, `Neutral`) escaped the
+  lint everywhere; the lint now checks `setStatus` and `reportStatus` and looks through `??` and `||`, and the
+  nineteen texts it found are catalogued
+  ([#319](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/319))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
   only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
@@ -475,6 +535,8 @@
 - **New, reused script state** - `Engine14` to `Engine17` (`aetswg-011-0014` to `aetswg-011-0017`)
 - **New, Lua calls** - `Engine18` (`aetswg-011-0018`, a call fitting none of an engine function's call forms) and
   `LuaAnalyzer11` (`aetswg-016-0011`, an argument past a Lua function's parameters)
+- **New, engine members** - `LuaAnalyzer12` (`aetswg-016-0012`, a member an engine type does not have, such as
+  `Is_Evil` on a player)
 - **New, Lua 5.1 syntax** - `Syntax3011` (`aetswg-012-3011`)
 - **New, particle files** - `Preview22` (`aetswg-014-0022`, data the game's reader has no case for) and
   `Preview23` (`aetswg-014-0023`, editor data the game leaves unapplied)
@@ -482,6 +544,11 @@
   (`aetswg-007-0032`, a hardpoint that never fires)
 - **New, Lua_Script** - `Assets16` to `Assets20` (`aetswg-004-0016` to `aetswg-004-0020`: missing, backslash,
   `..`, extension, outside GameObject)
+- **New, Lua imports** - `Structure19` (`aetswg-006-0019`, a library global the script does not require) and
+  `Structure20` (`aetswg-006-0020`, a cyclic require); both were reported without an id, so they showed no code
+  and could not be suppressed
+- **New, story handlers** - `References36` (`aetswg-001-0036`, a `StoryModeEvents` key that matches its event only
+  by case, which the game never reaches)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 - **Retired** - `Symbols3` (`aetswg-010-0003`), one name defined in two types: every lookup names its type now,
   so that is two objects, as it is to the game, and nothing to warn about; the number is never reused
@@ -510,6 +577,9 @@
   the extension keeps it off in a workspace
 - **More settings removed** - `aet-eaw-edit.lsp.locale` (no translation existed), `aet-eaw-edit.modVerify.enabled` and
   `aet-eaw-edit.modVerify.executable` (read by nothing), `aet-eaw-edit.shaders.sourceUrl`
+- **`aet-eaw-edit.lsp.debug.traceServer` is `aet-eaw-edit.lsp.debug.trace.server`** - the trace now covers the
+  handshake: `initialize` and its result are traced at the level set, where they were traced as bare message names
+  before the level applied; a value under the old name is not read
 - **Story simulator options moved into the simulator** - `aet-eaw-edit.storySimulator.autoResume` is *Resume after
   an answer* and `aet-eaw-edit.storySimulator.assumeMediaCompletes` is *Speech and movies finish on their own*, two
   toggles beside *Break on gates* in the transport. Resume is kept per viewer; the media option belongs to the run,

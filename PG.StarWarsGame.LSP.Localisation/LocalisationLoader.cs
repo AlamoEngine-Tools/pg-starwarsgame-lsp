@@ -78,8 +78,11 @@ public sealed class LocalisationLoader : ILocalisationLoader
         // resolves.
         var language = LocalisationFileNameLanguageResolver.Configured(_langService, locConfig);
 
-        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, language);
-        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, language);
+        // The project's game decides which shipped master texts resolve: the base game ships none
+        // of the expansion's.
+        var baselineDbs = BaselineMasterTexts.Contexts(workspaceConfig.Game)
+            .Select(c => _baselineProvider.GetMasterText(c, language))
+            .ToList();
 
         var registryEntries = new List<LocProjectInfo>();
         var layerDbs = new List<IKeyedTranslationDatabase>();
@@ -144,7 +147,8 @@ public sealed class LocalisationLoader : ILocalisationLoader
         _layerRegistry.Set(layerEntries);
 
         // Workspace layers (highest precedence first) shadow the shipped baseline.
-        var databases = new List<IKeyedTranslationDatabase>(layerDbs) { eawDb, focDb };
+        var databases = new List<IKeyedTranslationDatabase>(layerDbs);
+        databases.AddRange(baselineDbs);
         _indexService.ApplyLocalisation(new TranslationDatabaseLocalisationIndex(databases, language));
     }
 

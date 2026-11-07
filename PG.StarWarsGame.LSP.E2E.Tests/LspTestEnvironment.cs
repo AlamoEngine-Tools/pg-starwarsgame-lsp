@@ -49,6 +49,13 @@ public static class LspTestEnvironment
         ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace") : null);
 
     /// <summary>
+    ///     The authored FoC mod that ships its own registries over the shipped game, for the load-order
+    ///     rules: <c>e2e-workspace-load-order/</c> in the repository.
+    /// </summary>
+    public static string? E2eLoadOrderWorkspacePath =>
+        ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace-load-order") : null);
+
+    /// <summary>
     ///     The authored base project the two-project window puts beneath the mod (#280). Prefers
     ///     <c>LSP_E2E_MULTI_ROOT_WORKSPACE_PATH</c>; falls back to <c>e2e-workspace-multi-root/</c> in
     ///     the repository. Tracked for the same reason as <c>e2e-workspace/</c>.
@@ -63,14 +70,16 @@ public static class LspTestEnvironment
         Environment.GetEnvironmentVariable("LSP_GAME_PATH");
 
     /// <summary>
-    ///     Shipped-game baseline index. Prefers <c>LSP_BASELINE_LOCAL_PATH</c>; falls back to the
-    ///     FoC baseline checked in under <c>baseline/</c>, matching the <c>foc/</c> workspace the
-    ///     fixtures open by default. Returns <c>null</c> if neither exists.
+    ///     Shipped-game baseline index. Prefers <c>LSP_BASELINE_LOCAL_PATH</c>, a file or a folder;
+    ///     falls back to the <c>baseline/</c> checkout, a folder the server reads the file of each
+    ///     project's game from. Returns <c>null</c> if neither exists.
     /// </summary>
     public static string? BaselineLocalPath =>
         ExistingFile(Environment.GetEnvironmentVariable("LSP_BASELINE_LOCAL_PATH"))
-        ?? ExistingFile(SolutionRoot is not null
-            ? Path.Combine(SolutionRoot, "baseline", "foc", "aet-pg-swg-lsp-foc-baseline.aet")
+        ?? ExistingPath(Environment.GetEnvironmentVariable("LSP_BASELINE_LOCAL_PATH"))
+        ?? (SolutionRoot is not null
+            && File.Exists(Path.Combine(SolutionRoot, "baseline", "foc", "aet-pg-swg-lsp-foc-baseline.aet"))
+            ? Path.Combine(SolutionRoot, "baseline")
             : null);
 
     public static string Locale =>

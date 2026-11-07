@@ -26,6 +26,13 @@ public interface ILuaApiSchemaProvider
     IReadOnlySet<string> DeclaredGlobalNames { get; }
 
     /// <summary>
+    ///     The classes the engine stubs declare (<c>---@class Player: LuaUserVar</c>): the engine's
+    ///     own types, which define all of their members. A library's classes are Lua tables a script
+    ///     may extend, and are not among them. Case-sensitive, as Lua names are.
+    /// </summary>
+    IReadOnlySet<string> EngineClassNames { get; }
+
+    /// <summary>
     ///     Returns the reference entries for a function, or an empty list if none. A global function
     ///     is found by its name; a class method (<c>function GameObject.Play_SFX_Event</c>) by the
     ///     method name alone, since a call site does not know its receiver's type. Lookup is

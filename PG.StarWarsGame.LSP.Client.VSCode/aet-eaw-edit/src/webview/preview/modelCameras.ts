@@ -49,7 +49,7 @@ const NONE: ModelCameraEntry = {
     // the entry IS has the disabled button in front of them saying this model has none.
     title: l10n.t("Look from the model's own camera"),
     disabled: true,
-    disabledReason: "Author - this model carries no camera of its own",
+    disabledReason: l10n.t("Author - this model carries no camera of its own"),
     position: null,
     target: null,
 };

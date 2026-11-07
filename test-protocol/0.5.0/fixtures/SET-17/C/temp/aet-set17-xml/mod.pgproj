@@ -1,0 +1,1 @@
+{"name": "SET-17 XML texts", "directories": {"xml": ["data/xml"]}, "localisation": {"type": "XML", "directory": "data/text"}, "projectReferences": [], "_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.1.0", "game": "foc"}

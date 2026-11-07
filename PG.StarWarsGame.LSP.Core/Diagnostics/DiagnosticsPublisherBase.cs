@@ -350,14 +350,22 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
                                     || !ReferenceEquals(last.WorkspaceDynamicEnumValues,
                                         index.WorkspaceDynamicEnumValues)
                                     || !ReferenceEquals(last.WorkspaceEnumValueDefinitions,
-                                        index.WorkspaceEnumValueDefinitions);
+                                        index.WorkspaceEnumValueDefinitions)
+                                    || !ReferenceEquals(last.LoadOrder, index.LoadOrder);
+
+        // A rule may read another document's tags - a hardpoint file is checked against the units that
+        // attach it, a variant against its base - so a content-only edit also re-publishes every open
+        // document it is related to: one that defines a name the edited document references, or
+        // references a name it defines.
+        var related = crossDocInputsChanged ? null : RelatedToChanged(last!, index, openUris);
 
         foreach (var doc in openDocs)
         {
             if (!crossDocInputsChanged
                 && _lastPublishedUris.Contains(doc.Uri)
                 && ReferenceEquals(last!.Documents.GetValueOrDefault(doc.Uri),
-                    index.Documents.GetValueOrDefault(doc.Uri)))
+                    index.Documents.GetValueOrDefault(doc.Uri))
+                && !related!.Contains(doc.Uri))
                 continue;
 
             try
@@ -378,5 +386,39 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 
         _lastPublishedUris = openUris;
         _lastRunIndex = index;
+    }
+
+    /// <summary>The open documents a definition or reference relates to a document whose entry changed.</summary>
+    private static HashSet<string> RelatedToChanged(GameIndex last, GameIndex index, HashSet<string> openUris)
+    {
+        var defined = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void Collect(DocumentIndex? document)
+        {
+            if (document is null) return;
+            foreach (var symbol in document.Symbols) defined.Add(symbol.Id);
+            foreach (var reference in document.References) referenced.Add(reference.TargetId);
+        }
+
+        foreach (var (uri, document) in index.Documents)
+            if (!ReferenceEquals(last.Documents.GetValueOrDefault(uri), document))
+            {
+                Collect(document);
+                Collect(last.Documents.GetValueOrDefault(uri));
+            }
+
+        foreach (var (uri, document) in last.Documents)
+            if (!index.Documents.ContainsKey(uri))
+                Collect(document);
+
+        var related = new HashSet<string>(DocumentUris.Comparer);
+        if (defined.Count == 0 && referenced.Count == 0) return related;
+        foreach (var uri in openUris)
+            if (index.Documents.GetValueOrDefault(uri) is { } document &&
+                (document.Symbols.Any(s => referenced.Contains(s.Id)) ||
+                 document.References.Any(r => defined.Contains(r.TargetId))))
+                related.Add(uri);
+        return related;
     }
 }

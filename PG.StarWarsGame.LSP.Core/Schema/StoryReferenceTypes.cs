@@ -17,6 +17,7 @@ public static class StoryReferenceTypes
     // referenceType names in the YAML param definitions.
     public const string EventName = "StoryEventName";
     public const string Flag = "StoryFlag";
+    public const string AiTrigger = "StoryAiTrigger";
     public const string PlotFile = "StoryPlotFile";
     public const string Branch = "StoryBranch";
     public const string Notification = "StoryNotification";
@@ -24,6 +25,7 @@ public static class StoryReferenceTypes
     // Symbol TypeName strings (GameSymbol.TypeName / GameReference.ExpectedTypeName).
     public const string EventSymbol = "StoryEvent";
     public const string FlagSymbol = "StoryFlag";
+    public const string AiTriggerSymbol = "StoryAiTrigger";
     public const string NotificationSymbol = "StoryNotification";
 
     /// <summary>
@@ -38,13 +40,13 @@ public static class StoryReferenceTypes
     /// <summary>Whether the referenceType belongs to the story domain (campaign-scoped semantics).</summary>
     public static bool IsStoryScoped(string referenceTypeName)
     {
-        return referenceTypeName is EventName or Flag or PlotFile or Branch or Notification;
+        return referenceTypeName is EventName or Flag or AiTrigger or PlotFile or Branch or Notification;
     }
 
     /// <summary>Whether the symbol TypeName is a story symbol (exempt from index-wide duplicate/existence checks).</summary>
     public static bool IsStorySymbolType(string? typeName)
     {
-        return typeName is EventSymbol or FlagSymbol or NotificationSymbol;
+        return typeName is EventSymbol or FlagSymbol or AiTriggerSymbol or NotificationSymbol;
     }
 
     /// <summary>((event/reward type, 0-based position) -> referenceType) lookup over a schema enum.</summary>

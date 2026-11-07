@@ -6,6 +6,7 @@
 
 import * as vscode from "vscode";
 
+import type { LspGateway } from "./lsp/lspGateway";
 import type { ProjectTree } from "./projectGroupedTree";
 import type { SymbolOutline } from "./protocol/modBrowser";
 
@@ -33,10 +34,20 @@ export class ModBrowserOutlineItem extends vscode.TreeItem {
 export class ModBrowserViewProvider implements ProjectTree<ModBrowserOutlineItem> {
     static readonly viewId = "aet-eaw-edit.lsp.modBrowser";
 
+    /** The outlines a browser opens on; their summaries are what the panel asks for first. */
+    private static readonly OUTLINES = [
+        "gameData",
+        "assets",
+        "scripts",
+        "schema",
+    ];
+
     private readonly _onDidChangeTreeData = new vscode.EventEmitter<
         ModBrowserOutlineItem | undefined
     >();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+    constructor(private readonly lsp: LspGateway) {}
 
     getChildren(
         element?: ModBrowserOutlineItem,
@@ -73,8 +84,20 @@ export class ModBrowserViewProvider implements ProjectTree<ModBrowserOutlineItem
         return element;
     }
 
-    preload(): Promise<void> {
-        return Promise.resolve();
+    /**
+     * Asks the server for every outline's summary once the scan is done, so the project counts as
+     * ready only when a browser opened now would show its counts at once. The answers themselves
+     * are not kept: the panel asks again when it opens, and the server answers from its index.
+     */
+    async preload(): Promise<void> {
+        if (!this.lsp.isRunning) {
+            return;
+        }
+        await Promise.all(
+            ModBrowserViewProvider.OUTLINES.map((outline) =>
+                this.lsp.request("aet/getSymbolOutline", { outline }),
+            ),
+        );
     }
 
     refresh(): void {

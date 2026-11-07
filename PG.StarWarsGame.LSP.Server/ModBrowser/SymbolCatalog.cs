@@ -263,7 +263,7 @@ public sealed class SymbolCatalog
     private static IEnumerable<SymbolRow> XmlRows(GameIndex index, IReadOnlyList<ObjectKindDefinition> kinds)
     {
         var ids = new HashSet<string>(index.WorkspaceDefinitions.Keys, StringComparer.Ordinal);
-        ids.UnionWith(index.Baseline.Symbols.Keys);
+        ids.UnionWith(index.ShippedSymbols.Keys);
 
         foreach (var id in ids)
         {
@@ -275,7 +275,7 @@ public sealed class SymbolCatalog
                     .OrderByDescending(index.LayerRankOf)
                     .ToList()
                 : [];
-            var shipped = index.Baseline.Symbols.TryGetValue(id, out var s) && s.Kind == GameSymbolKind.XmlObject
+            var shipped = index.ShippedSymbols.TryGetValue(id, out var s) && s.Kind == GameSymbolKind.XmlObject
                 ? s
                 : null;
             // One row per type: the metafile that lists a file types it, and every type is an id space
@@ -315,7 +315,8 @@ public sealed class SymbolCatalog
     }
 
     // One row per file name: the game resolves an asset by name, so a second row would open the same
-    // file. The project's copy is the one kept, as the scene resolves to it.
+    // file. The project's copy is the one kept, the highest project's of several, as the scene
+    // resolves to it; it is named by that project, as an object or a script is.
     private static IEnumerable<(string Page, SymbolRow Row)> AssetRows(GameIndex index)
     {
         var assets = index.AssetFiles;
@@ -330,11 +331,12 @@ public sealed class SymbolCatalog
 
         return files
             .Select(f => (f.Page, Name: MergedAssetFileIndex.FileNameOf(f.Path), f.Path,
-                Shipped: assets.IsPackedAsset(f.Path)))
+                Shipped: assets.IsPackedAsset(f.Path), Rank: assets.LayerRankOf(f.Path)))
             .OrderBy(f => f.Shipped)
+            .ThenByDescending(f => f.Rank ?? -1)
             .DistinctBy(f => (f.Page, f.Name.ToLowerInvariant()))
             .Select(f => (f.Page, new SymbolRow(f.Path, f.Name, Path.GetExtension(f.Name).ToLowerInvariant(), [],
-                f.Shipped ? "game" : "project", null, [])));
+                f.Shipped ? "game" : f.Rank is { } rank ? "layer:" + rank : "project", null, [])));
     }
 
     private static IEnumerable<SymbolRow> ScriptRows(GameIndex index)

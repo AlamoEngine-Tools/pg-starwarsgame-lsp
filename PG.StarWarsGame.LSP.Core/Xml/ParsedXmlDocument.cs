@@ -35,6 +35,35 @@ public sealed class ParsedXmlDocument
     /// <summary>Raw '\n'-split lines; entries keep a trailing '\r' on CRLF input.</summary>
     public string[] Lines => _lines ??= Text.Split('\n');
 
+    /// <summary>
+    ///     The innermost element whose start tag, content or end tag holds the position (0-based), or
+    ///     null. By position rather than by line, so several elements on one line are told apart.
+    /// </summary>
+    public HtmlNode? ElementAt(int line, int character)
+    {
+        return Spans.ElementAt(XmlUtility.PositionToOffset(Text, line, character))?.Node;
+    }
+
+    /// <summary>
+    ///     What removing <paramref name="node" /> takes out, as 0-based positions: its whole lines when
+    ///     nothing else shares them, otherwise exactly the element - a file written on one line loses
+    ///     the element and not the line. Null for a node with no element span.
+    /// </summary>
+    public ((int Line, int Col) Start, (int Line, int Col) End)? RemovalRange(HtmlNode node)
+    {
+        if (Spans.Of(node) is not { } span) return null;
+
+        var lineStart = span.Start == 0 ? 0 : Text.LastIndexOf('\n', span.Start - 1) + 1;
+        var newline = Text.IndexOf('\n', span.End);
+        var lineEnd = newline < 0 ? Text.Length : newline;
+        var alone = Text.AsSpan(lineStart, span.Start - lineStart).IsWhiteSpace()
+                    && Text.AsSpan(span.End, lineEnd - span.End).IsWhiteSpace();
+        var (start, end) = alone
+            ? (lineStart, newline < 0 ? Text.Length : newline + 1)
+            : (span.Start, span.End);
+        return (LineIndex.GetPosition(start), LineIndex.GetPosition(end));
+    }
+
     public static ParsedXmlDocument Parse(string text)
     {
         return new ParsedXmlDocument(text, XmlUtility.CreateHtmlDocument(text));

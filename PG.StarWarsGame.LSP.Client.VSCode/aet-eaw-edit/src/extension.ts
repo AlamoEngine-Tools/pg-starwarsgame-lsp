@@ -13,7 +13,6 @@ import {
     LanguageClientOptions,
     ServerOptions,
     StaticFeature,
-    Trace,
 } from "vscode-languageclient/node";
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
 import {
@@ -70,19 +69,22 @@ import {
 import { logLine, setLogChannel } from "./log";
 import { directoriesNeedingOwnWatcher } from "./dependencyWatchers";
 import { LspGateway } from "./lsp/lspGateway";
-import { RoutedLspGateway } from "./lsp/routedLspGateway";
+import { RouteChanges, RoutedLspGateway } from "./lsp/routedLspGateway";
 import { stopClient } from "./lsp/stopClient";
 import { discoverProjects } from "./projectDiscovery";
 import { isModFolder, projectOfferDue } from "./modLayout";
 import {
     type ClientSpec,
     type ClientState,
+    type LoadingPhase,
     clientSpecs,
     diagnosticCollectionNameFor,
     documentSelectorFor,
     isInside,
     ownerKey,
     ownsPath,
+    phaseText,
+    pickGag,
     planChanges,
     statusText,
 } from "./projectClientPlan";
@@ -130,8 +132,8 @@ import {
     StoryTreeItem,
 } from "./storyNavigatorViewProvider";
 import {
-    ACCEPT,
-    DECLINE,
+    acceptLabel,
+    declineLabel,
     declinedMessage,
     diffTitle,
     outcomeOf,
@@ -139,7 +141,10 @@ import {
     proposalMessage,
 } from "./pgprojMigrationPrompt";
 
-const CLIENT_ID = "aet.pg.swg.lsp";
+// vscode-languageclient reads `<id>.trace.server` itself: when it sends initialize and on every
+// change. Named so that is aet-eaw-edit.lsp.debug.trace.server, the handshake is traced at the level
+// the setting asks for rather than only what follows it.
+const CLIENT_ID = "aet-eaw-edit.lsp.debug";
 const CLIENT_NAME = "Alamo Engine Tools - Empire at War Edit";
 const REQUIRED_SERVER_VERSION = "0.4.1";
 
@@ -301,11 +306,11 @@ class EffectiveObjectContentProvider
 
         if (!outcome.ok) {
             return outcome.reason === "offline"
-                ? "<!-- EaWEdit: LSP server is not running. -->"
-                : `<!-- EaWEdit: Failed to resolve effective object '${objectId}' - ${outcome.message} -->`;
+                ? `<!-- ${l10n.t("EaWEdit: LSP server is not running.")} -->`
+                : `<!-- ${l10n.t("EaWEdit: Failed to resolve effective object '{0}' - {1}", objectId, outcome.message)} -->`;
         }
         if (!outcome.value.found) {
-            return `<!-- EaWEdit: No object named '${objectId}' was found in the workspace. -->`;
+            return `<!-- ${l10n.t("EaWEdit: No object named '{0}' was found in the workspace.", objectId)} -->`;
         }
         return effectiveObjectBanner(objectId) + outcome.value.xml;
     }
@@ -330,6 +335,10 @@ interface ProjectClient {
     /** Requests to this project's server; offline once it failed or stopped. */
     gateway: LspGateway;
     state: ClientState;
+    /** Which feed a "loading" project waits for; cleared with every other state. */
+    phase?: LoadingPhase;
+    /** The line the bar shows in place of the phase for a moment, when a phase drew one. */
+    gag?: string;
     /** This server's watchers over directories outside the workspace folders. */
     dependencyWatchers: vscode.Disposable[];
     /** Disposed with the client: a project's own trace channel, when it has one. */
@@ -338,6 +347,11 @@ interface ProjectClient {
 
 /** The running clients, in discovery order. */
 const clients = new Map<string, ProjectClient>();
+
+/** How long a gag stays on the bar before the phase's own text replaces it. */
+const GAG_SHOWN_MS = 1200;
+/** How often a phase that is still loading draws again. */
+const GAG_REDRAW_MS = 30000;
 
 /** The first project in discovery order. */
 function primaryClient(): ProjectClient | undefined {
@@ -410,13 +424,31 @@ function routedProject(): ProjectClient | undefined {
  * process. Built once at module scope because the panels and navigators are handed it at
  * construction and outlive any single client.
  */
+/**
+ * Fired whenever the set of running servers changes. Every routed gateway is built on it, so none
+ * can be left waiting for a route that is already back (#318).
+ */
+const routeChanges = new RouteChanges();
+
 const lsp = new RoutedLspGateway(
     () => routedProject()?.gateway,
     vscodeMessageSink,
+    routeChanges,
 );
 
 /** Gateways bound to one project each, by key. */
 const projectGateways = new Map<string, RoutedLspGateway>();
+
+/**
+ * The gateway of a panel opened while no project runs: it binds to the one project that starts,
+ * and with several it stays offline rather than follow the editor in front - a panel that did
+ * showed one project's data through another's server, the shape #276 closed.
+ */
+const pendingProjectGateway = new RoutedLspGateway(
+    () => (clients.size === 1 ? primaryClient()?.gateway : undefined),
+    vscodeMessageSink,
+    routeChanges,
+);
 
 /**
  * The key a request or a panel is for: the key given, or - for "", which the navigators use for
@@ -447,6 +479,7 @@ function gatewayFor(key: string | undefined): LspGateway {
         gateway = new RoutedLspGateway(
             () => clients.get(key)?.gateway,
             vscodeMessageSink,
+            routeChanges,
         );
         projectGateways.set(key, gateway);
     }
@@ -462,7 +495,7 @@ function panelProject(key: string | undefined): PanelProject {
     return {
         key: resolved,
         name: clients.get(resolved)?.spec.name ?? "",
-        gateway: gatewayFor(resolved),
+        gateway: resolved ? gatewayFor(resolved) : pendingProjectGateway,
     };
 }
 
@@ -557,6 +590,9 @@ let statusItem: vscode.StatusBarItem | undefined;
 /**
  * The globs the server reacts to on disk. Kept in one place because two watcher sets are built
  * from it: the workspace-folder ones VS Code resolves itself, and the per-directory ones below.
+ * It mirrors the server's `WatchedGlobs`: the document kinds, then every extension the asset
+ * catalog records, so a texture or a model dropped into the workspace re-globs the catalog instead
+ * of waiting for a reload.
  */
 const WATCHED_GLOBS = [
     "**/*.xml",
@@ -565,6 +601,14 @@ const WATCHED_GLOBS = [
     "**/*.csv",
     "**/*.properties",
     "**/*.dat",
+    "**/*.tga",
+    "**/*.dds",
+    "**/*.alo",
+    "**/*.ala",
+    "**/*.wav",
+    "**/*.mp3",
+    "**/*.ted",
+    "**/*.lc",
 ];
 
 /**
@@ -660,24 +704,50 @@ let log: vscode.OutputChannel | undefined;
 /**
  * vscode-languageclient v10 types `traceOutputChannel` as `LogOutputChannel` and writes protocol
  * trace via its `trace()` method - which a real `LogOutputChannel` hides unless its (user-controlled)
- * log level is set to Trace, and which prefixes every line with a level/timestamp. That breaks the
- * LSP trace view, where the `traceServer` setting (via `setTrace`) is meant to control visibility and
- * the JSON should appear verbatim. Adapt a plain `OutputChannel` to the `LogOutputChannel` shape so
- * every level writes through unchanged.
+ * log level is set to Trace, and which prefixes every line with a level/timestamp. Adapt a plain
+ * `OutputChannel` to the `LogOutputChannel` shape so every level writes through unchanged, the JSON
+ * verbatim.
+ *
+ * The library traces nothing below log level Trace, and reads the verbosity from the trace.server
+ * setting above it - lifting `off` to `messages`. So the level stands for the setting's on/off: Off
+ * when it is off, Trace otherwise, and the library is told when that changes.
  */
 function createTraceChannel(name: string): vscode.LogOutputChannel {
     const channel = vscode.window.createOutputChannel(name);
     const logLevelEmitter = new vscode.EventEmitter<vscode.LogLevel>();
+    const level = () =>
+        cfg("lsp.debug").get<string>("trace.server", "off") === "off"
+            ? vscode.LogLevel.Off
+            : vscode.LogLevel.Trace;
+    let current = level();
+    const watch = vscode.workspace.onDidChangeConfiguration((e) => {
+        if (!e.affectsConfiguration("aet-eaw-edit.lsp.debug.trace.server")) {
+            return;
+        }
+        const next = level();
+        if (next !== current) {
+            current = next;
+            logLevelEmitter.fire(next);
+        }
+    });
     const write = (message: string, ..._args: unknown[]): void =>
         channel.appendLine(message);
+    const dispose = channel.dispose.bind(channel);
     return Object.assign(channel, {
-        logLevel: vscode.LogLevel.Trace,
+        get logLevel() {
+            return current;
+        },
         onDidChangeLogLevel: logLevelEmitter.event,
         trace: write,
         debug: write,
         info: write,
         warn: write,
         error: write,
+        dispose: () => {
+            watch.dispose();
+            logLevelEmitter.dispose();
+            dispose();
+        },
     }) as unknown as vscode.LogOutputChannel;
 }
 
@@ -954,20 +1024,9 @@ function startProjectClient(
 
     updateStatus();
 
-    const traceLevel = cfg("lsp.debug").get<string>("traceServer", "off");
-    const traceMap: Record<string, Trace> = {
-        off: Trace.Off,
-        messages: Trace.Messages,
-        verbose: Trace.Verbose,
-    };
-    const resolvedTrace = traceMap[traceLevel] ?? Trace.Off;
-
     lspClient
         .start()
         .then(async () => {
-            // setTrace must be called after start() resolves: before that, activeConnection()
-            // returns undefined and the trace level is stored but never applied to the transport.
-            await lspClient.setTrace(resolvedTrace);
             logLine(`${label}LSP server started and initialized.`);
 
             // The handshake is done and the server is answering; what remains is the workspace scan,
@@ -1010,22 +1069,6 @@ function startProjectClient(
                           ),
                 );
             }
-
-            // vscode-languageclient's hookConfigurationChanged reads aet.pg.swg.lsp.trace.server
-            // (the CLIENT_ID namespace), which is not in settings, so it resets trace to Off on
-            // every VS Code config change. Register our own listener - after hookConfigurationChanged's
-            // listener, so it fires last and wins - to re-apply the user's actual setting.
-            context.subscriptions.push(
-                vscode.workspace.onDidChangeConfiguration(() => {
-                    const level = cfg("lsp.debug").get<string>(
-                        "traceServer",
-                        "off",
-                    );
-                    if (project.client === lspClient) {
-                        void lspClient.setTrace(traceMap[level] ?? Trace.Off);
-                    }
-                }),
-            );
         })
         .catch((e: unknown) => {
             // Stopped on purpose while starting - the project went, or the window restarts it.
@@ -1078,8 +1121,8 @@ function startProjectClient(
             const answer = await vscode.window.showInformationMessage(
                 proposalMessage(proposal),
                 { modal: true },
-                ACCEPT,
-                DECLINE,
+                acceptLabel(),
+                declineLabel(),
             );
             const outcome = outcomeOf(answer);
             if (proposedUri) {
@@ -1109,19 +1152,68 @@ function startProjectClient(
         },
     );
 
-    lspClient.onNotification("$/workspaceScanComplete", () => {
+    lspClient.onNotification("$/workspaceScanComplete", async () => {
         logLine(`${label}Workspace scan complete.`);
-        project.state = "ready";
-        updateStatus();
         // Only now does the server know which projects the workspace resolved to, so this is the
         // first moment the dependency directories can be asked for. The notification fires on
         // startup only, which is why a .pgproj change rebuilds them separately.
         void refreshDependencyWatchers(project);
-        // Both navigators fetch now rather than when they are first opened. A tree view only asks
-        // for its children on reveal, so without this the first click on either paid for a round
-        // trip - and until the scan finished they had nothing to show but a "loading" line.
-        void storyNavigatorProvider?.preload(viewKey(project));
-        void localisationNavigatorProvider?.preload(viewKey(project));
+        // The index is open, but the views draw from feeds the server builds on request: the
+        // campaigns, the translations, the Mod Browser's lists. The bar used to show its check
+        // mark here while all three still said they were loading - two minutes apart on a large
+        // mod. The project is "loading" until each has answered once, in this order, and the bar
+        // names the one it waits for. A tree view only asks for its children on reveal, so this is
+        // also what spares the first click on a navigator its round trip.
+        const phases: [LoadingPhase, () => Promise<void> | undefined][] = [
+            [
+                "campaigns",
+                () => storyNavigatorProvider?.preload(viewKey(project)),
+            ],
+            [
+                "translations",
+                () => localisationNavigatorProvider?.preload(viewKey(project)),
+            ],
+            ["assets", () => modBrowserProvider?.preload(viewKey(project))],
+        ];
+        for (const [phase, load] of phases) {
+            project.state = "loading";
+            project.phase = phase;
+            // Now and then the phase shows a line from elsewhere in the galaxy, for a moment: one
+            // draw as it starts, another every half minute it lasts.
+            const draw = (): void => {
+                const gag = pickGag(Math.random);
+                if (gag === undefined || project.state !== "loading") {
+                    return;
+                }
+                project.gag = gag;
+                updateStatus();
+                setTimeout(() => {
+                    if (project.gag === gag) {
+                        project.gag = undefined;
+                        updateStatus();
+                    }
+                }, GAG_SHOWN_MS);
+            };
+            project.gag = undefined;
+            draw();
+            updateStatus();
+            const redraw = setInterval(draw, GAG_REDRAW_MS);
+            try {
+                await load();
+            } catch (e) {
+                logLine(`${label}Loading ${phase} failed: ${e}`);
+            } finally {
+                clearInterval(redraw);
+            }
+        }
+        // A reload or a stop that happened meanwhile owns the state now.
+        if (project.state !== "loading") {
+            return;
+        }
+        project.phase = undefined;
+        project.gag = undefined;
+        project.state = "ready";
+        updateStatus();
         // An encyclopedia card opened during the scan was answered from the baseline alone and kept
         // that answer: measured on EaWX, the popup width came back as vanilla's 262 before the scan
         // and the mod's own 340 after it. Nothing re-asked, so the card stayed vanilla all session.
@@ -1174,6 +1266,14 @@ function startProjectClient(
         ModelPreviewPanel.refreshAll(project.spec.key);
     });
 
+    lspClient.onNotification("aet/modBrowserChanged", () => {
+        // The index moved - an edit, a reload, a texture dropped into the workspace - so every
+        // open browser of this project re-reads its counts, its rail and its table. Until this
+        // notification existed the browser refreshed on the scan-complete signal alone, and a new
+        // asset stayed out of it until a sort or a node switch happened to ask again.
+        ModBrowserPanel.refresh(project.spec.key);
+    });
+
     return project;
 }
 
@@ -1209,7 +1309,7 @@ async function stopProjectClient(project: ProjectClient): Promise<void> {
 async function stopAllClients(): Promise<void> {
     const running = [...clients.values()];
     clients.clear();
-    lsp.routesChanged();
+    routeChanges.fire();
     WebviewPanelHost.setProjectCount(clients.size);
     await Promise.all(running.map((project) => stopProjectClient(project)));
 }
@@ -1228,20 +1328,28 @@ function updateStatus(): void {
     }
 
     statusItem.text = statusText(
-        running.map((p) => ({ name: p.spec.name, state: p.state })),
+        running.map((p) => ({
+            name: p.spec.name,
+            state: p.state,
+            phase: p.phase,
+            gag: p.gag,
+        })),
     );
     if (running.length === 1) {
         const state = running[0].state;
-        if (state === "indexing") {
+        if (state === "indexing" || state === "loading") {
             statusItem.tooltip = vscode.l10n.t(
-                "The server is connected. Language features become complete when the scan finishes.",
+                "The server is connected. Language features and the views become complete when loading finishes.",
             );
         } else if (state === "ready") {
             statusItem.tooltip = undefined;
         }
     } else {
         statusItem.tooltip = running
-            .map((p) => `${p.spec.name} - ${p.state}`)
+            .map(
+                (p) =>
+                    `${p.spec.name} - ${phaseText({ state: p.state, phase: p.phase }) ?? p.state}`,
+            )
             .join("\n");
     }
     statusItem.show();
@@ -1320,7 +1428,7 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
     for (const [key, project] of ordered) {
         clients.set(key, project);
     }
-    lsp.routesChanged();
+    routeChanges.fire();
     WebviewPanelHost.setProjectCount(clients.size);
     storyNavigatorProvider?.projectsChanged();
     localisationNavigatorProvider?.projectsChanged();
@@ -1666,7 +1774,8 @@ async function openDiagnosticReport(
     chosen?: { extended: boolean },
 ): Promise<void> {
     const tier =
-        chosen ?? (await pickReportTier(`Open report for ${report.id}`));
+        chosen ??
+        (await pickReportTier(vscode.l10n.t("Open report for {0}", report.id)));
     if (!tier) {
         return;
     }
@@ -1698,7 +1807,7 @@ async function pickModel(gateway: LspGateway): Promise<string | null> {
     const result = await gateway.requestOrReport<ListModelsResult>(
         "aet/listModels",
         {},
-        "Could not list models",
+        vscode.l10n.t("Could not list models"),
     );
     if (!result) {
         return null;
@@ -1706,7 +1815,9 @@ async function pickModel(gateway: LspGateway): Promise<string | null> {
 
     const pick = vscode.window.createQuickPick<ModelPickItem>();
     pick.title = vscode.l10n.t("Preview Model");
-    pick.placeholder = "Model file name, e.g. EV_StarDestroyer.ALO";
+    pick.placeholder = vscode.l10n.t(
+        "Model file name, e.g. EV_StarDestroyer.ALO",
+    );
     pick.matchOnDescription = true;
     pick.items = modelPickItems(result.models);
 
@@ -1873,7 +1984,7 @@ export async function activate(
                         await lsp.requestOrReport<GetLocalisationProjectsResult>(
                             "aet/getLocalisationProjects",
                             {},
-                            "could not list localisation files",
+                            vscode.l10n.t("Could not list localisation files"),
                         );
                     if (!result) {
                         return;
@@ -2009,7 +2120,7 @@ export async function activate(
                         await lsp.requestOrReport<GetLocalisationProjectsResult>(
                             "aet/getLocalisationProjects",
                             {},
-                            "could not list localisation files",
+                            vscode.l10n.t("Could not list localisation files"),
                         );
                     if (!result) {
                         return;
@@ -2087,7 +2198,11 @@ export async function activate(
                     await lsp.requestOrReport<ConvertLocalisationFormatResult>(
                         "aet/convertLocalisationFormat",
                         { projectFilePath: filePath, targetFormat },
-                        `could not convert ${path.basename(filePath)} to ${targetFormat}`,
+                        vscode.l10n.t(
+                            "Could not convert {0} to {1}",
+                            path.basename(filePath),
+                            targetFormat,
+                        ),
                     );
                 if (!result) {
                     return;
@@ -2105,24 +2220,41 @@ export async function activate(
                 const orphans =
                     result.projectFormatChanged &&
                     result.otherFilesInOldFormat > 0
-                        ? ` ${result.otherFilesInOldFormat} other file(s) are still in the previous format` +
-                          " and are no longer loaded."
-                        : "";
+                        ? result.otherFilesInOldFormat
+                        : 0;
                 // A single-language target (NLS) writes one file per language rather than dropping
                 // all but one, so the message has to be able to report more than a single path.
                 const written =
                     result.writtenPaths ??
                     (result.writtenPath ? [result.writtenPath] : []);
-                const wrote =
+                // Whole sentences, one per case: clauses glued into one give a translator nothing to work with.
+                const names = written.map((p) => path.basename(p)).join(", ");
+                const message =
                     written.length > 1
-                        ? `wrote ${written.length} files, one per language: ${written.map((p) => path.basename(p)).join(", ")}`
-                        : `wrote ${written[0]}`;
+                        ? orphans > 0
+                            ? vscode.l10n.t(
+                                  "EaWEdit: Wrote {0} files, one per language: {1}. The original file was kept. {2} other file(s) are still in the previous format and are no longer loaded.",
+                                  written.length,
+                                  names,
+                                  orphans,
+                              )
+                            : vscode.l10n.t(
+                                  "EaWEdit: Wrote {0} files, one per language: {1}. The original file was kept.",
+                                  written.length,
+                                  names,
+                              )
+                        : orphans > 0
+                          ? vscode.l10n.t(
+                                "EaWEdit: Wrote {0}. The original file was kept. {1} other file(s) are still in the previous format and are no longer loaded.",
+                                written[0],
+                                orphans,
+                            )
+                          : vscode.l10n.t(
+                                "EaWEdit: Wrote {0}. The original file was kept.",
+                                written[0],
+                            );
                 const choice = await vscode.window.showInformationMessage(
-                    vscode.l10n.t(
-                        "EaWEdit: {0}. The original file was kept.{1}",
-                        wrote,
-                        orphans,
-                    ),
+                    message,
                     vscode.l10n.t("Open"),
                 );
                 localisationNavigatorProvider?.refresh();
@@ -2178,7 +2310,10 @@ export async function activate(
                     await lsp.requestOrReport<SetLocalisationProjectFormatResult>(
                         "aet/setLocalisationProjectFormat",
                         { format: picked.format },
-                        `could not set the localisation format to ${picked.format}`,
+                        vscode.l10n.t(
+                            "Could not set the localisation format to {0}",
+                            picked.format,
+                        ),
                     );
                 if (!result) {
                     return;
@@ -2224,7 +2359,7 @@ export async function activate(
                     await lsp.requestOrReport<ExportLocalisationToDatResult>(
                         "aet/exportLocalisationToDat",
                         { projectFilePath: filePath },
-                        "DAT export failed",
+                        vscode.l10n.t("DAT export failed"),
                     );
                 if (!result) {
                     return;
@@ -2266,7 +2401,7 @@ export async function activate(
 
     modBrowserProvider = new ProjectGroupedTree<ModBrowserOutlineItem>(
         navigatorProjects,
-        () => new ModBrowserViewProvider(),
+        (key) => new ModBrowserViewProvider(gatewayFor(key)),
     );
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider(
@@ -2352,7 +2487,7 @@ export async function activate(
                         await lsp.requestOrReport<GetStoryPlotsResult>(
                             "aet/getStoryPlots",
                             {},
-                            "cannot load story campaigns",
+                            vscode.l10n.t("Cannot load story campaigns"),
                         );
                     if (!result) {
                         return;
@@ -2567,7 +2702,7 @@ export async function activate(
                         gatewayFor(key).executeCommand(
                             "aet-eaw-edit.lsp.revalidateWorkspace",
                             [],
-                            "could not revalidate the workspace",
+                            l10n.t("could not revalidate the workspace"),
                         ),
                     ),
                 );
@@ -2620,10 +2755,21 @@ export async function activate(
                 if (projectKey === null) {
                     return;
                 }
+                // The reload indexes the project again; the status says so until the server's
+                // $/workspaceScanComplete, which ends a reload as it ends startup.
+                const project = clients.get(projectKey);
+                if (
+                    project?.state === "ready" ||
+                    project?.state === "loading"
+                ) {
+                    project.state = "indexing";
+                    project.phase = undefined;
+                    updateStatus();
+                }
                 await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.reloadProject",
                     [],
-                    "could not reload the project",
+                    l10n.t("could not reload the project"),
                 );
             },
         ),
@@ -2644,7 +2790,7 @@ export async function activate(
                 await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.suppressDiagnosticGlobally",
                     args,
-                    "could not suppress the diagnostic",
+                    l10n.t("could not suppress the diagnostic"),
                 );
             },
         ),
@@ -2671,7 +2817,7 @@ export async function activate(
                 await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.revalidateDocument",
                     [target],
-                    "could not revalidate the document",
+                    l10n.t("could not revalidate the document"),
                 );
             },
         ),
@@ -2757,7 +2903,10 @@ export async function activate(
                 await lsp.executeCommand(
                     "aet-eaw-edit.lsp.createLocalisationKey",
                     [keyName, picked.filePath, { ENGLISH: english }],
-                    `could not create the localisation key '${keyName}'`,
+                    l10n.t(
+                        "could not create the localisation key '{0}'",
+                        keyName,
+                    ),
                 );
             },
         ),
@@ -2808,7 +2957,7 @@ export async function activate(
                     await lsp.executeCommand(
                         "aet-eaw-edit.lsp.initLocalisationProject",
                         [{}],
-                        "could not initialise the localisation project",
+                        l10n.t("could not initialise the localisation project"),
                     );
                     return;
                 }
@@ -2869,7 +3018,9 @@ export async function activate(
                         "Where the localisation project files will live",
                     ),
                     validateInput: (v) =>
-                        v?.trim() ? null : "A directory is required",
+                        v?.trim()
+                            ? null
+                            : vscode.l10n.t("A directory is required"),
                 });
                 if (!directory) {
                     return;
@@ -2878,7 +3029,7 @@ export async function activate(
                 await lsp.executeCommand(
                     "aet-eaw-edit.lsp.initLocalisationProject",
                     [{ format: formatItem.label, directory: directory.trim() }],
-                    "could not initialise the localisation project",
+                    l10n.t("could not initialise the localisation project"),
                 );
             },
         ),
@@ -2953,9 +3104,10 @@ export async function activate(
                         canSelectFiles: true,
                         canSelectMany: false,
                         defaultUri,
-                        filters: { "DAT files": ["dat"] },
-                        openLabel:
+                        filters: { [vscode.l10n.t("DAT files")]: ["dat"] },
+                        openLabel: vscode.l10n.t(
                             "Select a MasterTextFile_<LANGUAGE>.dat file",
+                        ),
                         title: vscode.l10n.t(
                             "Select one DAT file - its siblings in the same folder are imported too",
                         ),
@@ -2973,7 +3125,9 @@ export async function activate(
                         canSelectFiles: false,
                         canSelectMany: false,
                         defaultUri,
-                        openLabel: "Select folder with existing files",
+                        openLabel: vscode.l10n.t(
+                            "Select folder with existing files",
+                        ),
                         title: vscode.l10n.t(
                             "Folder containing the {0} files",
                             sourceFormatItem.label,
@@ -3042,7 +3196,9 @@ export async function activate(
                             targetFormatItem.label,
                         ),
                         validateInput: (v) =>
-                            v?.trim() ? null : "A directory is required",
+                            v?.trim()
+                                ? null
+                                : vscode.l10n.t("A directory is required"),
                     });
                     if (!targetDirectory) {
                         return;
@@ -3061,7 +3217,7 @@ export async function activate(
                                 : {}),
                         },
                     ],
-                    "could not import the localisation files",
+                    l10n.t("could not import the localisation files"),
                 );
                 // No message here: executeCommand returns nothing to check, so anything said at this
                 // point is a guess. The server reports the outcome - what it wrote, or why it did not.
@@ -3131,7 +3287,9 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.copyBugReportInfo",
             async () => {
-                const tier = await pickReportTier("Copy Bug Report Info");
+                const tier = await pickReportTier(
+                    vscode.l10n.t("Copy Bug Report Info"),
+                );
                 if (!tier) {
                     return;
                 }
@@ -3225,7 +3383,9 @@ export async function activate(
                             "Name of the GameObject to assemble, e.g. Generic_Star_Destroyer",
                         ),
                         validateInput: (v) =>
-                            v?.trim() ? null : "Object name is required",
+                            v?.trim()
+                                ? null
+                                : vscode.l10n.t("Object name is required"),
                     });
                 }
                 if (!objectId?.trim()) {
@@ -3264,7 +3424,9 @@ export async function activate(
                             "Name of the GameObject whose popup to preview",
                         ),
                         validateInput: (v) =>
-                            v?.trim() ? null : "Object name is required",
+                            v?.trim()
+                                ? null
+                                : vscode.l10n.t("Object name is required"),
                     });
                 }
                 if (!objectId?.trim()) {
@@ -3286,7 +3448,9 @@ export async function activate(
                                 multiplayer,
                                 ...encyclopediaScreenParams(),
                             },
-                            "load the encyclopedia entry",
+                            vscode.l10n.t(
+                                "Could not load the encyclopedia entry",
+                            ),
                         );
                     if (entry === undefined) {
                         return;
@@ -3346,7 +3510,9 @@ export async function activate(
                             "Name of the variant GameObject to resolve",
                         ),
                         validateInput: (v) =>
-                            v?.trim() ? null : "Object name is required",
+                            v?.trim()
+                                ? null
+                                : vscode.l10n.t("Object name is required"),
                     });
                 }
                 if (!objectId?.trim()) {

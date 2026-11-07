@@ -10,6 +10,8 @@
 // Everything here is the CLAMP, not the arc. They are different envelopes and that is the whole
 // point of the feature - see `turretEnvelopes` at the bottom.
 
+import * as l10n from "@vscode/l10n";
+
 import type { PreviewTurret } from "../../protocol/modelPreview";
 
 import { type TurretSweep, turretSweeps } from "./deathClone";
@@ -203,7 +205,7 @@ export function dragToAim(
  * numbers on each, and "free" is itself an answer.
  */
 export function aimText(handle: TurretHandle, aim: TurretAim): string {
-    return `${axisText("Yaw", handle.yaw, aim.yaw)}, ${axisText("Pitch", handle.pitch, aim.pitch)}`;
+    return `${axisText(l10n.t("Yaw"), handle.yaw, aim.yaw)}, ${axisText(l10n.t("Pitch"), handle.pitch, aim.pitch)}`;
 }
 
 function axisText(
@@ -211,13 +213,13 @@ function axisText(
     range: TurretAxisRange,
     degrees: number,
 ): string {
-    const value = `${label} ${round(degrees)} deg`;
+    const value = l10n.t("{0} {1} deg", label, round(degrees));
 
     if (range.free) {
-        return `${value} (free)`;
+        return l10n.t("{0} (free)", value);
     }
 
-    return atStop(range, degrees) ? `${value} (at stop)` : value;
+    return atStop(range, degrees) ? l10n.t("{0} (at stop)", value) : value;
 }
 
 /**

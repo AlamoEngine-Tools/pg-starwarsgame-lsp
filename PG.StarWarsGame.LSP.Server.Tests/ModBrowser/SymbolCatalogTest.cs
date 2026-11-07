@@ -67,12 +67,12 @@ public sealed class SymbolCatalogTest
                 .Add(Core, new DocumentIndex(Core, 1, [.. core], [], LayerRank: 0, LayerName: "Core"))
                 .Add(Mod, new DocumentIndex(Mod, 1, [.. mod], [], LayerRank: 1, LayerName: "Mod")),
             WorkspaceDefinitions = definitions,
-            AssetFiles = MergedAssetFileIndex.Merge(
+            AssetFiles = MergedAssetFileIndex.MergeLayered(
                 [
                     "data/art/models/ev_stardestroyer.alo", "data/art/models/p_smoke.alo",
                     "data/art/models/ev_stardestroyer_die.ala"
                 ],
-                ["data/art/models/core_frigate.alo"]),
+                [("data/art/models/core_frigate.alo", 0)]),
             ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_smoke.alo")
         };
     }
@@ -247,7 +247,8 @@ public sealed class SymbolCatalogTest
         Assert.Equal(1, outline["animations"]);
         Assert.Equal(["core_frigate.alo", "ev_stardestroyer.alo"], Page("models").Rows.Select(r => r.Name));
         Assert.Equal("game", Page("models").Rows.Single(r => r.Name == "ev_stardestroyer.alo").Origin);
-        Assert.Equal("project", Page("models").Rows.Single(r => r.Name == "core_frigate.alo").Origin);
+        // Named by the project that ships it, as an object or a script is.
+        Assert.Equal("layer:0", Page("models").Rows.Single(r => r.Name == "core_frigate.alo").Origin);
     }
 
     [Fact]

@@ -12,6 +12,8 @@
 // Kept free of `vscode` so it can be unit-tested: the UI it needs is one two-method sink, and the
 // extension host supplies the real one.
 
+import * as l10n from "@vscode/l10n";
+
 /** The two ways a call can come back with nothing. */
 export type LspFailure =
     /** The server is not running - nothing was sent. */
@@ -47,7 +49,17 @@ export interface LspRequestSender {
     sendRequest<T>(method: string, params: unknown): Promise<T>;
 }
 
-export const SERVER_NOT_RUNNING = "EaWEdit LSP: Server is not running.";
+/** What a request says while no server runs. Read per call, so it follows the catalogue. */
+export function serverNotRunning(): string {
+    return l10n.t("EaWEdit LSP: Server is not running.");
+}
+
+/** A failed request or command as the reader is told it, with what it was doing when there is a context. */
+function failureText(context: string | undefined, message: string): string {
+    return context
+        ? l10n.t("EaWEdit: {0}: {1}", context, message)
+        : l10n.t("EaWEdit: {0}", message);
+}
 
 /**
  * The LSP method behind `ExecuteCommandRequest.type`.
@@ -139,7 +151,7 @@ export class LspGateway {
         if (this.isRunning) {
             return true;
         }
-        this._sink?.warn(SERVER_NOT_RUNNING);
+        this._sink?.warn(serverNotRunning());
         return false;
     }
 
@@ -157,7 +169,7 @@ export class LspGateway {
             return {
                 ok: false,
                 reason: "offline",
-                message: SERVER_NOT_RUNNING,
+                message: serverNotRunning(),
             };
         }
 
@@ -188,13 +200,9 @@ export class LspGateway {
         }
 
         if (outcome.reason === "offline") {
-            this._sink?.warn(SERVER_NOT_RUNNING);
+            this._sink?.warn(serverNotRunning());
         } else {
-            this._sink?.error(
-                context
-                    ? `EaWEdit: ${context}: ${outcome.message}`
-                    : `EaWEdit: ${outcome.message}`,
-            );
+            this._sink?.error(failureText(context, outcome.message));
         }
         return undefined;
     }
@@ -251,13 +259,9 @@ export class LspGateway {
         }
 
         if (outcome.reason === "offline") {
-            this._sink?.warn(SERVER_NOT_RUNNING);
+            this._sink?.warn(serverNotRunning());
         } else {
-            this._sink?.error(
-                context
-                    ? `EaWEdit: ${context}: ${outcome.message}`
-                    : `EaWEdit: ${outcome.message}`,
-            );
+            this._sink?.error(failureText(context, outcome.message));
         }
         return false;
     }

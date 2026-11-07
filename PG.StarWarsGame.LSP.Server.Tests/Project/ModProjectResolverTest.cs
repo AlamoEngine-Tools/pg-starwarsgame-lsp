@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Project;
@@ -72,7 +73,7 @@ public sealed class ModProjectResolverTest
             new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var resolver = new ModProjectResolver(fileHelper, loader,
             new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
-            NullLogger<ModProjectResolver>.Instance);
+            NullLogger<ModProjectResolver>.Instance, ResxMessageCatalog.Server("en"));
 
         var config = resolver.Resolve(path, loader.Load(path));
 
@@ -101,7 +102,7 @@ public sealed class ModProjectResolverTest
             new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var resolver = new ModProjectResolver(fileHelper, loader,
             new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
-            NullLogger<ModProjectResolver>.Instance);
+            NullLogger<ModProjectResolver>.Instance, ResxMessageCatalog.Server("en"));
 
         var config = resolver.Resolve(path, loader.Load(path));
 
@@ -413,6 +414,103 @@ public sealed class ModProjectResolverTest
         Assert.Equal("XML", config.Layers[1].TextResourceType);
     }
 
+    // ── the target game ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void Resolve_CarriesTheRootProjectsGame()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new("""{ "name": "Root", "game": "eaw" }""")
+        });
+        var (resolver, root) = Build(fs);
+
+        Assert.Equal(TargetGame.EAW, resolver.Resolve(RootPath, root).Game);
+    }
+
+    // The base game cannot load the expansion's data, so an EaW mod built on a FoC project
+    // describes a game that does not exist. Both projects are named the same way - by file, as
+    // every 'Could not load mod project' message names one.
+    [Fact]
+    public void Resolve_EawProjectReferencingAFocProject_RefusesNamingTheDependency()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new("""
+                             { "name": "Root", "game": "eaw",
+                               "projectReferences": [ { "path": "../dep/dep.pgproj" } ] }
+                             """),
+            [DepPath] = new("""{ "name": "Expansion Library", "game": "foc" }""")
+        });
+        var (resolver, root) = Build(fs);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => resolver.Resolve(RootPath, root));
+
+        Assert.Contains("'root.pgproj': It targets Empire at War and references 'dep.pgproj',", ex.Message,
+            StringComparison.Ordinal);
+        Assert.Equal(ProjectProblem.Invalid, ex.Problem);
+    }
+
+    // The expansion reads the base game's data, so a FoC mod may build on an EaW project.
+    [Fact]
+    public void Resolve_FocProjectReferencingAnEawProject_Resolves()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new("""
+                             { "name": "Root", "game": "foc",
+                               "projectReferences": [ { "path": "../dep/dep.pgproj" } ] }
+                             """),
+            [DepPath] = new("""{ "name": "Base Library", "game": "eaw" }""")
+        });
+        var (resolver, root) = Build(fs);
+
+        var config = resolver.Resolve(RootPath, root);
+
+        Assert.Equal(TargetGame.FOC, config.Game);
+        Assert.Equal(2, config.Layers.Count);
+    }
+
+    // A project offers to update its own file and says nothing of what it builds on. A dependency is
+    // read in the current shape all the same; offering its file from every project over it asked
+    // about one file several times, and a second yes copied the updated file over the backup.
+    [Fact]
+    public void Resolve_ADependencyInAnOlderFormat_IsReadButNotOffered()
+    {
+        var root = Path.Combine(DriveRoot, "Mods", "Leaf", "Leaf.pgproj");
+        var dependency = Path.Combine(DriveRoot, "Mods", "Core", "Core.pgproj");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [root] = new("""
+                         { "_typeVersion": "aetswg-1.0.0", "name": "Leaf",
+                           "projectReferences": [{ "path": "../Core/Core.pgproj" }] }
+                         """),
+            [dependency] = new("""{ "_typeVersion": "aetswg-1.0.0", "name": "Core" }""")
+        });
+        var fileHelper = new FileHelper(fs);
+        var sink = new RecordingSink();
+        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance,
+            sink, PgprojMigrations.All, ResxMessageCatalog.Server("en"));
+        var resolver = new ModProjectResolver(fileHelper, loader,
+            new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
+            NullLogger<ModProjectResolver>.Instance, ResxMessageCatalog.Server("en"));
+
+        var config = resolver.Resolve(root, loader.Load(root));
+
+        Assert.Equal(2, config.Layers.Count);
+        Assert.Equal([root], sink.Paths);
+    }
+
+    private sealed class RecordingSink : IPgprojMigrationSink
+    {
+        public List<string> Paths { get; } = [];
+
+        public void Migrated(string pgprojPath, JsonNode migrated, IReadOnlyList<string> notices)
+        {
+            Paths.Add(pgprojPath);
+        }
+    }
+
     private static (ModProjectResolver Resolver, ModProjectFile Root) Build(MockFileSystem fs)
     {
         var fileHelper = new FileHelper(fs);
@@ -420,7 +518,7 @@ public sealed class ModProjectResolverTest
             new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"));
         var graph = new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance);
         var resolver = new ModProjectResolver(
-            fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance);
+            fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance, ResxMessageCatalog.Server("en"));
         var root = loader.Load(RootPath);
         return (resolver, root);
     }

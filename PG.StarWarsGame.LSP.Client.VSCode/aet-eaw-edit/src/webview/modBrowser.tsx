@@ -44,16 +44,24 @@ import {
 import { pickShipName } from "../shipNamePick";
 import { EncyclopediaCard } from "./encyclopediaCard";
 import { factionModes, factionSlotOf } from "./encyclopediaModes";
-import { ColumnFilter, DataColumn, DataTable } from "./shared/DataTable";
+import {
+    ColumnFilter,
+    DataColumn,
+    DataTable,
+    SelectedVia,
+} from "./shared/DataTable";
 import { menuAction, RowMenuFrame } from "./shared/RowMenu";
 import { TabStrip } from "./shared/TabStrip";
 import {
     ActionChoice,
     actionChoices,
+    filterActive,
     KindChoice,
     kindChoices,
     listColumns,
     menuChoices,
+    NO_FILTER,
+    opensOutline,
     originChoices,
     originLabel,
     pageIcon,
@@ -63,6 +71,7 @@ import {
     relationLabel,
     rowInertReason,
     rowTypeLabel,
+    SearchFilter,
 } from "./modBrowserModel";
 import { ACTION_ICONS, PreviewPage } from "./modBrowserPreview";
 import {
@@ -297,13 +306,7 @@ interface Menu {
 
 // ── state ──────────────────────────────────────────────────────────────────
 
-interface Filter {
-    query: string;
-    kinds: string[];
-    origins: string[];
-}
-
-const NO_FILTER: Filter = { query: "", kinds: [], origins: [] };
+type Filter = SearchFilter;
 
 /**
  * The ship name drawn for each object, kept for the panel's life - the encyclopedia panel's rule:
@@ -313,6 +316,8 @@ const shipNames = new Map<string, string | null>();
 
 function App(): React.JSX.Element {
     const [outline, setOutline] = useState<SymbolOutline | null>(null);
+    /** The outline shown, for the message handler, which outlives every render. */
+    const shownOutline = useRef<SymbolOutline | null>(null);
     const [summary, setSummary] = useState<GetSymbolOutlineResult | null>(null);
     /** What is selected - in the rail and, when it is one of its rows, in the table. */
     const [current, setCurrent] = useState<RailNode | null>(null);
@@ -373,7 +378,12 @@ function App(): React.JSX.Element {
                 type?: string;
                 outline?: SymbolOutline;
             };
-            if (msg.type === "outline" && msg.outline) {
+            if (
+                msg.type === "outline" &&
+                msg.outline &&
+                opensOutline(shownOutline.current, msg.outline)
+            ) {
+                shownOutline.current = msg.outline;
                 setOutline(msg.outline);
                 setCurrent(null);
                 setTableList(null);
@@ -803,6 +813,12 @@ function App(): React.JSX.Element {
         );
     }
 
+    /** The list's search back to nothing - from the form's reset or the table's foot. */
+    const resetFilter = (): void => {
+        setDraft(NO_FILTER);
+        setFilters((known) => ({ ...known, [list.key]: NO_FILTER }));
+    };
+
     // The rail, as VS Code's tree: its visible rows in order, one of them focused, keys moving the
     // focus and the selection with it.
     const railRows: RailRow[] = [];
@@ -1101,7 +1117,16 @@ function App(): React.JSX.Element {
                         selectedId={selectedRow}
                         nodeOf={(row) => nodes[entryOf(list, row).key]}
                         onHover={(row) => void fetchNode(entryOf(list, row))}
-                        onSelect={(row) => select(entryOf(list, row))}
+                        onSelect={(row, via) => {
+                            const entry = entryOf(list, row);
+                            select(entry);
+                            // A click is a choice of that entry, so its relations open beneath it in
+                            // the rail; the keys only pass over rows, and opening every one they pass
+                            // would unfold the whole list.
+                            if (via === "click") {
+                                expand(entry, true);
+                            }
+                        }}
                         onAct={(action, row) =>
                             void act(action, entryOf(list, row))
                         }
@@ -1156,6 +1181,8 @@ function App(): React.JSX.Element {
                                 }));
                             })
                         }
+                        filtered={filterActive(filter)}
+                        onClearFilters={resetFilter}
                     />
                 )}
                 {!activeTab && (
@@ -1186,13 +1213,7 @@ function App(): React.JSX.Element {
                                 [list.key]: draft,
                             }))
                         }
-                        onReset={() => {
-                            setDraft(NO_FILTER);
-                            setFilters((known) => ({
-                                ...known,
-                                [list.key]: NO_FILTER,
-                            }));
-                        }}
+                        onReset={resetFilter}
                     />
                 )}
             </main>
@@ -1265,14 +1286,15 @@ function Separator(): React.JSX.Element {
     );
 }
 
-/** Why a node opens nothing: a name nothing defines, a place rather than an entry, or an empty list. */
+/**
+ * Why a node opens nothing: an empty list's reason, or the row's own - the table's rule, so a packed
+ * definition reads the same in the rail as in the table.
+ */
 function inertReason(node: RailNode): string {
     if (node.kind === "list") {
         return reasonLabel(node.reason);
     }
-    return node.row.origin === "missing"
-        ? l10n.t("Nothing defines this name")
-        : l10n.t("Not an entry of its own");
+    return rowInertReason(node.row) ?? "";
 }
 
 /** A list's rows as the shared table: a click selects, a double click or Enter opens, F12 goes to the definition. */
@@ -1295,6 +1317,8 @@ function ListPage({
     onResize,
     onMove,
     filter,
+    filtered,
+    onClearFilters,
     columnKeys,
 }: {
     label: string;
@@ -1307,7 +1331,7 @@ function ListPage({
     /** The row's entry as the server opened it, once it has. */
     nodeOf: (row: SymbolRow) => GetSymbolNodeResult | undefined;
     onHover: (row: SymbolRow) => void;
-    onSelect: (row: SymbolRow) => void;
+    onSelect: (row: SymbolRow, via: SelectedVia) => void;
     onAct: (action: string, row: SymbolRow) => void;
     onMenu: (x: number, y: number, row: SymbolRow, index: number) => void;
     onMore: () => void;
@@ -1319,6 +1343,9 @@ function ListPage({
     onResize: (widths: Record<string, number>) => void;
     onMove: (from: string, to: string) => void;
     filter: (column: string) => ColumnFilter | undefined;
+    /** The search holds rows back, so the foot's clear-filters control has something to do. */
+    filtered: boolean;
+    onClearFilters: () => void;
     /** The columns this list shows, in its own order. */
     columnKeys: string[];
 }): React.JSX.Element {
@@ -1339,27 +1366,37 @@ function ListPage({
             label={label}
             columns={(
                 [
-                    { key: "name", label: l10n.t("Name"), cell: (r) => r.name },
+                    // Shares of the width: the name and the origin run longest.
+                    {
+                        key: "name",
+                        label: l10n.t("Name"),
+                        cell: (r) => r.name,
+                        share: 3,
+                    },
                     {
                         key: "value",
                         label: l10n.t("Value"),
                         cell: (r) => r.value ?? "",
+                        share: 2,
                     },
                     {
                         key: "type",
                         label: l10n.t("Type"),
                         cell: (r) => rowTypeLabel(r),
                         dim: true,
+                        share: 2,
                     },
                     {
                         key: "kinds",
                         label: l10n.t("Behaves like"),
                         cell: (r) => r.kinds.join(", "),
                         dim: true,
+                        share: 2,
                     },
                     {
                         key: "origin",
                         label: l10n.t("Origin"),
+                        share: 3,
                         cell: (r) => (
                             <>
                                 {originLabel(r.origin, r.originName, layers)}
@@ -1425,18 +1462,29 @@ function ListPage({
                             total.toLocaleString(),
                         )}
                     </span>
-                    <Button
-                        compact
-                        disabled={rows.length >= total || loading}
-                        disabledReason={
-                            loading
-                                ? l10n.t("Loading...")
-                                : l10n.t("Everything is loaded")
-                        }
-                        onClick={onMore}
-                    >
-                        {l10n.t("Load more")}
-                    </Button>
+                    <span className="foot-tools">
+                        <IconButton
+                            icon="clearFilter"
+                            title={l10n.t("Clear all filters")}
+                            disabled={!filtered}
+                            disabledReason={l10n.t(
+                                "Clear all filters - no filters are set",
+                            )}
+                            onClick={onClearFilters}
+                        />
+                        <Button
+                            compact
+                            disabled={rows.length >= total || loading}
+                            disabledReason={
+                                loading
+                                    ? l10n.t("Loading...")
+                                    : l10n.t("Everything is loaded")
+                            }
+                            onClick={onMore}
+                        >
+                            {l10n.t("Load more")}
+                        </Button>
+                    </span>
                 </>
             }
         />

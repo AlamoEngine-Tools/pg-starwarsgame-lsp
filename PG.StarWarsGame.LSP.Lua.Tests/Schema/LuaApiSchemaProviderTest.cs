@@ -125,6 +125,19 @@ public sealed class LuaApiSchemaProviderTest
         Assert.Null(provider.GetGlobalTypeName("OnEnter"));
     }
 
+    // An engine type defines all of its members; a library's class is a Lua table a script may extend.
+    [Fact]
+    public void EngineClassNames_AreTheClassesOfTheEngineStubs_Only()
+    {
+        var provider = LuaApiSchemaProvider.FromFiles([
+            new LuaStubFile("api.d.lua",
+                "---@class Player: LuaUserVar\nlocal Player = {}\n---@class GameRandom\nGameRandom = {}\n"),
+            new LuaStubFile("pgbase.d.lua", "---@class WeightedTypeList\nWeightedTypeList = {}\n")
+        ]);
+
+        Assert.True(provider.EngineClassNames.SetEquals(["Player", "GameRandom"]));
+    }
+
     // ── GetXmlRefs ───────────────────────────────────────────────────────────
 
     [Fact]

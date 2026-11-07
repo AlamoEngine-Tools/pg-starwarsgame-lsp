@@ -30,10 +30,10 @@ public sealed class WorkspaceIndexer(
     /// <inheritdoc />
     public BoneCatalogStats? LastBoneCatalog => models.LastBoneCatalog;
 
-    /// <summary>The metafile stage, over the baseline loaded now.</summary>
+    /// <summary>The metafile stage, over the baseline loaded now; publishes the load order it finds.</summary>
     public void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots)
     {
-        metafiles.Register(config, roots, indexService.Current.Baseline);
+        indexService.ApplyLoadOrder(metafiles.Register(config, roots, indexService.Current.Baseline));
     }
 
     public Task<int> IndexDocumentsAsync(WorkspaceConfiguration config, CancellationToken ct,

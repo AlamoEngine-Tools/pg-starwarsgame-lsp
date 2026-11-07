@@ -33,8 +33,10 @@ export abstract class LspTreeDataProvider<
     protected data: TData | undefined;
     /** The `aet/*` method this tree is built from. */
     protected abstract readonly method: string;
-    /** What the view is showing, for the empty-state line: "localisation files", "story campaigns". */
-    protected abstract readonly subject: string;
+    /** The row of a workspace the scan found none in: "No story campaigns found in this workspace." */
+    protected abstract noneFound(): string;
+    /** The row of a request that failed, when the subclass does not word it itself. */
+    protected abstract readFailed(): string;
     private readonly _onDidChangeTreeData = new vscode.EventEmitter<
         TItem | undefined
     >();
@@ -124,8 +126,8 @@ export abstract class LspTreeDataProvider<
         outcome: Extract<LspOutcome<TData>, { ok: false }>,
     ): string {
         return outcome.reason === "offline"
-            ? "LSP server is not running."
-            : `Could not read ${this.subject} from the server.`;
+            ? vscode.l10n.t("LSP server is not running.")
+            : this.readFailed();
     }
 
     private async _loadRoot(): Promise<TItem[]> {
@@ -151,7 +153,7 @@ export abstract class LspTreeDataProvider<
         return this.isEmpty(data)
             ? [
                   this.infoItem(
-                      emptyNavigatorMessage(this._scanned, this.subject),
+                      emptyNavigatorMessage(this._scanned, this.noneFound()),
                   ),
               ]
             : this.rootItems(data);

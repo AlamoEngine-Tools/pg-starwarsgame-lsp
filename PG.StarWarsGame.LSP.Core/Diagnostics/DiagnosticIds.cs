@@ -121,6 +121,13 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId ListMapReplacedInVariant = new(DiagnosticGroup.References, 35);
 
+    /// <summary>
+    ///     A name the game matches as written resolves to a definition that differs from it only
+    ///     by case, so it never matches in the game. A Lua <c>StoryModeEvents</c> key against its
+    ///     XML event: the shipped story-mode library indexes the table with the event's name.
+    /// </summary>
+    public static readonly DiagnosticId CaseOnlyMatch = new(DiagnosticGroup.References, 36);
+
     // ── Enums ──
     public static readonly DiagnosticId AbilityModFlag = new(DiagnosticGroup.Enums, 1);
     public static readonly DiagnosticId Audio3DProviderName = new(DiagnosticGroup.Enums, 2);
@@ -437,6 +444,11 @@ public static class DiagnosticIds
     public static readonly DiagnosticId LuaRedundantRequire = new(DiagnosticGroup.Structure, 9);
     public static readonly DiagnosticId LuaDuplicateRequire = new(DiagnosticGroup.Structure, 10);
 
+    // The two Lua import findings that carried no id, so they showed no code and could not be
+    // suppressed. Appended after 18, the highest this group had used.
+    public static readonly DiagnosticId LuaGlobalNotRequired = new(DiagnosticGroup.Structure, 19);
+    public static readonly DiagnosticId LuaCyclicRequire = new(DiagnosticGroup.Structure, 20);
+
     /// <summary>A dialog command that works but has not been verified against the engine.</summary>
     public static readonly DiagnosticId DialogUntestedCommand = new(DiagnosticGroup.Structure, 11);
 
@@ -689,7 +701,24 @@ public static class DiagnosticIds
     public static readonly DiagnosticId CampaignStoryRedundantAttachment = new(DiagnosticGroup.Story, 10);
 
     // ── Symbols ──
+    /// <summary>
+    ///     RETIRED in 0.5.0 - never reuse the number. It flagged one name defined twice on one project
+    ///     layer as an error and said nothing across layers. The game has no layers: which definition
+    ///     counts follows from the load order and the registry's rule, reported by
+    ///     <see cref="DefinitionNotUsed" />, <see cref="DefinitionMerged" /> and
+    ///     <see cref="DuplicateDefinition" />. A suppression naming this id now silences nothing.
+    /// </summary>
+    [Obsolete("Deprecated since 0.5.0: no longer emitted. See DefinitionNotUsed. Never reuse the number.")]
     public static readonly DiagnosticId DuplicateSymbol = new(DiagnosticGroup.Symbols, 1);
+
+    /// <summary>
+    ///     RETIRED in 0.5.0 - never reuse the number. It warned that a leaf project's definition
+    ///     overrode a dependency's, unless an Override comment declared it. A dependency's copy of a
+    ///     file the mod ships is never opened, and a definition in another file wins or loses by the
+    ///     registry's rule, which <see cref="DefinitionNotUsed" /> reports on the loser. A suppression
+    ///     or an Override comment naming this now does nothing.
+    /// </summary>
+    [Obsolete("Deprecated since 0.5.0: no longer emitted. See DefinitionNotUsed. Never reuse the number.")]
     public static readonly DiagnosticId CrossLayerShadow = new(DiagnosticGroup.Symbols, 2);
 
     /// <summary>
@@ -710,6 +739,23 @@ public static class DiagnosticIds
     ///     The engine keeps the first one it loads and can never find the other.
     /// </summary>
     public static readonly DiagnosticId ObjectNameCrcCollision = new(DiagnosticGroup.Symbols, 5);
+
+    /// <summary>
+    ///     A definition the game never uses: its registry keeps another definition of the name - the
+    ///     first loaded for game objects and SFX events, the last for trade routes, campaigns,
+    ///     hardpoints, command bar components and mouse pointers - or, for factions, a lookup by name
+    ///     finds the other.
+    /// </summary>
+    public static readonly DiagnosticId DefinitionNotUsed = new(DiagnosticGroup.Symbols, 6);
+
+    /// <summary>A second targeting set of one name, which the game parses into the first.</summary>
+    public static readonly DiagnosticId DefinitionMerged = new(DiagnosticGroup.Symbols, 7);
+
+    /// <summary>
+    ///     One name defined twice where no registry orders the definitions, as in a direct-content
+    ///     file: which one the game uses is not measured, so both are told of the other.
+    /// </summary>
+    public static readonly DiagnosticId DuplicateDefinition = new(DiagnosticGroup.Symbols, 8);
 
     // ── Engine ──
     // Built directly by XmlDiagnosticsPublisher rather than by a handler: these check values the
@@ -1100,4 +1146,7 @@ public static class DiagnosticIds
 
     /// <summary>An argument past the parameters of the Lua function called, which Lua drops.</summary>
     public static readonly DiagnosticId LuaAnalyzerRedundantParameter = new(DiagnosticGroup.LuaAnalyzer, 11);
+
+    /// <summary>A member an engine type does not have: the engine defines all of its members.</summary>
+    public static readonly DiagnosticId LuaAnalyzerUndefinedField = new(DiagnosticGroup.LuaAnalyzer, 12);
 }

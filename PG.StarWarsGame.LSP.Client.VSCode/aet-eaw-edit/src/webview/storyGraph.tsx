@@ -3643,17 +3643,19 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
 /** Native-tooltip text for virtual nodes - nothing on them is editable, so a hover suffices. */
 const VIRTUAL_DESCRIPTIONS: Record<string, string> = {
-    AndJunction: "AND junction - every input on this prereq line must fire.",
-    OrJunction: "OR junction - any one prereq line arms the event.",
-    Portal: "Portal - stands in for a cross-file target event.",
-    TacticalPlot: "Battle - opens its own graph",
-    GalacticPortal: "Galactic event - opens the campaign graph on it",
-    StagingAnd:
-        "Not yet attached - wire event outputs into this, then drag its output onto the " +
-        "event that should require all of them together. Nothing is saved until then.",
-    StagingOr:
-        "Not yet attached - wire event outputs into this, then drag its output onto the " +
-        "event that any one of them should arm. Nothing is saved until then.",
+    AndJunction: l10n.t(
+        "AND junction - every input on this prereq line must fire.",
+    ),
+    OrJunction: l10n.t("OR junction - any one prereq line arms the event."),
+    Portal: l10n.t("Portal - stands in for a cross-file target event."),
+    TacticalPlot: l10n.t("Battle - opens its own graph"),
+    GalacticPortal: l10n.t("Galactic event - opens the campaign graph on it"),
+    StagingAnd: l10n.t(
+        "Not yet attached - wire event outputs into this, then drag its output onto the event that should require all of them together. Nothing is saved until then.",
+    ),
+    StagingOr: l10n.t(
+        "Not yet attached - wire event outputs into this, then drag its output onto the event that any one of them should arm. Nothing is saved until then.",
+    ),
 };
 
 /** AND/OR/Portal/TacticalPlot - nothing on them is editable, so they keep the old compact shape. */
@@ -3852,13 +3854,13 @@ const { RefSocket } = Presets.classic;
 function battleStatusText(battle: { status: string; tick: number }): string {
     switch (battle.status) {
         case "running":
-            return `Running - t${battle.tick}`;
+            return l10n.t("Running - t{0}", battle.tick);
         case "won":
-            return "Won";
+            return l10n.t("Won");
         case "lost":
-            return "Lost";
+            return l10n.t("Lost");
         default:
-            return "Not started";
+            return l10n.t("Not started");
     }
 }
 
@@ -4769,7 +4771,12 @@ function TypeRow(props: {
                                             threadUri: props.threadUri,
                                             eventName: props.eventName,
                                         },
-                                        `Remove ${props.kind} '${props.typeName}' and its parameters from '${props.eventName}'?`,
+                                        l10n.t(
+                                            "Remove {0} '{1}' and its parameters from '{2}'?",
+                                            props.kind,
+                                            props.typeName ?? "",
+                                            props.eventName,
+                                        ),
                                     )
                                 }
                             >
@@ -5114,7 +5121,10 @@ function EventForm(props: {
                                         threadUri: dto.threadUri,
                                         eventName: dto.label,
                                     },
-                                    `Delete story event '${dto.label}'?`,
+                                    l10n.t(
+                                        "Delete story event '{0}'?",
+                                        dto.label,
+                                    ),
                                 )
                             }
                         >
@@ -6480,7 +6490,7 @@ function App(): React.JSX.Element {
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
     const [status, setStatus] = useState<string | null>(
-        "Loading story graph...",
+        l10n.t("Loading story graph..."),
     );
     // The gesture handlers live outside React, beside the rete pipes, and a refused gesture has to
     // reach this same slot. setStatus is stable, so one assignment covers the panel's life.
@@ -6736,7 +6746,9 @@ function App(): React.JSX.Element {
             const thread = handle.nearestEventThread(position, threads);
             if (!thread) {
                 setStatus(
-                    "This campaign has no thread file to add events to - create a thread first.",
+                    l10n.t(
+                        "This campaign has no thread file to add events to - create a thread first.",
+                    ),
                 );
                 return;
             }
@@ -6745,7 +6757,10 @@ function App(): React.JSX.Element {
             const owner = threadReadOnlyOwner(thread);
             if (owner) {
                 setStatus(
-                    `${readOnlyMessage(owner)}. Drop the event beside this project's own events`,
+                    l10n.t(
+                        "{0}. Drop the event beside this project's own events",
+                        readOnlyMessage(owner),
+                    ),
                 );
                 return;
             }
@@ -7237,7 +7252,7 @@ function App(): React.JSX.Element {
             // node still leaves the canvas taking drops.
             setEditBlockedBy(editModeBlockedBy(nodes));
             if (!nodes.length) {
-                setStatus("No events match the current filters.");
+                setStatus(l10n.t("No events match the current filters."));
                 return;
             }
             setStatus(null);
@@ -7545,7 +7560,7 @@ function App(): React.JSX.Element {
                     break;
                 }
                 case "error":
-                    setStatus("Warning: " + String(msg.message));
+                    setStatus(l10n.t("Warning: {0}", String(msg.message)));
                     break;
             }
         };
@@ -7735,7 +7750,7 @@ function App(): React.JSX.Element {
                             />
                             {status || layouting ? (
                                 <p className="status">
-                                    {status ?? "Arranging layout..."}
+                                    {status ?? l10n.t("Arranging layout...")}
                                 </p>
                             ) : null}
                             {/* The colour key, on a corner plate like the preview's stage controls. After
@@ -8070,7 +8085,7 @@ function App(): React.JSX.Element {
                                 <div className="filters-below">
                                     <SelectField
                                         value={filters.branch}
-                                        ariaLabel="Branch"
+                                        ariaLabel={l10n.t("Branch")}
                                         title={l10n.t("Branch")}
                                         icon="search"
                                         options={[
@@ -8088,7 +8103,7 @@ function App(): React.JSX.Element {
                                     />
                                     <SelectField
                                         value={filters.lifecycle}
-                                        ariaLabel="Lifecycle"
+                                        ariaLabel={l10n.t("Lifecycle")}
                                         title={l10n.t("Lifecycle")}
                                         icon="search"
                                         options={[
@@ -8106,7 +8121,7 @@ function App(): React.JSX.Element {
                                     />
                                     <SelectField
                                         value={filters.plotState}
-                                        ariaLabel="Plot state"
+                                        ariaLabel={l10n.t("Plot state")}
                                         icon="search"
                                         title={l10n.t(
                                             "Plot state - how this faction's manifest registers the thread an event lives in",
@@ -8657,6 +8672,7 @@ function stepColor(category: string, name: string | null): string {
 
 /** A tile/badge background: its family colour washed into the widget background (matches the palette). */
 function fadedBg(color: string): string {
+    // l10n-exempt: a CSS colour value
     return `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
 }
 
@@ -8779,9 +8795,11 @@ function NodePalette(props: {
                             ? tile(
                                   "blank",
                                   <span className="codicon codicon-add" />,
-                                  "New event",
+                                  l10n.t("New event"),
                                   { category: "blank", type: null },
-                                  "Drag onto the canvas to create a new untyped event, then edit it in place",
+                                  l10n.t(
+                                      "Drag onto the canvas to create a new untyped event, then edit it in place",
+                                  ),
                               )
                             : null}
                         {showAndJunction
@@ -8790,7 +8808,9 @@ function NodePalette(props: {
                                   <span className="junction-glyph shape-circle" />,
                                   "AND",
                                   { category: "andJunction", type: null },
-                                  "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together",
+                                  l10n.t(
+                                      "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together",
+                                  ),
                               )
                             : null}
                         {showOrJunction
@@ -8799,23 +8819,25 @@ function NodePalette(props: {
                                   <span className="junction-glyph shape-diamond" />,
                                   "OR",
                                   { category: "orJunction", type: null },
-                                  "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm",
+                                  l10n.t(
+                                      "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm",
+                                  ),
                               )
                             : null}
                     </div>
                 </div>
             ) : null}
             {typeGroup(
-                "Event types",
+                l10n.t("Event types"),
                 "trigger",
                 eventTypes,
-                "Drag onto the canvas to create an event",
+                l10n.t("Drag onto the canvas to create an event"),
             )}
             {typeGroup(
-                "Rewards",
+                l10n.t("Rewards"),
                 "reward",
                 rewardTypes,
-                "Drag onto an event node to attach this reward to it",
+                l10n.t("Drag onto an event node to attach this reward to it"),
             )}
             {q !== "" && !eventTypes.length && !rewardTypes.length ? (
                 <p className="palette-empty">

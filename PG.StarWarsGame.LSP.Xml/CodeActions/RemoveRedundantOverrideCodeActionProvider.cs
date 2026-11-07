@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -38,13 +37,13 @@ internal sealed class RemoveRedundantOverrideCodeActionProvider : IXmlCodeAction
         if (parsed is null)
             return [];
 
-        var hapDoc = parsed.Html;
-        var diagnosticLine = ctx.Diagnostic.Range.Start.Line;
-        if (!XmlUtility.TryFindNode(hapDoc, diagnosticLine, out var node) || node is null)
+        var at = ctx.Diagnostic.Range.Start;
+        if (parsed.ElementAt(at.Line, at.Character) is not { } node
+            || parsed.RemovalRange(node) is not var (start, end))
             return [];
 
-        var removeStart = new Position(node.Line - 1, 0);
-        var removeEnd = new Position(EndHapLine(node), 0);
+        var removeStart = new Position(start.Line, start.Col);
+        var removeEnd = new Position(end.Line, end.Col);
         var tagName = XmlUtility.GetOriginalTagName(node, parsed.Text);
 
         return
@@ -71,12 +70,5 @@ internal sealed class RemoveRedundantOverrideCodeActionProvider : IXmlCodeAction
                 }
             })
         ];
-    }
-
-    private static int EndHapLine(HtmlNode node)
-    {
-        if (node.EndNode is not null && !ReferenceEquals(node.EndNode, node))
-            return node.EndNode.Line;
-        return node.Line;
     }
 }

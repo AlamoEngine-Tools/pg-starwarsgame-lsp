@@ -37,26 +37,6 @@ export function sortRows(rows: LocRow[], sort: SortState | null): LocRow[] {
 }
 
 /**
- * How many rows repeat a key already used above them.
- *
- * Meaningful only in a text file, where a key is an identifier and a repeat is an error the batch
- * validator reports. A credits file keys every row by a formatting directive, so the same count
- * there is just the row total minus two.
- */
-export function countDuplicateKeys(rows: LocRow[]): number {
-    const seen = new Set<string>();
-    let duplicates = 0;
-    for (const row of rows) {
-        if (seen.has(row.key)) {
-            duplicates++;
-        } else {
-            seen.add(row.key);
-        }
-    }
-    return duplicates;
-}
-
-/**
  * Empty cells therefore sort first ascending, which is deliberate and confirmed: sorting a language
  * column is how untranslated rows get found, so they belong at the top where the sort lands you.
  * Do not "fix" this by pushing blanks to the end.

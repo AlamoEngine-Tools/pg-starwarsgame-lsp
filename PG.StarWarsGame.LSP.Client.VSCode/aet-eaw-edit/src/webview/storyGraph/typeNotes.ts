@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
+
 /** One thing the schema says about an event or reward type, as it arrives on the wire. */
 export interface StoryNote {
     kind: string;
@@ -30,10 +32,10 @@ export function worstNote(
 
 /** How each kind changes a node. A kind not listed here shows its words and nothing more. */
 const STYLING: Record<string, { className: string; lead: string }> = {
-    BuggedInEngine: { className: "note-bugged", lead: "Does not work" },
-    Deprecated: { className: "note-deprecated", lead: "Deprecated" },
+    BuggedInEngine: { className: "note-bugged", lead: l10n.t("Does not work") },
+    Deprecated: { className: "note-deprecated", lead: l10n.t("Deprecated") },
     // The dashed border predates the note model and readers already know it.
-    Untested: { className: "untested", lead: "Untested" },
+    Untested: { className: "untested", lead: l10n.t("Untested") },
 };
 
 /**

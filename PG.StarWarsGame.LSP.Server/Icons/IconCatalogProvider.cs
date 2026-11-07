@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Icons;
 
@@ -33,8 +34,8 @@ public interface IIconCatalogProvider : IIconRepackStatusProvider
 ///         Everything here is lazy on purpose. Assembling a catalog means decoding a 2048x2048 atlas
 ///         and every raw source image the project ships, and most editing sessions never open a
 ///         preview - so nothing is read until the first request asks for an icon. The baked baseline
-///         sidecar is fetched once and shared across project roots, since it does not vary by
-///         project.
+///         sidecar is fetched once per game and shared across project roots, since it varies by the
+///         game the project targets and by nothing else.
 ///     </para>
 ///     <para>
 ///         Keyed by project root rather than held as a single instance because one server hosts N
@@ -50,20 +51,24 @@ public sealed class IconCatalogProvider : IIconCatalogProvider, ICacheStatistics
     private readonly ILogger<IconCatalogProvider> _logger;
     private readonly IMtdService _mtdFileService;
     private readonly IconPackLoader _packLoader;
+    private readonly IBaselineBootstrapper _baselines;
     private IconPack? _baseline;
+    private TargetGame _baselineGame;
 
     public IconCatalogProvider(
         IconPackLoader packLoader,
         IMtdService mtdFileService,
         IFileHelper fileHelper,
         ILspConfigurationProvider config,
-        ILogger<IconCatalogProvider> logger)
+        ILogger<IconCatalogProvider> logger,
+        IBaselineBootstrapper baselines)
     {
         _packLoader = packLoader;
         _mtdFileService = mtdFileService;
         _fileHelper = fileHelper;
         _config = config;
         _logger = logger;
+        _baselines = baselines;
     }
 
     /// <summary>Catalogs built, one per layer set seen; each holds decoded icon bytes.</summary>
@@ -84,7 +89,14 @@ public sealed class IconCatalogProvider : IIconCatalogProvider, ICacheStatistics
             if (_catalogs.TryGetValue(key, out var cached))
                 return cached;
 
-            _baseline ??= await _packLoader.LoadAsync(_config.Current.BaselineSource, ct);
+            // The pack sits beside the baseline of the project's game, so a project switched to the
+            // other game reads the other pack.
+            var game = _baselines.LoadedGame ?? TargetGame.FOC;
+            if (_baseline is null || _baselineGame != game)
+            {
+                _baseline = await _packLoader.LoadAsync(_config.Current.BaselineSource.ForGame(game), ct);
+                _baselineGame = game;
+            }
 
             var catalog = IconCatalogLoader.Load(
                 _fileHelper.FileSystem,
@@ -137,8 +149,8 @@ public sealed class IconCatalogProvider : IIconCatalogProvider, ICacheStatistics
         {
             _catalogs.Clear();
 
-            // The sidecar is deliberately KEPT: it tracks the configured baseline, not the
-            // workspace, so a project reload has no bearing on whether it is still current.
+            // The sidecar is deliberately KEPT: it tracks the baseline's game, which GetAsync checks
+            // on every build, so a reload that leaves the game alone does not fetch it again.
         }
         finally
         {

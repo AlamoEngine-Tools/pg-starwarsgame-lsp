@@ -92,6 +92,14 @@ internal static class YamlSchemaParser
                 variantMode = VariantMode.Replace;
             }
 
+            var repeatMode = RepeatMode.REPLACE;
+            if (entry.RepeatMode is not null && !Enum.TryParse(entry.RepeatMode, true, out repeatMode))
+            {
+                logger?.LogWarning("Unknown repeatMode '{RepeatMode}' for tag '{Tag}' - defaulting to replace",
+                    entry.RepeatMode, entry.Tag);
+                repeatMode = RepeatMode.REPLACE;
+            }
+
             TagValidationOverride? validationOverride = null;
             if (entry.ValidationOverride is { } vo && !string.IsNullOrEmpty(vo.ValidationId))
             {
@@ -135,6 +143,7 @@ internal static class YamlSchemaParser
                 Notes = ReadNotes(entry.Notes),
                 MultipleAllowed = entry.MultipleAllowed,
                 VariantMode = variantMode,
+                RepeatMode = repeatMode,
                 ValidationOverride = validationOverride,
                 Slots = ReadSlots(entry, logger)
             });
@@ -328,11 +337,38 @@ internal static class YamlSchemaParser
             var normalizedPath = GamePaths.Key(entry.Path);
             result.Add(new MetafileDefinition(normalizedPath, metafileType, entry.Types)
             {
-                Notes = ReadNotes(entry.Notes)
+                Notes = ReadNotes(entry.Notes),
+                DuplicateNames = ReadDuplicateNames(entry, metafileType)
             });
         }
 
         return result;
+    }
+
+    /// <summary>
+    ///     The registry's rule for a name two of its files share. Required on a file registry and
+    ///     refused when unknown: without it the server cannot say which definition the game uses, and
+    ///     any default would be wrong for some registry - the engine handles them three ways.
+    /// </summary>
+    private static DuplicateNameRule? ReadDuplicateNames(YamlMetafileEntry entry, MetafileType metafileType)
+    {
+        if (entry.DuplicateNames is null)
+            return metafileType == MetafileType.FileRegistry
+                ? throw new InvalidOperationException(
+                    $"The file registry '{entry.Path}' declares no duplicateNames. The schema must say " +
+                    "which of two same-named definitions the game uses: firstWins, lastWins, merge or firstByName.")
+                : null;
+
+        return entry.DuplicateNames switch
+        {
+            "firstWins" => DuplicateNameRule.FIRST_WINS,
+            "lastWins" => DuplicateNameRule.LAST_WINS,
+            "merge" => DuplicateNameRule.MERGE,
+            "firstByName" => DuplicateNameRule.FIRST_BY_NAME,
+            _ => throw new InvalidOperationException(
+                $"Unknown duplicateNames '{entry.DuplicateNames}' on '{entry.Path}'. Known rules: " +
+                "firstWins, lastWins, merge, firstByName - update the extension if the schema is newer.")
+        };
     }
 
     /// <summary>

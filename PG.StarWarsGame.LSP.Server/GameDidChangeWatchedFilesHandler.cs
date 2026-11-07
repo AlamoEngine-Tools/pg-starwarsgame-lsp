@@ -6,13 +6,13 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Server.Indexing;
-using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using LspFileSystemWatcher = OmniSharp.Extensions.LanguageServer.Protocol.Models.FileSystemWatcher;
@@ -35,9 +35,21 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     ///         anything and every on-disk reaction only ran at startup. Change one list, change the
     ///         other.
     ///     </para>
+    ///     <para>
+    ///         The asset globs are the catalog's own extension list. A loose texture or model is
+    ///         re-globbed into the catalog on create and delete (<see cref="HandleChangesAsync" />),
+    ///         and for a long time that branch only ever ran for a script, because no asset
+    ///         extension was watched: a file dropped into the workspace was unknown until a reload.
+    ///     </para>
     /// </remarks>
     public static readonly string[] WatchedGlobs =
-        ["**/*.xml", "**/*.lua", "**/*.pgproj", "**/*.csv", "**/*.properties", "**/*.dat"];
+    [
+        "**/*.xml", "**/*.lua", "**/*.pgproj", "**/*.csv", "**/*.properties", "**/*.dat",
+        .. MegAssetCatalogBuilder.KnownAssetExtensions
+            .Select(extension => $"**/*{extension}")
+            .Where(glob => glob != "**/*.lua")
+            .Order(StringComparer.Ordinal)
+    ];
 
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -46,6 +58,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
     private readonly IStartupGate _startupGate;
+    private readonly IRegistryWalkStore _walks;
     private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILocalisationWriteLedger _writeLedger;
 
@@ -57,11 +70,13 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         IModProjectReloadService reloadService,
         ISchemaProvider schema,
         ILocalisationWriteLedger writeLedger,
+        IRegistryWalkStore walks,
         IStartupGate startupGate,
         ILogger<GameDidChangeWatchedFilesHandler> logger)
     {
         _startupGate = startupGate;
         _writeLedger = writeLedger;
+        _walks = walks;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
@@ -91,6 +106,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         var assetsChanged = false;
         var dynamicEnumsChanged = false;
         var localisationTextChanged = false;
+        HashSet<string>? listedKeys = null;
 
         // Built on first use so the schema's enum list is walked once per notification, not once
         // per changed file.
@@ -110,6 +126,10 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 }
 
                 var path = _fileHelper.FileUriToPath(uri);
+
+                // The change still goes on to be indexed or removed below; the reload runs once after.
+                if (path is not null && ChangesTheLoadOrder(path, change.Type, ref listedKeys))
+                    projectChanged = true;
 
                 // A changed/created/deleted file under any project layer's text root (csv/properties/
                 // loc-xml) needs a scoped localisation reload, never document indexing - no
@@ -254,6 +274,29 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         var directoryUri = _fileHelper.PathToFileUri(directory).TrimEnd('/');
         return textRoots.Any(root => string.Equals(
             _fileHelper.PathToFileUri(root).TrimEnd('/'), directoryUri, StringComparison.Ordinal));
+    }
+
+    // Whether a change moves which files the game loads or which copy it opens: an edited registry
+    // lists other files or another order, and a created or deleted copy of a listed file changes the
+    // copy that wins. Either needs the metafile stage again, which only a reload runs. The keys the
+    // registries list are gathered once per notification into listedKeys.
+    private bool ChangesTheLoadOrder(string path, FileChangeType type, ref HashSet<string>? listedKeys)
+    {
+        var xmlRoots = _reloadService.LastWorkspaceConfig?.XmlDirectories;
+        var xmlRoot = xmlRoots?.FirstOrDefault(root => GamePaths.Under(path, root));
+        if (xmlRoot is null) return false;
+
+        var key = GamePaths.Key(_fileHelper.FileSystem.Path.GetRelativePath(xmlRoot, path));
+        if (_schema.AllMetafiles.Any(def =>
+                def.MetafileType is MetafileType.FileRegistry or MetafileType.Special &&
+                string.Equals(_fileHelper.FileSystem.Path.GetFileName(GamePaths.Key(def.Path)), key,
+                    StringComparison.Ordinal)))
+            return true;
+
+        if (type is not (FileChangeType.Created or FileChangeType.Deleted)) return false;
+        listedKeys ??= _walks.Current.SelectMany(walk => walk.Entries).Select(entry => entry.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        return listedKeys.Contains(key);
     }
 
     protected override DidChangeWatchedFilesRegistrationOptions CreateRegistrationOptions(

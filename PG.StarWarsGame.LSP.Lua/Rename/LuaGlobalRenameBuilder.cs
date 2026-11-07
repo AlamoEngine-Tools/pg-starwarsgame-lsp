@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Loretta.CodeAnalysis;
+using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -28,6 +29,8 @@ public static class LuaGlobalRenameBuilder
         }
 
         var changes = new Dictionary<DocumentUri, List<TextEdit>>();
+        // The files the rename edits, as the index spells them: each is searched for uses by value.
+        var files = new HashSet<string>(StringComparer.Ordinal);
 
         // Definition edits - find `function <id>(` in the definition file.
         if (index.WorkspaceDefinitions.TryGetValue(id, out var defs))
@@ -40,6 +43,7 @@ public static class LuaGlobalRenameBuilder
                 var range = FindFunctionNameRange(parsed.Tree, id);
                 if (range is null) continue;
                 AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = range });
+                files.Add(fo.Uri);
             }
 
         // Reference edits - use indexed LuaGlobal refs (O(1) lookup, no per-file re-parse).
@@ -54,7 +58,20 @@ public static class LuaGlobalRenameBuilder
                         new Position(r.Line, r.Column),
                         new Position(r.Line, r.Column + r.Length))
                 });
+                files.Add(r.DocumentUri);
             }
+
+        // A use by value - handed to Define_State or Register_Timer - is no call site, so the index
+        // holds none (it would be 28% more references to keep, almost none of them a function's):
+        // found here, in the files the rename edits, the parse cache's trees scoped by Loretta.
+        foreach (var file in files)
+        {
+            if (parseCache.GetOrParse(file) is not { } parsed) continue;
+            var edited = changes[DocumentUri.From(file)];
+            foreach (var use in GlobalUses(parsed.Tree, id))
+                if (edited.All(e => e.Range.Start != use.Start))
+                    edited.Add(new TextEdit { NewText = newName, Range = use });
+        }
 
         if (changes.Count == 0)
             return null;
@@ -92,6 +109,37 @@ public static class LuaGlobalRenameBuilder
         }
 
         return null;
+    }
+
+    /// <summary>Every place <paramref name="tree" /> names the global <paramref name="id" />; a local of that name is not it.</summary>
+    internal static IEnumerable<LspRange> GlobalUses(SyntaxTree tree, string id)
+    {
+        var script = new Script([tree]);
+        foreach (var name in tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>())
+            if (name.Name == id && script.GetVariable(name) is { Kind: VariableKind.Global })
+                yield return RangeOf(name);
+    }
+
+    /// <summary>The global named at a position, by its use: an argument, an assignment, a call.</summary>
+    internal static (string Name, LspRange Range)? GlobalAt(SyntaxTree tree, int line, int character)
+    {
+        var script = new Script([tree]);
+        foreach (var name in tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>())
+        {
+            var range = RangeOf(name);
+            if (range.Start.Line != line || character < range.Start.Character || character > range.End.Character)
+                continue;
+            return script.GetVariable(name) is { Kind: VariableKind.Global } ? (name.Name, range) : null;
+        }
+
+        return null;
+    }
+
+    private static LspRange RangeOf(IdentifierNameSyntax name)
+    {
+        var span = name.GetLocation().GetLineSpan();
+        return new LspRange(new Position(span.StartLinePosition.Line, span.StartLinePosition.Character),
+            new Position(span.EndLinePosition.Line, span.EndLinePosition.Character));
     }
 
     private static void AddEdit(

@@ -8,7 +8,7 @@ import {
     LspGateway,
     LspMessageSink,
     LspRequestSender,
-    SERVER_NOT_RUNNING,
+    serverNotRunning,
 } from "./lspGateway";
 
 function sink(): LspMessageSink & { warnings: string[]; errors: string[] } {
@@ -95,7 +95,7 @@ describe("LspGateway.requireRunning", () => {
         const gateway = new LspGateway(() => undefined, messages);
 
         assert.equal(gateway.requireRunning(), false);
-        assert.deepEqual(messages.warnings, [SERVER_NOT_RUNNING]);
+        assert.deepEqual(messages.warnings, [serverNotRunning()]);
     });
 
     it("says nothing and allows when the server is up", () => {
@@ -116,7 +116,7 @@ describe("LspGateway.requestOrReport", () => {
             await gateway.requestOrReport("aet/x", {}, "load the graph"),
             undefined,
         );
-        assert.deepEqual(messages.warnings, [SERVER_NOT_RUNNING]);
+        assert.deepEqual(messages.warnings, [serverNotRunning()]);
         assert.deepEqual(messages.errors, []);
     });
 

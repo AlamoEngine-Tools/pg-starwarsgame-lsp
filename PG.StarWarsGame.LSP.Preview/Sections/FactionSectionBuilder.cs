@@ -45,7 +45,7 @@ public sealed class FactionSectionBuilder(ISchemaProvider schema, IVariantTagSou
         // used last time and got someone else's colour. Sorted within the groups rather than across
         // them, so the shadowing above still means what it says.
         var candidates = InXmlOrder(index.WorkspaceDefinitions.SelectMany(kv => kv.Value))
-            .Concat(InXmlOrder(index.Baseline.Symbols.Values));
+            .Concat(InXmlOrder(index.ShippedSymbols.Values));
 
         // ReSharper disable once LoopCanBeConvertedToQuery - each faction is resolved and the
         // unresolvable skipped; a query would hide the resolve.

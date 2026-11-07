@@ -1242,7 +1242,7 @@ describe("poolSummary", () => {
             { current: 250, max: 1000 },
         )!;
 
-        assert.match(summary.title, /Dies with hardpoints: no/);
+        assert.match(summary.title, /Dies with hardpoints: No/);
     });
 
     it("leaves the hardpoints out for a unit with none", () => {

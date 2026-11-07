@@ -8,9 +8,11 @@
 // the light has dropped under the ground plane is the shadow quietly disappearing. Both are stated
 // here in the terms the reader already has from the stage's own Front / Side / Top presets.
 
+import * as l10n from "@vscode/l10n";
+
 /** Where a light stands, said in words rather than in degrees. */
 export interface LightBearing {
-    /** Which side it is on, named against the Front view. */
+    /** Which side it is on, named against the Front view - a whole phrase, "from the front right". */
     from: string;
 
     /** How high it is, in a word. */
@@ -27,32 +29,32 @@ export interface LightBearing {
  * a light at 0 stands where the reader stands when they press Front.
  */
 const POINTS = [
-    "the front",
-    "the front right",
-    "the right",
-    "the back right",
-    "behind",
-    "the back left",
-    "the left",
-    "the front left",
+    l10n.t("from the front"),
+    l10n.t("from the front right"),
+    l10n.t("from the right"),
+    l10n.t("from the back right"),
+    l10n.t("from behind"),
+    l10n.t("from the back left"),
+    l10n.t("from the left"),
+    l10n.t("from the front left"),
 ];
 
 /** Height bands, from the horizon up. Anything below it is under the floor. */
 function heightWord(elevation: number): string {
     if (elevation < 0) {
-        return "below";
+        return l10n.t("below");
     }
 
     if (elevation === 0) {
-        return "level";
+        return l10n.t("level");
     }
 
     if (elevation < 25) {
         // The band that makes panel lines and hardpoint edges read, and the one worth naming.
-        return "raking";
+        return l10n.t("raking");
     }
 
-    return elevation < 65 ? "above" : "overhead";
+    return elevation < 65 ? l10n.t("above") : l10n.t("overhead");
 }
 
 /**

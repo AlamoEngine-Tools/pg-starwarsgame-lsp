@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<HardPoints>
+	<HardPoint Name="HP_Scratch_Salvo">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Full_Salvo_Weapon_Delay_Multiplier>0.5</Full_Salvo_Weapon_Delay_Multiplier>
+	</HardPoint>
+	<HardPoint Name="HP_Scratch_Rocket_Only">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Fire_When_In_Rocket_Attack_Mode>Yes</Fire_When_In_Rocket_Attack_Mode>
+		<Fire_When_In_Normal_Attack_Mode>No</Fire_When_In_Normal_Attack_Mode>
+	</HardPoint>
+	<HardPoint Name="HP_Scratch_Rocket_Row">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Fire_When_In_Rocket_Attack_Mode>Yes</Fire_When_In_Rocket_Attack_Mode>
+		<Fire_When_In_Normal_Attack_Mode>Yes</Fire_When_In_Normal_Attack_Mode>
+	</HardPoint>
+	<HardPoint Name="HP_Scratch_Dead">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Fire_When_In_Rocket_Attack_Mode>No</Fire_When_In_Rocket_Attack_Mode>
+		<Fire_When_In_Normal_Attack_Mode>No</Fire_When_In_Normal_Attack_Mode>
+	</HardPoint>
+	<HardPoint Name="HP_Scratch_NoBone_Targetable">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Is_Targetable>Yes</Is_Targetable>
+	</HardPoint>
+	<HardPoint Name="HP_Scratch_NoBone_FireBone">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Is_Targetable>No</Is_Targetable>
+		<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
+	</HardPoint>
+</HardPoints>

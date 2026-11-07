@@ -323,6 +323,7 @@ function buildHtml(
     // style-src still needs 'unsafe-inline' for styled-components' injected style tags; the codicon
     // stylesheet and its .ttf load from the extension origin (cspSource covers style-src and
     // font-src).
+    // l10n-exempt: the page's markup and security policy, no text a reader sees
     return `<!DOCTYPE html>
 <html lang="${escapeAttribute(vscode.env.language)}">
 <head>

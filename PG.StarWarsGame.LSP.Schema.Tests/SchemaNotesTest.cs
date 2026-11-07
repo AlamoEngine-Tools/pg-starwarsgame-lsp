@@ -240,6 +240,7 @@ public sealed class SchemaNotesTest
                                  metafiles:
                                    - path: Data/XML/GameObjectFiles.xml
                                      metaFileType: fileRegistry
+                                     duplicateNames: firstWins
                                      notes:
                                        - kind: Remark
                                          text:

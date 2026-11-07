@@ -251,5 +251,12 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
         {
             return false;
         }
+
+        public IReadOnlyList<string> FindByFileName(string fileName)
+        {
+            return _files.Keys
+                .Where(k => string.Equals(k.Split('/')[^1], fileName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
     }
 }

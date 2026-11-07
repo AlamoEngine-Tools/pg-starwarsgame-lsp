@@ -89,11 +89,11 @@ export function editModeBlockedBy(
 
     return all
         ? l10n.t(
-              "Every thread here belongs to {0}, which this workspace only references. Open the graph in that project to edit it",
+              "Every thread here belongs to {0}, which this workspace only references. Open the graph in that project to edit it.",
               named,
           )
         : l10n.t(
-              "Part of this graph belongs to {0}, which this workspace only references. Open the graph in that project to edit it",
+              "Part of this graph belongs to {0}, which this workspace only references. Open the graph in that project to edit it.",
               named,
           );
 }

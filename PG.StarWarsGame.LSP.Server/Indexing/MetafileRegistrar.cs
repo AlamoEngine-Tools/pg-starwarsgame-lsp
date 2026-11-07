@@ -17,7 +17,9 @@ namespace PG.StarWarsGame.LSP.Server.Indexing;
 ///     The first indexing stage: seeds the EaW XML context with the project's declared XML
 ///     directories, then walks the schema's metafile definitions to register concrete file -> type
 ///     mappings in the <see cref="IFileTypeRegistry" /> - from the metafile on disk, or the shipped
-///     baseline when no layer ships one - and follows the campaign registry's story chain.
+///     baseline when no layer ships one - and follows the campaign registry's story chain. Each
+///     listed file is typed at the one copy the game opens, and each file registry's entries are
+///     recorded in load order in the <see cref="IRegistryWalkStore" />.
 /// </summary>
 public sealed class MetafileRegistrar
 {
@@ -30,24 +32,28 @@ public sealed class MetafileRegistrar
     private readonly ILogger<MetafileRegistrar> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IStoryChainProblemStore _storyChainProblems;
+    private readonly IRegistryWalkStore _walks;
 
     public MetafileRegistrar(IFileHelper fileHelper, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
-        IEaWXmlContext eaWXmlContext, IStoryChainProblemStore storyChainProblems, ILogger<MetafileRegistrar> logger)
+        IEaWXmlContext eaWXmlContext, IStoryChainProblemStore storyChainProblems, IRegistryWalkStore walks,
+        ILogger<MetafileRegistrar> logger)
     {
         _fileHelper = fileHelper;
         _fileTypeRegistry = fileTypeRegistry;
         _schema = schema;
         _eaWXmlContext = eaWXmlContext;
         _storyChainProblems = storyChainProblems;
+        _walks = walks;
         _logger = logger;
     }
 
     /// <summary>
     ///     Registers every metafile's files for <paramref name="config" />, falling back to
-    ///     <paramref name="baseline" />'s file -> type map for a metafile no layer ships, and replaces
-    ///     the story chain's problems with this scan's.
+    ///     <paramref name="baseline" /> for a metafile no layer ships, and replaces the registration,
+    ///     the registry walks and the story chain's problems with this scan's. Returns the load order
+    ///     the scan found, for the index.
     /// </summary>
-    public void Register(WorkspaceConfiguration config, IReadOnlyList<string> roots, BaselineIndex baseline)
+    public LoadOrder Register(WorkspaceConfiguration config, IReadOnlyList<string> roots, BaselineIndex baseline)
     {
         _logger.LogDebug("PreScanMetafiles started");
         if (config.XmlDirectories.Count > 0)
@@ -60,12 +66,17 @@ public sealed class MetafileRegistrar
 
         var xmlRoots = config.XmlDirectories.ToList();
 
+        // Built aside and swapped in whole: adding to the live registry kept a copy typed after a
+        // reload had shadowed it or its registry had dropped it.
+        var typed = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+        var walks = new List<RegistryWalk>();
+        var shadowedShipped = new List<string>();
         var storyProblems = new List<StoryChainProblem>();
         foreach (var def in _schema.AllMetafiles)
         {
             if (def.MetafileType == MetafileType.Special)
             {
-                ScanStoryChain(def, roots, xmlRoots, baseline, storyProblems);
+                ScanStoryChain(def, roots, xmlRoots, baseline, storyProblems, typed);
                 continue;
             }
 
@@ -75,7 +86,11 @@ public sealed class MetafileRegistrar
             var copies = LocateInLayers(def.Path, roots, xmlRoots);
             if (copies.Count == 0)
             {
-                FallbackFromBaseline(baseline, def, xmlRoots);
+                if (def.MetafileType == MetafileType.FileRegistry &&
+                    baseline.RegistryLists.TryGetValue(GamePaths.Key(def.Path), out var shipped))
+                    walks.Add(Walk(def, null, shipped, xmlRoots, typed));
+                else
+                    FallbackFromBaseline(baseline, def, xmlRoots, typed);
                 continue;
             }
 
@@ -94,27 +109,33 @@ public sealed class MetafileRegistrar
                 // registered under its own URI - with no types, because the schema does not model
                 // its contents. Registering only the files it names reported the registry itself as
                 // read by nothing.
-                _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(winner), []);
-                RegisterFromMetafile(winner, def, xmlRoots);
+                typed[_fileHelper.PathToFileUri(winner)] = [];
+                if (ReadMetafile(winner) is { } listed)
+                    walks.Add(Walk(def, _fileHelper.PathToFileUri(winner), listed, xmlRoots, typed));
             }
             else // DirectContent: the file itself carries the type
             {
-                _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(winner), [.. def.Types]);
+                typed[_fileHelper.PathToFileUri(winner)] = [.. def.Types];
+                shadowedShipped.Add(LoadOrder.XmlKey(def.Path));
             }
         }
 
+        _fileTypeRegistry.Replace(typed);
+        _walks.Replace(walks);
         // Replace-all also clears stale problems when a rescan yields none.
         _storyChainProblems.Replace(storyProblems);
+        return LoadOrder.From(walks, _schema.AllMetafiles, shadowedShipped);
     }
 
     /// <summary>
     ///     Follows a <see cref="MetafileType.Special" /> definition (campaignfiles.xml) through the
     ///     campaign -> plot manifest -> story thread chain and types every discovered file
-    ///     (<c>StoryPlotManifest</c> / <c>StoryParser</c>) under every xml root. Chain problems are
-    ///     collected for the diagnostics pipeline.
+    ///     (<c>StoryPlotManifest</c> / <c>StoryParser</c>) at the copy the game opens. Chain problems
+    ///     are collected for the diagnostics pipeline.
     /// </summary>
     private void ScanStoryChain(MetafileDefinition def, IReadOnlyList<string> roots,
-        IReadOnlyList<string> xmlRoots, BaselineIndex baseline, List<StoryChainProblem> problems)
+        IReadOnlyList<string> xmlRoots, BaselineIndex baseline, List<StoryChainProblem> problems,
+        Dictionary<string, ImmutableArray<string>> typed)
     {
         var copies = LocateInLayers(def.Path, roots, xmlRoots);
 
@@ -122,13 +143,13 @@ public sealed class MetafileRegistrar
         // the chain behind it is followed here: registered under its own URI with no types. The
         // chain types the files it reaches, not this one.
         if (copies.Count > 0)
-            _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(copies[0]), []);
+            typed[_fileHelper.PathToFileUri(copies[0])] = [];
 
         if (copies.Count == 0)
         {
             // No campaign registry anywhere - same degradation as file registries: the shipped
             // baseline's typed story files are projected onto the workspace's xml roots.
-            FallbackFromBaseline(baseline, def, xmlRoots);
+            FallbackFromBaseline(baseline, def, xmlRoots, typed);
             return;
         }
 
@@ -151,8 +172,10 @@ public sealed class MetafileRegistrar
         var resolver = new WorkspaceStoryChainFileResolver(_fileHelper, xmlRoots, baseline);
         var result = new StoryChainScanner(resolver).Scan(registry);
 
-        RegisterStoryFiles(result.ManifestFiles, StoryPlotManifestTypes, xmlRoots);
-        RegisterStoryFiles(result.ThreadFiles, StoryParserTypes, xmlRoots);
+        foreach (var rel in result.ManifestFiles)
+            TypeEntry(GamePaths.Key(rel), StoryPlotManifestTypes, xmlRoots, typed);
+        foreach (var rel in result.ThreadFiles)
+            TypeEntry(GamePaths.Key(rel), StoryParserTypes, xmlRoots, typed);
         problems.AddRange(result.Problems);
 
         if (_logger.IsEnabled(LogLevel.Information))
@@ -160,21 +183,6 @@ public sealed class MetafileRegistrar
                 "Story chain: {Manifests} manifest(s), {Threads} thread file(s), {Lua} Lua script(s), {Problems} problem(s)",
                 result.ManifestFiles.Count, result.ThreadFiles.Count, result.LuaScripts.Count,
                 result.Problems.Count);
-    }
-
-    // Chain files are xml-dir-relative; like file-registry entries they are registered under
-    // EVERY xml root so a file shipped by any layer resolves to the same types.
-    private void RegisterStoryFiles(IReadOnlyList<string> relPaths, ImmutableArray<string> types,
-        IReadOnlyList<string> xmlRoots)
-    {
-        var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
-        foreach (var rel in relPaths)
-        {
-            var relPath = rel.Replace('/', sep);
-            foreach (var xmlRoot in xmlRoots)
-                _fileTypeRegistry.RegisterFile(
-                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, relPath)), types);
-        }
     }
 
     // Locates every existing copy of a metafile/content file (identified by its game-relative
@@ -209,51 +217,63 @@ public sealed class MetafileRegistrar
         }
     }
 
-    private void RegisterFromMetafile(string metafilePath, MetafileDefinition def, IReadOnlyList<string> xmlRoots)
+    private IReadOnlyList<string>? ReadMetafile(string metafilePath)
     {
-        string xmlContent;
         try
         {
-            xmlContent = _fileHelper.FileSystem.File.ReadAllText(metafilePath);
+            return MetafileReader.ReadFileKeys(_fileHelper.FileSystem.File.ReadAllText(metafilePath));
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not read metafile '{Path}'", metafilePath);
-            return;
-        }
-
-        var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
-        var types = def.Types.ToImmutableArray();
-        foreach (var filename in MetafileReader.ReadFileList(xmlContent))
-        {
-            // Metafile entries are paths relative to the XML directory, but may be a bare filename,
-            // include subdirectories ("Units\Foo.xml"), or be fully qualified ("Data\XML\Foo.xml").
-            // Normalise to an xml-dir-relative path (subdirectories PRESERVED) and resolve it against
-            // EVERY xml root, so a mod's registry can type files that live in a dependency project and
-            // files in subdirectories are no longer dropped.
-            var rel = ToXmlRelativePath(_fileHelper.NormalizeGamePath(filename)).Replace('/', sep);
-            foreach (var xmlRoot in xmlRoots)
-                _fileTypeRegistry.RegisterFile(
-                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, rel)), types);
+            return null;
         }
     }
 
-    // Falls back to the shipped baseline's file->type map when a metafile is absent from the workspace.
-    // Preserves subdirectories and resolves each key against every xml root (mirrors RegisterFromMetafile).
-    private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def,
-        IReadOnlyList<string> xmlRoots)
+    // Registry entries are paths relative to the XML directory, but may be a bare filename, include
+    // subdirectories ("Units\Foo.xml"), or be fully qualified ("Data\XML\Foo.xml"). Each is normalised
+    // to an xml-dir-relative key (subdirectories PRESERVED) and typed at the copy the game opens, so a
+    // mod's registry can type a file that lives in a dependency project.
+    private RegistryWalk Walk(MetafileDefinition def, string? registryUri, IEnumerable<string> listed,
+        IReadOnlyList<string> xmlRoots, Dictionary<string, ImmutableArray<string>> typed)
     {
-        if (xmlRoots.Count == 0) return;
+        var types = def.Types.ToImmutableArray();
+        var entries = listed
+            .Select(entry => ToXmlRelativePath(GamePaths.Key(entry)))
+            .Select(key => new RegistryWalkEntry(key, TypeEntry(key, types, xmlRoots, typed)))
+            .ToImmutableArray();
+        return new RegistryWalk(GamePaths.Key(def.Path), registryUri, entries);
+    }
+
+    // The game opens a listed file from the first layer that has it, highest first, and never reads
+    // another copy - so only that copy is typed. With none in any layer, the leaf project's path is
+    // typed instead: a copy created there wins, and the game opens the shipped one until then.
+    // Returns the URI of the layer copy that wins, or null when no layer ships the file.
+    private string? TypeEntry(string key, ImmutableArray<string> types, IReadOnlyList<string> xmlRoots,
+        Dictionary<string, ImmutableArray<string>> typed)
+    {
+        if (xmlRoots.Count == 0) return null;
+
+        string? winner = null;
+        for (var i = xmlRoots.Count - 1; i >= 0 && winner is null; i--)
+            winner = _fileHelper.FindInWorkspace([xmlRoots[i]], key);
 
         var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
+        var target = winner ?? _fileHelper.FileSystem.Path.Combine(xmlRoots[^1], key.Replace('/', sep));
+        typed[_fileHelper.PathToFileUri(target)] = types;
+        return winner is null ? null : _fileHelper.PathToFileUri(winner);
+    }
+
+    // Falls back to the shipped baseline's file->type map when a metafile is absent from the workspace
+    // and the baseline carries no ordered list for it (a baseline built before the lists).
+    private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def,
+        IReadOnlyList<string> xmlRoots, Dictionary<string, ImmutableArray<string>> typed)
+    {
         foreach (var (relativePath, types) in baseline.FileTypeMap)
         {
             if (!types.Any(t => def.Types.Contains(t, StringComparer.OrdinalIgnoreCase))) continue;
 
-            var rel = ToXmlRelativePath(relativePath).Replace('/', sep);
-            foreach (var xmlRoot in xmlRoots)
-                _fileTypeRegistry.RegisterFile(
-                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, rel)), types);
+            TypeEntry(ToXmlRelativePath(GamePaths.Key(relativePath)), types, xmlRoots, typed);
         }
     }
 

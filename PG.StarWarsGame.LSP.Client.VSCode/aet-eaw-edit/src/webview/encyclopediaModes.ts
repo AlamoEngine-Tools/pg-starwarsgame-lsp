@@ -31,8 +31,9 @@ export function factionModes(
                 id: "0",
                 label: l10n.t("None"),
                 disabled: true,
-                disabledReason:
+                disabledReason: l10n.t(
                     "This card declares no faction frame, so there is none to draw.",
+                ),
             },
         ];
     }
@@ -40,13 +41,15 @@ export function factionModes(
     const lone = frames.length === 1;
     return frames.map((frame) => ({
         id: String(frame.slot),
-        label: frame.slotName ?? `Slot ${frame.slot}`,
+        label: frame.slotName ?? l10n.t("Slot {0}", frame.slot),
         // The texture name is what an author searches their art folder for.
-        title: `${frame.slotName ?? `Slot ${frame.slot}`} - ${frame.textureName}`,
+        title: `${frame.slotName ?? l10n.t("Slot {0}", frame.slot)} - ${frame.textureName}`,
         disabled: lone,
         disabledReason: lone
-            ? `Only one faction frame is declared (${frame.textureName}), so there is nothing to ` +
-              "switch to."
+            ? l10n.t(
+                  "Only one faction frame is declared ({0}), so there is nothing to switch to.",
+                  frame.textureName,
+              )
             : undefined,
     }));
 }

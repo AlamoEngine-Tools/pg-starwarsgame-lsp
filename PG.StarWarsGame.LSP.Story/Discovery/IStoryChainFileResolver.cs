@@ -26,4 +26,11 @@ public interface IStoryChainFileResolver
     ///     downgrade problems inside vanilla-shipped files from error to warning.
     /// </summary>
     bool IsKnownToBaseline(string xmlRelativePath);
+
+    /// <summary>
+    ///     Every file of that name in any layer, as xml-directory-relative paths with <c>/</c>
+    ///     separators, highest layer first. The engine never looks a file up by its name - this
+    ///     exists to tell the author where a mis-filed one sits.
+    /// </summary>
+    IReadOnlyList<string> FindByFileName(string fileName);
 }

@@ -45,4 +45,7 @@ public sealed record WorkspaceConfiguration(
     ///     no longer say which dependency the root named and which came in through another.
     /// </summary>
     public ProjectDependencyShape Dependencies { get; init; } = new(0, 0, 0, 0);
+
+    /// <summary>The root project's game; decides which shipped game the project is checked against.</summary>
+    public TargetGame Game { get; init; } = TargetGame.FOC;
 }

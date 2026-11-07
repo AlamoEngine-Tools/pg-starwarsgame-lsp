@@ -39,6 +39,16 @@ public interface IGameIndexService
 
     void RemoveDocument(string uri);
     void ApplyBaseline(BaselineIndex baseline);
+
+    /// <summary>
+    ///     Publishes the files the game loads and their order, from the metafile scan. Defaulted to a
+    ///     no-op for the test doubles; one that ignores it keeps every shipped definition counting and
+    ///     the layers deciding, as before.
+    /// </summary>
+    void ApplyLoadOrder(LoadOrder order)
+    {
+    }
+
     void ApplyLocalisation(ILocalisationIndex index);
     void ApplyAssetFiles(IAssetFileIndex index);
     void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones);

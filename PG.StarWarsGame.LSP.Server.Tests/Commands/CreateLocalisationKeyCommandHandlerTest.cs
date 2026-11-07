@@ -10,7 +10,6 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Server.Commands;
-using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Commands;
@@ -19,7 +18,6 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
 {
     // ── XML ──────────────────────────────────────────────────────────────────
 
-    private const string XmlNs = "urn:alamoenginetools:localisation:v1";
     // ── CSV ──────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -107,9 +105,9 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var entries = xdoc.Root!.Elements(ns + "Localisation").ToList();
-        Assert.Single(entries, e => e.Attribute("key")?.Value == "TEXT_NEW");
+        Assert.Single(entries, e => e.Attribute("Key")?.Value == "TEXT_NEW");
     }
 
     [Fact]
@@ -122,9 +120,9 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var entry = xdoc.Root!.Elements(ns + "Localisation")
-            .Single(e => e.Attribute("key")?.Value == "TEXT_NEW");
+            .Single(e => e.Attribute("Key")?.Value == "TEXT_NEW");
         var translation = entry.Descendants(ns + "Translation").First();
         Assert.Equal("Hello XML", translation.Value);
     }
@@ -140,9 +138,9 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var matches = xdoc.Root!.Elements(ns + "Localisation")
-            .Where(e => e.Attribute("key")?.Value == "TEXT_DUPE").ToList();
+            .Where(e => e.Attribute("Key")?.Value == "TEXT_DUPE").ToList();
         Assert.Single(matches);
     }
 
@@ -224,11 +222,11 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
 
     private static string BuildXml(params (string Key, string Lang, string Value)[] entries)
     {
-        var ns = XNamespace.Get(XmlNs);
+        var ns = XNamespace.None;
         var root = new XElement(ns + "LocalisationData");
         foreach (var (key, lang, value) in entries)
             root.Add(new XElement(ns + "Localisation",
-                new XAttribute("key", key),
+                new XAttribute("Key", key),
                 new XElement(ns + "TranslationData",
                     new XElement(ns + "Translation",
                         new XAttribute("Language", lang),

@@ -1,0 +1,1 @@
+{"_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.1.0", "game": "foc", "name": "Nest Lib", "directories": {"xml": ["data/xml"]}, "projectReferences": []}

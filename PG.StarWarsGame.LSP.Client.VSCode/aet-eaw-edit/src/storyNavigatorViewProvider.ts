@@ -72,7 +72,14 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
     public static readonly viewId = "aet-eaw-edit.lsp.storyNavigator";
 
     protected readonly method = "aet/getStoryPlots";
-    protected readonly subject = "story campaigns";
+
+    protected noneFound(): string {
+        return vscode.l10n.t("No story campaigns found in this workspace.");
+    }
+
+    protected readFailed(): string {
+        return vscode.l10n.t("Could not read story campaigns from the server.");
+    }
 
     constructor(lsp: LspGateway) {
         super(lsp);
@@ -110,8 +117,8 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
         message: string;
     }): string {
         return outcome.reason === "offline"
-            ? "LSP server is not running."
-            : `Cannot load story plots: ${outcome.message}`;
+            ? vscode.l10n.t("LSP server is not running.")
+            : vscode.l10n.t("Cannot load story plots: {0}", outcome.message);
     }
 
     protected childrenOf(element: StoryTreeItem): StoryTreeItem[] {
@@ -228,7 +235,7 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
             setName ? "folder-library" : "folder",
         );
         item.description = setSummary(members, setName !== undefined);
-        item.tooltip = setName ?? "No Campaign_Set";
+        item.tooltip = setName ?? vscode.l10n.t("No Campaign_Set");
         item.contextValue = setName
             ? "aetCampaignSet"
             : "aetCampaignSetUngrouped";

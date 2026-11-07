@@ -61,8 +61,47 @@ public sealed class PgprojSchemaTest
         Assert.False(Evaluate("""{ "_type": "aetswg.StoryLayout", "name": "Mod" }""").IsValid);
     }
 
-    // It is the document's format, not the mod's version: a two-part or free-text value is the
-    // typo that would otherwise surface as "unreadable format version" on every open.
+    // ── game ─────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("eaw")]
+    [InlineData("foc")]
+    public void Game_TheTwoGamesAreAccepted(string game)
+    {
+        var result = Evaluate($$"""{ "name": "Mod", "game": "{{game}}" }""");
+
+        Assert.True(result.IsValid, DescribeErrors("game", result));
+    }
+
+    [Theory]
+    [InlineData("\"FOC\"")]
+    [InlineData("\"swgb\"")]
+    [InlineData("1")]
+    public void Game_AnythingElseIsRefused(string value)
+    {
+        Assert.False(Evaluate($$"""{ "name": "Mod", "game": {{value}} }""").IsValid);
+    }
+
+    // Explicit from the format that introduced it; an older file is valid without it until the
+    // migration writes it in.
+    [Theory]
+    [InlineData("aetswg-1.1.0")]
+    [InlineData("aetswg-2.0.0")]
+    public void Game_IsRequiredFromFormatOneOne(string version)
+    {
+        Assert.False(Evaluate($$"""{ "_typeVersion": "{{version}}", "name": "Mod" }""").IsValid);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "Mod" }""")]
+    [InlineData("""{ "_typeVersion": "aetswg-1.0.0", "name": "Mod" }""")]
+    public void Game_IsNotRequiredBeforeFormatOneOne(string project)
+    {
+        var result = Evaluate(project);
+
+        Assert.True(result.IsValid, DescribeErrors("pre-1.1 project", result));
+    }
+
     // It is the document's format, not the mod's version, and it carries its namespace: a bare
     // semver or free text is the typo that would otherwise surface as "unreadable format version"
     // on every open.

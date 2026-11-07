@@ -79,8 +79,32 @@ describe("panel projects", () => {
     it("builds a panel's project in one place", () => {
         const extension = fs.readFileSync(path.join(src, "extension.ts"), "utf8");
         // The one literal of a project is panelProject()'s; a second would be a panel bound some
-        // other way, and the routed gateway handed to one is exactly the bug.
-        assert.equal([...extension.matchAll(/\bgateway: gatewayFor\(/g)].length, 1);
+        // other way, and the routed gateway handed to one is exactly the bug. A panel opened while
+        // no project runs gets the pending gateway, which binds to the one project that starts and
+        // never to the editor in front (#318).
+        assert.equal(
+            [...extension.matchAll(/\bgateway: resolved \? gatewayFor\(resolved\) : pendingProjectGateway\b/g)].length,
+            1,
+        );
+        assert.equal([...extension.matchAll(/\bgateway: gatewayFor\(/g)].length, 0);
         assert.doesNotMatch(extension, /\bgateway: lsp\b/);
+    });
+
+    it("tells every gateway about a route change, through one event", () => {
+        const extension = fs.readFileSync(path.join(src, "extension.ts"), "utf8");
+        // Calling routesChanged() on one gateway by hand is how the project gateways were missed.
+        assert.doesNotMatch(extension, /\.routesChanged\(\)/);
+        assert.ok([...extension.matchAll(/\brouteChanges\.fire\(\)/g)].length >= 2);
+        // Every routed gateway is built on the shared routes.
+        const constructions = [...extension.matchAll(/new RoutedLspGateway\(([\s\S]*?)\);/g)];
+        assert.ok(constructions.length >= 3);
+        for (const [, args] of constructions) {
+            assert.match(args, /\brouteChanges\b/);
+        }
+        // The pending gateway routes to the single project only, never through the editor.
+        assert.match(
+            extension,
+            /const pendingProjectGateway = new RoutedLspGateway\(\s*\(\) =>\s*\(?clients\.size === 1 \? primaryClient\(\)\?\.gateway : undefined\)?,/,
+        );
     });
 });

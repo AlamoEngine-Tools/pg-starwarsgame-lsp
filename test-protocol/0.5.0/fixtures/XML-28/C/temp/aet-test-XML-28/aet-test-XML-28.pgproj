@@ -1,0 +1,8 @@
+{
+  "_type": "aetswg.ModProject",
+  "_typeVersion": "aetswg-1.1.0",
+  "name": "Dotted Bone Test",
+  "game": "foc",
+  "directories": { "xml": ["Data/XML"] },
+  "projectReferences": []
+}

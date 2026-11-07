@@ -292,7 +292,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     scope: this._target.scope,
                     ...(args ?? {}),
                 },
-                "simulation request failed",
+                vscode.l10n.t("Simulation request failed"),
             );
         // The record of a run, for a report of "nothing happened": every command but the
         // clock's own ticks and polls, with what came back.
@@ -360,7 +360,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     faction: this._target.faction,
                     ...payload,
                 },
-                "story command failed",
+                vscode.l10n.t("Story command failed"),
             );
 
         // Either a failed request or a refused command: a gesture may have changed the view
@@ -455,7 +455,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     faction: this._target.faction,
                     commands,
                 },
-                "save failed",
+                vscode.l10n.t("Save failed"),
             );
 
         // The webview needs an answer either way: without one the Save button stays spinning and
@@ -631,7 +631,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     faction: this._target.faction,
                     commands: this._pendingCommands,
                 },
-                "could not save the closed story graph",
+                vscode.l10n.t("Could not save the closed story graph"),
             );
         if (result === undefined || result.success) {
             return;
@@ -692,7 +692,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     commands,
                     ...filterFields(filters),
                 },
-                "preview failed",
+                vscode.l10n.t("Preview failed"),
             );
         if (result === undefined) {
             return;
@@ -731,7 +731,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     faction: this._target.faction,
                     commands,
                 },
-                "validation failed",
+                vscode.l10n.t("Validation failed"),
             );
         if (result === undefined) {
             return;

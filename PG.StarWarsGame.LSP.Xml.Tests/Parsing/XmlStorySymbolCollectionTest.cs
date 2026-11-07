@@ -51,6 +51,23 @@ public sealed class XmlStorySymbolCollectionTest
         Assert.Equal("REBEL_TRAP_SET", flag.Id);
     }
 
+    // TRIGGER_AI's first parameter names an AI story trigger, which the game keeps apart from the
+    // flags SET_FLAG creates: the reward sets it on the faction's AI player, and Lua's
+    // Check_Story_Flag reads only those. The vanilla games set 35 such names each and never one
+    // of them as a flag, so the trigger is a symbol of its own type rather than a flag.
+    [Fact]
+    public async Task TriggerAiParam_EmitsAiStoryTriggerSymbol()
+    {
+        var index = await ParseAsync(
+            "<Story><Event Name=\"E\"><Reward_Type>TRIGGER_AI</Reward_Type>" +
+            "<Reward_Param1>MANDO_CONSTRUCTION_01_BARRACKS</Reward_Param1>" +
+            "<Reward_Param2>UNDERWORLD</Reward_Param2></Event></Story>");
+
+        var trigger = Assert.Single(index.Symbols, s => s.TypeName == "StoryAiTrigger");
+        Assert.Equal("MANDO_CONSTRUCTION_01_BARRACKS", trigger.Id);
+        Assert.DoesNotContain(index.Symbols, s => s.TypeName == "StoryFlag");
+    }
+
     // ── References ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -200,6 +217,7 @@ public sealed class XmlStorySymbolCollectionTest
                 new EnumValueDefinition { Name = "TRIGGER_EVENT", Params = [Param(0, "StoryEventName")] },
                 new EnumValueDefinition { Name = "SET_FLAG", Params = [Param(0, "StoryFlag")] },
                 new EnumValueDefinition { Name = "INCREMENT_FLAG", Params = [Param(0, "StoryFlag")] },
+                new EnumValueDefinition { Name = "TRIGGER_AI", Params = [Param(0, "StoryAiTrigger")] },
                 new EnumValueDefinition
                 {
                     Name = "SPAWN_UNIT",

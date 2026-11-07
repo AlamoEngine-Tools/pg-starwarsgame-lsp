@@ -53,7 +53,7 @@ public sealed class DocumentIndexerTest
         var fh = new FileHelper(fs);
         var ctx = new EaWXmlContext(fh);
         var registrar = new MetafileRegistrar(fh, registry, schema, ctx, new StoryChainProblemStore(),
-            NullLogger<MetafileRegistrar>.Instance);
+            new RegistryWalkStore(), NullLogger<MetafileRegistrar>.Instance);
         var indexer = new DocumentIndexer(fh, svc, cache ?? new NullProjectIndexCache(),
             new ParseableFiles(fh, parsers, ctx), new IndexFingerprints(schema, luaSchema, registry, fh),
             NullLogger<DocumentIndexer>.Instance);

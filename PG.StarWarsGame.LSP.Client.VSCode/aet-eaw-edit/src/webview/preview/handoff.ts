@@ -53,11 +53,11 @@ export function handoffFor(
     // but an edit made there goes nowhere the game reads - worth building only together with a
     // way to put the file into the mod. Left for a later release.
     if (source?.packed === true) {
-        return { ...base, disabledReason: "Packed in a MEG archive" };
+        return { ...base, disabledReason: l10n.t("Packed in a MEG archive") };
     }
 
     if (source === null || source === undefined || source.path === null) {
-        return { ...base, disabledReason: "No file to open" };
+        return { ...base, disabledReason: l10n.t("No file to open") };
     }
 
     return base;

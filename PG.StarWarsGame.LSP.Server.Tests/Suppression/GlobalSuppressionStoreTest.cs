@@ -73,7 +73,7 @@ public sealed class GlobalSuppressionStoreTest
         var store = new GlobalSuppressionStore(new StubReloadService(setup.Configuration()), new FileHelper(fs),
             NullLogger<GlobalSuppressionStore>.Instance, new RecordingUserNotifier(), ResxMessageCatalog.Server("en"));
 
-        store.Add(SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), "intentional in this mod");
+        store.Add(SuppressionMatcher.ForId(DiagnosticIds.DefinitionNotUsed), "intentional in this mod");
 
         foreach (var layer in setup.Layers)
             Assert.Equal(layer.Rank == setup.LeafRank,
@@ -84,9 +84,9 @@ public sealed class GlobalSuppressionStoreTest
     public void Version1File_GainsTheDefaultEntryOnce_AndIsWrittenBack()
     {
         var (store, fs) = Build(existingJson:
-            """{ "_type": "aetswg.Suppressions", "_typeVersion": "aetswg-1.0.0", "entries": [ { "id": "aetswg-010-0001" } ] }""");
+            """{ "_type": "aetswg.Suppressions", "_typeVersion": "aetswg-1.0.0", "entries": [ { "id": "aetswg-010-0006" } ] }""");
 
-        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), CommentInsideValue], store.GetAll());
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DefinitionNotUsed), CommentInsideValue], store.GetAll());
 
         var written = JsonNode.Parse(fs.File.ReadAllText(SidecarPath))!.AsObject();
         Assert.Equal(SuppressionsDocument.Version.ToString(), (string?)written["_typeVersion"]);
@@ -109,9 +109,9 @@ public sealed class GlobalSuppressionStoreTest
     [Fact]
     public void BareArrayFile_GainsTheDefaultEntryOnce()
     {
-        var (store, fs) = Build(existingJson: """[ { "id": "aetswg-010-0001" } ]""");
+        var (store, fs) = Build(existingJson: """[ { "id": "aetswg-010-0006" } ]""");
 
-        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), CommentInsideValue], store.GetAll());
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DefinitionNotUsed), CommentInsideValue], store.GetAll());
         var written = JsonNode.Parse(fs.File.ReadAllText(SidecarPath))!.AsObject();
         Assert.Equal(SuppressionsDocument.Version.ToString(), (string?)written["_typeVersion"]);
     }
@@ -131,7 +131,7 @@ public sealed class GlobalSuppressionStoreTest
     public void Add_PersistsAndIsReadableByAFreshInstance()
     {
         var (store, fs) = Build();
-        store.Add(SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), "intentional in this mod");
+        store.Add(SuppressionMatcher.ForId(DiagnosticIds.DefinitionNotUsed), "intentional in this mod");
 
         Assert.True(fs.File.Exists(SidecarPath));
         Assert.Contains("intentional in this mod", fs.File.ReadAllText(SidecarPath));
@@ -145,7 +145,7 @@ public sealed class GlobalSuppressionStoreTest
             ResxMessageCatalog.Server("en"));
 
         Assert.Equal(
-            [CommentInsideValue, SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], reread.GetAll());
+            [CommentInsideValue, SuppressionMatcher.ForId(DiagnosticIds.DefinitionNotUsed)], reread.GetAll());
     }
 
     // The "suppress everywhere" quick fix can be invoked twice on the same diagnostic; the second
@@ -197,10 +197,10 @@ public sealed class GlobalSuppressionStoreTest
     public void UnreadableEntry_IsSkippedButOthersSurvive()
     {
         var (store, _) = Build(existingJson:
-            """[{"id":"garbage"},{"id":"aetswg-010-0001"}]""");
+            """[{"id":"garbage"},{"id":"aetswg-010-0006"}]""");
 
         // A bare array migrates like any file older than version 2: it gains the default-off entry.
-        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), CommentInsideValue], store.GetAll());
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DefinitionNotUsed), CommentInsideValue], store.GetAll());
     }
 
     // The failure this prevents: suppressions.json is hand-editable and committed, so a typo in it
@@ -211,7 +211,7 @@ public sealed class GlobalSuppressionStoreTest
     {
         var notifier = new RecordingUserNotifier();
         var (store, _) = BuildWith(notifier, existingJson:
-            """[{"id":"garbage"},{"id":"aetswg-010-0001"}]""");
+            """[{"id":"garbage"},{"id":"aetswg-010-0006"}]""");
 
         store.GetAll();
 
@@ -247,7 +247,7 @@ public sealed class GlobalSuppressionStoreTest
     public void ValidEntries_ReportNothing()
     {
         var notifier = new RecordingUserNotifier();
-        var (store, _) = BuildWith(notifier, existingJson: """[{"id":"aetswg-010-0001"}]""");
+        var (store, _) = BuildWith(notifier, existingJson: """[{"id":"aetswg-010-0006"}]""");
 
         store.GetAll();
 
@@ -275,14 +275,14 @@ public sealed class GlobalSuppressionStoreTest
     [Fact]
     public void LegacyArrayFile_IsRewrittenWithItsEnvelope()
     {
-        var (store, fs) = Build(existingJson: """[{"id":"aetswg-010-0001","reason":"known"}]""");
+        var (store, fs) = Build(existingJson: """[{"id":"aetswg-010-0006","reason":"known"}]""");
 
         store.GetAll();
 
         var written = JsonNode.Parse(fs.File.ReadAllText(SidecarPath))!.AsObject();
         Assert.Equal("aetswg.Suppressions", (string?)written["_type"]);
         Assert.Equal(SuppressionsDocument.Version.ToString(), (string?)written["_typeVersion"]);
-        Assert.Equal("aetswg-010-0001", (string?)written["entries"]![0]!["id"]);
+        Assert.Equal("aetswg-010-0006", (string?)written["entries"]![0]!["id"]);
         Assert.Equal("known", (string?)written["entries"]![0]!["reason"]);
     }
 
@@ -294,11 +294,11 @@ public sealed class GlobalSuppressionStoreTest
             {
               "_type": "aetswg.Suppressions",
               "_typeVersion": "aetswg-2.0.0",
-              "entries": [ { "id": "aetswg-010-0001" } ]
+              "entries": [ { "id": "aetswg-010-0006" } ]
             }
             """);
 
-        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], store.GetAll());
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DefinitionNotUsed)], store.GetAll());
     }
 
     // Enforced upgrading, and the half of it that protects the file: an older build suppresses

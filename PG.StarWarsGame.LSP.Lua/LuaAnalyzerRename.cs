@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -60,5 +61,26 @@ internal static class LuaAnalyzerRename
                 throw new InvalidOperationException(
                     messages.Format("LuaAnalyzerRename_RenameRefusedEditsWhichNot", Path.GetFileName(path)));
         }
+    }
+
+    /// <summary>
+    ///     Refuses an edit of the engine stubs: the analyzer's rename of an engine member edits the
+    ///     stub declaring it and every script calling it.
+    /// </summary>
+    public static void EnsureNoStubEdited(WorkspaceEdit edit, LuaStubLocation stubs, IMessageCatalog messages)
+    {
+        if (StubEdited(edit, stubs) is { } edited)
+            throw new InvalidOperationException(messages.Format("LuaAnalyzerRename_RenameRefusedEditsWhichNot",
+                Path.GetFileName(edited.GetFileSystemPath())));
+    }
+
+    /// <summary>The first stub <paramref name="edit" /> edits; null when it edits none.</summary>
+    public static DocumentUri? StubEdited(WorkspaceEdit edit, LuaStubLocation stubs)
+    {
+        return (edit.Changes?.Keys ?? [])
+            .Concat(edit.DocumentChanges?
+                .Where(c => c.IsTextDocumentEdit)
+                .Select(c => c.TextDocumentEdit!.TextDocument.Uri) ?? [])
+            .FirstOrDefault(u => LuaAnalyzerPassThrough.IsInStubs(u.ToString(), stubs));
     }
 }

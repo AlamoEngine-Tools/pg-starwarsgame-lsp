@@ -36,10 +36,19 @@ export interface ColourFinding {
  */
 const COLLISION_DELTA_E = 12;
 
-/** The dark of space, and a mid daylight terrain, as the two backdrops a unit is seen against. */
-const BACKDROPS: { name: string; colour: PreviewRgba }[] = [
-    { name: "the space backdrop", colour: { r: 10, g: 12, b: 20, a: 255 } },
-    { name: "daylight terrain", colour: { r: 138, g: 132, b: 112, a: 255 } },
+/**
+ * The dark of space, and a mid daylight terrain, as the two backdrops a unit is seen against - each
+ * with its whole sentence, as a backdrop's name slotted into another gives a translator nothing.
+ */
+const BACKDROPS: { hardToSee: string; colour: PreviewRgba }[] = [
+    {
+        hardToSee: l10n.t("Hard to pick out against the space backdrop."),
+        colour: { r: 10, g: 12, b: 20, a: 255 },
+    },
+    {
+        hardToSee: l10n.t("Hard to pick out against daylight terrain."),
+        colour: { r: 138, g: 132, b: 112, a: 255 },
+    },
 ];
 
 /**
@@ -321,7 +330,7 @@ export function reviewFactionColour(
         if (lowContrast && closeInHue) {
             findings.push({
                 severity: "info",
-                message: l10n.t("Hard to pick out against {0}.", backdrop.name),
+                message: backdrop.hardToSee,
             });
         }
     }

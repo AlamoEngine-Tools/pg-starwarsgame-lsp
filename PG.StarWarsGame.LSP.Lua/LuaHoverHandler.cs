@@ -74,11 +74,18 @@ public sealed class LuaHoverHandler : IHoverProvider
 
         // Phase 1: XML reference hover from DocumentIndex - no AST needed.
         var xmlRefHover = TryBuildXmlRefHover(index, uri, line, character);
-        if (xmlRefHover is not null)
-            return Task.FromResult<Hover?>(xmlRefHover);
 
         // AST (shared via the parse cache) for Phases 2 and 3.
         var root = parsed.Tree.GetRoot();
+
+        // A StoryModeEvents key is a state and a StoryEvent reference at once - every vanilla key names an
+        // event the story XML defines - so its state card would never show behind the reference's. Both
+        // are said, the state first.
+        if (xmlRefHover is not null)
+            return Task.FromResult<Hover?>(
+                TryBuildStateMachineHover(root, uri, line, character, index) is { } keyState
+                    ? Joined(keyState, xmlRefHover)
+                    : xmlRefHover);
 
         // Phase 2: require() module hover.
         var requireHover = TryBuildRequireHover(root, line, character, index.Documents, _fileHelper, uri);
@@ -315,5 +322,12 @@ public sealed class LuaHoverHandler : IHoverProvider
             }),
             Range = range
         };
+    }
+
+    /// <summary>Two cards of ours over one span: the first above a rule, the second below it.</summary>
+    private static Hover Joined(Hover first, Hover second)
+    {
+        return BuildHover(first.Contents.MarkupContent!.Value + "\n\n---\n\n" + second.Contents.MarkupContent!.Value,
+            first.Range!);
     }
 }

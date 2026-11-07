@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -17,8 +18,16 @@ namespace PG.StarWarsGame.LSP.Lua.Tests;
 /// <summary>Requests this server has nothing of its own for: the analyzer's answer, passed through.</summary>
 public sealed class LuaAnalyzerHandlersTest
 {
+    // ── the sandbox (#249) ───────────────────────────────────────────────────
+
+    private const string Interdictor = "file:///mod/data/scripts/gameobject/interdictor.lua";
+    private const string Vader = "file:///mod/data/scripts/gameobject/darthvader.lua";
+    private const string StateMachine = "file:///mod/data/scripts/library/pgstatemachine.lua";
+
+    private const string Stub = "file:///C:/schema/lua/pgstatemachine.d.lua";
     private static readonly TextDocumentIdentifier Lua = new(DocumentUri.From("file:///script.lua"));
     private static readonly TextDocumentIdentifier Xml = new(DocumentUri.From("file:///units.xml"));
+    private static readonly LuaStubLocation s_stubs = new() { Directory = "C:/schema/lua" };
 
     [Fact]
     public async Task References_AreTheAnalyzers()
@@ -34,12 +43,6 @@ public sealed class LuaAnalyzerHandlersTest
 
         Assert.Equal(3, Assert.Single(result!).Range.Start.Line);
     }
-
-    // ── the sandbox (#249) ───────────────────────────────────────────────────
-
-    private const string Interdictor = "file:///mod/data/scripts/gameobject/interdictor.lua";
-    private const string Vader = "file:///mod/data/scripts/gameobject/darthvader.lua";
-    private const string StateMachine = "file:///mod/data/scripts/library/pgstatemachine.lua";
 
     /// <summary>Two object scripts, each requiring the state machine: two states.</summary>
     private static FixedSandbox TwoObjectScripts()
@@ -82,8 +85,33 @@ public sealed class LuaAnalyzerHandlersTest
     {
         var locations = JArray.FromObject(new[] { At(Interdictor, 44), At(Vader, 70), At(StateMachine, 172) },
             JsonSerializer.Create(new JsonSerializerSettings
-                { ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver() }));
+                { ContractResolver = new CamelCasePropertyNamesContractResolver() }));
         var resolved = new CodeLens
+        {
+            Range = new Range(40, 9, 40, 20),
+            Command = new Command
+            {
+                Name = "emmy.showReferences", Title = "3 usages",
+                Arguments = new JArray(Interdictor, JObject.FromObject(new { line = 40, character = 9 }), locations)
+            }
+        };
+        var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", resolved);
+
+        var result = await new LuaCodeLensHandler(analyzer, TwoObjectScripts(), new LuaStubLocation())
+            .Handle(new CodeLens { Range = new Range(40, 9, 40, 20) }, CancellationToken.None);
+
+        Assert.Equal("2 usages", result.Command!.Title);
+        Assert.Equal(2, ((JArray)result.Command.Arguments![2]).Count);
+    }
+
+    // The analyzer lists the declaration the lens sits on among its usages (measured, 0.25.1).
+    [Fact]
+    public async Task ACodeLens_DoesNotCountItsOwnDeclaration()
+    {
+        var locations = JArray.FromObject(new[] { At(Interdictor, 30), At(Interdictor, 44), At(Interdictor, 50) },
+            JsonSerializer.Create(new JsonSerializerSettings
+                { ContractResolver = new CamelCasePropertyNamesContractResolver() }));
+        var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", new CodeLens
         {
             Range = new Range(44, 9, 44, 20),
             Command = new Command
@@ -91,18 +119,15 @@ public sealed class LuaAnalyzerHandlersTest
                 Name = "emmy.showReferences", Title = "3 usages",
                 Arguments = new JArray(Interdictor, JObject.FromObject(new { line = 44, character = 9 }), locations)
             }
-        };
-        var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", resolved);
+        });
 
         var result = await new LuaCodeLensHandler(analyzer, TwoObjectScripts(), new LuaStubLocation())
             .Handle(new CodeLens { Range = new Range(44, 9, 44, 20) }, CancellationToken.None);
 
         Assert.Equal("2 usages", result.Command!.Title);
-        Assert.Equal(2, ((JArray)result.Command.Arguments![2]).Count);
+        Assert.Equal([30, 50],
+            ((JArray)result.Command.Arguments![2]).Select(l => l["range"]!["start"]!["line"]!.Value<int>()));
     }
-
-    private const string Stub = "file:///C:/schema/lua/pgstatemachine.d.lua";
-    private static readonly LuaStubLocation s_stubs = new() { Directory = "C:/schema/lua" };
 
     // The stubs are the analyzer's library: their declarations describe a function, they never use it.
     [Fact]
@@ -125,19 +150,19 @@ public sealed class LuaAnalyzerHandlersTest
     {
         var locations = JArray.FromObject(new[] { At(Interdictor, 44), At(Stub, 12) },
             JsonSerializer.Create(new JsonSerializerSettings
-                { ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver() }));
+                { ContractResolver = new CamelCasePropertyNamesContractResolver() }));
         var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", new CodeLens
         {
-            Range = new Range(44, 9, 44, 20),
+            Range = new Range(40, 9, 40, 20),
             Command = new Command
             {
                 Name = "emmy.showReferences", Title = "2 usages",
-                Arguments = new JArray(Interdictor, JObject.FromObject(new { line = 44, character = 9 }), locations)
+                Arguments = new JArray(Interdictor, JObject.FromObject(new { line = 40, character = 9 }), locations)
             }
         });
 
         var result = await new LuaCodeLensHandler(analyzer, TwoObjectScripts(), s_stubs)
-            .Handle(new CodeLens { Range = new Range(44, 9, 44, 20) }, CancellationToken.None);
+            .Handle(new CodeLens { Range = new Range(40, 9, 40, 20) }, CancellationToken.None);
 
         Assert.Equal("1 usage", result.Command!.Title);
     }

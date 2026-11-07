@@ -62,7 +62,24 @@ public sealed class ModProjectLoader
         _migrations = migrations;
     }
 
+    /// <summary>Reads a project the server works on, offering to update its file when it is older.</summary>
     public ModProjectFile Load(string path)
+    {
+        return Load(path, true);
+    }
+
+    /// <summary>
+    ///     Reads a project another one builds on: in the current shape, like any other, but its file
+    ///     is never offered for updating. A project speaks for its own file and not for what it
+    ///     builds on; offered from every project over it, one file was asked about several times, and
+    ///     a second yes copied the updated file over the backup of the original.
+    /// </summary>
+    public ModProjectFile LoadDependency(string path)
+    {
+        return Load(path, false);
+    }
+
+    private ModProjectFile Load(string path, bool offer)
     {
         var text = _fileHelper.FileSystem.File.ReadAllText(path);
         var fileName = _fileHelper.FileSystem.Path.GetFileName(path);
@@ -100,7 +117,7 @@ public sealed class ModProjectLoader
                 _messages.Format("ModProject_CouldNotLoadModProject12", fileName, refusal.Message),
                 problem: ProjectProblem.UnsupportedVersion);
 
-        document = BringForward(document, declaredVersion, path, fileName);
+        document = BringForward(document, declaredVersion, path, fileName, offer);
 
         ModProjectFileDto? dto;
         try
@@ -154,6 +171,7 @@ public sealed class ModProjectLoader
 
         var localisation = ParseLocalisation(dto.Localisation, fileName);
         var icons = ParseIcons(dto.Icons, fileName);
+        var game = ParseGame(dto.Game, fileName);
 
         var references = new List<ProjectReference>();
         foreach (var reference in dto.ProjectReferences ?? [])
@@ -168,7 +186,23 @@ public sealed class ModProjectLoader
             references.Add(new ProjectReference(NormalizePath(raw)));
         }
 
-        return new ModProjectFile(name, modinfo, directories, references, localisation, icons);
+        return new ModProjectFile(name, modinfo, directories, references, game, localisation, icons);
+    }
+
+    // Required: the migration writes it into every older file, and a file that predates the version
+    // fields reaches here through that same migration, so a file without it here claims a format it
+    // does not follow. It must be one of exactly the schema's two spellings, so the editor and the
+    // server never disagree on a file.
+    private TargetGame ParseGame(JsonElement? value, string fileName)
+    {
+        if (value is not { } element)
+            throw new ModProjectLoadException(_messages.Format("ModProject_GameRequired", fileName));
+
+        var text = element.ValueKind == JsonValueKind.String ? element.GetString() : null;
+        if (TargetGameNames.TryParse(text, out var game)) return game;
+
+        throw new ModProjectLoadException(
+            _messages.Format("ModProject_GameMustBeOneOf", fileName, text ?? element.GetRawText()));
     }
 
     // Absence means "use the engine convention", not "no icons" - unlike localisation there is a
@@ -340,7 +374,7 @@ public sealed class ModProjectLoader
     ///     tell whoever can ask the user that there is something to persist.
     /// </remarks>
     private JsonObject BringForward(
-        JsonObject document, string? declaredVersion, string path, string fileName)
+        JsonObject document, string? declaredVersion, string path, string fileName, bool offer)
     {
         // No version and no initial migration means we cannot say which shape it holds, so there is
         // nothing to bring forward - it is read as it is, which for a project file is version one.
@@ -369,18 +403,23 @@ public sealed class ModProjectLoader
         migrated["_type"] = PgprojFormat.TypeName;
         migrated["_typeVersion"] = PgprojFormat.Current.ToString();
 
+        if (!offer) return migrated;
+
         // The diff is the one moment the author is already being asked to change this file, so a
         // project with icon sources it has no way to reach is offered the node here rather than
         // finding out later that every icon came from the base game. Outside the migration chain
         // because it needs the PATH: a migration step sees only the tree, so it could not tell
         // whether the folder it would name is really there. See PgprojIconProposal.
+        // The node goes on a COPY that only the diff sees: until the author accepts it the project
+        // has no icons node, and reading it with one hid the notice that says so.
         var notices = migration.Notices;
+        var proposed = (JsonObject)migrated.DeepClone();
         var directory = _fileHelper.FileSystem.Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory)
-            && PgprojIconProposal.TryPropose(migrated, directory, _fileHelper.FileSystem, _messages) is { } icons)
+            && PgprojIconProposal.TryPropose(proposed, directory, _fileHelper.FileSystem, _messages) is { } icons)
             notices = [.. notices, icons];
 
-        _migrationSink.Migrated(path, migrated, notices);
+        _migrationSink.Migrated(path, proposed, notices);
         return migrated;
     }
 
@@ -411,6 +450,10 @@ public sealed class ModProjectLoader
         [JsonPropertyName("_typeVersion")] public string? TypeVersion { get; init; }
 
         public string? Name { get; init; }
+
+        /// <summary>The game the mod is built for; see <see cref="TargetGameNames" />.</summary>
+        public JsonElement? Game { get; init; }
+
         public JsonElement? Modinfo { get; init; }
         public DirectoryMapDto? Directories { get; init; }
         public List<ProjectReferenceDto>? ProjectReferences { get; init; }

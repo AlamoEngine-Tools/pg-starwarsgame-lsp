@@ -130,29 +130,21 @@ public sealed class StoryGraphDiagnosticsProducerTest
         Assert.DoesNotContain(Produce(model), d => d.Message.Contains("suspended"));
     }
 
-    [Fact]
-    public void TagOrder_RewardBeforeEventType_Warns()
+    // The scripting document lists the event tags in one order, and a warning used to hold every
+    // event to it. The game reads each tag by name into its own slot and builds the event from the
+    // slots afterwards, so the order in the file changes nothing: 216 of EaW's 5,390 shipped events
+    // and 263 of FoC's 9,873 deviate from the document and run as written.
+    [Theory]
+    [InlineData("<Reward_Type>STORY_ELEMENT</Reward_Type><Event_Type>STORY_TRIGGER</Event_Type>")]
+    [InlineData("<Event_Type>STORY_TRIGGER</Event_Type><Reward_Param1>x</Reward_Param1>" +
+                "<Reward_Type>STORY_ELEMENT</Reward_Type>")]
+    [InlineData("<Event_Type>STORY_TRIGGER</Event_Type><Story_Dialog_Popup>Yes</Story_Dialog_Popup>" +
+                "<Prereq>E</Prereq><Story_Tag>T</Story_Tag>")]
+    [InlineData("<Event_Type>STORY_TRIGGER</Event_Type><Reward_Type>STORY_ELEMENT</Reward_Type>" +
+                "<Reward_Param1>x</Reward_Param1><Prereq>E</Prereq><Branch>B1</Branch><Perpetual>true</Perpetual>")]
+    public void TagOrder_IsNotChecked_TheGameReadsEveryTagByName(string tags)
     {
-        var model = Model([
-            (UriA,
-                "<Event Name=\"E\"><Reward_Type>STORY_ELEMENT</Reward_Type>" +
-                "<Event_Type>STORY_TRIGGER</Event_Type></Event>")
-        ]);
-
-        var warning = Assert.Single(Produce(model), d => d.Message.Contains("tag order"));
-        Assert.Contains("'Event_Type'", warning.Message);
-        Assert.Contains("'Reward_Type'", warning.Message);
-    }
-
-    [Fact]
-    public void TagOrder_DocumentedOrder_NoDiagnostic()
-    {
-        var model = Model([
-            (UriA,
-                "<Event Name=\"E\"><Event_Type>STORY_TRIGGER</Event_Type>" +
-                "<Reward_Type>STORY_ELEMENT</Reward_Type><Reward_Param1>x</Reward_Param1>" +
-                "<Prereq>E</Prereq><Branch>B1</Branch><Perpetual>true</Perpetual></Event>")
-        ]);
+        var model = Model([(UriA, $"<Event Name=\"E\">{tags}</Event>")]);
 
         Assert.DoesNotContain(Produce(model), d => d.Message.Contains("tag order"));
     }

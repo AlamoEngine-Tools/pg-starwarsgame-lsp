@@ -10,6 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -42,7 +43,7 @@ public class LspServerFixture : IAsyncLifetime
     /// </summary>
     public Task ScanCompleted => _scanCompleteTcs.Task;
 
-    public async ValueTask InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         TestDataDirectory = Path.Combine(
             Path.GetDirectoryName(typeof(LspServerFixture).Assembly.Location)!,
@@ -90,11 +91,20 @@ public class LspServerFixture : IAsyncLifetime
     protected virtual string? ProjectPath => null;
 
     /// <summary>
+    ///     Environment variables the spawned server starts with, over the test run's own; a null value
+    ///     removes one.
+    /// </summary>
+    protected virtual IReadOnlyDictionary<string, string?> ServerEnvironment => new Dictionary<string, string?>();
+
+    /// <summary>
     ///     Fired on every <c>publishDiagnostics</c> notification received from the server.
     ///     Use this instead of <c>client.Register(r => r.OnPublishDiagnostics(...))</c>,
     ///     which does not reliably receive server-push notifications in OmniSharp 0.19.x.
     /// </summary>
     public event Action<PublishDiagnosticsParams>? DiagnosticsReceived;
+
+    /// <summary>Every <c>window/showMessage</c> the server sent, in order - the notifications a reader sees.</summary>
+    public List<ShowMessageParams> MessagesShown { get; } = [];
 
     /// <summary>
     ///     Completes on the first <c>publishDiagnostics</c> for <paramref name="uri" /> that
@@ -284,6 +294,9 @@ public class LspServerFixture : IAsyncLifetime
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        foreach (var (name, value) in ServerEnvironment)
+            if (value is null) startInfo.Environment.Remove(name);
+            else startInfo.Environment[name] = value;
         _process = Process.Start(startInfo)!;
 
         _ = Task.Run(async () =>
@@ -350,6 +363,10 @@ public class LspServerFixture : IAsyncLifetime
         {
             _scanStartedTcs.TrySetResult();
             DiagnosticsReceived?.Invoke(p);
+        });
+        options.OnShowMessage(p =>
+        {
+            lock (MessagesShown) MessagesShown.Add(p);
         });
     }
 

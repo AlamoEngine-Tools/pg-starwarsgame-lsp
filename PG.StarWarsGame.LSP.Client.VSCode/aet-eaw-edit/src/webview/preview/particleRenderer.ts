@@ -452,6 +452,46 @@ export interface TailGeometry {
     turns: number;
 }
 
+/** One particle as the probe reports it: where it is drawn, how it moves, how old it is, its streak. */
+export interface ProbedParticle {
+    drawn: [number, number, number];
+    velocity: [number, number, number];
+    /** The direction it was born in, which `inwardSpeed` pushes it along at birth. */
+    inward: [number, number, number];
+    age: number;
+    stretch: number;
+}
+
+/**
+ * What one emitter is doing, as the UI tests read it: the questions the protocol asks of an effect - is
+ * the field full, does it drift, is the batch frozen, drawn back to front - are about the simulation,
+ * and reading them off pixels is guesswork. Read-only.
+ */
+export interface EmitterProbe {
+    name: string;
+    frozen: boolean;
+    weather: boolean;
+    /** The field's wind drift, simulation units per second; zero for every other kind. */
+    drift: [number, number, number];
+    live: number;
+    drawn: number;
+    /** Whether it draws through the engine's own effect rather than the preview's shader. */
+    throughEffect: boolean;
+    /** The declared spawn and speed volumes - their shape and, for a cube, the half-extent. */
+    position: { shape: string; sideLength: number };
+    speed: { shape: string; sideLength: number };
+    inwardSpeed: number;
+    /** At most {@link PROBE_PARTICLES}, in draw order. */
+    particles: ProbedParticle[];
+    /** Every live particle's position and age summed, in simulation space: equal on two frames of a frozen batch, whatever order it is drawn in. */
+    positionSum: [number, number, number];
+    ageSum: number;
+    /** A frozen batch sorted by depth: the squared camera distances in draw order. Null when unsorted. */
+    drawDepths: number[] | null;
+}
+
+const PROBE_PARTICLES = 400;
+
 /**
  * The kite a tailed emitter draws instead of a square.
  *
@@ -661,6 +701,11 @@ class EmitterRenderer {
     private readonly drawIndex: number[] = [];
     private readonly depths = new Float32Array(MAX_PARTICLES);
 
+    /** The last frame, its draw order and its drawn count, kept for {@link probe}. */
+    private lastFrame: EmitterFrame | null = null;
+    private lastOrder: number[] | null = null;
+    private lastDrawn = 0;
+
     /** Where `EveryVertex` has got to. Kept across ticks, because that walk is ordered. */
     private readonly cursor: EmissionCursor = { subMesh: 0, vertex: 0 };
 
@@ -819,6 +864,80 @@ class EmitterRenderer {
     /** True once the emitter's freeze time has passed and its particles are baked. */
     get isFrozen(): boolean {
         return this.frozen;
+    }
+
+    /** What this emitter did on its last frame, for the UI tests - see {@link EmitterProbe}. */
+    probe(): EmitterProbe {
+        const frame = this.lastFrame;
+        const order = this.lastOrder;
+        const count = Math.min(this.lastDrawn, PROBE_PARTICLES);
+        const particles: ProbedParticle[] = [];
+        for (let i = 0; i < count; i++) {
+            const particle = this.particles[order === null ? i : order[i]];
+            if (particle === undefined) {
+                break;
+            }
+            if (this.weatherHalf > 0) {
+                this.weatherDrawOf(particle);
+            }
+            const at =
+                this.weatherHalf > 0 ? this.weatherDrawn : particle.position;
+            const drift = this.weatherDrift;
+            particles.push({
+                drawn: [
+                    at.x * this.scaleFactor,
+                    at.y * this.scaleFactor,
+                    at.z * this.scaleFactor,
+                ],
+                velocity: [
+                    particle.velocity.x + drift.x,
+                    particle.velocity.y + drift.y,
+                    particle.velocity.z + drift.z,
+                ],
+                inward: [
+                    particle.inward.x,
+                    particle.inward.y,
+                    particle.inward.z,
+                ],
+                age: particle.age,
+                stretch:
+                    frame === null ? 1 : this.kiteFor(particle, frame).stretch,
+            });
+        }
+        return {
+            name: this.mesh.name,
+            frozen: this.frozen,
+            weather: this.weatherHalf > 0,
+            drift: [
+                this.weatherDrift.x,
+                this.weatherDrift.y,
+                this.weatherDrift.z,
+            ],
+            live: this.particles.length,
+            drawn: this.lastDrawn,
+            throughEffect: this.engine !== null,
+            position: {
+                shape: this.emitter.position.shape,
+                sideLength: this.emitter.position.sideLength,
+            },
+            speed: {
+                shape: this.emitter.speed.shape,
+                sideLength: this.emitter.speed.sideLength,
+            },
+            inwardSpeed: this.emitter.properties.inwardSpeed,
+            particles,
+            positionSum: this.particles.reduce<[number, number, number]>(
+                (sum, p) => [
+                    sum[0] + p.position.x,
+                    sum[1] + p.position.y,
+                    sum[2] + p.position.z,
+                ],
+                [0, 0, 0],
+            ),
+            ageSum: this.particles.reduce((sum, p) => sum + p.age, 0),
+            drawDepths:
+                order === null ? null : order.map((i) => this.depths[i]),
+        };
     }
 
     /**
@@ -1506,6 +1625,10 @@ class EmitterRenderer {
             this.placeWeatherCube(frame);
         }
         const order = this.frozen ? this.depthOrder(frame) : null;
+        // Kept for the probe: the order and the count this frame was drawn with.
+        this.lastFrame = frame;
+        this.lastOrder = order === null ? null : [...order];
+        this.lastDrawn = this.drawnCount(frame);
 
         if (this.engine !== null) {
             this.writeQuads(this.engine, frame, order);
@@ -1941,6 +2064,11 @@ export class ParticleSystemInstance {
     /** The emitters in file order. Names repeat - p_explosion_huge01 has three called "debre". */
     emitterNames(): string[] {
         return this.emitters.map((emitter) => emitter.mesh.name);
+    }
+
+    /** Every emitter's last frame, in file order, for the UI tests - see {@link EmitterProbe}. */
+    probe(): EmitterProbe[] {
+        return this.emitters.map((emitter) => emitter.probe());
     }
 
     /** Whether one emitter lies flat on the ground rather than facing the camera. */

@@ -43,15 +43,15 @@ const FAMILIES = [
 export type AnimationFamily = (typeof FAMILIES)[number];
 
 export const FAMILY_LABELS: Record<AnimationFamily, string> = {
-    idle: "Idle",
-    move: "Movement",
-    attack: "Attack",
-    hit: "Taking a hit",
-    death: "Death",
-    travel: "Landing and takeoff",
-    state: "State changes",
-    cinematic: "Cinematic",
-    other: "Other",
+    idle: l10n.t("Idle"),
+    move: l10n.t("Movement"),
+    attack: l10n.t("Attack"),
+    hit: l10n.t("Taking a hit"),
+    death: l10n.t("Death"),
+    travel: l10n.t("Landing and takeoff"),
+    state: l10n.t("State changes"),
+    cinematic: l10n.t("Cinematic"),
+    other: l10n.t("Other"),
 };
 
 /** How an action is being held. */
@@ -408,10 +408,10 @@ function pad(take: number): string {
  * would be a translation, and it would rot.
  */
 const ACTION_LABELS: Record<string, string> = {
-    turnl: "Turn left",
-    turnr: "Turn right",
-    turn_left: "Turn left",
-    turn_right: "Turn right",
+    turnl: l10n.t("Turn left"),
+    turnr: l10n.t("Turn right"),
+    turn_left: l10n.t("Turn left"),
+    turn_right: l10n.t("Turn right"),
 };
 
 /** What an action row is called, with its stance said out loud when it has one. */

@@ -253,18 +253,6 @@ public static class XmlUtility
         return string.Join("_", Regex.Split(pascalName, @"(?<=[a-z])(?=[A-Z])"));
     }
 
-    public static bool TryFindNodeByClosingLine(HtmlDocument doc, int line, out HtmlNode? node)
-    {
-        node = doc.DocumentNode
-            .Descendants()
-            .FirstOrDefault(n =>
-                n.NodeType == HtmlNodeType.Element &&
-                n.EndNode != null &&
-                !ReferenceEquals(n.EndNode, n) &&
-                GetLine(n.EndNode) == line);
-        return node is not null;
-    }
-
     /// <summary>
     ///     Returns the deepest element that structurally contains <paramref name="cursorLine" /> (0-based).
     ///     Elements with no explicit closing tag (auto-closed by HAP) are treated as extending to
@@ -305,6 +293,49 @@ public static class XmlUtility
         }
 
         return best;
+    }
+
+    /// <summary>
+    ///     Returns the deepest element whose content holds the text <paramref name="offset" />: after
+    ///     its start tag began and no later than its end tag begins. The rule of the line overload,
+    ///     taken by stream position, so elements sharing a line - a file written on one - are told
+    ///     apart. An element never closed (truncated text) extends to the end of the document, a leaf
+    ///     the parser closed for it to the end of the line it starts on (where a value is being typed);
+    ///     a self-closing one encloses nothing.
+    /// </summary>
+    public static HtmlNode? FindEnclosingElementAt(HtmlDocument doc, int offset)
+    {
+        HtmlNode? best = null;
+        var bestDepth = -1;
+        foreach (var node in doc.DocumentNode.Descendants()
+                     .Where(n => n.NodeType == HtmlNodeType.Element))
+        {
+            if (node.StreamPosition >= offset) continue;
+            var end = node.EndNode is not null && !ReferenceEquals(node.EndNode, node)
+                                               && node.EndNode.Line >= node.Line
+                ? node.EndNode.StreamPosition // explicit, valid closing tag
+                : ReferenceEquals(node.EndNode, node)
+                    ? node.StreamPosition // self-closing
+                    : node.EndNode is null || node.ChildNodes.Any(c => c.NodeType == HtmlNodeType.Element)
+                        ? int.MaxValue // never closed, or a synthetic close on a container
+                        : EndOfLine(doc.Text, node.StreamPosition); // synthetic close on a leaf
+            if (offset > end) continue;
+
+            var depth = GetDepth(node);
+            if (depth > bestDepth)
+            {
+                bestDepth = depth;
+                best = node;
+            }
+        }
+
+        return best;
+    }
+
+    private static int EndOfLine(string text, int from)
+    {
+        var newline = text.IndexOf('\n', from);
+        return newline < 0 ? text.Length : newline;
     }
 
     /// <summary>

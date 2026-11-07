@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Project;
+
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
 /// <summary>
@@ -10,5 +12,9 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 /// </summary>
 public interface IBaselineBootstrapper
 {
-    Task LoadAsync(CancellationToken ct);
+    /// <summary>The game whose baseline is loaded, or null while none has loaded.</summary>
+    TargetGame? LoadedGame => null;
+
+    /// <summary>Loads <paramref name="game" />'s baseline unless it is the one already loaded.</summary>
+    Task LoadAsync(TargetGame game, CancellationToken ct);
 }

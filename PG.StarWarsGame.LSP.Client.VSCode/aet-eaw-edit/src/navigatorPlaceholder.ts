@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
+
 /**
  * What a navigator shows when the server comes back with nothing.
  *
@@ -10,6 +12,6 @@
  *
  * Shared so the two navigators cannot drift into answering the same question differently.
  */
-export function emptyNavigatorMessage(scanned: boolean, what: string): string {
-    return scanned ? `No ${what} found in this workspace.` : "Loading...";
+export function emptyNavigatorMessage(scanned: boolean, none: string): string {
+    return scanned ? none : l10n.t("Loading...");
 }

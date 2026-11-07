@@ -38,7 +38,7 @@ public sealed class BaselineLoader
     {
         var (baseline, source) = await (config.Type switch
         {
-            BaselineSourceType.Local => LoadLocalAsync(config.LocalPath, ct),
+            BaselineSourceType.Local => LoadLocalAsync(config.LocalFile(_fileHelper.FileSystem), ct),
             BaselineSourceType.Http => LoadHttpAsync(config, ct),
             _ => Task.FromResult((BaselineIndex.Empty, StatusAssetSource.Empty))
         });

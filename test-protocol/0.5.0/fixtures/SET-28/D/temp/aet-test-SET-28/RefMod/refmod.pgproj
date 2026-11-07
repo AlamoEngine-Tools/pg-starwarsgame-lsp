@@ -1,0 +1,1 @@
+{ "name": "Ref Mod", "directories": { "xml": ["data/xml"] }, "projectReferences": [ { "path": "../../../github/alamoengine-tools/PG.StarWarsGame.LSP/eaw/empire-at-war-vanilla.pgproj" } ], "_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.1.0", "game": "eaw" }

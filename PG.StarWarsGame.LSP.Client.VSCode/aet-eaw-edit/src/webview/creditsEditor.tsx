@@ -732,7 +732,7 @@ function App(): React.JSX.Element {
             languages={languages}
             error={rowFilter.error}
             placeholders={PLACEHOLDERS}
-            keyScopeLabel="Format only"
+            keyScopeLabel={l10n.t("Format only")}
         />
     );
 
@@ -767,8 +767,8 @@ function App(): React.JSX.Element {
                         labelOf={(problem) =>
                             problem.index === null ||
                             problem.index === undefined
-                                ? "This file"
-                                : `Row ${problem.index + 1}`
+                                ? l10n.t("This file")
+                                : l10n.t("Row {0}", problem.index + 1)
                         }
                         jumpTo={jumpToProblem}
                         onClose={() => setProblemsOpen(false)}

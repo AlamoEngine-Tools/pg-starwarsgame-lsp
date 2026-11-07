@@ -39,9 +39,8 @@ internal sealed class RemoveEarlierDuplicatesCodeActionProvider : IXmlCodeAction
         if (parsed is null)
             return [];
 
-        var hapDoc = parsed.Html;
-        var diagnosticLine = ctx.Diagnostic.Range.Start.Line;
-        if (!XmlUtility.TryFindNode(hapDoc, diagnosticLine, out var node) || node?.ParentNode is null)
+        var at = ctx.Diagnostic.Range.Start;
+        if (parsed.ElementAt(at.Line, at.Character) is not { ParentNode: not null } node)
             return [];
 
         // All same-named siblings in document order. The game keeps the last one WITH A VALUE -
@@ -55,14 +54,14 @@ internal sealed class RemoveEarlierDuplicatesCodeActionProvider : IXmlCodeAction
             return [];
 
         var kept = occurrences.LastOrDefault(n => !XmlUtility.WritesNoValue(n)) ?? occurrences[^1];
-        var edits = occurrences
-            .Where(n => !ReferenceEquals(n, kept))
-            .Select(n => new TextEdit
-            {
-                Range = new LspRange(new Position(n.Line - 1, 0), new Position(EndHapLine(n), 0)),
-                NewText = ""
-            })
-            .ToList();
+        var edits = new List<TextEdit>();
+        foreach (var n in occurrences.Where(n => !ReferenceEquals(n, kept)))
+            if (parsed.RemovalRange(n) is var (start, end))
+                edits.Add(new TextEdit
+                {
+                    Range = new LspRange(new Position(start.Line, start.Col), new Position(end.Line, end.Col)),
+                    NewText = ""
+                });
 
         var tagName = XmlUtility.GetOriginalTagName(node, parsed.Text);
         var count = occurrences.Count - 1;
@@ -84,12 +83,5 @@ internal sealed class RemoveEarlierDuplicatesCodeActionProvider : IXmlCodeAction
                 }
             })
         ];
-    }
-
-    private static int EndHapLine(HtmlNode node)
-    {
-        if (node.EndNode is not null && !ReferenceEquals(node.EndNode, node))
-            return node.EndNode.Line;
-        return node.Line;
     }
 }

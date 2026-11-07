@@ -98,10 +98,13 @@ export type SimSelection =
 /** Why a session takes no command right now, or null: the reason every transport control shows. */
 export function frozenReason(state: StorySimStateDto): string | null {
     if (state.pausedFor) {
-        return `Galaxy paused - battle ${state.pausedFor}`;
+        return l10n.t("Galaxy paused - battle {0}", state.pausedFor);
+    }
+    if (state.outcome === "won") {
+        return l10n.t("Battle won - re-enter Simulation to replay");
     }
     if (state.outcome) {
-        return `Battle ${state.outcome} - re-enter Simulation to replay`;
+        return l10n.t("Battle lost - re-enter Simulation to replay");
     }
     return null;
 }
@@ -110,19 +113,19 @@ export function frozenReason(state: StorySimStateDto): string | null {
 export function battleStatusLabel(battle: StorySimBattleDto): string {
     switch (battle.status) {
         case "pending":
-            return "Pending - fight or auto-resolve";
+            return l10n.t("Pending - fight or auto-resolve");
         case "fight":
-            return "Starting";
+            return l10n.t("Starting");
         case "autoResolve":
-            return "Auto-resolve - decide the outcome";
+            return l10n.t("Auto-resolve - decide the outcome");
         case "running":
-            return `Running - t${battle.tick}`;
+            return l10n.t("Running - t{0}", battle.tick);
         case "won":
-            return "Won";
+            return l10n.t("Won");
         case "lost":
-            return "Lost";
+            return l10n.t("Lost");
         default:
-            return "Not started";
+            return l10n.t("Not started");
     }
 }
 
@@ -541,14 +544,22 @@ export function SimInventory(props: {
                                     : "") +
                                 (planet.destroyed ? " gone" : "")
                             }
-                            title={`${planet.name} - ${planet.owner ?? "Neutral"}${planet.corrupted ? ", corrupted" : ""}`}
+                            title={
+                                planet.corrupted
+                                    ? l10n.t(
+                                          "{0} - {1}, corrupted",
+                                          planet.name,
+                                          planet.owner ?? l10n.t("Neutral"),
+                                      )
+                                    : `${planet.name} - ${planet.owner ?? l10n.t("Neutral")}`
+                            }
                             onClick={() =>
                                 pick({ kind: "planet", name: planet.name })
                             }
                         >
                             <span className="sim-row-name">{planet.name}</span>
                             <span className="sim-row-value">
-                                {planet.owner ?? "Neutral"}
+                                {planet.owner ?? l10n.t("Neutral")}
                             </span>
                         </button>
                     ))}
@@ -622,7 +633,7 @@ export function SimInventory(props: {
                                 : "")
                         }
                         title={
-                            `${script.scriptName} - ${script.current ?? "not started"}` +
+                            `${script.scriptName} - ${script.current ?? l10n.t("not started")}` +
                             (script.next ? ` -> ${script.next}` : "")
                         }
                         onClick={() =>
@@ -681,7 +692,7 @@ function DecisionRow(props: {
             <button
                 type="button"
                 className="sim-row-main"
-                title={`${item.eventName} - ${item.eventType ?? "unknown type"}`}
+                title={`${item.eventName} - ${item.eventType ?? l10n.t("unknown type")}`}
                 onClick={props.onSelect}
             >
                 <span className="sim-row-name">
@@ -691,7 +702,7 @@ function DecisionRow(props: {
             </button>
             <IconButton
                 icon="check"
-                title={quick?.title ?? "No one-press answer"}
+                title={quick?.title ?? l10n.t("No one-press answer")}
                 disabled={quick === null}
                 disabledReason={l10n.t("No one-press answer - open the row")}
                 onClick={() => quick?.run()}
@@ -823,13 +834,13 @@ function BattleControls(props: {
     const label = battle?.label ?? battleKey;
     const status = inside
         ? state.outcome === "won"
-            ? "Won"
+            ? l10n.t("Won")
             : state.outcome === "lost"
-              ? "Lost"
-              : `Running - t${state.tick}`
+              ? l10n.t("Lost")
+              : l10n.t("Running - t{0}", state.tick)
         : battle
           ? battleStatusLabel(battle)
-          : "Unknown";
+          : l10n.t("Unknown");
     const resolved = inside
         ? !!state.outcome
         : battle?.status === "won" || battle?.status === "lost";
@@ -1233,7 +1244,7 @@ function EventDialog(
                             (nodeState?.lifecycle ?? "Inactive")
                         }
                     >
-                        {nodeState?.lifecycle ?? "Inactive"}
+                        {nodeState?.lifecycle ?? l10n.t("Inactive")}
                     </span>
                 </div>
                 <div className="sim-row static">
@@ -1349,7 +1360,7 @@ function PlanetDialog(props: {
         <Modal
             form
             title={props.name}
-            confirmLabel="OK"
+            confirmLabel={l10n.t("OK")}
             canConfirm={changed}
             disabledReason={
                 draft ? l10n.t("Owner unchanged") : l10n.t("Owner required")
@@ -1372,7 +1383,7 @@ function PlanetDialog(props: {
                         value={owner}
                         onChange={setOwner}
                         placeholder={l10n.t("Owner")}
-                        ariaLabel="Owner"
+                        ariaLabel={l10n.t("Owner")}
                         icon="search"
                         options={factions.map((f) => ({ value: f }))}
                         autoFocus
@@ -1444,7 +1455,7 @@ function FlagDialog(props: {
             title={
                 existing ? l10n.t("Set {0}", existing.name) : l10n.t("Set flag")
             }
-            confirmLabel="OK"
+            confirmLabel={l10n.t("OK")}
             canConfirm={valid}
             disabledReason={
                 name.trim()
@@ -1465,7 +1476,7 @@ function FlagDialog(props: {
                         value={name}
                         onChange={setName}
                         placeholder={l10n.t("Flag name")}
-                        ariaLabel="Flag name"
+                        ariaLabel={l10n.t("Flag name")}
                         icon="search"
                         options={state.flags.map((f) => ({
                             value: f.name,
@@ -1477,7 +1488,7 @@ function FlagDialog(props: {
                 <IntegerField
                     value={value}
                     onChange={setValue}
-                    ariaLabel="Value"
+                    ariaLabel={l10n.t("Value")}
                     autoFocus={!!existing}
                 />
             </div>
@@ -1508,7 +1519,7 @@ function DecisionDialog(props: {
         <Modal
             form
             title={picker.title}
-            confirmLabel="OK"
+            confirmLabel={l10n.t("OK")}
             canConfirm={value.length > 0}
             disabledReason={l10n.t("{0} required", picker.noun)}
             onConfirm={() => {
@@ -1601,10 +1612,10 @@ function decisionPicker(
                   : l10n.t("Enter a name"),
         noun:
             kind === "planet"
-                ? "Planet"
+                ? l10n.t("Planet")
                 : kind === "unit"
-                  ? "Unit type"
-                  : "Name",
+                  ? l10n.t("Unit type")
+                  : l10n.t("Name"),
         initial:
             (kind === "planet"
                 ? base.planet
@@ -1657,7 +1668,7 @@ function ScriptDialog(
                 <div className="sim-row static">
                     <span className="sim-row-name">{l10n.t("Current")}</span>
                     <span className="sim-row-value">
-                        {script.current ?? "not started"}
+                        {script.current ?? l10n.t("not started")}
                     </span>
                 </div>
                 <div className="sim-row static">
@@ -1759,14 +1770,14 @@ export function SimTransport(props: {
                     icon="firstFrame"
                     title={l10n.t("Restart")}
                     disabled={state.tick === 0 || frozen !== null}
-                    disabledReason={frozen ?? "Already at tick 0"}
+                    disabledReason={frozen ?? l10n.t("Already at tick 0")}
                     onClick={actions.restart}
                 />
                 <IconButton
                     icon="previousClip"
                     title={l10n.t("Back one tick")}
                     disabled={state.tick === 0 || frozen !== null}
-                    disabledReason={frozen ?? "Already at tick 0"}
+                    disabledReason={frozen ?? l10n.t("Already at tick 0")}
                     onClick={actions.back}
                 />
                 <IconButton

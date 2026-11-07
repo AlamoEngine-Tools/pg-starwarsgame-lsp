@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<GroundVehicles>
+	<GroundVehicle Name="Scratch_Dotted_Bone">
+		<Land_Model_Name>Ev_bike.alo</Land_Model_Name>
+		<HardPoints>HP_Scratch_Dotted</HardPoints>
+	</GroundVehicle>
+</GroundVehicles>

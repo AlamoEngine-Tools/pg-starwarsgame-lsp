@@ -37,6 +37,9 @@ public sealed class LuaStorySymbolCollectionTest
         Assert.Equal(2, refs[0].Line);
         Assert.Equal(4, refs[0].Column);
         Assert.Equal("Rebel_M01_Start".Length, refs[0].Length);
+        // The shipped story-mode library indexes this table with the event's name as written, so
+        // the key must match the XML name byte for byte - unlike every other story name lookup.
+        Assert.All(refs, r => Assert.True(r.ExactCase));
     }
 
     [Fact]
@@ -77,18 +80,20 @@ public sealed class LuaStorySymbolCollectionTest
         Assert.Single(index.Symbols, s => s.TypeName == "StoryNotification");
     }
 
+    // Check_Story_Flag reads the AI story triggers the TRIGGER_AI reward sets, never the flags
+    // SET_FLAG creates, so its argument references the trigger type.
     [Fact]
-    public async Task CheckStoryFlag_WithXmlrefSchema_EmitsStoryFlagReference()
+    public async Task CheckStoryFlag_WithXmlrefSchema_EmitsAiStoryTriggerReference()
     {
         const string api = """
                            ---@param flagName string
-                           ---@aetref XmlObject:StoryFlag
+                           ---@aetref XmlObject:StoryAiTrigger
                            function Check_Story_Flag(flagName) end
                            """;
 
         var index = await ParseAsync("if Check_Story_Flag(\"REBEL_TRAP_SET\") then end", apiSchema: api);
 
-        var reference = Assert.Single(index.References, r => r.ExpectedTypeName == "StoryFlag");
+        var reference = Assert.Single(index.References, r => r.ExpectedTypeName == "StoryAiTrigger");
         Assert.Equal("REBEL_TRAP_SET", reference.TargetId);
     }
 }

@@ -23,6 +23,7 @@
 
 import * as l10n from "@vscode/l10n";
 import {
+    EncyclopediaAbility,
     EncyclopediaImage,
     EncyclopediaLayout,
     EncyclopediaReference,
@@ -31,6 +32,13 @@ import {
     GetEncyclopediaEntryResult,
 } from "../protocol/encyclopedia";
 import { cssFontStack } from "./encyclopediaFonts";
+
+/** An ability as its slot's tooltip names it: the type, and the activated ability's name after it. */
+function abilityLabel(ability: EncyclopediaAbility): string {
+    return ability.abilityName
+        ? `${ability.type} (${ability.abilityName})`
+        : ability.type;
+}
 import { encyclopediaIconTitle } from "./encyclopediaIconTitle";
 import { wrapByCharacterBudget } from "./encyclopediaWrap";
 import { drawsPopulationBlip } from "./encyclopediaBlip";
@@ -987,12 +995,13 @@ export function EncyclopediaCard({
                                         wordBreak: "break-word",
                                     }}
                                     title={
-                                        `${ability.type}${ability.abilityName ? ` (${ability.abilityName})` : ""}` +
-                                        `${
-                                            ability.alternateIconName
-                                                ? ` - alternate icon ${ability.alternateIconName}`
-                                                : ""
-                                        }`
+                                        ability.alternateIconName
+                                            ? l10n.t(
+                                                  "{0} - alternate icon {1}",
+                                                  abilityLabel(ability),
+                                                  ability.alternateIconName,
+                                              )
+                                            : abilityLabel(ability)
                                     }
                                 >
                                     {ability.icon ? (

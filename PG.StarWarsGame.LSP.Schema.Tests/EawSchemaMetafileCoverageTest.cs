@@ -86,6 +86,30 @@ public sealed class EawSchemaMetafileCoverageTest
         return YamlSchemaParser.ParseMetafileFile(EawSchemaRepo.Read("meta/metafiles.yaml"));
     }
 
+    /// <summary>
+    ///     What the engine does with a name two listed files both define, read out of each manager's
+    ///     loader on both 2024 builds. The game keeps the first object or event; it overwrites the
+    ///     slot for trade routes, campaigns, hardpoints, command bar components and mouse pointers;
+    ///     it parses a second targeting set into the first; it keeps both factions and finds the
+    ///     first by name.
+    /// </summary>
+    [Theory]
+    [InlineData("data/xml/gameobjectfiles.xml", DuplicateNameRule.FIRST_WINS)]
+    [InlineData("data/xml/sfxeventfiles.xml", DuplicateNameRule.FIRST_WINS)]
+    [InlineData("data/xml/factionfiles.xml", DuplicateNameRule.FIRST_BY_NAME)]
+    [InlineData("data/xml/commandbarcomponentfiles.xml", DuplicateNameRule.LAST_WINS)]
+    [InlineData("data/xml/campaignfiles.xml", DuplicateNameRule.LAST_WINS)]
+    [InlineData("data/xml/hardpointdatafiles.xml", DuplicateNameRule.LAST_WINS)]
+    [InlineData("data/xml/targetingprioritysetfiles.xml", DuplicateNameRule.MERGE)]
+    [InlineData("data/xml/traderoutefiles.xml", DuplicateNameRule.LAST_WINS)]
+    [InlineData("data/xml/mousepointerfiles.xml", DuplicateNameRule.LAST_WINS)]
+    public void EveryRegistry_CarriesTheMeasuredDuplicateNameRule(string registry, DuplicateNameRule rule)
+    {
+        var entry = Assert.Single(Shipped(), m => m.Path == registry && m.MetafileType == MetafileType.FileRegistry);
+
+        Assert.Equal(rule, entry.DuplicateNames);
+    }
+
     private static IReadOnlyList<ScannedDirectoryDefinition> ShippedDirectories()
     {
         return YamlSchemaParser.ParseScannedDirectories(EawSchemaRepo.Read("meta/metafiles.yaml"));

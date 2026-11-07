@@ -15,7 +15,8 @@ public static partial class LuaAnalyzerAnswers
 
     /// <summary>
     ///     One hover card: this server's first - it knows the engine and the XML - then a rule, then
-    ///     the analyzer's. Either alone when the other has nothing.
+    ///     the analyzer's, less any paragraph ours already says: the analyzer reads our stubs too and
+    ///     repeats their description. Either alone when the other has nothing.
     /// </summary>
     public static Hover? MergeHover(Hover? ours, Hover? theirs)
     {
@@ -24,11 +25,46 @@ public static partial class LuaAnalyzerAnswers
         if (ours is null)
             return new Hover { Contents = Content(theirText), Range = theirs!.Range };
 
+        var ourText = Markdown(ours.Contents);
+        var said = new HashSet<string>(Lines(ourText), StringComparer.Ordinal);
+        var kept = Paragraphs(theirText).Where(p => !Lines(p).All(said.Contains)).ToList();
+        // A rule left at either end separated what was dropped.
+        while (kept.Count > 0 && kept[0].Trim() == "---") kept.RemoveAt(0);
+        while (kept.Count > 0 && kept[^1].Trim() == "---") kept.RemoveAt(kept.Count - 1);
+        theirText = string.Join("\n\n", kept).Trim();
+        if (theirText.Length == 0) return ours;
+
         return new Hover
         {
-            Contents = Content(Markdown(ours.Contents) + "\n\n---\n\n" + theirText),
+            Contents = Content(ourText + "\n\n---\n\n" + theirText),
             Range = ours.Range ?? theirs!.Range
         };
+    }
+
+    private static IEnumerable<string> Lines(string markdown)
+    {
+        return markdown.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0);
+    }
+
+    // Blank-line separated blocks; a fenced code block can hold blank lines, so it stays whole.
+    private static IEnumerable<string> Paragraphs(string markdown)
+    {
+        var block = new List<string>();
+        var fenced = false;
+        foreach (var line in markdown.Replace("\r", "", StringComparison.Ordinal).Split('\n'))
+        {
+            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal)) fenced = !fenced;
+            if (!fenced && line.Trim().Length == 0)
+            {
+                if (block.Count > 0) yield return string.Join("\n", block);
+                block.Clear();
+                continue;
+            }
+
+            block.Add(line);
+        }
+
+        if (block.Count > 0) yield return string.Join("\n", block);
     }
 
     /// <summary>

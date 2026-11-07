@@ -138,4 +138,24 @@ public sealed class MergedAssetFileIndexTest
 
         Assert.True(idx.IsPackedAsset("DATA/ART/TEXTURES/PACKED.TGA"));
     }
+
+    // A loose file belongs to the project that ships it, and of two projects shipping one path the
+    // higher one's copy is the one read - as with every other file of a layered mod.
+    [Fact]
+    public void Merge_Layered_KnowsWhichProjectEachLooseFileComesFrom()
+    {
+        var idx = MergedAssetFileIndex.MergeLayered(
+            ["data/art/models/packed.alo"],
+            [
+                ("data/art/models/shared.alo", 0), ("data/art/models/core.alo", 0),
+                ("data/art/models/shared.alo", 2), ("data/art/models/mod.alo", 2)
+            ]);
+
+        Assert.Equal(0, idx.LayerRankOf("data/art/models/core.alo"));
+        Assert.Equal(2, idx.LayerRankOf("DATA/ART/MODELS/SHARED.ALO"));
+        Assert.Equal(2, idx.LayerRankOf("data/art/models/mod.alo"));
+        Assert.Null(idx.LayerRankOf("data/art/models/packed.alo"));
+        Assert.True(idx.Contains("data/art/models/mod.alo"));
+        Assert.True(idx.IsPackedAsset("data/art/models/packed.alo"));
+    }
 }

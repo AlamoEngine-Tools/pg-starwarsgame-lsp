@@ -4,7 +4,9 @@
 using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
+using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -141,20 +143,28 @@ public sealed class ModProjectFileWriterTest
         return (writer, fs);
     }
 
-    // A file we rewrite gains its identity if it did not have one. Stamping on write is what makes
-    // the fields spread without ever touching a project the user has not asked us to change.
-    [Fact]
-    public async Task SetLocalisation_StampsTypeAndVersionOnAnUnstampedProject()
+    // A patch changes the node it was asked to change and claims no format the file does not
+    // follow: bringing a file forward is the migration offer's, which says what it changes - an EaW
+    // mod stamped as current would have been given foc without being told.
+    [Theory]
+    [InlineData("""{ "name": "Mod" }""", null)]
+    [InlineData("""{ "_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.0.0", "name": "Mod" }""", "aetswg-1.0.0")]
+    public async Task SetLocalisation_KeepsTheFormatTheFileDeclares(string project, string? version)
     {
         var fs = new MockFileSystem();
-        fs.AddFile(Path, new MockFileData("""{ "name": "Mod" }"""));
+        fs.AddFile(Path, new MockFileData(project));
 
         await new ModProjectFileWriter(new FileHelper(fs))
             .SetLocalisationAsync(Path, "CSV", "data/text", CancellationToken.None);
 
         var written = JsonNode.Parse(fs.File.ReadAllText(Path))!.AsObject();
-        Assert.Equal(PgprojFormat.TypeName, (string?)written["_type"]);
-        Assert.Equal(PgprojFormat.Current.ToString(), (string?)written["_typeVersion"]);
-        Assert.Equal("Mod", (string?)written["name"]);
+        Assert.Equal(version, (string?)written["_typeVersion"]);
+        Assert.Null(written["game"]);
+        var model = new ModProjectLoader(new FileHelper(fs),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ModProjectLoader>.Instance,
+                new NullPgprojMigrationSink(), PgprojMigrations.All, ResxMessageCatalog.Server("en"))
+            .Load(Path);
+        Assert.Equal(TargetGame.FOC, model.Game);
+        Assert.Equal("data/text", model.Localisation!.Directory);
     }
 }

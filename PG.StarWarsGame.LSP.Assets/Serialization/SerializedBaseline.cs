@@ -56,4 +56,12 @@ public sealed class SerializedBaseline
     /// </summary>
     [Key(13)]
     public SerializedEnumValues[] ModelProxies { get; set; } = [];
+
+    /// <summary>
+    ///     Each shipped registry's entries in load order, keyed by the registry's path. Needs no new
+    ///     <see cref="CurrentSchemaVersion" />: a baseline written before it reads as none, and every
+    ///     registry falls back to <see cref="FileTypeMap" /> - the behaviour before the field.
+    /// </summary>
+    [Key(14)]
+    public SerializedEnumValues[] RegistryLists { get; set; } = [];
 }

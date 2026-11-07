@@ -194,7 +194,13 @@ public sealed class StoryChainScanner
         StoryChainProblemKind unresolvedKind, ScanState state)
     {
         var rel = ToXmlRelativePath(rawReference);
-        if (!state.ManifestSeen.Add(rel)) return;
+        if (!state.ManifestSeen.Add(rel))
+        {
+            // Scanned once; a miss is still a problem at every place that names the file.
+            if (state.Unresolved.TryGetValue(rel, out var known))
+                state.AddProblem(origin, unresolvedKind, known);
+            return;
+        }
 
         var file = _resolver.ReadFile(rel);
         if (file is null)
@@ -202,8 +208,14 @@ public sealed class StoryChainScanner
             if (_resolver.IsKnownToBaseline(rel))
                 state.Manifests.Add(rel); // baseline ships it - typed, but nothing to recurse into
             else
-                state.AddProblem(origin, unresolvedKind,
-                    new CatalogueText("StoryChain_PlotFileMissing", rawReference));
+            {
+                var text = MissingFileText(rawReference, rel,
+                    new CatalogueText("StoryChain_PlotFileMissing", rawReference),
+                    "StoryChain_PlotFileMissingFiledElsewhere");
+                state.Unresolved[rel] = text;
+                state.AddProblem(origin, unresolvedKind, text);
+            }
+
             return;
         }
 
@@ -257,7 +269,12 @@ public sealed class StoryChainScanner
     private void AddThread(string rawReference, SourceLocation origin, ScanState state)
     {
         var rel = ToXmlRelativePath(rawReference);
-        if (!state.ThreadSeen.Add(rel)) return;
+        if (!state.ThreadSeen.Add(rel))
+        {
+            if (state.Unresolved.TryGetValue(rel, out var known))
+                state.AddProblem(origin, StoryChainProblemKind.UnresolvedPlotEntry, known);
+            return;
+        }
 
         var file = _resolver.ReadFile(rel);
         if (file is null)
@@ -265,8 +282,14 @@ public sealed class StoryChainScanner
             if (_resolver.IsKnownToBaseline(rel))
                 state.Threads.Add(rel);
             else
-                state.AddProblem(origin, StoryChainProblemKind.UnresolvedPlotEntry,
-                    new CatalogueText("StoryChain_StoryFileMissing", rawReference));
+            {
+                var text = MissingFileText(rawReference, rel,
+                    new CatalogueText("StoryChain_StoryFileMissing", rawReference),
+                    "StoryChain_StoryFileMissingFiledElsewhere");
+                state.Unresolved[rel] = text;
+                state.AddProblem(origin, StoryChainProblemKind.UnresolvedPlotEntry, text);
+            }
+
             return;
         }
 
@@ -306,6 +329,20 @@ public sealed class StoryChainScanner
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    // The engine opens the listed path and nothing else: the plot loader joins the XML folder and
+    // the entry, and mod paths, the game folder and the archives are each tried with that whole
+    // path (measured on the 2024 build). A file of that name filed in another folder is the usual
+    // cause of a miss, so the text says where it sits instead of leaving the author to search.
+    private CatalogueText MissingFileText(string rawReference, string rel, CatalogueText missing,
+        string filedElsewhereKey)
+    {
+        var elsewhere = _resolver.FindByFileName(rel.Split('/')[^1]);
+        return elsewhere.Count == 0
+            ? missing
+            : new CatalogueText(filedElsewhereKey, rawReference,
+                string.Join(", ", elsewhere.Select(p => p.Replace('/', '\\'))));
+    }
+
     // References come in two forms: xml-dir-relative ("Story_Plots_X.xml") or game-root-relative
     // ("DATA\XML\CAMPAIGNS_X.XML"). Shared with StoryGraphBuilder's tactical-node keying so a
     // manifest reference correlates to the same node regardless of which event's raw text it
@@ -328,6 +365,10 @@ public sealed class StoryChainScanner
         public HashSet<string> ManifestSeen { get; } = new(StringComparer.OrdinalIgnoreCase);
         public List<string> Threads { get; } = [];
         public HashSet<string> ThreadSeen { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The files no layer ships, by relative path, with the text their first miss produced.</summary>
+        public Dictionary<string, CatalogueText> Unresolved { get; } = new(StringComparer.OrdinalIgnoreCase);
+
         public List<string> LuaScripts { get; } = [];
         public HashSet<string> LuaSeen { get; } = new(StringComparer.OrdinalIgnoreCase);
         public List<StoryChainProblem> Problems { get; } = [];

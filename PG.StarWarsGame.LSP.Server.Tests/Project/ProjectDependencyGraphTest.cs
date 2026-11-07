@@ -18,7 +18,8 @@ public sealed class ProjectDependencyGraphTest
             "Mod",
             null,
             new DirectoryMap(),
-            references.Select(r => new ProjectReference(r)).ToList());
+            references.Select(r => new ProjectReference(r)).ToList(),
+            TargetGame.FOC);
     }
 
     // ── the shape, for the bug report ────────────────────────────────────────

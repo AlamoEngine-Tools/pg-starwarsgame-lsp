@@ -8,15 +8,19 @@ namespace PG.StarWarsGame.LSP.Core.Xml;
 /// <summary>One element's source spans, as (offset, length) into the document text.</summary>
 public sealed class XmlElementSpan
 {
-    internal XmlElementSpan(string name, (int Start, int Length) startTag, (int Start, int Length) startName,
-        (int Start, int Length)? endTag, (int Start, int Length)? endName)
+    internal XmlElementSpan(HtmlNode node, string name, (int Start, int Length) startTag,
+        (int Start, int Length) startName, (int Start, int Length)? endTag, (int Start, int Length)? endName)
     {
+        Node = node;
         Name = name;
         StartTag = startTag;
         StartName = startName;
         EndTag = endTag;
         EndName = endName;
     }
+
+    /// <summary>The element in the lenient tree, for the features that read it from there.</summary>
+    public HtmlNode Node { get; }
 
     /// <summary>The name as written in the start tag.</summary>
     public string Name { get; }
@@ -69,6 +73,12 @@ public sealed class XmlElementSpans
         return best;
     }
 
+    /// <summary>The span of <paramref name="node" />, or null for a node with no element span.</summary>
+    public XmlElementSpan? Of(HtmlNode node)
+    {
+        return Elements.FirstOrDefault(e => ReferenceEquals(e.Node, node));
+    }
+
     public static XmlElementSpans Build(HtmlDocument doc, string text)
     {
         var elements = new List<XmlElementSpan>();
@@ -94,7 +104,7 @@ public sealed class XmlElementSpans
             if (nameLength == 0) continue;
             var name = text.Substring(at + 1, nameLength);
             var startTagEnd = TagEnd(text, at);
-            var span = new XmlElementSpan(name, (at, startTagEnd - at), (at + 1, nameLength),
+            var span = new XmlElementSpan(node, name, (at, startTagEnd - at), (at + 1, nameLength),
                 EndTagOf(node, name, text, out var endName), endName);
             elements.Add(span);
             byNode[node] = span;
