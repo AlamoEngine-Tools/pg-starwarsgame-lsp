@@ -530,21 +530,6 @@ export const Shell = styled.div`
         padding: 0 var(--space-6);
     }
 
-    .counts {
-        opacity: 0.75;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-    }
-
-    /* A duplicate key in a keyed file is an error the batch validator reports, so it is not just
-       another statistic. */
-
-    .counts .warn {
-        color: var(--vscode-charts-yellow, #cca700);
-        opacity: 1;
-    }
-
     .actions {
         display: flex;
         gap: var(--space-6);

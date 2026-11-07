@@ -286,7 +286,6 @@
   "'{0}' is already in this file. Only one row per key is ever read.": "'{0}' is already in this file. Only one row per key is ever read.",
   "'{0}' is already in this file, and the game cannot tell it apart from '{1}' - it reads keys as ASCII, so both become '{2}'.": "'{0}' is already in this file, and the game cannot tell it apart from '{1}' - it reads keys as ASCII, so both become '{2}'.",
   "Key": "Key",
-  "{0} duplicate keys": "{0} duplicate keys",
   "Key only": "Key only",
   "Show entries whose value is identical to the layer below this file": "Show entries whose value is identical to the layer below this file",
   "Inherited": "Inherited",

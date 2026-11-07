@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { LocRow } from "./loc/locRow";
-import { countDuplicateKeys, sortRows } from "./translationView";
+import { sortRows } from "./translationView";
 
 function row(
     index: number,
@@ -108,17 +108,5 @@ describe("sortRows", () => {
         sortRows(rows, { column: "key", direction: "asc" });
 
         assert.deepEqual(keysOf(rows), keysOf(original));
-    });
-});
-
-describe("countDuplicateKeys", () => {
-    it("counts repeats beyond the first occurrence", () => {
-        const rows = [row(0, "A"), row(1, "B"), row(2, "A"), row(3, "A")];
-
-        assert.equal(countDuplicateKeys(rows), 2);
-    });
-
-    it("is zero when every key is unique", () => {
-        assert.equal(countDuplicateKeys([row(0, "A"), row(1, "B")]), 0);
     });
 });

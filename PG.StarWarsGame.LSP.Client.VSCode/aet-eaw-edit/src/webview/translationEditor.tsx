@@ -58,7 +58,7 @@ import {
     coalesce,
     TranslationCommand,
 } from "./translationStaging";
-import { countDuplicateKeys, sortRows } from "./translationView";
+import { sortRows } from "./translationView";
 import { nextSort, SortState } from "./shared/tableSort";
 import { Button } from "./shared/Button";
 import { Field } from "./shared/Field";
@@ -312,7 +312,6 @@ function App(): React.JSX.Element {
         return <LocGridMessage>{l10n.t("Loading...")}</LocGridMessage>;
     }
 
-    const duplicateCount = countDuplicateKeys(rows);
     // Two things can hold rows back here, and the footer says how many are doing so.
     const activeFilters =
         (filter.trim().length > 0 ? 1 : 0) +
@@ -504,16 +503,6 @@ function App(): React.JSX.Element {
                 }
                 onExportDat={() => post({ type: "exportDat" })}
             />
-
-            {/* A repeated key is an error the validator reports: only one of the two would ever be
-                read. Row counts live under the table, where they describe it. */}
-            {duplicateCount > 0 && (
-                <div className="counts">
-                    <div className="warn">
-                        {l10n.t("{0} duplicate keys", duplicateCount)}
-                    </div>
-                </div>
-            )}
         </>
     );
 
