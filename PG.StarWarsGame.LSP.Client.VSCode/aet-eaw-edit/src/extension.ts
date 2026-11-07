@@ -29,6 +29,13 @@ import {
 } from "./modBrowserViewProvider";
 import { PanelProject } from "./panelProject";
 import { WebviewPanelHost } from "./webviewPanelHost";
+import { whatsNewOnStart } from "./whatsNewModel";
+import {
+    OPEN_AFTER_UPDATE_SETTING,
+    OPEN_WHATS_NEW,
+    WHATS_NEW_SEEN_VERSION,
+    WhatsNewPanel,
+} from "./whatsNewPanel";
 import { ModelPreviewEditorProvider } from "./modelPreviewEditor";
 import { ModelInspectorPanel } from "./modelInspectorPanel";
 import { ModelPreviewPanel } from "./modelPreviewPanel";
@@ -1858,6 +1865,46 @@ export async function activate(
     // not of the mod you have open.
     initPanelLayoutStorage(context.globalState);
 
+    // The What's New page belongs to the extension, not to a project: it opens from the palette
+    // in any window, project or none.
+    const extensionVersion = String(
+        context.extension.packageJSON.version ?? "unknown",
+    );
+    // The manifest's preview flag, the one the Marketplace badges the extension with; the page
+    // carries the same mark.
+    const extensionPreview = context.extension.packageJSON.preview === true;
+    context.subscriptions.push(
+        vscode.commands.registerCommand(OPEN_WHATS_NEW, () =>
+            WhatsNewPanel.show(
+                context.extensionUri,
+                extensionVersion,
+                extensionPreview,
+            ),
+        ),
+    );
+    // Once per new version, and on the first start, which stands in for a walkthrough: nothing
+    // stored a version before this page existed, so every user of the first release carrying it
+    // is a first start, and that release's notes are the ones that matter most to them.
+    {
+        const seen = whatsNewOnStart(
+            context.globalState.get<string>(WHATS_NEW_SEEN_VERSION),
+            extensionVersion,
+            vscode.workspace
+                .getConfiguration()
+                .get<boolean>(OPEN_AFTER_UPDATE_SETTING, true),
+        );
+        if (seen.store !== undefined) {
+            void context.globalState.update(WHATS_NEW_SEEN_VERSION, seen.store);
+        }
+        if (seen.open) {
+            void WhatsNewPanel.show(
+                context.extensionUri,
+                extensionVersion,
+                extensionPreview,
+            );
+        }
+    }
+
     // The Lua debugger. Both registrations stay in place whatever the feature flag says: the
     // debug type must exist for launch.json to validate, and a disabled feature answers with the
     // setting to turn on rather than by vanishing.
@@ -3564,5 +3611,6 @@ export async function deactivate(): Promise<void> {
     ModBrowserPanel.disposeAll();
     ModelPreviewPanel.disposeAll();
     ModelInspectorPanel.disposeAll();
+    WhatsNewPanel.disposeAll();
     await stopAllClients();
 }

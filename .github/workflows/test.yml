@@ -192,7 +192,11 @@ jobs:
         # vsce does not create the folder it writes to.
         New-Item dist -ItemType Directory -Force | Out-Null
         Push-Location PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
-        npx --yes @vscode/vsce package --no-dependencies --target win32-x64 --out ../../dist/aet-eaw-edit-check.vsix
+        # The same link bases the release passes, at HEAD: a check build has no tag, and vsce's own
+        # guess is the repository root, which misses the extension's folder.
+        $tree = "https://github.com/${{ github.repository }}"
+        $folder = "PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit"
+        npx --yes @vscode/vsce package --no-dependencies --target win32-x64 --out ../../dist/aet-eaw-edit-check.vsix --baseContentUrl "$tree/blob/HEAD/$folder" --baseImagesUrl "$tree/raw/HEAD/$folder"
         if ($LASTEXITCODE -ne 0) { exit 1 }
         Pop-Location
         ./scripts/check-vsix.ps1 dist/aet-eaw-edit-check.vsix

@@ -2,8 +2,77 @@
 
 ## Unreleased
 
+### Highlights
+
+Everything the extension needs now ships inside it: the language server and the Lua analyzer come with the
+VSIX, nothing is downloaded or configured, and the Lua analyzer is on from the first start. The new Mod
+Browser lists everything a project indexes - game objects, models, particle systems, scripts, the schema's
+own types and enums - each entry with its relations, previews and problems. Every XML file is read the way
+the game reads it, with a repair for each structural finding, folding and a formatter that changes nothing
+the game sees. Several mods open in one window, each with a server of its own. The release notes open in the
+editor after every update, on this page.
+
+- **Mod Browser** - one view over the whole project, by what each thing is, with its origin, references and
+  previews
+- **Bundled server and Lua analyzer** - completion, hover, references, rename and diagnostics for Lua out of
+  the box, every script analyzed in a Lua state of its own, as the game runs it
+- **XML as the game reads it** - a file the game drops is an error with a repair, XML the game reads but
+  standard tools reject is a warning; Format Document re-indents without changing a value
+- **Particles as the game draws them** - frozen asteroid and debris fields, weather around the camera, bump
+  and depth-sprite emitters through the engine's own effects
+- **Several projects in one window** - every `.pgproj` under the open folders gets a language server, panels
+  and navigators filed per project
+- **Eleven settings** - everything else is on; a mod opened without a project file is offered one
+
+### Migration
+
+Settings renamed; a value under the old key is not read:
+
+| Before                                       | Now                                         |
+|----------------------------------------------|---------------------------------------------|
+| `aet-eaw-edit.features.tools.storyEditing`   | `aet-eaw-edit.experimental.storyEditing`    |
+| `aet-eaw-edit.features.tools.storySimulator` | `aet-eaw-edit.experimental.storySimulator`  |
+| `aet-eaw-edit.lsp.debug.traceServer`         | `aet-eaw-edit.lsp.debug.trace.server`       |
+
+Settings moved out of `settings.json`:
+
+| Before                                        | Now                                                        |
+|-----------------------------------------------|------------------------------------------------------------|
+| `aet-eaw-edit.game.executable`                | `program` in the `launch.json` configuration               |
+| `aet-eaw-edit.game.luaDebugHost`              | `host` in `launch.json`                                    |
+| `aet-eaw-edit.game.luaDebugPort`              | `port` in `launch.json`                                    |
+| `aet-eaw-edit.game.unsafeTableExpansion`      | `unsafeTableExpansion` in `launch.json`                    |
+| `aet-eaw-edit.game.arguments`                 | `args` in `launch.json`, after the mod chain               |
+| `aet-eaw-edit.storySimulator.autoResume`      | *Resume after an answer*, in the simulator's transport     |
+| `aet-eaw-edit.storySimulator.assumeMediaCompletes` | *Speech and movies finish on their own*, in the transport |
+| `aet-eaw-edit.encyclopedia.screenWidth` and `screenHeight` | the *Screen* dropdown in the encyclopedia preview |
+
+Settings removed, with nothing to set in their place: every `aet-eaw-edit.features.*` key but
+`aet-eaw-edit.features.preview.energyPool`, `aet-eaw-edit.lsp.enabled` (a `.pgproj` or a mod's folder starts
+the server; *Disable (Workspace)* on the extension keeps it off), `aet-eaw-edit.lsp.locale`,
+`aet-eaw-edit.modVerify.enabled`, `aet-eaw-edit.modVerify.executable` and `aet-eaw-edit.shaders.sourceUrl`. A
+key left in `settings.json` shows as unknown and does nothing.
+
+In the project:
+
+- `aet-eaw-edit.lsp.executable` pointing at a separately downloaded server: clear it, the bundled server
+  is the one that matches
+- A `$schema` line in the `.pgproj`: remove it; the extension validates the file with the schema it ships
+- `aetswg-006-0008` in a suppression: silences nothing now; the structural findings carry
+  `aetswg-012-3001` to `aetswg-012-3009` and `aetswg-015-0001` to `aetswg-015-0006`
+- `---@xmlref` in a Lua annotation: the tag is `---@aetref`
+- `.aetswg/suppressions.json` migrates itself on the first load
+- A dependency's localisation file is read-only in the editor: copy it into the project's text directory to
+  change it
+
 ### Features
 
+- **What's New page** - the release notes of the installed version open in the editor once after an update,
+  and on the first start; **EaWEdit: What's New** opens them any time, and
+  `aet-eaw-edit.whatsNew.openAfterUpdate` turns the automatic opening off. The page renders the changelog
+  that ships inside the extension, the same text the Marketplace and the GitHub release show: the release's
+  highlights first, the migration notes as a callout, then the full notes, with the earlier releases folded
+  below. A preview build carries the Marketplace's preview mark
 - **Localisable texts** - every user-facing string moves into one catalogue per runtime, the start of
   translations and the one place the text rules are checked
   ([#274](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/274))
@@ -14,10 +83,10 @@
     items and panel titles - go through `vscode.l10n.t` into `l10n/bundle.l10n.json`; the lint fails on a
     text written in place or a bundle that no longer matches the code. Six texts in second person were
     reworded on the way, and plural messages are whole sentences
-  - The webviews' texts - the model preview, story graph, localisation editor, encyclopedia and credits
-    - come from the same bundle, which the host hands every page; text interrupted by values is one
-    message with placeholders. The page's language follows VS Code's display language. Curly quotes in one
-    message became straight ones, and texts in second person were reworded
+  - The webviews' texts - the model preview, story graph, localisation editor, encyclopedia and
+    credits - come from the same bundle, which the host hands every page; text interrupted by values is
+    one message with placeholders. The page's language follows VS Code's display language. Curly quotes
+    in one message became straight ones, and texts in second person were reworded
   - The server's own texts come from one catalogue, `ServerMessages.resx`; English is the only language it holds so
     far; values in a message keep the form the XML holds - `0.5`, never `0,5`. A test ties every key the code asks
     for to the catalogue and back

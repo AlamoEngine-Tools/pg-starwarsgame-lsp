@@ -73,6 +73,7 @@ async function main() {
             'src/webview/modelPreview.tsx',
             'src/webview/modelInspector.tsx',
             'src/webview/modBrowser.tsx',
+            'src/webview/whatsNew.tsx',
         ],
         bundle: true,
         format: 'iife',

@@ -418,6 +418,10 @@
         "title": "%command.lsp.openModBrowser.title%"
       },
       {
+        "command": "aet-eaw-edit.whatsNew.open",
+        "title": "%command.whatsNew.open.title%"
+      },
+      {
         "command": "aet-eaw-edit.lsp.openStoryGraph",
         "title": "%command.lsp.openStoryGraph.title%",
         "icon": "$(type-hierarchy)"
@@ -611,6 +615,12 @@
             "format": "uri-reference",
             "scope": "machine-overridable",
             "markdownDescription": "%config.shaders.directory.markdownDescription%"
+          },
+          "aet-eaw-edit.whatsNew.openAfterUpdate": {
+            "order": 4,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.whatsNew.openAfterUpdate.markdownDescription%"
           }
         }
       },
@@ -887,6 +897,7 @@
     "serialize-javascript": "^7.0.5"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
@@ -904,8 +915,10 @@
     "@wdio/local-runner": "^9.32.0",
     "@wdio/mocha-framework": "^9.32.0",
     "@wdio/spec-reporter": "^9.32.0",
+    "dompurify": "^3.4.17",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
+    "markdown-it": "^15.0.3",
     "prettier": "3.9.10",
     "typescript": "^6.0.0",
     "wdio-vscode-service": "^8.0.0",

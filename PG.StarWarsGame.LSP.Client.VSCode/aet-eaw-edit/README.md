@@ -31,6 +31,9 @@ From the Marketplace, or `aet-eaw-edit-x.x.x.vsix` from the
 [Releases](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases) page (*Extensions* view, `...` menu,
 *Install from VSIX...*).
 
+After an install or an update the **What's New** page opens once with the release notes; **EaWEdit: What's New**
+opens it again.
+
 ### 2. Open the mod
 
 The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod without one: a `Data`
@@ -722,6 +725,7 @@ Command Palette (`Ctrl+Shift+P`).
 | EaWEdit: Re-validate Workspace                         | Re-runs diagnostics in every language                            |
 | EaWEdit: Restart LSP Server                            | Restarts the language server                                     |
 | EaWEdit: Copy Bug Report Info                          | Client and server status for a public issue; no paths            |
+| EaWEdit: What's New                                    | The release notes of the installed version                       |
 | EaWEdit: Force LSP Startup                             | Runs the startup scan again when a session came up without one   |
 | EaWEdit: Show Effective Object (Variant Inheritance)   | Merged XML of a variant object                                   |
 | EaWEdit: Preview Model                                 | Opens a model by file name, without XML                          |
@@ -751,7 +755,7 @@ Command Palette (`Ctrl+Shift+P`).
 
 ## Settings reference
 
-Ten settings on the settings page; everything else is always on. The development settings are hidden from it.
+Eleven settings on the settings page; everything else is always on. The development settings are hidden from it.
 
 ### Experimental
 
@@ -780,6 +784,7 @@ once set.
 | `aet-eaw-edit.tools.aloViewerExecutable`      | _(empty)_ | `AloViewer.exe`, for *Open in AloViewer*                                                                  |
 | `aet-eaw-edit.tools.particleEditorExecutable` | _(empty)_ | `ParticleEditor.exe`, for *Open in Particle Editor*                                                       |
 | `aet-eaw-edit.shaders.directory`              | _(empty)_ | Base game shader sources (`.fx`) for the preview; filled by *Set Up Base Shader Sources* or a copy at hand |
+| `aet-eaw-edit.whatsNew.openAfterUpdate`       | `true`    | Open the What's New page once after an update, and on the first start                                     |
 
 ### Localisation editor
 
