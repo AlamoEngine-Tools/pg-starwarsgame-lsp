@@ -24,6 +24,14 @@ public sealed class GetStoryPlotsHandler(
 {
     public Task<GetStoryPlotsResult> Handle(GetStoryPlotsParams request, CancellationToken ct)
     {
+        // Off the request thread: on a large mod this walks every campaign and faction, and run
+        // inline it held every other request - the localisation and Mod Browser feeds among them -
+        // until it returned.
+        return Task.Run(() => Build(ct), ct);
+    }
+
+    private GetStoryPlotsResult Build(CancellationToken ct)
+    {
         var chain = modelService.GetChainResult();
         var manifestsByFile = new Dictionary<string, StoryManifestContents>(StringComparer.OrdinalIgnoreCase);
         foreach (var manifest in chain.Manifests)
@@ -49,6 +57,7 @@ public sealed class GetStoryPlotsHandler(
         var campaigns = new List<StoryCampaignDto>();
         foreach (var campaign in chain.Campaigns)
         {
+            ct.ThrowIfCancellationRequested();
             var factions = new List<StoryFactionDto>();
             foreach (var faction in campaign.FactionManifests)
             {
@@ -106,7 +115,7 @@ public sealed class GetStoryPlotsHandler(
                 campaign.PlayerFaction, navigable?.Uri, navigable?.Line));
         }
 
-        return Task.FromResult(new GetStoryPlotsResult(campaigns));
+        return new GetStoryPlotsResult(campaigns);
     }
 
     // (campaign definition origin) -> Campaign_Set value, derived from the workspace group index

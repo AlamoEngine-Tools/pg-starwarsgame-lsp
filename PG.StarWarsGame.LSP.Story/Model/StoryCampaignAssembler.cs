@@ -66,6 +66,22 @@ public sealed record StoryCampaignModel(
 /// </summary>
 public sealed class StoryCampaignAssembler(ISchemaProvider schema)
 {
+    /// <summary>
+    ///     The manifest files that seed the model of one campaign faction: every declaration of the
+    ///     campaign across the layers contributes its manifest for that faction. Two campaigns with
+    ///     the same list build the same model, which is what a cache keys on.
+    /// </summary>
+    public static IReadOnlyList<string> FactionManifestsOf(StoryChainScanResult chain, string campaignName,
+        string faction)
+    {
+        return chain.Campaigns
+            .Where(c => c.Name.Equals(campaignName, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(c => c.FactionManifests)
+            .Where(f => f.Faction.Equals(faction, StringComparison.OrdinalIgnoreCase))
+            .Select(f => f.ManifestFile)
+            .ToList();
+    }
+
     /// <param name="campaignName">The campaign whose manifests are walked.</param>
     /// <param name="chain">The chain scan the manifests come from.</param>
     /// <param name="readThread">Reads a thread's URI and text by its manifest path; null when it does not exist.</param>
@@ -78,9 +94,14 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
     ///     Resolves an attached script name (extensionless, as the manifest writes it) to its
     ///     machine; null skips the Lua overlay. Called once per distinct script.
     /// </param>
+    /// <param name="parseThread">
+    ///     Parses a thread's text; the default parses afresh. A caller that keeps a parse per
+    ///     document hands the same one to every model that lists the file.
+    /// </param>
     public StoryCampaignModel? Assemble(string campaignName, string faction,
         StoryChainScanResult chain, Func<string, (string Uri, string Text)?> readThread,
-        Func<string, LuaStoryMachine?>? luaMachineFor = null)
+        Func<string, LuaStoryMachine?>? luaMachineFor = null,
+        Func<string, string, StoryThread>? parseThread = null)
     {
         var campaigns = chain.Campaigns
             .Where(c => c.Name.Equals(campaignName, StringComparison.OrdinalIgnoreCase))
@@ -89,11 +110,7 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
 
         // The campaign may be declared more than once across layers; every declaration's manifest
         // for THIS faction seeds the walk, which is what the merged version did per campaign.
-        var factionManifests = campaigns
-            .SelectMany(c => c.FactionManifests)
-            .Where(f => f.Faction.Equals(faction, StringComparison.OrdinalIgnoreCase))
-            .Select(f => f.ManifestFile)
-            .ToList();
+        var factionManifests = FactionManifestsOf(chain, campaignName, faction);
         if (factionManifests.Count == 0) return null;
 
         var manifestsByFile = new Dictionary<string, StoryManifestContents>(StringComparer.OrdinalIgnoreCase);
@@ -151,7 +168,7 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             var read = readThread(threadFile);
             if (read is null) continue;
             var (uri, text) = read.Value;
-            threads.Add(StoryThreadParser.Parse(text, uri));
+            threads.Add((parseThread ?? StoryThreadParser.Parse)(text, uri));
             uriByThreadFile[threadFile] = uri;
             if (!activeFiles.Contains(threadFile))
                 suspendedUris.Add(uri);

@@ -150,6 +150,81 @@ public sealed class StoryModelServiceTest
         Assert.Null(service.GetCampaignModel("GC_One", "Underworld"));
     }
 
+    // A model is built from the faction's manifest files, and the campaign only names it. On a
+    // large mod hundreds of campaign variants list the same manifest - one of them 1,077
+    // campaigns x 13 factions, 13,469 models from 98 manifests - and keying the cache by the
+    // campaign's name built every one of them from scratch: 135 s for the navigator feed on start,
+    // and the same again for the diagnostics of a thread file on every save.
+    private static Dictionary<string, MockFileData> SharedManifestFixture()
+    {
+        var files = Fixture();
+        files[Path.Combine(XmlDir, "Campaigns_Test.xml")] = new(
+            "<Campaigns>" +
+            "<Campaign Name=\"GC_One\"><Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name></Campaign>" +
+            "<Campaign Name=\"GC_Two\"><Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name></Campaign>" +
+            "</Campaigns>");
+        return files;
+    }
+
+    [Fact]
+    public void GetCampaignModel_TwoCampaignsWithTheSameFactionManifest_ShareOneBuild()
+    {
+        var (service, _, _, _, _, _) = Build(SharedManifestFixture());
+
+        var one = service.GetCampaignModel("GC_One", "Rebel")!;
+        var two = service.GetCampaignModel("GC_Two", "Rebel")!;
+
+        Assert.Equal("GC_One", one.CampaignName);
+        Assert.Equal("GC_Two", two.CampaignName);
+        Assert.Same(one.Graph, two.Graph);
+        Assert.Same(one.Threads, two.Threads);
+    }
+
+    [Fact]
+    public void GetCampaignModel_SharedBuild_IsRebuiltForBothWhenAThreadChanges()
+    {
+        var (service, _, index, host, fh, _) = Build(SharedManifestFixture());
+        var threadUri = fh.NormalizeUri(Path.Combine(XmlDir, "Story_Act_I.xml"));
+        var staleOne = service.GetCampaignModel("GC_One", "Rebel")!;
+        _ = service.GetCampaignModel("GC_Two", "Rebel")!;
+
+        host.AddOrUpdate(threadUri, "<Story><Event Name=\"Rewritten\"/></Story>", 2);
+        index.InjectDocument(new DocumentIndex(threadUri, 2, [], []));
+
+        var freshTwo = service.GetCampaignModel("GC_Two", "Rebel")!;
+        var freshOne = service.GetCampaignModel("GC_One", "Rebel")!;
+
+        Assert.NotSame(staleOne, freshOne);
+        Assert.Contains(freshTwo.Graph.Nodes, n => n.Label == "Rewritten");
+        Assert.Same(freshOne.Graph, freshTwo.Graph);
+    }
+
+    // Two manifests that list one thread file parsed it twice; 73 thread files served 13,469
+    // models on the mod above. A parse is kept per document version and shared.
+    private static Dictionary<string, MockFileData> SharedThreadFixture()
+    {
+        var files = TwoFactionFixture();
+        files[Path.Combine(XmlDir, "Story_Plots_R.xml")] = new(
+            "<Story_Mode_Plots><Active_Plot>Story_Shared.xml</Active_Plot></Story_Mode_Plots>");
+        files[Path.Combine(XmlDir, "Story_Plots_E.xml")] = new(
+            "<Story_Mode_Plots><Active_Plot>Story_Shared.xml</Active_Plot></Story_Mode_Plots>");
+        files[Path.Combine(XmlDir, "Story_Shared.xml")] = new(
+            "<Story><Event Name=\"Universal_Story_Start\"/></Story>");
+        return files;
+    }
+
+    [Fact]
+    public void GetCampaignModel_AThreadTwoManifestsList_IsParsedOnce()
+    {
+        var (service, _, _, _, _, _) = Build(SharedThreadFixture());
+
+        var rebel = service.GetCampaignModel("GC_One", "Rebel")!;
+        var empire = service.GetCampaignModel("GC_One", "Empire")!;
+
+        Assert.NotSame(rebel.Graph, empire.Graph);
+        Assert.Same(Assert.Single(rebel.Threads), Assert.Single(empire.Threads));
+    }
+
     [Fact]
     public void GetCampaignModel_ParsesThreadsAndMarksSuspension()
     {
