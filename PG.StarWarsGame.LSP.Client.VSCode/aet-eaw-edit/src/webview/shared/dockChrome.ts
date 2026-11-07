@@ -863,7 +863,9 @@ ${tokensCss}
     /* Every table of rows, read as the editor's own Keyboard Shortcuts table: a sticky header, the
        list's hover and selection colours, a focus outline on the row the keys move, the row's
        actions at its end. An inert row is greyed, and says why; a row with a finding carries the
-       loc grids' severity bar. */
+       loc grids' severity bar. A line between the columns and a slightly lighter every other row
+       keep a wide table readable; the line is on a cell's LEFT so the last column and the actions
+       cell add none at the table's edge. */
     .data-table-frame { display: flex; flex-direction: column; min-height: 0; flex: 1; }
     .data-table-scroll { flex: 1; overflow: auto; min-height: 0; }
     .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
@@ -881,6 +883,8 @@ ${tokensCss}
         white-space: nowrap;
     }
     .data-table th.sortable { cursor: pointer; }
+    .data-table th + th, .data-table td + td { border-left: var(--space-1) solid var(--colour-line); }
+    .data-table td.row-actions-cell { border-left: 0; }
     .data-table th.sortable:hover { color: var(--colour-ink); }
     .data-table th svg { vertical-align: middle; margin-left: var(--space-4); }
     /* A header's filter button sits after its label, lit while the filter holds rows back. Its
@@ -931,6 +935,7 @@ ${tokensCss}
         white-space: nowrap;
     }
     .data-table td.dim { color: var(--colour-muted); }
+    .data-table tbody tr:nth-child(even) td { background: color-mix(in srgb, currentColor 4%, transparent); }
     .data-table tbody tr:hover td { background: var(--colour-hover); }
     .data-table tbody tr.selected td {
         background: var(--colour-selected);
@@ -961,6 +966,9 @@ ${tokensCss}
     .data-table tbody tr:hover .row-actions,
     .data-table tbody tr:focus-within .row-actions,
     .data-table tbody tr.selected .row-actions { visibility: visible; }
+    .data-table tbody tr:nth-child(even) .row-actions {
+        background: linear-gradient(color-mix(in srgb, currentColor 4%, transparent), color-mix(in srgb, currentColor 4%, transparent)), var(--colour-editor-ground);
+    }
     .data-table tbody tr:hover .row-actions {
         background: linear-gradient(var(--colour-hover), var(--colour-hover)), var(--colour-editor-ground);
     }
@@ -977,6 +985,7 @@ ${tokensCss}
         border-top: var(--space-1) solid var(--colour-line);
         color: var(--colour-muted);
     }
+    .data-table-foot .foot-tools { display: inline-flex; align-items: center; gap: var(--space-8); }
 `;
 
 /**

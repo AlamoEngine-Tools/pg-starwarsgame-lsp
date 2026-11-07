@@ -592,3 +592,21 @@ function actionReasonLabel(reason: string): string {
             return reason;
     }
 }
+
+/** A list's search: the name to match, the kinds and the origins that narrow its rows. */
+export interface SearchFilter {
+    query: string;
+    kinds: string[];
+    origins: string[];
+}
+
+export const NO_FILTER: SearchFilter = { query: "", kinds: [], origins: [] };
+
+/** Whether the search holds any row back - what the table's clear-filters control acts on. */
+export function filterActive(filter: SearchFilter): boolean {
+    return (
+        filter.query !== "" ||
+        filter.kinds.length > 0 ||
+        filter.origins.length > 0
+    );
+}

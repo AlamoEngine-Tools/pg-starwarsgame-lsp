@@ -55,10 +55,12 @@ import { TabStrip } from "./shared/TabStrip";
 import {
     ActionChoice,
     actionChoices,
+    filterActive,
     KindChoice,
     kindChoices,
     listColumns,
     menuChoices,
+    NO_FILTER,
     opensOutline,
     originChoices,
     originLabel,
@@ -69,6 +71,7 @@ import {
     relationLabel,
     rowInertReason,
     rowTypeLabel,
+    SearchFilter,
 } from "./modBrowserModel";
 import { ACTION_ICONS, PreviewPage } from "./modBrowserPreview";
 import {
@@ -303,13 +306,7 @@ interface Menu {
 
 // ── state ──────────────────────────────────────────────────────────────────
 
-interface Filter {
-    query: string;
-    kinds: string[];
-    origins: string[];
-}
-
-const NO_FILTER: Filter = { query: "", kinds: [], origins: [] };
+type Filter = SearchFilter;
 
 /**
  * The ship name drawn for each object, kept for the panel's life - the encyclopedia panel's rule:
@@ -816,6 +813,12 @@ function App(): React.JSX.Element {
         );
     }
 
+    /** The list's search back to nothing - from the form's reset or the table's foot. */
+    const resetFilter = (): void => {
+        setDraft(NO_FILTER);
+        setFilters((known) => ({ ...known, [list.key]: NO_FILTER }));
+    };
+
     // The rail, as VS Code's tree: its visible rows in order, one of them focused, keys moving the
     // focus and the selection with it.
     const railRows: RailRow[] = [];
@@ -1178,6 +1181,8 @@ function App(): React.JSX.Element {
                                 }));
                             })
                         }
+                        filtered={filterActive(filter)}
+                        onClearFilters={resetFilter}
                     />
                 )}
                 {!activeTab && (
@@ -1208,13 +1213,7 @@ function App(): React.JSX.Element {
                                 [list.key]: draft,
                             }))
                         }
-                        onReset={() => {
-                            setDraft(NO_FILTER);
-                            setFilters((known) => ({
-                                ...known,
-                                [list.key]: NO_FILTER,
-                            }));
-                        }}
+                        onReset={resetFilter}
                     />
                 )}
             </main>
@@ -1318,6 +1317,8 @@ function ListPage({
     onResize,
     onMove,
     filter,
+    filtered,
+    onClearFilters,
     columnKeys,
 }: {
     label: string;
@@ -1342,6 +1343,9 @@ function ListPage({
     onResize: (widths: Record<string, number>) => void;
     onMove: (from: string, to: string) => void;
     filter: (column: string) => ColumnFilter | undefined;
+    /** The search holds rows back, so the foot's clear-filters control has something to do. */
+    filtered: boolean;
+    onClearFilters: () => void;
     /** The columns this list shows, in its own order. */
     columnKeys: string[];
 }): React.JSX.Element {
@@ -1458,18 +1462,29 @@ function ListPage({
                             total.toLocaleString(),
                         )}
                     </span>
-                    <Button
-                        compact
-                        disabled={rows.length >= total || loading}
-                        disabledReason={
-                            loading
-                                ? l10n.t("Loading...")
-                                : l10n.t("Everything is loaded")
-                        }
-                        onClick={onMore}
-                    >
-                        {l10n.t("Load more")}
-                    </Button>
+                    <span className="foot-tools">
+                        <IconButton
+                            icon="clearFilter"
+                            title={l10n.t("Clear all filters")}
+                            disabled={!filtered}
+                            disabledReason={l10n.t(
+                                "Clear all filters - no filters are set",
+                            )}
+                            onClick={onClearFilters}
+                        />
+                        <Button
+                            compact
+                            disabled={rows.length >= total || loading}
+                            disabledReason={
+                                loading
+                                    ? l10n.t("Loading...")
+                                    : l10n.t("Everything is loaded")
+                            }
+                            onClick={onMore}
+                        >
+                            {l10n.t("Load more")}
+                        </Button>
+                    </span>
                 </>
             }
         />

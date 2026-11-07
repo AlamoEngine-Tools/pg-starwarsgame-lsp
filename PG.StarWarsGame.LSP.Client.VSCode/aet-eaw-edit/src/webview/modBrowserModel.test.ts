@@ -8,8 +8,10 @@ import {
     actionChoices,
     factLabel,
     fileSize,
+    filterActive,
     kindChoices,
     listColumns,
+    NO_FILTER,
     problemMessage,
     locationLabel,
     menuChoices,
@@ -532,5 +534,22 @@ describe("opensOutline", () => {
 
     it("keeps the browser as it is for the outline it shows", () => {
         assert.equal(opensOutline("scripts", "scripts"), false);
+    });
+});
+
+// The table's clear-filters control is disabled, and says why, while nothing holds rows back.
+describe("filterActive", () => {
+    it("is false for the empty search", () => {
+        assert.equal(filterActive(NO_FILTER), false);
+        assert.equal(
+            filterActive({ query: "", kinds: [], origins: [] }),
+            false,
+        );
+    });
+
+    it("is true once a name, a kind or an origin narrows the rows", () => {
+        assert.equal(filterActive({ ...NO_FILTER, query: "Star" }), true);
+        assert.equal(filterActive({ ...NO_FILTER, kinds: ["HeroUnit"] }), true);
+        assert.equal(filterActive({ ...NO_FILTER, origins: ["game"] }), true);
     });
 });

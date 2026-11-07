@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { DataTable, DataTableProps } from "./DataTable";
+import { dockChromeCss } from "./dockChrome";
 
 interface Row {
     name: string;
@@ -41,6 +42,38 @@ const table = (props: Partial<DataTableProps<Row>> = {}): string =>
     );
 
 describe("DataTable", () => {
+    // One tone over every cell left the rows and the columns to be told apart by alignment alone;
+    // the reader asked for a line between the columns and a slightly lighter every other row.
+    describe("its rules in dockChromeCss", () => {
+        const rule = (selector: string): string | undefined =>
+            dockChromeCss
+                .split("}")
+                .map((block) => block.trim())
+                .find((block) => block.startsWith(selector));
+
+        it("draws a line between the columns, none at the edges and none at the actions", () => {
+            assert.match(
+                rule(".data-table th + th, .data-table td + td {") ?? "",
+                /border-left:/,
+            );
+            assert.match(
+                rule(".data-table td.row-actions-cell {") ?? "",
+                /border-left: 0/,
+            );
+        });
+
+        it("shades every other row a little, under the hover and the selection", () => {
+            const zebra = ".data-table tbody tr:nth-child(even) td";
+            const hover = ".data-table tbody tr:hover td";
+            assert.match(rule(`${zebra} {`) ?? "", /background:/);
+            // Equal specificity: the later rule wins, so the hover and the selection must follow.
+            assert.ok(
+                dockChromeCss.indexOf(zebra) < dockChromeCss.indexOf(hover),
+                "the alternating shade is declared before the hover colour",
+            );
+        });
+    });
+
     it("draws a header cell per column and a row per entry", () => {
         const html = table();
 
