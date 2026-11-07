@@ -126,10 +126,19 @@ function Invoke-Extra([string] $testId) {
                     Copy-Item -Destination $dest -Recurse -Force
             $api = Join-Path $dest 'lua\api.d.lua'
             $lines = [System.IO.File]::ReadAllLines($api)
-            if ($lines[488] -ne '---@aetref XmlObject:Faction') {
-                Write-Warning "LUA-25: line 489 of $api is '$($lines[488])', not the Find_Player annotation; left as it is."
+            # The stub is generated and its line numbers move with every regeneration, so the
+            # annotation is found by content: the Faction reference tag right above Find_Player.
+            $function = [Array]::FindIndex($lines, [Predicate[string]] { param($l) $l -like 'function Find_Player(*' })
+            $tag = -1
+            if ($function -gt 0) {
+                for ($i = $function - 1; $i -ge 0 -and $lines[$i] -like '---*'; $i--) {
+                    if ($lines[$i] -eq '---@aetref XmlObject:Faction') { $tag = $i; break }
+                }
+            }
+            if ($tag -lt 0) {
+                Write-Warning "LUA-25: no '---@aetref XmlObject:Faction' above Find_Player in $api; left as it is."
             } else {
-                $lines[488] = '---@xmlref XmlObject:Faction'
+                $lines[$tag] = '---@xmlref XmlObject:Faction'
                 [System.IO.File]::WriteAllLines($api, $lines)
             }
         }
