@@ -458,12 +458,12 @@ describe("statusText", () => {
                 undefined,
             );
             assert.equal(
-                pickGag(() => 0.02),
+                pickGag(() => 0.05),
                 undefined,
             );
             const first = pickGag(() => 0);
             assert.equal(first, "Charging hyperdrive...");
-            const draws = [0.019, 0.999];
+            const draws = [0.049, 0.999];
             const last = pickGag(() => draws.shift() ?? 0);
             assert.equal(
                 last,

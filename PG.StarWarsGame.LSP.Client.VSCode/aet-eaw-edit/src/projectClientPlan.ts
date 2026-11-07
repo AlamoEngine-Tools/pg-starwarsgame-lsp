@@ -253,8 +253,11 @@ export function phaseText(client: {
     }
 }
 
-/** How often a loading phase opens with a gag: one start in fifty, on average. */
-const GAG_CHANCE = 0.02;
+/**
+ * How often a draw yields a gag: one in twenty. A phase draws when it starts and again every
+ * half minute it lasts, so a short load sees one now and then and a long one is not left without.
+ */
+const GAG_CHANCE = 0.05;
 
 /**
  * The lines a loading phase may open with, for a moment, before its real text. Each reads as

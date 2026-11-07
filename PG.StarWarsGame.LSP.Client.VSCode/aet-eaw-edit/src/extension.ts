@@ -350,6 +350,8 @@ const clients = new Map<string, ProjectClient>();
 
 /** How long a gag stays on the bar before the phase's own text replaces it. */
 const GAG_SHOWN_MS = 1200;
+/** How often a phase that is still loading draws again. */
+const GAG_REDRAW_MS = 30000;
 
 /** The first project in discovery order. */
 function primaryClient(): ProjectClient | undefined {
@@ -1176,22 +1178,32 @@ function startProjectClient(
         for (const [phase, load] of phases) {
             project.state = "loading";
             project.phase = phase;
-            // Rarely, the phase opens with a line from elsewhere in the galaxy, for a moment.
-            const gag = pickGag(Math.random);
-            project.gag = gag;
-            if (gag !== undefined) {
+            // Now and then the phase shows a line from elsewhere in the galaxy, for a moment: one
+            // draw as it starts, another every half minute it lasts.
+            const draw = (): void => {
+                const gag = pickGag(Math.random);
+                if (gag === undefined || project.state !== "loading") {
+                    return;
+                }
+                project.gag = gag;
+                updateStatus();
                 setTimeout(() => {
                     if (project.gag === gag) {
                         project.gag = undefined;
                         updateStatus();
                     }
                 }, GAG_SHOWN_MS);
-            }
+            };
+            project.gag = undefined;
+            draw();
             updateStatus();
+            const redraw = setInterval(draw, GAG_REDRAW_MS);
             try {
                 await load();
             } catch (e) {
                 logLine(`${label}Loading ${phase} failed: ${e}`);
+            } finally {
+                clearInterval(redraw);
             }
         }
         // A reload or a stop that happened meanwhile owns the state now.
