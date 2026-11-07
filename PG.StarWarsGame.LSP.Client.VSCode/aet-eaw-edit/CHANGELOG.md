@@ -302,6 +302,12 @@
   `Cataloguing assets...` as each feed is asked for, and several projects count as `ready` only once their
   last feed has answered
 - **No warning for the order of an event's tags** - the story graph warned when an event's tags left the
+- **A name the TRIGGER_AI reward sets is a symbol** - the reward's first parameter sets an AI story trigger on the
+  faction's AI player, and Lua's `Check_Story_Flag` reads those triggers and nothing else; the flags `SET_FLAG`
+  creates are a separate store the game never shows that function. The index defined a flag from `SET_FLAG` alone
+  and typed `Check_Story_Flag` against it, so every such name read as missing, the shipped campaigns' included.
+  TRIGGER_AI now defines an AI story trigger, the Lua reference goes to it and finds it, and a script that checks
+  a name only `SET_FLAG` ever sets is still reported, since the game would not see it either
 - **One place for a repeated key in the localisation editor** - the editor counted repeated keys itself and
   showed the count among its actions, beside the header badge and the Problems bar that already report the
   same key with the row it repeats. The count is gone; the badge and the bar remain

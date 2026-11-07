@@ -69,6 +69,7 @@ internal static class StoryDocumentSymbolCollector
         {
             StoryReferenceTypes.EventName => StoryReferenceTypes.EventSymbol,
             StoryReferenceTypes.Flag => StoryReferenceTypes.FlagSymbol,
+            StoryReferenceTypes.AiTrigger => StoryReferenceTypes.AiTriggerSymbol,
             StoryReferenceTypes.Notification => StoryReferenceTypes.NotificationSymbol,
             _ => null
         };
@@ -103,8 +104,9 @@ internal static class StoryDocumentSymbolCollector
             return;
         }
 
-        // SET_FLAG creates the flag — its param is the definition; every other flag param reads.
-        var defines = isReward && typeUpper == "SET_FLAG" && position == 0;
+        // SET_FLAG creates the flag and TRIGGER_AI sets the AI story trigger - each one's first
+        // param is the definition; every other flag or trigger param reads.
+        var defines = isReward && position == 0 && typeUpper is "SET_FLAG" or "TRIGGER_AI";
 
         foreach (var (token, line, column) in Tokens(parsed, paramNode))
             if (defines)
