@@ -229,7 +229,11 @@ export const LOADING_PHASES: readonly LoadingPhase[] = [
 export function phaseText(client: {
     state: ClientState;
     phase?: LoadingPhase;
+    gag?: string;
 }): string | undefined {
+    if (client.gag !== undefined && client.state === "loading") {
+        return client.gag;
+    }
     switch (client.state) {
         case "starting":
             return l10n.t("Starting...");
@@ -249,6 +253,52 @@ export function phaseText(client: {
     }
 }
 
+/** How often a loading phase opens with a gag: one start in fifty, on average. */
+const GAG_CHANCE = 0.02;
+
+/**
+ * The lines a loading phase may open with, for a moment, before its real text. Each reads as
+ * the galaxy's own business unless the reader places it. Picked by the maintainer; the two at the
+ * end are the deep cuts.
+ */
+function gags(): string[] {
+    return [
+        l10n.t("Charging hyperdrive..."),
+        l10n.t("Raising deflector shields..."),
+        l10n.t("Calculating the jump to lightspeed..."),
+        l10n.t("Clearing the hangar deck..."),
+        l10n.t("Asking the Hutts for a loan..."),
+        l10n.t("Finding the droids..."),
+        l10n.t("Rerouting power to the forward batteries..."),
+        l10n.t("Herding the nerfs..."),
+        l10n.t("Bullseyeing womp rats..."),
+        l10n.t("Using the Force..."),
+        l10n.t("Combing the desert..."),
+        l10n.t("Negotiating with the Trade Federation..."),
+        l10n.t("Taking the high ground..."),
+        l10n.t("Executing Order 66..."),
+        l10n.t("Counting midi-chlorians..."),
+        l10n.t("Podracing on Tatooine..."),
+        l10n.t("Sensing a disturbance in the Force..."),
+        l10n.t("Restoring the natural order..."),
+        l10n.t("Without hope, without witness, without reward..."),
+    ];
+}
+
+/**
+ * A gag for a loading phase that is about to start, or nothing - nothing almost always. The
+ * first draw decides whether, the second which; the caller supplies the randomness so a test
+ * can.
+ */
+export function pickGag(random: () => number): string | undefined {
+    if (random() >= GAG_CHANCE) {
+        return undefined;
+    }
+    const lines = gags();
+    const at = Math.min(lines.length - 1, Math.floor(random() * lines.length));
+    return lines[at];
+}
+
 /**
  * The status bar text. One client names its own phase; several count the projects ready, name
  * the phase of the first one still busy, and name any that failed or stopped.
@@ -258,6 +308,7 @@ export function statusText(
         name: string;
         state: ClientState;
         phase?: LoadingPhase;
+        gag?: string;
     }[],
 ): string {
     if (clients.length === 1) {

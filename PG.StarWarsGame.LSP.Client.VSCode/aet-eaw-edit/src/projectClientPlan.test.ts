@@ -12,6 +12,7 @@ import {
     documentSelectorFor,
     ownerKey,
     ownsPath,
+    pickGag,
     planChanges,
     statusText,
     type ClientSpec,
@@ -445,6 +446,56 @@ describe("statusText", () => {
             ]),
             "$(loading~spin) EaWEdit LSP: 1 of 2 projects ready - Indexing symbols...",
         );
+    });
+
+    // Once in a while a loading phase opens with a line from somewhere else in the galaxy, for a
+    // moment, before the real phase text takes over. Rare on purpose: a joke on every start is a
+    // nuisance, and the bar is a status readout first.
+    describe("the gags", () => {
+        it("are picked rarely, from the list, by the caller's random", () => {
+            assert.equal(
+                pickGag(() => 0.5),
+                undefined,
+            );
+            assert.equal(
+                pickGag(() => 0.02),
+                undefined,
+            );
+            const first = pickGag(() => 0);
+            assert.equal(first, "Charging hyperdrive...");
+            const draws = [0.019, 0.999];
+            const last = pickGag(() => draws.shift() ?? 0);
+            assert.equal(
+                last,
+                "Without hope, without witness, without reward...",
+            );
+        });
+
+        it("stand in for the phase text while one is shown", () => {
+            assert.equal(
+                statusText([
+                    {
+                        name: "M",
+                        state: "loading",
+                        phase: "campaigns",
+                        gag: "Combing the desert...",
+                    },
+                ]),
+                "$(loading~spin) EaWEdit LSP: Combing the desert...",
+            );
+            assert.equal(
+                statusText([
+                    { name: "Rev", state: "ready" },
+                    {
+                        name: "TR",
+                        state: "loading",
+                        phase: "assets",
+                        gag: "Executing Order 66...",
+                    },
+                ]),
+                "$(loading~spin) EaWEdit LSP: 1 of 2 projects ready - Executing Order 66...",
+            );
+        });
     });
 
     /** A declined project migration stops the server; the bar must not keep reading as running. */

@@ -84,6 +84,7 @@ import {
     ownerKey,
     ownsPath,
     phaseText,
+    pickGag,
     planChanges,
     statusText,
 } from "./projectClientPlan";
@@ -336,6 +337,8 @@ interface ProjectClient {
     state: ClientState;
     /** Which feed a "loading" project waits for; cleared with every other state. */
     phase?: LoadingPhase;
+    /** The line the bar shows in place of the phase for a moment, when a phase drew one. */
+    gag?: string;
     /** This server's watchers over directories outside the workspace folders. */
     dependencyWatchers: vscode.Disposable[];
     /** Disposed with the client: a project's own trace channel, when it has one. */
@@ -344,6 +347,9 @@ interface ProjectClient {
 
 /** The running clients, in discovery order. */
 const clients = new Map<string, ProjectClient>();
+
+/** How long a gag stays on the bar before the phase's own text replaces it. */
+const GAG_SHOWN_MS = 1200;
 
 /** The first project in discovery order. */
 function primaryClient(): ProjectClient | undefined {
@@ -1170,6 +1176,17 @@ function startProjectClient(
         for (const [phase, load] of phases) {
             project.state = "loading";
             project.phase = phase;
+            // Rarely, the phase opens with a line from elsewhere in the galaxy, for a moment.
+            const gag = pickGag(Math.random);
+            project.gag = gag;
+            if (gag !== undefined) {
+                setTimeout(() => {
+                    if (project.gag === gag) {
+                        project.gag = undefined;
+                        updateStatus();
+                    }
+                }, GAG_SHOWN_MS);
+            }
             updateStatus();
             try {
                 await load();
@@ -1182,6 +1199,7 @@ function startProjectClient(
             return;
         }
         project.phase = undefined;
+        project.gag = undefined;
         project.state = "ready";
         updateStatus();
         // An encyclopedia card opened during the scan was answered from the baseline alone and kept
@@ -1302,6 +1320,7 @@ function updateStatus(): void {
             name: p.spec.name,
             state: p.state,
             phase: p.phase,
+            gag: p.gag,
         })),
     );
     if (running.length === 1) {
