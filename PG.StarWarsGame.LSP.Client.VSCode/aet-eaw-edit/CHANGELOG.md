@@ -297,6 +297,10 @@
 - **A texture, model, animation or sound added to the workspace is known at once** - the server re-globs its
   asset catalog when a loose asset appears or goes, but no asset extension was watched, so the file stayed
   unknown until the project was reloaded. The watched globs now carry every extension the catalog records
+- **The Mod Browser follows the index** - its tree, table and counts were refreshed on the scan-complete
+  signal alone, so an edit, a reload or a texture dropped into the workspace reached it only when a sort or a
+  node switch asked the server again. The server now sends one notification per burst of index writes, as it
+  does for the preview and the story graph, and every open browser of that project re-reads
 - **One name in two types is two objects** - the metafile that lists a file types it, and every type is an
   id space of its own: the shipped game has a Sarlacc faction and a Sarlacc unit, and SFX and speech events
   of one name. Where an id alone was looked up, whichever definition the index listed first answered, and

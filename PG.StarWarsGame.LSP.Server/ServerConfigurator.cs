@@ -578,6 +578,14 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IStartupGate>(),
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<PreviewSceneChangeNotifier>>()));
+                // The Mod Browser lists the index; one debounced notification per burst of writes
+                // (edits, reloads, a re-globbed asset catalog) tells its panels to ask again.
+                services.AddSingleton<ModBrowserChangeNotifier>(sp =>
+                    new ModBrowserChangeNotifier(
+                        sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStartupGate>(),
+                        method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
+                        sp.GetRequiredService<ILogger<ModBrowserChangeNotifier>>()));
 
                 // GameHoverHandler hands a request to the first of these that handles the document.
                 // Registered as the provider interface only so DryIoc does not see them as competing
@@ -674,6 +682,7 @@ public static class ServerConfigurator
                 server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
                 server.Services.GetRequiredService<StoryGraphChangeNotifier>();
                 server.Services.GetRequiredService<PreviewSceneChangeNotifier>();
+                server.Services.GetRequiredService<ModBrowserChangeNotifier>();
                 // StartupPipeline rather than the same stages written out again here: this copy had
                 // already drifted from it - it ran schema and baseline one after the other, skipped
                 // progress reporting entirely, and had no place to put the project-migration

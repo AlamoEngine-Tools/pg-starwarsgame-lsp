@@ -1205,6 +1205,14 @@ function startProjectClient(
         ModelPreviewPanel.refreshAll(project.spec.key);
     });
 
+    lspClient.onNotification("aet/modBrowserChanged", () => {
+        // The index moved - an edit, a reload, a texture dropped into the workspace - so every
+        // open browser of this project re-reads its counts, its rail and its table. Until this
+        // notification existed the browser refreshed on the scan-complete signal alone, and a new
+        // asset stayed out of it until a sort or a node switch happened to ask again.
+        ModBrowserPanel.refresh(project.spec.key);
+    });
+
     return project;
 }
 
