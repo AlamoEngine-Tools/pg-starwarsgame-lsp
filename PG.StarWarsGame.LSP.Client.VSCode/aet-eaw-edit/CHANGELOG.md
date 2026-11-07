@@ -202,9 +202,9 @@
   ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
   - Every asteroid, junk and planet-destruction field is a bump emitter: lit, normal-mapped rocks instead of flat
     cut-outs
-  - `PrimAlpha`, `PrimAdditive`, `PrimDiffuseAlpha`, `PrimOpaque` and `PrimAlphaScanlines` ship fixed-function only
-    (their programmable technique is commented out in the sources), so they keep the preview's own shader, which is
-    that path; heat sprites keep the distortion pass; tailed emitters keep the preview's shader for now
+  - `PrimAlpha`, `PrimAdditive`, `PrimDiffuseAlpha`, `PrimOpaque` and `PrimAlphaScanlines` ship fixed-function only,
+    so they keep the preview's own shader, which is that path; heat sprites keep the distortion pass; tailed
+    emitters keep the preview's shader for now
   - A depth sprite (`PrimDepthSprite*`) is drawn through its effect too: the emitter's own depth map, read from
     the same chunk as a bump emitter's normal map, is bound as the effect's second texture, and the pixel
     shader's depth output reaches the depth buffer, so a chunk sinks into or stands off the hull as the game
@@ -218,13 +218,13 @@
     rest of the effect scaffolding - the bump effect's tangent rotation and the depth sprites' PS1.x fallbacks
     were each a compile error that left the preview's own shader drawing in silence
   - The whole shipped set was then compiled the same way, and the translator learned what the rest of the corpus
-    writes: brace initialisers (`float4 TexU = { 0.01, 0, 0, 0 };`, flat array lists, matrices), `int4` and
-    `D3DCOLORtoUBYTE4`, a swizzled literal (`0.5.xx`), a scalar assigned to a vector (`Out.Diff = 0;`), an
-    integer compared with a float, `lerp` over mismatched widths, a `mul` of a float3 by a float4x4 kept at
-    HLSL's float4 result, a comment inside an expression, a sampler with both register and state block or with
-    neither, an annotation block after a semantic, a DX8 `asm` handle, and a `//` comment after a scaled integer.
-    60 of the 69 translatable effects compile, up from 41; the 9 left are development effects that name a
-    function, globals or a header the shipped sources do not have, and fail for an HLSL compiler the same way
+    writes: brace initialisers of vectors, flat arrays and matrices, `int4` and `D3DCOLORtoUBYTE4`, a swizzle on
+    a literal, a scalar assigned to a vector, an integer compared with a float, `lerp` over mismatched widths, a
+    `mul` of a float3 by a float4x4 kept at HLSL's float4 result, a comment inside an expression, a sampler with
+    both register and state block or with neither, an annotation block after a semantic, a DX8 `asm` handle, and
+    a `//` comment after a scaled integer. 60 of the 69 translatable effects compile, up from 41; the 9 left are
+    development effects that name something the shipped set does not define, and fail for an HLSL compiler the
+    same way
   - The shader resolver looks in the shaders' `Engine/` folder, where the particle effects live, and a header is
     asked for by its bare name whatever path the include wrote
   - An emitter with a skip time is pre-simulated through it before its first frame, in tenths of a second as the
@@ -289,8 +289,8 @@
   the listed path and nowhere else, so a mission plot filed one folder down never loads. The finding now names
   every file of that name in the project's layers, instead of leaving the author to search the tree
 - **Opening the campaign navigator and saving a story file take seconds on a large mod, not minutes** - a
-  story model was built per campaign and faction and cached under the campaign's name, so a mod with 1,077
-  campaign variants and 13 factions built 13,469 models from 98 manifest files, each parsing its story files
+  story model was built per campaign and faction and cached under the campaign's name, so a mod with many
+  campaign variants of a few plot sets built over thirteen thousand models, each parsing its story files
   again: 135 seconds for the navigator on start, and the same work again for a story file's diagnostics on
   every save. One build now serves every campaign that lists the same manifests, a story file is parsed once
   per text, and the navigator's feed is built off the request thread, so the localisation views and the Mod
@@ -301,7 +301,6 @@
   bar now reads `Indexing symbols...`, then `Parsing campaigns...`, `Loading translations...` and
   `Cataloguing assets...` as each feed is asked for, and several projects count as `ready` only once their
   last feed has answered
-- **No warning for the order of an event's tags** - the story graph warned when an event's tags left the
 - **A name the TRIGGER_AI reward sets is a symbol** - the reward's first parameter sets an AI story trigger on the
   faction's AI player, and Lua's `Check_Story_Flag` reads those triggers and nothing else; the flags `SET_FLAG`
   creates are a separate store the game never shows that function. The index defined a flag from `SET_FLAG` alone
@@ -316,6 +315,7 @@
 - **One place for a repeated key in the localisation editor** - the editor counted repeated keys itself and
   showed the count among its actions, beside the header badge and the Problems bar that already report the
   same key with the row it repeats. The count is gone; the badge and the bar remain
+- **No warning for the order of an event's tags** - the story graph warned when an event's tags left the
   order of the scripting document, `'Prereq' appears after 'Story_Dialog_Popup'`. The game reads each tag by
   name into its own slot and builds the event from the slots afterwards, so the order in the file changes
   nothing; 216 of Empire at War's 5,390 shipped events and 263 of Forces of Corruption's 9,873 are in another

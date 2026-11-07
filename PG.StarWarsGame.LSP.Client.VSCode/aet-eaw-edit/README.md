@@ -240,7 +240,7 @@ Scripts under the declared `scripts` directories are indexed and checked.
 - **Lua analyzer** - identifier and member completion, the workspace's own functions and types on hover,
   references, symbols, signature help, folding, semantic highlighting, code lenses and inlay hints; see
   [Lua analyzer](#lua-analyzer)
-- **Engine surface from measured stubs** - the 133 registered engine functions, the 9 wrapper classes with their
+- **Engine surface from measured stubs** - the registered engine functions, the wrapper classes with their
   methods, the standard library the game opens (Lua 5.0: no `math`, `io` or `os`) and the globals each script
   host maps in, as `---@meta` files in the [schema repository](https://github.com/AlamoEngine-Tools/eaw-schema)
   - String arguments that name a game object, a faction, a sound or music event, a text key or a movie complete
@@ -429,6 +429,7 @@ Several ids per directive, comma-separated; a note after `reason::`:
 | `aetswg-011-*` | Engine constraints                                                                                             |
 | `aetswg-012-*` | Syntax errors, and XML files the game drops                                                                    |
 | `aetswg-013-*` | Suppression comments themselves                                                                                |
+| `aetswg-014-*` | Model preview: what assembling a unit or reading a particle file found                                         |
 | `aetswg-015-*` | XML strictness: XML the game reads that standard tools reject, or reads differently                            |
 | `aetswg-016-*` | Lua analyzer: findings that hold for any Lua - unused or redefined locals, unreachable code, annotation errors |
 
@@ -509,7 +510,7 @@ as one graph. Edit and Simulation modes are experimental, each behind its own se
   - **A linked battle waits for its choice**, as the game's pending-battle panel does: a `LINK_TACTICAL` reward makes
     the battle pending and holds gameplay time - the story keeps running (pushes, flag polls, scripts, generic and GUI
     events), only `STORY_ELAPSED` timers stand still. The decision sits on the battle's portal: **Fight** opens the
-    battle's panel straight into its session, **Auto-resolve** leaves won or lost and the flag picks to you. A
+    battle's panel straight into its session, **Auto-resolve** leaves won or lost and the flag picks to the author. A
     `FORCE_CLICK_GUI` on the left choice button fights by itself, as the tutorial does, and on the right one
     auto-resolves. The `battle_end_closed` listener is the battle's to raise, not a decision, while one is pending or
     running; a loss that links the same mission again is a new attempt
