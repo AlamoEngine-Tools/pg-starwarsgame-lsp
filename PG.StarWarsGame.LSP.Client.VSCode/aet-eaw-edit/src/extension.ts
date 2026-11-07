@@ -578,6 +578,9 @@ let statusItem: vscode.StatusBarItem | undefined;
 /**
  * The globs the server reacts to on disk. Kept in one place because two watcher sets are built
  * from it: the workspace-folder ones VS Code resolves itself, and the per-directory ones below.
+ * It mirrors the server's `WatchedGlobs`: the document kinds, then every extension the asset
+ * catalog records, so a texture or a model dropped into the workspace re-globs the catalog instead
+ * of waiting for a reload.
  */
 const WATCHED_GLOBS = [
     "**/*.xml",
@@ -586,6 +589,14 @@ const WATCHED_GLOBS = [
     "**/*.csv",
     "**/*.properties",
     "**/*.dat",
+    "**/*.tga",
+    "**/*.dds",
+    "**/*.alo",
+    "**/*.ala",
+    "**/*.wav",
+    "**/*.mp3",
+    "**/*.ted",
+    "**/*.lc",
 ];
 
 /**

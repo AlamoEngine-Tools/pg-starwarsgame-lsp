@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
@@ -392,9 +393,29 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [InlineData("**/*.csv")] // localisation
     [InlineData("**/*.properties")]
     [InlineData("**/*.dat")] // the engine's own localisation format
+    // Loose assets: the handler re-globs the asset catalog for one, but for a long time nothing
+    // sent it the event - a texture or a model dropped into the workspace was unknown until a reload.
+    [InlineData("**/*.tga")]
+    [InlineData("**/*.dds")]
+    [InlineData("**/*.alo")]
+    [InlineData("**/*.ala")]
+    [InlineData("**/*.wav")]
+    [InlineData("**/*.mp3")]
+    [InlineData("**/*.ted")]
     public void WatchedGlobs_CoversEveryFileKindTheServerReactsTo(string glob)
     {
         Assert.Contains(glob, GameDidChangeWatchedFilesHandler.WatchedGlobs);
+    }
+
+    /// <summary>
+    ///     The asset globs are the catalog's own extension list, so an extension the catalog learns
+    ///     is watched without anyone remembering this list.
+    /// </summary>
+    [Fact]
+    public void WatchedGlobs_CoverEveryExtensionTheAssetCatalogRecords()
+    {
+        foreach (var extension in MegAssetCatalogBuilder.KnownAssetExtensions)
+            Assert.Contains($"**/*{extension}", GameDidChangeWatchedFilesHandler.WatchedGlobs);
     }
 
     // ── dynamic enum source file changes ─────────────────────────────────────────

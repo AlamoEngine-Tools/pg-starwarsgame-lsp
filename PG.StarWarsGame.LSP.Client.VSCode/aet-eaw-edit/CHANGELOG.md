@@ -285,6 +285,9 @@
 
 ### Fixes
 
+- **A texture, model, animation or sound added to the workspace is known at once** - the server re-globs its
+  asset catalog when a loose asset appears or goes, but no asset extension was watched, so the file stayed
+  unknown until the project was reloaded. The watched globs now carry every extension the catalog records
 - **One name in two types is two objects** - the metafile that lists a file types it, and every type is an
   id space of its own: the shipped game has a Sarlacc faction and a Sarlacc unit, and SFX and speech events
   of one name. Where an id alone was looked up, whichever definition the index listed first answered, and

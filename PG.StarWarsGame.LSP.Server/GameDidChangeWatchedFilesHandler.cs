@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -34,9 +35,21 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     ///         anything and every on-disk reaction only ran at startup. Change one list, change the
     ///         other.
     ///     </para>
+    ///     <para>
+    ///         The asset globs are the catalog's own extension list. A loose texture or model is
+    ///         re-globbed into the catalog on create and delete (<see cref="HandleChangesAsync" />),
+    ///         and for a long time that branch only ever ran for a script, because no asset
+    ///         extension was watched: a file dropped into the workspace was unknown until a reload.
+    ///     </para>
     /// </remarks>
     public static readonly string[] WatchedGlobs =
-        ["**/*.xml", "**/*.lua", "**/*.pgproj", "**/*.csv", "**/*.properties", "**/*.dat"];
+    [
+        "**/*.xml", "**/*.lua", "**/*.pgproj", "**/*.csv", "**/*.properties", "**/*.dat",
+        .. MegAssetCatalogBuilder.KnownAssetExtensions
+            .Select(extension => $"**/*{extension}")
+            .Where(glob => glob != "**/*.lua")
+            .Order(StringComparer.Ordinal)
+    ];
 
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
