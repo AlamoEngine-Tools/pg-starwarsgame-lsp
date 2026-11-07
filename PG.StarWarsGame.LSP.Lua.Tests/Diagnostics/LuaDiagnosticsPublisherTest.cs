@@ -491,6 +491,36 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Contains("No object with this name exists", diag.Message);
     }
 
+    // A reference whose type NOTHING indexes - no workspace file of it, none in the baseline - names
+    // nothing the tool can judge. The XML side says so (ReferenceTypeNotIndexed, Information); the
+    // Lua side claimed "no object with this name exists", which is false about the author's data.
+    // Seen on a library project whose Factions.xml only its consumers supply: Find_Player("Rebel")
+    // was an error there.
+    [Fact]
+    public void OnIndexChanged_UnresolvedRefOfATypeNothingIndexes_SaysItCannotVerify()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.With(LuaUri, """Find_Player("Rebel")""");
+        var reference = new GameReference("Rebel", GameSymbolKind.XmlObject, "Faction", LuaUri, 0, 13, 5);
+        var doc = new DocumentIndex(LuaUri, 1, [], [reference]);
+        var unit = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "GameObjectType",
+            new FileOrigin(XmlUri, 3, 10), null);
+        var index = new GameIndex(
+            BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, doc),
+            ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+                .Add(unit.Id, [unit]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        indexService.Raise(index);
+
+        var diag = Assert.Single(Assert.Single(published).Diagnostics);
+        Assert.Equal(DiagnosticSeverity.Information, diag.Severity);
+        Assert.Equal(DiagnosticIds.ReferenceTypeNotIndexed.ToString(), diag.Code?.String);
+        Assert.Contains("Cannot verify", diag.Message);
+        Assert.DoesNotContain("No object with this name exists", diag.Message);
+    }
+
     // ── suppression, end to end ───────────────────────────────────────────────
 
     [Fact]

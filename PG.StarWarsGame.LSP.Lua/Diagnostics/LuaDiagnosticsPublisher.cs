@@ -249,17 +249,19 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
                 case GameSymbolKind.XmlObject:
                 {
                     var resolved = index.ResolveReference(reference);
+                    // The indexed types go along, as on the XML side: a type nothing indexes - no
+                    // workspace file of it, none in the baseline - is a check the tool cannot make,
+                    // and saying "no object with this name exists" there is false about the data.
                     var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName,
-                        resolved, messages: messages, exactCase: reference.ExactCase);
+                        resolved, messages, index.IndexedTypeNames, exactCase: reference.ExactCase);
                     if (eval is null) continue;
 
                     diagnostics.Add(new LspDiagnostic
                     {
                         // Same id the XML side uses: an unresolved reference is the same kind of
                         // problem whichever language names the target. Taken from the evaluator
-                        // rather than named here, so the two cannot disagree once this side is
-                        // taught about indexed types - it passes none today, so every id it sees
-                        // is still UnresolvedReference.
+                        // rather than named here, so the two cannot disagree about which id an
+                        // outcome carries.
                         Code = new LspDiagnosticCode(eval.Value.Id.ToString()),
                         Severity = eval.Value.Severity.ToLsp(),
                         Message = eval.Value.Message,
