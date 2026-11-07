@@ -729,6 +729,12 @@ file sealed class GameRepositoryStoryChainFileResolver(Func<string, Stream?> ope
     {
         return false;
     }
+
+    // The builder records what the game ships; a hint for the author has no reader here.
+    public IReadOnlyList<string> FindByFileName(string fileName)
+    {
+        return [];
+    }
 }
 
 // Minimal fallback when no schema is wired - all types become GameObjectType.

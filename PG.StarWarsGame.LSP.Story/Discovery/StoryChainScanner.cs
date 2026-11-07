@@ -203,7 +203,7 @@ public sealed class StoryChainScanner
                 state.Manifests.Add(rel); // baseline ships it - typed, but nothing to recurse into
             else
                 state.AddProblem(origin, unresolvedKind,
-                    new CatalogueText("StoryChain_PlotFileMissing", rawReference));
+                    MissingFileText("StoryChain_PlotFileMissing", rawReference, rel));
             return;
         }
 
@@ -266,7 +266,7 @@ public sealed class StoryChainScanner
                 state.Threads.Add(rel);
             else
                 state.AddProblem(origin, StoryChainProblemKind.UnresolvedPlotEntry,
-                    new CatalogueText("StoryChain_StoryFileMissing", rawReference));
+                    MissingFileText("StoryChain_StoryFileMissing", rawReference, rel));
             return;
         }
 
@@ -305,6 +305,19 @@ public sealed class StoryChainScanner
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    // The engine opens the listed path and nothing else: the plot loader joins the XML folder and
+    // the entry, and mod paths, the game folder and the archives are each tried with that whole
+    // path (measured on the 2024 build). A file of that name filed in another folder is the usual
+    // cause of a miss, so the text says where it sits instead of leaving the author to search.
+    private CatalogueText MissingFileText(string missingKey, string rawReference, string rel)
+    {
+        var elsewhere = _resolver.FindByFileName(rel.Split('/')[^1]);
+        return elsewhere.Count == 0
+            ? new CatalogueText(missingKey, rawReference)
+            : new CatalogueText(missingKey + "FiledElsewhere", rawReference,
+                string.Join(", ", elsewhere.Select(p => p.Replace('/', '\\'))));
+    }
 
     // References come in two forms: xml-dir-relative ("Story_Plots_X.xml") or game-root-relative
     // ("DATA\XML\CAMPAIGNS_X.XML"). Shared with StoryGraphBuilder's tactical-node keying so a

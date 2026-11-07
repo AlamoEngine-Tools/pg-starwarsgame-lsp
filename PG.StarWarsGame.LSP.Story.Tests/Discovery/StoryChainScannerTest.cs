@@ -379,6 +379,87 @@ public sealed class StoryChainScannerTest
         Assert.Empty(result.ThreadFiles);
     }
 
+    // The engine opens the listed path and nothing else - it never searches a folder for the
+    // name (measured: the plot loader joins the XML folder and the entry, and every stage of the
+    // file open, mod paths, disk and archive, keys on the whole path). A file of that name filed
+    // one folder down is the usual cause, so the problem names where it is.
+    [Fact]
+    public void Scan_UnresolvablePlotEntry_NamesAFileOfThatNameFiledElsewhere()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                "<Campaigns><Campaign Name=\"T\">" +
+                "<Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Story_Plots_Rebel.xml",
+                "<Story_Mode_Plots>\n" +
+                "  <Active_Plot>StoryEvents\\Story_Elsewhere.xml</Active_Plot>\n" +
+                "</Story_Mode_Plots>")
+            .Add("StoryEvents/Era_One/Story_Elsewhere.xml", "<Story_Episode/>");
+
+        var result = Scan(resolver);
+
+        var problem = Assert.Single(result.Problems);
+        Assert.Equal(StoryChainProblemKind.UnresolvedPlotEntry, problem.Kind);
+        Assert.Equal("StoryChain_StoryFileMissingFiledElsewhere", problem.Message.Key);
+        Assert.Equal(["StoryEvents\\Story_Elsewhere.xml", "StoryEvents\\Era_One\\Story_Elsewhere.xml"],
+            problem.Message.Args);
+        Assert.Empty(result.ThreadFiles);
+    }
+
+    [Fact]
+    public void Scan_UnresolvablePlotEntry_WithNoFileOfThatName_SaysOnlyThatItIsMissing()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                "<Campaigns><Campaign Name=\"T\">" +
+                "<Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Story_Plots_Rebel.xml",
+                "<Story_Mode_Plots>\n" +
+                "  <Active_Plot>Story_Missing.xml</Active_Plot>\n" +
+                "</Story_Mode_Plots>");
+
+        var problem = Assert.Single(Scan(resolver).Problems);
+
+        Assert.Equal("StoryChain_StoryFileMissing", problem.Message.Key);
+        Assert.Equal(["Story_Missing.xml"], problem.Message.Args);
+    }
+
+    // The same hint on a tactical manifest reference (Reward_Param7), which is where the mission
+    // plots of a large mod are listed.
+    [Fact]
+    public void Scan_UnresolvableTacticalReference_NamesAFileOfThatNameFiledElsewhere()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                "<Campaigns><Campaign Name=\"T\">" +
+                "<Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Story_Plots_Rebel.xml",
+                "<Story_Mode_Plots><Active_Plot>Story_Rebel.xml</Active_Plot></Story_Mode_Plots>")
+            .Add("Story_Rebel.xml",
+                "<Story_Episode><Event Name=\"E\">" +
+                "<Reward_Type>LINK_TACTICAL</Reward_Type>" +
+                "<Reward_Param7>StoryEvents\\MissionPlot_Gone.xml</Reward_Param7>" +
+                "</Event></Story_Episode>")
+            .Add("StoryEvents/Era_One/MissionPlot_Gone.xml", "<Story_Mode_Plots/>")
+            .Add("StoryEvents/Era_Two/MissionPlot_Gone.xml", "<Story_Mode_Plots/>");
+
+        var problem = Assert.Single(Scan(resolver).Problems);
+
+        Assert.Equal(StoryChainProblemKind.UnresolvedTacticalReference, problem.Kind);
+        Assert.Equal("StoryChain_PlotFileMissingFiledElsewhere", problem.Message.Key);
+        Assert.Equal([
+                "StoryEvents\\MissionPlot_Gone.xml",
+                "StoryEvents\\Era_One\\MissionPlot_Gone.xml, StoryEvents\\Era_Two\\MissionPlot_Gone.xml"
+            ],
+            problem.Message.Args);
+    }
+
     [Fact]
     public void Scan_UnresolvableTacticalReference_ProducesProblemInThread()
     {
@@ -631,6 +712,14 @@ public sealed class StoryChainScannerTest
         public bool IsKnownToBaseline(string xmlRelativePath)
         {
             return _baselineKnown.Contains(xmlRelativePath);
+        }
+
+        public IReadOnlyList<string> FindByFileName(string fileName)
+        {
+            return _files.Keys
+                .Where(k => string.Equals(k.Split('/')[^1], fileName, StringComparison.OrdinalIgnoreCase))
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         public FakeResolver Add(string relPath, string content)

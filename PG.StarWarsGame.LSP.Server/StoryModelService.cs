@@ -369,6 +369,8 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
     /// <summary>Chain-scan resolver over the workspace, recording every read for invalidation.</summary>
     private sealed class RecordingResolver(StoryModelService service) : IStoryChainFileResolver
     {
+        private readonly XmlFileNameIndex _byName = new(service._fileHelper, service.XmlRootsHighestFirst());
+
         public Dictionary<string, int?> Versions { get; } = new(StringComparer.Ordinal);
 
         public StoryChainFile? ReadFile(string xmlRelativePath)
@@ -384,6 +386,11 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
             var normalized = GamePaths.Key(xmlRelativePath);
             var map = service._indexService.Current.Baseline.FileTypeMap;
             return map.ContainsKey(normalized) || map.ContainsKey("data/xml/" + normalized);
+        }
+
+        public IReadOnlyList<string> FindByFileName(string fileName)
+        {
+            return _byName.Find(fileName);
         }
     }
 

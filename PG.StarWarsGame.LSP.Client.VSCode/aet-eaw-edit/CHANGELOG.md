@@ -285,6 +285,9 @@
 
 ### Fixes
 
+- **A missing story file says where a file of that name sits** - the game opens a listed plot or story file at
+  the listed path and nowhere else, so a mission plot filed one folder down never loads. The finding now names
+  every file of that name in the project's layers, instead of leaving the author to search the tree
 - **A texture, model, animation or sound added to the workspace is known at once** - the server re-globs its
   asset catalog when a loose asset appears or goes, but no asset extension was watched, so the file stayed
   unknown until the project was reloaded. The watched globs now carry every extension the catalog records

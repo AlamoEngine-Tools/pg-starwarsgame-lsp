@@ -1894,8 +1894,14 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="StoryChain_PlotFileMissing" xml:space="preserve">
     <value>Story plot file '{0}' does not exist in any project layer or the baseline.</value>
   </data>
+  <data name="StoryChain_PlotFileMissingFiledElsewhere" xml:space="preserve">
+    <value>Story plot file '{0}' does not exist in any project layer or the baseline. A file of that name is at '{1}'; the game opens the listed path only.</value>
+  </data>
   <data name="StoryChain_StoryFileMissing" xml:space="preserve">
     <value>Story file '{0}' does not exist in any project layer or the baseline.</value>
+  </data>
+  <data name="StoryChain_StoryFileMissingFiledElsewhere" xml:space="preserve">
+    <value>Story file '{0}' does not exist in any project layer or the baseline. A file of that name is at '{1}'; the game opens the listed path only.</value>
   </data>
   <data name="StoryCommand_ADependency" xml:space="preserve">
     <value>a dependency</value>
