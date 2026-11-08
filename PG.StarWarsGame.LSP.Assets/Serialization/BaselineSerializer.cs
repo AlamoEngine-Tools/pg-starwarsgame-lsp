@@ -78,8 +78,9 @@ public static class BaselineSerializer
     private static BaselineIndex FromDto(SerializedBaseline dto)
     {
         var builtAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.BuiltAtMs);
-        var symbols = dto.Symbols.GroupBy(s => s.Id, StringComparer.Ordinal)
-            .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray(), StringComparer.Ordinal);
+        // Case folded, as the game reads names and as the index keys everything else.
+        var symbols = dto.Symbols.GroupBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
+            .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
         var enums = FromSerializedArray(dto.DynamicEnumValues);
         var hardcoded = FromSerializedArray(dto.HardcodedEnumValues);
         var fileTypeMap = FromSerializedArray(dto.FileTypeMap);

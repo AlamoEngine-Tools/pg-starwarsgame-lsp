@@ -9,7 +9,8 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 ///     Every definition projected from the shipped game, by id: one entry per type that defines the
 ///     id, in projection order (game objects first). An id names objects of several types - the
 ///     shipped game has a Sarlacc faction and a Sarlacc indigenous unit - and each type is an id
-///     space of its own, as <c>GameIndex.WorkspaceDefinitions</c> keeps a mod's.
+///     space of its own, as <c>GameIndex.WorkspaceDefinitions</c> keeps a mod's. Keyed
+///     case-insensitively, as the game reads its names; the index folds the key either way.
 /// </param>
 /// <param name="BuiltAt">UTC timestamp when the baseline was generated.</param>
 /// <param name="SourceManifestHash">
@@ -36,7 +37,7 @@ public sealed record BaselineIndex(
 )
 {
     public static readonly BaselineIndex Empty = new(
-        ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+        ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase),
         DateTimeOffset.MinValue,
         string.Empty,
         ImmutableDictionary<string, ImmutableArray<string>>.Empty,

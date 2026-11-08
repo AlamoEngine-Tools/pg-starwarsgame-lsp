@@ -29,8 +29,9 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         // One list per id, one entry per type in it: a later definition of the same type replaces the
         // earlier, a definition of another type sits beside it - the shipped game has a Sarlacc faction
         // and a Sarlacc indigenous unit, and each type is an id space of its own. Projection order
-        // within the list is what a bare id resolves to, so game objects come first.
-        var builder = new Dictionary<string, List<GameSymbol>>(StringComparer.Ordinal);
+        // within the list is what a bare id resolves to, so game objects come first. Keyed as the game
+        // reads names: case folded.
+        var builder = new Dictionary<string, List<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
         var objectTags = ImmutableDictionary.CreateBuilder<string, ImmutableArray<BaselineTag>>(
             StringComparer.OrdinalIgnoreCase);
 
@@ -119,7 +120,8 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         }
 
         return new BaselineIndex(
-            builder.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.ToImmutableArray(), StringComparer.Ordinal),
+            builder.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.ToImmutableArray(),
+                StringComparer.OrdinalIgnoreCase),
             DateTimeOffset.UtcNow,
             sourceManifestHash,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,

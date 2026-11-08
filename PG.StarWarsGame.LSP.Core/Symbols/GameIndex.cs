@@ -144,7 +144,8 @@ public sealed record GameIndex(
     /// <summary>
     ///     The shipped definitions the game loads under <see cref="LoadOrder" />. Every lookup reads the
     ///     baseline through this, never through <see cref="BaselineIndex.Symbols" />. By id, one entry
-    ///     per type that defines the id, as <see cref="WorkspaceDefinitions" /> keeps a mod's.
+    ///     per type that defines the id and case folded, as <see cref="WorkspaceDefinitions" /> keeps a
+    ///     mod's.
     /// </summary>
     public ImmutableDictionary<string, ImmutableArray<GameSymbol>> ShippedSymbols => LoadOrder.VisibleOf(Baseline);
 

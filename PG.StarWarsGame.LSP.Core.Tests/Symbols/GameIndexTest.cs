@@ -209,6 +209,23 @@ public sealed class GameIndexTest
         Assert.Equal([unit, faction], index.ResolveAll("Sarlacc"));
     }
 
+    // The game folds case for its names and the workspace side of the index has always done so. The
+    // shipped side is keyed by whoever built the dictionary - the builder, a loader, a test - so the
+    // index folds it itself rather than trusting every producer to.
+    [Fact]
+    public void Resolve_ShippedId_FoldsCase()
+    {
+        var unit = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "GameObjectType",
+            new FileOrigin("DATA\\XML\\GROUNDINDIGENOUS.XML", 10, null), null);
+        var faction = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin("DATA\\XML\\FACTIONS.XML", 3, null), null);
+        var index = GameIndex.Empty with { Baseline = Baseline(unit, faction) };
+
+        Assert.Same(faction, index.ResolveOfType("SARLACC", "Faction"));
+        Assert.Same(unit, index.Resolve("sarlacc"));
+        Assert.Equal([unit, faction], index.ResolveAll("SARLACC"));
+    }
+
     private static BaselineIndex Baseline(params GameSymbol[] symbols)
     {
         return new BaselineIndex(

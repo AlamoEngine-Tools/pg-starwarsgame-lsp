@@ -129,17 +129,19 @@ public sealed class LoadOrder
     ///     The shipped definitions the game loads: those in a file a walked registry lists and no layer
     ///     copy replaces, and those of types no walked registry holds, unless a layer ships their
     ///     direct-content file. Judged per definition, so of two types sharing an id one can load and
-    ///     the other not. Computed once per baseline.
+    ///     the other not. Keyed case-insensitively whatever the baseline's own keying, since the game
+    ///     folds case for its names and the workspace side always has. Computed once per baseline.
     /// </summary>
     public ImmutableDictionary<string, ImmutableArray<GameSymbol>> VisibleOf(BaselineIndex baseline)
     {
-        return IsKnown ? _visible.GetValue(baseline, Visible) : baseline.Symbols;
+        return _visible.GetValue(baseline, IsKnown ? Visible : b => FoldCase(b.Symbols));
     }
 
     private ImmutableDictionary<string, ImmutableArray<GameSymbol>> Visible(BaselineIndex baseline)
     {
-        var visible = baseline.Symbols.ToBuilder();
-        foreach (var (id, symbols) in baseline.Symbols)
+        var folded = FoldCase(baseline.Symbols);
+        var visible = folded.ToBuilder();
+        foreach (var (id, symbols) in folded)
         {
             var loaded = symbols.RemoveAll(s => !Loads(s));
             if (loaded.Length == symbols.Length) continue;
@@ -148,6 +150,21 @@ public sealed class LoadOrder
         }
 
         return visible.ToImmutable();
+    }
+
+    // The shipped dictionary is keyed by whoever built it - the builder, a loader, a test. The index
+    // folds it here rather than trusting each of them: two ids that differ only by case are one name
+    // to the game, so their lists become one.
+    private static ImmutableDictionary<string, ImmutableArray<GameSymbol>> FoldCase(
+        ImmutableDictionary<string, ImmutableArray<GameSymbol>> symbols)
+    {
+        if (ReferenceEquals(symbols.KeyComparer, StringComparer.OrdinalIgnoreCase)) return symbols;
+
+        var folded =
+            ImmutableDictionary.CreateBuilder<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, list) in symbols)
+            folded[id] = folded.TryGetValue(id, out var have) ? have.AddRange(list) : list;
+        return folded.ToImmutable();
     }
 
     private bool Loads(GameSymbol shipped)
