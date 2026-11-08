@@ -10,6 +10,8 @@ The language server and the Lua analyzer ship inside the extension: nothing is d
 the analyzer is on from the first start. A mod folder opened without a `.pgproj` project file is offered one.
 Eleven settings cover the whole extension; every other feature is on without a switch.
 
+---
+
 #### Mod Browser
 
 One view over everything a project indexes - game objects, models, particle systems, scripts, the schema's
@@ -21,6 +23,8 @@ own types and enums - each entry with its origin, references, previews and probl
 
 Every `.pgproj` under the open folders gets a language server of its own, and every panel and view is filed
 under its project.
+
+---
 
 #### Lua Support
 
@@ -34,33 +38,37 @@ own, as the game runs it.
 A file the game refuses to load is an error, with a repair offered; XML the game loads but standard tools
 reject is a warning, not an error. Format Document re-indents a file without changing a value the game sees.
 
+---
+
 #### Enhanced Particle Support
 
 Frozen asteroid and debris fields, weather around the camera, and bump and depth-sprite emitters, drawn with
 the engine's own shaders.
 
+---
+
 ### Migration
 
 Settings renamed; a value under the old key is not read:
 
-| Before                                       | Now                                         |
-|----------------------------------------------|---------------------------------------------|
-| `aet-eaw-edit.features.tools.storyEditing`   | `aet-eaw-edit.experimental.storyEditing`    |
-| `aet-eaw-edit.features.tools.storySimulator` | `aet-eaw-edit.experimental.storySimulator`  |
-| `aet-eaw-edit.lsp.debug.traceServer`         | `aet-eaw-edit.lsp.debug.trace.server`       |
+| Before                                       | Now                                        |
+|----------------------------------------------|--------------------------------------------|
+| `aet-eaw-edit.features.tools.storyEditing`   | `aet-eaw-edit.experimental.storyEditing`   |
+| `aet-eaw-edit.features.tools.storySimulator` | `aet-eaw-edit.experimental.storySimulator` |
+| `aet-eaw-edit.lsp.debug.traceServer`         | `aet-eaw-edit.lsp.debug.trace.server`      |
 
 Settings moved out of `settings.json`:
 
-| Before                                                     | Now                                                                  |
-|------------------------------------------------------------|----------------------------------------------------------------------|
-| `aet-eaw-edit.game.executable`                             | `program` in the Lua debugger's `launch.json` configuration          |
-| `aet-eaw-edit.game.luaDebugHost`                           | `host` in `launch.json`                                              |
-| `aet-eaw-edit.game.luaDebugPort`                           | `port` in `launch.json`                                              |
-| `aet-eaw-edit.game.unsafeTableExpansion`                   | `unsafeTableExpansion` in `launch.json`                              |
+| Before                                                     | Now                                                                         |
+|------------------------------------------------------------|-----------------------------------------------------------------------------|
+| `aet-eaw-edit.game.executable`                             | `program` in the Lua debugger's `launch.json` configuration                 |
+| `aet-eaw-edit.game.luaDebugHost`                           | `host` in `launch.json`                                                     |
+| `aet-eaw-edit.game.luaDebugPort`                           | `port` in `launch.json`                                                     |
+| `aet-eaw-edit.game.unsafeTableExpansion`                   | `unsafeTableExpansion` in `launch.json`                                     |
 | `aet-eaw-edit.game.arguments`                              | `args` in `launch.json`, appended after the mod arguments the debugger adds |
-| `aet-eaw-edit.storySimulator.autoResume`                   | *Resume after an answer*, a switch in the story simulator's playback row |
-| `aet-eaw-edit.storySimulator.assumeMediaCompletes`         | *Speech and movies finish on their own*, beside it                   |
-| `aet-eaw-edit.encyclopedia.screenWidth` and `screenHeight` | the *Screen* dropdown in the encyclopedia preview                    |
+| `aet-eaw-edit.storySimulator.autoResume`                   | *Resume after an answer*, a switch in the story simulator's playback row    |
+| `aet-eaw-edit.storySimulator.assumeMediaCompletes`         | *Speech and movies finish on their own*, beside it                          |
+| `aet-eaw-edit.encyclopedia.screenWidth` and `screenHeight` | the *Screen* dropdown in the encyclopedia preview                           |
 
 Settings removed, with nothing to set in their place: every `aet-eaw-edit.features.*` key but
 `aet-eaw-edit.features.preview.energyPool`, `aet-eaw-edit.lsp.enabled` (the server starts for any folder that
@@ -133,8 +141,7 @@ In a project's own files:
     fails any server text written in place where a reader sees it
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
-  reason when the scene has none
-  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+  reason when the scene has none ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
 - **Baseline read from a release** - the server reads the newest release of the baseline repository whose
   baseline it can load, the way it reads the schema since 0.4.1; a merge to that repository's `main` no longer
   reaches installed clients. Before the first release exists the default branch is read as before, and the copy
@@ -173,7 +180,8 @@ In a project's own files:
   - The language server starts for a workspace with a `.pgproj`, or a folder laid out like a mod: a `Data` folder
     holding `XML`, `Scripts`, `Art`, `Audio`, `Text` or a MEG archive, or a `modinfo.json`; the game's own folder and
     any other folder get none
-  - The game installs are found in the Steam library or the Windows registry; `aet-eaw-edit.lsp.source.baseGameDirectory`
+  - The game installs are found in the Steam library or the Windows registry;
+    `aet-eaw-edit.lsp.source.baseGameDirectory`
     and `aet-eaw-edit.lsp.source.expansionDirectory` override them
   - A mod opened without a `.pgproj` is offered one, once, written from what the folder holds: the directories that
     exist, the text format, the name from `modinfo.json`; nothing created, `modinfo.json` unchanged
@@ -331,7 +339,8 @@ In a project's own files:
   - Vanilla and a large total-conversion mod: every reference resolves inside `Data/Scripts/GameObject`
 - **Mod Browser** - everything a project indexes, by what it is: game objects and every other XML type, models,
   particle systems, animations, textures, audio, Lua scripts and the schema's types, tags, enums and behaviours,
-  each once, as the definition the game uses ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
+  each once, as the definition the game uses
+  ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
   - A **Mod Browser** view with the outlines Game Data, Assets, Scripts and Schema; one panel per project
   - A rail drawn as VS Code's tree, with its keys and a picture per kind, of lists, their entries and each entry's
     relations, whose path is the breadcrumb; the rail and the search form are resized by dragging
@@ -463,8 +472,7 @@ In a project's own files:
 - **A repeated or untrimmed tag reads the same everywhere** - the preview, the encyclopedia and the validation
   rules read a tag through one set of accessors on the effective object: the last occurrence, trimmed, an empty
   element as no value, and a number or a flag read as the game reads it. A `Scale_Factor` written `2.5f` draws
-  at 2.5 where the preview drew it at 1.0
-  ([#301](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/301))
+  at 2.5 where the preview drew it at 1.0 ([#301](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/301))
 - **Numbers are read the way the game reads them** - one parser serves every validator, rule and the preview.
   The preview and the comparison rules take the number at the front of a value as the game does, so `2.0ff` and
   `2.0 f` read 2.0 where the preview dropped the spin time to its default; a validator accepts a number with at
@@ -490,11 +498,11 @@ In a project's own files:
 - **Every status text and every fallback text comes from the catalogue** - the story graph's status slot wrote its
   texts in place, and a text standing in for a missing value (`No model`, `Nothing selected`, `Neutral`) escaped the
   lint everywhere; the lint now checks `setStatus` and `reportStatus` and looks through `??` and `||`, and the
-  nineteen texts it found are catalogued
-  ([#319](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/319))
+  nineteen texts it found are catalogued ([#319](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/319))
 - **Death animations looked up by their file name** - a death animation type's clips are found under the name the
   engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
-  only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
+  only `_CHOKE_DIE_` files has no death animation
+  ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
 - **Diagnostics for a file opened from the server** - a file first opened at a URI the server handed out, such as
   a definition from the Mod Browser, reached no project and got no diagnostics
   ([#291](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/291))
@@ -534,11 +542,9 @@ In a project's own files:
   it as its odds and bears its particles at its share of their speed, a mesh-vertex emitter takes its share
   of the count, and a weather field draws its share of its particles. It is 1.0 for every system the preview
   shows, as in the game, where only weather phases, planet corruption, transport dust and surface effects
-  change it
-  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+  change it ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
 - **Cube-shaped spawn and velocity volumes** - drawn at their full size: the file stores a cube's half-extent,
-  and the preview halved it again
-  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+  and the preview halved it again ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
 - **Streak length** - a tailed particle's streak reaches the tail size times its speed across the view over
   the emitter's ceiling, plus one, as the game draws it; the ceiling is the fastest the emitter's velocity
   can throw a particle plus its gravity and acceleration, or a fixed 1000 for an emitter linked to its
@@ -605,7 +611,8 @@ In a project's own files:
   - A project's own `Data\MegaFiles.xml` replaces the game's list; dependencies count, the leaf project first
   - Model preview with the expansion configured: the base game's loose files rank below every archive, as in the game
 - **A particle system saved by the Particle Editor** - opens in the model preview; the editor's own link-group chunk
-  was refused as malformed ([#163](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/163), the reader half)
+  was refused as malformed ([#163](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/163), the reader
+  half)
   - A chunk or property the game's reader has no case for is skipped as the game skips it, and listed in the
     preview's problems as a warning; known editor data the game leaves unapplied (the link group, property 0x06) is
     listed as information
