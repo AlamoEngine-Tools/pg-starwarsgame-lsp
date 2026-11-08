@@ -77,10 +77,20 @@ const Shell = styled.div`
     background: var(--colour-editor-ground);
 
     .page {
-        /* Wide enough for a frame to read at a glance; the notes' own lines stay short by their
-           own wrapping, and a table scrolls rather than squeezing. */
-        max-width: 1100px;
+        /* The column follows the pane: nine tenths of its width up to 1600px, so a frame reads at
+           a glance on a wide window and nothing is squeezed on a narrow one; a table scrolls. */
+        max-width: min(90%, 1600px);
         margin: 0 auto;
+    }
+
+    /* A narrow pane, as a side-by-side editor group gives: the gutters and the column's own
+       margin go, the text takes the whole width. */
+    @media (max-width: 700px) {
+        padding: var(--space-16) var(--space-16);
+
+        .page {
+            max-width: 100%;
+        }
     }
 
     .masthead {
