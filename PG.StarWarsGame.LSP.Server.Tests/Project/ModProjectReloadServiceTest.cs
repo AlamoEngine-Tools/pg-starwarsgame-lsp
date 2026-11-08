@@ -220,7 +220,7 @@ public sealed class ModProjectReloadServiceTest
         {
             Baseline = BaselineIndex.Empty with
             {
-                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add(symbol.Id, symbol)
+                Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(symbol.Id, [symbol])
             }
         };
     }

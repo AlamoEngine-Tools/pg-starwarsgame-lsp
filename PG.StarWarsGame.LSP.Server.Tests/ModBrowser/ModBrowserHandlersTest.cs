@@ -18,9 +18,11 @@ public sealed class ModBrowserHandlersTest
     {
         Baseline = BaselineIndex.Empty with
         {
-            Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add("Star_Destroyer",
+            Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Star_Destroyer",
+            [
                 new GameSymbol("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType",
-                    new UnknownOrigin("baseline"), null))
+                    new UnknownOrigin("baseline"), null)
+            ])
         }
     };
 

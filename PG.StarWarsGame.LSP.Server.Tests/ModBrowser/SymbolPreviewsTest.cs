@@ -162,7 +162,7 @@ public sealed class SymbolPreviewsTest
         {
             Baseline = BaselineIndex.Empty with
             {
-                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add(shipped.Id, shipped)
+                Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(shipped.Id, [shipped])
             },
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(Units, new DocumentIndex(Units, 1, [.. symbols], [], LayerRank: 0, LayerName: "Mod"))

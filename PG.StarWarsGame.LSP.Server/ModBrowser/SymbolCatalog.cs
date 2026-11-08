@@ -275,20 +275,19 @@ public sealed class SymbolCatalog
                     .OrderByDescending(index.LayerRankOf)
                     .ToList()
                 : [];
-            var shipped = index.ShippedSymbols.TryGetValue(id, out var s) && s.Kind == GameSymbolKind.XmlObject
-                ? s
-                : null;
+            var shipped = index.ShippedSymbols.TryGetValue(id, out var s)
+                ? s.Where(symbol => symbol.Kind == GameSymbolKind.XmlObject).ToList()
+                : [];
             // One row per type: the metafile that lists a file types it, and every type is an id space
             // of its own - the shipped game has a Sarlacc faction and a Sarlacc unit.
-            var types = workspace.Select(d => d.TypeName).Append(shipped?.TypeName).OfType<string>()
+            var types = workspace.Select(d => d.TypeName).Concat(shipped.Select(d => d.TypeName)).OfType<string>()
                 .Distinct(StringComparer.OrdinalIgnoreCase);
             foreach (var type in types)
             {
                 var ofType = workspace.Where(d => string.Equals(d.TypeName, type, StringComparison.OrdinalIgnoreCase))
                     .ToList();
-                var shippedOfType = string.Equals(shipped?.TypeName, type, StringComparison.OrdinalIgnoreCase)
-                    ? shipped
-                    : null;
+                var shippedOfType = shipped.FirstOrDefault(d =>
+                    string.Equals(d.TypeName, type, StringComparison.OrdinalIgnoreCase));
                 var winner = ofType.FirstOrDefault() ?? shippedOfType!;
 
                 var origins = ofType.Select(d => OriginOf(index, d)).Distinct().ToList();

@@ -266,6 +266,18 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     Console.WriteLine($"Shadow blob materials: {shadowBlobMaterials.Count} (direct-parsed stopgap)");
 
+    // ── Factions ────────────────────────────────────────────────────────────
+    //
+    // The engine keeps factions in a manager of their own that PG.StarWarsGame.Engine does not
+    // expose, so this is the same direct-parse stopgap as the two blocks above, over the files the
+    // FactionFiles registry lists. Without it no baseline carried a faction, and a project that
+    // ships no Factions.xml of its own - a library whose consumers supply it - had vanilla's Rebel
+    // and Empire reported as missing (2026-11-07).
+    var factions = FactionReader.Read("DATA\\XML\\FACTIONFILES.XML",
+        path => engine.GameRepository.TryOpenFile(path),
+        problem => Console.Error.WriteLine($"Warning: faction file unread - {problem}"));
+    Console.WriteLine($"Factions: {factions.Count} (direct-parsed stopgap)");
+
     // ── Singletons (GameConstants) ──────────────────────────────────────────
     //
     // A singleton type is declared in the schema with no `nameTag`: one instance, no Name
@@ -336,8 +348,8 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
     var baseline = projector.Project(
-        gameObjects, sfxEvents, manifestHash, musicEvents, shadowBlobMaterials, singletons);
-    Console.WriteLine($"Projected {baseline.Symbols.Count} symbol(s)");
+        gameObjects, sfxEvents, manifestHash, musicEvents, shadowBlobMaterials, singletons, factions);
+    Console.WriteLine($"Projected {baseline.SymbolCount} symbol(s) under {baseline.Symbols.Count} id(s)");
 
     // ── MEG loading (EaW layer first, then engine layer) ──────────────────────
     //

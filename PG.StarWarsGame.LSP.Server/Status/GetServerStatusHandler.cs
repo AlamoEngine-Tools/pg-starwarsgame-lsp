@@ -282,7 +282,7 @@ public sealed class GetServerStatusHandler(
         return new ServerStatusSymbolsDto(
             documents.Where(d => IsLanguage(d, ".xml")).Sum(d => d.Symbols.Length),
             documents.Where(d => IsLanguage(d, ".lua")).Sum(d => d.Symbols.Length),
-            index.Baseline.Symbols.Count,
+            index.Baseline.SymbolCount,
             index.Localisation.Keys.Count());
     }
 

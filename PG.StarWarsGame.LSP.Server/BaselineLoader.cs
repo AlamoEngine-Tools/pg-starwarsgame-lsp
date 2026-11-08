@@ -58,12 +58,12 @@ public sealed class BaselineLoader
     private void WarnIfWithoutBehaviors(BaselineIndex baseline)
     {
         if (baseline.Symbols.IsEmpty) return;
-        if (baseline.Symbols.Values.Any(s => s.Behaviors is { Length: > 0 })) return;
+        if (baseline.AllSymbols.Any(s => s.Behaviors is { Length: > 0 })) return;
 
         _logger.LogWarning(
             "Baseline holds {Count} symbol(s) but no behaviours - it predates behaviour indexing, so no " +
             "shipped object can be matched by kind; rebuild it with the BaselineBuilder to restore that",
-            baseline.Symbols.Count);
+            baseline.SymbolCount);
     }
 
     private async Task<(BaselineIndex, StatusAssetSource)> LoadLocalAsync(string? path, CancellationToken ct)

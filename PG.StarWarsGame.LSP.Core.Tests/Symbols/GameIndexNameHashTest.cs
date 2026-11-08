@@ -93,8 +93,8 @@ public sealed class GameIndexNameHashTest
         var game = Object("Darth_Vader", "DATA\\XML\\HEROES.XML");
         svc.ApplyBaseline(BaselineIndex.Empty with
         {
-            Symbols = ImmutableDictionary.Create<string, GameSymbol>(StringComparer.OrdinalIgnoreCase)
-                .Add(game.Id, game)
+            Symbols = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+                .Add(game.Id, [game])
         });
         var afterBaseline = hash.Calls;
 

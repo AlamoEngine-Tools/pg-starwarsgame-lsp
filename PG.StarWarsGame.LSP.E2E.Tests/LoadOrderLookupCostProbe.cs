@@ -58,16 +58,16 @@ public sealed class LoadOrderLookupCostProbe(ITestOutputHelper output)
         var ordered = provider.GetRequiredService<IGameIndexService>().Current;
         var layered = ordered with { LoadOrder = LoadOrder.Unknown };
         var names = ordered.WorkspaceDefinitions.Values.SelectMany(d => d)
-            .Concat(ordered.Baseline.Symbols.Values)
+            .Concat(ordered.Baseline.AllSymbols)
             .Select(s => (s.Id, s.TypeName ?? string.Empty))
             .Distinct()
             .ToList();
 
         var visible = Stopwatch.StartNew();
-        var shipped = ordered.ShippedSymbols.Count;
+        var shipped = ordered.AllShippedSymbols.Count();
         visible.Stop();
         output.WriteLine(
-            $"{corpus}: {names.Count} names, {ordered.Baseline.Symbols.Count} shipped, {shipped} loaded; " +
+            $"{corpus}: {names.Count} names, {ordered.Baseline.SymbolCount} shipped, {shipped} loaded; " +
             $"visible set {visible.Elapsed.TotalMilliseconds:F1} ms");
         output.WriteLine($"{corpus}: by load order {Time(ordered, names):F0} ns per name, " +
                          $"by layer {Time(layered, names):F0} ns per name");

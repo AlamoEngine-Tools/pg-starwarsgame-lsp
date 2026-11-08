@@ -143,9 +143,14 @@ public sealed record GameIndex(
 
     /// <summary>
     ///     The shipped definitions the game loads under <see cref="LoadOrder" />. Every lookup reads the
-    ///     baseline through this, never through <see cref="BaselineIndex.Symbols" />.
+    ///     baseline through this, never through <see cref="BaselineIndex.Symbols" />. By id, one entry
+    ///     per type that defines the id and case folded, as <see cref="WorkspaceDefinitions" /> keeps a
+    ///     mod's.
     /// </summary>
-    public ImmutableDictionary<string, GameSymbol> ShippedSymbols => LoadOrder.VisibleOf(Baseline);
+    public ImmutableDictionary<string, ImmutableArray<GameSymbol>> ShippedSymbols => LoadOrder.VisibleOf(Baseline);
+
+    /// <summary>Every loaded shipped definition, whatever its id and type.</summary>
+    public IEnumerable<GameSymbol> AllShippedSymbols => ShippedSymbols.Values.SelectMany(s => s);
 
     /// <summary>
     ///     Merged (baseline ∪ workspace) localisation key set. Used by
@@ -278,7 +283,8 @@ public sealed record GameIndex(
         {
             if (!table.TryGetValue(hash, out var named)) continue;
             foreach (var other in named)
-                if ((ReferenceEquals(table, WorkspaceNameHashes) || shipped.ContainsKey(other.Id)) &&
+                if ((ReferenceEquals(table, WorkspaceNameHashes) ||
+                     (shipped.TryGetValue(other.Id, out var loaded) && loaded.Contains(other))) &&
                     byName.TryAdd(other.Id, other))
                     others.Add(other);
         }
@@ -289,7 +295,7 @@ public sealed record GameIndex(
     private ImmutableHashSet<string> ComputeIndexedTypeNames()
     {
         var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var symbol in ShippedSymbols.Values)
+        foreach (var symbol in AllShippedSymbols)
             if (symbol.TypeName is { } baselineType)
                 builder.Add(baselineType);
         foreach (var symbols in WorkspaceDefinitions.Values)
@@ -361,8 +367,8 @@ public sealed record GameIndex(
 
         foreach (var (id, symbols) in WorkspaceDefinitions)
             Add(id, symbols);
-        foreach (var (id, symbol) in ShippedSymbols)
-            Add(id, [symbol]);
+        foreach (var (id, symbols) in ShippedSymbols)
+            Add(id, symbols);
 
         return builder.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.ToImmutableArray(),
             StringComparer.OrdinalIgnoreCase);
@@ -425,7 +431,9 @@ public sealed record GameIndex(
             return InLoadOrder(id, type).First();
         }
 
-        return ShippedSymbols.GetValueOrDefault(id);
+        // The shipped list is in projection order, game objects first, so a bare id that the shipped
+        // game gives several types means its game object - the Sarlacc unit, not the Sarlacc faction.
+        return ShippedSymbols.TryGetValue(id, out var shipped) ? shipped[0] : null;
     }
 
     /// <summary>
@@ -501,7 +509,8 @@ public sealed record GameIndex(
             foreach (var s in InPrecedence(ws))
                 yield return s;
         if (ShippedSymbols.TryGetValue(id, out var b))
-            yield return b;
+            foreach (var s in b)
+                yield return s;
     }
 
     public (GameSymbol Winner, GameSymbol? Shadowed)? ResolveWithShadow(string id)
@@ -534,8 +543,8 @@ public sealed record GameIndex(
                 LayerRankOf(s) < winnerRank && IsOfType(s, winner.TypeName));
         }
 
-        if (shadowed is null && ShippedSymbols.TryGetValue(id, out var b) && IsOfType(b, winner.TypeName))
-            shadowed = b;
+        if (shadowed is null && ShippedSymbols.TryGetValue(id, out var b))
+            shadowed = b.FirstOrDefault(s => IsOfType(s, winner.TypeName));
 
         // Only report a shadow when it is a different object than the winner.
         return (winner, !ReferenceEquals(winner, shadowed) ? shadowed : null);
@@ -632,8 +641,8 @@ public sealed record GameIndex(
         var candidates = WorkspaceDefinitions.TryGetValue(id, out var ws)
             ? InPrecedence(ws).Where(s => IsOfType(s, typeName)).ToList()
             : [];
-        if (ShippedSymbols.TryGetValue(id, out var shipped) && IsOfType(shipped, typeName))
-            candidates.Add(shipped);
+        if (ShippedSymbols.TryGetValue(id, out var shipped))
+            candidates.AddRange(shipped.Where(s => IsOfType(s, typeName)));
         return candidates;
     }
 

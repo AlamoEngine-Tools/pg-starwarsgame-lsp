@@ -106,7 +106,7 @@ public sealed class BaselineSerializerTest
             Behaviors = ["PLANET", "PRODUCTION"]
         };
 
-        var result = Deserialize(BaselineSerializer.Serialize(Baseline(sym))).Symbols["CORUSCANT"];
+        var result = Deserialize(BaselineSerializer.Serialize(Baseline(sym))).Symbols["CORUSCANT"].Single();
 
         Assert.Equal(["PLANET", "PRODUCTION"], result.Behaviors!);
     }
@@ -138,7 +138,7 @@ public sealed class BaselineSerializerTest
     {
         var sym = Symbol("UNIT_A", new FileOrigin("file:///data/unit.xml", 10, 5));
         var data = BaselineSerializer.Serialize(Baseline(sym));
-        var result = Deserialize(data).Symbols["UNIT_A"];
+        var result = Deserialize(data).Symbols["UNIT_A"].Single();
 
         var origin = Assert.IsType<FileOrigin>(result.Origin);
         Assert.Equal("file:///data/unit.xml", origin.Uri);
@@ -151,7 +151,7 @@ public sealed class BaselineSerializerTest
     {
         var sym = Symbol("UNIT_B", new MegArchiveOrigin("DATA.MEG", "DATA/UNITS/B.XML", 3, null));
         var data = BaselineSerializer.Serialize(Baseline(sym));
-        var result = Deserialize(data).Symbols["UNIT_B"];
+        var result = Deserialize(data).Symbols["UNIT_B"].Single();
 
         var origin = Assert.IsType<MegArchiveOrigin>(result.Origin);
         Assert.Equal("DATA.MEG", origin.ArchivePath);
@@ -165,7 +165,7 @@ public sealed class BaselineSerializerTest
     {
         var sym = Symbol("UNIT_C", new UnknownOrigin("CRC collision survivor"));
         var data = BaselineSerializer.Serialize(Baseline(sym));
-        var result = Deserialize(data).Symbols["UNIT_C"];
+        var result = Deserialize(data).Symbols["UNIT_C"].Single();
 
         var origin = Assert.IsType<UnknownOrigin>(result.Origin);
         Assert.Equal("CRC collision survivor", origin.Hint);
@@ -179,7 +179,7 @@ public sealed class BaselineSerializerTest
         var sym = new GameSymbol("UNIT_D", GameSymbolKind.XmlObject, "Infantry",
             new FileOrigin("file:///f.xml", 1, null), "A description");
         var result = Deserialize(BaselineSerializer.Serialize(Baseline(sym)))
-            .Symbols["UNIT_D"];
+            .Symbols["UNIT_D"].Single();
 
         Assert.Equal("UNIT_D", result.Id);
         Assert.Equal(GameSymbolKind.XmlObject, result.Kind);
@@ -192,7 +192,7 @@ public sealed class BaselineSerializerTest
     {
         var sym = Symbol("UNIT_E", new FileOrigin("file:///f.xml", 1, null), null);
         var result = Deserialize(BaselineSerializer.Serialize(Baseline(sym)))
-            .Symbols["UNIT_E"];
+            .Symbols["UNIT_E"].Single();
 
         Assert.Null(result.TypeName);
         Assert.Null(result.Description);
@@ -205,7 +205,7 @@ public sealed class BaselineSerializerTest
     public void RoundTrip_MetadataFields()
     {
         var baseline = new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             TestDate, "abc123hash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
@@ -229,13 +229,28 @@ public sealed class BaselineSerializerTest
         Assert.True(result.Symbols.ContainsKey("BETA"));
     }
 
+    // The shipped game names a faction and an indigenous unit Sarlacc: both come back under one id,
+    // in the order they were projected - the unit first, which is what a bare id resolves to.
+    [Fact]
+    public void RoundTrip_TwoTypesOfOneId_KeepsBothInProjectionOrder()
+    {
+        var unit = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "GameObjectType",
+            new FileOrigin("DATA\\XML\\GROUNDINDIGENOUS.XML", 10, null), null);
+        var faction = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin("DATA\\XML\\FACTIONS.XML", 3, null), null);
+
+        var result = Deserialize(BaselineSerializer.Serialize(Baseline(unit, faction))).Symbols["Sarlacc"];
+
+        Assert.Equal(["GameObjectType", "Faction"], result.Select(s => s.TypeName));
+    }
+
     // ── DynamicEnumValues ────────────────────────────────────────────────────
 
     [Fact]
     public void RoundTrip_DynamicEnumValues()
     {
         var baseline = new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             TestDate, "hash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add("DamageType", ["EXPLOSIVE", "ENERGY", "GRENADE"])
@@ -268,7 +283,7 @@ public sealed class BaselineSerializerTest
     public void RoundTrip_HardcodedEnumValues()
     {
         var baseline = new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             TestDate, "hash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty
@@ -299,7 +314,7 @@ public sealed class BaselineSerializerTest
     public void RoundTrip_FileTypeMap()
     {
         var baseline = new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             TestDate, "hash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
@@ -560,7 +575,8 @@ public sealed class BaselineSerializerTest
         string[] names = ["zeta", "Alpha", "mike", "bravo", "Yankee", "charlie", "x_ray", "delta", "kilo", "echo"];
         var map = names.ToImmutableDictionary(n => n, n => ImmutableArray.Create(n), StringComparer.OrdinalIgnoreCase);
         var baseline = new BaselineIndex(
-            names.Select(n => Symbol(n, new UnknownOrigin("engine"))).ToImmutableDictionary(s => s.Id),
+            names.Select(n => Symbol(n, new UnknownOrigin("engine")))
+                .ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s)),
             TestDate, "hash", map, map, map)
         {
             AssetFiles = names.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
@@ -639,7 +655,8 @@ public sealed class BaselineSerializerTest
 
     private static BaselineIndex Baseline(params GameSymbol[] symbols)
     {
-        return new BaselineIndex(symbols.ToImmutableDictionary(s => s.Id), TestDate, "hash",
+        return new BaselineIndex(
+            symbols.GroupBy(s => s.Id).ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray()), TestDate, "hash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);

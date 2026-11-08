@@ -95,9 +95,11 @@ public sealed class WorkspaceIndexerTest
             }).Build());
         svc.ApplyBaseline(BaselineIndex.Empty with
         {
-            Symbols = ImmutableDictionary<string, GameSymbol>.Empty
-                .Add("Executor", new GameSymbol("Executor", GameSymbolKind.XmlObject, "GameObjectType",
-                    new FileOrigin(@"DATA\XML\Units_Underworld.xml", 1, null), null))
+            Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("Executor", [
+                    new GameSymbol("Executor", GameSymbolKind.XmlObject, "GameObjectType",
+                        new FileOrigin(@"DATA\XML\Units_Underworld.xml", 1, null), null)
+                ])
         });
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [Root("ws")]);

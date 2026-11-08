@@ -29,7 +29,10 @@ public sealed class LoadOrder
     private readonly ImmutableArray<DuplicateNameRule> _rules;
     private readonly ImmutableHashSet<string> _shadowedShipped;
     private readonly ImmutableDictionary<string, LoadPosition> _shippedFiles;
-    private readonly ConditionalWeakTable<BaselineIndex, ImmutableDictionary<string, GameSymbol>> _visible = new();
+
+    private readonly ConditionalWeakTable<BaselineIndex, ImmutableDictionary<string, ImmutableArray<GameSymbol>>>
+        _visible = new();
+
     private readonly ImmutableHashSet<string> _walkedTypes;
 
     private LoadOrder(ImmutableDictionary<string, LoadPosition> layerFiles,
@@ -125,20 +128,43 @@ public sealed class LoadOrder
     /// <summary>
     ///     The shipped definitions the game loads: those in a file a walked registry lists and no layer
     ///     copy replaces, and those of types no walked registry holds, unless a layer ships their
-    ///     direct-content file. Computed once per baseline.
+    ///     direct-content file. Judged per definition, so of two types sharing an id one can load and
+    ///     the other not. Keyed case-insensitively whatever the baseline's own keying, since the game
+    ///     folds case for its names and the workspace side always has. Computed once per baseline.
     /// </summary>
-    public ImmutableDictionary<string, GameSymbol> VisibleOf(BaselineIndex baseline)
+    public ImmutableDictionary<string, ImmutableArray<GameSymbol>> VisibleOf(BaselineIndex baseline)
     {
-        return IsKnown ? _visible.GetValue(baseline, Visible) : baseline.Symbols;
+        return _visible.GetValue(baseline, IsKnown ? Visible : b => FoldCase(b.Symbols));
     }
 
-    private ImmutableDictionary<string, GameSymbol> Visible(BaselineIndex baseline)
+    private ImmutableDictionary<string, ImmutableArray<GameSymbol>> Visible(BaselineIndex baseline)
     {
-        var visible = baseline.Symbols.ToBuilder();
-        foreach (var (id, symbol) in baseline.Symbols)
-            if (!Loads(symbol))
-                visible.Remove(id);
+        var folded = FoldCase(baseline.Symbols);
+        var visible = folded.ToBuilder();
+        foreach (var (id, symbols) in folded)
+        {
+            var loaded = symbols.RemoveAll(s => !Loads(s));
+            if (loaded.Length == symbols.Length) continue;
+            if (loaded.IsEmpty) visible.Remove(id);
+            else visible[id] = loaded;
+        }
+
         return visible.ToImmutable();
+    }
+
+    // The shipped dictionary is keyed by whoever built it - the builder, a loader, a test. The index
+    // folds it here rather than trusting each of them: two ids that differ only by case are one name
+    // to the game, so their lists become one.
+    private static ImmutableDictionary<string, ImmutableArray<GameSymbol>> FoldCase(
+        ImmutableDictionary<string, ImmutableArray<GameSymbol>> symbols)
+    {
+        if (ReferenceEquals(symbols.KeyComparer, StringComparer.OrdinalIgnoreCase)) return symbols;
+
+        var folded =
+            ImmutableDictionary.CreateBuilder<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, list) in symbols)
+            folded[id] = folded.TryGetValue(id, out var have) ? have.AddRange(list) : list;
+        return folded.ToImmutable();
     }
 
     private bool Loads(GameSymbol shipped)

@@ -25,9 +25,11 @@ public sealed class GetServerStatusHandlerTest
 {
     private static readonly BaselineIndex LoadedBaseline = BaselineIndex.Empty with
     {
-        Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add("UNIT_A",
+        Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A",
+        [
             new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "GameObjectType",
-                new FileOrigin("file:///units.xml", 0, 0), null)),
+                new FileOrigin("file:///units.xml", 0, 0), null)
+        ]),
         BuiltAt = new DateTimeOffset(2026, 9, 16, 10, 0, 0, TimeSpan.Zero),
         SourceManifestHash = "ab12"
     };

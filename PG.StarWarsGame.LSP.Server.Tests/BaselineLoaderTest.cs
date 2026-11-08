@@ -38,9 +38,11 @@ public sealed class BaselineLoaderTest
     private static BaselineIndex MakeBaseline()
     {
         return new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty
-                .Add("UNIT_A", new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "GameObjectType",
-                    new FileOrigin("f.xml", 0, null), null)),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("UNIT_A", [
+                    new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "GameObjectType",
+                        new FileOrigin("f.xml", 0, null), null)
+                ]),
             DateTimeOffset.UtcNow,
             "testhash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
@@ -430,7 +432,7 @@ public sealed class BaselineLoaderTest
         var withBehaviors = baseline with
         {
             Symbols = baseline.Symbols.SetItem("UNIT_A",
-                baseline.Symbols["UNIT_A"] with { Behaviors = ["DUMMY_STARSHIP"] })
+                [baseline.Symbols["UNIT_A"][0] with { Behaviors = ["DUMMY_STARSHIP"] }])
         };
         var fs = new MockFileSystem();
         fs.AddFile("C:\\b.bin", new MockFileData(Serialize(withBehaviors)));

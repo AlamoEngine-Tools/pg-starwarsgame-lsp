@@ -73,7 +73,8 @@ public sealed class StoryParamValueProposalProviderTest
         var dict = ImmutableDictionary.CreateRange(
             StringComparer.OrdinalIgnoreCase,
             symbols.Select(s => KeyValuePair.Create(s.id,
-                new GameSymbol(s.id, GameSymbolKind.XmlObject, s.typeName, new UnknownOrigin("test"), null))));
+                ImmutableArray.Create(
+                    new GameSymbol(s.id, GameSymbolKind.XmlObject, s.typeName, new UnknownOrigin("test"), null)))));
         return GameIndex.Empty with { Baseline = BaselineIndex.Empty with { Symbols = dict } };
     }
 

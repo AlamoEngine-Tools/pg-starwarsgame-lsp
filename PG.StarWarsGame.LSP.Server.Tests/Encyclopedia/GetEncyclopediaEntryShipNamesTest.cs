@@ -126,7 +126,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
         {
             Symbols = ImmutableDictionary.CreateRange(
                 StringComparer.OrdinalIgnoreCase,
-                [KeyValuePair.Create("GameConstants", Sym("GameConstants", "GameConstants"))]),
+                [KeyValuePair.Create("GameConstants", ImmutableArray.Create(Sym("GameConstants", "GameConstants")))]),
             ObjectTags = ImmutableDictionary.CreateRange(
                 StringComparer.OrdinalIgnoreCase,
                 [

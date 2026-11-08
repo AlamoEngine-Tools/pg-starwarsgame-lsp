@@ -277,19 +277,22 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             break;
         }
 
-        foreach (var (id, sym) in index.ShippedSymbols)
+        foreach (var (id, shipped) in index.ShippedSymbols)
         {
             if (index.WorkspaceDefinitions.ContainsKey(id)) continue;
-            if (expectedTypeName is not null &&
-                !string.Equals(sym.TypeName, expectedTypeName, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            yield return new CompletionItem
+            foreach (var sym in shipped)
             {
-                Label = id,
-                Detail = sym.TypeName,
-                Kind = CompletionItemKind.Reference
-            };
+                if (expectedTypeName is not null &&
+                    !string.Equals(sym.TypeName, expectedTypeName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                yield return new CompletionItem
+                {
+                    Label = id,
+                    Detail = sym.TypeName,
+                    Kind = CompletionItemKind.Reference
+                };
+            }
         }
     }
 }
