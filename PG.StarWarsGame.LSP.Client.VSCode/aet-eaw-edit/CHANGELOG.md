@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.1
+
+### Fixes
+
+- **A project file inside another project's folder is a project of its own** - a repository holding its
+  library's project file at the root and its mods in subfolders showed only the root project: every project
+  file under it was taken as the root project's dependency, and the mods' files went to a server that never
+  indexed them, with no entry in the views, no findings and no error. A nested project file counts as a
+  dependency only when the project around it references it or declares the directory it sits in; otherwise
+  it runs its own server, and the root project's server serves nothing inside it
+
 ## 0.5.0
 
 ### Highlights

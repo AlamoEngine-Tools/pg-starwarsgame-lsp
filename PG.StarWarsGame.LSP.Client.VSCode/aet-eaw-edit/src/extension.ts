@@ -1374,8 +1374,12 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
             }
         },
     });
-    const specs = clientSpecs(discovery, folders, onDiskSpelling, (folder) =>
-        isModFolder(folder, subdirectories, files),
+    const specs = clientSpecs(
+        discovery,
+        folders,
+        onDiskSpelling,
+        (folder) => isModFolder(folder, subdirectories, files),
+        subdirectories,
     );
 
     if (specs.length > 1) {

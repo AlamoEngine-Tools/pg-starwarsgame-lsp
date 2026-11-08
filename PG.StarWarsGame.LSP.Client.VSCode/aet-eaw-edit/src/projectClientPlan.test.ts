@@ -279,6 +279,158 @@ describe("documentSelectorFor", () => {
     });
 });
 
+/**
+ * A monorepo (#364): the library's project file at the repository root and the mods in subfolders.
+ * The root client's glob would cover the mods, so its selector names the root's own files and each
+ * subdirectory that holds no project, one glob per directory, in listing order.
+ */
+describe("documentSelectorFor with projects inside a root", () => {
+    const folders = ["c:/dev/EaWX"];
+    const MONOREPO = {
+        "c:/dev/EaWX/core.pgproj": pgproj("Core"),
+        "c:/dev/EaWX/Rev/rev.pgproj": pgproj("Rev", ["../core.pgproj"]),
+        "c:/dev/EaWX/TR/tr.pgproj": pgproj("TR", ["../core.pgproj"]),
+    };
+    const listing: Record<string, string[]> = {
+        "c:/dev/eawx": ["Data", "Docs", "Rev", "TR"],
+    };
+    const subdirectories = (directory: string) =>
+        listing[directory.replace(/\\/g, "/").toLowerCase()];
+    const root = "[cC]:/[dD][eE][vV]/[eE][aA][wW][xX]";
+
+    it("leaves the projects' directories out of the root client's selector", () => {
+        const [core] = clientSpecs(
+            discover(folders, MONOREPO),
+            folders,
+            undefined,
+            undefined,
+            subdirectories,
+        );
+
+        assert.deepEqual(core.excluded, ["c:/dev/EaWX/Rev", "c:/dev/EaWX/TR"]);
+        assert.deepEqual(documentSelectorFor(core), [
+            { scheme: "file", language: "xml", pattern: `${root}/*` },
+            { scheme: "file", language: "lua", pattern: `${root}/*` },
+            { scheme: "file", language: "plaintext", pattern: `${root}/*.txt` },
+            {
+                scheme: "file",
+                language: "xml",
+                pattern: `${root}/[dD][aA][tT][aA]/**`,
+            },
+            {
+                scheme: "file",
+                language: "lua",
+                pattern: `${root}/[dD][aA][tT][aA]/**`,
+            },
+            {
+                scheme: "file",
+                language: "plaintext",
+                pattern: `${root}/[dD][aA][tT][aA]/**/*.txt`,
+            },
+            {
+                scheme: "file",
+                language: "xml",
+                pattern: `${root}/[dD][oO][cC][sS]/**`,
+            },
+            {
+                scheme: "file",
+                language: "lua",
+                pattern: `${root}/[dD][oO][cC][sS]/**`,
+            },
+            {
+                scheme: "file",
+                language: "plaintext",
+                pattern: `${root}/[dD][oO][cC][sS]/**/*.txt`,
+            },
+        ]);
+    });
+
+    it("keeps the mods' own selectors whole", () => {
+        const [, rev] = clientSpecs(
+            discover(folders, MONOREPO),
+            folders,
+            undefined,
+            undefined,
+            subdirectories,
+        );
+
+        assert.deepEqual(rev.excluded, []);
+        assert.deepEqual(documentSelectorFor(rev), [
+            {
+                scheme: "file",
+                language: "xml",
+                pattern: `${root}/[rR][eE][vV]/**`,
+            },
+            {
+                scheme: "file",
+                language: "lua",
+                pattern: `${root}/[rR][eE][vV]/**`,
+            },
+            {
+                scheme: "file",
+                language: "plaintext",
+                pattern: `${root}/[rR][eE][vV]/**/*.txt`,
+            },
+        ]);
+    });
+
+    it("tells the root client about no change inside a project it holds", () => {
+        const [core, rev] = clientSpecs(
+            discover(folders, MONOREPO),
+            folders,
+            undefined,
+            undefined,
+            subdirectories,
+        );
+
+        assert.equal(ownsPath(core, "c:/dev/EaWX/Data/XML/units.xml"), true);
+        assert.equal(
+            ownsPath(core, "c:/dev/EaWX/Rev/Data/XML/units.xml"),
+            false,
+        );
+        assert.equal(ownsPath(rev, "c:/dev/EaWX/Rev/Data/XML/units.xml"), true);
+    });
+
+    it("falls back to the whole root when its directory cannot be listed", () => {
+        const [core] = clientSpecs(
+            discover(folders, MONOREPO),
+            folders,
+            undefined,
+            undefined,
+            () => undefined,
+        );
+
+        assert.equal(documentSelectorFor(core)[0].pattern, `${root}/**`);
+    });
+
+    it("restarts the root client when a project appears inside its directory", () => {
+        const before = clientSpecs(
+            discover(folders, {
+                "c:/dev/EaWX/core.pgproj": pgproj("Core"),
+                "c:/dev/EaWX/Rev/rev.pgproj": pgproj("Rev", ["../core.pgproj"]),
+            }),
+            folders,
+            undefined,
+            undefined,
+            subdirectories,
+        );
+        const after = clientSpecs(
+            discover(folders, MONOREPO),
+            folders,
+            undefined,
+            undefined,
+            subdirectories,
+        );
+
+        const plan = planChanges(
+            new Map(before.map((s) => [s.key, s.signature])),
+            after,
+        );
+
+        assert.ok(plan.stop.includes(before[0].key));
+    });
+});
+
 describe("documentSelectorFor case", () => {
     /**
      * Measured in a live window: VS Code matches a selector's pattern against its own spelling of
