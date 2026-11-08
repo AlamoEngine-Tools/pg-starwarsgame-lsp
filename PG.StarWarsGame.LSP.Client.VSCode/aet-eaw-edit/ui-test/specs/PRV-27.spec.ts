@@ -76,8 +76,8 @@ describe("PRV-27", () => {
 
             await selectRow("Infantry");
             await railExpand("Infantry", 3);
-            await railExpand("Referenced by", 4);
-            expect((await railChildren("Referenced by")).length).toBeGreaterThan(0);
+            await railExpand("References", 4);
+            expect((await railChildren("References")).length).toBeGreaterThan(0);
         });
     });
 

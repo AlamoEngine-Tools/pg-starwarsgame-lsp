@@ -42,7 +42,7 @@ describe("PRV-25", () => {
                 "Animations",
                 "Particle Systems",
                 "Textures",
-                "Referenced by",
+                "References",
             ]);
             await railExpand("Animations", 2);
             expect(lower((await railChildren("Animations")).map((n) => n.label))).toEqual([
@@ -54,7 +54,7 @@ describe("PRV-25", () => {
             await openRow("Ev_lambdashuttle.alo");
             await browser.waitUntil(async () => (await panels()).includes("Model tree"), { timeout: 60_000 });
             const shown = (await panels()).filter((p) => p !== "Problems");
-            expect(shown).toEqual(["Header", "Model tree", "Textures", "Particle Systems", "Animations", "Referenced by"]);
+            expect(shown).toEqual(["Header", "Model tree", "Textures", "Particle Systems", "Animations", "References"]);
             expect(Object.keys((await entryHead()).rows)).toEqual(
                 expect.arrayContaining(["Bones", "Textures", "Particle Systems", "Animations"]),
             );
@@ -88,8 +88,8 @@ describe("PRV-25", () => {
             await search("P_sandspeederheat");
             await selectRow("P_sandspeederheat.alo");
             await railExpand("P_sandspeederheat.alo", 1);
-            await railExpand("Referenced by", 2);
-            expect(lower((await railChildren("Referenced by")).map((n) => n.label))).toContain("nv_sandspeeder.alo");
+            await railExpand("References", 2);
+            expect(lower((await railChildren("References")).map((n) => n.label))).toContain("nv_sandspeeder.alo");
 
             await openRow("P_sandspeederheat.alo");
             const tiles = await actions();

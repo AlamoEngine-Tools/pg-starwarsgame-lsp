@@ -162,12 +162,13 @@ export function relationLabel(relation: string): string {
             return l10n.t("Samples");
         case "luaScript":
             return l10n.t("Lua Script");
-        // What names an entry, as the code lens counts it: an asset's are the objects whose tags
-        // name it, an object's those the reference index holds. The row reads as the direction
-        // it is, against "Referenced objects" for what the entry's own tags name.
+        // What names an entry is its references, the word the code lens and Find References use
+        // for the same direction: an asset's are the objects whose tags name it, an object's those
+        // the reference index holds. "Referenced objects" is the other direction, what the entry's
+        // own tags name.
         case "referencedBy":
         case "usedBy":
-            return l10n.t("Referenced by");
+            return l10n.t("References");
         case "overrides":
             return l10n.t("Overrides");
         case "animations":

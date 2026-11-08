@@ -30,7 +30,7 @@ const RELATIONS = [
     "Referenced objects",
     "Textures",
     "Lua Script",
-    "Referenced by",
+    "References",
     "Overrides",
 ];
 
@@ -87,7 +87,7 @@ describe("PRV-23", () => {
             const head = await entryHead();
             expect(head.title).toBe("Nebulon_B_Frigate");
             expect(head.rows["Defined in"]).toBe("Spaceunitsfrigates.xml:4");
-            expect(await panels()).toEqual(["Header", "Problems", "Encyclopedia", "Referenced by"]);
+            expect(await panels()).toEqual(["Header", "Problems", "Encyclopedia", "References"]);
             // The card draws after the page: its faction switch is waited for, not read at once.
             await (await browser.$('section.panel[aria-label="Encyclopedia"] [aria-label="Faction frame"]')).waitForExist({
                 timeout: 30_000,
