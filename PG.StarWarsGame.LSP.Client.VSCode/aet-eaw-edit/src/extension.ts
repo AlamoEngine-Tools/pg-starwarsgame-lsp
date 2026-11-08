@@ -29,7 +29,7 @@ import {
 } from "./modBrowserViewProvider";
 import { PanelProject } from "./panelProject";
 import { WebviewPanelHost } from "./webviewPanelHost";
-import { whatsNewOnStart } from "./whatsNewModel";
+import { shownVersion, whatsNewOnStart } from "./whatsNewModel";
 import {
     OPEN_AFTER_UPDATE_SETTING,
     OPEN_WHATS_NEW,
@@ -1873,11 +1873,17 @@ export async function activate(
     // The manifest's preview flag, the one the Marketplace badges the extension with; the page
     // carries the same mark.
     const extensionPreview = context.extension.packageJSON.preview === true;
+    // The page's version: the installed one, or Unreleased in the development host, where the
+    // manifest still names the last release and the notes being written sit above its section.
+    const whatsNewVersion = shownVersion(
+        extensionVersion,
+        context.extensionMode === vscode.ExtensionMode.Development,
+    );
     context.subscriptions.push(
         vscode.commands.registerCommand(OPEN_WHATS_NEW, () =>
             WhatsNewPanel.show(
                 context.extensionUri,
-                extensionVersion,
+                whatsNewVersion,
                 extensionPreview,
             ),
         ),
@@ -1899,7 +1905,7 @@ export async function activate(
         if (seen.open) {
             void WhatsNewPanel.show(
                 context.extensionUri,
-                extensionVersion,
+                whatsNewVersion,
                 extensionPreview,
             );
         }

@@ -15,6 +15,7 @@ import {
     inlineImages,
     opensOn,
     readImageAsDataUri,
+    shownVersion,
     splitChangelog,
     whatsNewOnStart,
 } from "./whatsNewModel";
@@ -296,6 +297,31 @@ describe("readImageAsDataUri", () => {
         assert.equal(
             readImageAsDataUri(path.join(dir, "media"), "b.gif"),
             undefined,
+        );
+    });
+});
+
+describe("shownVersion", () => {
+    it("shows the installed version to a user", () => {
+        assert.equal(shownVersion("0.4.1", false), "0.4.1");
+    });
+
+    it("shows Unreleased in the development host, which is the section being written", () => {
+        assert.equal(shownVersion("0.4.1", true), "Unreleased");
+        const sections = splitChangelog(changelog);
+        assert.equal(
+            currentSection(sections, shownVersion("0.4.1", true))?.version,
+            "Unreleased",
+        );
+    });
+
+    it("falls back to the newest release when nothing is unreleased", () => {
+        const released = splitChangelog(
+            changelog.replace("## Unreleased", "## 0.5.0"),
+        );
+        assert.equal(
+            currentSection(released, shownVersion("0.4.1", true))?.version,
+            "0.5.0",
         );
     });
 });

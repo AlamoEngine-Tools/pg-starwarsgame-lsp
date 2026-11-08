@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The What's New page's model: the changelog split into releases, the start classified against
@@ -97,14 +97,27 @@ export function splitChangelog(markdown: string): ReleaseSection[] {
 }
 
 /**
- * The section the page opens on: the installed version's, or the first section when no heading
- * matches, which is `Unreleased` in a development build whose manifest version is behind.
+ * The section the page opens on: the version's own, or the first section when no heading
+ * matches - the newest release, right after a release has renamed `Unreleased`.
  */
 export function currentSection(
     sections: readonly ReleaseSection[],
     installedVersion: string,
 ): ReleaseSection | undefined {
     return sections.find((s) => s.version === installedVersion) ?? sections[0];
+}
+
+/**
+ * The version the page shows. An installed extension shows its own. The development host shows
+ * `Unreleased`: its manifest still names the last release, whose section the page would pick,
+ * while the notes being written sit above it and would never be seen.
+ */
+export function shownVersion(
+    installedVersion: string,
+    development: boolean,
+): string {
+    // l10n-exempt: the changelog's own heading, matched by name; only the development host shows it
+    return development ? "Unreleased" : installedVersion;
 }
 
 /** Numeric per-part comparison of dotted versions; a missing part is zero. */
