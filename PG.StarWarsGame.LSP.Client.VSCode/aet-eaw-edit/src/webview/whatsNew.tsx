@@ -77,7 +77,9 @@ const Shell = styled.div`
     background: var(--colour-editor-ground);
 
     .page {
-        max-width: 78ch;
+        /* Wide enough for a frame to read at a glance; the notes' own lines stay short by their
+           own wrapping, and a table scrolls rather than squeezing. */
+        max-width: 1100px;
         margin: 0 auto;
     }
 
