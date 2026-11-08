@@ -235,10 +235,10 @@ const Shell = styled.div`
         background: var(--colour-panel);
     }
 
-    .callout h2 {
-        font-size: 1.1em;
-        font-weight: 600;
-        margin: 0 0 var(--space-8);
+    /* The block's own heading leads it: no room above, inside the callout's own padding. */
+    .callout h3:first-child,
+    .highlights h3:first-child {
+        margin-top: 0;
     }
 
     .older {
@@ -357,7 +357,6 @@ function App(): React.JSX.Element {
                         )}
                         {current.migration !== undefined && (
                             <section className="callout">
-                                <h2>{l10n.t("After the update")}</h2>
                                 <Notes text={current.migration} />
                             </section>
                         )}

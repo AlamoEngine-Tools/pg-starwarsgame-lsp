@@ -278,6 +278,8 @@ export function buildWhatsNewPayload(
     const picked = currentSection(sections, version);
     const inline = (text: string) =>
         inlineImages(text, (p) => readImageAsDataUri(imageDir, p));
+    // The lifted blocks keep the headings they had in the file: the page places them, it does
+    // not rename them, so the reader sees the same words as on GitHub.
     const current =
         picked === undefined
             ? undefined
@@ -286,11 +288,11 @@ export function buildWhatsNewPayload(
                   highlights:
                       picked.highlights === undefined
                           ? undefined
-                          : inline(picked.highlights),
+                          : inline(`### Highlights\n\n${picked.highlights}`),
                   migration:
                       picked.migration === undefined
                           ? undefined
-                          : inline(picked.migration),
+                          : inline(`### Migration\n\n${picked.migration}`),
                   body: inline(picked.body),
               };
     // The earlier sections stay whole, their lifted blocks put back as the headings they were:
