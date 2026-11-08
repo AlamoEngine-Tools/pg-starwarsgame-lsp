@@ -146,7 +146,13 @@ jobs:
       run: |
         npm ci
         if ($LASTEXITCODE -ne 0) { exit 1 }
-        $vsceArgs = @('package', '--no-dependencies', '--target', 'win32-x64', '--out', "../../dist/aet-eaw-edit-$env:VERSION.vsix")
+        # The changelog's relative links and images (media/whats-new/...) are rewritten for the
+        # Marketplace against the release tag and the extension's own folder. Left to vsce, the base
+        # is the repository ROOT at HEAD, which misses the subfolder and moves with master.
+        $tree = "https://github.com/${{ github.repository }}"
+        $folder = "PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit"
+        $vsceArgs = @('package', '--no-dependencies', '--target', 'win32-x64', '--out', "../../dist/aet-eaw-edit-$env:VERSION.vsix",
+            '--baseContentUrl', "$tree/blob/v$env:VERSION/$folder", '--baseImagesUrl', "$tree/raw/v$env:VERSION/$folder")
         if ('${{ inputs.prerelease }}' -eq 'true') { $vsceArgs += '--pre-release' }
         npx --yes @vscode/vsce @vsceArgs
         if ($LASTEXITCODE -ne 0) { exit 1 }
@@ -247,8 +253,13 @@ jobs:
         fi
         args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --draft)
         [ "$PRERELEASE" = true ] && args+=(--prerelease)
+        # The section's relative images (media/whats-new/...) are written against the extension's
+        # folder; on the release page they resolve against the tag, the same URLs the Marketplace
+        # copy gets from vsce. Absolute links carry a scheme and are left alone.
+        images="https://github.com/$GITHUB_REPOSITORY/raw/$TAG/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit"
         awk -v v="## $VERSION" '$0 == v { on = 1; next } /^## / { on = 0 } on' \
-          repo/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/CHANGELOG.md | tr -d '\r' >notes.md
+          repo/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/CHANGELOG.md | tr -d '\r' \
+          | sed -E "s#!\[([^]]*)\]\(([^):]+)\)#![\1](${images}/\2)#g" >notes.md
         if [ -n "$NOTES" ]; then
           args+=(--notes "$NOTES")
         elif grep -q '[^[:space:]]' notes.md; then

@@ -29,6 +29,13 @@ import {
 } from "./modBrowserViewProvider";
 import { PanelProject } from "./panelProject";
 import { WebviewPanelHost } from "./webviewPanelHost";
+import { shownVersion, whatsNewOnStart } from "./whatsNewModel";
+import {
+    OPEN_AFTER_UPDATE_SETTING,
+    OPEN_WHATS_NEW,
+    WHATS_NEW_SEEN_VERSION,
+    WhatsNewPanel,
+} from "./whatsNewPanel";
 import { ModelPreviewEditorProvider } from "./modelPreviewEditor";
 import { ModelInspectorPanel } from "./modelInspectorPanel";
 import { ModelPreviewPanel } from "./modelPreviewPanel";
@@ -347,11 +354,6 @@ interface ProjectClient {
 
 /** The running clients, in discovery order. */
 const clients = new Map<string, ProjectClient>();
-
-/** How long a gag stays on the bar before the phase's own text replaces it. */
-const GAG_SHOWN_MS = 1200;
-/** How often a phase that is still loading draws again. */
-const GAG_REDRAW_MS = 30000;
 
 /** The first project in discovery order. */
 function primaryClient(): ProjectClient | undefined {
@@ -1178,32 +1180,15 @@ function startProjectClient(
         for (const [phase, load] of phases) {
             project.state = "loading";
             project.phase = phase;
-            // Now and then the phase shows a line from elsewhere in the galaxy, for a moment: one
-            // draw as it starts, another every half minute it lasts.
-            const draw = (): void => {
-                const gag = pickGag(Math.random);
-                if (gag === undefined || project.state !== "loading") {
-                    return;
-                }
-                project.gag = gag;
-                updateStatus();
-                setTimeout(() => {
-                    if (project.gag === gag) {
-                        project.gag = undefined;
-                        updateStatus();
-                    }
-                }, GAG_SHOWN_MS);
-            };
-            project.gag = undefined;
-            draw();
+            // Now and then a phase shows a line from elsewhere in the galaxy instead of its own
+            // name: one draw as it starts, and a hit stands for the whole phase. Phases last
+            // seconds now, so a line shown for a moment and taken back was never read.
+            project.gag = pickGag(Math.random);
             updateStatus();
-            const redraw = setInterval(draw, GAG_REDRAW_MS);
             try {
                 await load();
             } catch (e) {
                 logLine(`${label}Loading ${phase} failed: ${e}`);
-            } finally {
-                clearInterval(redraw);
             }
         }
         // A reload or a stop that happened meanwhile owns the state now.
@@ -1857,6 +1842,52 @@ export async function activate(
     // Same reasoning: how wide you like a dock is a property of your screen and your habits,
     // not of the mod you have open.
     initPanelLayoutStorage(context.globalState);
+
+    // The What's New page belongs to the extension, not to a project: it opens from the palette
+    // in any window, project or none.
+    const extensionVersion = String(
+        context.extension.packageJSON.version ?? "unknown",
+    );
+    // The manifest's preview flag, the one the Marketplace badges the extension with; the page
+    // carries the same mark.
+    const extensionPreview = context.extension.packageJSON.preview === true;
+    // The page's version: the installed one, or Unreleased in the development host, where the
+    // manifest still names the last release and the notes being written sit above its section.
+    const whatsNewVersion = shownVersion(
+        extensionVersion,
+        context.extensionMode === vscode.ExtensionMode.Development,
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand(OPEN_WHATS_NEW, () =>
+            WhatsNewPanel.show(
+                context.extensionUri,
+                whatsNewVersion,
+                extensionPreview,
+            ),
+        ),
+    );
+    // Once per new version, and on the first start, which stands in for a walkthrough: nothing
+    // stored a version before this page existed, so every user of the first release carrying it
+    // is a first start, and that release's notes are the ones that matter most to them.
+    {
+        const seen = whatsNewOnStart(
+            context.globalState.get<string>(WHATS_NEW_SEEN_VERSION),
+            extensionVersion,
+            vscode.workspace
+                .getConfiguration()
+                .get<boolean>(OPEN_AFTER_UPDATE_SETTING, true),
+        );
+        if (seen.store !== undefined) {
+            void context.globalState.update(WHATS_NEW_SEEN_VERSION, seen.store);
+        }
+        if (seen.open) {
+            void WhatsNewPanel.show(
+                context.extensionUri,
+                whatsNewVersion,
+                extensionPreview,
+            );
+        }
+    }
 
     // The Lua debugger. Both registrations stay in place whatever the feature flag says: the
     // debug type must exist for launch.json to validate, and a disabled feature answers with the
@@ -3564,5 +3595,6 @@ export async function deactivate(): Promise<void> {
     ModBrowserPanel.disposeAll();
     ModelPreviewPanel.disposeAll();
     ModelInspectorPanel.disposeAll();
+    WhatsNewPanel.disposeAll();
     await stopAllClients();
 }

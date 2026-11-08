@@ -155,15 +155,17 @@ export function relationLabel(relation: string): string {
         case "hardpoints":
             return l10n.t("Hardpoints");
         case "otherReferences":
-            return l10n.t("Other references");
+            return l10n.t("Referenced objects");
         case "textures":
             return l10n.t("Textures");
         case "samples":
             return l10n.t("Samples");
         case "luaScript":
             return l10n.t("Lua Script");
-        // What names an entry is its references, as the code lens counts them; an asset's are
-        // the objects whose tags name it, an object's those the reference index holds.
+        // What names an entry is its references, the word the code lens and Find References use
+        // for the same direction: an asset's are the objects whose tags name it, an object's those
+        // the reference index holds. "Referenced objects" is the other direction, what the entry's
+        // own tags name.
         case "referencedBy":
         case "usedBy":
             return l10n.t("References");

@@ -513,11 +513,12 @@ fabric.properties
 docs/
 *.py
 *.ps1
-# The workspace setup script and the two packaging scripts CI runs are tracked; every other .ps1
-# here is a local tool
+# The workspace setup script, the two packaging scripts CI runs and the screenshot rig's window
+# sizer are tracked; every other .ps1 here is a local tool
 !/setup-workspace.ps1
 !/scripts/stage-bundled-executables.ps1
 !/scripts/check-vsix.ps1
+!/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/ui-test/whats-new/Set-WindowSize.ps1
 *.md
 *.MD
 /dist

@@ -149,7 +149,7 @@ export abstract class WebviewPanelHost {
             vscode.Uri.joinPath(extensionUri, "out", "codicons", "codicon.css"),
         );
 
-        this.panel.webview.html = buildHtml(
+        this.panel.webview.html = buildWebviewHtml(
             scriptUri,
             codiconUri,
             this.panel.webview.cspSource,
@@ -310,7 +310,12 @@ function escapeAttribute(value: string): string {
         .replace(/>/g, "&gt;");
 }
 
-function buildHtml(
+/**
+ * The page every webview of this extension loads: the CSP, the codicon stylesheet, the bundle and
+ * the root element carrying the stored layout and the l10n bundle. Exported for the one panel that
+ * belongs to no project (the What's New page), so it shares this skeleton rather than a copy.
+ */
+export function buildWebviewHtml(
     scriptUri: vscode.Uri,
     codiconUri: vscode.Uri,
     cspSource: string,

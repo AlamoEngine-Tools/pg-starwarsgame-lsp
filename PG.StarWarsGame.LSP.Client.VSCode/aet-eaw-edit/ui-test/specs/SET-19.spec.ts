@@ -3,10 +3,10 @@ import { browser, expect } from "@wdio/globals";
 import { command, logChannels, lspStatus } from "../protocol.js";
 
 describe("SET-19", () => {
-    it("counts two projects indexed", async () => {
+    it("counts two projects ready", async () => {
         let status: string | null = null;
         await browser.waitUntil(
-            async () => (status = await lspStatus()) === "$(check) EaWEdit LSP: 2 projects indexed",
+            async () => (status = await lspStatus()) === "$(check) EaWEdit LSP: 2 projects ready",
             { timeout: 300_000, interval: 2000, timeoutMsg: `Status ${status}` },
         );
     });

@@ -6,7 +6,7 @@ export const TAG_RELATIONS = [
     "SFX Events",
     "Speech Events",
     "Hardpoints",
-    "Other references",
+    "Referenced objects",
     "Textures",
     "Lua Script",
 ];

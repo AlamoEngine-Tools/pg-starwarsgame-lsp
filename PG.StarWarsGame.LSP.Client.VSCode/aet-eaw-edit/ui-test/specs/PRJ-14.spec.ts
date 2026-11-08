@@ -58,6 +58,6 @@ describe("PRJ-14", () => {
         }, gamma);
         await browser.pause(5_000);
         expect(linesSince(start).filter((l) => l.includes("Starting LSP server")).length).toBe(before);
-        expect(await lspStatus()).toBe("$(check) EaWEdit LSP: 2 projects indexed");
+        expect(await lspStatus()).toBe("$(check) EaWEdit LSP: 2 projects ready");
     });
 });

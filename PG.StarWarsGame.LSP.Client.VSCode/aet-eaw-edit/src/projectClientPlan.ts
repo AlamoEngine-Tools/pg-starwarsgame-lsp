@@ -254,10 +254,10 @@ export function phaseText(client: {
 }
 
 /**
- * How often a draw yields a gag: one in twenty. A phase draws when it starts and again every
- * half minute it lasts, so a short load sees one now and then and a long one is not left without.
+ * How often a draw yields a gag: about one in seven. A phase draws once when it starts, and a
+ * hit names the phase for as long as it lasts.
  */
-const GAG_CHANCE = 0.05;
+const GAG_CHANCE = 0.15;
 
 /**
  * The lines a loading phase may open with, for a moment, before its real text. Each reads as
