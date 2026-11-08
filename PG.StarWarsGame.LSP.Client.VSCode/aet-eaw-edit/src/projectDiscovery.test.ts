@@ -159,6 +159,53 @@ describe("discoverProjects", () => {
         );
     });
 
+    /**
+     * A monorepo (#364): the library's project file at the repository root, the mods in subfolders.
+     * The root project does not reference the mods and does not index their directories, so they
+     * are projects of their own; the root project's server serves nothing inside them.
+     */
+    it("gives a project file inside another project's directory its own project when that project does not reference it", () => {
+        const result = discover(["c:/dev/EaWX"], {
+            "c:/dev/EaWX/core.pgproj": pgproj("Core"),
+            "c:/dev/EaWX/TR/tr.pgproj": pgproj("TR", ["../core.pgproj"]),
+        });
+
+        assert.deepEqual(
+            result.projects.map((p) => p.name),
+            ["Core", "TR"],
+        );
+        assert.deepEqual(result.nested, []);
+        const [core, tr] = result.projects;
+        assert.deepEqual(core.excluded, ["c:/dev/EaWX/TR"]);
+        assert.deepEqual(tr.excluded, []);
+        assert.deepEqual(tr.libraries, []);
+        assert.equal(
+            result.ownerOf("c:/dev/EaWX/TR/data/xml/units.xml")?.name,
+            "TR",
+        );
+        assert.equal(
+            result.ownerOf("c:/dev/EaWX/data/xml/units.xml")?.name,
+            "Core",
+        );
+    });
+
+    /** The outer project indexes a declared directory as its own, so a project file inside one stays its dependency. */
+    it("serves a project file inside a declared directory of the project around it as its dependency", () => {
+        const result = discover(["c:/mods/MyMod"], {
+            "c:/mods/MyMod/mymod.pgproj": pgproj("My Mod"),
+            "c:/mods/MyMod/data/xml/Sub/sub.pgproj": pgproj("Sub"),
+        });
+
+        assert.deepEqual(
+            result.projects.map((p) => p.name),
+            ["My Mod"],
+        );
+        assert.deepEqual(result.nested, [
+            "c:/mods/MyMod/data/xml/Sub/sub.pgproj",
+        ]);
+        assert.deepEqual(result.projects[0].excluded, []);
+    });
+
     it("gives a dependency opened as a folder its own project", () => {
         const result = discover(["c:/dev/EaWX/Rev", "c:/dev/EaWX/Data"], {
             "c:/dev/EaWX/Rev/rev.pgproj": pgproj("Rev", [

@@ -34,8 +34,21 @@ export interface ClientSpec {
     roots?: string[];
     /** The directories whose on-disk changes this client is told about; undefined is all of them. */
     watched?: string[];
+    /** The directories of other projects inside {@link roots}; this client serves and watches nothing in them. */
+    excluded?: string[];
+    /**
+     * What the document selector names: the roots with {@link excluded} cut out, one entry per
+     * remaining directory. Undefined when the roots are taken whole.
+     */
+    served?: ServedDirectory[];
     /** Changes whenever anything above changes, so a changed client is restarted. */
     signature: string;
+}
+
+/** A directory a client's document selector names: all of it, or only the files directly in it. */
+export interface ServedDirectory {
+    path: string;
+    recursive: boolean;
 }
 
 /**
@@ -52,12 +65,16 @@ export const WINDOW_CLIENT = "window";
  *     as the project file wrote it, and a document selector is matched against VS Code's own
  *     spelling of the path.
  * @param isModFolder Whether a folder without a project file is laid out like a mod.
+ * @param subdirectories The subdirectories of a directory, or undefined when it cannot be read; a
+ *     root holding another project's directory is served as its remaining subdirectories (#364).
  */
 export function clientSpecs(
     discovery: Discovery,
     folders: readonly string[],
     canonical: (directory: string) => string = (d) => d,
     isModFolder: (directory: string) => boolean = () => false,
+    subdirectories: (directory: string) => string[] | undefined = () =>
+        undefined,
 ): ClientSpec[] {
     if (discovery.projects.length <= 1) {
         const first = folders[0];
@@ -79,21 +96,66 @@ export function clientSpecs(
         ];
     }
 
-    return discovery.projects.map((project) =>
-        withSignature({
+    return discovery.projects.map((project) => {
+        const roots = project.roots.map(canonical);
+        const excluded = project.excluded.map(canonical);
+        return withSignature({
             key: project.path.toLowerCase(),
             name: project.name,
             projectPath: project.path,
             workspaceRoot: project.directory,
             logDirectory: project.directory,
-            roots: project.roots.map(canonical),
+            roots,
             watched: unique(
                 [...project.roots, ...project.closure.map(directoryOf)].map(
                     canonical,
                 ),
             ),
-        }),
+            excluded,
+            served:
+                excluded.length === 0
+                    ? undefined
+                    : roots.flatMap((root) =>
+                          servedUnder(root, excluded, subdirectories),
+                      ),
+        });
+    });
+}
+
+/**
+ * A root as its selector names it with `excluded` cut out: whole when nothing excluded lies inside
+ * it; otherwise its own files plus each subdirectory in turn, the excluded ones left out. A root
+ * that cannot be listed is taken whole - the two servers then overlap, which is the lesser harm.
+ * Globs cannot say "except", so this is spelled out directory by directory.
+ */
+function servedUnder(
+    root: string,
+    excluded: readonly string[],
+    subdirectories: (directory: string) => string[] | undefined,
+): ServedDirectory[] {
+    const inside = excluded.filter(
+        (e) => isInside(e, root) && !sameDirectory(e, root),
     );
+    if (inside.length === 0) {
+        return [{ path: root, recursive: true }];
+    }
+    const children = subdirectories(root);
+    if (children === undefined) {
+        return [{ path: root, recursive: true }];
+    }
+    const served: ServedDirectory[] = [{ path: root, recursive: false }];
+    for (const child of children) {
+        const path = `${slashed(root)}/${child}`;
+        if (inside.some((e) => sameDirectory(e, path))) {
+            continue;
+        }
+        served.push(...servedUnder(path, inside, subdirectories));
+    }
+    return served;
+}
+
+function sameDirectory(a: string, b: string): boolean {
+    return slashed(a).toLowerCase() === slashed(b).toLowerCase();
 }
 
 /** Which running clients to stop and which specs to start. A changed client is both. */
@@ -148,11 +210,19 @@ export function documentSelectorFor(spec: ClientSpec): DocumentFilter[] {
     // spelled "C:/..." selected nothing against its lower-case drive letter, and a file opened under
     // another spelling of its path reached no server (#291). A project owns a path the way the
     // server compares one, ignoring case - as ownerKey does.
-    return spec.roots.map(anyCase).flatMap((root) => [
-        { scheme: "file", language: "xml", pattern: `${root}/**` },
-        { scheme: "file", language: "lua", pattern: `${root}/**` },
-        { scheme: "file", language: "plaintext", pattern: `${root}/**/*.txt` },
-    ]);
+    const served =
+        spec.served ??
+        spec.roots.map((root) => ({ path: root, recursive: true }));
+    return served.flatMap(({ path, recursive }) => {
+        const root = anyCase(path);
+        const files = recursive ? `${root}/**` : `${root}/*`;
+        const texts = recursive ? `${root}/**/*.txt` : `${root}/*.txt`;
+        return [
+            { scheme: "file", language: "xml", pattern: files },
+            { scheme: "file", language: "lua", pattern: files },
+            { scheme: "file", language: "plaintext", pattern: texts },
+        ];
+    });
 }
 
 /** A glob for `path` in any case: each letter a class of both of its cases. */
@@ -196,7 +266,8 @@ export function ownerKey(
 export function ownsPath(spec: ClientSpec, path: string): boolean {
     return (
         spec.watched === undefined ||
-        spec.watched.some((directory) => isInside(path, directory))
+        (spec.watched.some((directory) => isInside(path, directory)) &&
+            !spec.excluded?.some((directory) => isInside(path, directory)))
     );
 }
 
@@ -385,6 +456,8 @@ function withSignature(spec: Omit<ClientSpec, "signature">): ClientSpec {
             spec.logDirectory,
             spec.roots,
             spec.watched,
+            spec.excluded,
+            spec.served,
         ]),
     };
 }

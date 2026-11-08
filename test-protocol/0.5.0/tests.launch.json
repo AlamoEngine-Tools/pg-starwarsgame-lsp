@@ -510,5 +510,8 @@
   },
   "PRV-37": {
     "open": "{repo}\\foc"
+  },
+  "PRJ-28": {
+    "open": "C:\\temp\\aet-test-PRJ-mono\\mono.code-workspace"
   }
 }

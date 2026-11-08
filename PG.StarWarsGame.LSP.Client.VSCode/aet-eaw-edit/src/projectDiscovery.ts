@@ -13,8 +13,11 @@
  * - An open project is a `.pgproj` under any workspace folder. Its identity is its path compared
  *   without regard to separator or case, so one file reached through two folders is one project.
  * - A project file inside another open project's directory is that project's dependency, not a
- *   project of its own: the outer project's directory already covers every file in it, and two
- *   servers publishing for one file would show every finding twice.
+ *   project of its own, when the outer project references it or it lies inside one of the outer
+ *   project's declared directories: the outer project's server indexes those files already, and two
+ *   servers publishing for one file would show every finding twice. Otherwise it is a project of
+ *   its own - a monorepo keeps its library's project file at the root and its mods in subfolders
+ *   (#364) - and the outer project's server serves nothing inside its directory.
  * - A dependency under no folder - reached only through `projectReferences` - is assigned to the
  *   first open project that references it, in folder order, and to no other.
  * - A file under no project's directories belongs to no server.
@@ -53,6 +56,8 @@ export interface DiscoveredProject {
     libraries: string[];
     /** The directories whose files this project's server owns. */
     roots: string[];
+    /** The directories of other open projects inside {@link roots}; the server serves nothing in them. */
+    excluded: string[];
 }
 
 /** The workspace's projects, and who owns what. */
@@ -104,13 +109,26 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
         }
     }
 
+    const closures = new Map<string, string[]>();
+    const closure = (path: string): string[] => {
+        const key = keyOf(path);
+        if (!closures.has(key)) {
+            closures.set(key, closureOf(path, load));
+        }
+        return closures.get(key)!;
+    };
+    const declared = (path: string): string[] =>
+        load(path)?.directories.map((d) => resolve(dirname(path), d)) ?? [];
+    // The outer project already indexes the inner one's files: as a referenced dependency, or
+    // because they lie in a directory it declares. Anything else inside it is a project of its own.
+    const swallows = (outer: string, inner: string): boolean =>
+        outer !== inner &&
+        isInside(dirname(inner), dirname(outer)) &&
+        keyOf(dirname(inner)) !== keyOf(dirname(outer)) &&
+        (closure(outer).some((d) => keyOf(d) === keyOf(inner)) ||
+            declared(outer).some((d) => isInside(dirname(inner), d)));
     const nested = candidates.filter((p) =>
-        candidates.some(
-            (outer) =>
-                outer !== p &&
-                isInside(dirname(p), dirname(outer)) &&
-                keyOf(dirname(p)) !== keyOf(dirname(outer)),
-        ),
+        candidates.some((outer) => swallows(outer, p)),
     );
     const open = candidates.filter((p) => !nested.includes(p));
 
@@ -127,9 +145,10 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
             directory,
             directories:
                 file?.directories.map((d) => resolve(directory, d)) ?? [],
-            closure: closureOf(path, load),
+            closure: closure(path),
             libraries: [],
             roots: [],
+            excluded: [],
         };
     });
 
@@ -164,6 +183,15 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
                 ),
             );
         }
+    }
+    // Another open project's directory inside a root is that project's: the server owning the root
+    // serves and watches nothing in it, so one file never has two servers.
+    for (const project of projects) {
+        project.excluded = openDirectories.filter(
+            (d) =>
+                keyOf(d) !== keyOf(project.directory) &&
+                project.roots.some((root) => isInside(d, root)),
+        );
     }
 
     const foldersWithoutProject = folders.filter(
