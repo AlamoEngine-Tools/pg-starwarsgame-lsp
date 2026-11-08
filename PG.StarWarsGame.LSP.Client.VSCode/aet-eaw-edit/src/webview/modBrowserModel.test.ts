@@ -184,8 +184,8 @@ describe("relationLabel", () => {
     });
 
     it("calls what names an entry its references, as the code lens does, for an object and an asset alike", () => {
-        assert.equal(relationLabel("referencedBy"), "References");
-        assert.equal(relationLabel("usedBy"), "References");
+        assert.equal(relationLabel("referencedBy"), "Referenced by");
+        assert.equal(relationLabel("usedBy"), "Referenced by");
     });
 
     it("calls the definitions the winning one replaces its overrides", () => {
