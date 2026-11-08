@@ -182,11 +182,17 @@ export function whatsNewOnStart(
 
 const IMAGE = /!\[([^\]]*)\]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g;
 
+/** The shipped path an absolute image URL points at: whatever follows its `media/` segment. */
+const SHIPPED_PATH = /(?:^|\/)(media\/.+)$/;
+
 /**
- * Rewrites every relative image of a Markdown text through `resolve`, which returns a data URI
- * or undefined. An absolute `http(s):` or `data:` source stays as written. An image the resolver
- * cannot supply is reduced to its alt text in italics, or removed when it has none: the webview
- * guard admits nothing but a data URI, so a broken image slot is never drawn.
+ * Rewrites every image of a Markdown text through `resolve`, which returns a data URI or
+ * undefined. A relative source is resolved as written. An absolute `http(s):` source is resolved
+ * by its `media/...` tail, because packaging rewrites the changelog's relative images to absolute
+ * repository URLs while the files still ship inside the extension; one with no such tail, and any
+ * image the resolver cannot supply, is reduced to its alt text in italics, or removed when it has
+ * none - the webview guard admits nothing but a data URI, so a broken image slot is never drawn.
+ * A `data:` source stays as written.
  */
 export function inlineImages(
     markdown: string,
@@ -195,10 +201,13 @@ export function inlineImages(
     return markdown.replace(
         IMAGE,
         (whole, alt: string, src: string, title: string) => {
-            if (/^(https?:|data:)/i.test(src)) {
+            if (/^data:/i.test(src)) {
                 return whole;
             }
-            const uri = resolve(src);
+            const shipped = /^https?:/i.test(src)
+                ? (SHIPPED_PATH.exec(src)?.[1] ?? undefined)
+                : src;
+            const uri = shipped === undefined ? undefined : resolve(shipped);
             if (uri !== undefined) {
                 return `![${alt}](${uri}${title})`;
             }

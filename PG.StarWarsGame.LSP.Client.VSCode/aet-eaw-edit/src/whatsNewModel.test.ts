@@ -250,10 +250,40 @@ describe("inlineImages", () => {
         );
     });
 
-    it("keeps a title and an absolute or data source as written", () => {
-        const text =
-            '![A](https://example.test/a.png "Title") ![B](data:image/png;base64,AAAA)';
-        assert.equal(inlineImages(text, resolve), text);
+    it("keeps a title, and a data source as written", () => {
+        assert.equal(
+            inlineImages(
+                '![A](media/a.gif "Title") ![B](data:image/png;base64,AAAA)',
+                resolve,
+            ),
+            '![A](data:image/gif;base64,R0lGOD "Title") ![B](data:image/png;base64,AAAA)',
+        );
+    });
+
+    // vsce rewrites the changelog's relative images to absolute repository URLs when it packages,
+    // while the files still ship inside the extension: the tail after media/ is what is on disk.
+    it("resolves an absolute repository URL by its shipped media path", () => {
+        assert.equal(
+            inlineImages(
+                "![Frame](https://github.com/owner/repo/raw/v1.0.0/Client/ext/media/a.gif)",
+                resolve,
+            ),
+            "![Frame](data:image/gif;base64,R0lGOD)",
+        );
+    });
+
+    it("reduces an absolute image that ships nothing to its alt text", () => {
+        assert.equal(
+            inlineImages("![Elsewhere](https://example.test/a.png)", resolve),
+            "*Elsewhere*",
+        );
+        assert.equal(
+            inlineImages(
+                "![Gone](https://example.test/media/none.png)",
+                resolve,
+            ),
+            "*Gone*",
+        );
     });
 
     it("reduces an image the resolver cannot read to its alt text", () => {
