@@ -29,7 +29,10 @@ public sealed class LoadOrder
     private readonly ImmutableArray<DuplicateNameRule> _rules;
     private readonly ImmutableHashSet<string> _shadowedShipped;
     private readonly ImmutableDictionary<string, LoadPosition> _shippedFiles;
-    private readonly ConditionalWeakTable<BaselineIndex, ImmutableDictionary<string, GameSymbol>> _visible = new();
+
+    private readonly ConditionalWeakTable<BaselineIndex, ImmutableDictionary<string, ImmutableArray<GameSymbol>>>
+        _visible = new();
+
     private readonly ImmutableHashSet<string> _walkedTypes;
 
     private LoadOrder(ImmutableDictionary<string, LoadPosition> layerFiles,
@@ -125,19 +128,25 @@ public sealed class LoadOrder
     /// <summary>
     ///     The shipped definitions the game loads: those in a file a walked registry lists and no layer
     ///     copy replaces, and those of types no walked registry holds, unless a layer ships their
-    ///     direct-content file. Computed once per baseline.
+    ///     direct-content file. Judged per definition, so of two types sharing an id one can load and
+    ///     the other not. Computed once per baseline.
     /// </summary>
-    public ImmutableDictionary<string, GameSymbol> VisibleOf(BaselineIndex baseline)
+    public ImmutableDictionary<string, ImmutableArray<GameSymbol>> VisibleOf(BaselineIndex baseline)
     {
         return IsKnown ? _visible.GetValue(baseline, Visible) : baseline.Symbols;
     }
 
-    private ImmutableDictionary<string, GameSymbol> Visible(BaselineIndex baseline)
+    private ImmutableDictionary<string, ImmutableArray<GameSymbol>> Visible(BaselineIndex baseline)
     {
         var visible = baseline.Symbols.ToBuilder();
-        foreach (var (id, symbol) in baseline.Symbols)
-            if (!Loads(symbol))
-                visible.Remove(id);
+        foreach (var (id, symbols) in baseline.Symbols)
+        {
+            var loaded = symbols.RemoveAll(s => !Loads(s));
+            if (loaded.Length == symbols.Length) continue;
+            if (loaded.IsEmpty) visible.Remove(id);
+            else visible[id] = loaded;
+        }
+
         return visible.ToImmutable();
     }
 

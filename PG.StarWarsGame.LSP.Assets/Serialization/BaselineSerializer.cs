@@ -30,7 +30,9 @@ public static class BaselineSerializer
     {
         var dto = new SerializedBaseline
         {
-            Symbols = [.. baseline.Symbols.Values.OrderBy(s => s.Id, StringComparer.Ordinal)],
+            // A stable sort: within one id the definitions keep their projection order, which is what a
+            // bare id resolves to once read back.
+            Symbols = [.. baseline.AllSymbols.OrderBy(s => s.Id, StringComparer.Ordinal)],
             BuiltAtMs = baseline.BuiltAt.ToUnixTimeMilliseconds(),
             SourceManifestHash = baseline.SourceManifestHash,
             DynamicEnumValues = ToSerializedArray(baseline.DynamicEnumValues),
@@ -76,7 +78,8 @@ public static class BaselineSerializer
     private static BaselineIndex FromDto(SerializedBaseline dto)
     {
         var builtAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.BuiltAtMs);
-        var symbols = dto.Symbols.ToImmutableDictionary(s => s.Id);
+        var symbols = dto.Symbols.GroupBy(s => s.Id, StringComparer.Ordinal)
+            .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray(), StringComparer.Ordinal);
         var enums = FromSerializedArray(dto.DynamicEnumValues);
         var hardcoded = FromSerializedArray(dto.HardcodedEnumValues);
         var fileTypeMap = FromSerializedArray(dto.FileTypeMap);

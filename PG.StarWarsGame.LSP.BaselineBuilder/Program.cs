@@ -349,7 +349,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
     var baseline = projector.Project(
         gameObjects, sfxEvents, manifestHash, musicEvents, shadowBlobMaterials, singletons, factions);
-    Console.WriteLine($"Projected {baseline.Symbols.Count} symbol(s)");
+    Console.WriteLine($"Projected {baseline.SymbolCount} symbol(s) under {baseline.Symbols.Count} id(s)");
 
     // ── MEG loading (EaW layer first, then engine layer) ──────────────────────
     //

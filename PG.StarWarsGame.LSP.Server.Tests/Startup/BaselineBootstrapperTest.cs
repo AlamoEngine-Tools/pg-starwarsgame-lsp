@@ -108,9 +108,11 @@ public sealed class BaselineBootstrapperTest
     private static byte[] Baseline(string onlySymbol)
     {
         return BaselineSerializer.Serialize(new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty.Add(onlySymbol,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(onlySymbol,
+            [
                 new GameSymbol(onlySymbol, GameSymbolKind.XmlObject, "GameObjectType",
-                    new FileOrigin("data\\xml\\units.xml", 0, null), null)),
+                    new FileOrigin("data\\xml\\units.xml", 0, null), null)
+            ]),
             DateTimeOffset.UtcNow, "testhash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,

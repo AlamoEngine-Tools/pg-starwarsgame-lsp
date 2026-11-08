@@ -216,9 +216,11 @@ public sealed class MetafileRegistrarTest
         var (registrar, _) = Build(fs, new FileTypeRegistry(), schema);
         var baseline = BaselineIndex.Empty with
         {
-            Symbols = ImmutableDictionary<string, GameSymbol>.Empty
-                .Add("Theme", new GameSymbol("Theme", GameSymbolKind.XmlObject, "MusicEvent",
-                    new FileOrigin(@"DATA\XML\MusicEvents.xml", 1, null), null))
+            Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("Theme", [
+                    new GameSymbol("Theme", GameSymbolKind.XmlObject, "MusicEvent",
+                        new FileOrigin(@"DATA\XML\MusicEvents.xml", 1, null), null)
+                ])
         };
 
         var order = registrar.Register(new WorkspaceConfiguration([xmlDir], [], [], [], null), [Root("ws")],

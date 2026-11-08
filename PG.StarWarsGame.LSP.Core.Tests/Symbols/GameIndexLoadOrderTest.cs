@@ -67,7 +67,10 @@ public sealed class GameIndexLoadOrderTest
                     LayerRank: 1));
         return GameIndex.Empty with
         {
-            Baseline = BaselineIndex.Empty with { Symbols = shipped.ToImmutableDictionary(s => s.Id) },
+            Baseline = BaselineIndex.Empty with
+            {
+                Symbols = shipped.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s))
+            },
             Documents = documents,
             WorkspaceDefinitions = workspace.GroupBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
                 .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray(), StringComparer.OrdinalIgnoreCase),
@@ -93,7 +96,7 @@ public sealed class GameIndexLoadOrderTest
         Assert.NotNull(index.Resolve("Rebel_Trooper"));
         Assert.Null(index.Resolve("Executor"));
         Assert.Null(index.ResolveOfType("Executor", "GameObjectType"));
-        Assert.DoesNotContain(index.ShippedSymbols.Values, s => s.Id == "Executor");
+        Assert.DoesNotContain(index.AllShippedSymbols, s => s.Id == "Executor");
     }
 
     // A mod's copy of a shipped file replaces it whole: an object the copy drops is gone.

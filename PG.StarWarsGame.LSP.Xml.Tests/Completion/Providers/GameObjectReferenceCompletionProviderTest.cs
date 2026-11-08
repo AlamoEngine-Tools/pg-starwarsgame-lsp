@@ -191,7 +191,7 @@ public sealed class GameObjectReferenceCompletionProviderTest
         var index = GameIndex.Empty with
         {
             Baseline = new BaselineIndex(
-                ImmutableDictionary<string, GameSymbol>.Empty.Add("Millennium_Falcon", baselineSym),
+                ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Millennium_Falcon", [baselineSym]),
                 DateTimeOffset.UtcNow, "hash",
                 ImmutableDictionary<string, ImmutableArray<string>>.Empty,
                 ImmutableDictionary<string, ImmutableArray<string>>.Empty,

@@ -117,7 +117,7 @@ public sealed class WorkspaceVariantTagSourceTest
         {
             Baseline = BaselineIndex.Empty with
             {
-                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add("A", shipped)
+                Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("A", [shipped])
             },
             LoadOrder = LoadOrder.From(
                 [
@@ -302,7 +302,7 @@ public sealed class WorkspaceVariantTagSourceTest
         {
             Baseline = BaselineIndex.Empty with
             {
-                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add("B", Symbol("B", Uri))
+                Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("B", [Symbol("B", Uri)])
             }
         };
 

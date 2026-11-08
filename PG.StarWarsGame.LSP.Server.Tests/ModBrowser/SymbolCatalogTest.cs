@@ -54,9 +54,9 @@ public sealed class SymbolCatalogTest
         ];
         var baseline = BaselineIndex.Empty with
         {
-            Symbols = ImmutableDictionary<string, GameSymbol>.Empty
-                .Add("Star_Destroyer", Shipped("Star_Destroyer", "GameObjectType"))
-                .Add("Unit_Fire_SFX", Shipped("Unit_Fire_SFX", "SFXEvent"))
+            Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("Star_Destroyer", [Shipped("Star_Destroyer", "GameObjectType")])
+                .Add("Unit_Fire_SFX", [Shipped("Unit_Fire_SFX", "SFXEvent")])
         };
         var definitions = core.Concat(mod).GroupBy(s => s.Id)
             .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray());

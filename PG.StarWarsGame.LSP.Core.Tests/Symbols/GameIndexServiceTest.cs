@@ -57,7 +57,7 @@ public sealed class GameIndexServiceTest
     {
         var svc = Build();
         var baseline = new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty.Add("A", Symbol("A")),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("A", [Symbol("A")]),
             DateTimeOffset.UtcNow, "h",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,

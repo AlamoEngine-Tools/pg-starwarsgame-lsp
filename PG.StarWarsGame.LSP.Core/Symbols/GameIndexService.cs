@@ -148,11 +148,11 @@ public sealed class GameIndexService : IGameIndexService
             {
                 Baseline = baseline,
                 BaselineNameHashes = HashedTable(ImmutableDictionary<uint, ImmutableArray<GameSymbol>>.Empty,
-                    baseline.Symbols.Values, [])
+                    baseline.AllSymbols, [])
             };
         } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
-        _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.Symbols.Count,
+        _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.SymbolCount,
             baseline.BuiltAt);
         var afterBaseline = Volatile.Read(ref _current);
         RaiseIndexChanged(afterBaseline);

@@ -38,6 +38,12 @@ public sealed class GameSymbolProjectorTest
         return new ProjectableEntry(name, classification, new XmlLocationInfo(xmlFile, line));
     }
 
+    /// <summary>The one definition of <paramref name="id" />, failing when the id names several types.</summary>
+    private static GameSymbol Only(BaselineIndex result, string id)
+    {
+        return Assert.Single(result.Symbols[id]);
+    }
+
     // ── Empty ─────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -69,7 +75,7 @@ public sealed class GameSymbolProjectorTest
 
         var result = Build().Project([entry], [], "hash");
 
-        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], result.Symbols["CORUSCANT"].Behaviors!);
+        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], Only(result, "CORUSCANT").Behaviors!);
     }
 
     [Fact]
@@ -82,7 +88,7 @@ public sealed class GameSymbolProjectorTest
 
         var result = Build().Project([entry], [], "hash");
 
-        Assert.Null(result.Symbols["MY_UNIT"].Behaviors);
+        Assert.Null(Only(result, "MY_UNIT").Behaviors);
     }
 
     // ── TypeName assignment ────────────────────────────────────────────────────
@@ -93,7 +99,7 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("FOO_ABILITY", "COMBAT_BONUS_ABILITY");
         var result = Build().Project([entry], [], "hash");
 
-        Assert.Equal("CombatBonusAbility", result.Symbols["FOO_ABILITY"].TypeName);
+        Assert.Equal("CombatBonusAbility", Only(result, "FOO_ABILITY").TypeName);
     }
 
     [Fact]
@@ -102,7 +108,7 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("MY_UNIT", "MY_CUSTOM_UNIT_TYPE");
         var result = Build().Project([entry], [], "hash");
 
-        Assert.Equal("GameObjectType", result.Symbols["MY_UNIT"].TypeName);
+        Assert.Equal("GameObjectType", Only(result, "MY_UNIT").TypeName);
     }
 
     [Fact]
@@ -111,8 +117,8 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("EXPLOSION_01", "SFXEVENT");
         var result = Build().Project([], [entry], "hash");
 
-        Assert.Equal("SFXEvent", result.Symbols["EXPLOSION_01"].TypeName);
-        Assert.Equal(GameSymbolKind.XmlObject, result.Symbols["EXPLOSION_01"].Kind);
+        Assert.Equal("SFXEvent", Only(result, "EXPLOSION_01").TypeName);
+        Assert.Equal(GameSymbolKind.XmlObject, Only(result, "EXPLOSION_01").Kind);
     }
 
     [Fact]
@@ -121,8 +127,8 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("MAIN_THEME", "MUSIC_EVENT");
         var result = Build().Project([], [], "hash", [entry]);
 
-        Assert.Equal("MusicEvent", result.Symbols["MAIN_THEME"].TypeName);
-        Assert.Equal(GameSymbolKind.XmlObject, result.Symbols["MAIN_THEME"].Kind);
+        Assert.Equal("MusicEvent", Only(result, "MAIN_THEME").TypeName);
+        Assert.Equal(GameSymbolKind.XmlObject, Only(result, "MAIN_THEME").Kind);
     }
 
     [Fact]
@@ -151,8 +157,8 @@ public sealed class GameSymbolProjectorTest
             "DATA\\XML\\SHADOWBLOBMATERIALS.XML");
         var result = Build().Project([], [], "hash", shadowBlobMaterials: [entry]);
 
-        Assert.Equal("ShadowBlobMaterial", result.Symbols["Generic_Shadow"].TypeName);
-        Assert.Equal(GameSymbolKind.XmlObject, result.Symbols["Generic_Shadow"].Kind);
+        Assert.Equal("ShadowBlobMaterial", Only(result, "Generic_Shadow").TypeName);
+        Assert.Equal(GameSymbolKind.XmlObject, Only(result, "Generic_Shadow").Kind);
     }
 
     [Fact]
@@ -162,7 +168,7 @@ public sealed class GameSymbolProjectorTest
             new XmlLocationInfo("DATA\\XML\\SHADOWBLOBMATERIALS.XML", 27));
         var result = Build().Project([], [], "hash", shadowBlobMaterials: [entry]);
 
-        var origin = Assert.IsType<FileOrigin>(result.Symbols["Generic_Shadow"].Origin);
+        var origin = Assert.IsType<FileOrigin>(Only(result, "Generic_Shadow").Origin);
         Assert.Contains("SHADOWBLOBMATERIALS", origin.Uri, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -177,12 +183,38 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("Rebel", "FACTION", "DATA\\XML\\FACTIONS.XML", 8);
         var result = Build().Project([], [], "hash", factions: [entry]);
 
-        var symbol = result.Symbols["Rebel"];
+        var symbol = Only(result, "Rebel");
         Assert.Equal("Faction", symbol.TypeName);
         Assert.Equal(GameSymbolKind.XmlObject, symbol.Kind);
         var origin = Assert.IsType<FileOrigin>(symbol.Origin);
         Assert.Contains("FACTIONS", origin.Uri, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(8, origin.Line);
+    }
+
+    // The shipped game names a faction and a game object alike - Sarlacc is in GROUNDINDIGENOUS.XML
+    // and in FACTIONS.XML - and each type is an id space of its own: both are carried under the one
+    // id, the object first, which is what a bare id resolves to.
+    [Fact]
+    public void Project_FactionNamedLikeAGameObject_CarriesBothUnderOneId()
+    {
+        var unit = Entry("Sarlacc", "GROUND_INDIGENOUS", "DATA\\XML\\GROUNDINDIGENOUS.XML");
+        var faction = Entry("Sarlacc", "FACTION", "DATA\\XML\\FACTIONS.XML");
+        var result = Build().Project([unit], [], "hash", factions: [faction]);
+
+        Assert.Equal(["GameObjectType", "Faction"], result.Symbols["Sarlacc"].Select(s => s.TypeName));
+    }
+
+    // Within one type an id is one object, as the engine's managers keep it: the later definition
+    // replaces the earlier rather than sitting beside it.
+    [Fact]
+    public void Project_TwoDefinitionsOfOneIdAndType_KeepsTheLater()
+    {
+        var first = Entry("MY_UNIT", "SPACE_UNIT", "DATA\\XML\\A.XML", 1);
+        var second = Entry("MY_UNIT", "SPACE_UNIT", "DATA\\XML\\B.XML", 2);
+        var result = Build().Project([first, second], [], "hash");
+
+        var origin = Assert.IsType<FileOrigin>(Only(result, "MY_UNIT").Origin);
+        Assert.Contains("B.XML", origin.Uri, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── Symbol fields ──────────────────────────────────────────────────────────
@@ -193,7 +225,7 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("UNIT_ALPHA", "COMBAT_BONUS_ABILITY");
         var result = Build().Project([entry], [], "hash");
 
-        var sym = result.Symbols["UNIT_ALPHA"];
+        var sym = Only(result, "UNIT_ALPHA");
         Assert.Equal("UNIT_ALPHA", sym.Id);
         Assert.Equal(GameSymbolKind.XmlObject, sym.Kind);
         Assert.Null(sym.Description);
@@ -207,7 +239,7 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("OBJ_A", "SPAWN_ABILITY", "DATA\\XML\\ABILITIES.XML", 42);
         var result = Build().Project([entry], [], "hash");
 
-        var origin = Assert.IsType<FileOrigin>(result.Symbols["OBJ_A"].Origin);
+        var origin = Assert.IsType<FileOrigin>(Only(result, "OBJ_A").Origin);
         Assert.Equal("DATA\\XML\\ABILITIES.XML", origin.Uri);
         Assert.Equal(42, origin.Line);
     }
@@ -218,7 +250,7 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("OBJ_B", "SPAWN_ABILITY", "", null);
         var result = Build().Project([entry], [], "hash");
 
-        Assert.IsType<UnknownOrigin>(result.Symbols["OBJ_B"].Origin);
+        Assert.IsType<UnknownOrigin>(Only(result, "OBJ_B").Origin);
     }
 
     [Fact]
@@ -227,7 +259,7 @@ public sealed class GameSymbolProjectorTest
         var entry = Entry("OBJ_C", "SPAWN_ABILITY", "DATA\\XML\\X.XML", null);
         var result = Build().Project([entry], [], "hash");
 
-        var origin = Assert.IsType<FileOrigin>(result.Symbols["OBJ_C"].Origin);
+        var origin = Assert.IsType<FileOrigin>(Only(result, "OBJ_C").Origin);
         Assert.Equal(0, origin.Line);
     }
 
@@ -305,7 +337,7 @@ public sealed class GameSymbolProjectorTest
             Tag("Variant_Of_Existing_Type", "BASE_OBJ"));
         var result = projector.Project([entry], [], "hash");
 
-        Assert.Equal("BASE_OBJ", result.Symbols["VARIANT_A"].VariantBaseId);
+        Assert.Equal("BASE_OBJ", Only(result, "VARIANT_A").VariantBaseId);
     }
 
     [Fact]
@@ -314,7 +346,7 @@ public sealed class GameSymbolProjectorTest
         var entry = EntryWithTags("UNIT_C", "COMBAT_BONUS_ABILITY", Tag("Max_Health", "100"));
         var result = Build().Project([entry], [], "hash");
 
-        Assert.Null(result.Symbols["UNIT_C"].VariantBaseId);
+        Assert.Null(Only(result, "UNIT_C").VariantBaseId);
     }
 
     // ── Dynamic enum extraction is delegated to DynamicEnumExtractor ──────────
@@ -343,7 +375,7 @@ public sealed class GameSymbolProjectorTest
         var result = new GameSymbolProjector(SchemaWithSingleton)
             .Project([], [], "hash", singletons: [Singleton(Tag("Credits_Per_CP", "50"))]);
 
-        var sym = result.Symbols["GameConstants"];
+        var sym = Only(result, "GameConstants");
         Assert.Equal("GameConstants", sym.Id);
         Assert.Equal("GameConstants", sym.TypeName);
         Assert.Equal(GameSymbolKind.XmlObject, sym.Kind);
@@ -379,7 +411,7 @@ public sealed class GameSymbolProjectorTest
         var result = new GameSymbolProjector(SchemaWithSingleton)
             .Project([], [], "hash", singletons: [Singleton(Tag("A", "1"))]);
 
-        Assert.Equal("GameConstants", result.Symbols["GameConstants"].TypeName);
+        Assert.Equal("GameConstants", Only(result, "GameConstants").TypeName);
         Assert.False(result.Symbols.ContainsKey("GAME_CONSTANTS"));
     }
 

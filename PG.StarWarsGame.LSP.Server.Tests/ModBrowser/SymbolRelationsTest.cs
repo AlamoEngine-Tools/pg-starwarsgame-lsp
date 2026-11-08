@@ -86,11 +86,15 @@ public sealed class SymbolRelationsTest
         // on FoC: DATA\XML\SPACEUNITSCAPITAL.XML), which is no document of the project.
         var baseline = BaselineIndex.Empty with
         {
-            Symbols = ImmutableDictionary<string, GameSymbol>.Empty
-                .Add("Star_Destroyer", new GameSymbol("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType",
-                    new FileOrigin(@"DATA\XML\UNITS.XML", 3, 4), null))
-                .Add("Shipped_Only", new GameSymbol("Shipped_Only", GameSymbolKind.XmlObject, "GameObjectType",
-                    new FileOrigin(@"DATA\XML\UNITS.XML", 12, 4), null))
+            Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("Star_Destroyer", [
+                    new GameSymbol("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType",
+                        new FileOrigin(@"DATA\XML\UNITS.XML", 3, 4), null)
+                ])
+                .Add("Shipped_Only", [
+                    new GameSymbol("Shipped_Only", GameSymbolKind.XmlObject, "GameObjectType",
+                        new FileOrigin(@"DATA\XML\UNITS.XML", 12, 4), null)
+                ])
         };
         var tieUsesSd =
             new GameReference("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType", Units, 25, 8, 14);

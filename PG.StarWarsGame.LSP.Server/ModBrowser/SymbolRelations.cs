@@ -104,8 +104,10 @@ public sealed class SymbolRelations(
             .Append(Counted(Overrides, OverrideRows(entry).Count, "definedOnce"))
             .ToList();
         var defined = WorkspaceDefinition(entry);
-        var shipped = index.ShippedSymbols.GetValueOrDefault(entry.Id);
-        var winner = defined ?? (OfEntryType(shipped, entry) ? shipped : null);
+        var shipped = index.ShippedSymbols.TryGetValue(entry.Id, out var shippedOfId)
+            ? shippedOfId.FirstOrDefault(s => OfEntryType(s, entry))
+            : null;
+        var winner = defined ?? shipped;
         // Only a workspace definition is a document to go to: the baseline's origin is the game's own
         // path of the file, inside its packed data.
         var location = defined?.Origin is FileOrigin origin ? new SymbolLocation(origin.Uri, origin.Line) : null;
@@ -506,8 +508,8 @@ public sealed class SymbolRelations(
             });
         }
 
-        if (index.ShippedSymbols.TryGetValue(entry.Id, out var shipped) && shipped.Kind == GameSymbolKind.XmlObject
-                                                                        && OfEntryType(shipped, entry))
+        if (index.ShippedSymbols.TryGetValue(entry.Id, out var shippedOfId) && shippedOfId.FirstOrDefault(s =>
+                s.Kind == GameSymbolKind.XmlObject && OfEntryType(s, entry)) is { } shipped)
             rows.Add(new SymbolRow(entry.Id, entry.Id, shipped.TypeName, [], "game", null, []) { Packed = true });
         return rows.Skip(1).ToList();
     }

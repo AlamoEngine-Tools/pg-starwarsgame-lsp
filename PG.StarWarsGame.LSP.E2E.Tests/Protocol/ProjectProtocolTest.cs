@@ -323,7 +323,7 @@ public sealed class ProjectStartsProtocolTest
     {
         var file = Path.Combine(LspTestEnvironment.RepositoryRoot!, "baseline", game,
             $"aet-pg-swg-lsp-{game}-baseline.aet");
-        return BaselineSerializer.Deserialize(File.ReadAllBytes(ProjectProtocol.Required(file)))!.Symbols.Count;
+        return BaselineSerializer.Deserialize(File.ReadAllBytes(ProjectProtocol.Required(file)))!.SymbolCount;
     }
 
     [Fact]

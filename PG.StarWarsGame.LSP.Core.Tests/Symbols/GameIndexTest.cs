@@ -192,9 +192,27 @@ public sealed class GameIndexTest
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin("file:///f.xml", 1, null), null);
     }
 
+    // The shipped game names a faction and an indigenous unit Sarlacc. Each type is an id space of its
+    // own, so each typed lookup finds its own, and a bare id means the game object.
+    [Fact]
+    public void Resolve_ShippedIdOfTwoTypes_EachTypeFindsItsOwn()
+    {
+        var unit = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "GameObjectType",
+            new FileOrigin("DATA\\XML\\GROUNDINDIGENOUS.XML", 10, null), null);
+        var faction = new GameSymbol("Sarlacc", GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin("DATA\\XML\\FACTIONS.XML", 3, null), null);
+        var index = GameIndex.Empty with { Baseline = Baseline(unit, faction) };
+
+        Assert.Same(unit, index.ResolveOfType("Sarlacc", "GameObjectType"));
+        Assert.Same(faction, index.ResolveOfType("Sarlacc", "Faction"));
+        Assert.Same(unit, index.Resolve("Sarlacc"));
+        Assert.Equal([unit, faction], index.ResolveAll("Sarlacc"));
+    }
+
     private static BaselineIndex Baseline(params GameSymbol[] symbols)
     {
-        return new BaselineIndex(symbols.ToImmutableDictionary(s => s.Id),
+        return new BaselineIndex(
+            symbols.GroupBy(s => s.Id).ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray()),
             DateTimeOffset.UtcNow,
             "hash-abc",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,

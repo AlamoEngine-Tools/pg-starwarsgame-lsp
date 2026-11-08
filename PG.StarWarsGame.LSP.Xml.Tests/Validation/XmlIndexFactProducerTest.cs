@@ -105,7 +105,7 @@ public sealed class XmlIndexFactProducerTest
         {
             Baseline = BaselineIndex.Empty with
             {
-                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add(shipped.Id, shipped)
+                Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(shipped.Id, [shipped])
             },
             LoadOrder = LoadOrder.From(
                 [

@@ -524,7 +524,7 @@ public sealed class EffectiveObjectResolverTest
         var baseSym = Sym("SHIPPED");
         var baseline = BaselineIndex.Empty with
         {
-            Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add("SHIPPED", baseSym),
+            Symbols = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("SHIPPED", [baseSym]),
             ObjectTags = ImmutableDictionary<string, ImmutableArray<BaselineTag>>.Empty
                 .Add("SHIPPED", [new BaselineTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 2)])
         };
