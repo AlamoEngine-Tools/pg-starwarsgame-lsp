@@ -227,11 +227,11 @@ export const foc = path.join(repo, "foc");
 export const EAW = "Empire at War - Vanilla";
 export const FOC = "Forces of Corruption - Vanilla";
 
-/** Waits for the status of a window serving several projects to read them all indexed. */
+/** Waits for the status of a window serving several projects to read them all ready. */
 export async function projectsReady(count: number, timeout = 300_000): Promise<void> {
     let status: string | null = null;
     await browser.waitUntil(
-        async () => (status = await lspStatus()) === `$(check) EaWEdit LSP: ${count} projects indexed`,
+        async () => (status = await lspStatus()) === `$(check) EaWEdit LSP: ${count} projects ready`,
         { timeout, interval: 2000, timeoutMsg: `Status ${status}` },
     );
 }

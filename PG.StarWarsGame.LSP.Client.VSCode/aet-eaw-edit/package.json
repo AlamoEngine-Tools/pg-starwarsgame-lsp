@@ -876,6 +876,7 @@
     "watch:tsc": "tsc -p ./ --noEmit --watch",
     "test:unit": "node esbuild.test.js && node --test \"out/test-unit/**/*.test.js\" && node --test \"scripts/**/*.test.js\"",
     "test:ui": "node ui-test/run.mjs",
+    "screenshots:whats-new": "node node_modules/@wdio/cli/bin/wdio.js run ui-test/whats-new/wdio.conf.ts",
     "rig:translate": "node scripts/shader-rig/translate.js",
     "rig:glcheck": "node scripts/shader-rig/translate.js > scripts/shader-rig/out/translate.txt && node scripts/shader-rig/glcheck.js",
     "rig:render": "node scripts/shader-rig/render.js",

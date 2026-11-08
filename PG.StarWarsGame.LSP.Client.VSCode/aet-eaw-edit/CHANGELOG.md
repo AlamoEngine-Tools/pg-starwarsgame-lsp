@@ -4,25 +4,40 @@
 
 ### Highlights
 
-Everything the extension needs now ships inside it: the language server and the Lua analyzer come with the
-VSIX, nothing is downloaded or configured, and the Lua analyzer is on from the first start. The new Mod
-Browser lists everything a project indexes - game objects, models, particle systems, scripts, the schema's
-own types and enums - each entry with its relations, previews and problems. Every XML file is read the way
-the game reads it, with a repair for each structural finding, folding and a formatter that changes nothing
-the game sees. Several mods open in one window, each with a server of its own. The release notes open in the
-editor after every update, on this page.
+#### Simplified Setup
 
-- **Mod Browser** - one view over the whole project, by what each thing is, with its origin, references and
-  previews
-- **Bundled server and Lua analyzer** - completion, hover, references, rename and diagnostics for Lua out of
-  the box, every script analyzed in a Lua state of its own, as the game runs it
-- **XML as the game reads it** - a file the game drops is an error with a repair, XML the game reads but
-  standard tools reject is a warning; Format Document re-indents without changing a value
-- **Particles as the game draws them** - frozen asteroid and debris fields, weather around the camera, bump
-  and depth-sprite emitters through the engine's own effects
-- **Several projects in one window** - every `.pgproj` under the open folders gets a language server, panels
-  and navigators filed per project
-- **Eleven settings** - everything else is on; a mod opened without a project file is offered one
+The language server and the Lua analyzer ship inside the extension: nothing is downloaded or configured, and
+the analyzer is on from the first start. A mod folder opened without a `.pgproj` project file is offered one.
+Eleven settings cover the whole extension; every other feature is on without a switch.
+
+#### Mod Browser
+
+One view over everything a project indexes - game objects, models, particle systems, scripts, the schema's
+own types and enums - each entry with its origin, references, previews and problems.
+
+![The Mod Browser open on a game object - its origin, references and encyclopedia card - in a window holding both vanilla projects](media/whats-new/0.5.0/mod-browser.png)
+
+#### Multi-root Workspace and Multi-Project Support
+
+Every `.pgproj` under the open folders gets a language server of its own, and every panel and view is filed
+under its project.
+
+#### Lua Support
+
+Completion, hover, references, rename and diagnostics for every script, each analyzed in a Lua state of its
+own, as the game runs it.
+
+![A Lua script with a hover card beside an XML file, their findings listed in Problems](media/whats-new/0.5.0/lua-and-xml.png)
+
+#### Enhanced XML File Loading and Validation
+
+A file the game refuses to load is an error, with a repair offered; XML the game loads but standard tools
+reject is a warning, not an error. Format Document re-indents a file without changing a value the game sees.
+
+#### Enhanced Particle Support
+
+Frozen asteroid and debris fields, weather around the camera, and bump and depth-sprite emitters, drawn with
+the engine's own shaders.
 
 ### Migration
 
@@ -36,34 +51,36 @@ Settings renamed; a value under the old key is not read:
 
 Settings moved out of `settings.json`:
 
-| Before                                        | Now                                                        |
-|-----------------------------------------------|------------------------------------------------------------|
-| `aet-eaw-edit.game.executable`                | `program` in the `launch.json` configuration               |
-| `aet-eaw-edit.game.luaDebugHost`              | `host` in `launch.json`                                    |
-| `aet-eaw-edit.game.luaDebugPort`              | `port` in `launch.json`                                    |
-| `aet-eaw-edit.game.unsafeTableExpansion`      | `unsafeTableExpansion` in `launch.json`                    |
-| `aet-eaw-edit.game.arguments`                 | `args` in `launch.json`, after the mod chain               |
-| `aet-eaw-edit.storySimulator.autoResume`      | *Resume after an answer*, in the simulator's transport     |
-| `aet-eaw-edit.storySimulator.assumeMediaCompletes` | *Speech and movies finish on their own*, in the transport |
-| `aet-eaw-edit.encyclopedia.screenWidth` and `screenHeight` | the *Screen* dropdown in the encyclopedia preview |
+| Before                                                     | Now                                                                  |
+|------------------------------------------------------------|----------------------------------------------------------------------|
+| `aet-eaw-edit.game.executable`                             | `program` in the Lua debugger's `launch.json` configuration          |
+| `aet-eaw-edit.game.luaDebugHost`                           | `host` in `launch.json`                                              |
+| `aet-eaw-edit.game.luaDebugPort`                           | `port` in `launch.json`                                              |
+| `aet-eaw-edit.game.unsafeTableExpansion`                   | `unsafeTableExpansion` in `launch.json`                              |
+| `aet-eaw-edit.game.arguments`                              | `args` in `launch.json`, appended after the mod arguments the debugger adds |
+| `aet-eaw-edit.storySimulator.autoResume`                   | *Resume after an answer*, a switch in the story simulator's playback row |
+| `aet-eaw-edit.storySimulator.assumeMediaCompletes`         | *Speech and movies finish on their own*, beside it                   |
+| `aet-eaw-edit.encyclopedia.screenWidth` and `screenHeight` | the *Screen* dropdown in the encyclopedia preview                    |
 
 Settings removed, with nothing to set in their place: every `aet-eaw-edit.features.*` key but
-`aet-eaw-edit.features.preview.energyPool`, `aet-eaw-edit.lsp.enabled` (a `.pgproj` or a mod's folder starts
-the server; *Disable (Workspace)* on the extension keeps it off), `aet-eaw-edit.lsp.locale`,
-`aet-eaw-edit.modVerify.enabled`, `aet-eaw-edit.modVerify.executable` and `aet-eaw-edit.shaders.sourceUrl`. A
-key left in `settings.json` shows as unknown and does nothing.
+`aet-eaw-edit.features.preview.energyPool`, `aet-eaw-edit.lsp.enabled` (the server starts for any folder that
+holds a `.pgproj` or a mod; to keep it off, disable the extension for that workspace),
+`aet-eaw-edit.lsp.locale`, `aet-eaw-edit.modVerify.enabled`, `aet-eaw-edit.modVerify.executable` and
+`aet-eaw-edit.shaders.sourceUrl`. A removed key left in `settings.json` is marked unknown by the settings
+editor and does nothing.
 
-In the project:
+In a project's own files:
 
-- `aet-eaw-edit.lsp.executable` pointing at a separately downloaded server: clear it, the bundled server
-  is the one that matches
+- `aet-eaw-edit.lsp.executable` pointing at a separately downloaded server: clear it; the server bundled with
+  the extension is the one that matches this version
 - A `$schema` line in the `.pgproj`: remove it; the extension validates the file with the schema it ships
-- `aetswg-006-0008` in a suppression: silences nothing now; the structural findings carry
-  `aetswg-012-3001` to `aetswg-012-3009` and `aetswg-015-0001` to `aetswg-015-0006`
-- `---@xmlref` in a Lua annotation: the tag is `---@aetref`
-- `.aetswg/suppressions.json` migrates itself on the first load
-- A dependency's localisation file is read-only in the editor: copy it into the project's text directory to
-  change it
+- `.aetswg/suppressions.json`: brought to the new file shape on the first load, every entry kept; nothing to
+  do. An entry for `aetswg-006-0008` silences nothing any more: the structural findings it used to cover
+  carry `aetswg-012-3001` to `aetswg-012-3009` and `aetswg-015-0001` to `aetswg-015-0006`, each suppressed on
+  its own
+- `---@xmlref` in a Lua doc comment: the tag is now `---@aetref`
+- A localisation file that belongs to a dependency project opens read-only: copy it into the project's own
+  text folder to change it
 
 ### Features
 
