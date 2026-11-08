@@ -357,8 +357,8 @@ const clients = new Map<string, ProjectClient>();
 
 /** How long a gag stays on the bar before the phase's own text replaces it. */
 const GAG_SHOWN_MS = 1200;
-/** How often a phase that is still loading draws again. */
-const GAG_REDRAW_MS = 30000;
+/** How often a phase that is still loading draws again: loads last seconds now, not minutes. */
+const GAG_REDRAW_MS = 2000;
 
 /** The first project in discovery order. */
 function primaryClient(): ProjectClient | undefined {
