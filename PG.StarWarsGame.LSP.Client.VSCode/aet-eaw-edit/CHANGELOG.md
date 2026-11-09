@@ -21,6 +21,13 @@
   game object type, and the schema now declares it, so the tag no longer gets an unknown-tag finding
   (`Structure12`)
 
+### Building and releasing
+
+- **The styled-CSS lint covers the shared stylesheet** - a backtick in a CSS comment of `dockChrome.ts` ends the
+  template and fails the type check forty lines away under another name; the lint meant to catch it first never
+  matched that file, as a stray control character sat in its pattern. It does now, and a test plants the backtick
+  to keep it so
+
 ## 0.5.0
 
 ### Highlights
