@@ -196,6 +196,35 @@ public sealed class SymbolCatalogTest
         Assert.Equal(["Hero_Ship", "Star_Destroyer"], Sorted("name", false, query: "s").Rows.Select(r => r.Name));
     }
 
+    // The sorted column is the order the list opens with: the plain character order, case folded,
+    // where a letter sorts before an underscore. A word-aware comparison let the underscore slide
+    // and put 2_Warpod ahead of 2M_Repulsor_Tank only once the Name header was clicked (#382).
+    [Fact]
+    public void SortingByName_IsTheOrderTheListOpensWith()
+    {
+        string[] names = ["2_Warpod", "2M_Repulsor_Tank", "A_Wing", "Alderaan"];
+        var symbols = names.Select(n => Xml(n, "GameObjectType", Mod)).ToArray();
+        var index = GameIndex.Empty with
+        {
+            Documents = ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(Mod, new DocumentIndex(Mod, 1, [.. symbols], [], LayerRank: 1, LayerName: "Mod")),
+            WorkspaceDefinitions = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s))
+        };
+        var catalog = SymbolCatalog.Build(index, Kinds, [], new SchemaProviderBuilder().Build());
+
+        IEnumerable<string> Page(bool? descending)
+        {
+            return catalog.Page(new GetSymbolPageParams("xml:GameObjectType")
+                    { Sort = descending is null ? null : "name", Descending = descending ?? false }).Rows
+                .Select(r => r.Name);
+        }
+
+        string[] opened = ["2M_Repulsor_Tank", "2_Warpod", "Alderaan", "A_Wing"];
+        Assert.Equal(opened, Page(null));
+        Assert.Equal(opened, Page(false));
+        Assert.Equal(opened.Reverse(), Page(true));
+    }
+
     [Fact]
     public void TheKindsAndOriginFilters_Narrow()
     {

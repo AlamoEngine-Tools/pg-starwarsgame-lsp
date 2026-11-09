@@ -540,5 +540,8 @@
   },
   "PRV-39": {
     "open": "{repo}\\foc"
+  },
+  "PRV-41": {
+    "open": "{repo}\\eaw"
   }
 }

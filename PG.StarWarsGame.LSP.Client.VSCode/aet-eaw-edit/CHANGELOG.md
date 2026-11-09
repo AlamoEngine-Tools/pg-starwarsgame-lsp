@@ -12,6 +12,11 @@
   its `Turret_Rotation_Offset` (Y the pitch, Z the yaw) and a unit's own turret at its `Turret_Rest_Angle`; a
   hardpoint's `Turret_Rest_Angle` is logged by the game and poses nothing
   ([#389](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/389))
+- **Sorting a Mod Browser column by name gives the order the list opened with** - the list opens in the plain
+  character order, case folded, where an underscore sorts after the letters; the sorted column ran through a
+  word-aware comparison that let the underscore slide, so `2_Warpod` jumped ahead of `2M_Repulsor_Tank` once
+  the header was clicked. Text columns now sort the way the list opens
+  ([#382](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/382))
 
 ## 0.5.1
 
