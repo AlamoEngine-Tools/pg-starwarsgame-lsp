@@ -14,8 +14,8 @@ public sealed class LooseIconDecoderTest
 
     /// <summary>
     ///     Builds a source image of <paramref name="format" />. TGA is hand-written by the shared
-    ///     fixture, exactly as the game ships it; PNG goes through this project's own writer, which
-    ///     is also what the decoder passes straight back for a PNG source.
+    ///     fixture, exactly as the game ships it, and so is BMP; PNG goes through this project's own
+    ///     writer, which is also what the decoder passes straight back for a PNG source.
     /// </summary>
     private static byte[] ImageBytes(string format, int width = 4, int height = 4)
     {
@@ -23,6 +23,8 @@ public sealed class LooseIconDecoderTest
         {
             case "tga":
                 return MegaTextureFixture.BuildTga(width, height, (_, _) => Colour);
+            case "bmp":
+                return MegaTextureFixture.BuildBmp(width, height, (_, _) => Colour);
             case "png":
                 var pixels = new byte[width * height * 4];
                 for (var i = 0; i < width * height; i++)
@@ -39,10 +41,11 @@ public sealed class LooseIconDecoderTest
         }
     }
 
-    // BMP is no longer decodable - it was reachable through the previous imaging library and is not
-    // through this one - so it is covered by the unsupported-format test instead.
+    // BMP is decoded by this project's own reader since #166: two shipped mods keep their mega texture
+    // as a bitmap under the .tga name, and a source folder may hold one under its own name too.
     [Theory]
     [InlineData("tga")]
+    [InlineData("bmp")]
     [InlineData("png")]
     public void TryDecode_ReadsEverySupportedFormat(string format)
     {
@@ -59,16 +62,6 @@ public sealed class LooseIconDecoderTest
         Assert.Equal(((byte)10, (byte)20, (byte)30, (byte)255), image[0, 0]);
     }
 
-    [Fact]
-    public void TryDecode_BmpIsUnsupported()
-    {
-        var fileSystem = new MockFileSystem();
-        fileSystem.AddFile($@"{Root}\i_button_luke.bmp", new MockFileData([0, 1, 2]));
-        var catalog = LooseIconCatalog.Scan(fileSystem, [Root]);
-
-        Assert.Null(LooseIconDecoder.TryDecode(fileSystem, catalog["I_BUTTON_LUKE"]));
-    }
-
     // One corrupt source image must not cost the caller every other icon.
     [Fact]
     public void DecodeAll_SkipsCorruptFilesAndReportsThem()
@@ -76,7 +69,7 @@ public sealed class LooseIconDecoderTest
         var fileSystem = new MockFileSystem();
         fileSystem.AddFile($@"{Root}\i_good.png", new MockFileData(ImageBytes("png")));
         fileSystem.AddFile($@"{Root}\i_corrupt.png", new MockFileData([0xDE, 0xAD, 0xBE, 0xEF]));
-        fileSystem.AddFile($@"{Root}\i_unsupported.bmp", new MockFileData([0, 1]));
+        fileSystem.AddFile($@"{Root}\i_truncated.bmp", new MockFileData([0, 1]));
         var catalog = LooseIconCatalog.Scan(fileSystem, [Root]);
 
         var decoded = LooseIconDecoder.DecodeAll(fileSystem, catalog, out var unsupported);
@@ -85,7 +78,7 @@ public sealed class LooseIconDecoderTest
         Assert.Single(decoded);
         Assert.Equal(2, unsupported.Count);
         Assert.Contains("i_corrupt", unsupported, StringComparer.OrdinalIgnoreCase);
-        Assert.Contains("i_unsupported", unsupported, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("i_truncated", unsupported, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]

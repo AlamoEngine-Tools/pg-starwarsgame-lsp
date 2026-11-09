@@ -24,6 +24,11 @@
   past the end of the line, which the editor sorts ahead of everything on it, and it cuts a line's hints off
   past a length, so on a line with texts the `overrides ...` marker was the part cut off. The markers now come
   first on every line; a long text is what gets cut
+- **A mega texture saved as a Windows bitmap under the `.tga` name is read** - two shipped mods keep theirs
+  that way, and the game shows their icons; the server read it as a TGA, failed with "Detected invalid targa
+  image", fell back to the base game's icons, and every icon only the mod has showed the missing-icon
+  placeholder. The content picks the decoder now, for the mega texture and for a loose icon source alike, so
+  `.bmp` sources decode too
 
 ### Building and releasing
 

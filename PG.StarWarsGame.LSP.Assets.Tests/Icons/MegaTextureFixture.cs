@@ -68,6 +68,51 @@ internal static class MegaTextureFixture
         return bytes;
     }
 
+    /// <summary>
+    ///     Writes a Windows bitmap - BITMAPINFOHEADER, 32 bits per pixel, uncompressed, bottom-up - whose
+    ///     pixel at (x, y) measured from the TOP left is <paramref name="pixelAt" />, with the alpha in
+    ///     the fourth byte of each pixel.
+    /// </summary>
+    /// <remarks>
+    ///     The shape two shipped mods keep their mega texture in, under the <c>.tga</c> name the game
+    ///     looks for (MEASURED 2026-11-09 on both: <c>BM</c>, a 40-byte info header, 2048x2048, 32 bpp,
+    ///     BI_RGB, and alpha values from 0 to 254 in the fourth byte). Hand-written like the TGA, so the
+    ///     decoder is measured against the format and not against an encoder's view of it.
+    /// </remarks>
+    public static byte[] BuildBmp(int width, int height, Func<int, int, Rgba> pixelAt)
+    {
+        const int fileHeader = 14;
+        const int infoHeader = 40;
+        var dataOffset = fileHeader + infoHeader;
+        var bytes = new byte[dataOffset + width * height * 4];
+
+        bytes[0] = (byte)'B';
+        bytes[1] = (byte)'M';
+        WriteUInt32(bytes, 2, (uint)bytes.Length);
+        WriteUInt32(bytes, 10, (uint)dataOffset);
+        WriteUInt32(bytes, 14, infoHeader);
+        WriteUInt32(bytes, 18, (uint)width);
+        WriteUInt32(bytes, 22, (uint)height); // positive: the first row in the file is the BOTTOM row
+        bytes[26] = 1; // planes
+        bytes[28] = 32; // bits per pixel
+        WriteUInt32(bytes, 30, 0); // BI_RGB
+        WriteUInt32(bytes, 34, (uint)(width * height * 4));
+
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            var fileRow = height - 1 - y;
+            var o = dataOffset + (fileRow * width + x) * 4;
+            var p = pixelAt(x, y);
+            bytes[o] = p.B;
+            bytes[o + 1] = p.G;
+            bytes[o + 2] = p.R;
+            bytes[o + 3] = p.A;
+        }
+
+        return bytes;
+    }
+
     /// <summary>Writes a mega texture directory containing <paramref name="entries" /> in order.</summary>
     public static byte[] BuildMtd(params (string Name, Rectangle Area, bool Alpha)[] entries)
     {

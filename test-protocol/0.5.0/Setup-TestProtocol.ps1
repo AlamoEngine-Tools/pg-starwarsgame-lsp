@@ -152,6 +152,10 @@ function Invoke-Extra([string] $testId) {
                 python (Join-Path $here 'make_particles.py') $source 'C:\temp\aet-prv-pe\Data\Art\Models\P_prv'
             } else { Write-Warning "PRV-36: $source not found; the particle files are missing." }
         }
+        'PRV-38' {
+            # The mod's mega texture is a Windows bitmap under the .tga name, as two shipped mods keep theirs.
+            python (Join-Path $here 'make_icons.py') 'C:\temp\aet-test-PRV-bmp\Data\Art\Textures\mt_commandbar'
+        }
         'PRV-35' {
             # The game loads an object file only when its registry lists it, and of two definitions the
             # first read counts: the mod's list names its file, then the base's, then the game's own.

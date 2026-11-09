@@ -1,0 +1,10 @@
+﻿<?xml version="1.0"?>
+<BmpUnits>
+<SpaceUnit Name="Bmp_Unit">
+<Text_ID>TEXT_BMP_UNIT</Text_ID>
+<Encyclopedia_Unit_Class>TEXT_BMP_CLASS</Encyclopedia_Unit_Class>
+<Encyclopedia_Text>TEXT_BMP_BODY</Encyclopedia_Text>
+<Icon_Name>i_button_bmp.tga</Icon_Name>
+<Tech_Level>1</Tech_Level>
+</SpaceUnit>
+</BmpUnits>
