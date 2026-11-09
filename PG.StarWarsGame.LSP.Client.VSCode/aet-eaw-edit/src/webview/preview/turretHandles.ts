@@ -85,14 +85,25 @@ export interface TurretHandle {
     pitch: TurretAxisRange;
 }
 
-/** Where a turret is pointed, in degrees off the pose the model authored. */
+/** Where a turret is pointed, in degrees off the pose it rests in. */
 export interface TurretAim {
     yaw: number;
     pitch: number;
 }
 
-/** Rest: the authored pose, which is what an untouched turret reads. */
+/** Rest: what an untouched turret reads - zero off its rest pose. */
 export const TURRET_AT_REST: TurretAim = { yaw: 0, pitch: 0 };
+
+/**
+ * The pose a turret rests in, as an aim off the pose the model authored.
+ *
+ * The game composes a turret's turn onto the bone it computed from the file and its animation, so
+ * a rest angle is a turn ON TOP of the authored pose, never instead of it. Writing it into the bone
+ * outright turned every turret whose bone the exporter had oriented - a quarter turn on most (#389).
+ */
+export function restAim(turret: PreviewTurret | null | undefined): TurretAim {
+    return { yaw: turret?.restAngle ?? 0, pitch: turret?.restPitch ?? 0 };
+}
 
 /**
  * The handles that should be on screen, which is decided by the arc toggle and nothing else.

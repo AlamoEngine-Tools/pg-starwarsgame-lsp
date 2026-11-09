@@ -2106,7 +2106,8 @@
         "TurretBone": "B_Turret",
         "BarrelBone": null,
         "DeployedRotateExtentDegrees": 360,
-        "DeployedElevateExtentDegrees": 180
+        "DeployedElevateExtentDegrees": 180,
+        "RestPitch": null
       },
       "FireSfxEvent": null,
       "DeployedConeWidthDegrees": 360,

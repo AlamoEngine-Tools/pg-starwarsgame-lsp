@@ -445,7 +445,10 @@ export interface PreviewInaccuracy {
 
 /** A turret hardpoint's rest pose and how far it may swing. Absent when it is not a turret. */
 export interface PreviewTurret {
+    /** The yaw it rests at, in degrees off the pose the model authored. */
     restAngle?: number | null;
+    /** The pitch it rests at, in degrees off the authored pose, nose up positive. */
+    restPitch?: number | null;
     rotateExtentDegrees?: number | null;
     elevateExtentDegrees?: number | null;
     turretBone?: string | null;

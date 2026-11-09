@@ -634,7 +634,10 @@ public sealed class PreviewSceneBuilderTest
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_T, HP_F"))
             .With("HP_T",
                 Tag("Is_Turret", "Yes"),
-                Tag("Turret_Rest_Angle", "45"),
+                // The rest pose is the rotation offset (Y pitch, Z yaw); a hardpoint's rest angle is a
+                // vector the game only ever logs (#389).
+                Tag("Turret_Rotation_Offset", "0.0, 10.0, 45.0"),
+                Tag("Turret_Rest_Angle", "0.0, 0.0, 90.0"),
                 Tag("Turret_Rotate_Extent_Degrees", "180"),
                 Tag("Turret_Bone_Name", "TURRET_01"))
             .With("HP_F", Tag("Attachment_Bone", "HP_00"));
@@ -644,6 +647,7 @@ public sealed class PreviewSceneBuilderTest
         var turret = scene.Hardpoints.Single(h => h.Id == "HP_T").Turret;
         Assert.NotNull(turret);
         Assert.Equal(45f, turret.RestAngle);
+        Assert.Equal(10f, turret.RestPitch);
         Assert.Equal(180f, turret.RotateExtentDegrees);
         Assert.Equal("TURRET_01", turret.TurretBone);
 

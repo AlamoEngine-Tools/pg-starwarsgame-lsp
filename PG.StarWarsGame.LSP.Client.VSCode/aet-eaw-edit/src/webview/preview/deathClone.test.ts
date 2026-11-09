@@ -202,6 +202,14 @@ describe("sweepAngles", () => {
         assert.equal(offset.rotate, 180);
     });
 
+    it("is centred on the rest pitch too", () => {
+        // The one shipped turret with a rest pitch rests nose-up at 45 degrees; its elevation
+        // swings about that, not about level (#389).
+        const tilted = sweepAngles({ ...turret, restPitch: -45 }, 0);
+
+        assert.equal(tilted.elevate, -45);
+    });
+
     it("does not move a turret that declares no extents", () => {
         // 53 of foc's weapon objects declare the extents and the rest do not. A sweep that invented
         // one would claim a traverse the unit has not got.

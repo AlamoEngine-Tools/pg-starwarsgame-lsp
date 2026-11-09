@@ -140,4 +140,39 @@ public sealed class WeaponSectionBuilderTest
         Assert.Equal("BARREL_00", turret.BarrelBone);
         Assert.Null(PreviewFireArcs.Turret(Setup([("Turret_Bone_Name", "TURRET_00")]).Unit));
     }
+
+    // The game snaps a hardpoint turret to its Turret_Rotation_Offset and steers back to it with no
+    // target: Z is the yaw, Y the pitch. Turret_Rest_Angle on a hardpoint is only ever printed to the
+    // sync log, so it does not pose anything (#389).
+    [Fact]
+    public void Turret_RestsAtTheRotationOffset_NotAtTheRestAngle()
+    {
+        var (_, hardpoint, _) = Setup([
+            ("Is_Turret", "Yes"), ("Turret_Bone_Name", "TURRET_00"),
+            ("Turret_Rotation_Offset", "0.0, 10.0, 25.0"), ("Turret_Rest_Angle", "0.0, 0.0, 90.0")
+        ]);
+
+        var turret = PreviewFireArcs.Turret(hardpoint);
+
+        Assert.NotNull(turret);
+        Assert.Equal(25f, turret.RestAngle);
+        Assert.Equal(10f, turret.RestPitch);
+        var unwritten = PreviewFireArcs.Turret(Setup([("Is_Turret", "Yes"), ("Turret_Bone_Name", "TURRET_00")]).Unit);
+        Assert.Null(unwritten!.RestAngle);
+        Assert.Null(unwritten.RestPitch);
+    }
+
+    // A unit's own turret rests at its Turret_Rest_Angle - the no-target pose the turret behaviour
+    // steers to - with the same component order (#389).
+    [Fact]
+    public void UnitTurret_RestsAtTheRestAngle()
+    {
+        var (_, unit, _) = Setup([("Turret_Bone_Name", "TURRET_00"), ("Turret_Rest_Angle", "0.0, -45.0, 0.0")]);
+
+        var turret = PreviewFireArcs.UnitTurret(unit);
+
+        Assert.NotNull(turret);
+        Assert.Equal(0f, turret.RestAngle);
+        Assert.Equal(-45f, turret.RestPitch);
+    }
 }

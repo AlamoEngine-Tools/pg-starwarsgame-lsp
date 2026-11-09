@@ -103,10 +103,20 @@ public sealed record PreviewWeapon(
 public sealed record PreviewInaccuracy(string Category, float Distance);
 
 /// <summary>A turret hardpoint's rest pose and how far it may swing.</summary>
+/// <param name="RestAngle">
+///     The yaw the turret rests at, in degrees about the turret bone's up axis and composed on
+///     the pose the model authored: a hardpoint's <c>Turret_Rotation_Offset</c> Z, a unit
+///     turret's <c>Turret_Rest_Angle</c> Z. The game snaps a turret to it and steers back to it
+///     with no target; a hardpoint's <c>Turret_Rest_Angle</c> is only ever logged.
+/// </param>
 /// <param name="DeployedRotateExtentDegrees">
 ///     How far a unit turret swings while DEPLOYED, or null when the unit is never deployed.
 ///     <c>Adjust_Turret_Facing</c> reads the deployed pair in place of the normal one
 ///     whenever the is-deployed test, so the swing opens with the shot.
+/// </param>
+/// <param name="RestPitch">
+///     The pitch the turret rests at, the same vector's Y, carried by the barrel bone when one
+///     is named and by the turret bone otherwise.
 /// </param>
 public sealed record PreviewTurret(
     float? RestAngle,
@@ -115,7 +125,8 @@ public sealed record PreviewTurret(
     string? TurretBone,
     string? BarrelBone,
     float? DeployedRotateExtentDegrees = null,
-    float? DeployedElevateExtentDegrees = null);
+    float? DeployedElevateExtentDegrees = null,
+    float? RestPitch = null);
 
 /// <summary>
 ///     One attached hardpoint, with everything needed to destroy and repair it in the preview.

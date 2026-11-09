@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.2
+
+### Fixes
+
+- **Turrets rest where the model put them** - the assembled-unit preview wrote a turret's rest angle straight
+  into the turret bone, which threw the pose the exporter authored away and turned every turret whose bone was
+  not axis-aligned, a quarter turn on most. The game composes a turret's turn on top of the bone it computed from
+  the file, and the preview now does the same: the rest pose, the sweep and the drag handles all turn the
+  authored pose rather than replace it. The rest pose is read as the game reads it - a hardpoint turret rests at
+  its `Turret_Rotation_Offset` (Y the pitch, Z the yaw) and a unit's own turret at its `Turret_Rest_Angle`; a
+  hardpoint's `Turret_Rest_Angle` is logged by the game and poses nothing
+  ([#389](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/389))
+
 ## 0.5.1
 
 ### Fixes
