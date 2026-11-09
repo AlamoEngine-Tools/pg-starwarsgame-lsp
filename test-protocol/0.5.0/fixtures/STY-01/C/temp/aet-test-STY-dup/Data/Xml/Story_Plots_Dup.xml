@@ -1,0 +1,5 @@
+﻿<?xml version="1.0"?>
+<Story_Mode_Plots>
+<Active_Plot>Story_Dup.xml</Active_Plot>
+<Lua_Script>Story_Dup</Lua_Script>
+</Story_Mode_Plots>

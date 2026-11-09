@@ -1,0 +1,18 @@
+﻿<?xml version="1.0"?>
+<Story>
+<Event Name="Story_Enter_1_SECTOR_FORCES">
+<Event_Type>STORY_TRIGGER</Event_Type>
+</Event>
+<Event Name="Story_Enter_2_SECTOR_FORCES">
+<Event_Type>STORY_TRIGGER</Event_Type>
+<Prereq>Story_Enter_1_SECTOR_FORCES</Prereq>
+<Reward_Type>LINK_TACTICAL</Reward_Type>
+<Reward_Param1>Kuat</Reward_Param1>
+<Reward_Param2>SPACE</Reward_Param2>
+<Reward_Param3>Empire</Reward_Param3>
+<Reward_Param4>Dup_Battle.TED</Reward_Param4>
+<Reward_Param5>Rebel</Reward_Param5>
+<Reward_Param7>Story_Plots_Dup_Battle.xml</Reward_Param7>
+<Reward_Param8>0</Reward_Param8>
+</Event>
+</Story>

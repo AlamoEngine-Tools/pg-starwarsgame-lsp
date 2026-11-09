@@ -1,0 +1,7 @@
+﻿<?xml version="1.0"?>
+<Campaigns>
+<Campaign Name="Dup_Campaign">
+<Is_Story_Campaign>true</Is_Story_Campaign>
+<Empire_Story_Name>Story_Plots_Dup.xml</Empire_Story_Name>
+</Campaign>
+</Campaigns>
