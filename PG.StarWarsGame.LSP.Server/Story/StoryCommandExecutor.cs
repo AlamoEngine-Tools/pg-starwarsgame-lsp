@@ -57,7 +57,8 @@ internal sealed class StoryCommandExecutor(
     IFileHelper fileHelper,
     IModProjectReloadService reloadService,
     ILogger logger,
-    IMessageCatalog messages)
+    IMessageCatalog messages,
+    IStorySideNamesSource? sides = null)
 {
     /// <summary>The skeleton for a newly created plot manifest file.</summary>
     private const string ManifestFileSkeleton =
@@ -396,7 +397,7 @@ internal sealed class StoryCommandExecutor(
             if (string.IsNullOrEmpty(request.TargetFaction))
                 return (null, messages.Format("StoryCommand_AddPlotManifestNeedsFaction"));
             edits = StoryManifestWriter.AddCampaignStoryName(
-                text, request.Campaign, request.TargetFaction!, request.File!);
+                text, request.Campaign, request.TargetFaction!, request.File!, sides?.Current);
             if (edits.Count == 0)
                 return (null,
                     messages.Format("StoryCommand_CampaignWasNotFound", request.Campaign, campaignChain.SourceFile));

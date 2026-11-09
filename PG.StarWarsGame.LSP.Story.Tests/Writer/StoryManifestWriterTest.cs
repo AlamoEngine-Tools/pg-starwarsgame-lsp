@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Writer;
 
 namespace PG.StarWarsGame.LSP.Story.Tests.Writer;
@@ -151,6 +152,32 @@ public sealed class StoryManifestWriterTest
                 "\t<Campaign Name=\"GC\">\n" +
                 "\t\t<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>\n"),
             Apply(fixture, edits));
+    }
+
+    /// <summary>
+    ///     #192: the dedicated tags belong to the SIDES GameConstants names, not to the factions their
+    ///     prefixes spell. With the good side renamed Republic, attaching a plot to Republic writes
+    ///     Rebel_Story_Name - the tag the game loads for that side - and attaching one to a faction
+    ///     that is no side any more goes through the generic tag.
+    /// </summary>
+    [Fact]
+    public void AddCampaignStoryName_ASideFaction_GetsTheSidesTag_AndAFormerSideTheGenericOne()
+    {
+        const string fixture =
+            "<Campaigns>\n" +
+            "\t<Campaign Name=\"GC\">\n" +
+            "\t\t<Locations>Hoth</Locations>\n" +
+            "\t</Campaign>\n" +
+            "</Campaigns>\n";
+        var sides = new StorySideNames("Republic", "CIS", "Underworld");
+
+        var republic = Apply(fixture,
+            StoryManifestWriter.AddCampaignStoryName(fixture, "GC", "Republic", "Story_Plots_Rep.xml", sides));
+        var rebel = Apply(fixture,
+            StoryManifestWriter.AddCampaignStoryName(fixture, "GC", "Rebel", "Story_Plots_R.xml", sides));
+
+        Assert.Contains("\t\t<Rebel_Story_Name>Story_Plots_Rep.xml</Rebel_Story_Name>\n", republic);
+        Assert.Contains("\t\t<Story_Name>Rebel, Story_Plots_R.xml</Story_Name>\n", rebel);
     }
 
     // ── Full round-trip ──────────────────────────────────────────────────────

@@ -91,6 +91,7 @@ public sealed class ExecuteStoryCommandHandlerTest
             }),
             applier,
             config,
+            new ShippedSides(),
             NullLogger<ExecuteStoryCommandHandler>.Instance, TestCatalogues.English);
     }
 

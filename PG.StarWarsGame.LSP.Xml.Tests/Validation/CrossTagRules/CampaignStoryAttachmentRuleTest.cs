@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -22,19 +23,47 @@ public sealed class CampaignStoryAttachmentRuleTest
 {
     private const string Uri = "file:///Campaigns/Campaigns_Test.xml";
 
-    private static XmlDocumentFactProducer BuildProducer()
+    private static XmlDocumentFactProducer BuildProducer(IStorySideNamesSource? sides = null)
     {
         return new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
             new SchemaProviderBuilder().Build(),
             new NoFileTypeRegistry(),
             new XmlStructuralValidator(),
-            [new CampaignStoryAttachmentRule()]);
+            [new CampaignStoryAttachmentRule(sides)]);
     }
 
-    private static IReadOnlyList<CampaignStoryAttachmentFact> Facts(string xml)
+    private static IReadOnlyList<CampaignStoryAttachmentFact> Facts(string xml, IStorySideNamesSource? sides = null)
     {
-        return BuildProducer().Produce(xml, Uri).OfType<CampaignStoryAttachmentFact>().ToList();
+        return BuildProducer(sides).Produce(xml, Uri).OfType<CampaignStoryAttachmentFact>().ToList();
+    }
+
+    private sealed class FixedSides(StorySideNames current) : IStorySideNamesSource
+    {
+        public StorySideNames Current => current;
+    }
+
+    /// <summary>
+    ///     #192: Rebel_Story_Name attaches the faction GameConstants' Good_Side_Name names. With the
+    ///     good side renamed Republic, the dedicated tag and a generic pair for Republic attach the
+    ///     same faction twice - and a generic pair for Rebel does not.
+    /// </summary>
+    [Fact]
+    public void FactionSpecificTag_attaches_the_side_GameConstants_names()
+    {
+        var sides = new FixedSides(new StorySideNames("Republic", "CIS", "Underworld"));
+        const string body =
+            "    <Rebel_Story_Name>Story_Plots_Rep.xml</Rebel_Story_Name>\n" +
+            "    <Story_Name>Republic, Story_Plots_Rep.xml</Story_Name>\n";
+
+        var redundant = Facts(Campaign(body), sides)
+            .Where(f => f.Problem == CampaignStoryAttachmentProblem.RedundantAttachment).ToList();
+        var shipped = Facts(Campaign(body))
+            .Where(f => f.Problem == CampaignStoryAttachmentProblem.RedundantAttachment).ToList();
+
+        Assert.Equal(2, redundant.Count);
+        Assert.All(redundant, f => Assert.Equal("Republic", f.Faction));
+        Assert.Empty(shipped);
     }
 
     private static string Campaign(string body)

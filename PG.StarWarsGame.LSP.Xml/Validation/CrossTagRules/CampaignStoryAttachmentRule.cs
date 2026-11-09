@@ -21,7 +21,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///     Whether a referenced plot file EXISTS stays with the chain scan; this rule never touches the
 ///     file system.
 /// </summary>
-public sealed class CampaignStoryAttachmentRule : IXmlCrossTagRule
+public sealed class CampaignStoryAttachmentRule(IStorySideNamesSource? sides = null) : IXmlCrossTagRule
 {
     private const string CampaignElement = "campaign";
 
@@ -38,13 +38,16 @@ public sealed class CampaignStoryAttachmentRule : IXmlCrossTagRule
 
         var facts = new List<XmlFact>();
         var attachments = new List<Attachment>();
+        // A faction-specific tag attaches the side GameConstants names for it (#192), so two forms
+        // naming that faction are correlated as one faction, whatever the tag's prefix spells.
+        var sideNames = sides?.Current ?? StorySideNames.Shipped;
 
         foreach (var (tagName, nodes) in childrenByName)
         {
             if (!StoryNameTagSyntax.IsStoryNameTag(tagName)) continue;
             foreach (var node in nodes)
                 if (StoryNameTagSyntax.IsFactionSpecificTag(tagName))
-                    ReadFactionSpecificTag(node, tagName, documentUri, lineIndex, facts, attachments);
+                    ReadFactionSpecificTag(node, tagName, sideNames, documentUri, lineIndex, facts, attachments);
                 else
                     ReadGenericTag(node, lineIndex, attachments);
         }
@@ -71,14 +74,15 @@ public sealed class CampaignStoryAttachmentRule : IXmlCrossTagRule
     ///     Such a tag contributes no attachment: correlating a value the author never meant as a
     ///     filename would report a second, phantom problem on top of the real one.
     /// </summary>
-    private static void ReadFactionSpecificTag(HtmlNode node, string tagName, string documentUri,
-        LineOffsetIndex lineIndex, List<XmlFact> facts, List<Attachment> attachments)
+    private static void ReadFactionSpecificTag(HtmlNode node, string tagName, StorySideNames sideNames,
+        string documentUri, LineOffsetIndex lineIndex, List<XmlFact> facts, List<Attachment> attachments)
     {
         var value = node.InnerText.Trim();
         if (value.Length == 0) return;
 
-        // HAP lowercased the name; rebuild the schema's casing so messages read as authored.
-        var faction = StoryNameTagSyntax.FactionOf(tagName)!;
+        // HAP lowercased the name; the schema's casing is what messages quote as authored.
+        var faction = StoryNameTagSyntax.FactionOf(tagName, sideNames)!;
+        var authoredTag = StoryNameTagSyntax.CanonicalFactionTag(tagName)!;
         var (line, column, length) = XmlUtility.GetValuePosition(node, lineIndex);
 
         if (value.Contains(','))
@@ -86,11 +90,11 @@ public sealed class CampaignStoryAttachmentRule : IXmlCrossTagRule
             facts.Add(new CampaignStoryAttachmentFact(
                 documentUri, line, column, length,
                 CampaignStoryAttachmentProblem.TupleInFactionSpecificTag,
-                StoryNameTagSyntax.FactionTagFor(faction), faction, value));
+                authoredTag, faction, value));
             return;
         }
 
-        attachments.Add(new Attachment(faction, value, StoryNameTagSyntax.FactionTagFor(faction),
+        attachments.Add(new Attachment(faction, value, authoredTag,
             true, line, column, length, XmlUtility.GetPrintableLine(node)));
     }
 

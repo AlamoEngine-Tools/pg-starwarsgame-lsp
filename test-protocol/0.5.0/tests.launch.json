@@ -532,6 +532,9 @@
       "aet-eaw-edit.lsp.source.baseline.localPath": "{repo}\\baseline\\foc\\aet-pg-swg-lsp-foc-baseline.aet"
     }
   },
+  "STY-02": {
+    "open": "C:\\temp\\aet-test-STY-sides"
+  },
   "XML-33": {
     "open": "{repo}\\foc"
   }

@@ -25,10 +25,18 @@ public sealed class StoryChainScanner
         { "STORY_LAND_TACTICAL", "STORY_SPACE_TACTICAL" };
 
     private readonly IStoryChainFileResolver _resolver;
+    private readonly StorySideNames _sides;
 
-    public StoryChainScanner(IStoryChainFileResolver resolver)
+    /// <param name="resolver">Reads the chain's files.</param>
+    /// <param name="sides">
+    ///     The factions GameConstants names as the sides, which the dedicated story tags attach their
+    ///     plots to (#192); the shipped sides when none are given, as in the indexing-time scan that
+    ///     only types files.
+    /// </param>
+    public StoryChainScanner(IStoryChainFileResolver resolver, StorySideNames? sides = null)
     {
         _resolver = resolver;
+        _sides = sides ?? StorySideNames.Shipped;
     }
 
     /// <summary>
@@ -94,7 +102,7 @@ public sealed class StoryChainScanner
                                      StoryNameTagSyntax.IsStoryNameTag(n.Name)))
             {
                 processed.Add(node);
-                foreach (var (faction, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText))
+                foreach (var (faction, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText, _sides))
                 {
                     AddManifest(plotFile, source.At(node, plotFile),
                         StoryChainProblemKind.UnresolvedStoryName, state);
@@ -117,7 +125,7 @@ public sealed class StoryChainScanner
         foreach (var node in source.Doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element &&
                                  StoryNameTagSyntax.IsStoryNameTag(n.Name) && !processed.Contains(n)))
-        foreach (var (_, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText))
+        foreach (var (_, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText, _sides))
             AddManifest(plotFile, source.At(node, plotFile), StoryChainProblemKind.UnresolvedStoryName, state);
     }
 

@@ -38,6 +38,12 @@
   and two more, in 37 files per game. The game opens the part after the last backslash in its texture
   directories, and they render; the Mod Browser, the particle preview and the XML check reported every one of
   them missing (`Assets12`). All three now look the file name up, as the game does
+- **The dedicated story tags attach the sides GameConstants names** - `Rebel_Story_Name`,
+  `Empire_Story_Name` and `Underworld_Story_Name` attach their plots to the factions `Good_Side_Name`,
+  `Evil_Side_Name` and `Corrupt_Side_Name` name, which is what the game's campaign start does; a mod that
+  renames its good side to Republic runs `Rebel_Story_Name` for Republic. The Campaign Editor, the simulator,
+  the attachment check (`Story10`, `Story9`) and the attach-plot command follow the renamed side; the shipped
+  names stay as they were
 
 ### Building and releasing
 

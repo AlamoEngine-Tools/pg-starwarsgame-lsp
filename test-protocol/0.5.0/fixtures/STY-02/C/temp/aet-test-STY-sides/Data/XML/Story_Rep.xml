@@ -1,0 +1,7 @@
+﻿<?xml version="1.0"?>
+<Story_Plot>
+<Event Name="Story_Rep_Begin">
+<Event_Type>STORY_ELAPSED</Event_Type>
+<Event_Param1>1</Event_Param1>
+</Event>
+</Story_Plot>

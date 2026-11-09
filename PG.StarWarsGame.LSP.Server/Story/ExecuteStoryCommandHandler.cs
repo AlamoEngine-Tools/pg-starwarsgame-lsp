@@ -31,6 +31,7 @@ public sealed class ExecuteStoryCommandHandler(
     IModProjectReloadService reloadService,
     IWorkspaceEditApplier applier,
     ILspConfigurationProvider config,
+    IStorySideNamesSource sides,
     ILogger<ExecuteStoryCommandHandler> logger,
     IMessageCatalog messages)
     : IJsonRpcRequestHandler<ExecuteStoryCommandParams, ExecuteStoryCommandResult>
@@ -54,7 +55,7 @@ public sealed class ExecuteStoryCommandHandler(
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService, logger,
-            messages);
+            messages, sides);
         var (produced, error) = executor.Produce(request, model, new WorkingTextSet(textSource));
         if (error is not null)
             return Task.FromResult(Error(error));

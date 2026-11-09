@@ -28,6 +28,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
             Reload(),
             applier,
             Config(storyEditing),
+            new ShippedSides(),
             NullLogger<ApplyStoryCommandBatchHandler>.Instance, TestCatalogues.English);
     }
 

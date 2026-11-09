@@ -1,0 +1,9 @@
+﻿<?xml version="1.0"?>
+<Campaigns>
+<Campaign Name="Sides_Campaign">
+<Is_Story_Campaign>Yes</Is_Story_Campaign>
+<Rebel_Story_Name>Story_Plots_Rep.xml</Rebel_Story_Name>
+<Story_Name>Republic, Story_Plots_Rep.xml</Story_Name>
+<Story_Name>Rebel, Story_Plots_Rebel.xml</Story_Name>
+</Campaign>
+</Campaigns>
