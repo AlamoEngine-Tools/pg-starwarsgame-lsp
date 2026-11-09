@@ -82,7 +82,8 @@ public sealed class AloParticleReaderTest
         return Concat([.. parts]);
     }
 
-    private static byte[] Emitter(
+    // Shared with the projection tests: a particle system is bytes only these builders write.
+    internal static byte[] Emitter(
         string name = "spark",
         string colorTexture = "p_particle_master.tga",
         byte[][]? properties = null,
@@ -118,7 +119,7 @@ public sealed class AloParticleReaderTest
         return Chunk(0x0700, true, Concat([.. parts]));
     }
 
-    private static byte[] System(
+    internal static byte[] System(
         string name = "p_test", bool? leaveParticles = null, params byte[][] emitters)
     {
         var parts = new List<byte[]>

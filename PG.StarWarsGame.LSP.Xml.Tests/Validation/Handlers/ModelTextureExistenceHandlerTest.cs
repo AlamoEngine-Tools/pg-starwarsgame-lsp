@@ -62,6 +62,32 @@ public sealed class ModelTextureExistenceHandlerTest
         Assert.Contains("ev_ship.alo", d.Message);
     }
 
+    /// <summary>
+    ///     #292: the shipped particle systems name their sprite sheets by the art machine's absolute
+    ///     path. The game looks the part after the last backslash up in its texture directories, and
+    ///     they render; so does this check.
+    /// </summary>
+    [Fact]
+    public void TextureNamedByAnAbsolutePath_ResolvesByItsFileName()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "p_engines.alo");
+        var ctx = CtxWith(new FakeModelTextures(@"C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga"),
+            "data/art/models/p_engines.alo", "data/art/textures/p_particle_master.tga");
+
+        Assert.Empty(Sut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void TextureNamedByAnAbsolutePath_IsReportedByItsFileName_WhenThatIsMissing()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "p_engines.alo");
+        var ctx = CtxWith(new FakeModelTextures(@"C:\Projects\Starwars\Art\Textures\Game\p_gone.tga"),
+            "data/art/models/p_engines.alo");
+
+        var d = Assert.Single(Sut.Handle(fact, ctx));
+        Assert.Contains("p_gone.tga", d.Message);
+    }
+
     [Fact]
     public void MissingTextures_WarnOncePerTexture()
     {

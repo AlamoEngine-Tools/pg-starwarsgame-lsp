@@ -531,5 +531,8 @@
     "settings": {
       "aet-eaw-edit.lsp.source.baseline.localPath": "{repo}\\baseline\\foc\\aet-pg-swg-lsp-foc-baseline.aet"
     }
+  },
+  "XML-33": {
+    "open": "{repo}\\foc"
   }
 }

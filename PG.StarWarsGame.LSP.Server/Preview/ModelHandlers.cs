@@ -241,13 +241,17 @@ public sealed class GetModelTextureHandler(
     IMessageCatalog messages)
     : IJsonRpcRequestHandler<GetModelTextureParams, GetModelTextureResult>
 {
-    /// <summary>Textures live here, and a shader parameter names one without any path.</summary>
+    /// <summary>
+    ///     Textures live here. A shader parameter names one without a path - or, in the shipped
+    ///     particle systems, by the art machine's absolute path, of which the game keeps the file name
+    ///     (<see cref="GameTextureName.FileName" />, #292).
+    /// </summary>
     private const string TextureDirectory = "Data/Art/Textures/";
 
     public Task<GetModelTextureResult> Handle(
         GetModelTextureParams request, CancellationToken cancellationToken)
     {
-        var name = request.Name.Trim();
+        var name = GameTextureName.FileName(request.Name);
         if (string.IsNullOrEmpty(name))
             return Task.FromResult(new GetModelTextureResult(null, null,
                 messages.Format("PreviewHandlers_NoTextureWasNamed")));

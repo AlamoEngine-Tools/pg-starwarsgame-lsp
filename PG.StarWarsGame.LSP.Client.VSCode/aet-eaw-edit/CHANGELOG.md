@@ -33,6 +33,11 @@
   local baseline setting names one file, and both servers loaded it, so the EaW project knew every FoC-only
   object as the game's. A setting naming one game's file in the baseline layout reads as the other game's
   sibling file for that game's project, when it is there; a folder picked each game's file already
+- **A texture named by an absolute path resolves as the game resolves it** - the shipped particle systems name
+  their sprite sheets by the art machine's path, `C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga`
+  and two more, in 37 files per game. The game opens the part after the last backslash in its texture
+  directories, and they render; the Mod Browser, the particle preview and the XML check reported every one of
+  them missing (`Assets12`). All three now look the file name up, as the game does
 
 ### Building and releasing
 
