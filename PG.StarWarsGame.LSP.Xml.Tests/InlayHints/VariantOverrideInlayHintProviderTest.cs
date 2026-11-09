@@ -114,6 +114,34 @@ public sealed class VariantOverrideInlayHintProviderTest
         Assert.True(label.Length < 50, $"marker too long for an inline hint: '{label}'");
     }
 
+    /// <summary>
+    ///     #136: the report showed "overrides " with nothing after it on tags whose base was empty.
+    ///     An empty value writes nothing in the game (#290), so the resolver skips it and the variant's
+    ///     tag adds rather than overrides - no marker; and should an empty displaced value ever reach
+    ///     the marker, it says "overrides base", never a cut-off "overrides ".
+    /// </summary>
+    [Theory]
+    [InlineData("<Tech_Level></Tech_Level>", "<Tech_Level>0</Tech_Level>")]
+    [InlineData("<Tech_Level>99</Tech_Level>", "<Tech_Level/>")]
+    [InlineData("<Tech_Level> </Tech_Level>", "<Tech_Level>0</Tech_Level>")]
+    public void Handle_AnEmptyValueOnEitherSide_NeverYieldsAMarkerThatEndsInASpace(string baseTag, string variantTag)
+    {
+        var text = "<X><SpaceUnit Name=\"V\"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type>" + variantTag +
+                   "</SpaceUnit></X>";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type").Plain("Tech_Level");
+        var baseValue = baseTag.Contains("99") ? "99" : baseTag.Contains("> <") ? " " : "";
+        var variantValue = variantTag.Contains(">0<") ? "0" : "";
+        var source = new FakeTagSource()
+            .With("V", Tag("Variant_Of_Existing_Type", "B", "file:///u.xml"),
+                Tag("Tech_Level", variantValue, "file:///u.xml"))
+            .With("B", Tag("Tech_Level", baseValue, BaseUri, 7));
+
+        var hints = Hints(text, "Tech_Level", source, schema, IndexWith(Sym("V", "B"), Sym("B", null, BaseUri)));
+
+        Assert.All(hints, h => Assert.False(h.Label.String!.EndsWith(' '), $"'{h.Label.String}' ends in a space"));
+        Assert.All(hints, h => Assert.NotEqual("overrides", h.Label.String!.TrimEnd()));
+    }
+
     [Fact]
     public void Handle_SingleOccurrenceMergeTag_NamesTheValueItMergesWith()
     {

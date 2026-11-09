@@ -63,6 +63,23 @@ public sealed class EffectiveObjectXmlRendererTest
         Assert.Contains("overrides base - was 99", xml);
     }
 
+    // #136: a displaced value that is empty or whitespace has nothing to quote; "was " with nothing
+    // after it reads as a cut-off sentence. The plain note says the same.
+    [Theory]
+    [InlineData("")]
+    [InlineData("  \n ")]
+    public void Render_OverriddenTag_WithAnEmptyBaseValue_SaysOverridesBase(string baseValue)
+    {
+        var xml = EffectiveObjectXmlRenderer.Render(Object(
+            TagWithBase("No_Colorization_Color", "255, 0, 0", VariantProvenance.Overridden, "V", baseValue),
+            TagWithBase("Required_Planets", "Hoth", VariantProvenance.Merged, "V", baseValue)), TestCatalogues.English);
+
+        Assert.Contains("<!-- overrides base -->", xml);
+        Assert.Contains("<!-- merged with base -->", xml);
+        Assert.DoesNotContain("was ", xml);
+        Assert.DoesNotContain("contributes ", xml);
+    }
+
     [Fact]
     public void Render_MergedTag_ShowsWhatTheBaseContributes()
     {

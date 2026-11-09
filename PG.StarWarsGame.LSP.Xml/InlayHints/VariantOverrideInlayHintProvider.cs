@@ -87,12 +87,16 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
     /// </summary>
     private static string? Label(EffectiveTag tag, EffectiveObject effective, IMessageCatalog messages)
     {
+        // An empty or whitespace displaced value has nothing to quote: the report showed "overrides "
+        // with nothing after it (#136). The resolver skips an empty tag today (#290), so this is the
+        // guard for whatever else may carry one.
+        var displaced = string.IsNullOrWhiteSpace(tag.BaseValue) ? null : tag.BaseValue;
         switch (tag.Provenance)
         {
             case VariantProvenance.Overridden:
-                return tag.BaseValue is null
+                return displaced is null
                     ? messages.Format("VariantOverrideInlayHint_OverridesBase")
-                    : messages.Format("VariantOverrideInlayHint_Overrides", Truncate(tag.BaseValue));
+                    : messages.Format("VariantOverrideInlayHint_Overrides", Truncate(displaced));
 
             case VariantProvenance.Merged:
                 // A repeatable additive tag contributes one entry per element, so the useful figure
@@ -102,9 +106,9 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
                     && t.Provenance == VariantProvenance.Inherited);
                 if (inherited > 0)
                     return messages.Format("VariantOverrideInlayHint_AddsInherited", inherited);
-                return tag.BaseValue is null
+                return displaced is null
                     ? messages.Format("VariantOverrideInlayHint_AddsBase")
-                    : messages.Format("VariantOverrideInlayHint_Merges", Truncate(tag.BaseValue));
+                    : messages.Format("VariantOverrideInlayHint_Merges", Truncate(displaced));
 
             default:
                 return null;

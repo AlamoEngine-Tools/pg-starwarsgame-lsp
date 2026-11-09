@@ -23,7 +23,8 @@
 - **A variant's `Encyclopedia_Text` says what it overrides** - the localisation texts of the keys were anchored
   past the end of the line, which the editor sorts ahead of everything on it, and it cuts a line's hints off
   past a length, so on a line with texts the `overrides ...` marker was the part cut off. The markers now come
-  first on every line; a long text is what gets cut
+  first on every line; a long text is what gets cut. A tag displacing an empty value says `overrides base`, in
+  the marker and in the effective object, rather than `overrides ` with nothing after it
 - **A mega texture saved as a Windows bitmap under the `.tga` name is read** - two shipped mods keep theirs
   that way, and the game shows their icons; the server read it as a TGA, failed with "Detected invalid targa
   image", fell back to the base game's icons, and every icon only the mod has showed the missing-icon
