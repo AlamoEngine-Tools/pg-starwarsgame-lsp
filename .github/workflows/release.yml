@@ -48,7 +48,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
@@ -83,16 +83,16 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         path: PG.StarWarsGame.LSP
         fetch-depth: 0
 
-    - uses: actions/setup-dotnet@v5
+    - uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v7
       with:
         node-version: 22
 
@@ -161,7 +161,7 @@ jobs:
       run: ./scripts/check-vsix.ps1 "dist/aet-eaw-edit-$env:VERSION.vsix"
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: release-files
         path: PG.StarWarsGame.LSP/dist/*.vsix
@@ -193,7 +193,7 @@ jobs:
 
     steps:
     - name: Checkout the changelog and the extension manifest
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         sparse-checkout: |
           PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/CHANGELOG.md
@@ -201,7 +201,7 @@ jobs:
         sparse-checkout-cone-mode: false
         path: repo
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v7
       with:
         node-version: 22
 
@@ -220,13 +220,13 @@ jobs:
       run: npx --yes @vscode/vsce verify-pat "${{ steps.ext.outputs.publisher }}"
 
     - name: Download artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: release-files
         path: files
 
     - name: Download SBOMs
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         pattern: '*.sbom.spdx.json'
         path: sbom

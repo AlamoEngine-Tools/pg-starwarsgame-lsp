@@ -42,17 +42,17 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         path: PG.StarWarsGame.LSP
         fetch-depth: 0
 
-    - uses: actions/setup-dotnet@v5
+    - uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
 
     # node --test takes glob patterns from Node 21 on; the runner image's default may be older.
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v7
       with:
         node-version: 22
 
