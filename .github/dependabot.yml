@@ -1,0 +1,99 @@
+# Dependabot version and security updates. The alerts tab reports vulnerable packages on its own;
+# this file is what turns them, and ordinary version drift, into pull requests.
+#
+# One pull request per group, so a Monday brings at most one PR per ecosystem and kind rather than
+# one per package. Dependabot cannot carry an issue number, so its subjects are `chore(deps): ...`.
+# Every PR still runs the full test workflow before it can merge.
+
+version: 2
+updates:
+
+  # The extension and its webviews. The VSIX bundles only `dependencies`; `devDependencies` are the
+  # publishing, lint, bundling and UI-test tooling and never ship.
+  - package-ecosystem: npm
+    directory: /PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      extension-runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+      extension-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+      extension-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    ignore:
+      # `@types/vscode` must not run ahead of `engines.vscode`, or `vsce package` refuses the VSIX.
+      # The engine floor is raised by hand, and the types follow in the same commit.
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # `rete-auto-arrange-plugin` declares `peer elkjs@^0.8.2`; a newer elkjs needs an override
+      # and a layout comparison, not a bump.
+      - dependency-name: elkjs
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # `@typescript-eslint` supports TypeScript below 6.1 only; TypeScript 7 waits for it.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+
+  # The repository root holds one dev dependency, the esbuild the scripts use.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      root-tooling:
+        patterns: ["*"]
+
+  # The server, the Lua debugger and the baseline builder; versions are central in
+  # Directory.Packages.props.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      server-packages:
+        update-types: [minor, patch]
+      server-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    ignore:
+      # Held at the versions the PetroglyphTools libraries use: the editor's CSV reads share their
+      # importers, and the Lua debugger hashes the same datagram bytes as PG.Commons.
+      - dependency-name: CsvHelper
+      - dependency-name: System.IO.Hashing
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
