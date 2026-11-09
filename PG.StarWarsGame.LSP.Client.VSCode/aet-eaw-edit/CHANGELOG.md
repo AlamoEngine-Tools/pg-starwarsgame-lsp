@@ -29,6 +29,10 @@
   image", fell back to the base game's icons, and every icon only the mod has showed the missing-icon
   placeholder. The content picks the decoder now, for the mega texture and for a loose icon source alike, so
   `.bmp` sources decode too
+- **A window with an Empire at War and a Forces of Corruption project loads each game's baseline** - the one
+  local baseline setting names one file, and both servers loaded it, so the EaW project knew every FoC-only
+  object as the game's. A setting naming one game's file in the baseline layout reads as the other game's
+  sibling file for that game's project, when it is there; a folder picked each game's file already
 
 ### Building and releasing
 
