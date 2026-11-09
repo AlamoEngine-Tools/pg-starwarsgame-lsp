@@ -60,6 +60,31 @@ public sealed class LuaStoryMachineExtractorTest
         Assert.Equal([("LINE_ONE", 6.0), ("LINE_TWO", 8.5)], enter.Emissions.Select(e => (e.Id, e.DelaySeconds)));
     }
 
+    // Define_State(state, f) assigns StateMachine[state] = f: a name registered again keeps its first
+    // place in the order and takes the later function. Two spellings are two states (#362).
+    [Fact]
+    public void Extract_KeepsOneStatePerExactName_TheLaterFunction_AndBothSpellings()
+    {
+        var machine = LuaStoryMachineExtractor.Extract("""
+                                                       StoryModeEvents = {
+                                                           Enter_FORCES = State_First,
+                                                           Enter_Forces = State_Other,
+                                                           Enter_FORCES = State_Second,
+                                                       }
+                                                       function State_First(message)
+                                                           if message == OnEnter then Story_Event("FIRST") end
+                                                       end
+                                                       function State_Second(message)
+                                                           if message == OnEnter then Story_Event("SECOND") end
+                                                       end
+                                                       function State_Other(message) end
+                                                       """, Uri)!;
+
+        Assert.Equal(["Enter_FORCES", "Enter_Forces"], machine.States.Select(s => s.Name));
+        Assert.Equal("State_Second", machine.States[0].FunctionName);
+        Assert.Equal("SECOND", Assert.Single(machine.States[0].OnEnter.Emissions).Id);
+    }
+
     [Fact]
     public void Extract_FollowsASameFileHelperInline_AndStopsAtTheDepthLimit()
     {

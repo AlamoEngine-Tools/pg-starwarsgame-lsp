@@ -10,6 +10,13 @@
   indexed them, with no entry in the views, no findings and no error. A nested project file counts as a
   dependency only when the project around it references it or declares the directory it sits in; otherwise
   it runs its own server, and the root project's server serves nothing inside it
+- **A story script with two state names differing only in case loads in the Campaign Editor** - a
+  `StoryModeEvents` table holding `Story_Enter_1_SECTOR_FORCES` and `Story_Enter_1_Sector_Forces` failed the
+  whole campaign list with an internal error. Lua keeps the two apart, and so does the game's state machine
+  library, which selects a state by the event's exact name; the graph and the simulator now keep them apart
+  too, and an event or a transition links the state spelled like its name. The key no event spells the same
+  way keeps its case-only-match warning (`References36`). A name registered twice keeps one state with the
+  later function, as the library does
 
 ## 0.5.0
 

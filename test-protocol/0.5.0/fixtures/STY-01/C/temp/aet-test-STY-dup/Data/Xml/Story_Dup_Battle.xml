@@ -1,0 +1,6 @@
+﻿<?xml version="1.0"?>
+<Story>
+<Event Name="Dup_Battle_Begin">
+<Event_Type>STORY_TRIGGER</Event_Type>
+</Event>
+</Story>

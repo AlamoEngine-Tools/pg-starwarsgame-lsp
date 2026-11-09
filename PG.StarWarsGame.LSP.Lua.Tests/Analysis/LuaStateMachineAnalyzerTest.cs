@@ -137,6 +137,17 @@ public sealed class LuaStateMachineAnalyzerTest
         Assert.Equal(1, diagnostic.Range.Start.Line);
     }
 
+    // Lua table keys are case-sensitive, and so are the library's lookups (Pgstatemachine.lua
+    // Define_State and Set_Next_State index StateMachine[state]; Pgstorymode.lua Story_Event_Trigger
+    // indexes StoryModeEvents[name]): two keys differing only in case are two states, not one
+    // registered twice (#362). The key no event spells the same way is the reference rules' finding.
+    [Fact]
+    public void StateNamesDifferingOnlyInCase_AreTwoStates_NotARegistrationTwice()
+    {
+        Assert.Empty(Analyze("StoryModeEvents = { Enter_FORCES = F, Enter_Forces = G }\n" +
+                             "function F(message) end\nfunction G(message) end"));
+    }
+
     [Fact]
     public void AHandlerNotTakingOneParameter_IsAWarning()
     {

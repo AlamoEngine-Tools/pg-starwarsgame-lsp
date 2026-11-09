@@ -15,7 +15,7 @@ public sealed record LuaScriptState(string? Current, string? Next, string? Trigg
     public static readonly LuaScriptState Idle = new(null, null, null, 0);
 
     /// <summary>Measured: Story_Event_Trigger only sets the next state while none is pending.</summary>
-    public bool TransitionPending => !string.Equals(Current, Next, StringComparison.OrdinalIgnoreCase);
+    public bool TransitionPending => !string.Equals(Current, Next, StringComparison.Ordinal);
 }
 
 /// <summary>A <c>Story_Event(Id)</c> a thread will make at <see cref="DueClock" />.</summary>
@@ -40,7 +40,8 @@ public sealed partial class StorySimulator
         var name = eventNode.Event!.Name;
         foreach (var machine in _model.LuaMachines)
         {
-            var state = machine.States.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            // Exact: the library indexes StoryModeEvents by the event's name (#362).
+            var state = machine.States.FirstOrDefault(s => s.Name.Equals(name, StringComparison.Ordinal));
             if (state is null) continue;
             var stateId = StoryGraphBuilder.LuaStateNodeId(machine.ScriptUri, state.Name);
             var script = snapshot.Runtime.Scripts.GetValueOrDefault(machine.ScriptUri) ?? LuaScriptState.Idle;
@@ -185,6 +186,6 @@ public sealed partial class StorySimulator
 
     private static LuaStoryState? FindState(LuaStoryMachine machine, string name)
     {
-        return machine.States.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        return machine.States.FirstOrDefault(s => s.Name.Equals(name, StringComparison.Ordinal));
     }
 }

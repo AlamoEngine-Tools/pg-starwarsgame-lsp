@@ -36,7 +36,11 @@ public static class LuaStoryMachineExtractor
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         var scope = new FileScope(root, functions);
 
+        // Define_State(state, f) assigns StateMachine[state] = f: a name registered again keeps its
+        // first place in the order and takes the later function. Names are case-sensitive, so two
+        // spellings stay two states (#362).
         var states = new List<LuaStoryState>();
+        var indexByName = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var (stateName, functionName, inline) in entries)
         {
             var body = inline?.Body;
@@ -45,8 +49,15 @@ public static class LuaStoryMachineExtractor
             var phases = body is null
                 ? (LuaStoryPhase.Empty, LuaStoryPhase.Empty, LuaStoryPhase.Empty)
                 : Phases(body, scope);
-            states.Add(
-                new LuaStoryState(stateName, functionName ?? stateName, phases.Item1, phases.Item2, phases.Item3));
+            var state = new LuaStoryState(stateName, functionName ?? stateName, phases.Item1, phases.Item2,
+                phases.Item3);
+            if (indexByName.TryGetValue(stateName, out var index))
+                states[index] = state;
+            else
+            {
+                indexByName[stateName] = states.Count;
+                states.Add(state);
+            }
         }
 
         var scriptName = Path.GetFileNameWithoutExtension(documentUri);

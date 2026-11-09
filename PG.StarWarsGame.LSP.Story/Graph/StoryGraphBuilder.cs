@@ -246,6 +246,12 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         // Pass 5: the campaign scripts as state nodes. An XML event whose name is a StoryModeEvents
         // key selects that state (Story_Event_Trigger); a state's phases emit Story_Event ids that
         // STORY_AI_NOTIFICATION events listen for; a Set_Next_State is a state-to-state link.
+        // State names are case-sensitive (#362): Lua table keys are, and so are the library's lookups -
+        // Pgstorymode.lua indexes StoryModeEvents[name] with the event's name, Pgstatemachine.lua
+        // indexes StateMachine[state] - and on the corpus every key matches its event's exact spelling
+        // (eaw 94 of 94, foc 725 of 725 keys with an event). Two keys differing only in case are two
+        // states, each selected by the event spelled like it; one id for both made every dictionary
+        // keyed by node id throw.
         foreach (var machine in luaMachines ?? [])
         {
             foreach (var luaState in machine.States)
@@ -256,7 +262,8 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             {
                 var stateId = LuaStateNodeId(machine.ScriptUri, luaState.Name);
                 if (state.EventsByName.TryGetValue(luaState.Name, out var triggers))
-                    foreach (var trigger in triggers)
+                    foreach (var trigger in triggers.Where(t =>
+                                 string.Equals(t.Event!.Name, luaState.Name, StringComparison.Ordinal)))
                         state.AddEdge(new StoryEdge(trigger.Id, stateId, StoryEdgeKind.LuaLink, "Story_Event_Trigger"));
 
                 var emitted = new[] { luaState.OnEnter, luaState.OnUpdate, luaState.OnExit }
@@ -268,8 +275,8 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
                         state.AddEdge(new StoryEdge(stateId, node.Id, StoryEdgeKind.LuaLink, id));
 
                 foreach (var target in new[] { luaState.OnEnter, luaState.OnUpdate, luaState.OnExit }
-                             .SelectMany(p => p.Transitions).Distinct(StringComparer.OrdinalIgnoreCase))
-                    if (machine.States.Any(s => s.Name.Equals(target, StringComparison.OrdinalIgnoreCase)))
+                             .SelectMany(p => p.Transitions).Distinct(StringComparer.Ordinal))
+                    if (machine.States.Any(s => s.Name.Equals(target, StringComparison.Ordinal)))
                         state.AddEdge(new StoryEdge(stateId, LuaStateNodeId(machine.ScriptUri, target),
                             StoryEdgeKind.LuaLink, "Set_Next_State"));
             }
@@ -334,9 +341,10 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         return after;
     }
 
+    /// <summary>A Lua state node's id: the script and the state name as written, since state names are case-sensitive.</summary>
     public static string LuaStateNodeId(string scriptUri, string stateName)
     {
-        return $"{scriptUri}#lua#{stateName.ToLowerInvariant()}";
+        return $"{scriptUri}#lua#{stateName}";
     }
 
     private static bool ListensFor(BuildState state, StoryEvent storyEvent, string notificationId)

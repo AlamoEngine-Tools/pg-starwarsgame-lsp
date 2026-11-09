@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
 
@@ -235,6 +236,59 @@ public sealed class StoryGraphBuilderTest
         Assert.Equal("right_click", problem.Reference);
         Assert.Contains("never fires", ResxMessageCatalog.Server("en").Format(problem.Message));
         Assert.Contains("click", ResxMessageCatalog.Server("en").Format(problem.Message));
+    }
+
+    // ── Lua states ───────────────────────────────────────────────────────────
+
+    private const string LuaUri = "file:///ws/data/scripts/story/story_a.lua";
+
+    private static LuaStoryMachine Machine(params string[] stateNames)
+    {
+        return new LuaStoryMachine(LuaUri, "story_a", stateNames
+            .Select(n => new LuaStoryState(n, "State_" + n, LuaStoryPhase.Empty, LuaStoryPhase.Empty,
+                LuaStoryPhase.Empty))
+            .ToList());
+    }
+
+    private static StoryGraph BuildWithCaseVariantStates()
+    {
+        return new StoryGraphBuilder(Schema).Build(
+            [
+                Thread(UriA,
+                    "<Event Name=\"Story_Enter_1_SECTOR_FORCES\"><Event_Type>STORY_TRIGGER</Event_Type></Event>")
+            ],
+            null, [Machine("Story_Enter_1_SECTOR_FORCES", "Story_Enter_1_Sector_Forces")]);
+    }
+
+    // #362: a script's StoryModeEvents held Story_Enter_1_SECTOR_FORCES and Story_Enter_1_Sector_Forces.
+    // Lua keeps them apart - table keys are case-sensitive, and so is the library's lookup - so they
+    // are two nodes. One id for both made the battle scoper's dictionary throw and failed the navigator.
+    [Fact]
+    public void LuaStates_DifferingOnlyInCase_AreTwoNodes_AndTheBattlesStillBuild()
+    {
+        var graph = BuildWithCaseVariantStates();
+
+        var states = graph.Nodes.Where(n => n.Kind == StoryNodeKind.LuaState).ToList();
+        Assert.Equal(2, states.Count);
+        Assert.NotEqual(states[0].Id, states[1].Id);
+        var manifests = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Story_Plots_M2.xml"] = new HashSet<string>(StringComparer.Ordinal)
+        };
+        Assert.NotNull(StoryGraphScoper.Battles(graph, manifests));
+    }
+
+    // The library selects the state by the event's exact name (Pgstorymode.lua: StoryModeEvents[name]),
+    // so the XML event links the state spelled the same way and no other.
+    [Fact]
+    public void LuaState_IsSelectedByTheEventSpelledExactlyLikeIt()
+    {
+        var graph = BuildWithCaseVariantStates();
+
+        var link = Assert.Single(graph.Edges, e => e.Kind == StoryEdgeKind.LuaLink && e.Label == "Story_Event_Trigger");
+        Assert.Equal(EventId(UriA, "Story_Enter_1_SECTOR_FORCES"), link.FromId);
+        Assert.Equal(StoryGraphBuilder.LuaStateNodeId(LuaUri, "Story_Enter_1_SECTOR_FORCES"), link.ToId);
+        Assert.Contains(graph.Nodes, n => n.Id == link.ToId && n.Label == "Story_Enter_1_SECTOR_FORCES");
     }
 
     [Fact]
