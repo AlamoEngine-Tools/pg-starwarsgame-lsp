@@ -12,6 +12,11 @@
   its `Turret_Rotation_Offset` (Y the pitch, Z the yaw) and a unit's own turret at its `Turret_Rest_Angle`; a
   hardpoint's `Turret_Rest_Angle` is logged by the game and poses nothing
   ([#389](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/389))
+- **A sample's references count the SFX events naming it** - an SFXEvent names its samples by their
+  game-relative path and the Mod Browser's Audio page lists a file by its name; the lookup between the two took
+  the written path as its key, so every sample's References read 0 and an event's Samples relation showed its
+  files as missing. Both directions now meet on the file name, as the Textures page already did
+  ([#380](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/380))
 - **Sorting a Mod Browser column by name gives the order the list opened with** - the list opens in the plain
   character order, case folded, where an underscore sorts after the letters; the sorted column ran through a
   word-aware comparison that let the underscore slide, so `2_Warpod` jumped ahead of `2M_Repulsor_Tank` once

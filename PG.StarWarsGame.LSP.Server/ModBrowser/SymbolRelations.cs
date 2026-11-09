@@ -324,7 +324,13 @@ public sealed class SymbolRelations(
                 if (relation is not ("models" or "particleSystems" or "textures" or "samples")) continue;
                 foreach (var (name, _) in targets)
                 {
-                    var asset = relation is "models" or "particleSystems" ? WithExtension(name, ".alo") : name;
+                    var asset = relation switch
+                    {
+                        "models" or "particleSystems" => WithExtension(name, ".alo"),
+                        // A sample is written as a game-relative path; the audio page lists the file (#380).
+                        "samples" => MergedAssetFileIndex.FileNameOf(name),
+                        _ => name
+                    };
                     if (!users.TryGetValue(asset, out var objects))
                         users[asset] = objects = new SortedSet<(string Id, string? Type)>(ObjectOrder);
                     objects.Add((row.Id, row.Type));
@@ -420,7 +426,7 @@ public sealed class SymbolRelations(
             "models" => catalog.Find("models", WithExtension(name, ".alo")),
             "particleSystems" => catalog.Find("particleSystems", WithExtension(name, ".alo")),
             "textures" => Texture(name),
-            "samples" => catalog.Find("audio", name),
+            "samples" => catalog.Find("audio", MergedAssetFileIndex.FileNameOf(name)),
             "luaScript" => catalog.Find("luaScripts", WithExtension(name, ".lua")),
             // A kind is a predicate over game objects; a type is its own id space.
             _ => catalog.FindObject(name, type is not null && schema.GetKind(type) is not null
