@@ -170,6 +170,8 @@ public sealed class MetafileRegistrar
         }
 
         var resolver = new WorkspaceStoryChainFileResolver(_fileHelper, xmlRoots, baseline);
+        // The shipped sides suffice here: this scan types files, and which faction a plot attaches
+        // to is the story model's question, asked with the project's GameConstants in hand (#192).
         var result = new StoryChainScanner(resolver).Scan(registry);
 
         foreach (var rel in result.ManifestFiles)

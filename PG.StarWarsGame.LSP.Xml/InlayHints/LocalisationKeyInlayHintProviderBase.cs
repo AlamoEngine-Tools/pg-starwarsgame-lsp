@@ -24,9 +24,13 @@ internal abstract class LocalisationKeyInlayHintProviderBase : IXmlInlayHintProv
     {
         var translated = ctx.Index.Localisation.GetValue(extractedValue) ??
                          ctx.Messages.Format("LocalisationKeyInlayHint_Missing", extractedValue);
+        // Anchored INSIDE the line, like every other hint. This used to be int.MaxValue, and the
+        // editor compares hint positions as 32-bit integers (column = character + 1 overflows to a
+        // negative number), so these texts sorted before everything else on their line - ahead of
+        // the override marker, which the per-line length limit then cut off (#136).
         return new InlayHint
             {
-                Position = new Position(ctx.Line, int.MaxValue),
+                Position = new Position(ctx.Line, ctx.LineEndCharacter),
                 Label = ((StringOrInlayHintLabelParts?)$"\"{translated}\"")!,
                 Kind = InlayHintKind.Type,
                 PaddingLeft = true

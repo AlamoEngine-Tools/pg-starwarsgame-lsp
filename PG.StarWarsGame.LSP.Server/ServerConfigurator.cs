@@ -281,6 +281,9 @@ public static class ServerConfigurator
 
                 // Story campaign models (per-campaign threads + graph) and their diagnostics.
                 services.AddSingleton<IStoryModelService, StoryModelService>();
+                // The sides the project's GameConstants names, which the dedicated story tags attach
+                // their plots to: read by the chain scan, the attachment check and the manifest writer (#192).
+                services.AddSingleton<IStorySideNamesSource, GameConstantsStorySideNames>();
                 services.AddSingleton<ICacheStatisticsSource>(sp =>
                     (ICacheStatisticsSource)sp.GetRequiredService<IStoryModelService>());
                 services.AddSingleton<IStoryGraphDiagnosticsSource, StoryGraphDiagnosticsService>();

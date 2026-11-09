@@ -29,6 +29,10 @@ namespace PG.StarWarsGame.LSP.Server.Assets;
 ///         resolves is looked up fresh against the asset catalog every time, so dropping a missing
 ///         texture into the workspace clears the warning without touching this cache.
 ///     </para>
+///     <para>
+///         Every name is the file name the game looks up (<see cref="GameTextureName.FileName" />):
+///         the shipped particle systems name theirs by the art machine's absolute path (#292).
+///     </para>
 /// </remarks>
 public sealed class ModelTextureIndex(
     IGameAssetResolver assets,
@@ -118,7 +122,7 @@ public sealed class ModelTextureIndex(
         foreach (var parameter in sub.Parameters)
             if (parameter.Type == AlamoShaderParameterType.Texture
                 && !string.IsNullOrWhiteSpace(parameter.Texture))
-                names.Add(parameter.Texture);
+                names.Add(GameTextureName.FileName(parameter.Texture));
 
         return names;
     }
@@ -130,10 +134,10 @@ public sealed class ModelTextureIndex(
         foreach (var emitter in AloParticleReader.Read(bytes).Emitters)
         {
             if (!string.IsNullOrWhiteSpace(emitter.ColorTexture))
-                names.Add(emitter.ColorTexture);
+                names.Add(GameTextureName.FileName(emitter.ColorTexture));
 
             if (!string.IsNullOrWhiteSpace(emitter.NormalTexture))
-                names.Add(emitter.NormalTexture);
+                names.Add(GameTextureName.FileName(emitter.NormalTexture));
         }
 
         return names;

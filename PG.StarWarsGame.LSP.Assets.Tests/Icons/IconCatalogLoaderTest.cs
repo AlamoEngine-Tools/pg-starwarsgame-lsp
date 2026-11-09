@@ -82,6 +82,28 @@ public sealed class IconCatalogLoaderTest
         Assert.Equal(((byte)255, (byte)0, (byte)0, (byte)255), image[0, 0]);
     }
 
+    /// <summary>
+    ///     #166: a mod's mega texture that is a Windows bitmap under the <c>.tga</c> name is the mod's
+    ///     mega texture all the same - the game shows its icons - so it is read and wins, rather than
+    ///     failing to decode and leaving every icon to the baseline.
+    /// </summary>
+    [Fact]
+    public void Load_WorkspaceMegaTextureSavedAsABitmapUnderTheTgaName_IsReadAndWins()
+    {
+        var fileSystem = new MockFileSystem();
+        fileSystem.AddFile($@"{Root}\data\art\textures\mt_mymod.mtd",
+            new MockFileData(MegaTextureFixture.BuildMtd(("I_BUTTON_LUKE.TGA", new Rectangle(0, 0, 4, 4), true))));
+        fileSystem.AddFile($@"{Root}\data\art\textures\mt_mymod.tga",
+            new MockFileData(MegaTextureFixture.BuildBmp(4, 4, (_, _) => new Rgba(0, 0, 255, 200))));
+
+        var catalog = Load(fileSystem, BaselineWith("I_BUTTON_LUKE.TGA"));
+
+        Assert.True(catalog.HasWorkspaceMegaTexture);
+        var result = catalog.Resolve("I_BUTTON_LUKE.TGA");
+        Assert.Equal(IconSource.WorkspaceMegaTexture, result!.Source);
+        Assert.Equal(((byte)0, (byte)0, (byte)255, (byte)200), TestPng.Decode(result.Png)[0, 0]);
+    }
+
     [Fact]
     public void Load_LooseSourcesAreDecoded()
     {

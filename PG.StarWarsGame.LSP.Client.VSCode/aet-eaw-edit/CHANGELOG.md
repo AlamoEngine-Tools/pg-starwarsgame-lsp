@@ -8,7 +8,7 @@
   library's project file at the root and its mods in subfolders showed only the root project: every project
   file under it was taken as the root project's dependency, and the mods' files went to a server that never
   indexed them, with no entry in the views, no findings and no error. A nested project file counts as a
-  dependency only when the project around it references it or declares the directory it sits in; otherwise
+  dependency only when the surrounding project references it or declares the directory it sits in; otherwise
   it runs its own server, and the root project's server serves nothing inside it
 - **A story script with two state names differing only in case loads in the Campaign Editor** - a
   `StoryModeEvents` table holding `Story_Enter_1_SECTOR_FORCES` and `Story_Enter_1_Sector_Forces` failed the
@@ -17,6 +17,50 @@
   too, and an event or a transition links the state spelled like its name. The key no event spells the same
   way keeps its case-only-match warning (`References36`). A name registered twice keeps one state with the
   later function, as the library does
+- **`Disregard_Space_Layer_For_Guard_Attack_Move` is a known tag** - the 64-bit game reads this yes/no flag on a
+  game object type, and the schema now declares it, so the tag no longer gets an unknown-tag finding
+  (`Structure12`)
+- **A variant's `Encyclopedia_Text` says what it overrides** - the localisation texts of the keys were anchored
+  past the end of the line, which the editor sorts ahead of everything on it, and it cuts a line's hints off
+  past a length, so on a line with texts the `overrides ...` marker was the part cut off. The markers now come
+  first on every line; a long text is what gets cut. A tag displacing an empty value says `overrides base`, in
+  the marker and in the effective object, rather than `overrides ` with nothing after it
+- **A mega texture saved as a Windows bitmap under the `.tga` name is read** - two shipped mods keep theirs
+  that way, and the game shows their icons; the server read it as a TGA, failed with "Detected invalid targa
+  image", fell back to the base game's icons, and every icon only the mod has showed the missing-icon
+  placeholder. The content picks the decoder now, for the mega texture and for a loose icon source alike, so
+  `.bmp` sources decode too
+- **A window with an Empire at War and a Forces of Corruption project loads each game's baseline** - the one
+  local baseline setting names one file, and both servers loaded it, so the EaW project knew every FoC-only
+  object as the game's. A setting naming one game's file in the baseline layout reads as the other game's
+  sibling file for that game's project, when it is there; a folder picked each game's file already
+- **A texture named by an absolute path resolves as the game resolves it** - the shipped particle systems name
+  their sprite sheets by the art machine's path, `C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga`
+  and two more, in 37 files per game. The game opens the part after the last backslash in its texture
+  directories, and they render; the Mod Browser, the particle preview and the XML check reported every one of
+  them missing (`Assets12`). All three now look the file name up, as the game does, and the XML check says
+  that the texture is named by a path, as an information (`Assets21`): the game keeps the file name, and the
+  path belongs to another machine
+- **The dedicated story tags attach the sides GameConstants names** - `Rebel_Story_Name`,
+  `Empire_Story_Name` and `Underworld_Story_Name` attach their plots to the factions `Good_Side_Name`,
+  `Evil_Side_Name` and `Corrupt_Side_Name` name, which is what the game's campaign start does; a mod that
+  renames its good side to Republic runs `Rebel_Story_Name` for Republic. The Campaign Editor, the simulator,
+  the attachment check (`Story10`, `Story9`) and the attach-plot command follow the renamed side; the shipped
+  names stay as they were
+
+### Diagnostic IDs
+
+- **New** - `Assets21` (`aetswg-004-0021`, information: a model or particle system names a texture by a path,
+  of which the game keeps the file name)
+
+### Building and releasing
+
+- **The styled-CSS lint covers the shared stylesheet** - a backtick in a CSS comment of `dockChrome.ts` ends the
+  template and fails the type check forty lines away under another name; the lint meant to catch it first never
+  matched that file, as a stray control character sat in its pattern. It does now, and a test plants the backtick
+  to keep it so
+- **The pull request build type-checks the client on its own** - `check-types` runs before the lint and the unit
+  tests, so a type error is reported as one rather than as a packaging failure
 
 ## 0.5.0
 

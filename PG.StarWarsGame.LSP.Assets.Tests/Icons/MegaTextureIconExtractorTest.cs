@@ -107,6 +107,39 @@ public sealed class MegaTextureIconExtractorTest
         Assert.True(icons.ContainsKey("i_red.tga"));
     }
 
+    // ── A bitmap under the .tga name (#166) ────────────────────────────────────
+
+    /// <summary>
+    ///     Two shipped mods keep their mega texture as a Windows bitmap under the <c>.tga</c> name, and
+    ///     the game shows their icons. Read as a TGA it fails with "Detected invalid targa image" - the
+    ///     report's exact error - and every icon of the mod then counts as missing. The content decides
+    ///     the decoder, not the name; the crop is measured from the top as for a TGA, and the alpha is
+    ///     the fourth byte, which in those two files carries real values.
+    /// </summary>
+    [Theory]
+    [InlineData("I_RED.TGA", 255, 0, 0, 255)]
+    [InlineData("I_GREEN.TGA", 0, 255, 0, 128)]
+    [InlineData("I_BLUE.TGA", 0, 0, 255, 0)]
+    public void ExtractAll_ReadsAnAtlasSavedAsABitmap(string name, byte r, byte g, byte b, byte a)
+    {
+        var directory = MegaTextureFixture.LoadDirectory(MegaTextureFixture.BuildMtd(Entries));
+        using var texture = new MemoryStream(MegaTextureFixture.BuildBmp(16, 16, (x, y) =>
+        {
+            if (x is >= 0 and < 4 && y is >= 0 and < 4) return Red;
+            if (x is >= 6 and < 10 && y is >= 2 and < 6) return Green with { A = 128 };
+            if (x is >= 12 and < 16 && y is >= 12 and < 16) return Blue with { A = 0 };
+            return Background;
+        }));
+
+        var icons = MegaTextureIconExtractor.ExtractAll(directory, texture);
+
+        var image = DecodePng(icons[name]);
+        Assert.Equal(4, image.Width);
+        for (var y = 0; y < image.Height; y++)
+        for (var x = 0; x < image.Width; x++)
+            Assert.Equal((r, g, b, a), image[x, y]);
+    }
+
     // ── Robustness ────────────────────────────────────────────────────────────
 
     /// <summary>

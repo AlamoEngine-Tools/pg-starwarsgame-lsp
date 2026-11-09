@@ -30,6 +30,7 @@ public sealed class PreviewStoryGraphHandler(
     IFileHelper fileHelper,
     IModProjectReloadService reloadService,
     ILspConfigurationProvider config,
+    IStorySideNamesSource sides,
     IMessageCatalog messages)
     : IJsonRpcRequestHandler<PreviewStoryGraphParams, GetStoryGraphResult>
 {
@@ -51,7 +52,7 @@ public sealed class PreviewStoryGraphHandler(
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService, NullLogger.Instance,
-            messages);
+            messages, sides);
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, error) = executor.Compose(

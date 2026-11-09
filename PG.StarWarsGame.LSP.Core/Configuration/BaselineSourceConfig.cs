@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
+using System.Text.RegularExpressions;
 using PG.StarWarsGame.LSP.Core.Project;
 
 namespace PG.StarWarsGame.LSP.Core.Configuration;
@@ -34,7 +35,8 @@ public record BaselineSourceConfig
 
     /// <summary>
     ///     This source for <paramref name="game" />: the game's file in the repository layout. A URL or a
-    ///     local file named outright stays what it is - the user chose that file.
+    ///     local path named outright stays what it is here; <see cref="LocalFile" /> decides what a local
+    ///     path means for the game.
     /// </summary>
     public BaselineSourceConfig ForGame(TargetGame game)
     {
@@ -43,12 +45,37 @@ public record BaselineSourceConfig
     }
 
     /// <summary>
-    ///     The local <c>.aet</c> to read: <see cref="LocalPath" /> itself, or <see cref="FilePath" />
-    ///     inside it when it names a folder. Null when no local path is set.
+    ///     The local <c>.aet</c> this game's server reads. <see cref="FilePath" /> inside
+    ///     <see cref="LocalPath" /> when that names a folder; this game's sibling when it names the OTHER
+    ///     game's file of the same layout and this game's exists; otherwise <see cref="LocalPath" /> itself,
+    ///     the file the user named. Null when no local path is set.
     /// </summary>
+    /// <remarks>
+    ///     The sibling rule exists because the setting is one per window, and a window may hold an Empire
+    ///     at War project and a Forces of Corruption project: with the FoC file named, the EaW project's
+    ///     server loaded it too and knew every FoC-only object as the game's (#288, measured 2026-10-22).
+    ///     A file outside the layout, or with no sibling for this game, is read as named: the user chose
+    ///     it, and a guess would load nothing.
+    /// </remarks>
     public string? LocalFile(IFileSystem fileSystem)
     {
         if (string.IsNullOrWhiteSpace(LocalPath)) return null;
-        return fileSystem.Directory.Exists(LocalPath) ? fileSystem.Path.Combine(LocalPath, FilePath) : LocalPath;
+
+        var path = fileSystem.Path;
+        var layoutFile = FilePath.Replace('/', path.DirectorySeparatorChar);
+        if (fileSystem.Directory.Exists(LocalPath)) return path.Combine(LocalPath, layoutFile);
+
+        // "<root>/<game>/aet-pg-swg-lsp-<game>-baseline.aet": two levels up is the root of the layout.
+        if (!LayoutFileName.IsMatch(path.GetFileName(LocalPath))) return LocalPath;
+        var root = path.GetDirectoryName(path.GetDirectoryName(LocalPath));
+        if (root is null) return LocalPath;
+
+        var sibling = path.Combine(root, layoutFile);
+        return !string.Equals(sibling, LocalPath, StringComparison.OrdinalIgnoreCase) && fileSystem.File.Exists(sibling)
+            ? sibling
+            : LocalPath;
     }
+
+    private static readonly Regex LayoutFileName =
+        new("^aet-pg-swg-lsp-[a-z0-9]+-baseline\\.aet$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 }

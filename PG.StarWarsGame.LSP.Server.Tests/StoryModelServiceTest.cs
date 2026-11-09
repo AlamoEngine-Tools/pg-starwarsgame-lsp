@@ -91,6 +91,7 @@ public sealed class StoryModelServiceTest
                 MetafileType.Special, ["Campaign", "StoryParser", "StoryPlotManifest"])).Build(),
             fileHelper,
             new DocumentTextSource(host, fileHelper, NullLogger<DocumentTextSource>.Instance),
+            new Story.ShippedSides(),
             NullLogger<StoryModelService>.Instance);
         return (service, fs, index, host, fileHelper, reload);
     }

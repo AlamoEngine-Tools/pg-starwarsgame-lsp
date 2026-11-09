@@ -48,15 +48,18 @@ public static class EffectiveObjectXmlRenderer
 
     private static string? ProvenanceNote(EffectiveTag tag, IMessageCatalog messages)
     {
+        // An empty or whitespace displaced value has nothing to quote: "was " with nothing after it
+        // reads as a cut-off sentence (#136), so the plain note says it.
+        var displaced = string.IsNullOrWhiteSpace(tag.BaseValue) ? null : tag.BaseValue;
         return tag.Provenance switch
         {
             VariantProvenance.Inherited => messages.Format("EffectiveObject_InheritedFrom", tag.OriginObjectId),
-            VariantProvenance.Overridden => tag.BaseValue is null
+            VariantProvenance.Overridden => displaced is null
                 ? messages.Format("EffectiveObject_OverridesBase")
-                : messages.Format("EffectiveObject_OverridesBaseWas", Describe(tag.BaseValue)),
-            VariantProvenance.Merged => tag.BaseValue is null
+                : messages.Format("EffectiveObject_OverridesBaseWas", Describe(displaced)),
+            VariantProvenance.Merged => displaced is null
                 ? messages.Format("EffectiveObject_MergedWithBase")
-                : messages.Format("EffectiveObject_MergedWithBaseContributes", Describe(tag.BaseValue)),
+                : messages.Format("EffectiveObject_MergedWithBaseContributes", Describe(displaced)),
             VariantProvenance.Added => messages.Format("EffectiveObject_AddedByVariant"),
             _ => null
         };

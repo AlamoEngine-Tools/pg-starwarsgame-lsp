@@ -81,13 +81,14 @@ public static class StoryManifestWriter
     }
 
     /// <summary>
-    ///     Attaches a plot to a faction inside the named <c>&lt;Campaign&gt;</c> element. Major
-    ///     factions (Rebel/Empire/Underworld) get their dedicated <c>{Faction}_Story_Name</c> tag;
-    ///     every other faction can only attach through the generic
-    ///     <c>&lt;Story_Name&gt;Faction, PlotFile&lt;/Story_Name&gt;</c> tag.
+    ///     Attaches a plot to a faction inside the named <c>&lt;Campaign&gt;</c> element. A faction
+    ///     that is one of the sides GameConstants names gets that side's dedicated tag - the one the
+    ///     game loads for it (#192) - and every other faction can only attach through the generic
+    ///     <c>&lt;Story_Name&gt;Faction, PlotFile&lt;/Story_Name&gt;</c> tag. The shipped sides apply
+    ///     when none are given.
     /// </summary>
     public static IReadOnlyList<StoryTextEdit> AddCampaignStoryName(
-        string text, string campaignName, string faction, string manifestFile)
+        string text, string campaignName, string faction, string manifestFile, StorySideNames? sides = null)
     {
         var document = ParsedXmlDocument.Parse(text);
         var campaign = FindCampaign(document, campaignName);
@@ -113,9 +114,8 @@ public static class StoryManifestWriter
             indent = LeadingWhitespace(text, campaignLine) + "\t";
         }
 
-        var newTag = StoryNameTagSyntax.IsMajorFaction(faction)
-            ? "<" + StoryNameTagSyntax.FactionTagFor(faction) + ">" + manifestFile +
-              "</" + StoryNameTagSyntax.FactionTagFor(faction) + ">"
+        var newTag = StoryNameTagSyntax.SideTagFor(faction, sides ?? StorySideNames.Shipped) is { } sideTag
+            ? "<" + sideTag + ">" + manifestFile + "</" + sideTag + ">"
             : "<" + StoryNameTagSyntax.GenericTag + ">" + faction + ", " + manifestFile +
               "</" + StoryNameTagSyntax.GenericTag + ">";
 

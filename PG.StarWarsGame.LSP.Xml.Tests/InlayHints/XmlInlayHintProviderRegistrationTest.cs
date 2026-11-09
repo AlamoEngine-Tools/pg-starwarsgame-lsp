@@ -74,4 +74,23 @@ public sealed class XmlInlayHintProviderRegistrationTest
         Assert.True(duplicates.Count == 0,
             "Providers registered more than once: " + string.Join(", ", duplicates));
     }
+
+    /// <summary>
+    ///     #136: the editor draws a line's hints in the order they are served and cuts them off past a
+    ///     length (editor.inlayHints.maximumLength, 43 by default). A localisation key's text hint is
+    ///     long, so the short override marker on an Encyclopedia_Text line has to be served before the
+    ///     texts, or it is the part that is cut off - which is what the report showed.
+    /// </summary>
+    [Fact]
+    public void Override_marker_is_served_before_the_localisation_texts()
+    {
+        var order = RegisteredProviderTypes().ToList();
+        var marker = order.IndexOf(typeof(VariantOverrideInlayHintProvider));
+
+        Assert.True(marker >= 0, "VariantOverrideInlayHintProvider is not registered");
+        Assert.True(marker < order.IndexOf(typeof(LocalisationKeySingleValueInlayHintProvider)),
+            "The override marker is served after the single-value localisation text");
+        Assert.True(marker < order.IndexOf(typeof(LocalisationKeyMultiValueInlayHintProvider)),
+            "The override marker is served after the multi-value localisation texts");
+    }
 }

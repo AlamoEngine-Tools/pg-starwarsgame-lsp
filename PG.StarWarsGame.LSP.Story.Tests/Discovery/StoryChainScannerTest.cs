@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Discovery;
 
 namespace PG.StarWarsGame.LSP.Story.Tests.Discovery;
@@ -22,6 +23,38 @@ public sealed class StoryChainScannerTest
     private static StoryChainScanResult Scan(FakeResolver resolver)
     {
         return new StoryChainScanner(resolver).Scan(Registry);
+    }
+
+    /// <summary>
+    ///     #192: a faction-specific tag attaches its plot to the faction GameConstants names for that
+    ///     side (measured in the campaign start of the 2024 build), not to the faction the tag's prefix
+    ///     spells. A mod that renames its good side to Republic runs Rebel_Story_Name for Republic.
+    /// </summary>
+    [Fact]
+    public void Scan_AttachesAFactionTagToTheSideGameConstantsNames()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Test">
+                    <Rebel_Story_Name>Story_Plots_Rep.xml</Rebel_Story_Name>
+                    <Empire_Story_Name>Story_Plots_Cis.xml</Empire_Story_Name>
+                    <Story_Name>Hutts, Story_Plots_Hutt.xml</Story_Name>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Rep.xml", "<Story_Mode_Plots/>")
+            .Add("Story_Plots_Cis.xml", "<Story_Mode_Plots/>")
+            .Add("Story_Plots_Hutt.xml", "<Story_Mode_Plots/>");
+        var sides = new StorySideNames("Republic", "CIS", "Underworld");
+
+        var campaign = new StoryChainScanner(resolver, sides).Scan(Registry).Campaigns.Single();
+
+        Assert.Equal(["Republic", "CIS", "Hutts"], campaign.FactionManifests.Select(m => m.Faction));
+        Assert.Equal(["Rebel", "Empire", "Hutts"],
+            Scan(resolver).Campaigns.Single().FactionManifests.Select(m => m.Faction));
     }
 
     [Fact]

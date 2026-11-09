@@ -101,6 +101,7 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
     private readonly Dictionary<string, ParsedMachine> _machines = new(StringComparer.Ordinal);
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
+    private readonly IStorySideNamesSource _sides;
     private readonly IDocumentTextSource _textSource;
     private ChainCache? _chain;
 
@@ -115,6 +116,7 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
         ISchemaProvider schema,
         IFileHelper fileHelper,
         IDocumentTextSource textSource,
+        IStorySideNamesSource sides,
         ILogger<StoryModelService> logger)
     {
         _reloadService = reloadService;
@@ -122,6 +124,7 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
         _schema = schema;
         _fileHelper = fileHelper;
         _textSource = textSource;
+        _sides = sides;
         _logger = logger;
     }
 
@@ -327,7 +330,8 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
             // extending them. Scan(string) reads through the resolver, which searches xml roots
             // highest-rank-first - the same rule MetafileRegistrar.ScanStoryChain applies, so the
             // set of campaigns typed there and modelled here stays identical.
-            var scan = new StoryChainScanner(resolver).Scan(def.Path);
+            // The dedicated story tags attach the sides GameConstants names (#192).
+            var scan = new StoryChainScanner(resolver, _sides.Current).Scan(def.Path);
             if (!ReferenceEquals(scan, StoryChainScanResult.Empty))
                 result = scan;
         }

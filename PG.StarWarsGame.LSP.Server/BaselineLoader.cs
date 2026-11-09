@@ -36,6 +36,11 @@ public sealed class BaselineLoader
 
     public async Task<BaselineIndex> LoadAsync(BaselineSourceConfig config, CancellationToken ct)
     {
+        // Named in the log because one setting serves every project of a window: which file each
+        // game's server read is the first thing to check when the wrong objects count as the game's (#288).
+        if (config.Type == BaselineSourceType.Local)
+            _logger.LogInformation("Local baseline file: {Path}", config.LocalFile(_fileHelper.FileSystem) ?? "<none>");
+
         var (baseline, source) = await (config.Type switch
         {
             BaselineSourceType.Local => LoadLocalAsync(config.LocalFile(_fileHelper.FileSystem), ct),

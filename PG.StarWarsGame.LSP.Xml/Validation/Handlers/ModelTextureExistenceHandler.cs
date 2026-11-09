@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Util;
@@ -61,10 +62,19 @@ public sealed class ModelTextureExistenceHandler : XmlDiagnosticsHandler<XmlTagV
 
             foreach (var texture in ctx.ModelTextures.TexturesOf(model))
             {
-                var name = texture.Trim();
+                // The file name the game looks up: a baseline built before #292 still carries the
+                // shipped particle systems' absolute names, so the cut is made here as well as at the read.
+                var name = GameTextureName.FileName(texture);
 
                 if (string.IsNullOrEmpty(name) || !reported.Add(name))
                     continue;
+
+                // Emulate, then say so: the game resolves a path-named texture by its file name, so it
+                // is not missing - but an art machine's path is nobody's intention in a shipped file.
+                if (!string.Equals(name, texture.Trim(), StringComparison.Ordinal))
+                    results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Information,
+                        ctx.Messages.Format("ModelTextureExistence_ModelNamesTextureByPath", model, texture.Trim(),
+                            name), Id: DiagnosticIds.ModelTextureNamedByPath));
 
                 if (AssetFileLookup.Resolves(
                         ctx.Index.AssetFiles, name, TextureExtensions, TextureExtensions))

@@ -89,8 +89,8 @@ public static class MegaTextureIconExtractor
 /// </summary>
 /// <remarks>
 ///     Wraps Pfim, which decodes TGA and DDS but hands back the source layout - bottom-up rows,
-///     BGR(A) channel order, and varying bit depths. Normalising once here keeps that awkwardness
-///     out of every caller.
+///     BGR(A) channel order, and varying bit depths - and this project's own <see cref="BitmapFile" />
+///     reader. Normalising once here keeps that awkwardness out of every caller.
 /// </remarks>
 public sealed class ImageSurface
 {
@@ -106,11 +106,27 @@ public sealed class ImageSurface
     public int Width { get; }
     public int Height { get; }
 
-    /// <summary>Decodes TGA or DDS from <paramref name="source" />.</summary>
+    /// <summary>Decodes TGA, DDS or a Windows bitmap from <paramref name="source" />.</summary>
+    /// <remarks>
+    ///     The CONTENT picks the decoder, never the file name. The game reads a mega texture by what
+    ///     it holds, and two shipped mods keep a bitmap under the <c>.tga</c> name; read by name they
+    ///     failed with "Detected invalid targa image" and lost every icon (#166).
+    /// </remarks>
     /// <exception cref="NotSupportedException">The pixel format is one we do not convert.</exception>
     public static ImageSurface Load(Stream source)
     {
-        using var image = Pfimage.FromStream(source);
+        using var buffer = new MemoryStream();
+        source.CopyTo(buffer);
+        var bytes = buffer.GetBuffer().AsSpan(0, (int)buffer.Length);
+
+        if (BitmapFile.IsBitmap(bytes))
+        {
+            var (width, height, rgba) = BitmapFile.Decode(bytes);
+            return new ImageSurface(width, height, rgba);
+        }
+
+        buffer.Position = 0;
+        using var image = Pfimage.FromStream(buffer);
         return new ImageSurface(image.Width, image.Height, ToRgba(image));
     }
 

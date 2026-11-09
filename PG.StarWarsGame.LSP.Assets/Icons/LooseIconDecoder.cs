@@ -9,12 +9,11 @@ namespace PG.StarWarsGame.LSP.Assets.Icons;
 ///     Converts the raw icon sources a project keeps on disk into the PNGs the preview renders.
 /// </summary>
 /// <remarks>
-///     Covers TGA, PNG and DDS - the three <see cref="LooseIconCatalog.DecodableExtensions" /> lists.
-///     BMP is catalogued so a caller can say "unsupported icon source format" instead of "icon not
-///     found", but it is not decoded, and it is reported through <see cref="DecodeAll" />'s
-///     <c>unsupported</c> list rather than being silently dropped. A file that is catalogued but
-///     unreadable or corrupt is treated the same way: one bad source image must not cost the caller
-///     every other icon.
+///     Covers TGA, DDS, BMP and PNG - what <see cref="LooseIconCatalog.DecodableExtensions" /> lists;
+///     the content picks the decoder, so a bitmap under a <c>.tga</c> name reads too (#166). A file
+///     that is catalogued but unreadable or corrupt is reported through <see cref="DecodeAll" />'s
+///     <c>unsupported</c> list rather than being silently dropped: one bad source image must not cost
+///     the caller every other icon.
 /// </remarks>
 public static class LooseIconDecoder
 {

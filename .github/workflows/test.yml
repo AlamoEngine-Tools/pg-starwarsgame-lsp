@@ -170,14 +170,18 @@ jobs:
 
     # The client, and the package a release would ship: built here so a missing bundled file or a
     # failing client check shows on the pull request, not in the release run. Windows only - the
-    # package is win32-x64. Packaging also type-checks (vscode:prepublish). The lint carries the
-    # TypeScript format check: prettier --check, Prettier with its defaults, pinned in package.json.
+    # package is win32-x64. The type check runs on its own, before the lint and the unit tests, so a
+    # type error is reported as what it is rather than as a packaging failure further down (packaging
+    # type-checks again through vscode:prepublish). The lint carries the TypeScript format check:
+    # prettier --check, Prettier with its defaults, pinned in package.json.
     - name: Client checks
       if: runner.os == 'Windows'
       working-directory: PG.StarWarsGame.LSP/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
       shell: pwsh
       run: |
         npm ci
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        npm run check-types
         if ($LASTEXITCODE -ne 0) { exit 1 }
         npm run lint
         if ($LASTEXITCODE -ne 0) { exit 1 }

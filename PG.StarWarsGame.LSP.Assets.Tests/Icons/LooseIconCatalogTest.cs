@@ -83,16 +83,12 @@ public sealed class LooseIconCatalogTest
     // ── Formats we can and cannot decode ──────────────────────────────────────
 
     /// <summary>
-    ///     BMP is catalogued but flagged undecodable, so a caller can say "this format is not
-    ///     supported" instead of the much less useful "icon not found".
+    ///     Every catalogued format is decodable: TGA and DDS through the decoder library, BMP through
+    ///     this project's own reader (#166), PNG passed through. The distinction between catalogued
+    ///     and decodable stays in the model for the next format that arrives before its decoder does.
     /// </summary>
-    /// <remarks>
-    ///     DDS used to be the undecodable case and is now supported - the decoder handles it
-    ///     natively - while BMP went the other way when the imaging dependency changed. The point of
-    ///     the test is the CATALOGUED-BUT-UNDECODABLE distinction, not which format occupies it.
-    /// </remarks>
     [Fact]
-    public void Scan_IncludesBmpButMarksItUndecodable()
+    public void Scan_IncludesBmpAsDecodable()
     {
         var fileSystem = FileSystemWith(
             $@"{Root}\i_button_luke.tga",
@@ -101,7 +97,7 @@ public sealed class LooseIconCatalogTest
         var icons = LooseIconCatalog.Scan(fileSystem, [Root]);
 
         Assert.True(icons["I_BUTTON_LUKE"].IsDecodable);
-        Assert.False(icons["I_BUTTON_VADER"].IsDecodable);
+        Assert.True(icons["I_BUTTON_VADER"].IsDecodable);
     }
 
     [Fact]

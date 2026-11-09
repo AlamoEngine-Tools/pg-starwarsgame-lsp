@@ -516,5 +516,26 @@
   },
   "STY-01": {
     "open": "C:\\temp\\aet-test-STY-dup"
+  },
+  "XML-31": {
+    "open": "C:\\temp\\aet-test-XML-guard"
+  },
+  "XML-32": {
+    "open": "C:\\temp\\aet-test-XML-ency"
+  },
+  "PRV-38": {
+    "open": "C:\\temp\\aet-test-PRV-bmp"
+  },
+  "SET-31": {
+    "open": "C:\\temp\\aet-test-SET-games\\games.code-workspace",
+    "settings": {
+      "aet-eaw-edit.lsp.source.baseline.localPath": "{repo}\\baseline\\foc\\aet-pg-swg-lsp-foc-baseline.aet"
+    }
+  },
+  "STY-02": {
+    "open": "C:\\temp\\aet-test-STY-sides"
+  },
+  "XML-33": {
+    "open": "{repo}\\foc"
   }
 }

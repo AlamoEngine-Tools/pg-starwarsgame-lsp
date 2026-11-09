@@ -42,7 +42,9 @@ public sealed class InlayHintContext : XmlDocumentHandlerContextBase
     ///     Character offset just past the last character of <see cref="Line" />, for hints that want
     ///     to sit at the end of the line. <c>int.MaxValue</c> is out of range per the LSP spec: clients
     ///     clamp it for rendering, but an anchor beyond the line can break interaction with a
-    ///     clickable label part.
+    ///     clickable label part - and the editor compares hint positions as 32-bit integers, so an
+    ///     anchor of <c>int.MaxValue</c> overflows and sorts its hint ahead of everything else on the
+    ///     line (#136). Every hint anchors here.
     /// </summary>
     public int LineEndCharacter { get; }
 }

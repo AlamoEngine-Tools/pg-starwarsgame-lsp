@@ -351,11 +351,17 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeLensProvider, EncyclopediaCodeLensProvider>();
         services.AddSingleton<IXmlCodeLensProvider, PreviewUnitCodeLensProvider>();
 
-        // Inlay hint providers - add IXmlInlayHintProvider implementations here to register new providers
-        services.AddSingleton<IXmlInlayHintProvider, LocalisationKeySingleValueInlayHintProvider>();
-        services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
+        // Inlay hint providers - add IXmlInlayHintProvider implementations here to register new providers.
+        // THE ORDER IS WHAT THE READER SEES: every provider answers every tag, and the hints of one line
+        // reach the editor in this order, which draws them in it and cuts them off past a length
+        // (editor.inlayHints.maximumLength, 43 characters by default). The variant markers are short
+        // and go first; a localisation key's text is long and goes after them, so it is the text that
+        // is cut, never the marker. The other way round, an Encyclopedia_Text that overrode its base
+        // showed its texts and no marker (#136).
         services.AddSingleton<IXmlInlayHintProvider, VariantInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, VariantOverrideInlayHintProvider>();
+        services.AddSingleton<IXmlInlayHintProvider, LocalisationKeySingleValueInlayHintProvider>();
+        services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, BoneModelInlayHintProvider>();
 
         // Variant inheritance (Variant_Of_Existing_Type) - workspace tag source feeds the

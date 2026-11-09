@@ -18,11 +18,11 @@ public sealed record LooseIcon(string Name, string FilePath, string Extension)
     ///     Whether this file is in a format we can actually turn into a preview.
     /// </summary>
     /// <remarks>
-    ///     Covers TGA and DDS (both decoded) plus PNG (passed through as-is). BMP is catalogued but
-    ///     NOT decodable - it was reachable through the previous imaging library and is not through
-    ///     this one - so callers can still report "unsupported icon source format" rather than the
-    ///     misleading "icon not found". DDS moved the other way: it used to be the unsupported case
-    ///     and now works, since the decoder handles it natively.
+    ///     Covers TGA and DDS (decoded by the library), BMP (decoded by this project's own reader
+    ///     since #166) and PNG (passed through as-is). The catalogued-but-undecodable distinction
+    ///     stays in the model for the next format that arrives before its decoder does; today no
+    ///     catalogued format occupies it, and only a file that will not decode is reported as
+    ///     "unsupported icon source format" rather than the misleading "icon not found".
     /// </remarks>
     public bool IsDecodable => LooseIconCatalog.DecodableExtensions.Contains(Extension);
 }
@@ -47,11 +47,10 @@ public sealed record LooseIcon(string Name, string FilePath, string Extension)
 public static class LooseIconCatalog
 {
     internal static readonly ImmutableHashSet<string> DecodableExtensions =
-        ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, ".tga", ".png", ".dds");
+        ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, ".tga", ".png", ".dds", ".bmp");
 
     /// <summary>Extensions catalogued at all - decodable ones plus those we can only diagnose.</summary>
-    private static readonly ImmutableHashSet<string> KnownExtensions =
-        DecodableExtensions.Add(".bmp");
+    private static readonly ImmutableHashSet<string> KnownExtensions = DecodableExtensions;
 
     /// <summary>
     ///     Recursively indexes every icon source under <paramref name="roots" />. Roots read as a

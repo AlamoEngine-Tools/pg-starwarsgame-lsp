@@ -17,7 +17,8 @@ public sealed class LocalisationKeyMultiValueInlayHintProviderTest
         string tagName,
         string innerText,
         ReferenceKind referenceKind,
-        ILocalisationIndex? localisation = null)
+        ILocalisationIndex? localisation = null,
+        int lineEnd = 0)
     {
         var hapDoc = new HtmlDocument();
         hapDoc.LoadHtml($"<{tagName}>{innerText}</{tagName}>");
@@ -30,7 +31,25 @@ public sealed class LocalisationKeyMultiValueInlayHintProviderTest
             : GameIndex.Empty;
 
         return new InlayHintContext("file:///test.xml", index, new SchemaProviderBuilder().Build(), hapDoc, node,
-            tagDef, 0) { Messages = TestCatalogues.English };
+            tagDef, 0, lineEnd) { Messages = TestCatalogues.English };
+    }
+
+    /// <summary>
+    ///     #136: anchored at the end of the line, never past it. The editor compares hint positions as
+    ///     32-bit integers, so an anchor of int.MaxValue overflowed and sorted these texts ahead of the
+    ///     override marker on their line, which the per-line length limit then cut off.
+    /// </summary>
+    [Fact]
+    public void Hints_AreAnchoredAtTheEndOfTheLine_NotPastIt()
+    {
+        const string text = "<Encyclopedia_Text>TEXT_001 TEXT_002</Encyclopedia_Text>";
+        var ctx = MakeCtx("Encyclopedia_Text", "TEXT_001 TEXT_002", ReferenceKind.LocalisationKey,
+            lineEnd: text.Length);
+
+        var hints = new LocalisationKeyMultiValueInlayHintProvider().Handle(ctx).ToList();
+
+        Assert.Equal(2, hints.Count);
+        Assert.All(hints, h => Assert.Equal(text.Length, h.Position.Character));
     }
 
     [Fact]

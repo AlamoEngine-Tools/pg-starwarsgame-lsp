@@ -225,7 +225,10 @@ public sealed class SymbolRelations(
                 .Select(p => ModelLevelTag.Strip(p) + ".alo")
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(p => catalog.Find("particleSystems", p) ?? Missing(p.ToLowerInvariant(), ".alo")),
+            // By the file name the game looks up: a baseline built before #292 still carries the
+            // shipped particle systems' absolute texture names.
             (_, "textures") => index.ModelTextures.GetValueOrDefault(ModelBoneKey.From(entry.Name), [])
+                .Select(GameTextureName.FileName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(t => Texture(t) ?? Missing(t, null)),
             ("animations", "model") => ModelOf(entry.Name),
@@ -447,7 +450,7 @@ public sealed class SymbolRelations(
     // A texture name as one key for its .tga and its .dds, in any case.
     private static string TextureKey(string name)
     {
-        var lower = name.ToLowerInvariant();
+        var lower = GameTextureName.FileName(name).ToLowerInvariant();
         return s_textureInterchange.Contains(Path.GetExtension(lower)) ? Path.ChangeExtension(lower, ".tga") : lower;
     }
 

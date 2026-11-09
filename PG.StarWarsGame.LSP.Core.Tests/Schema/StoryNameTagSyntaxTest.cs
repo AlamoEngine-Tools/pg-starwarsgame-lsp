@@ -91,4 +91,67 @@ public sealed class StoryNameTagSyntaxTest
         Assert.Empty(StoryNameTagSyntax.ReadPairs("rebel_story_name", "   "));
         Assert.Empty(StoryNameTagSyntax.ReadPairs("story_name", ""));
     }
+
+    // ── the sides GameConstants names (#192) ─────────────────────────────────
+
+    // MEASURED on the 2024 64-bit build, in the routine that starts a campaign: a Rebel_Story_Name
+    // loads its plots for the player of the faction GameConstants' Good_Side_Name names, Empire_Story_Name
+    // for Evil_Side_Name's, Underworld_Story_Name for Corrupt_Side_Name's. The tag's prefix is a name
+    // for the slot, not for the faction.
+    private static readonly StorySideNames Renamed = new("Republic", "CIS", "Underworld");
+
+    [Theory]
+    [InlineData("Rebel_Story_Name", "Republic")]
+    [InlineData("empire_story_name", "CIS")]
+    [InlineData("Underworld_Story_Name", "Underworld")]
+    public void FactionOf_a_faction_tag_is_the_side_GameConstants_names(string tagName, string faction)
+    {
+        Assert.Equal(faction, StoryNameTagSyntax.FactionOf(tagName, Renamed));
+    }
+
+    [Fact]
+    public void ReadPairs_of_a_faction_tag_attaches_the_side_faction()
+    {
+        var pair = Assert.Single(StoryNameTagSyntax.ReadPairs("rebel_story_name", "Story_Plots_Rep.xml", Renamed));
+
+        Assert.Equal(("Republic", "Story_Plots_Rep.xml"), pair);
+    }
+
+    [Theory]
+    [InlineData("Republic", "Rebel_Story_Name")]
+    [InlineData("cis", "Empire_Story_Name")]
+    [InlineData("Rebel", null)]
+    [InlineData("Hutts", null)]
+    public void SideTagFor_names_the_tag_of_a_side_and_nothing_for_any_other_faction(string faction, string? tag)
+    {
+        Assert.Equal(tag, StoryNameTagSyntax.SideTagFor(faction, Renamed));
+    }
+
+    [Fact]
+    public void Shipped_sides_are_the_schemas_names_and_the_default_everywhere()
+    {
+        Assert.Equal(new StorySideNames("Rebel", "Empire", "Underworld"), StorySideNames.Shipped);
+        Assert.Equal("Rebel", StoryNameTagSyntax.FactionOf("Rebel_Story_Name"));
+        Assert.Equal("Rebel_Story_Name", StoryNameTagSyntax.SideTagFor("rebel", StorySideNames.Shipped));
+    }
+
+    // The shipped GameConstants spell the sides REBEL, EMPIRE and UNDERWORLD; the schema and every
+    // label spell them Rebel, Empire and Underworld. A side that is the shipped one keeps the
+    // schema's casing, so vanilla output stays as it was; a renamed side is taken as written.
+    [Fact]
+    public void From_GameConstants_keeps_the_shipped_casing_and_takes_a_renamed_side_as_written()
+    {
+        var shipped = StorySideNames.From(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Good_Side_Name"] = "REBEL", ["Evil_Side_Name"] = "EMPIRE", ["Corrupt_Side_Name"] = "UNDERWORLD"
+        });
+        var renamed = StorySideNames.From(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Good_Side_Name"] = " Republic ", ["Evil_Side_Name"] = "EMPIRE"
+        });
+
+        Assert.Equal(StorySideNames.Shipped, shipped);
+        Assert.Equal(new StorySideNames("Republic", "Empire", "Underworld"), renamed);
+        Assert.Equal(StorySideNames.Shipped, StorySideNames.From(new Dictionary<string, string>()));
+    }
 }

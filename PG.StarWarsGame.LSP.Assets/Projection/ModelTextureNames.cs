@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
@@ -26,9 +27,10 @@ public static class ModelTextureNames
 {
     /// <summary>
     ///     Every texture the file names, in declaration order and with duplicates kept (callers
-    ///     dedupe by what they report on). Empty for anything that is not a readable model or
-    ///     particle system - a file we cannot parse is not a missing texture, and claiming one
-    ///     would be a lie.
+    ///     dedupe by what they report on), each as the file name the game looks up
+    ///     (<see cref="GameTextureName.FileName" /> - the shipped particle systems name theirs by an
+    ///     absolute path, #292). Empty for anything that is not a readable model or particle system -
+    ///     a file we cannot parse is not a missing texture, and claiming one would be a lie.
     /// </summary>
     public static IReadOnlyList<string> Read(byte[] bytes)
     {
@@ -78,7 +80,7 @@ public static class ModelTextureNames
         foreach (var parameter in sub.Parameters)
             if (parameter.Type == AlamoShaderParameterType.Texture
                 && !string.IsNullOrWhiteSpace(parameter.Texture))
-                names.Add(parameter.Texture);
+                names.Add(GameTextureName.FileName(parameter.Texture));
 
         return names;
     }
@@ -90,10 +92,10 @@ public static class ModelTextureNames
         foreach (var emitter in AloParticleReader.Read(bytes).Emitters)
         {
             if (!string.IsNullOrWhiteSpace(emitter.ColorTexture))
-                names.Add(emitter.ColorTexture);
+                names.Add(GameTextureName.FileName(emitter.ColorTexture));
 
             if (!string.IsNullOrWhiteSpace(emitter.NormalTexture))
-                names.Add(emitter.NormalTexture);
+                names.Add(GameTextureName.FileName(emitter.NormalTexture));
         }
 
         return names;

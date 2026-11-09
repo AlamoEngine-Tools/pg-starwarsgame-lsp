@@ -27,6 +27,11 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 ///         one, but should only specify one." So it mirrors <c>Garrison_Category</c> exactly.
 ///     </para>
 ///     <para>
+///         <c>Disregard_Space_Layer_For_Guard_Attack_Move</c> is the one tag here with a binary
+///         behind it: the 2024 64-bit build parses it as a yes/no flag on a game object type and reads
+///         it through a getter of the same name; the 2018 build has no such row (#194).
+///     </para>
+///     <para>
 ///         Deliberately NOT added here: <c>&lt;Text&gt;</c> on <c>CommandBarComponent</c>. The note
 ///         is a single clause - "adding &lt;Text&gt; option" - with nothing to say whether it takes
 ///         a localisation key or a literal string, and no shipped data exercises it. Guessing would
@@ -39,6 +44,13 @@ public sealed class EawSchemaPostPatchTagTest
     public void MoveAttackWhileStopped_IsABoolean()
     {
         Assert.Equal(XmlValueType.Boolean, Tag("GameObjectType.yaml", "MoveAttackWhileStopped").ValueType);
+    }
+
+    [Fact]
+    public void DisregardSpaceLayerForGuardAttackMove_IsABoolean()
+    {
+        Assert.Equal(XmlValueType.Boolean,
+            Tag("GameObjectType.yaml", "Disregard_Space_Layer_For_Guard_Attack_Move").ValueType);
     }
 
     // Same tag by another name, so it has to carry the same typing or one spelling validates

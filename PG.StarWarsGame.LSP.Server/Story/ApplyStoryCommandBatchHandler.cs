@@ -35,6 +35,7 @@ public sealed class ApplyStoryCommandBatchHandler(
     IModProjectReloadService reloadService,
     IWorkspaceEditApplier applier,
     ILspConfigurationProvider config,
+    IStorySideNamesSource sides,
     ILogger<ApplyStoryCommandBatchHandler> logger,
     IMessageCatalog messages)
     : IJsonRpcRequestHandler<ApplyStoryCommandBatchParams, ApplyStoryCommandBatchResult>
@@ -65,7 +66,7 @@ public sealed class ApplyStoryCommandBatchHandler(
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService, logger,
-            messages);
+            messages, sides);
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, error) = executor.Compose(

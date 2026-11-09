@@ -22,6 +22,12 @@ using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
+/// <summary>The shipped sides, for handlers whose test campaigns name no other (#192).</summary>
+internal sealed class ShippedSides : IStorySideNamesSource
+{
+    public StorySideNames Current => StorySideNames.Shipped;
+}
+
 /// <summary>
 ///     Shared test doubles and sample story data for the story command executor and its batch/
 ///     validate handlers. The dependencies are wired against one <see cref="MockFileSystem" /> so the
