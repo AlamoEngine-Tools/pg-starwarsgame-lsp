@@ -915,7 +915,7 @@
     "@wdio/cli": "^9.32.0",
     "@wdio/local-runner": "^9.32.0",
     "@wdio/mocha-framework": "^9.32.0",
-    "@wdio/spec-reporter": "^9.32.0",
+    "@wdio/spec-reporter": "^10.2.0",
     "dompurify": "^3.4.17",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
