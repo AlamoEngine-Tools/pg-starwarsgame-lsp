@@ -1,0 +1,7 @@
+﻿<?xml version="1.0"?>
+<GuardUnits>
+<SpaceUnit Name="Guard_Unit">
+<Disregard_Space_Layer_For_Guard_Attack_Move>Yes</Disregard_Space_Layer_For_Guard_Attack_Move>
+<Zzq_Not_A_Tag>1</Zzq_Not_A_Tag>
+</SpaceUnit>
+</GuardUnits>

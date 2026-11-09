@@ -17,6 +17,9 @@
   too, and an event or a transition links the state spelled like its name. The key no event spells the same
   way keeps its case-only-match warning (`References36`). A name registered twice keeps one state with the
   later function, as the library does
+- **`Disregard_Space_Layer_For_Guard_Attack_Move` is a known tag** - the 64-bit game reads this yes/no flag on a
+  game object type, and the schema now declares it, so the tag no longer gets an unknown-tag finding
+  (`Structure12`)
 
 ## 0.5.0
 
