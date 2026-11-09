@@ -8,7 +8,7 @@
   library's project file at the root and its mods in subfolders showed only the root project: every project
   file under it was taken as the root project's dependency, and the mods' files went to a server that never
   indexed them, with no entry in the views, no findings and no error. A nested project file counts as a
-  dependency only when the project around it references it or declares the directory it sits in; otherwise
+  dependency only when the surrounding project references it or declares the directory it sits in; otherwise
   it runs its own server, and the root project's server serves nothing inside it
 - **A story script with two state names differing only in case loads in the Campaign Editor** - a
   `StoryModeEvents` table holding `Story_Enter_1_SECTOR_FORCES` and `Story_Enter_1_Sector_Forces` failed the
@@ -37,13 +37,20 @@
   their sprite sheets by the art machine's path, `C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga`
   and two more, in 37 files per game. The game opens the part after the last backslash in its texture
   directories, and they render; the Mod Browser, the particle preview and the XML check reported every one of
-  them missing (`Assets12`). All three now look the file name up, as the game does
+  them missing (`Assets12`). All three now look the file name up, as the game does, and the XML check says
+  that the texture is named by a path, as an information (`Assets21`): the game keeps the file name, and the
+  path belongs to another machine
 - **The dedicated story tags attach the sides GameConstants names** - `Rebel_Story_Name`,
   `Empire_Story_Name` and `Underworld_Story_Name` attach their plots to the factions `Good_Side_Name`,
   `Evil_Side_Name` and `Corrupt_Side_Name` name, which is what the game's campaign start does; a mod that
   renames its good side to Republic runs `Rebel_Story_Name` for Republic. The Campaign Editor, the simulator,
   the attachment check (`Story10`, `Story9`) and the attach-plot command follow the renamed side; the shipped
   names stay as they were
+
+### Diagnostic IDs
+
+- **New** - `Assets21` (`aetswg-004-0021`, information: a model or particle system names a texture by a path,
+  of which the game keeps the file name)
 
 ### Building and releasing
 

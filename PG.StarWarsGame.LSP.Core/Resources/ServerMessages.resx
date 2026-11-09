@@ -1417,6 +1417,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="ModelTextureExistence_ModelReferencesTextureWhichWas" xml:space="preserve">
     <value>Model '{0}' references texture '{1}', which was not found in the game data or workspace asset files. The reference is inside the model, so the fix is in the art rather than on this line.</value>
   </data>
+  <data name="ModelTextureExistence_ModelNamesTextureByPath" xml:space="preserve">
+    <value>Model '{0}' names its texture by a path, '{1}'. The game keeps the file name '{2}' and looks it up in its texture directories. The reference is inside the model, so the fix is in the art rather than on this line.</value>
+  </data>
   <data name="MovieFrameTrigger_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>

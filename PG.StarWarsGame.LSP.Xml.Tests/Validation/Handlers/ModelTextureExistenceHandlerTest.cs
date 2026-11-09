@@ -65,27 +65,47 @@ public sealed class ModelTextureExistenceHandlerTest
     /// <summary>
     ///     #292: the shipped particle systems name their sprite sheets by the art machine's absolute
     ///     path. The game looks the part after the last backslash up in its texture directories, and
-    ///     they render; so does this check.
+    ///     they render; so does this check. The path itself is still said, as an information: nobody
+    ///     wants an art machine's path in their files, and the game keeps the file name.
     /// </summary>
     [Fact]
-    public void TextureNamedByAnAbsolutePath_ResolvesByItsFileName()
+    public void TextureNamedByAnAbsolutePath_ResolvesByItsFileName_AndIsSaidAsAnInformation()
     {
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "p_engines.alo");
         var ctx = CtxWith(new FakeModelTextures(@"C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga"),
             "data/art/models/p_engines.alo", "data/art/textures/p_particle_master.tga");
 
-        Assert.Empty(Sut.Handle(fact, ctx));
+        var d = Assert.Single(Sut.Handle(fact, ctx));
+
+        Assert.Equal(XmlDiagnosticSeverity.Information, d.Severity);
+        Assert.Equal(DiagnosticIds.ModelTextureNamedByPath, d.Id);
+        Assert.Contains(@"C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga", d.Message);
+        Assert.Contains("p_particle_master.tga", d.Message);
+        Assert.Contains("p_engines.alo", d.Message);
     }
 
     [Fact]
-    public void TextureNamedByAnAbsolutePath_IsReportedByItsFileName_WhenThatIsMissing()
+    public void TextureNamedByAnAbsolutePath_IsReportedMissingByItsFileName_BesideTheInformation()
     {
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "p_engines.alo");
         var ctx = CtxWith(new FakeModelTextures(@"C:\Projects\Starwars\Art\Textures\Game\p_gone.tga"),
             "data/art/models/p_engines.alo");
 
-        var d = Assert.Single(Sut.Handle(fact, ctx));
-        Assert.Contains("p_gone.tga", d.Message);
+        var results = Sut.Handle(fact, ctx).ToList();
+
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.Severity == XmlDiagnosticSeverity.Warning && r.Message.Contains("p_gone.tga"));
+        Assert.Contains(results, r => r.Id == DiagnosticIds.ModelTextureNamedByPath);
+    }
+
+    [Fact]
+    public void TextureNamedByItsFileName_GetsNoInformation()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "ev_ship.alo");
+        var ctx = CtxWith(new FakeModelTextures("hull.tga"),
+            "data/art/models/ev_ship.alo", "data/art/textures/hull.tga");
+
+        Assert.Empty(Sut.Handle(fact, ctx));
     }
 
     [Fact]

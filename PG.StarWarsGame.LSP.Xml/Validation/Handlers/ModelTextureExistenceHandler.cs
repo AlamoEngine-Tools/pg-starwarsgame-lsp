@@ -69,6 +69,13 @@ public sealed class ModelTextureExistenceHandler : XmlDiagnosticsHandler<XmlTagV
                 if (string.IsNullOrEmpty(name) || !reported.Add(name))
                     continue;
 
+                // Emulate, then say so: the game resolves a path-named texture by its file name, so it
+                // is not missing - but an art machine's path is nobody's intention in a shipped file.
+                if (!string.Equals(name, texture.Trim(), StringComparison.Ordinal))
+                    results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Information,
+                        ctx.Messages.Format("ModelTextureExistence_ModelNamesTextureByPath", model, texture.Trim(),
+                            name), Id: DiagnosticIds.ModelTextureNamedByPath));
+
                 if (AssetFileLookup.Resolves(
                         ctx.Index.AssetFiles, name, TextureExtensions, TextureExtensions))
                     continue;

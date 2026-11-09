@@ -403,6 +403,16 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId LuaScriptOutsideGameObject = new(DiagnosticGroup.Assets, 20);
 
+    /// <summary>
+    ///     A model or particle system names one of its textures by a path, such as the art machine's
+    ///     <c>C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga</c> the shipped particle
+    ///     systems carry. The game keeps the part after the last backslash and looks that up in its
+    ///     texture directories, so the texture resolves; the path is still nobody's intention and
+    ///     belongs to another machine. Information, reported against the tag that pulls the model in,
+    ///     like <see cref="ModelTextureExistence" /> (#292).
+    /// </summary>
+    public static readonly DiagnosticId ModelTextureNamedByPath = new(DiagnosticGroup.Assets, 21);
+
     // ── Localisation ──
     public static readonly DiagnosticId LocalisationKeyExistence = new(DiagnosticGroup.Localisation, 1);
     public static readonly DiagnosticId LocalisationKeyListExistence = new(DiagnosticGroup.Localisation, 2);
