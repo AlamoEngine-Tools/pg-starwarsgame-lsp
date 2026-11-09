@@ -20,6 +20,10 @@
 - **`Disregard_Space_Layer_For_Guard_Attack_Move` is a known tag** - the 64-bit game reads this yes/no flag on a
   game object type, and the schema now declares it, so the tag no longer gets an unknown-tag finding
   (`Structure12`)
+- **A variant's `Encyclopedia_Text` says what it overrides** - the localisation texts of the keys were anchored
+  past the end of the line, which the editor sorts ahead of everything on it, and it cuts a line's hints off
+  past a length, so on a line with texts the `overrides ...` marker was the part cut off. The markers now come
+  first on every line; a long text is what gets cut
 
 ### Building and releasing
 

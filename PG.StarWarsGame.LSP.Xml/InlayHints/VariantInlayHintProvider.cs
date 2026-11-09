@@ -46,7 +46,9 @@ internal sealed class VariantInlayHintProvider : IXmlInlayHintProvider
         [
             new InlayHint
             {
-                Position = new Position(ctx.Line, int.MaxValue),
+                // Inside the line: an anchor of int.MaxValue overflows the editor's 32-bit position
+                // comparison and sorts the hint ahead of everything on its line (#136).
+                Position = new Position(ctx.Line, ctx.LineEndCharacter),
                 Label = label!,
                 Kind = InlayHintKind.Type,
                 PaddingLeft = true

@@ -1,0 +1,21 @@
+﻿<?xml version="1.0"?>
+<EncyUnits>
+<SpaceUnit Name="Ency_Base">
+<Text_ID>TEXT_ENCY_BASE</Text_ID>
+<Encyclopedia_Text>TEXT_ENCY_BASE_1 TEXT_ENCY_BASE_2</Encyclopedia_Text>
+<Tech_Level>1</Tech_Level>
+</SpaceUnit>
+<SpaceUnit Name="Ency_Variant">
+<Variant_Of_Existing_Type>Ency_Base</Variant_Of_Existing_Type>
+<Text_ID>TEXT_ENCY_VARIANT</Text_ID>
+<Encyclopedia_Text>TEXT_ENCY_VARIANT_1 TEXT_ENCY_VARIANT_2</Encyclopedia_Text>
+<Tech_Level>2</Tech_Level>
+</SpaceUnit>
+<SpaceUnit Name="Ency_Same">
+<Variant_Of_Existing_Type>Ency_Base</Variant_Of_Existing_Type>
+<Encyclopedia_Text>
+	TEXT_ENCY_BASE_1
+	TEXT_ENCY_BASE_2
+</Encyclopedia_Text>
+</SpaceUnit>
+</EncyUnits>
