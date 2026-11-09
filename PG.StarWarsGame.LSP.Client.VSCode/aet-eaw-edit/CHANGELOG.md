@@ -27,6 +27,8 @@
   template and fails the type check forty lines away under another name; the lint meant to catch it first never
   matched that file, as a stray control character sat in its pattern. It does now, and a test plants the backtick
   to keep it so
+- **The pull request build type-checks the client on its own** - `check-types` runs before the lint and the unit
+  tests, so a type error is reported as one rather than as a packaging failure
 
 ## 0.5.0
 
