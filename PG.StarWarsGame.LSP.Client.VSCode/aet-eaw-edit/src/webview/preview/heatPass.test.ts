@@ -15,6 +15,7 @@ import { HeatPass } from "./heatPass";
 class RecordingRenderer {
     readonly calls: string[] = [];
     autoClear = true;
+    outputColorSpace: THREE.ColorSpace = THREE.SRGBColorSpace;
     private target: THREE.WebGLRenderTarget | null = null;
     private readonly clearColor = new THREE.Color(0, 0, 0);
     private clearAlpha = 1;
@@ -34,8 +35,18 @@ class RecordingRenderer {
     setClearColor(color: THREE.Color, alpha: number): void {
         this.clearColor.copy(color);
         this.clearAlpha = alpha;
-        // The raw channel, not the hex string: colour management would encode it on the way out.
-        this.calls.push(`setClearColor(${Math.round(color.r * 255)})`);
+        // The channel the BUFFER receives, converted as three converts a clear: to the canvas's
+        // output colour space when the canvas is bound, to the working space for a target. The
+        // stored channel is not what lands - recording it hid a neutral that reached the canvas as
+        // 188 and pulled the whole frame to one side.
+        const out = { r: 0, g: 0, b: 0 };
+        color.getRGB(
+            out,
+            this.target === null
+                ? this.outputColorSpace
+                : THREE.LinearSRGBColorSpace,
+        );
+        this.calls.push(`setClearColor(${Math.round(out.r * 255)})`);
     }
 
     setRenderTarget(target: THREE.WebGLRenderTarget | null): void {
@@ -98,6 +109,21 @@ describe("HeatPass", () => {
             "setRenderTarget(canvas)",
             "render(quad -> canvas, autoClear=true)",
         ]);
+    });
+
+    // The composite subtracts 128/255, so 128 is "no offset" whatever the canvas encodes into.
+    it("clears the field to 128 on a linear canvas too", () => {
+        const renderer = new RecordingRenderer();
+        renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+        const pass = new HeatPass(3);
+
+        pass.render(
+            renderer as unknown as THREE.WebGLRenderer,
+            new THREE.Scene(),
+            new THREE.PerspectiveCamera(),
+        );
+
+        assert.ok(renderer.calls.includes("setClearColor(128)"));
     });
 
     it("hands the camera's layers and the renderer's clearing back as it found them", () => {

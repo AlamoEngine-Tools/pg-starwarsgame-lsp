@@ -60,13 +60,6 @@ const DISTORTION_AMOUNT = 0.05;
  */
 const NEUTRAL_CHANNEL = 128 / 255;
 
-/** Zero distortion, as a colour to clear with. */
-const NEUTRAL_HEAT = new THREE.Color(
-    NEUTRAL_CHANNEL,
-    NEUTRAL_CHANNEL,
-    NEUTRAL_CHANNEL,
-);
-
 const COMPOSITE_VERTEX_SHADER = `
 varying vec2 vUv;
 
@@ -147,6 +140,8 @@ export class HeatPass {
     /** Reused so a frame of rendering allocates nothing. */
     private readonly size = new THREE.Vector2();
     private readonly previousClear = new THREE.Color();
+    /** Zero distortion, as a colour to clear with - see `render` for why it is set per frame. */
+    private readonly neutral = new THREE.Color();
 
     constructor(private readonly heatLayer: number) {
         this.composite = new THREE.ShaderMaterial({
@@ -212,7 +207,18 @@ export class HeatPass {
         // paint over the neutral field with a flat colour that decodes to a hard pull to one side.
         camera.layers.set(this.heatLayer);
         scene.background = null;
-        renderer.setClearColor(NEUTRAL_HEAT, 1);
+        // three converts a clear on the canvas from its working space - linear - into the canvas's
+        // output space, so the neutral has to be named IN that space to land as 128. Named as a
+        // plain 128/255 it was encoded on the way and the canvas stored 188: every pixel nothing
+        // bent was read from 2.35% of the frame up and to the right, which slid the model, its arcs
+        // and its handles off the bone tags, the reticles and the pointer's hit test.
+        this.neutral.setRGB(
+            NEUTRAL_CHANNEL,
+            NEUTRAL_CHANNEL,
+            NEUTRAL_CHANNEL,
+            renderer.outputColorSpace,
+        );
+        renderer.setClearColor(this.neutral, 1);
         renderer.clear(true, false, false);
         const autoClear = renderer.autoClear;
         renderer.autoClear = false;

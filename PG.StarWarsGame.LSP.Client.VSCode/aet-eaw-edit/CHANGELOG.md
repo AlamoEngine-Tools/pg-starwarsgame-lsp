@@ -22,6 +22,11 @@
   word-aware comparison that let the underscore slide, so `2_Warpod` jumped ahead of `2M_Repulsor_Tank` once
   the header was clicked. Text columns now sort the way the list opens
   ([#382](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/382))
+- **Bend the frame no longer moves the whole picture** - the heat pass clears its distortion field to a
+  neutral value, and that value reached the canvas colour-converted, so every pixel nothing bent was read from
+  2.35% of the frame up and to the right. The model, its firing arcs and its turret handles drew away from the
+  bone tags, the targeting reticles and the spot the pointer had to grab. The neutral now lands as itself and
+  the frame stays put wherever no heat effect bends it
 
 ## 0.5.1
 
