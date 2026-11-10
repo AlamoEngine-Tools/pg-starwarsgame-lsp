@@ -259,6 +259,7 @@ import {
 import {
     aimText,
     handlesForShownArcs,
+    restAim,
     TURRET_AT_REST,
     type TurretAim,
 } from "./preview/turretHandles";
@@ -6459,22 +6460,29 @@ function ModelPreview(): React.JSX.Element {
         // the model, and Gameplay is the only lens that carries the pill that switches it off.
         viewport.setTurretHandles(annotate ? draggableTurrets : []);
 
+        // Every turret, from BOTH places one can be declared, at the rest the game steers it to -
+        // a turret with nothing written rests where the model put it.
         viewport.setTurretRestAngles(
-            (scene?.hardpoints ?? []).flatMap((hardpoint) => {
-                const turret = hardpoint.turret;
+            [
+                ...(scene?.hardpoints ?? []).map((hardpoint) => ({
+                    partId: hardpoint.partId ?? "hull",
+                    turret: hardpoint.turret,
+                })),
+                ...weapons.map((weapon) => ({
+                    partId: weapon.partId,
+                    turret: weapon.turret,
+                })),
+            ].flatMap(({ partId, turret }) => {
                 const bone = turret?.turretBone ?? "";
 
-                return turret === null ||
-                    turret === undefined ||
-                    bone === "" ||
-                    turret.restAngle === null ||
-                    turret.restAngle === undefined
+                return turret === null || turret === undefined || bone === ""
                     ? []
                     : [
                           {
-                              partId: hardpoint.partId ?? "hull",
-                              bone,
-                              restAngleDegrees: turret.restAngle,
+                              partId,
+                              turretBone: bone,
+                              barrelBone: turret.barrelBone ?? null,
+                              rest: restAim(turret),
                           },
                       ];
             }),

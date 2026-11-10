@@ -537,5 +537,20 @@
   },
   "XML-33": {
     "open": "{repo}\\foc"
+  },
+  "PRV-39": {
+    "open": "{repo}\\foc"
+  },
+  "PRV-40": {
+    "open": "C:\\temp\\aet-test-PRV-samples"
+  },
+  "PRV-41": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-42": {
+    "open": "{repo}\\foc"
+  },
+  "PRJ-29": {
+    "open": "{repo}\\eaw-foc.code-workspace"
   }
 }

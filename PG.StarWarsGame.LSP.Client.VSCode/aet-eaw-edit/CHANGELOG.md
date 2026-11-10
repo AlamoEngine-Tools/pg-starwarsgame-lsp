@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.5.2
+
+### Fixes
+
+- **Turrets rest where the model put them** - the assembled-unit preview wrote a turret's rest angle straight
+  into the turret bone, which threw the pose the exporter authored away and turned every turret whose bone was
+  not axis-aligned, a quarter turn on most. The game composes a turret's turn on top of the bone it computed from
+  the file, and the preview now does the same: the rest pose, the sweep and the drag handles all turn the
+  authored pose rather than replace it. The rest pose is read as the game reads it - a hardpoint turret rests at
+  its `Turret_Rotation_Offset` (Y the pitch, Z the yaw) and a unit's own turret at its `Turret_Rest_Angle`; a
+  hardpoint's `Turret_Rest_Angle` is logged by the game and poses nothing
+  ([#389](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/389))
+- **A sample's references count the SFX events naming it** - an SFXEvent names its samples by their
+  game-relative path and the Mod Browser's Audio page lists a file by its name; the lookup between the two took
+  the written path as its key, so every sample's References read 0 and an event's Samples relation showed its
+  files as missing. Both directions now meet on the file name, as the Textures page already did
+  ([#380](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/380))
+- **Sorting a Mod Browser column by name gives the order the list opened with** - the list opens in the plain
+  character order, case folded, where an underscore sorts after the letters; the sorted column ran through a
+  word-aware comparison that let the underscore slide, so `2_Warpod` jumped ahead of `2M_Repulsor_Tank` once
+  the header was clicked. Text columns now sort the way the list opens
+  ([#382](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/382))
+- **Bend the frame no longer moves the whole picture** - the heat pass clears its distortion field to a
+  neutral value, and that value reached the canvas colour-converted, so every pixel nothing bent was read from
+  2.35% of the frame up and to the right. The model, its firing arcs and its turret handles drew away from the
+  bone tags, the targeting reticles and the spot the pointer had to grab. The neutral now lands as itself and
+  the frame stays put wherever no heat effect bends it
+- **One status bar item while the projects load** - each server reported its own startup as progress, and VS
+  Code showed that as a second footer, "Star Wars LSP - starting", beside the EaWEdit LSP item. The EaWEdit LSP
+  item is the only one again, every project's state in its tooltip
+
 ## 0.5.1
 
 ### Fixes

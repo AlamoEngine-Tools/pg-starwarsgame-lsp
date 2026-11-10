@@ -210,21 +210,32 @@ public sealed class SymbolCatalog
         return new GetSymbolPageResult(slice, filtered.Count) { Kinds = KindCounts(rows, unkinded) };
     }
 
-    // A column's order, ties by name. Origins run from the project's own layer down to the game's -
-    // the leafiest layer first - and a name nothing defines last; an unknown column keeps the list's.
+    // A column's order, ties by name. Text columns sort in the plain character order, case folded -
+    // the order a list opens with and its ids are kept in; a culture comparison let an underscore
+    // slide past the letters, so a sorted column disagreed with the unsorted list (#382). Origins
+    // run from the project's own layer down to the game's - the leafiest layer first - and a name
+    // nothing defines last; an unknown column keeps the list's.
     private static List<SymbolRow> Sorted(List<SymbolRow> rows, string column, bool descending)
     {
-        Func<SymbolRow, IComparable>? key = column switch
+        Func<SymbolRow, string>? text = column switch
         {
-            "name" => r => r.Name.ToLowerInvariant(),
-            "type" => r => (r.Type ?? string.Empty).ToLowerInvariant(),
-            "kinds" => r => string.Join(",", r.Kinds).ToLowerInvariant(),
-            "value" => r => (r.Value ?? string.Empty).ToLowerInvariant(),
-            "origin" => r => OriginRank(r.Origin),
+            "name" => r => r.Name,
+            "type" => r => r.Type ?? string.Empty,
+            "kinds" => r => string.Join(",", r.Kinds),
+            "value" => r => r.Value ?? string.Empty,
             _ => null
         };
-        if (key is null) return rows;
-        var ordered = descending ? rows.OrderByDescending(key) : rows.OrderBy(key);
+        IOrderedEnumerable<SymbolRow> ordered;
+        if (text is not null)
+            ordered = descending
+                ? rows.OrderByDescending(text, StringComparer.OrdinalIgnoreCase)
+                : rows.OrderBy(text, StringComparer.OrdinalIgnoreCase);
+        else if (column == "origin")
+            ordered = descending
+                ? rows.OrderByDescending(r => OriginRank(r.Origin))
+                : rows.OrderBy(r => OriginRank(r.Origin));
+        else
+            return rows;
         return [.. ordered.ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)];
     }
 

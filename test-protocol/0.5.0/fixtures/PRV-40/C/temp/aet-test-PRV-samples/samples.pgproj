@@ -1,0 +1,1 @@
+﻿{"_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.1.0", "game": "eaw", "name": "Samples Mod", "directories": {"xml": ["data/xml"], "audio": ["data/audio"]}, "projectReferences": []}

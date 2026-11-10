@@ -308,6 +308,11 @@ const TURRET_HANDLE_RENDER_ORDER = 3;
 /** The two axes, in the order a reader meets them: traverse first, then elevation. */
 const TURRET_AXES: readonly TurretAxis[] = ["yaw", "pitch"];
 
+/** One turret bone across the lists that name it: by its part and its name, case folded. */
+function restKey(partId: string, bone: string): string {
+    return `${partId}/${bone.toLowerCase()}`;
+}
+
 /** One axis of one handle: its track, its stops, its knob, and the range it was built for. */
 interface TurretHandleParts {
     /**
@@ -1086,6 +1091,12 @@ export class PreviewViewport {
      */
     private turretHandles: TurretHandle[] = [];
     private readonly turretAims = new Map<string, TurretAim>();
+    /**
+     * The pose each turret rests in, by part and turret bone, as an aim off the authored pose.
+     * A handle's aim is measured from it, as the sweep is, the way the game measures a turret's
+     * swing from its rest vector.
+     */
+    private readonly turretRests = new Map<string, TurretAim>();
     /** The knob under the pointer, and the one being dragged. At most one of each. */
     private hoveredTurretAxis: { id: string; axis: TurretAxis } | null = null;
     private turretDrag: {
@@ -2462,6 +2473,12 @@ export class PreviewViewport {
     /**
      * Poses turrets at their rest angle.
      *
+     * COMPOSED on the pose the model authored, through the same `aimBone` the sweep and the
+     * handles use: the game applies a turret's turn on top of the bone it computed from the file,
+     * so a rest angle is a turn off the authored pose and never a replacement for it. Writing the
+     * angle into the bone's Z rotation outright threw the authored yaw away and turned every turret
+     * whose bone the exporter had oriented - a quarter turn on most (#389).
+     *
      * Traverse is about the bone's local Z. Alamo is Z-up, and the exporter's Z-up-to-Y-up rotation
      * sits on the ROOT node, so a bone's own axes still follow the file's convention - the same one
      * the fire bones showed: X forward, Y lateral, Z up.
@@ -2469,18 +2486,30 @@ export class PreviewViewport {
     setTurretRestAngles(
         poses: readonly {
             partId: string;
-            bone: string;
-            restAngleDegrees: number;
+            turretBone: string;
+            barrelBone: string | null;
+            rest: TurretAim;
         }[],
     ): void {
+        this.turretRests.clear();
         for (const pose of poses) {
-            const bone = this.parts
-                .get(pose.partId)
-                ?.bones.get(pose.bone.toLowerCase());
-            if (bone !== undefined) {
-                bone.rotation.z = pose.restAngleDegrees * (Math.PI / 180);
+            this.turretRests.set(
+                restKey(pose.partId, pose.turretBone),
+                pose.rest,
+            );
+            const part = this.parts.get(pose.partId);
+            const turret = part?.bones.get(pose.turretBone.toLowerCase());
+            if (turret === undefined) {
+                continue;
             }
+            const barrel =
+                pose.barrelBone === null
+                    ? undefined
+                    : part?.bones.get(pose.barrelBone.toLowerCase());
+            this.poseTurretBones(turret, barrel, pose.rest);
         }
+        // A held or shown handle is an aim off the rest pose, so it follows the rest.
+        this.applyTurretAims();
     }
 
     /**
@@ -5873,6 +5902,27 @@ export class PreviewViewport {
                 ? undefined
                 : this.turretBoneNode(handle.partId, handle.barrelBone);
 
+        // Off the rest pose, which is what the handle reads out and what the sweep swings about.
+        const rest =
+            this.turretRests.get(restKey(handle.partId, handle.turretBone)) ??
+            TURRET_AT_REST;
+        this.poseTurretBones(turret, barrel, {
+            yaw: rest.yaw + aim.yaw,
+            pitch: rest.pitch + aim.pitch,
+        });
+    }
+
+    /**
+     * Turns a turret's bones to an aim measured from the pose the model authored.
+     *
+     * The barrel carries the elevation when the model separates the two; one bone does both
+     * otherwise, the elevation composed after the traverse.
+     */
+    private poseTurretBones(
+        turret: THREE.Object3D,
+        barrel: THREE.Object3D | undefined,
+        aim: TurretAim,
+    ): void {
         // NEGATIVE elevation, so a positive pitch is nose up: rotating about +Y takes local +X,
         // which is forward, towards -Z, and Z is up.
         if (barrel !== undefined) {

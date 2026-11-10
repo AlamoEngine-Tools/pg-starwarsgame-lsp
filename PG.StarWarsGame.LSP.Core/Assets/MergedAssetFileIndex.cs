@@ -101,7 +101,8 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
     /// </summary>
     public static string FileNameOf(string path)
     {
-        var slash = path.LastIndexOf('/');
+        // Either separator: the index's own paths use '/', a path as an XML tag writes it '\'.
+        var slash = path.LastIndexOfAny(['/', '\\']);
         return slash < 0 ? path : path[(slash + 1)..];
     }
 

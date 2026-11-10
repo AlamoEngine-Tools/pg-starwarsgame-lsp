@@ -135,11 +135,12 @@ const CONTINUOUS_TURN_DEGREES = 180;
 
 export function sweepAngles(turret: PreviewTurret, phase: number): SweepPose {
     const rest = turret.restAngle ?? 0;
+    const restPitch = turret.restPitch ?? 0;
     const rotateExtent = turret.rotateExtentDegrees ?? 0;
     const elevateExtent = turret.elevateExtentDegrees ?? 0;
 
     if (rotateExtent <= 0 && elevateExtent <= 0) {
-        return { rotate: rest, elevate: 0 };
+        return { rotate: rest, elevate: restPitch };
     }
 
     const rotate =
@@ -151,7 +152,7 @@ export function sweepAngles(turret: PreviewTurret, phase: number): SweepPose {
     // number for both would tip a turret through the hull it stands on.
     return {
         rotate,
-        elevate: Math.sin(phase * 2 * Math.PI) * elevateExtent,
+        elevate: restPitch + Math.sin(phase * 2 * Math.PI) * elevateExtent,
     };
 }
 

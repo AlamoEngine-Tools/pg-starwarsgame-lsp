@@ -1,10 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Preview;
-using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Preview.Sections;
 
@@ -60,14 +57,19 @@ public static class PreviewFireArcs
 
         // EFFECTIVE, not authored: the client clamps a drag handle to these, and the two owners
         // default differently. See DefaultHardpointRotateExtentDegrees.
+        // The rest pose is the ROTATION OFFSET: the game snaps a hardpoint turret to its Z when the
+        // hardpoint is set up and steers back to the whole vector with no target, Y the pitch and Z
+        // the yaw. Its Turret_Rest_Angle is read for a log line and poses nothing (#389).
+        var rest = PreviewTagReader.Vector3Tag(effective, "Turret_Rotation_Offset");
         return new PreviewTurret(
-            effective.FloatOf("Turret_Rest_Angle"),
+            rest?.Z,
             effective.FloatOf("Turret_Rotate_Extent_Degrees")
             ?? DefaultHardpointRotateExtentDegrees,
             effective.FloatOf("Turret_Elevate_Extent_Degrees")
             ?? DefaultHardpointElevateExtentDegrees,
             effective.ValueOf("Turret_Bone_Name"),
-            effective.ValueOf("Barrel_Bone_Name"));
+            effective.ValueOf("Barrel_Bone_Name"),
+            RestPitch: rest?.Y);
     }
 
     /// <summary>
@@ -89,8 +91,11 @@ public static class PreviewFireArcs
         // deployed pair has the same defaults, and Adjust_Turret_Facing swaps it in
         // whenever the unit is deployed - so only a unit that can deploy gets one.
         var canDeploy = CanDeploy(effective);
+        // A unit turret rests at its Turret_Rest_Angle, the no-target pose the game steers it to:
+        // Y the pitch, Z the yaw (#389).
+        var rest = PreviewTagReader.Vector3Tag(effective, "Turret_Rest_Angle");
         return new PreviewTurret(
-            null,
+            rest?.Z,
             effective.FloatOf("Turret_Rotate_Extent_Degrees")
             ?? DefaultTurretRotateExtentDegrees,
             effective.FloatOf("Turret_Elevate_Extent_Degrees")
@@ -102,7 +107,8 @@ public static class PreviewFireArcs
                 : null,
             canDeploy
                 ? effective.FloatOf("Deployed_Turret_Elevate_Extent_Degrees") ?? DefaultTurretElevateExtentDegrees
-                : null);
+                : null,
+            rest?.Y);
     }
 
     /// <summary>

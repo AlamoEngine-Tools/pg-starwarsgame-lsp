@@ -14,6 +14,7 @@ import {
     clampAxis,
     dragToAim,
     handlesForShownArcs,
+    restAim,
     turretEnvelopes,
     turretHandles,
 } from "./turretHandles";
@@ -317,5 +318,24 @@ describe("handlesForShownArcs", () => {
             ),
             [],
         );
+    });
+});
+
+// The pose a turret rests in, as an aim off the pose the model authored: the game composes its
+// turret transform onto the bone it computed, it never replaces the bone (#389).
+describe("restAim", () => {
+    it("is the rest yaw and pitch the server read, as an aim", () => {
+        assert.deepEqual(restAim({ restAngle: 25, restPitch: 10 }), {
+            yaw: 25,
+            pitch: 10,
+        });
+    });
+
+    it("is the authored pose when nothing is written", () => {
+        assert.deepEqual(restAim({ restAngle: null, restPitch: undefined }), {
+            yaw: 0,
+            pitch: 0,
+        });
+        assert.deepEqual(restAim(null), { yaw: 0, pitch: 0 });
     });
 });

@@ -1,0 +1,11 @@
+﻿<?xml version="1.0"?>
+<SFXEventList>
+<SFXEvent Name="Unit_Speed_Sample">
+<Use_Preset>Preset_UR</Use_Preset>
+<Samples>
+Data\Audio\Units\Sample_Speed1_ENG.wav
+Data\Audio\Units\Sample_Speed2_ENG.wav
+</Samples>
+<Localize>Yes</Localize>
+</SFXEvent>
+</SFXEventList>

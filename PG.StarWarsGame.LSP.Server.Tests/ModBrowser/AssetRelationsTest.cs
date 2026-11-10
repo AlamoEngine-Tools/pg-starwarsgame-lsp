@@ -26,6 +26,7 @@ public sealed class AssetRelationsTest
         ["Space_Model_Name"] = Tag("Space_Model_Name", ReferenceKind.ModelFile),
         ["Icon_Name"] = Tag("Icon_Name", ReferenceKind.TextureFile),
         ["Lua_Script"] = Tag("Lua_Script", ReferenceKind.WorkspaceFile),
+        ["Samples"] = Tag("Samples", ReferenceKind.AudioFile),
         ["Idle_Animation"] = Tag("Idle_Animation", ReferenceKind.Enum) with { Enum = s_animationType }
     };
 
@@ -49,14 +50,23 @@ public sealed class AssetRelationsTest
         public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
         {
             Asked++;
-            return objectId == "Tie_Fighter"
-                ?
+            return objectId switch
+            {
+                "Tie_Fighter" =>
                 [
                     new VariantTag("Space_Model_Name", "EV_TIE.alo", "", 0),
                     new VariantTag("Icon_Name", "I_Tie.tga", "", 1),
                     new VariantTag("Lua_Script", "TieScript", "", 2)
-                ]
-                : null;
+                ],
+                // Samples are game-relative paths, one per line, as a mod's SFXEvents write them.
+                "Unit_Speed_Tie" =>
+                [
+                    new VariantTag("Samples",
+                        "Data\\Audio\\Units\\Tie_Speed1_ENG.wav\n            Data\\Audio\\Units\\Tie_Speed2_ENG.wav",
+                        "", 0)
+                ],
+                _ => null
+            };
         }
     }
 
@@ -66,23 +76,27 @@ public sealed class AssetRelationsTest
     {
         var tie = new GameSymbol("Tie_Fighter", GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin(Units, 2, 4),
             null);
+        var speed = new GameSymbol("Unit_Speed_Tie", GameSymbolKind.XmlObject, "SFXEvent", new FileOrigin(Units, 30, 4),
+            null);
         var loads = new GameReference(WorkspaceFileKey.Create(WorkspaceFileKey.LuaScriptType, "TieScript"),
             GameSymbolKind.WorkspaceFile, WorkspaceFileKey.LuaScriptType, Units, 5, 8, 9);
         var index = GameIndex.Empty with
         {
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
-                .Add(Units, new DocumentIndex(Units, 1, [tie], [loads], LayerRank: 0, LayerName: "Mod"))
+                .Add(Units, new DocumentIndex(Units, 1, [tie, speed], [loads], LayerRank: 0, LayerName: "Mod"))
                 .Add(TieScript, new DocumentIndex(TieScript, 1, [], [], ["PGBase"], LayerRank: 0, LayerName: "Mod"))
                 .Add(PgBase, new DocumentIndex(PgBase, 1, [], [], LayerRank: 0, LayerName: "Mod")),
             WorkspaceDefinitions =
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Tie_Fighter", [tie]),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Tie_Fighter", [tie])
+                .Add("Unit_Speed_Tie", [speed]),
             WorkspaceReferences = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add(loads.TargetId, [loads]),
             AssetFiles = MergedAssetFileIndex.Merge(
             [
                 "data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala", "data/art/models/ev_tie_die.ala",
                 "data/art/models/p_smoke.alo", "data/art/textures/tie.tga", "data/art/textures/smoke.tga",
-                "data/art/textures/i_tie.tga", "data/art/textures/glow.dds", "data/art/models/stray_walk.ala"
+                "data/art/textures/i_tie.tga", "data/art/textures/glow.dds", "data/art/models/stray_walk.ala",
+                "data/audio/units/tie_speed1_eng.wav"
             ], ["data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala"]),
             ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_smoke.alo"),
             ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
@@ -264,5 +278,20 @@ public sealed class AssetRelationsTest
     public void AnEnum_IsUsedByTheTagsTypedWithIt()
     {
         Assert.Equal(["Idle_Animation"], Names(Relations().Rows("enums", "AnimationType", "usedBy")));
+    }
+
+    // An SFXEvent names its samples by their game-relative path and the audio page lists them by
+    // file name, as the textures page does; the two have to meet in both directions (#380).
+    [Fact]
+    public void ASample_IsUsedByTheSfxEventsNamingItByPath()
+    {
+        var relations = Relations();
+
+        Assert.Equal(["Unit_Speed_Tie"], Names(relations.Rows("audio", "tie_speed1_eng.wav", "usedBy")));
+        var samples = relations.Rows("xml:SFXEvent", "Unit_Speed_Tie", "samples")!;
+        Assert.Equal(2, samples.Count);
+        Assert.Equal("tie_speed1_eng.wav", samples[0].Name);
+        Assert.NotEqual("missing", samples[0].Origin);
+        Assert.Equal("missing", samples[1].Origin);
     }
 }
