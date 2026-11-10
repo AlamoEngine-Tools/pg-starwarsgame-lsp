@@ -27,6 +27,9 @@
   2.35% of the frame up and to the right. The model, its firing arcs and its turret handles drew away from the
   bone tags, the targeting reticles and the spot the pointer had to grab. The neutral now lands as itself and
   the frame stays put wherever no heat effect bends it
+- **One status bar item while the projects load** - each server reported its own startup as progress, and VS
+  Code showed that as a second footer, "Star Wars LSP - starting", beside the EaWEdit LSP item. The EaWEdit LSP
+  item is the only one again, every project's state in its tooltip
 
 ## 0.5.1
 

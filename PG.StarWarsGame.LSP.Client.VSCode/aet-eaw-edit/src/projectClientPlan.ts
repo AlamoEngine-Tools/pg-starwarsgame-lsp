@@ -374,6 +374,24 @@ export function pickGag(random: () => number): string | undefined {
 }
 
 /**
+ * What a language client lets through of its server's own work-done progress: only the end.
+ *
+ * The window has ONE status item for every project - the one `statusText` writes. Each server also
+ * reports its startup as work-done progress, and the language client shows any such progress as a
+ * window progress item of its own, which put a second footer, "Star Wars LSP - starting", beside
+ * ours for every project still loading. A begin or a report is dropped so that item never opens;
+ * the end still goes through, because it is what makes the client let go of the token.
+ */
+export function serverWorkDoneProgress(
+    params: { kind: "begin" | "report" | "end" },
+    next: () => void,
+): void {
+    if (params.kind === "end") {
+        next();
+    }
+}
+
+/**
  * The status bar text. One client names its own phase; several count the projects ready, name
  * the phase of the first one still busy, and name any that failed or stopped.
  */

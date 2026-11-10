@@ -14,6 +14,7 @@ import {
     ownsPath,
     pickGag,
     planChanges,
+    serverWorkDoneProgress,
     statusText,
     type ClientSpec,
 } from "./projectClientPlan";
@@ -684,5 +685,24 @@ describe("statusText", () => {
             ]),
             "$(error) EaWEdit LSP: 1 of 2 projects ready, 1 failed",
         );
+    });
+});
+
+describe("serverWorkDoneProgress", () => {
+    // The window shows ONE status item for every project. A server's own startup progress would
+    // become a second, "Star Wars LSP - starting", next to it - so only its end reaches the client,
+    // which lets the client drop what it holds for the token.
+    for (const kind of ["begin", "report"] as const) {
+        it(`keeps a ${kind} off the status bar`, () => {
+            let shown = false;
+            serverWorkDoneProgress({ kind }, () => (shown = true));
+            assert.equal(shown, false);
+        });
+    }
+
+    it("passes the end on", () => {
+        let ended = false;
+        serverWorkDoneProgress({ kind: "end" }, () => (ended = true));
+        assert.equal(ended, true);
     });
 });

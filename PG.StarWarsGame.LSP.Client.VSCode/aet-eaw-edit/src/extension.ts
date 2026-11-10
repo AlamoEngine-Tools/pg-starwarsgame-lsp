@@ -93,6 +93,7 @@ import {
     phaseText,
     pickGag,
     planChanges,
+    serverWorkDoneProgress,
     statusText,
 } from "./projectClientPlan";
 import { WatcherPool } from "./watcherPool";
@@ -956,6 +957,12 @@ function startProjectClient(
         documentSelector: documentSelectorFor(spec),
         diagnosticCollectionName: diagnosticCollectionNameFor(CLIENT_ID, spec),
         traceOutputChannel: trace,
+        // The status item above is the one footer for every project; the server's startup progress
+        // would open a second beside it.
+        middleware: {
+            handleWorkDoneProgress: (token, params, next) =>
+                serverWorkDoneProgress(params, () => next(token, params)),
+        },
         initializationOptions: {
             workspaceRoot: spec.workspaceRoot,
             projectPath: spec.projectPath,
