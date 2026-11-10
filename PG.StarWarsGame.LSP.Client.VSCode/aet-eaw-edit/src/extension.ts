@@ -154,7 +154,7 @@ import {
 // the setting asks for rather than only what follows it.
 const CLIENT_ID = "aet-eaw-edit.lsp.debug";
 const CLIENT_NAME = "Alamo Engine Tools - Empire at War Edit";
-const REQUIRED_SERVER_VERSION = "0.5.1";
+const REQUIRED_SERVER_VERSION = "0.5.2";
 
 /**
  * Forces every language-feature capability to be advertised STATICALLY (in the initialize response)
