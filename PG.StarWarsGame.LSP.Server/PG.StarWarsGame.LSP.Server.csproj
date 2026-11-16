@@ -32,6 +32,7 @@
         <PackageReference Include="AlamoEngineTools.PG.StarWarsGame.Infrastructure"/>
         <PackageReference Include="AlamoEngineTools.PG.StarWarsGame.Infrastructure.Steam"/>
         <PackageReference Include="CsvHelper"/>
+        <PackageReference Include="JsonSchema.Net" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
         <PackageReference Include="Microsoft.Extensions.Http"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Console"/>
