@@ -489,12 +489,9 @@ const Shell = styled.div`
         max-width: min(280px, calc(100vw - 24px));
         padding: var(--space-8) var(--space-8);
         text-align: left;
-        border: var(--space-1) solid var(--vscode-panel-border, #444);
+        border: var(--space-1) solid var(--colour-line);
         border-radius: var(--radius-3);
-        background: var(
-            --vscode-editorWidget-background,
-            var(--vscode-editor-background)
-        );
+        background: var(--colour-panel);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
 
@@ -513,16 +510,13 @@ const Shell = styled.div`
 
     .model-info::before {
         top: -5px;
-        border: var(--space-1) solid var(--vscode-panel-border, #444);
-        background: var(--vscode-panel-border, #444);
+        border: var(--space-1) solid var(--colour-line);
+        background: var(--colour-line);
     }
 
     .model-info::after {
         top: -4px;
-        background: var(
-            --vscode-editorWidget-background,
-            var(--vscode-editor-background)
-        );
+        background: var(--colour-panel);
     }
 
     .model-info-name {
@@ -577,7 +571,7 @@ const Shell = styled.div`
         letter-spacing: 0.03em;
         text-transform: uppercase;
         opacity: 0.6;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
     }
 
     .card-group-title .section-count {
@@ -585,7 +579,7 @@ const Shell = styled.div`
     }
 
     .card-group-title:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
         opacity: 0.9;
     }
 
@@ -605,9 +599,9 @@ const Shell = styled.div`
        moment and then goes quiet - red because that is what it just did to the model. */
 
     .icon-btn.as-action.fired {
-        background: var(--vscode-charts-red, #f14c4c);
-        border-color: var(--vscode-charts-red, #f14c4c);
-        color: var(--vscode-button-foreground, #fff);
+        background: var(--colour-data-red);
+        border-color: var(--colour-data-red);
+        color: var(--colour-action-ink);
     }
 
     /* The log. Monospace, because the numbers are the point and a proportional font makes a
@@ -620,13 +614,13 @@ const Shell = styled.div`
         padding: 0;
         max-height: 220px;
         overflow-y: auto;
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         font-size: var(--font-size-smaller);
     }
 
     .damage-log li {
         padding: var(--space-2) var(--space-2);
-        border-bottom: var(--space-1) solid var(--vscode-panel-border, #333);
+        border-bottom: var(--space-1) solid var(--colour-line);
         /* Long names - a projectile, an armour column, a hardpoint id - must wrap rather than push
            a horizontal scrollbar under the whole flyout. */
         overflow-wrap: anywhere;
@@ -643,8 +637,8 @@ const Shell = styled.div`
     .pool-summary {
         margin: 0 0 var(--space-4) 0;
         padding: 0 0 var(--space-4) 0;
-        border-bottom: var(--space-1) solid var(--vscode-panel-border, #333);
-        font-family: var(--vscode-editor-font-family, monospace);
+        border-bottom: var(--space-1) solid var(--colour-line);
+        font-family: var(--font-family-code);
         font-size: var(--font-size-smaller);
         font-variant-numeric: tabular-nums;
         white-space: pre-wrap;
@@ -668,7 +662,7 @@ const Shell = styled.div`
         list-style: none;
         margin: var(--space-1) 0 0 0;
         padding: 0 0 0 var(--space-12);
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         font-size: 0.9em;
         opacity: 0.7;
         font-variant-numeric: tabular-nums;
@@ -683,7 +677,7 @@ const Shell = styled.div`
        scanning for. Everything between them is ordinary and stays quiet. */
 
     .damage-log .log-kill {
-        color: var(--vscode-charts-red, #f14c4c);
+        color: var(--colour-data-red);
     }
 
     .damage-log .log-nothing {
@@ -691,7 +685,7 @@ const Shell = styled.div`
     }
 
     .fire-target {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         opacity: 0.85;
     }
 
@@ -711,22 +705,21 @@ const Shell = styled.div`
            things rather than one column of text. */
         gap: var(--space-4);
         padding: var(--space-8) var(--space-8);
-        border: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+        border: var(--space-1) solid var(--colour-line-strong);
         border-radius: var(--radius-6);
         cursor: pointer;
     }
 
     .hardpoint-card:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
     }
 
     /* The selected card is the one the attacker is aimed at, which is the same state the Fire at
        list and the targeting marks show. One fact, three places, one highlight. */
 
     .hardpoint-card.selected {
-        background: var(--vscode-list-activeSelectionBackground);
-        border-color: var(--vscode-focusBorder);
+        background: var(--colour-selected);
+        border-color: var(--colour-focus);
     }
 
     /* Shot away. Dimmed rather than struck through or removed: it is still a card you can press to
@@ -760,7 +753,7 @@ const Shell = styled.div`
        one thing worth saying on a clone card beyond the mapping itself. */
 
     .card-unresolved {
-        color: var(--vscode-editorWarning-foreground, #cca700);
+        color: var(--colour-warning);
     }
 
     /* Title line: the name, and the jump pushed to the far corner. */
@@ -785,7 +778,7 @@ const Shell = styled.div`
        greps their own files for. */
 
     .card-type {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         opacity: 0.75;
     }
 
@@ -808,7 +801,7 @@ const Shell = styled.div`
         height: 14px;
         border-radius: var(--radius-3);
         overflow: hidden;
-        background: var(--vscode-input-background, rgba(128, 128, 128, 0.18));
+        background: var(--colour-input);
     }
 
     .card-health-fill {
@@ -828,8 +821,8 @@ const Shell = styled.div`
         font-variant-numeric: tabular-nums;
         /* Over both the filled and the empty half, so it has to carry its own contrast rather than
            relying on whichever colour happens to be under it. */
-        color: var(--vscode-foreground);
-        text-shadow: 0 0 3px var(--vscode-editor-background);
+        color: var(--colour-ink);
+        text-shadow: 0 0 3px var(--colour-editor-ground);
     }
 
     /* One row per fire bone, full width: the slot on the left and the bone it names beside it. They
@@ -865,23 +858,20 @@ const Shell = styled.div`
         padding: var(--space-2) var(--space-6);
         border: var(--space-1) solid transparent;
         border-radius: var(--radius-3);
-        background: var(
-            --vscode-button-secondaryBackground,
-            rgba(128, 128, 128, 0.14)
-        );
-        color: var(--vscode-foreground);
+        background: var(--colour-action-2);
+        color: var(--colour-ink);
         font-size: var(--font-size-smaller);
         cursor: pointer;
         text-align: left;
     }
 
     .muzzle-row:hover:not(:disabled) {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
     }
 
     .muzzle-row.selected {
-        border-color: var(--vscode-focusBorder);
-        background: var(--vscode-list-activeSelectionBackground);
+        border-color: var(--colour-focus);
+        background: var(--colour-selected);
     }
 
     .muzzle-row:disabled {
@@ -895,7 +885,7 @@ const Shell = styled.div`
     }
 
     .muzzle-bone {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         overflow: hidden;
         text-overflow: ellipsis;
     }
@@ -979,13 +969,8 @@ const Shell = styled.div`
         border-radius: var(--radius-6);
         /* Its own plate. Rows run underneath it, and a transparent strip over a list of names is
            unreadable in both directions. */
-        background: color-mix(
-            in srgb,
-            var(--vscode-sideBar-background, #181818) 88%,
-            transparent
-        );
-        border: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.3));
+        background: color-mix(in srgb, var(--colour-sidebar) 88%, transparent);
+        border: var(--space-1) solid var(--colour-line-strong);
     }
 
     .tree-search.open {
@@ -1011,9 +996,9 @@ const Shell = styled.div`
            height, so the vertical padding was only ever there to make one. */
         height: 22px;
         padding: 0 var(--space-8);
-        color: var(--vscode-input-foreground);
-        background: var(--vscode-input-background);
-        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        color: var(--colour-input-ink);
+        background: var(--colour-input);
+        border: var(--space-1) solid var(--colour-input-line);
         border-radius: var(--radius-3);
         font-family: inherit;
         font-size: inherit;
@@ -1023,15 +1008,12 @@ const Shell = styled.div`
        pixel each side would nudge the icons every time the box took focus. */
 
     .tree-search .tree-filter:focus {
-        outline: var(--space-1) solid var(--vscode-focusBorder);
+        outline: var(--space-1) solid var(--colour-focus);
         outline-offset: -1px;
     }
 
     .tree-search .tree-filter::placeholder {
-        color: var(
-            --vscode-input-placeholderForeground,
-            var(--vscode-descriptionForeground)
-        );
+        color: var(--colour-placeholder);
     }
 
     /* The one button that never moves. Everything else in this row is what it opens onto, so it
@@ -1164,7 +1146,7 @@ const Shell = styled.div`
         gap: var(--space-4);
         font-size: var(--font-size-smaller);
         opacity: 0.7;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
     }
 
     /* The two side slots are EQUAL, which is the whole of what centres the middle one.
@@ -1290,9 +1272,9 @@ const Shell = styled.div`
     .stage-chrome select {
         height: 22px;
         font-size: 1em;
-        color: var(--vscode-dropdown-foreground);
-        background: var(--vscode-dropdown-background);
-        border: var(--space-1) solid var(--vscode-dropdown-border, transparent);
+        color: var(--colour-dropdown-ink);
+        background: var(--colour-dropdown);
+        border: var(--space-1) solid var(--colour-dropdown-line);
         border-radius: var(--radius-3);
         padding: 0 var(--space-4);
         max-width: 150px;
@@ -1358,10 +1340,7 @@ const Shell = styled.div`
         height: 5px;
         border-radius: var(--radius-3);
         overflow: hidden;
-        background: var(
-            --vscode-editorWidget-background,
-            rgba(128, 128, 128, 0.25)
-        );
+        background: var(--colour-panel);
     }
 
     /* No transition on the width. A shot empties a pool in one step and the engine's own bars do
@@ -1384,26 +1363,23 @@ const Shell = styled.div`
         justify-content: center;
         border-radius: var(--radius-3);
         border: var(--space-1) solid transparent;
-        background: var(
-            --vscode-button-secondaryBackground,
-            rgba(255, 255, 255, 0.08)
-        );
-        color: var(--vscode-button-secondaryForeground, inherit);
+        background: var(--colour-action-2);
+        color: var(--colour-action-2-ink);
         cursor: pointer;
         overflow: hidden;
     }
 
     .stage-chrome .ability-key:hover:not(:disabled) {
-        border-color: var(--vscode-focusBorder, #007fd4);
+        border-color: var(--colour-focus);
     }
 
     /* Active reads as PRESSED IN, not merely highlighted - it is a state you leave running while
        you look at what it did, so it has to survive the pointer moving away. */
 
     .stage-chrome .ability-key.active {
-        background: var(--vscode-button-background, #0e639c);
-        color: var(--vscode-button-foreground, #fff);
-        border-color: var(--vscode-focusBorder, #007fd4);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+        border-color: var(--colour-focus);
     }
 
     /* An order - it drives nothing on this model. Dimmed rather than absent, and its tooltip says
@@ -1491,8 +1467,7 @@ const Shell = styled.div`
         width: 22px;
         height: 22px;
         padding: 0;
-        border: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.5));
+        border: var(--space-1) solid var(--colour-line-strong);
         border-radius: var(--radius-3);
         cursor: pointer;
         background-clip: padding-box;
@@ -1502,7 +1477,7 @@ const Shell = styled.div`
        dark faction it is the only thing that says which one is applied. */
 
     .faction-palette .swatch.active {
-        outline: 2px solid var(--vscode-focusBorder);
+        outline: 2px solid var(--colour-focus);
         outline-offset: 1px;
     }
 
@@ -1510,7 +1485,7 @@ const Shell = styled.div`
         display: flex;
         align-items: center;
         justify-content: center;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
         background: transparent;
     }
 
@@ -1518,7 +1493,7 @@ const Shell = styled.div`
 
     .faction-palette .swatch-custom {
         margin-left: var(--space-4);
-        border-left: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-left: var(--space-1) solid var(--colour-line);
         padding-left: var(--space-6);
         width: 28px;
         box-sizing: content-box;
@@ -1632,7 +1607,7 @@ const Shell = styled.div`
         width: min(100cqw, calc(100cqh * var(--capture-ratio)));
         aspect-ratio: var(--capture-ratio);
         box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
-        outline: 1px dashed var(--vscode-focusBorder);
+        outline: 1px dashed var(--colour-focus);
     }
 
     .capture-frame-size {
@@ -1642,12 +1617,8 @@ const Shell = styled.div`
         padding: 0 var(--space-4);
         font-size: var(--font-size-smaller);
         font-variant-numeric: tabular-nums;
-        color: var(--vscode-foreground);
-        background: color-mix(
-            in srgb,
-            var(--vscode-editorWidget-background, #202020) 82%,
-            transparent
-        );
+        color: var(--colour-ink);
+        background: color-mix(in srgb, var(--colour-panel) 82%, transparent);
         border-radius: var(--radius-3);
     }
 
@@ -1697,8 +1668,8 @@ const Shell = styled.div`
         align-items: center;
         justify-content: center;
         gap: var(--space-8);
-        background: var(--vscode-editor-background, #1f1f1f);
-        color: var(--vscode-descriptionForeground, #999);
+        background: var(--colour-editor-ground);
+        color: var(--colour-muted);
         font-size: var(--font-size-12);
     }
 
@@ -1706,8 +1677,8 @@ const Shell = styled.div`
         width: 22px;
         height: 22px;
         border-radius: 50%;
-        border: 2px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        border-top-color: var(--vscode-progressBar-background, #0078d4);
+        border: 2px solid var(--colour-line-strong);
+        border-top-color: var(--colour-progress);
         animation: load-spin 0.9s linear infinite;
     }
 
@@ -1770,18 +1741,18 @@ const Shell = styled.div`
         padding: 0 var(--space-2);
         font-size: var(--font-size-10);
         white-space: nowrap;
-        color: var(--vscode-editor-foreground);
+        color: var(--colour-editor-ink);
         background: color-mix(
             in srgb,
-            var(--vscode-editor-background) 70%,
+            var(--colour-editor-ground) 70%,
             transparent
         );
         border-radius: var(--radius-3);
     }
 
     .bone-label.selected {
-        color: var(--vscode-editor-background);
-        background: var(--vscode-focusBorder);
+        color: var(--colour-editor-ground);
+        background: var(--colour-focus);
     }
 
     /* The targeting marks. Shares the label layer, so it inherits pointer-events: none and the
@@ -1864,7 +1835,7 @@ const Shell = styled.div`
     }
 
     .bone-row.selected {
-        background: var(--vscode-list-activeSelectionBackground);
+        background: var(--colour-selected);
     }
 
     .bone-row.hidden-bone .tree-name {
@@ -1892,7 +1863,7 @@ const Shell = styled.div`
     }
 
     .bone-row .bone-attach {
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         font-size: var(--font-size-smaller);
     }
 
@@ -1973,10 +1944,9 @@ const Shell = styled.div`
         max-height: 62vh;
         display: flex;
         flex-direction: column;
-        border: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--colour-line-strong);
         border-radius: var(--radius-6);
-        background: var(--vscode-editorWidget-background, #202020);
+        background: var(--colour-panel);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
 
@@ -1985,7 +1955,7 @@ const Shell = styled.div`
         align-items: baseline;
         gap: var(--space-6);
         padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
-        border-bottom: var(--space-1) solid var(--vscode-panel-border);
+        border-bottom: var(--space-1) solid var(--colour-line);
         font-size: var(--font-size-11);
     }
 
@@ -2004,7 +1974,7 @@ const Shell = styled.div`
     .details-subtitle {
         flex: 1;
         min-width: 0;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -2039,10 +2009,10 @@ const Shell = styled.div`
         flex-shrink: 0;
         padding: 0 var(--space-4);
         border-radius: var(--radius-3);
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         font-size: var(--font-size-smaller);
-        background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
-        color: var(--vscode-badge-foreground, inherit);
+        background: var(--colour-badge);
+        color: var(--colour-badge-ink);
     }
 
     /* A readout, not a menu: no hover state and no pointer, because nothing here is clickable yet.
@@ -2096,7 +2066,7 @@ const Shell = styled.div`
         white-space: nowrap;
         padding-left: var(--space-24);
         font-size: var(--font-size-smaller);
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
 
     /* A weapon's is four separate facts - reach, cone, cadence, damage - and clipping them at the
@@ -2153,8 +2123,7 @@ const Shell = styled.div`
     }
 
     .ability-list li + li {
-        border-top: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+        border-top: var(--space-1) solid var(--colour-line-strong);
     }
 
     /* How a jump LOOKS. Where it goes is the card head's business, and this used to decide that
@@ -2172,7 +2141,7 @@ const Shell = styled.div`
         background: none;
         font: inherit;
         font-size: var(--font-size-smaller);
-        color: var(--vscode-textLink-foreground);
+        color: var(--colour-heading);
         cursor: pointer;
     }
 
@@ -2181,7 +2150,7 @@ const Shell = styled.div`
     }
 
     .part-list li .goto-definition:disabled {
-        color: var(--vscode-disabledForeground);
+        color: var(--colour-faint);
         cursor: default;
     }
 
@@ -2215,8 +2184,7 @@ const Shell = styled.div`
         display: inline-flex;
         align-items: center;
         gap: var(--space-2);
-        border: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.4));
+        border: var(--space-1) solid var(--colour-line-strong);
         border-radius: var(--radius-6);
         padding: 0 var(--space-4);
         background: none;
@@ -2226,16 +2194,16 @@ const Shell = styled.div`
     }
 
     .section-count.as-button:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
     }
 
     /* A picked bone is boxed on the model, so its button carries the same weight as the active
        segment of a mode selector - it is a current state, not an action waiting to be taken. */
 
     .btn.selected {
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
-        border-color: var(--vscode-button-background);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+        border-color: var(--colour-action);
     }
 
     .stat-row {
@@ -2247,7 +2215,7 @@ const Shell = styled.div`
     }
 
     .stat-row .value {
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
 
     .view-row {
@@ -2293,7 +2261,7 @@ const Shell = styled.div`
     }
 
     .dock-section-title.as-fold:hover {
-        color: var(--vscode-foreground, #ccc);
+        color: var(--colour-ink);
     }
 
     /* An ACTION, as a full-width card down a list.
@@ -2318,26 +2286,18 @@ const Shell = styled.div`
         align-items: center;
         gap: var(--space-8);
         padding: var(--space-8) var(--space-8);
-        border: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+        border: var(--space-1) solid var(--colour-line-strong);
         border-radius: var(--radius-6);
-        background: var(
-            --vscode-editorWidget-background,
-            rgba(128, 128, 128, 0.08)
-        );
+        background: var(--colour-panel);
     }
 
     .anim-card:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
     }
 
     .anim-card.active {
-        border-color: var(--vscode-button-background);
-        background: color-mix(
-            in srgb,
-            var(--vscode-button-background) 22%,
-            transparent
-        );
+        border-color: var(--colour-action);
+        background: color-mix(in srgb, var(--colour-action) 22%, transparent);
     }
 
     /* Its own column, so it is centred across BOTH rows rather than sitting beside the name. */
@@ -2358,10 +2318,7 @@ const Shell = styled.div`
     }
 
     .anim-play:hover {
-        background: var(
-            --vscode-toolbar-hoverBackground,
-            rgba(128, 128, 128, 0.2)
-        );
+        background: var(--colour-toolbar-hover);
     }
 
     .anim-play svg {
@@ -2402,19 +2359,19 @@ const Shell = styled.div`
         border: var(--space-1) solid transparent;
         border-radius: var(--radius-3);
         background: none;
-        color: var(--vscode-descriptionForeground, #999);
-        font-family: var(--vscode-editor-font-family, monospace);
+        color: var(--colour-muted);
+        font-family: var(--font-family-code);
         font-size: var(--font-size-smallest);
         cursor: pointer;
     }
 
     .anim-take:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
     }
 
     .anim-take.active {
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
     }
 
     .anim-row {
@@ -2425,28 +2382,22 @@ const Shell = styled.div`
         padding: var(--space-4) var(--space-8);
         border: var(--space-1) solid transparent;
         border-radius: var(--radius-3);
-        background: var(
-            --vscode-editorWidget-background,
-            rgba(128, 128, 128, 0.08)
-        );
-        color: var(--vscode-foreground, #ccc);
-        font-family: var(--vscode-font-family, sans-serif);
-        font-size: var(--vscode-font-size, 13px);
+        background: var(--colour-panel);
+        color: var(--colour-ink);
+        font-family: var(--font-family-ui);
+        font-size: var(--font-size-body);
         text-align: left;
         cursor: pointer;
     }
 
     .anim-row:hover {
-        background: var(
-            --vscode-toolbar-hoverBackground,
-            rgba(128, 128, 128, 0.2)
-        );
-        border-color: var(--vscode-focusBorder);
+        background: var(--colour-toolbar-hover);
+        border-color: var(--colour-focus);
     }
 
     .anim-row.active {
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
     }
 
     .anim-row svg {

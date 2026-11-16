@@ -231,7 +231,7 @@ export function healthBar(
 }
 
 /** What a hardpoint that is no longer there looks like. Grey, and it comes from the theme. */
-const DESTROYED_COLOUR = "var(--vscode-disabledForeground, #5a5a5a)";
+const DESTROYED_COLOUR = "var(--colour-faint)";
 
 /**
  * Which fire-bone slot a bone sits in, by position.

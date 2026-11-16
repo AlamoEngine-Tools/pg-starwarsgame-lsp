@@ -191,18 +191,35 @@ describe("the colour block", () => {
      * Colour is the one scale where the name cannot carry the value, so these are role names. It is
      * also the whole of the host coupling: every --vscode-* reference in the layer is here, which is
      * what makes an IntelliJ port a matter of redefining one block.
+     *
+     * A fallback is a colour, or another role of this block for a host variable a theme may leave
+     * unset (#206) - never a host variable, which would put coupling outside the `from` column.
      */
-    it("routes every token through a host variable with a literal fallback", () => {
+    it("routes every token through a host variable with a colour or a role as its fallback", () => {
         assert.ok(colourTokens.length > 0);
+        const roles = new Set(colourTokens.map((t) => t.name));
 
         for (const token of colourTokens) {
             assert.match(token.name, /^--colour-[a-z0-9-]+$/, token.name);
             assert.match(token.from, /^--vscode-[a-zA-Z0-9.-]+$/, token.name);
-            assert.match(
-                token.fallback,
-                /^#[0-9a-f]{6}$/,
-                `${token.name} fallback`,
-            );
+            const role = /^var\((--colour-[a-z0-9-]+)\)$/.exec(token.fallback);
+            if (role) {
+                assert.ok(
+                    roles.has(role[1]),
+                    `${token.name} falls back to ${role[1]}, which is no role`,
+                );
+                assert.notEqual(
+                    role[1],
+                    token.name,
+                    `${token.name} falls back to itself`,
+                );
+            } else {
+                assert.match(
+                    token.fallback,
+                    /^#[0-9a-f]{6}([0-9a-f]{2})?$/,
+                    `${token.name} fallback`,
+                );
+            }
         }
     });
 

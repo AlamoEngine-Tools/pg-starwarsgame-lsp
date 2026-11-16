@@ -81,6 +81,11 @@ export const scaleCss = `
     --font-size-body: var(--vscode-font-size, 13px);
     --font-size-16: 16px;
 
+    /* The two faces, both the reader's: the workbench's for the interface, the editor's for code,
+       ids and anything read column by column. */
+    --font-family-ui: var(--vscode-font-family, sans-serif);
+    --font-family-code: var(--vscode-editor-font-family, monospace);
+
     /* The two steps that are not lengths, and the only place a name cannot carry its value.
        Across the panels these were written eight different ways - 0.75, 0.8, 0.82, 0.85, 0.88, 0.9
        and 0.92em - which is two intentions ("a little smaller" and "distinctly smaller") expressed
@@ -144,7 +149,10 @@ export interface ColourToken {
     readonly name: string;
     /** The host variable it defers to. In an IntelliJ port this is the column that changes. */
     readonly from: string;
-    /** Used when the host defines nothing. Always the value VS Code's own dark theme ships. */
+    /**
+     * Used when the host defines nothing: the value VS Code's own dark theme ships, or - for a host
+     * variable a theme may leave unset - the role it stands nearest, as its call sites always did.
+     */
     readonly fallback: string;
 }
 
@@ -404,6 +412,174 @@ export const colourTokens: readonly ColourToken[] = [
         name: "--colour-tab-active-edge",
         from: "--vscode-tab-activeBorderTop",
         fallback: "#0078d4",
+    },
+    // Hover states the actions take on, beside the two they belong to. A role whose host variable a
+    // theme may leave unset falls back to the role it stands nearest, as its call sites always did:
+    // VS Code leaves a colour unset when its default is the high-contrast border.
+    {
+        name: "--colour-action-hover",
+        from: "--vscode-button-hoverBackground",
+        fallback: "var(--colour-action)",
+    },
+    {
+        name: "--colour-action-2-hover",
+        from: "--vscode-button-secondaryHoverBackground",
+        fallback: "#45494e",
+    },
+    {
+        name: "--colour-action-line",
+        from: "--vscode-button-border",
+        fallback: "var(--colour-line-strong)",
+    },
+    // A list's other selections: the one in a list without focus, and the focused row's outline.
+    {
+        name: "--colour-selected-inactive",
+        from: "--vscode-list-inactiveSelectionBackground",
+        fallback: "#37373d",
+    },
+    {
+        name: "--colour-focus-outline",
+        from: "--vscode-list-focusOutline",
+        fallback: "var(--colour-focus)",
+    },
+    {
+        name: "--colour-indent-guide",
+        from: "--vscode-tree-indentGuidesStroke",
+        fallback: "var(--colour-line-strong)",
+    },
+    // A resize handle under the pointer.
+    {
+        name: "--colour-sash",
+        from: "--vscode-sash-hoverBorder",
+        fallback: "var(--colour-focus)",
+    },
+    // Severity marks as the editor draws them in the text, beside the plain error ink above.
+    {
+        name: "--colour-error",
+        from: "--vscode-editorError-foreground",
+        fallback: "#f14c4c",
+    },
+    {
+        name: "--colour-breakpoint",
+        from: "--vscode-debugIcon-breakpointForeground",
+        fallback: "#e51400",
+    },
+    {
+        name: "--colour-passed",
+        from: "--vscode-testing-iconPassed",
+        fallback: "#73c991",
+    },
+    // A value the reader typed that cannot be taken.
+    {
+        name: "--colour-invalid",
+        from: "--vscode-inputValidation-errorBackground",
+        fallback: "#5a1d1d",
+    },
+    {
+        name: "--colour-invalid-line",
+        from: "--vscode-inputValidation-errorBorder",
+        fallback: "#be1100",
+    },
+    {
+        name: "--colour-invalid-ink",
+        from: "--vscode-inputValidation-errorForeground",
+        fallback: "var(--colour-critical)",
+    },
+    // The hint an empty input shows.
+    {
+        name: "--colour-placeholder",
+        from: "--vscode-input-placeholderForeground",
+        fallback: "var(--colour-muted)",
+    },
+    // A tooltip or popover, read as the editor's own hover.
+    {
+        name: "--colour-hover-widget",
+        from: "--vscode-editorHoverWidget-background",
+        fallback: "#252526",
+    },
+    {
+        name: "--colour-hover-widget-ink",
+        from: "--vscode-editorHoverWidget-foreground",
+        fallback: "#cccccc",
+    },
+    {
+        name: "--colour-hover-widget-line",
+        from: "--vscode-editorHoverWidget-border",
+        fallback: "#454545",
+    },
+    // A menu, read as the editor's own context menu.
+    {
+        name: "--colour-menu",
+        from: "--vscode-menu-background",
+        fallback: "var(--colour-panel)",
+    },
+    {
+        name: "--colour-menu-ink",
+        from: "--vscode-menu-foreground",
+        fallback: "#cccccc",
+    },
+    {
+        name: "--colour-menu-line",
+        from: "--vscode-menu-border",
+        fallback: "var(--colour-line)",
+    },
+    {
+        name: "--colour-menu-selected",
+        from: "--vscode-menu-selectionBackground",
+        fallback: "#04395e",
+    },
+    {
+        name: "--colour-menu-selected-ink",
+        from: "--vscode-menu-selectionForeground",
+        fallback: "#ffffff",
+    },
+    {
+        name: "--colour-menu-separator",
+        from: "--vscode-menu-separatorBackground",
+        fallback: "#454545",
+    },
+    // A drop-down list, read as the editor's own select.
+    {
+        name: "--colour-dropdown",
+        from: "--vscode-dropdown-background",
+        fallback: "#3c3c3c",
+    },
+    {
+        name: "--colour-dropdown-ink",
+        from: "--vscode-dropdown-foreground",
+        fallback: "#cccccc",
+    },
+    {
+        name: "--colour-dropdown-line",
+        from: "--vscode-dropdown-border",
+        fallback: "#3c3c3c",
+    },
+    // A bar standing for the window's own title, and a running task's progress.
+    {
+        name: "--colour-title",
+        from: "--vscode-titleBar-activeBackground",
+        fallback: "var(--colour-panel)",
+    },
+    {
+        name: "--colour-title-ink",
+        from: "--vscode-titleBar-activeForeground",
+        fallback: "var(--colour-ink)",
+    },
+    {
+        name: "--colour-title-line",
+        from: "--vscode-titleBar-border",
+        fallback: "var(--colour-line-strong)",
+    },
+    {
+        name: "--colour-progress",
+        from: "--vscode-progressBar-background",
+        fallback: "#0078d4",
+    },
+    // A block of code in rendered text.
+    {
+        name: "--colour-code-block",
+        from: "--vscode-textCodeBlock-background",
+        fallback: "#0a0a0a66",
     },
 ];
 

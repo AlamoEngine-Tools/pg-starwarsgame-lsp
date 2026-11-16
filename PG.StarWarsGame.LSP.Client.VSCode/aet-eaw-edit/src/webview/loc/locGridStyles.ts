@@ -30,10 +30,10 @@ export const Shell = styled.div`
     flex-direction: column;
     /* Containing block for the crawl preview, which covers the whole editor. */
     position: relative;
-    color: var(--vscode-foreground, #ccc);
-    background: var(--vscode-editor-background, #1e1e1e);
-    font-family: var(--vscode-font-family, sans-serif);
-    font-size: var(--vscode-font-size, 13px);
+    color: var(--colour-ink);
+    background: var(--colour-editor-ground);
+    font-family: var(--font-family-ui);
+    font-size: var(--font-size-body);
 
     /* Every control here is sized with width:100% inside a track or a column, and each also carries
        padding and a border. Without this they come out wider than what holds them - which is what
@@ -82,7 +82,7 @@ export const Shell = styled.div`
         left: 0;
         right: 0;
         height: 2px;
-        background: var(--vscode-focusBorder, #007fd4);
+        background: var(--colour-focus);
         pointer-events: none;
         z-index: 15;
     }
@@ -103,8 +103,8 @@ export const Shell = styled.div`
         display: flex;
         flex-direction: column;
         min-height: 0;
-        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
-        background: var(--vscode-sideBar-background, #252526);
+        border-top: var(--space-1) solid var(--colour-line);
+        background: var(--colour-sidebar);
         font-size: var(--font-size-12);
     }
 
@@ -112,7 +112,7 @@ export const Shell = styled.div`
     .problem-target {
         flex-shrink: 0;
         max-width: 220px;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -121,8 +121,8 @@ export const Shell = styled.div`
     .grid-footer {
         flex-shrink: 0;
         padding: var(--space-2) var(--space-8);
-        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
-        background: var(--vscode-editorWidget-background, #252526);
+        border-top: var(--space-1) solid var(--colour-line);
+        background: var(--colour-panel);
         font-size: var(--font-size-smaller);
         opacity: 0.8;
         white-space: nowrap;
@@ -144,8 +144,8 @@ export const Shell = styled.div`
         position: sticky;
         top: 0;
         z-index: 2;
-        background: var(--vscode-editorWidget-background, #252526);
-        border-bottom: var(--space-1) solid var(--vscode-panel-border, #444);
+        background: var(--colour-panel);
+        border-bottom: var(--space-1) solid var(--colour-line);
         font-weight: 600;
     }
 
@@ -177,9 +177,8 @@ export const Shell = styled.div`
         gap: var(--space-4);
         padding: var(--space-8) var(--space-8);
         border-radius: var(--radius-6);
-        border: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        background: var(--vscode-editorWidget-background, #252526);
+        border: var(--space-1) solid var(--colour-line-strong);
+        background: var(--colour-panel);
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
         font-weight: normal;
         white-space: nowrap;
@@ -226,11 +225,11 @@ export const Shell = styled.div`
     }
 
     .head-row .sortable:hover {
-        background: var(--vscode-list-hoverBackground, #2a2d2e);
+        background: var(--colour-hover);
     }
 
     .head-row .sortable:focus-visible {
-        outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4);
+        outline: var(--space-1) solid var(--colour-focus);
         outline-offset: -1px;
     }
 
@@ -270,7 +269,7 @@ export const Shell = styled.div`
     }
 
     .data-row:hover {
-        background: var(--vscode-list-hoverBackground, #2a2d2e);
+        background: var(--colour-hover);
     }
 
     /* Rows a validation run had something to say about, tinted by how bad it was. A single red
@@ -281,37 +280,30 @@ export const Shell = styled.div`
        selected row still shows what is wrong with it. */
 
     .data-row.row-sev-error {
-        background: color-mix(
-            in srgb,
-            var(--vscode-errorForeground, #f48771) 13%,
-            transparent
-        );
-        box-shadow: inset var(--severity-stripe) 0 0
-            var(--vscode-errorForeground, #f48771);
+        background: color-mix(in srgb, var(--colour-critical) 13%, transparent);
+        box-shadow: inset var(--severity-stripe) 0 0 var(--colour-critical);
     }
 
     .data-row.row-sev-warning {
         background: color-mix(
             in srgb,
-            var(--vscode-charts-yellow, #cca700) 13%,
+            var(--colour-data-yellow) 13%,
             transparent
         );
-        box-shadow: inset var(--severity-stripe) 0 0
-            var(--vscode-charts-yellow, #cca700);
+        box-shadow: inset var(--severity-stripe) 0 0 var(--colour-data-yellow);
     }
 
     .data-row.row-sev-info {
         background: color-mix(
             in srgb,
-            var(--vscode-charts-blue, #3794ff) 11%,
+            var(--colour-data-blue) 11%,
             transparent
         );
-        box-shadow: inset var(--severity-stripe) 0 0
-            var(--vscode-charts-blue, #3794ff);
+        box-shadow: inset var(--severity-stripe) 0 0 var(--colour-data-blue);
     }
 
     .data-row.selected {
-        background: var(--vscode-list-inactiveSelectionBackground, #37373d);
+        background: var(--colour-selected-inactive);
     }
 
     .cell {
@@ -331,13 +323,13 @@ export const Shell = styled.div`
     }
 
     select.directive:hover {
-        border-color: var(--vscode-panel-border, #444);
+        border-color: var(--colour-line);
     }
 
     select.directive:focus {
         outline: none;
-        border-color: var(--vscode-focusBorder, #007fd4);
-        background: var(--vscode-input-background, #3c3c3c);
+        border-color: var(--colour-focus);
+        background: var(--colour-input);
     }
 
     .grid input {
@@ -350,13 +342,13 @@ export const Shell = styled.div`
     }
 
     .grid input:hover {
-        border-color: var(--vscode-panel-border, #444);
+        border-color: var(--colour-line);
     }
 
     .grid input:focus {
         outline: none;
-        border-color: var(--vscode-focusBorder, #007fd4);
-        background: var(--vscode-input-background, #3c3c3c);
+        border-color: var(--colour-focus);
+        background: var(--colour-input);
     }
 
     ${dockHeaderCss}
@@ -381,41 +373,32 @@ export const Shell = styled.div`
     ${dockBodyCss}
     ${dockOverviewCss}
     button {
-        background: var(
-            --vscode-button-secondaryBackground,
-            var(--vscode-button-background, #3a3d41)
-        );
-        color: var(
-            --vscode-button-secondaryForeground,
-            var(--vscode-button-foreground, #ccc)
-        );
+        background: var(--colour-action-2);
+        color: var(--colour-action-2-ink);
         border: none;
         padding: var(--space-2) var(--space-8);
         cursor: pointer;
-        font-size: var(--vscode-font-size, 13px);
-        font-family: var(--vscode-font-family, sans-serif);
+        font-size: var(--font-size-body);
+        font-family: var(--font-family-ui);
         white-space: nowrap;
         flex-shrink: 0;
     }
 
     button:hover {
-        background: var(
-            --vscode-button-secondaryHoverBackground,
-            var(--vscode-button-hoverBackground)
-        );
+        background: var(--colour-action-2-hover);
     }
 
     button.primary {
-        background: var(--vscode-button-background, #0e639c);
-        color: var(--vscode-button-foreground, #fff);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
     }
 
     button.danger {
-        color: var(--vscode-errorForeground, #f44);
+        color: var(--colour-critical);
     }
 
     button:hover:not(:disabled) {
-        background: var(--vscode-toolbar-hoverBackground, #4a4d51);
+        background: var(--colour-toolbar-hover);
     }
 
     button:disabled {
@@ -424,24 +407,24 @@ export const Shell = styled.div`
     }
 
     button.primary {
-        background: var(--vscode-button-background, #0e639c);
-        color: var(--vscode-button-foreground, #fff);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
     }
 
     button.validate.sev-ok {
-        color: var(--vscode-charts-green, #89d185);
+        color: var(--colour-data-green);
     }
 
     button.validate.sev-info {
-        color: var(--vscode-charts-blue, #3794ff);
+        color: var(--colour-data-blue);
     }
 
     button.validate.sev-warning {
-        color: var(--vscode-charts-yellow, #cca700);
+        color: var(--colour-data-yellow);
     }
 
     button.validate.sev-error {
-        color: var(--vscode-errorForeground, #f48771);
+        color: var(--colour-critical);
     }
 
     /* Inputs, selects and the filter row are the story graph editor's rules verbatim, so the two
@@ -449,19 +432,19 @@ export const Shell = styled.div`
 
     select,
     input[type="text"] {
-        background: var(--vscode-input-background, #3c3c3c);
-        color: var(--vscode-input-foreground, #ccc);
-        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        background: var(--colour-input);
+        color: var(--colour-input-ink);
+        border: var(--space-1) solid var(--colour-input-line);
         padding: var(--space-2) var(--space-6);
-        font-size: var(--vscode-font-size, 13px);
-        font-family: var(--vscode-font-family, sans-serif);
+        font-size: var(--font-size-body);
+        font-family: var(--font-family-ui);
         outline: none;
         min-width: 0;
     }
 
     input[type="text"]:focus,
     select:focus {
-        border-color: var(--vscode-focusBorder, #007fd4);
+        border-color: var(--colour-focus);
     }
 
     /* The search-mode toggles: icon buttons, the same ones the graph editor's overview tools use. */
@@ -485,7 +468,7 @@ export const Shell = styled.div`
     }
 
     .spacer-cell:focus {
-        outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4);
+        outline: var(--space-1) solid var(--colour-focus);
     }
 
     .spacer-rule {
@@ -506,7 +489,7 @@ export const Shell = styled.div`
 
     .data-row.inherited input,
     .data-row.inherited select {
-        color: var(--vscode-disabledForeground, #888);
+        color: var(--colour-faint);
         font-style: italic;
     }
 
@@ -524,8 +507,8 @@ export const Shell = styled.div`
     .inherited-toggle .badge {
         opacity: 0.7;
         font-size: var(--font-size-smaller);
-        background: var(--vscode-badge-background, #4d4d4d);
-        color: var(--vscode-badge-foreground, #fff);
+        background: var(--colour-badge);
+        color: var(--colour-badge-ink);
         border-radius: var(--radius-6);
         padding: 0 var(--space-6);
     }
@@ -551,15 +534,15 @@ export const Shell = styled.div`
     }
 
     .problems li.sev-error {
-        border-left-color: var(--vscode-errorForeground, #f48771);
+        border-left-color: var(--colour-critical);
     }
 
     .problems li.sev-warning {
-        border-left-color: var(--vscode-charts-yellow, #cca700);
+        border-left-color: var(--colour-data-yellow);
     }
 
     .problems li.sev-info {
-        border-left-color: var(--vscode-charts-blue, #3794ff);
+        border-left-color: var(--colour-data-blue);
     }
 
     /* ── Add-translation dialog content ──────────────────────────────────────
@@ -579,28 +562,25 @@ export const Shell = styled.div`
     }
 
     .field input {
-        background: var(--vscode-input-background, #3c3c3c);
-        color: var(--vscode-input-foreground, #ccc);
-        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        background: var(--colour-input);
+        color: var(--colour-input-ink);
+        border: var(--space-1) solid var(--colour-input-line);
         padding: var(--space-4) var(--space-6);
         font: inherit;
     }
 
     .field input:focus {
-        outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4);
+        outline: var(--space-1) solid var(--colour-focus);
         outline-offset: -1px;
     }
 
     .field input[aria-invalid="true"] {
-        border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+        border-color: var(--colour-invalid-line);
     }
 
     .field-error {
         margin: -4px 0 0;
-        color: var(
-            --vscode-inputValidation-errorForeground,
-            var(--vscode-errorForeground, #f48771)
-        );
+        color: var(--colour-invalid-ink);
         font-size: var(--font-size-smaller);
     }
 
@@ -632,7 +612,7 @@ export const Shell = styled.div`
         padding: 0;
         max-height: 180px;
         overflow-y: auto;
-        border: var(--space-1) solid var(--vscode-panel-border, #444);
+        border: var(--space-1) solid var(--colour-line);
     }
 
     .suggestions button {
@@ -651,7 +631,7 @@ export const Shell = styled.div`
 
     .suggestions button:hover,
     .suggestions button:focus-visible {
-        background: var(--vscode-list-hoverBackground, #2a2d2e);
+        background: var(--colour-hover);
         outline: none;
     }
 
@@ -673,8 +653,8 @@ export const Shell = styled.div`
     }
 
     .dialog-actions button {
-        background: var(--vscode-button-secondaryBackground, #3a3d41);
-        color: var(--vscode-button-secondaryForeground, #ccc);
+        background: var(--colour-action-2);
+        color: var(--colour-action-2-ink);
         border: none;
         padding: var(--space-4) var(--space-12);
         font: inherit;
@@ -682,8 +662,8 @@ export const Shell = styled.div`
     }
 
     .dialog-actions .primary {
-        background: var(--vscode-button-background, #0e639c);
-        color: var(--vscode-button-foreground, #fff);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
     }
 
     .dialog-actions button:disabled {

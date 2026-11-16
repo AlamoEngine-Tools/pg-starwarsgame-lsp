@@ -74,7 +74,7 @@ ${tokensCss}
     .dock-section-title .section-count {
         margin-left: auto;
         font-weight: normal;
-        color: var(--vscode-foreground, #ccc);
+        color: var(--colour-ink);
     }
 
     /* The right-hand end of a heading: chips, the count, and the section's own button, packed
@@ -119,10 +119,10 @@ ${tokensCss}
         gap: var(--space-4);
         padding: var(--space-8) var(--space-6);
         border-radius: var(--radius-6);
-        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
-        color: var(--vscode-foreground, #ccc);
-        font-family: var(--vscode-font-family, sans-serif);
+        border: var(--space-1) solid var(--colour-line-strong);
+        background: var(--colour-panel);
+        color: var(--colour-ink);
+        font-family: var(--font-family-ui);
         font-size: var(--font-size-body);
         cursor: pointer;
         text-align: center;
@@ -130,10 +130,10 @@ ${tokensCss}
         overflow: hidden;
     }
     .dock-tile:hover:not(:disabled) {
-        background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
-        border-color: var(--vscode-focusBorder, #007fd4);
+        background: var(--colour-toolbar-hover);
+        border-color: var(--colour-focus);
     }
-    .dock-tile:focus-visible { outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4); }
+    .dock-tile:focus-visible { outline: var(--space-1) solid var(--colour-focus); }
     /* An action that does not apply here stays, greyed, with its reason under the label. */
     .dock-tile:disabled { cursor: default; color: var(--colour-faint); background: transparent; border-color: var(--colour-line); }
     .dock-tile:disabled .tile-badge { font-family: inherit; border: 0; padding: 0; }
@@ -158,10 +158,10 @@ ${tokensCss}
     }
     /* The raw token a tile stands for, in the monospace the file itself would show it in. */
     .dock-tile .tile-badge {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         font-size: var(--font-size-smallest);
         padding: 0 var(--space-4);
-        border: var(--space-1) solid var(--vscode-panel-border, #444);
+        border: var(--space-1) solid var(--colour-line);
         border-radius: var(--radius-3);
         opacity: 0.7;
         max-width: 100%;
@@ -223,11 +223,11 @@ ${tokensCss}
     }
     .info-badge:hover, .info-badge:focus-visible {
         opacity: 1;
-        background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+        background: var(--colour-toolbar-hover);
     }
     .info-badge svg { flex-shrink: 0; }
-    .info-badge.sev-warning { color: var(--vscode-editorWarning-foreground, #cca700); opacity: 1; }
-    .info-badge.sev-error { color: var(--vscode-editorError-foreground, #f14c4c); opacity: 1; }
+    .info-badge.sev-warning { color: var(--colour-warning); opacity: 1; }
+    .info-badge.sev-error { color: var(--colour-error); opacity: 1; }
 
     /* The BUBBLE's own styles are not here. This block is interpolated into a styled.div, so
        everything in it is scoped to that element - and the bubble is portalled to the document
@@ -248,7 +248,7 @@ ${tokensCss}
         height: 9px;
         transform: translate(-50%, -50%);
         border-radius: var(--radius-pill);
-        background: var(--vscode-descriptionForeground, #999);
+        background: var(--colour-muted);
         opacity: 0.55;
         pointer-events: none;
     }
@@ -262,7 +262,7 @@ ${tokensCss}
     .field-note {
         font-size: var(--font-size-smaller);
         line-height: 1.35;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
     }
     /* The same sentence, when it is telling the reader something is off rather than explaining
        the control. Warning colour and no other change: it has to read as the same kind of text in
@@ -270,7 +270,7 @@ ${tokensCss}
     .field-warn {
         font-size: var(--font-size-smaller);
         line-height: 1.35;
-        color: var(--vscode-editorWarning-foreground, #cca700);
+        color: var(--colour-warning);
     }
     /* A colour well, not a form control. The browser renders a colour input as a wide bordered
        button with a swatch inside it, which took a whole row for one colour.
@@ -286,7 +286,7 @@ ${tokensCss}
         height: 20px;
         padding: 0;
         flex-shrink: 0;
-        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--colour-line-strong);
         border-radius: var(--radius-3);
         background: none;
         cursor: pointer;
@@ -312,10 +312,10 @@ ${tokensCss}
         flex: 1 1 auto;
         min-width: 0;
         padding: var(--space-2) var(--space-6);
-        border: var(--space-1) solid var(--vscode-panel-border, #444);
+        border: var(--space-1) solid var(--colour-line);
         border-right-width: 0;
-        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.18));
-        color: var(--vscode-foreground);
+        background: var(--colour-action-2);
+        color: var(--colour-ink);
         font-size: var(--font-size-smaller);
         line-height: 1.5;
         cursor: pointer;
@@ -331,21 +331,21 @@ ${tokensCss}
         cursor: default;
     }
     .mode-selector button:disabled:hover {
-        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.18));
+        background: var(--colour-action-2);
     }
 
     .mode-selector button:first-child { border-radius: var(--radius-3) 0 0 var(--radius-3); }
     .mode-selector button:last-child { border-right-width: var(--space-1); border-radius: 0 var(--radius-3) var(--radius-3) 0; }
     .mode-selector button:hover {
-        background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.3));
+        background: var(--colour-action-2-hover);
     }
     .mode-selector button.active {
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
-        border-color: var(--vscode-button-background);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+        border-color: var(--colour-action);
     }
     /* The neighbour's shared edge, so the selected segment is not outlined by the one before it. */
-    .mode-selector button.active + button { border-left-color: var(--vscode-button-background); }
+    .mode-selector button.active + button { border-left-color: var(--colour-action); }
 
     /* ── Buttons ───────────────────────────────────────────────────────── */
     .btn {
@@ -356,17 +356,17 @@ ${tokensCss}
         gap: var(--space-4);
         padding: var(--space-4) var(--space-12);
         border-radius: var(--radius-3);
-        border: var(--space-1) solid var(--vscode-button-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.4)));
-        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
+        border: var(--space-1) solid var(--colour-action-line);
+        background: var(--colour-action-2);
         box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
-        color: var(--vscode-button-secondaryForeground, #ccc);
-        font-family: var(--vscode-font-family, sans-serif);
+        color: var(--colour-action-2-ink);
+        font-family: var(--font-family-ui);
         font-size: var(--font-size-body);
         cursor: pointer;
     }
     .btn.primary {
-        background: var(--vscode-button-background, #0e639c);
-        color: var(--vscode-button-foreground, #fff);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
     }
     .btn:hover:not(:disabled) { filter: brightness(1.1); }
     .btn:disabled { opacity: 0.5; cursor: default; }
@@ -407,8 +407,8 @@ ${tokensCss}
            has to follow, or the bar stops reaching the edge. */
         padding: var(--space-12) var(--space-16);
         border-radius: var(--radius-6);
-        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        background: var(--vscode-editorWidget-background, #252526);
+        border: var(--space-1) solid var(--colour-line-strong);
+        background: var(--colour-panel);
         box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
     }
     /* The title bar is the drag handle, so it has to LOOK like one - a flat, full-bleed bar in the
@@ -424,9 +424,9 @@ ${tokensCss}
         padding: var(--space-6) var(--space-16);
         /* The dialog's radius less its border, or the bar's corners sit proud of the dialog's. */
         border-radius: calc(var(--radius-6) - var(--space-1)) calc(var(--radius-6) - var(--space-1)) 0 0;
-        border-bottom: var(--space-1) solid var(--vscode-titleBar-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
-        background: var(--vscode-titleBar-activeBackground, var(--vscode-editorWidget-background, #3c3c3c));
-        color: var(--vscode-titleBar-activeForeground, var(--vscode-foreground, #ccc));
+        border-bottom: var(--space-1) solid var(--colour-title-line);
+        background: var(--colour-title);
+        color: var(--colour-title-ink);
         font-weight: 600;
         font-size: 1em;
     }
@@ -461,9 +461,9 @@ ${tokensCss}
         /* Two hairlines in the corner - the conventional grip, without shipping an image. */
         background:
             linear-gradient(135deg, transparent 50%,
-                var(--vscode-widget-border, rgba(128, 128, 128, 0.55)) 50% 60%, transparent 60%),
+                var(--colour-line-strong) 50% 60%, transparent 60%),
             linear-gradient(135deg, transparent 70%,
-                var(--vscode-widget-border, rgba(128, 128, 128, 0.55)) 70% 80%, transparent 80%);
+                var(--colour-line-strong) 70% 80%, transparent 80%);
     }
 
     /* The flexible part: the title bar and the buttons keep their height and the body takes what is
@@ -507,7 +507,7 @@ ${tokensCss}
         font-variant-numeric: tabular-nums;
     }
     .integer-field input[aria-invalid="true"] {
-        outline: var(--space-1) solid var(--vscode-inputValidation-errorBorder, #be1100);
+        outline: var(--space-1) solid var(--colour-invalid-line);
     }
 
     .modal-title, .modal > h2.drag-handle, .modal-buttons, .dialog-actions,
@@ -524,7 +524,7 @@ ${tokensCss}
         flex-direction: column;
         gap: var(--space-8);
         padding-bottom: var(--space-8);
-        border-bottom: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-bottom: var(--space-1) solid var(--colour-line);
     }
     .modal-buttons { display: flex; align-items: center; gap: var(--space-8); }
 
@@ -564,10 +564,10 @@ ${tokensCss}
         border: var(--space-1) solid transparent;
         cursor: pointer;
     }
-    .choice:hover { background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15)); }
+    .choice:hover { background: var(--colour-hover); }
     .choice.selected {
-        border-color: var(--vscode-focusBorder, #007fd4);
-        background: var(--vscode-list-activeSelectionBackground, rgba(0, 127, 212, 0.15));
+        border-color: var(--colour-focus);
+        background: var(--colour-selected);
     }
     .choice-label { font-weight: 600; }
     .choice-detail { opacity: 0.75; font-size: var(--font-size-smaller); }
@@ -581,13 +581,10 @@ ${tokensCss}
         display: flex;
         flex-direction: column;
         padding: var(--space-4) 0;
-        background: var(
-            --vscode-menu-background,
-            var(--vscode-editorWidget-background, #252526)
-        );
-        color: var(--vscode-menu-foreground, #ccc);
+        background: var(--colour-menu);
+        color: var(--colour-menu-ink);
         border: var(--space-1) solid
-            var(--vscode-menu-border, var(--vscode-panel-border, #454545));
+            var(--colour-menu-line);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     }
     .row-menu button {
@@ -601,24 +598,24 @@ ${tokensCss}
     }
     .row-menu button:hover:not(:disabled),
     .row-menu button:focus-visible {
-        background: var(--vscode-menu-selectionBackground, #04395e);
-        color: var(--vscode-menu-selectionForeground, #fff);
+        background: var(--colour-menu-selected);
+        color: var(--colour-menu-selected-ink);
         outline: none;
     }
     .row-menu button.danger:hover:not(:disabled) {
-        background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+        background: var(--colour-invalid);
     }
     .row-menu button:disabled {
-        color: var(--vscode-disabledForeground);
+        color: var(--colour-faint);
     }
     .row-menu .keys {
         margin-left: auto;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
     .row-menu .sep {
         height: 1px;
         margin: var(--space-4) 0;
-        background: var(--vscode-menu-separatorBackground, #454545);
+        background: var(--colour-menu-separator);
     }
 
     /* ── Key/value lines ───────────────────────────────────────────────── */
@@ -657,14 +654,14 @@ ${tokensCss}
         font-variant-numeric: tabular-nums;
     }
 
-    .kv-rows dd.texture { font-family: var(--vscode-editor-font-family, monospace); }
+    .kv-rows dd.texture { font-family: var(--font-family-code); }
 
     /* Four rows of four, laid out as the author authored them. Preformatted rather than line-break
        elements, so a narrow dock cannot re-wrap the rows into something that is no longer a matrix. */
     .kv-rows dd.matrix {
         white-space: pre;
         overflow-x: auto;
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         font-size: var(--font-size-smaller);
         line-height: 1.35;
     }
@@ -912,7 +909,7 @@ ${tokensCss}
         cursor: col-resize;
         z-index: 2;
     }
-    .data-table th .th-grip:hover { background: var(--vscode-sash-hoverBorder, var(--colour-focus)); }
+    .data-table th .th-grip:hover { background: var(--colour-sash); }
     .data-table th.drop-target { box-shadow: inset var(--space-2) 0 0 var(--colour-focus); }
     /* At the widths the reader dragged to, a cell that does not fit ends in an ellipsis. */
     .data-table.fixed { table-layout: fixed; min-width: 100%; }
@@ -1034,7 +1031,7 @@ export const rightDockCss = `
         cursor: ew-resize;
         z-index: 2;
     }
-    .resize-handle-w:hover { background: var(--vscode-sash-hoverBorder, #007fd4); }
+    .resize-handle-w:hover { background: var(--colour-sash); }
 `;
 
 /**
@@ -1084,7 +1081,7 @@ export const dockHeaderCss = `
         cursor: pointer;
     }
     .icon-btn:hover {
-        background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
+        background: var(--colour-toolbar-hover);
         opacity: 1;
     }
     /* An ACTION rather than a state.
@@ -1094,12 +1091,12 @@ export const dockHeaderCss = `
        in a band beside controls that latch, a bare glyph reads as a switch that happens to be off.
        A resting border is what says press me. */
     .icon-btn.as-action {
-        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.14));
+        background: var(--colour-action-2);
         border: var(--space-1) solid var(--colour-line-strong);
         opacity: 1;
     }
     .icon-btn.as-action:hover:not(:disabled) {
-        background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.28));
+        background: var(--colour-action-2-hover);
         border-color: var(--colour-focus);
     }
     .icon-btn:disabled { opacity: 0.35; cursor: default; }
@@ -1109,7 +1106,7 @@ export const dockHeaderCss = `
         opacity: 1;
     }
     .icon-btn.sev-unvalidated { color: var(--colour-ink); opacity: 1; }
-    .icon-btn.sev-ok { color: var(--vscode-charts-green, #89d185); opacity: 1; }
+    .icon-btn.sev-ok { color: var(--colour-data-green); opacity: 1; }
     .icon-btn.sev-info { color: var(--colour-data-blue); opacity: 1; }
     .icon-btn.sev-warning { color: var(--colour-data-yellow); opacity: 1; }
     .icon-btn.sev-error { color: var(--colour-critical); opacity: 1; }
@@ -1124,7 +1121,7 @@ export const dockHeaderCss = `
         background: color-mix(in srgb, var(--colour-ink) 15%, transparent);
     }
     .validate-btn.sev-ok {
-        background: color-mix(in srgb, var(--vscode-charts-green, #89d185) 14%, transparent);
+        background: color-mix(in srgb, var(--colour-data-green) 14%, transparent);
     }
     .validate-btn.sev-info {
         background: color-mix(in srgb, var(--colour-data-blue) 14%, transparent);
@@ -1165,7 +1162,7 @@ export const problemsPanelCss = `
         z-index: 2;
     }
     .resize-handle-n:hover, .resize-handle-n:active {
-        background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder, #007fd4));
+        background: var(--colour-sash);
     }
 
     .panel-bar {
@@ -1184,7 +1181,7 @@ export const problemsPanelCss = `
         padding: 0 var(--space-4);
         flex-shrink: 0;
     }
-    .panel-close:hover { background: transparent; color: var(--vscode-editor-foreground, #ccc); }
+    .panel-close:hover { background: transparent; color: var(--colour-editor-ink); }
 
     /* The view filter, beside the count it qualifies.
 
@@ -1206,7 +1203,7 @@ export const problemsPanelCss = `
     }
     .panel-filter:hover:not(:disabled) {
         background: transparent;
-        color: var(--vscode-editor-foreground, #ccc);
+        color: var(--colour-editor-ink);
     }
     /* On, and therefore hiding something. Coloured because this is the state a reader has to be
        able to notice without going looking - it is why the table is shorter than they expect. */
@@ -1259,7 +1256,7 @@ export const problemsPanelCss = `
         flex: 0 0 auto;
         margin-left: auto;
         padding-left: var(--space-8);
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         font-size: var(--font-size-smaller);
         font-variant-numeric: tabular-nums;
         opacity: 0.55;
@@ -1310,7 +1307,7 @@ export const problemsPanelCss = `
 export const dockOverviewCss = `
     .dock-overview {
         flex-shrink: 0;
-        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-top: var(--space-1) solid var(--colour-line);
         padding: var(--space-8) var(--space-8);
         display: flex;
         flex-direction: column;
@@ -1344,7 +1341,7 @@ export const playerCss = `
         padding-right: var(--space-4);
         font-variant-numeric: tabular-nums;
         font-size: var(--font-size-smaller);
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
     /* The travel direction is explicit on every slider in a player. A range input takes it from
        the inherited writing direction, so anything upstream that flips that - a host laying the
@@ -1379,13 +1376,13 @@ export const rotarySwitchCss = `
         padding: 0;
         display: flex; align-items: center; justify-content: center;
         border-radius: var(--radius-round);
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
-        border: var(--space-2) solid var(--vscode-focusBorder);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+        border: var(--space-2) solid var(--colour-focus);
         cursor: pointer;
         z-index: 1;
     }
-    .rotary-center:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
+    .rotary-center:hover { background: var(--colour-action-hover); }
     .rotary-pos {
         position: absolute;
         left: 50%; top: 70%;
@@ -1395,8 +1392,8 @@ export const rotarySwitchCss = `
         border: none;
         border-radius: var(--radius-round);
         line-height: 1;
-        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
-        color: var(--vscode-button-secondaryForeground, #ccc);
+        background: var(--colour-action-2);
+        color: var(--colour-action-2-ink);
         cursor: pointer;
         opacity: 0.6;
     }
@@ -1416,11 +1413,11 @@ export const rotarySwitchCss = `
        rendering fault; an outline landed a blue ring against the readout's blue border. */
     .rotary-pos.active {
         opacity: 1;
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
         box-shadow:
-            0 0 0 2px var(--vscode-editor-background, #1f1f1f),
-            0 0 7px 1px var(--vscode-focusBorder, #0078d4);
+            0 0 0 2px var(--colour-editor-ground),
+            0 0 7px 1px var(--colour-focus);
     }
 `;
 
@@ -1442,8 +1439,8 @@ export const stageChromeCss = `
         padding: var(--space-2);
         border-radius: var(--radius-6);
         background: color-mix(in srgb,
-            var(--vscode-editorWidget-background, #202020) 82%, transparent);
-        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+            var(--colour-panel) 82%, transparent);
+        border: var(--space-1) solid var(--colour-line-strong);
         /* Never wider than the stage; a long faction roster wraps rather than running off it. */
         max-width: calc(100% - 16px);
         flex-wrap: wrap;
@@ -1496,8 +1493,8 @@ export const comboboxCss = `
         max-height: 160px;
         overflow-y: auto;
         z-index: 30;
-        background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-        border: var(--space-1) solid var(--vscode-focusBorder);
+        background: var(--colour-panel);
+        border: var(--space-1) solid var(--colour-focus);
         font-size: var(--font-size-11);
     }
 
@@ -1517,19 +1514,19 @@ export const comboboxCss = `
 
     .suggest-item:hover,
     .suggest-item.highlighted {
-        background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.2));
+        background: var(--colour-hover);
     }
 
     /* The value the field already holds: offered with the rest, marked so it can be found. */
     .suggest-item.current {
         font-weight: 600;
-        color: var(--vscode-list-activeSelectionForeground, inherit);
-        background: var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.25));
+        color: var(--colour-selected-ink);
+        background: var(--colour-selected-inactive);
     }
 
     .suggest-item.current:hover,
     .suggest-item.current.highlighted {
-        background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.2));
+        background: var(--colour-hover);
     }
 `;
 
@@ -1555,9 +1552,9 @@ export const stageFlyoutCss = `
         max-height: calc(100% - 56px);
         display: flex;
         flex-direction: column;
-        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--colour-line-strong);
         border-radius: var(--radius-6);
-        background: var(--vscode-editorWidget-background, #202020);
+        background: var(--colour-panel);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
     /* A flyout the reader can size. The max-height above still caps it against the stage, so a
@@ -1586,12 +1583,12 @@ export const stageFlyoutCss = `
         align-items: center;
         gap: var(--space-4);
         padding: var(--space-6) var(--space-6) var(--space-6) var(--space-12);
-        border-bottom: var(--space-1) solid var(--vscode-panel-border);
+        border-bottom: var(--space-1) solid var(--colour-line);
         font-size: var(--font-size-11);
         font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
     }
     /* Whatever comes first after the title takes the space. A count claims it where there is one,
        and the close button then follows it rather than fighting it for a second auto margin -
@@ -1657,18 +1654,18 @@ export const inspectorCss = `
         border-bottom: none;
         border-radius: var(--radius-3) var(--radius-3) 0 0;
         background: none;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
         font: inherit;
         cursor: pointer;
     }
-    .geometry-tab:hover:not(:disabled) { background: var(--vscode-list-hoverBackground); }
+    .geometry-tab:hover:not(:disabled) { background: var(--colour-hover); }
     .geometry-tab:disabled { opacity: 0.4; cursor: default; }
 
     /* The open tab joins the panel below it: same border, and no line between the two. */
     .geometry-tab.open {
-        border-color: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        background: var(--vscode-editorWidget-background, #202020);
-        color: var(--vscode-foreground, #ccc);
+        border-color: var(--colour-line-strong);
+        background: var(--colour-panel);
+        color: var(--colour-ink);
         margin-bottom: calc(-1 * var(--space-1));
         padding-bottom: var(--space-4);
     }
@@ -1690,7 +1687,7 @@ export const inspectorCss = `
         min-height: 320px;
         margin-top: var(--space-16);
         padding-top: var(--space-12);
-        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-top: var(--space-1) solid var(--colour-line);
     }
 
     .inspect-geometry > :not(.geometry-panel) { flex-shrink: 0; }
@@ -1700,7 +1697,7 @@ export const inspectorCss = `
         flex-direction: column;
         flex: 1 1 0;
         min-height: 0;
-        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--colour-line-strong);
         border-radius: 0 var(--radius-3) var(--radius-3) var(--radius-3);
         overflow: hidden;
     }
@@ -1717,7 +1714,7 @@ export const inspectorCss = `
     .geometry-table {
         width: 100%;
         border-collapse: collapse;
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
         font-size: var(--font-size-smaller);
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
@@ -1731,7 +1728,7 @@ export const inspectorCss = `
     .geometry-table thead th {
         position: sticky;
         top: 0;
-        background: var(--vscode-editorWidget-background, #202020);
+        background: var(--colour-panel);
         opacity: 0.95;
         font-weight: 600;
         text-align: right;
@@ -1747,8 +1744,8 @@ export const inspectorCss = `
     .geometry-foot {
         flex-shrink: 0;
         padding: var(--space-2) var(--space-8);
-        border-top: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        color: var(--vscode-descriptionForeground, #999);
+        border-top: var(--space-1) solid var(--colour-line-strong);
+        color: var(--colour-muted);
         font-size: var(--font-size-smaller);
         font-variant-numeric: tabular-nums;
     }
@@ -1761,7 +1758,7 @@ export const inspectorCss = `
         vertical-align: -1px;
         border-radius: var(--radius-3);
         /* Over a border rather than inside it: a border would eat into the colour being judged. */
-        outline: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.5));
+        outline: var(--space-1) solid var(--colour-line-strong);
         outline-offset: -1px;
     }
 `;

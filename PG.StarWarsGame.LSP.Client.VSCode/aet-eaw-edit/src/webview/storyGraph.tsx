@@ -439,7 +439,7 @@ function branchGlowStyle(
     const c = branchColor(branch);
     const tint = `color-mix(in srgb, ${c} 14%, transparent)`;
     const style: CSSProperties = {
-        background: `linear-gradient(${tint}, ${tint}), var(--vscode-editorWidget-background)`,
+        background: `linear-gradient(${tint}, ${tint}), var(--colour-panel)`,
         boxShadow: `0 0 8px 1px color-mix(in srgb, ${c} 45%, transparent)`,
     };
     if (withBorder) {
@@ -3648,12 +3648,9 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     position: relative;
     width: ${(p) => p.$w}px;
     height: ${(p) => p.$h}px;
-    background: var(
-        --vscode-editorWidget-background,
-        var(--vscode-editor-background)
-    );
-    color: var(--vscode-editor-foreground);
-    border: 2px solid var(--vscode-disabledForeground, #888);
+    background: var(--colour-panel);
+    color: var(--colour-editor-ink);
+    border: 2px solid var(--colour-faint);
     border-radius: var(--radius-6);
     box-sizing: border-box;
     display: flex;
@@ -3669,18 +3666,18 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         p.selected
             ? `
         &:not(.k-OrJunction):not(.k-StagingOr) {
-            outline: 2px solid var(--vscode-focusBorder);
+            outline: 2px solid var(--colour-focus);
             outline-offset: 2px;
         }
         &.k-OrJunction .diamond, &.k-StagingOr .diamond {
-            outline: 2px solid var(--vscode-focusBorder);
+            outline: 2px solid var(--colour-focus);
             outline-offset: 2px;
         }
     `
             : ""}
     .title {
         font-size: var(--font-size-12);
-        font-family: var(--vscode-font-family);
+        font-family: var(--font-family-ui);
         text-align: center;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -3721,12 +3718,9 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         position: absolute;
         inset: 15%;
         transform: rotate(45deg);
-        border: 2px solid var(--vscode-disabledForeground, #888);
+        border: 2px solid var(--colour-faint);
         border-radius: var(--radius-3);
-        background: var(
-            --vscode-editorWidget-background,
-            var(--vscode-editor-background)
-        );
+        background: var(--colour-panel);
     }
 
     &.k-OrJunction .title,
@@ -3769,19 +3763,16 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         line-height: 12px;
         text-align: center;
         border-radius: 50%;
-        background: var(
-            --vscode-editorWidget-background,
-            var(--vscode-editor-background)
-        );
-        border: var(--space-1) solid var(--vscode-disabledForeground, #888);
-        color: var(--vscode-descriptionForeground);
+        background: var(--colour-panel);
+        border: var(--space-1) solid var(--colour-faint);
+        color: var(--colour-muted);
         cursor: pointer;
         font-size: var(--font-size-10);
         padding: 0;
     }
 
     .discard:hover {
-        color: var(--vscode-errorForeground, #f44);
+        color: var(--colour-critical);
     }
 
     .jump {
@@ -3793,19 +3784,16 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         line-height: 12px;
         text-align: center;
         border-radius: 50%;
-        background: var(
-            --vscode-editorWidget-background,
-            var(--vscode-editor-background)
-        );
-        border: var(--space-1) solid var(--vscode-disabledForeground, #888);
-        color: var(--vscode-descriptionForeground);
+        background: var(--colour-panel);
+        border: var(--space-1) solid var(--colour-faint);
+        color: var(--colour-muted);
         cursor: pointer;
         font-size: var(--font-size-10);
         padding: 0;
     }
 
     .jump:hover {
-        color: var(--vscode-focusBorder);
+        color: var(--colour-focus);
     }
 
     /* The way back sits on the side the galaxy is on: a battle's portals point left, to the
@@ -3993,12 +3981,9 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     position: relative;
     width: ${(p) => p.$w}px;
     height: ${(p) => p.$h}px;
-    background: var(
-        --vscode-editorWidget-background,
-        var(--vscode-editor-background)
-    );
-    color: var(--vscode-editor-foreground);
-    border: 2px solid var(--vscode-disabledForeground, #888);
+    background: var(--colour-panel);
+    color: var(--colour-editor-ink);
+    border: 2px solid var(--colour-faint);
     border-radius: var(--radius-6);
     box-sizing: border-box;
     display: flex;
@@ -4016,8 +4001,8 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         padding: 0 5px;
         border-radius: 9px;
         box-sizing: border-box;
-        background: var(--lifecycle-fired, var(--vscode-badge-background));
-        color: var(--vscode-badge-foreground, #fff);
+        background: var(--lifecycle-fired, var(--colour-badge));
+        color: var(--colour-badge-ink);
         font-size: var(--font-size-10, 10px);
         font-weight: bold;
         line-height: 18px;
@@ -4055,7 +4040,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         right: var(--space-4);
         bottom: var(--space-4);
         font-size: var(--font-size-10, 10px);
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         pointer-events: none;
     }
 
@@ -4069,16 +4054,16 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         width: 14px;
         height: 14px;
         border-radius: 50%;
-        background: var(--vscode-debugIcon-breakpointForeground, #e51400);
-        border: 2px solid var(--vscode-editorWidget-background, #202020);
+        background: var(--colour-breakpoint);
+        border: 2px solid var(--colour-panel);
         box-sizing: border-box;
         pointer-events: none;
     }
 
-    font-family: var(--vscode-font-family);
+    font-family: var(--font-family-ui);
     cursor: default;
 
-    ${(p) => (p.selected ? "outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px;" : "")}
+    ${(p) => (p.selected ? "outline: 2px solid var(--colour-focus); outline-offset: 2px;" : "")}
     /* Generated from LIFECYCLE_TOKENS, which the colour key swatches and the overview rects also read.
            These four rules, those swatches and a hex mirror for the canvas used to be three separate
            copies of one mapping, kept in step by hand. */
@@ -4103,7 +4088,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
        than untested, because the node is not merely unverified - it does not work. */
 
     &.note-bugged {
-        border-color: var(--vscode-editorError-foreground);
+        border-color: var(--colour-error);
         border-style: dashed;
     }
 
@@ -4120,7 +4105,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         gap: var(--space-2);
         height: ${EVENT_HEADER_H}px;
         flex-shrink: 0;
-        border-bottom: var(--space-1) solid var(--vscode-panel-border);
+        border-bottom: var(--space-1) solid var(--colour-line);
         margin-bottom: var(--space-2);
     }
 
@@ -4155,9 +4140,9 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     }
 
     .header input.title-edit {
-        background: var(--vscode-input-background);
-        color: var(--vscode-input-foreground);
-        border: var(--space-1) solid var(--vscode-focusBorder);
+        background: var(--colour-input);
+        color: var(--colour-input-ink);
+        border: var(--space-1) solid var(--colour-focus);
         font-size: var(--font-size-11);
         font-family: inherit;
         padding: 0 var(--space-2);
@@ -4167,7 +4152,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         flex-shrink: 0;
         background: transparent;
         border: none;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         cursor: pointer;
         padding: 0 var(--space-2);
         font-size: var(--font-size-11);
@@ -4175,11 +4160,11 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     }
 
     .header button:hover {
-        color: var(--vscode-editor-foreground);
+        color: var(--colour-editor-ink);
     }
 
     .header button.danger:hover {
-        color: var(--vscode-errorForeground, #f44);
+        color: var(--colour-critical);
     }
 
     .row {
@@ -4193,14 +4178,14 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     .row label {
         width: 72px;
         flex-shrink: 0;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
     .row.section-head {
-        border-top: var(--space-1) solid var(--vscode-panel-border);
+        border-top: var(--space-1) solid var(--colour-line);
         margin-top: var(--space-2);
     }
 
@@ -4213,14 +4198,14 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         font-size: var(--font-size-10);
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
     .section-toggle:hover {
-        color: var(--vscode-editor-foreground);
+        color: var(--colour-editor-ink);
     }
 
     /* Drag.NoDrag's own wrapper is an unstyleable <span> - flex it via the child combinator so the
@@ -4238,9 +4223,9 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         min-width: 0;
         font-size: var(--font-size-11);
         font-family: inherit;
-        background: var(--vscode-input-background);
-        color: var(--vscode-input-foreground);
-        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        background: var(--colour-input);
+        color: var(--colour-input-ink);
+        border: var(--space-1) solid var(--colour-input-line);
         padding: 0 var(--space-2);
     }
 
@@ -4250,19 +4235,19 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
 
     .row input.missing,
     .row select.missing {
-        border-color: var(--vscode-errorForeground, #f44);
+        border-color: var(--colour-critical);
     }
 
     .row input.diag-error,
     .row select.diag-error {
-        border-color: var(--vscode-errorForeground, #f44);
-        outline: var(--space-1) solid var(--vscode-errorForeground, #f44);
+        border-color: var(--colour-critical);
+        outline: var(--space-1) solid var(--colour-critical);
     }
 
     .row input.diag-warning,
     .row select.diag-warning {
-        border-color: var(--vscode-charts-yellow, #cca700);
-        outline: var(--space-1) solid var(--vscode-charts-yellow, #cca700);
+        border-color: var(--colour-data-yellow);
+        outline: var(--space-1) solid var(--colour-data-yellow);
     }
 
     .row input:disabled,
@@ -4284,7 +4269,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     }
 
     .row button.chip-remove:hover {
-        color: var(--vscode-errorForeground, #f44);
+        color: var(--colour-critical);
     }
 
     .header .diag-badge {
@@ -4307,7 +4292,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         text-overflow: ellipsis;
         white-space: nowrap;
         font-size: var(--font-size-10);
-        color: var(--vscode-descriptionForeground, #9d9d9d);
+        color: var(--colour-muted);
         cursor: help;
     }
 
@@ -4329,14 +4314,14 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         flex-shrink: 0;
         background: transparent;
         border: none;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         cursor: pointer;
         padding: 0 var(--space-2);
         font-size: var(--font-size-11);
     }
 
     .row button.goto:hover {
-        color: var(--vscode-focusBorder);
+        color: var(--colour-focus);
     }
 
     /* same socket-offset rule as NodeBox - see the comment there for why calc(), not transform. */
@@ -4725,7 +4710,7 @@ function TypeRow(props: {
                                     props.kind,
                                     props.typeName,
                                 ),
-                                color: "var(--vscode-editor-foreground)",
+                                color: "var(--colour-editor-ink)",
                             }}
                             title={l10n.t(
                                 "{0} - remove the type to attach a different one",
@@ -5249,7 +5234,7 @@ const ConnSvg = styled.svg`
     path {
         fill: none;
         stroke-width: 2px;
-        stroke: var(--vscode-charts-foreground, #999);
+        stroke: var(--colour-data-neutral);
         marker-end: url(#story-arrow);
     }
 
@@ -5285,10 +5270,7 @@ const ConnSvg = styled.svg`
     }
 
     &.flow-active path:not(.glow-underlay) {
-        stroke: var(
-            --lifecycle-fired,
-            var(--vscode-testing-iconPassed, #73c991)
-        );
+        stroke: var(--lifecycle-fired, var(--colour-passed));
         stroke-width: 3px;
         stroke-dasharray: 10 4;
         animation: story-flow 0.5s linear infinite;
@@ -5299,10 +5281,7 @@ const ConnSvg = styled.svg`
        canvas draws, so a graph looks the same whether rete or the canvas holds its edges. */
 
     &.flow-spent path:not(.glow-underlay) {
-        stroke: var(
-            --lifecycle-fired,
-            var(--vscode-testing-iconPassed, #73c991)
-        );
+        stroke: var(--lifecycle-fired, var(--colour-passed));
         stroke-width: 2.5px;
         stroke-dasharray: 6 8;
         animation: story-flow 2.4s linear infinite;
@@ -5362,7 +5341,7 @@ const SocketDot = styled.div`
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: var(--vscode-charts-foreground, #999);
+    background: var(--colour-data-neutral);
     opacity: 0.55;
     cursor: crosshair;
 
@@ -5390,10 +5369,10 @@ const GlobalStyle = createGlobalStyle`
     html, body, #root {
         height: 100%;
         overflow: hidden;
-        font-family: var(--vscode-font-family);
-        font-size: var(--vscode-font-size);
-        color: var(--vscode-editor-foreground);
-        background: var(--vscode-editor-background);
+        font-family: var(--font-family-ui);
+        font-size: var(--font-size-body);
+        color: var(--colour-editor-ink);
+        background: var(--colour-editor-ground);
         /* This is a canvas app, not a document: nearly every pointer gesture is a drag (pan, node
            move, socket wiring), and a drag that starts on a label or ends over the dock would
            otherwise leave a text selection behind. A live selection then hijacks subsequent
@@ -5424,8 +5403,8 @@ const GlobalStyle = createGlobalStyle`
             box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
         }
         20%, 60% {
-            box-shadow: 0 0 0 4px var(--vscode-focusBorder, #3794ff),
-            0 0 18px 6px var(--vscode-focusBorder, #3794ff);
+            box-shadow: 0 0 0 4px var(--colour-focus),
+            0 0 18px 6px var(--colour-focus);
         }
     }
 
@@ -5456,11 +5435,11 @@ const GlobalStyle = createGlobalStyle`
     }
 
     .diag-badge.diag-error {
-        color: var(--vscode-errorForeground, #f44);
+        color: var(--colour-critical);
     }
 
     .diag-badge.diag-warning {
-        color: var(--vscode-charts-yellow, #cca700);
+        color: var(--colour-data-yellow);
     }
 
     /* Immutable-type chips - used in node bodies and the toolbar's create form. In a node body the
@@ -5472,12 +5451,12 @@ const GlobalStyle = createGlobalStyle`
         gap: var(--space-4);
         min-width: 0;
         padding: var(--space-1) var(--space-6);
-        border: var(--space-1) solid var(--vscode-panel-border);
+        border: var(--space-1) solid var(--colour-line);
         border-radius: var(--radius-3);
-        background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
+        background: var(--colour-badge);
         /* Pair the text with the badge background - without this the chip inherited the dark
            editor foreground and read as near-black on the theme's (often blue) badge colour. */
-        color: var(--vscode-badge-foreground, var(--vscode-editor-foreground));
+        color: var(--colour-badge-ink);
     }
 
     .type-chip .codicon {
@@ -5494,9 +5473,9 @@ const GlobalStyle = createGlobalStyle`
 
     .type-empty {
         padding: var(--space-1) var(--space-6);
-        border: var(--space-1) dashed var(--vscode-panel-border);
+        border: var(--space-1) dashed var(--colour-line);
         border-radius: var(--radius-3);
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         font-style: italic;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -5519,19 +5498,19 @@ const Shell = styled.div`
         display: flex;
         gap: var(--space-6);
         align-items: center;
-        background: var(--vscode-sideBar-background);
-        border-bottom: var(--space-1) solid var(--vscode-panel-border);
+        background: var(--colour-sidebar);
+        border-bottom: var(--space-1) solid var(--colour-line);
         flex-shrink: 0;
     }
 
     select,
     input[type="text"] {
-        background: var(--vscode-input-background);
-        color: var(--vscode-input-foreground);
-        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        background: var(--colour-input);
+        color: var(--colour-input-ink);
+        border: var(--space-1) solid var(--colour-input-line);
         padding: var(--space-2) var(--space-6);
-        font-size: var(--vscode-font-size);
-        font-family: var(--vscode-font-family);
+        font-size: var(--font-size-body);
+        font-family: var(--font-family-ui);
         outline: none;
         min-width: 0;
     }
@@ -5542,47 +5521,38 @@ const Shell = styled.div`
 
     input[type="text"]:focus,
     select:focus {
-        border-color: var(--vscode-focusBorder);
+        border-color: var(--colour-focus);
     }
 
     button {
-        background: var(
-            --vscode-button-secondaryBackground,
-            var(--vscode-button-background)
-        );
-        color: var(
-            --vscode-button-secondaryForeground,
-            var(--vscode-button-foreground)
-        );
+        background: var(--colour-action-2);
+        color: var(--colour-action-2-ink);
         border: none;
         padding: var(--space-2) var(--space-8);
         cursor: pointer;
-        font-size: var(--vscode-font-size);
-        font-family: var(--vscode-font-family);
+        font-size: var(--font-size-body);
+        font-family: var(--font-family-ui);
         white-space: nowrap;
         flex-shrink: 0;
     }
 
     button:hover {
-        background: var(
-            --vscode-button-secondaryHoverBackground,
-            var(--vscode-button-hoverBackground)
-        );
+        background: var(--colour-action-2-hover);
     }
 
     button.primary {
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
     }
 
     button.danger {
-        color: var(--vscode-errorForeground, #f44);
+        color: var(--colour-critical);
     }
 
     .mode-switch {
         display: flex;
         flex-shrink: 0;
-        border: var(--space-1) solid var(--vscode-panel-border);
+        border: var(--space-1) solid var(--colour-line);
         border-radius: var(--radius-3);
         overflow: hidden;
     }
@@ -5592,7 +5562,7 @@ const Shell = styled.div`
     }
 
     .mode-switch button + button {
-        border-left: var(--space-1) solid var(--vscode-panel-border);
+        border-left: var(--space-1) solid var(--colour-line);
     }
 
     .body {
@@ -5662,8 +5632,8 @@ const Shell = styled.div`
         align-items: center;
         justify-content: center;
         padding: var(--space-16);
-        color: var(--vscode-disabledForeground);
-        background: var(--vscode-editor-background);
+        color: var(--colour-faint);
+        background: var(--colour-editor-ground);
     }
 
     /* ── Right dock ─────────────────────────────────────────────────────── */
@@ -5735,7 +5705,7 @@ const Shell = styled.div`
 
     .resize-handle-w:hover,
     .resize-handle-w:active {
-        background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+        background: var(--colour-sash);
     }
 
     /* ── Palette (dock content, Edit mode) ─────────────────────────────── */
@@ -5750,8 +5720,7 @@ const Shell = styled.div`
 
     .palette-new {
         padding-bottom: var(--space-12);
-        border-bottom: var(--space-1) solid
-            var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+        border-bottom: var(--space-1) solid var(--colour-line);
     }
 
     /* The .toggle variant lived here: a third hand-rolled folding heading, on a div with an
@@ -5774,12 +5743,12 @@ const Shell = styled.div`
     }
 
     .palette-tile:hover {
-        outline: var(--space-1) solid var(--vscode-focusBorder);
+        outline: var(--space-1) solid var(--colour-focus);
     }
 
     .palette-empty {
         font-size: var(--font-size-11);
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
 
     /* ── Minimap (dock overview) ───────────────────────────────────────── */
@@ -5792,9 +5761,9 @@ const Shell = styled.div`
 
     .minimap {
         display: block;
-        border: var(--space-1) solid var(--vscode-panel-border);
+        border: var(--space-1) solid var(--colour-line);
         border-radius: var(--radius-3);
-        background: var(--vscode-editor-background);
+        background: var(--colour-editor-ground);
         cursor: crosshair;
     }
 
@@ -5805,18 +5774,18 @@ const Shell = styled.div`
         align-items: center;
         justify-content: center;
         font-size: var(--font-size-11);
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
 
     .minimap .mm-node {
-        fill: var(--vscode-descriptionForeground);
+        fill: var(--colour-muted);
         opacity: 0.55;
     }
 
     .minimap .mm-view {
-        fill: var(--vscode-focusBorder);
+        fill: var(--colour-focus);
         fill-opacity: 0.12;
-        stroke: var(--vscode-focusBorder);
+        stroke: var(--colour-focus);
         stroke-width: 1;
     }
 
@@ -5835,10 +5804,9 @@ const Shell = styled.div`
         min-height: 28px;
         padding: var(--space-4) var(--space-8);
         border-radius: var(--radius-6);
-        border: var(--space-1) solid
-            var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--colour-line-strong);
         background: transparent;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         font: inherit;
         font-size: var(--font-size-12);
         text-align: left;
@@ -5849,7 +5817,7 @@ const Shell = styled.div`
     }
 
     button.sim-status:hover {
-        background: var(--vscode-toolbar-hoverBackground);
+        background: var(--colour-toolbar-hover);
     }
 
     .sim-status-text {
@@ -5867,12 +5835,12 @@ const Shell = styled.div`
 
     .sim-status.owed {
         border-color: var(--lifecycle-armed, #e2b93d);
-        color: var(--vscode-foreground);
+        color: var(--colour-ink);
     }
 
     .sim-status.halted {
-        border-color: var(--vscode-debugIcon-breakpointForeground, #e51400);
-        color: var(--vscode-foreground);
+        border-color: var(--colour-breakpoint);
+        color: var(--colour-ink);
     }
 
     /* Running is the one state that has to be legible at a glance from across the dock: the
@@ -5880,14 +5848,14 @@ const Shell = styled.div`
 
     .sim-status.running {
         border-color: var(--lifecycle-fired, #73c991);
-        color: var(--vscode-foreground);
+        color: var(--colour-ink);
     }
 
     /* The galaxy standing still for a battle, and a battle that has ended. */
 
     .sim-status.battle {
-        border-color: var(--vscode-focusBorder);
-        color: var(--vscode-foreground);
+        border-color: var(--colour-focus);
+        color: var(--colour-ink);
     }
 
     .sim-status.resolved.won {
@@ -5896,18 +5864,15 @@ const Shell = styled.div`
 
     .sim-status.resolved.lost,
     .sim-status.lost {
-        border-color: var(--vscode-errorForeground);
-        color: var(--vscode-foreground);
+        border-color: var(--colour-critical);
+        color: var(--colour-ink);
     }
 
     /* What the server last refused: the reason play stopped, under the readout until the next
        state. */
 
     .sim-notice {
-        color: var(
-            --vscode-editorWarning-foreground,
-            var(--vscode-descriptionForeground)
-        );
+        color: var(--colour-warning);
         font-size: var(--font-size-11);
         white-space: nowrap;
         overflow: hidden;
@@ -5953,7 +5918,7 @@ const Shell = styled.div`
     }
 
     .sim-row.add {
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
 
     /* Content: inventories. A row is a button - it opens its detail beside the dock - and reads
@@ -5976,7 +5941,7 @@ const Shell = styled.div`
         align-items: center;
         gap: var(--space-4);
         font-size: var(--font-size-smaller);
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         padding: var(--space-2) 0 0;
     }
 
@@ -5990,7 +5955,7 @@ const Shell = styled.div`
         border: none;
         border-radius: var(--radius-3);
         background: transparent;
-        color: var(--vscode-foreground);
+        color: var(--colour-ink);
         font: inherit;
         text-align: left;
         box-sizing: border-box;
@@ -6002,12 +5967,12 @@ const Shell = styled.div`
 
     button.sim-row:hover,
     .sim-row.decision:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
     }
 
     .sim-row.selected {
-        background: var(--vscode-list-activeSelectionBackground);
-        color: var(--vscode-list-activeSelectionForeground);
+        background: var(--colour-selected);
+        color: var(--colour-selected-ink);
     }
 
     .sim-row.gone {
@@ -6029,7 +5994,7 @@ const Shell = styled.div`
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         font-variant-numeric: tabular-nums;
     }
 
@@ -6080,7 +6045,7 @@ const Shell = styled.div`
     }
 
     .sim-answer.active {
-        border-color: var(--vscode-focusBorder);
+        border-color: var(--colour-focus);
     }
 
     .sim-chip-row {
@@ -6114,7 +6079,7 @@ const Shell = styled.div`
 
     .sim-arm-or,
     .sim-arm-and {
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         font-size: var(--font-size-smaller);
         text-transform: uppercase;
     }
@@ -6187,8 +6152,8 @@ const Shell = styled.div`
     .sim-trace {
         position: relative;
         overflow-y: auto;
-        border-top: var(--space-1) solid var(--vscode-panel-border);
-        background: var(--vscode-sideBar-background);
+        border-top: var(--space-1) solid var(--colour-line);
+        background: var(--colour-sidebar);
         flex-shrink: 0;
         font-size: var(--font-size-11);
         padding: 0 var(--space-4) var(--space-2);
@@ -6202,7 +6167,7 @@ const Shell = styled.div`
         gap: var(--space-4);
         align-items: center;
         padding: var(--space-2) 0;
-        background: var(--vscode-sideBar-background);
+        background: var(--colour-sidebar);
     }
 
     .sim-trace-tools input {
@@ -6234,21 +6199,21 @@ const Shell = styled.div`
     }
 
     .sim-trace-row.clickable:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
     }
 
     .sim-trace-row.muted {
         display: block;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         font-style: italic;
     }
 
     .sim-trace-tick {
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
 
     .sim-trace-cause {
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
 
     .sim-trace-row.cause-trigger .sim-trace-node,
@@ -6261,7 +6226,7 @@ const Shell = styled.div`
     }
 
     .sim-trace-row.cause-breakpoint {
-        color: var(--vscode-debugIcon-breakpointForeground, #e51400);
+        color: var(--colour-breakpoint);
     }
 
     .sim-trace-row.cause-ignored {
@@ -6269,7 +6234,7 @@ const Shell = styled.div`
     }
 
     .sim-trace-detail {
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
 
     @media (max-width: 700px) {
@@ -6307,7 +6272,7 @@ const Shell = styled.div`
        the frame a flex column and the row list the scroller, the bar no longer needs to stick. */
 
     .panel-bar {
-        background: var(--vscode-sideBar-background);
+        background: var(--colour-sidebar);
         padding: var(--space-1) var(--space-4) var(--space-2);
     }
 
@@ -6318,8 +6283,8 @@ const Shell = styled.div`
     .problems {
         position: relative;
         overflow-y: auto;
-        border-top: var(--space-1) solid var(--vscode-panel-border);
-        background: var(--vscode-sideBar-background);
+        border-top: var(--space-1) solid var(--colour-line);
+        background: var(--colour-sidebar);
         flex-shrink: 0;
         font-size: var(--font-size-12);
         padding: var(--space-2) var(--space-4);
@@ -6328,7 +6293,7 @@ const Shell = styled.div`
     .problem-node {
         flex-shrink: 0;
         max-width: 180px;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -6337,7 +6302,7 @@ const Shell = styled.div`
     .problem-row button {
         background: transparent;
         border: none;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         cursor: pointer;
         padding: 0 var(--space-2);
         flex-shrink: 0;
@@ -6345,7 +6310,7 @@ const Shell = styled.div`
 
     .problem-row button:hover {
         background: transparent;
-        color: var(--vscode-editor-foreground);
+        color: var(--colour-editor-ink);
     }
 
     /* The colour key's corner plate - bottom right, where the legend strip used to end. */
@@ -6383,7 +6348,7 @@ const Shell = styled.div`
 
     .colour-key .key-shared {
         grid-column: 2;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         font-size: var(--font-size-11);
     }
 
@@ -7657,7 +7622,7 @@ function App(): React.JSX.Element {
                         >
                             <path
                                 d="M 0 0 L 10 5 L 0 10 z"
-                                fill="var(--vscode-charts-foreground, #999)"
+                                fill="var(--colour-data-neutral)"
                             />
                         </marker>
                     </defs>
@@ -8605,36 +8570,36 @@ function TacticalCreateBar(props: {
  */
 function stepColor(category: string, name: string | null): string {
     if (category === "blank") {
-        return "var(--vscode-charts-foreground, #bbb)";
+        return "var(--colour-data-neutral)";
     }
     if (category === "andJunction" || category === "orJunction") {
-        return "var(--vscode-charts-purple, #b180d7)";
+        return "var(--colour-data-purple)";
     }
     const n = (name ?? "").toUpperCase();
     if (/FLAG/.test(n)) {
-        return "var(--vscode-charts-orange, #d18616)";
+        return "var(--colour-data-orange)";
     }
     if (/TACTICAL|VICTORY|MISSION|LAND|SPACE|BATTLE|CONQUER|BOMBARD/.test(n)) {
-        return "var(--vscode-charts-red, #f14c4c)";
+        return "var(--colour-data-red)";
     }
     if (/DIALOG|SPEECH|NOTIF|MOVIE|SOUND|MUSIC|CAMERA|SUBTITLE|TEXT/.test(n)) {
-        return "var(--vscode-charts-purple, #b180d7)";
+        return "var(--colour-data-purple)";
     }
     if (/ELAPSED|TIME|TIMER|CLOCK/.test(n)) {
-        return "var(--vscode-charts-yellow, #cca700)";
+        return "var(--colour-data-yellow)";
     }
     if (/TRIGGER|RESET|DISABLE|ACTIVATE|ENABLE|EVENT|PLOT|ELEMENT/.test(n)) {
-        return "var(--vscode-charts-blue, #3794ff)";
+        return "var(--colour-data-blue)";
     }
     return category === "reward"
-        ? "var(--vscode-charts-green, #89d185)"
-        : "var(--vscode-charts-blue, #3794ff)";
+        ? "var(--colour-data-green)"
+        : "var(--colour-data-blue)";
 }
 
 /** A tile/badge background: its family colour washed into the widget background (matches the palette). */
 function fadedBg(color: string): string {
     // l10n-exempt: a CSS colour value
-    return `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
+    return `color-mix(in srgb, ${color} 20%, var(--colour-panel))`;
 }
 
 function NodePalette(props: {

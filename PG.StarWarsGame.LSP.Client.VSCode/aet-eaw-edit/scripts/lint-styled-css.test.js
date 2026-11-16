@@ -70,4 +70,28 @@ describe('the lint run', () => {
             fs.rmSync(root, {recursive: true, force: true});
         }
     });
+
+    it('fails on a host variable outside tokens.ts and names the role to use (#206)', () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'styled-css-'));
+        try {
+            const shared = path.join(root, 'webview', 'shared');
+            fs.mkdirSync(shared, {recursive: true});
+            fs.copyFileSync(TOKENS, path.join(shared, 'tokens.ts'));
+            fs.writeFileSync(path.join(root, 'webview', 'panel.ts'), '\nexport const ink = "var(--vscode-foreground)";\n');
+
+            const run = spawnSync(process.execPath, [path.join(__dirname, 'lint-styled-css.js'), root],
+                {encoding: 'utf8'});
+
+            assert.equal(run.status, 1, run.stderr);
+            assert.match(run.stderr, /panel\.ts:2 {2}var\(--vscode-foreground\)/);
+            assert.match(run.stderr, /var\(--colour-ink\)/);
+        } finally {
+            fs.rmSync(root, {recursive: true, force: true});
+        }
+    });
+
+    it('passes on the shipped tree', () => {
+        const run = spawnSync(process.execPath, [path.join(__dirname, 'lint-styled-css.js')], {encoding: 'utf8'});
+        assert.equal(run.status, 0, run.stderr);
+    });
 });

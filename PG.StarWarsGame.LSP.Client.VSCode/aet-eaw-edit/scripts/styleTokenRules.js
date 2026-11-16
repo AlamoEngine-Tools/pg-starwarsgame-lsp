@@ -122,4 +122,50 @@ function tokenOffences(body, {
     return found.sort((a, b) => a.index - b.index);
 }
 
-module.exports = {KINDS, SCALE_PROPERTY, tokenOffences};
+/**
+ * Every host variable a file reads directly (#206).
+ *
+ * The host's colours and fonts reach a panel through the layer's roles, so a theme is answered in one
+ * file and every panel behaves the same in it. A raw `var(--vscode-...)` anywhere else - a stylesheet, a
+ * string a style object takes, an inline style - is reported with the role that stands for it. A line
+ * that is a comment is left alone: a comment may say what a role stands for.
+ *
+ * @param {string} text the whole file
+ * @param {Map<string, string>} [roles] host variable -> the role the layer publishes for it
+ */
+function hostOffences(text, roles = new Map()) {
+    const found = [];
+    for (const m of text.matchAll(/var\(\s*(--vscode-[a-zA-Z0-9.-]+)/g)) {
+        const lineStart = text.lastIndexOf('\n', m.index) + 1;
+        const lead = text.slice(lineStart, m.index).trimStart();
+        if (lead.startsWith('//') || lead.startsWith('*') || lead.startsWith('/*')) {
+            continue;
+        }
+        const name = m[1];
+        const role = roles.get(name);
+        found.push({
+            index: m.index,
+            line: text.slice(0, m.index).split('\n').length,
+            name,
+            hint: role
+                ? `var(${role}) - the layer's role for it`
+                : 'a role for it in src/webview/shared/tokens.ts first',
+        });
+    }
+    return found;
+}
+
+/** Host variable -> role, as tokens.ts declares them: the colour list and the CSS blocks alike. */
+function hostRoles(tokensText) {
+    const roles = new Map();
+    const flat = tokensText.replace(/\s+/g, ' ');
+    for (const m of flat.matchAll(/name:\s*["'](--[a-z0-9-]+)["'],\s*from:\s*["'](--vscode-[a-zA-Z0-9.-]+)["']/g)) {
+        if (!roles.has(m[2])) roles.set(m[2], m[1]);
+    }
+    for (const m of tokensText.matchAll(/(--[a-z0-9-]+)\s*:\s*var\(\s*(--vscode-[a-zA-Z0-9.-]+)/g)) {
+        if (!roles.has(m[2])) roles.set(m[2], m[1]);
+    }
+    return roles;
+}
+
+module.exports = {KINDS, SCALE_PROPERTY, hostOffences, hostRoles, tokenOffences};
