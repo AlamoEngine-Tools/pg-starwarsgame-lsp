@@ -12,10 +12,18 @@ describe("PRJ-23", () => {
             async () => (tabs = await tabLabels()).includes("old-game.pgproj - on disk <-> updated format"),
             { timeout: 120_000, timeoutMsg: `Tabs ${JSON.stringify(tabs)}` },
         );
-        const proposed: string = await browser.executeWorkbench((vscode) => {
-            const editor = vscode.window.visibleTextEditors.find((e: any) => e.document.uri.scheme !== "file");
-            return editor?.document.getText() ?? "";
-        });
+        // The tab is labelled before its editors are visible, so the proposed text is waited for itself.
+        let proposed = "";
+        await browser.waitUntil(
+            async () => {
+                proposed = await browser.executeWorkbench((vscode) => {
+                    const editor = vscode.window.visibleTextEditors.find((e: any) => e.document.uri.scheme !== "file");
+                    return editor?.document.getText() ?? "";
+                });
+                return proposed.length > 0;
+            },
+            { timeout: 30_000, timeoutMsg: "The updated form never showed beside the file" },
+        );
         const project = JSON.parse(proposed);
         expect(project.game).toBe("foc");
         expect(project._typeVersion).toBe("aetswg-1.1.0");

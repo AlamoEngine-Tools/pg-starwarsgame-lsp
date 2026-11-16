@@ -286,6 +286,11 @@ export async function panels(): Promise<string[]> {
 
 /** The open entry's header: its tags and its key-value rows. */
 export async function entryHead(): Promise<{ title: string; tags: string[]; rows: Record<string, string> }> {
+    // Read once the page has drawn it: opening a row only asks for the page.
+    await browser.waitUntil(
+        async () => browser.execute(() => document.querySelector("section.entry-head dt") !== null),
+        { timeout: 30_000, timeoutMsg: "The entry's head never drew" },
+    );
     return browser.execute(() => {
         const head = document.querySelector("section.entry-head");
         const rows: Record<string, string> = {};

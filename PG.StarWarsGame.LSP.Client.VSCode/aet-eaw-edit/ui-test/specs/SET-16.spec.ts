@@ -60,10 +60,10 @@ describe("SET-16", () => {
 
     it("refuses a second project file", async () => {
         await newModProject(existing);
-        await notification(
-            (m) => m === `Mod project not created: A project file already exists - ${path.join(existing, "Test_Mod.pgproj")}`,
-        );
-        expect((await notifications()).filter((n) => n.message.startsWith("Mod project 'Test Mod' created"))).toEqual([]);
+        const file = path.join(existing, "Test_Mod.pgproj");
+        await notification((m) => m === `Mod project not created: A project file already exists - ${file}`);
+        // This folder's own: the previous step's notice for FreshMod has been seen to arrive after the clear.
+        expect((await notifications()).filter((n) => n.message === `Mod project 'Test Mod' created - ${file}`)).toEqual([]);
     });
 
     it("does not restart the running server", async () => {
