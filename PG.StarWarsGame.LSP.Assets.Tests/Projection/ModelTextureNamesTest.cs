@@ -34,17 +34,22 @@ public sealed class ModelTextureNamesTest
 
     /// <summary>
     ///     #292: the shipped particle systems name their sprite sheets by the art machine's absolute
-    ///     path, and the game opens the part after the last backslash. The names come out as the game
-    ///     looks them up, so every catalog built from them agrees with it.
+    ///     path, and the game opens the part after the last backslash. The names come out as WRITTEN:
+    ///     every reader cuts them itself, and the XML check can only say a texture is named by a path
+    ///     while the path is still there to see.
     /// </summary>
     [Fact]
-    public void Read_ReportsATextureNamedByAnAbsolutePath_ByItsFileName()
+    public void Read_KeepsATextureNamedByAnAbsolutePath_AsWritten()
     {
         var system = AloParticleReaderTest.System("p_engines", null,
             AloParticleReaderTest.Emitter(colorTexture: @"C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga",
                 normalTexture: @"C:\Projects\Starwars\Art\Textures\Game\p_particle_depth_master.tga"));
 
-        Assert.Equal(["p_particle_master.tga", "p_particle_depth_master.tga"], ModelTextureNames.Read(system));
+        Assert.Equal(
+        [
+            @"C:\Projects\Starwars\Art\Textures\Game\p_particle_master.tga",
+            @"C:\Projects\Starwars\Art\Textures\Game\p_particle_depth_master.tga"
+        ], ModelTextureNames.Read(system));
     }
 
     [Fact]

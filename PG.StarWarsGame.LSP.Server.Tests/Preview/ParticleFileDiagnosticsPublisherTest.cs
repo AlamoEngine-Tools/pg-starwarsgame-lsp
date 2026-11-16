@@ -41,7 +41,7 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         var d = Assert.Single(p.Diagnostics);
         Assert.Equal(DiagnosticIds.PreviewParticleUnreadByGame.ToString(), d.Code?.String);
         Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
-        Assert.Contains("0x7F", d.Message);
+        Assert.Contains("0x7F", d.Message.Text());
         Assert.Equal(0, d.Range.Start.Line);
     }
 

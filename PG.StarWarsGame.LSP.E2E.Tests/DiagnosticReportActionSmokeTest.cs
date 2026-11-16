@@ -6,6 +6,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -51,7 +52,7 @@ public abstract class DiagnosticReportActionSmokeTestBase<TFixture>(TFixture fix
         });
 
         var damage = Assert.Single((await received).Diagnostics,
-            d => d.Message.Contains("<Damage> must be greater than 0", StringComparison.Ordinal));
+            d => d.Message.Text().Contains("<Damage> must be greater than 0", StringComparison.Ordinal));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var actions = await fixture.Client.RequestCodeAction(new CodeActionParams

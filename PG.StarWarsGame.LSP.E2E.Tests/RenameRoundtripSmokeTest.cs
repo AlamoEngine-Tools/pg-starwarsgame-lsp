@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -189,14 +190,14 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             // anything stale.
             var diagTask = _fixture.WaitForDiagnosticsAsync(corvettesUri,
                 p => !p.Diagnostics.Any(d =>
-                    d.Message.Contains(OriginalName, StringComparison.OrdinalIgnoreCase)),
+                    d.Message.Text().Contains(OriginalName, StringComparison.OrdinalIgnoreCase)),
                 TimeSpan.FromSeconds(15));
 
             await ApplyWorkspaceEditAsync(edit, inMemory, versions);
             renamed = true;
 
             var diags = await diagTask;
-            var diagMessages = diags?.Diagnostics.Select(d => d.Message).ToList() ?? [];
+            var diagMessages = diags?.Diagnostics.Select(d => d.Message.Text()).ToList() ?? [];
 
             // "Rename_Test" must not be unresolved (proves symbol was properly defined/indexed).
             Assert.False(
@@ -276,7 +277,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
 
             var diagsBack = await diagBackTask;
             Assert.NotNull(diagsBack);
-            var backMessages = diagsBack.Diagnostics.Select(d => d.Message).ToList();
+            var backMessages = diagsBack.Diagnostics.Select(d => d.Message.Text()).ToList();
 
             Assert.False(
                 backMessages.Any(m =>

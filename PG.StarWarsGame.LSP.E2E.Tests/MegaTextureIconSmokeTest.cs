@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -94,8 +95,8 @@ public sealed class MegaTextureIconSmokeTest : IClassFixture<LspServerFixture>, 
     private static void AssertNotReportedMissing(PublishDiagnosticsParams diags, string icon)
     {
         var falsePositives = diags.Diagnostics
-            .Where(d => d.Message.Contains(icon, StringComparison.OrdinalIgnoreCase)
-                        && d.Message.Contains("was not found", StringComparison.OrdinalIgnoreCase))
+            .Where(d => d.Message.Text().Contains(icon, StringComparison.OrdinalIgnoreCase)
+                        && d.Message.Text().Contains("was not found", StringComparison.OrdinalIgnoreCase))
             .Select(d => d.Message)
             .ToList();
 

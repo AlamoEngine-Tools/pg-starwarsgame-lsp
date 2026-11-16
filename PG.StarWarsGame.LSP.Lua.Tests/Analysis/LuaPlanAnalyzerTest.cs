@@ -48,7 +48,7 @@ public sealed class LuaPlanAnalyzerTest
         var diagnostic = Assert.Single(Analyze(text));
         Assert.Equal(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString(), diagnostic.Code?.String);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.Contains("MainForce_Thread", diagnostic.Message);
+        Assert.Contains("MainForce_Thread", diagnostic.Message.Text());
         Assert.Equal(2, diagnostic.Range.Start.Line);
         Assert.Equal("    { \"".Length, diagnostic.Range.Start.Character);
         Assert.Equal("    { \"MainForce".Length, diagnostic.Range.End.Character);

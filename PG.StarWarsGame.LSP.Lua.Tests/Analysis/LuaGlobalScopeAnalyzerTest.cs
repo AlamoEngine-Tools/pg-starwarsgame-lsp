@@ -110,8 +110,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "Sleep(1)", index, schema, s_fileHelper,
             TestCatalogues.English);
         var diagnostic = Assert.Single(result);
-        Assert.Contains("Sleep", diagnostic.Message);
-        Assert.Contains("not required", diagnostic.Message);
+        Assert.Contains("Sleep", diagnostic.Message.Text());
+        Assert.Contains("not required", diagnostic.Message.Text());
         // An id like every other finding of ours, so it shows a code and can be suppressed.
         Assert.Equal(DiagnosticIds.LuaGlobalNotRequired.ToString(), diagnostic.Code?.String);
     }
@@ -172,7 +172,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
-        Assert.Contains("MyHelper", diag.Message);
+        Assert.Contains("MyHelper", diag.Message.Text());
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var diag = Assert.Single(LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English));
 
-        Assert.Contains("mylib", diag.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("mylib", diag.Message.Text(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -299,7 +299,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Hint, diag.Severity);
-        Assert.Contains("mylib", diag.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("mylib", diag.Message.Text(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -331,7 +331,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var diag = Assert.Single(LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English));
 
-        Assert.Contains("mylib", diag.Message);
+        Assert.Contains("mylib", diag.Message.Text());
     }
 
     [Fact]
@@ -471,7 +471,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var errors = result.Where(d =>
             d.Severity == DiagnosticSeverity.Error).ToList();
         Assert.Single(errors);
-        Assert.Contains("cyclic", errors[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("cyclic", errors[0].Message.Text(), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(DiagnosticIds.LuaCyclicRequire.ToString(), errors[0].Code?.String);
     }
 
@@ -692,9 +692,9 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var overrideWarnings = result.Where(d =>
             d.Severity == DiagnosticSeverity.Warning &&
-            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase)).ToList();
+            d.Message.Text().Contains("overrides", StringComparison.OrdinalIgnoreCase)).ToList();
         var warning = Assert.Single(overrideWarnings);
-        Assert.Contains("Foo", warning.Message);
+        Assert.Contains("Foo", warning.Message.Text());
     }
 
     [Fact]
@@ -724,7 +724,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var overrideWarnings = result.Where(d =>
             d.Severity == DiagnosticSeverity.Warning &&
-            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase)).ToList();
+            d.Message.Text().Contains("overrides", StringComparison.OrdinalIgnoreCase)).ToList();
         Assert.Single(overrideWarnings);
     }
 
@@ -751,7 +751,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         Assert.DoesNotContain(result, d =>
             d.Severity == DiagnosticSeverity.Warning &&
-            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase));
+            d.Message.Text().Contains("overrides", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -775,7 +775,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
             TestCatalogues.English);
 
         Assert.DoesNotContain(result, d =>
-            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase));
+            d.Message.Text().Contains("overrides", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -802,7 +802,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var warning = result.Single(d =>
             d.Severity == DiagnosticSeverity.Warning &&
-            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase));
+            d.Message.Text().Contains("overrides", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(1, warning.Range.Start.Line);
         Assert.Equal(9, warning.Range.Start.Character); // after "function "
     }
@@ -834,9 +834,9 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var redundant = result.Where(d =>
             d.Severity == DiagnosticSeverity.Warning &&
-            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase)).ToList();
+            d.Message.Text().Contains("redundant", StringComparison.OrdinalIgnoreCase)).ToList();
         Assert.Single(redundant);
-        Assert.Contains("\"c\"", redundant[0].Message);
+        Assert.Contains("\"c\"", redundant[0].Message.Text());
     }
 
     [Fact]
@@ -863,7 +863,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
             TestCatalogues.English);
 
         Assert.DoesNotContain(result, d =>
-            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
+            d.Message.Text().Contains("redundant", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -882,7 +882,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
             TestCatalogues.English);
 
         Assert.DoesNotContain(result, d =>
-            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
+            d.Message.Text().Contains("redundant", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -909,9 +909,9 @@ public sealed class LuaGlobalScopeAnalyzerTest
             TestCatalogues.English);
 
         var redundant = result.Single(d =>
-            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("PGBase", redundant.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("PGStateMachine", redundant.Message, StringComparison.OrdinalIgnoreCase);
+            d.Message.Text().Contains("redundant", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("PGBase", redundant.Message.Text(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PGStateMachine", redundant.Message.Text(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -941,9 +941,9 @@ public sealed class LuaGlobalScopeAnalyzerTest
             TestCatalogues.English);
 
         var redundant = result.Where(d =>
-            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase)).ToList();
+            d.Message.Text().Contains("redundant", StringComparison.OrdinalIgnoreCase)).ToList();
         Assert.Single(redundant);
-        Assert.Contains("\"d\"", redundant[0].Message);
+        Assert.Contains("\"d\"", redundant[0].Message.Text());
     }
 
     // ── duplicate require (Phase 8) ───────────────────────────────────────────
@@ -963,7 +963,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English);
 
-        var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
+        var dups = result.Where(d => d.Message.Text().Contains("duplicate", StringComparison.OrdinalIgnoreCase))
+            .ToList();
         Assert.Single(dups);
         Assert.Equal(DiagnosticSeverity.Warning, dups[0].Severity);
         Assert.Equal(1, dups[0].Range.Start.Line); // second require is on line 1
@@ -984,7 +985,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English);
 
-        var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
+        var dups = result.Where(d => d.Message.Text().Contains("duplicate", StringComparison.OrdinalIgnoreCase))
+            .ToList();
         Assert.Equal(2, dups.Count);
     }
 
@@ -1003,7 +1005,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English);
 
-        Assert.DoesNotContain(result, d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(result, d => d.Message.Text().Contains("duplicate", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1023,7 +1025,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English);
 
-        Assert.DoesNotContain(result, d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(result, d => d.Message.Text().Contains("duplicate", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1040,7 +1042,8 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English);
 
-        var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
+        var dups = result.Where(d => d.Message.Text().Contains("duplicate", StringComparison.OrdinalIgnoreCase))
+            .ToList();
         Assert.Single(dups);
     }
 
@@ -1059,7 +1062,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English);
 
-        var dup = result.Single(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        var dup = result.Single(d => d.Message.Text().Contains("duplicate", StringComparison.OrdinalIgnoreCase));
         Assert.True(dup.Code?.IsString == true);
         Assert.Equal(DiagnosticIds.LuaDuplicateRequire.ToString(), dup.Code?.String);
     }
@@ -1079,9 +1082,9 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper,
             TestCatalogues.English);
 
-        var dup = result.Single(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        var dup = result.Single(d => d.Message.Text().Contains("duplicate", StringComparison.OrdinalIgnoreCase));
         // Original is on line 0 (0-indexed) = line 1 for human display.
-        Assert.Contains("line 1", dup.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("line 1", dup.Message.Text(), StringComparison.OrdinalIgnoreCase);
     }
 
     // ── sandbox isolation (Tier 3 standalones invisible to other files) ───────
@@ -1149,7 +1152,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
-        Assert.Contains("LibHelper", diag.Message);
+        Assert.Contains("LibHelper", diag.Message.Text());
     }
 
     [Fact]
@@ -1177,7 +1180,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
-        Assert.Contains("StateMachineInit", diag.Message);
+        Assert.Contains("StateMachineInit", diag.Message.Text());
     }
 
     [Fact]
@@ -1243,7 +1246,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(library, "if Definitions then Definitions() end", index,
             EmptySchema, s_fileHelper, TestCatalogues.English);
 
-        Assert.Equal(warns, result.Any(d => d.Message.Contains("Definitions")));
+        Assert.Equal(warns, result.Any(d => d.Message.Text().Contains("Definitions")));
     }
 
     // The usual holder is a script of its own, not a shared file: vanilla's PGStateMachine calls
@@ -1278,6 +1281,6 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(library, "if Definitions then Definitions() end", index,
             EmptySchema, s_fileHelper, TestCatalogues.English);
 
-        Assert.Equal(warns, result.Any(d => d.Message.Contains("Definitions")));
+        Assert.Equal(warns, result.Any(d => d.Message.Text().Contains("Definitions")));
     }
 }

@@ -13,6 +13,7 @@ import {
     railChildren,
     railClick,
     railExpand,
+    railOpen,
     rows,
     search,
     selectRow,
@@ -107,8 +108,7 @@ describe("PRV-27", () => {
             const tags = await railChildren(relations[0].label);
             expect(tags.length).toBeGreaterThan(10);
             await openRow("GameObjectType");
-            await railClick(tags[0].label, 3);
-            await browser.keys("Enter");
+            await railOpen(tags[0].label, 3);
             await browser.waitUntil(async () => /value type/i.test(await bodyText()), {
                 timeout: 30_000,
                 timeoutMsg: `The tag ${tags[0].label} shows no documentation`,

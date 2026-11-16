@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Schema;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis;
 
@@ -153,8 +154,8 @@ public sealed class CrossModTierClassificationTest
 
         Assert.Contains(diagnostics, d =>
             d.Severity == DiagnosticSeverity.Warning &&
-            d.Message.Contains("Base_Util") &&
-            d.Message.Contains("overrides"));
+            d.Message.Text().Contains("Base_Util") &&
+            d.Message.Text().Contains("overrides"));
     }
 
     [Fact]
@@ -174,7 +175,7 @@ public sealed class CrossModTierClassificationTest
         var diagnostics = LuaGlobalScopeAnalyzer.Analyze(
             RootScriptUri, rootText, index, s_emptySchema, s_fileHelper, TestCatalogues.English);
 
-        Assert.DoesNotContain(diagnostics, d => d.Message.Contains("Base_Plan"));
+        Assert.DoesNotContain(diagnostics, d => d.Message.Text().Contains("Base_Plan"));
     }
 
     [Fact]
@@ -197,6 +198,6 @@ public sealed class CrossModTierClassificationTest
 
         // No override warning - the dep-mod's standalone file is not in the shared URI set
         Assert.DoesNotContain(diagnostics, d =>
-            d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("Shared_Impl"));
+            d.Severity == DiagnosticSeverity.Warning && d.Message.Text().Contains("Shared_Impl"));
     }
 }

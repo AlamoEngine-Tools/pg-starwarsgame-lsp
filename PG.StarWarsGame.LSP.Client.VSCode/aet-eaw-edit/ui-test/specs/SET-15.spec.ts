@@ -96,10 +96,10 @@ describe("SET-15", () => {
         await browser.waitUntil(
             async () => {
                 const seen = await statusHistory();
-                const indexing = seen.indexOf("EaWEdit LSP: Indexing workspace...");
+                const indexing = seen.indexOf("EaWEdit LSP: Indexing symbols...");
                 return indexing >= 0 && seen.slice(indexing + 1).includes("EaWEdit LSP");
             },
-            { timeout: 60_000, timeoutMsg: "The status did not go through Indexing workspace... and back" },
+            { timeout: 60_000, timeoutMsg: "The status did not go through Indexing symbols... and back" },
         );
         await serverReady();
     });

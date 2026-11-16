@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -57,7 +58,7 @@ public abstract class ContainerTypeOverrideSmokeTestBase<TFixture> : IClassFixtu
             }
         });
 
-        var messages = (await received).Diagnostics.Select(d => d.Message).ToList();
+        var messages = (await received).Diagnostics.Select(d => d.Message.Text()).ToList();
 
         Assert.DoesNotContain(messages, m => m.Contains("music event", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(messages, m => m.Contains("not a known faction", StringComparison.OrdinalIgnoreCase));

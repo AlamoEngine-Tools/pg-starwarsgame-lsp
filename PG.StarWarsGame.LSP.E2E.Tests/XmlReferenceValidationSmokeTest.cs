@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -98,7 +99,7 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
     private static IReadOnlyList<Diagnostic> TypeMismatchDiagnostics(IReadOnlyList<Diagnostic> diags)
     {
         return diags.Where(d =>
-            d.Message.Contains("Type mismatch", StringComparison.OrdinalIgnoreCase)).ToList();
+            d.Message.Text().Contains("Type mismatch", StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
     /// <summary>

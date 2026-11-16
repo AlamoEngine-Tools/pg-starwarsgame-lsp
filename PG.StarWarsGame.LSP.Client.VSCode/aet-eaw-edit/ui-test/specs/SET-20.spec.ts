@@ -2,7 +2,7 @@
 // version check.
 import path from "node:path";
 import { browser, expect } from "@wdio/globals";
-import { repo } from "../paths.js";
+import { client, readJson, repo } from "../paths.js";
 import {
     eaw,
     extensionLog,
@@ -17,6 +17,8 @@ import {
 } from "../protocol.js";
 
 const debugServer = path.join(repo, "PG.StarWarsGame.LSP.Server", "bin", "Debug", "net10.0", "PG.StarWarsGame.LSP.Server.exe");
+// The version the client expects is its own release's, bumped with it.
+const expected: string = readJson(path.join(client, "package.json")).version;
 
 describe("SET-20", () => {
     before(async () => {
@@ -54,7 +56,7 @@ describe("SET-20", () => {
         const reported = (await logLine(/Server version reported: /)).split("Server version reported: ").at(-1)!.trim();
         await browser.pause(3_000);
         const warned = (await notifications()).some((n) => n.message.startsWith(`EaWEdit: Server version ${reported} does not match`));
-        expect(warned).toBe(reported !== "0.4.1");
+        expect(warned).toBe(reported !== expected);
     });
 
     after(async () => {

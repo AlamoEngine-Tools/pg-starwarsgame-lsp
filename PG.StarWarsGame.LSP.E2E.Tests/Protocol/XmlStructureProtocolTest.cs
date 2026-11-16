@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests.Protocol;
 
@@ -127,7 +128,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         var document = await OpenTestFile(Clean.Replace("1.0</Max_Speed>", "1.0</Max_Sped>"));
         var typo = One(document, "aetswg-012-3002", 4);
         Assert.Equal("End tag </Max_Sped> does not match <Max_Speed>: The game compares them byte for byte and " +
-                     "drops the whole file", typo.Message.TrimEnd('.'));
+                     "drops the whole file", typo.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(await Preferred(document, typo, "Rename the end tag to </Max_Speed>"));
         Assert.Equal("\t\t<Max_Speed>1.0</Max_Speed>", document.Lines[3]);
         Assert.Empty(Structure(document));
@@ -135,7 +136,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         await document.ReplaceAsync(Clean.Replace("1.0</Max_Speed>", "1.0</Max_Speed></Max_Speed>"));
         var extra = One(document, "aetswg-012-3002", 4);
         Assert.Equal("End tag </Max_Speed> does not match <SpaceUnit>: The game compares them byte for byte and " +
-                     "drops the whole file", extra.Message.TrimEnd('.'));
+                     "drops the whole file", extra.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(await Preferred(document, extra, "Remove the end tag"));
         Assert.Equal("\t\t<Max_Speed>1.0</Max_Speed>", document.Lines[3]);
         Assert.Empty(Structure(document));
@@ -143,7 +144,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         await document.ReplaceAsync(Clean.Replace("1.0</Max_Speed>", "1.0"));
         var open = One(document, "aetswg-012-3002", 4);
         Assert.Equal("<Max_Speed> is never closed: The game reads </SpaceUnit> where it expects </Max_Speed> and " +
-                     "drops the whole file", open.Message.TrimEnd('.'));
+                     "drops the whole file", open.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(Assert.Single(await document.CodeActionsAsync(open),
             a => a.Title == "Close <Max_Speed>"));
         Assert.Equal("\t\t<Max_Speed>1.0</Max_Speed>", document.Lines[3]);
@@ -159,7 +160,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
                                           "\t\t<Max_Speed>2.0</Max_Speed>\n\t</SpaceUnit>\n</SpaceUnits>\n");
         var d = One(document, "aetswg-012-3002", 3);
         Assert.Equal("<SpaceUnit> is never closed: The game reads </SpaceUnits> where it expects </SpaceUnit> and " +
-                     "drops the whole file", d.Message.TrimEnd('.'));
+                     "drops the whole file", d.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(
             Assert.Single(await document.CodeActionsAsync(d), a => a.Title == "Close <SpaceUnit>"));
         Assert.Equal(["\t\t<Max_Speed>1.0</Max_Speed>", "\t</SpaceUnit>", "\t<SpaceUnit Name=\"Scratch_B\">"],
@@ -178,7 +179,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         await document.ReplaceAsync("<?xml version=\"1.0\"?>\n<SpaceUnits>\n\t<SpaceUnit Name=\"Scratch_A\">\n" +
                                     "\t\t<Max_Speed>1.0</Max_Speed>\n\t</SpaceUnit>\n");
         var f = One(document, "aetswg-012-3009", 2);
-        Assert.Equal("<SpaceUnits> is never closed: The game drops the whole file", f.Message.TrimEnd('.'));
+        Assert.Equal("<SpaceUnits> is never closed: The game drops the whole file", f.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(Assert.Single(await document.CodeActionsAsync(f),
             a => a.Title == "Close <SpaceUnits>"));
         Assert.Equal("</SpaceUnits>", document.Lines.Last(l => l.Length > 0));
@@ -193,13 +194,13 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         var casing = One(document, "aetswg-012-3003", 4);
         Assert.Equal(DiagnosticSeverity.Error, casing.Severity);
         Assert.Equal("End tag </max_speed> does not match <Max_Speed>: The game compares them byte for byte and " +
-                     "drops the whole file", casing.Message.TrimEnd('.'));
+                     "drops the whole file", casing.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(await Preferred(document, casing, "Rename the end tag to </Max_Speed>"));
         Assert.Empty(Structure(document));
 
         await document.ReplaceAsync(Clean + "</SpaceUnits>\n");
         var outside = One(document, "aetswg-012-3004", 7);
-        Assert.Equal("End tag outside any element: The game drops the whole file", outside.Message.TrimEnd('.'));
+        Assert.Equal("End tag outside any element: The game drops the whole file", outside.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(await Preferred(document, outside, "Remove the end tag"));
         Assert.Equal("", document.Lines[6]);
         Assert.Empty(Structure(document));
@@ -211,19 +212,20 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
     {
         var document = await OpenTestFile("<?xml version=\"1.0\"?>\n<SpaceUnits>\n</SpaceUnits>\n");
         var empty = One(document, "aetswg-012-3005", 2);
-        Assert.Equal("Root element without child elements: The game drops the whole file", empty.Message.TrimEnd('.'));
+        Assert.Equal("Root element without child elements: The game drops the whole file",
+            empty.Message.Text().TrimEnd('.'));
         await NoRepairOffered(document, empty);
 
         await document.ReplaceAsync("<?xml version=\"1.0\"?>\n");
         var none = Assert.Single(Structure(document));
         Assert.Equal("aetswg-012-3005", none.Code?.String);
-        Assert.Equal("No root element: The game drops the whole file", none.Message.TrimEnd('.'));
+        Assert.Equal("No root element: The game drops the whole file", none.Message.Text().TrimEnd('.'));
 
         await document.ReplaceAsync(Clean + Clean[(Clean.IndexOf('\n') + 1)..].Replace("Scratch_A", "Scratch_B")
             .Replace("1.0", "2.0"));
         var second = One(document, "aetswg-012-3006", 7);
         Assert.Equal("Second root element: The game reads one root per file and drops the whole file",
-            second.Message.TrimEnd('.'));
+            second.Message.Text().TrimEnd('.'));
         await NoRepairOffered(document, second);
         document.Close();
     }
@@ -234,7 +236,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         var document = await OpenTestFile(Clean.Replace("Name=\"Scratch_A\"", "Name='Scratch_A'"));
         var quotes = One(document, "aetswg-012-3007", 3);
         Assert.Equal("Attribute Name on <SpaceUnit> uses single quotes: The game requires double quotes and drops " +
-                     "the whole file", quotes.Message.TrimEnd('.'));
+                     "the whole file", quotes.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(await Preferred(document, quotes, "Use double quotes"));
         Assert.Equal("\t<SpaceUnit Name=\"Scratch_A\">", document.Lines[2]);
         Assert.Empty(Structure(document));
@@ -246,7 +248,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         await document.ReplaceLineAsync(3, "\t<SpaceUnit Name>");
         var noEquals = One(document, "aetswg-012-3007", 3);
         Assert.Equal("Attribute Name on <SpaceUnit> has no '=': The game drops the whole file",
-            noEquals.Message.TrimEnd('.'));
+            noEquals.Message.Text().TrimEnd('.'));
         await NoRepairOffered(document, noEquals);
         document.Close();
     }
@@ -258,14 +260,14 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         lines.Insert(2, "\t<!-- a -- b -->");
         var document = await OpenTestFile(string.Join("\n", lines));
         var hyphens = One(document, "aetswg-012-3008", 3);
-        Assert.Equal("'--' inside a comment: The game drops the whole file", hyphens.Message.TrimEnd('.'));
+        Assert.Equal("'--' inside a comment: The game drops the whole file", hyphens.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(await Preferred(document, hyphens, "Separate the hyphens"));
         Assert.Equal("\t<!-- a - - b -->", document.Lines[2]);
         Assert.Empty(Structure(document));
 
         await document.ReplaceLineAsync(3, "\t<!-- never closed");
         var unclosed = One(document, "aetswg-012-3008", 3);
-        Assert.Equal("Comment is never closed: The game drops the whole file", unclosed.Message.TrimEnd('.'));
+        Assert.Equal("Comment is never closed: The game drops the whole file", unclosed.Message.Text().TrimEnd('.'));
         await NoRepairOffered(document, unclosed);
         document.Close();
     }
@@ -277,7 +279,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         var declaration = One(document, "aetswg-015-0001", 1);
         Assert.Equal(DiagnosticSeverity.Warning, declaration.Severity);
         Assert.Equal("XML declaration must end in '?>': The game reads it, standard XML tools reject the file",
-            declaration.Message.TrimEnd('.'));
+            declaration.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(await Preferred(document, declaration, "End the declaration with '?>'"));
         Assert.Equal("<?xml version=\"1.0\"?>", document.Lines[0]);
         Assert.Empty(Structure(document));
@@ -286,7 +288,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         var ampersand = One(document, "aetswg-015-0002", 3);
         Assert.Equal(35, ampersand.Range.Start.Character);
         Assert.Equal("'&' that starts no entity: The game reads it as a plain character, standard XML tools reject " +
-                     "the file", ampersand.Message.TrimEnd('.'));
+                     "the file", ampersand.Message.Text().TrimEnd('.'));
         await NoRepairOffered(document, ampersand);
 
         int before;
@@ -311,7 +313,8 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
 
         await document.ReplaceAsync(Clean + "trailing\n");
         var trailing = One(document, "aetswg-015-0003", 7);
-        Assert.StartsWith("Invalid XML (Data at the root level is invalid", trailing.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Invalid XML (Data at the root level is invalid", trailing.Message.Text(),
+            StringComparison.Ordinal);
         await NoRepairOffered(document, trailing);
         document.Close();
     }
@@ -322,7 +325,7 @@ public sealed class XmlStructureProtocolTest(XmlScratchFixture fixture) : IClass
         var document = await OpenTestFile(Clean.Replace("1.0</Max_Speed>", "1.0</Max_Speed>``"));
         var text = One(document, "aetswg-015-0004", 4);
         Assert.Equal("Text after a child element: The game skips it; values must come before the first child",
-            text.Message.TrimEnd('.'));
+            text.Message.Text().TrimEnd('.'));
         await document.ApplyAsync(await Preferred(document, text, "Remove the text the game skips"));
         Assert.Equal("\t\t<Max_Speed>1.0</Max_Speed>", document.Lines[3]);
         Assert.Empty(Structure(document));

@@ -72,7 +72,7 @@ public sealed class LuaStateMachineAnalyzerTest
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal((2, 16, 27), (diagnostic.Range.Start.Line, diagnostic.Range.Start.Character,
             diagnostic.Range.End.Character));
-        Assert.Contains("State_Atack", diagnostic.Message);
+        Assert.Contains("State_Atack", diagnostic.Message.Text());
     }
 
     // A state registered under a computed name could be any name: transitions are not judged then.
@@ -90,7 +90,7 @@ public sealed class LuaStateMachineAnalyzerTest
             DiagnosticIds.LuaStateHandlerNotFunction);
 
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.Contains("State_Iint", diagnostic.Message);
+        Assert.Contains("State_Iint", diagnostic.Message.Text());
     }
 
     // A handler defined in a file of the script's state is a function at run time.
@@ -109,7 +109,7 @@ public sealed class LuaStateMachineAnalyzerTest
             DiagnosticIds.LuaStoryEventHandlerMissing);
 
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
-        Assert.Contains("Demo_Start", diagnostic.Message);
+        Assert.Contains("Demo_Start", diagnostic.Message.Text());
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public sealed class LuaStateMachineAnalyzerTest
             DiagnosticIds.LuaStateHandlerParameters);
 
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
-        Assert.Contains("2", diagnostic.Message);
+        Assert.Contains("2", diagnostic.Message.Text());
     }
 
     // The parameter list of a handler taking none is "()", too small to see: the name is marked.
@@ -186,7 +186,7 @@ public sealed class LuaStateMachineAnalyzerTest
             DiagnosticIds.LuaStateMessageComparison);
 
         Assert.Equal(2, diagnostic.Range.Start.Line);
-        Assert.Contains("OnEntre", diagnostic.Message);
+        Assert.Contains("OnEntre", diagnostic.Message.Text());
     }
 
     // The handler's parameter is the message whatever the author called it.

@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -69,8 +70,8 @@ public sealed class HardpointBoneSmokeTest : IClassFixture<LspServerFixture>, IA
         // for it must be published - the only model that lacks it is the galactic one, which hardpoints
         // do not attach to.
         var falsePositives = diags.Diagnostics
-            .Where(d => d.Message.Contains("HP01_COM_BONE", StringComparison.OrdinalIgnoreCase)
-                        && d.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+            .Where(d => d.Message.Text().Contains("HP01_COM_BONE", StringComparison.OrdinalIgnoreCase)
+                        && d.Message.Text().Contains("does not exist", StringComparison.OrdinalIgnoreCase))
             .Select(d => d.Message)
             .ToList();
 
@@ -106,8 +107,8 @@ public sealed class HardpointBoneSmokeTest : IClassFixture<LspServerFixture>, IA
         // origin, so this is a valid reference: validating bones ∪ mesh names must not flag it. Before the
         // union it was a false positive on every station that mounts the L2 hardpoint.
         var falsePositives = diags.Diagnostics
-            .Where(d => d.Message.Contains("HP02_LC_BLAST", StringComparison.OrdinalIgnoreCase)
-                        && d.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+            .Where(d => d.Message.Text().Contains("HP02_LC_BLAST", StringComparison.OrdinalIgnoreCase)
+                        && d.Message.Text().Contains("does not exist", StringComparison.OrdinalIgnoreCase))
             .Select(d => d.Message)
             .ToList();
 

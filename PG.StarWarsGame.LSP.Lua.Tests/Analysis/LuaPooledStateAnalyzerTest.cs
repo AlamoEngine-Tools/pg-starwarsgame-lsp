@@ -43,7 +43,7 @@ public sealed class LuaPooledStateAnalyzerTest
 
         Assert.Equal(2, found.Count);
         Assert.All(found, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
-        Assert.Contains("PlayerObject", found[0].Message);
+        Assert.Contains("PlayerObject", found[0].Message.Text());
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class LuaPooledStateAnalyzerTest
             DiagnosticIds.LuaHostGlobalInDefinitions));
 
         Assert.Equal(4, found.Range.Start.Line);
-        Assert.Contains("Setup", found.Message);
+        Assert.Contains("Setup", found.Message.Text());
     }
 
     // The library resets them: a write is no read.
@@ -81,7 +81,7 @@ public sealed class LuaPooledStateAnalyzerTest
 
         Assert.Equal(DiagnosticSeverity.Warning, found.Severity);
         Assert.Equal(5, found.Range.Start.Line);
-        Assert.Contains("fired", found.Message);
+        Assert.Contains("fired", found.Message.Text());
     }
 
     // Measured on the vanilla scripts: most run-time globals are set before every read.

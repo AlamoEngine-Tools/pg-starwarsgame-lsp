@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -46,11 +47,11 @@ public abstract class ListMapSmokeTestBase<TFixture>(TFixture fixture) : IClassF
 
         var diagnostics = (await received).Diagnostics.ToList();
         var presence = diagnostics
-            .Where(d => d.Message.Contains("<Presence_Induced_Animations>", StringComparison.Ordinal)).ToList();
+            .Where(d => d.Message.Text().Contains("<Presence_Induced_Animations>", StringComparison.Ordinal)).ToList();
 
         var dropped = Assert.Single(presence);
         Assert.Equal(DiagnosticSeverity.Error, dropped.Severity);
-        Assert.Contains("'Atention' is none", dropped.Message);
+        Assert.Contains("'Atention' is none", dropped.Message.Text());
         var lines = text.Split('\n');
         Assert.Contains("Atention", lines[dropped.Range.Start.Line]);
     }

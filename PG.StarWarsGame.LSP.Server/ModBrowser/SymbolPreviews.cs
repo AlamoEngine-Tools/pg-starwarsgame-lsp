@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Xml;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 
@@ -366,7 +367,7 @@ public sealed class SymbolPreviews(
         var found = diagnostics.Collect(location.Uri, document.Text, index)
             .Where(d => d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)
             .Where(d => d.Range.Start.Line >= location.Line && d.Range.Start.Line <= last)
-            .Select(d => new PreviewEntry(d.Message, d.Code?.String)
+            .Select(d => new PreviewEntry(d.Message.Text(), d.Code?.String)
             {
                 Location = new SymbolLocation(location.Uri, d.Range.Start.Line),
                 Severity = d.Severity == DiagnosticSeverity.Error ? "error" : "warning"

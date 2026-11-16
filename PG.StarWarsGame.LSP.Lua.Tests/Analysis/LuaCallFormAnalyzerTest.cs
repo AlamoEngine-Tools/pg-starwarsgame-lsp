@@ -72,8 +72,8 @@ public sealed class LuaCallFormAnalyzerTest
         var diagnostic = Assert.Single(Analyze(call));
         Assert.Equal(DiagnosticIds.LuaNoCallFormFits.ToString(), diagnostic.Code?.String);
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
-        Assert.Contains(call[..call.IndexOf('(')], diagnostic.Message);
-        Assert.Contains(seen, diagnostic.Message);
+        Assert.Contains(call[..call.IndexOf('(')], diagnostic.Message.Text());
+        Assert.Contains(seen, diagnostic.Message.Text());
         Assert.Equal(0, diagnostic.Range.Start.Character);
         Assert.Equal(call.Length, diagnostic.Range.End.Character);
     }

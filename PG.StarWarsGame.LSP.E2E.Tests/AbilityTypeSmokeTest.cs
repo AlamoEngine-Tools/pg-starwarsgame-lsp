@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -51,7 +52,7 @@ public abstract class AbilityTypeSmokeTestBase<TFixture> : IClassFixture<TFixtur
 
         var diags = await received;
         Assert.Contains(diags.Diagnostics,
-            d => d.Message.Contains("HUN", StringComparison.OrdinalIgnoreCase));
+            d => d.Message.Text().Contains("HUN", StringComparison.OrdinalIgnoreCase));
 
         Close(uri);
     }

@@ -54,7 +54,10 @@ export async function rows(): Promise<TableRow[]> {
 /** The table's foot: its count line, and the Load more button. */
 export async function foot(): Promise<{ text: string; more: { disabled: boolean; title: string } }> {
     return browser.execute(() => {
-        const button = document.querySelector<HTMLButtonElement>(".data-table-foot button");
+        // By its label, not its place: the foot's first button is Clear all filters.
+        const button = Array.from(document.querySelectorAll<HTMLButtonElement>(".data-table-foot button")).find(
+            (b) => (b.textContent ?? "").trim() === "Load more",
+        );
         return {
             text: (document.querySelector(".data-table-foot span")?.textContent ?? "").trim(),
             more: { disabled: button?.disabled ?? true, title: button?.getAttribute("title") ?? "" },
@@ -95,6 +98,17 @@ export async function railClick(label: string, depth = 0): Promise<void> {
     await node.waitForExist({ timeout: 30_000 });
     // By script: the workbench's own labels over the panel's top edge took a pointer click meant for it.
     await browser.execute((el: HTMLElement) => el.click(), node as unknown as HTMLElement);
+}
+
+/**
+ * Opens a rail entry the way Enter does. The script click of {@link railClick} selects without moving the
+ * focus, and the rail takes its keys only while one of its rows holds it, so the row is focused first.
+ */
+export async function railOpen(label: string, depth = 0): Promise<void> {
+    await railClick(label, depth);
+    const node = await browser.$(railNode(label, depth));
+    await browser.execute((el: HTMLElement) => el.focus(), node as unknown as HTMLElement);
+    await browser.keys("Enter");
 }
 
 function railNode(label: string, depth?: number): string {
@@ -272,6 +286,11 @@ export async function panels(): Promise<string[]> {
 
 /** The open entry's header: its tags and its key-value rows. */
 export async function entryHead(): Promise<{ title: string; tags: string[]; rows: Record<string, string> }> {
+    // Read once the page has drawn it: opening a row only asks for the page.
+    await browser.waitUntil(
+        async () => browser.execute(() => document.querySelector("section.entry-head dt") !== null),
+        { timeout: 30_000, timeoutMsg: "The entry's head never drew" },
+    );
     return browser.execute(() => {
         const head = document.querySelector("section.entry-head");
         const rows: Record<string, string> = {};

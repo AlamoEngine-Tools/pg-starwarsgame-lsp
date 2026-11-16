@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -78,7 +79,7 @@ public sealed class StorySymbolSmokeTest : IClassFixture<LspServerFixture>
         {
             var diagnostics = await received;
             var prereqDuplicates = diagnostics.Diagnostics
-                .Where(d => d.Message.Contains("Duplicate tag 'Prereq'", StringComparison.OrdinalIgnoreCase))
+                .Where(d => d.Message.Text().Contains("Duplicate tag 'Prereq'", StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             Assert.True(prereqDuplicates.Count == 0,

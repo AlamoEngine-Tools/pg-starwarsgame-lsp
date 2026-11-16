@@ -9,6 +9,7 @@ using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Server.Status;
 using PG.StarWarsGame.LSP.Server.Variants;
 using OmniSharpWindow = OmniSharp.Extensions.LanguageServer.Protocol.Models.MessageType;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests.Protocol;
 
@@ -85,7 +86,7 @@ public sealed class LoadOrderProtocolTest(LoadOrderCopyFixture fixture) : IClass
 
     private static List<string> Unresolved(ProtocolDocument document)
     {
-        return [.. document.WithCode("aetswg-001-0021").Select(d => d.Message)];
+        return [.. document.WithCode("aetswg-001-0021").Select(d => d.Message.Text())];
     }
 
     [Fact]
@@ -136,13 +137,13 @@ public sealed class LoadOrderProtocolTest(LoadOrderCopyFixture fixture) : IClass
 
         bool XwingNotUsed(IReadOnlyList<Diagnostic> ds, string keptIn)
         {
-            return ds.Any(d => d.Code?.String == "aetswg-010-0006" && d.Message.StartsWith("'X-Wing'") &&
-                               d.Message.Contains(keptIn, StringComparison.Ordinal));
+            return ds.Any(d => d.Code?.String == "aetswg-010-0006" && d.Message.Text().StartsWith("'X-Wing'") &&
+                               d.Message.Text().Contains(keptIn, StringComparison.Ordinal));
         }
 
         bool Unresolves(IReadOnlyList<Diagnostic> ds, string name)
         {
-            return ds.Any(d => d.Code?.String == "aetswg-001-0021" && d.Message.Contains($"'{name}'"));
+            return ds.Any(d => d.Code?.String == "aetswg-001-0021" && d.Message.Text().Contains($"'{name}'"));
         }
 
         var within = TimeSpan.FromSeconds(90);
@@ -156,7 +157,7 @@ public sealed class LoadOrderProtocolTest(LoadOrderCopyFixture fixture) : IClass
             await File.WriteAllTextAsync(registry, unlisted);
             ProjectProtocol.Watched(fixture, registry, FileChangeType.Changed);
             Assert.True(await appended.UntilAsync(ds => !ds.Any(d => d.Code?.String == "aetswg-010-0006" &&
-                                                                     d.Message.StartsWith("'X-Wing'")) &&
+                                                                     d.Message.Text().StartsWith("'X-Wing'")) &&
                                                         !Unresolves(ds, "X-Wing"), within),
                 "With the fighters' file unlisted, X-Wing still shows its warning or is unresolved: " +
                 string.Join("; ", appended.Diagnostics.Select(d => d.Message)));
@@ -214,7 +215,7 @@ public sealed class LoadOrderProtocolTest(LoadOrderCopyFixture fixture) : IClass
             var lines = document.Lines.ToList();
             lines.Insert(line, "\t" + comment);
             await document.ReplaceAsync(string.Join("\n", lines));
-            var warned = document.WithCode("aetswg-010-0006").Any(d => d.Message.StartsWith("'X-Wing'"));
+            var warned = document.WithCode("aetswg-010-0006").Any(d => d.Message.Text().StartsWith("'X-Wing'"));
             await document.ReplaceAsync(original);
             return warned;
         }
@@ -356,8 +357,8 @@ public sealed class ProjectStartsProtocolTest
         await document.ReplaceAsync(string.Join("\n", lines));
 
         var unresolved = document.WithCode("aetswg-001-0021").Where(d => d.Range.Start.Line == line + 1).ToList();
-        Assert.Contains(unresolved, d => d.Message.Contains("'Executor_Super_Star_Destroyer'"));
-        Assert.Contains(unresolved, d => d.Message.Contains("'Bossk'"));
+        Assert.Contains(unresolved, d => d.Message.Text().Contains("'Executor_Super_Star_Destroyer'"));
+        Assert.Contains(unresolved, d => d.Message.Text().Contains("'Bossk'"));
 
         lines[line + 1] = "\t\t<Company_Units>Exec</Company_Units>";
         await document.ReplaceAsync(string.Join("\n", lines));

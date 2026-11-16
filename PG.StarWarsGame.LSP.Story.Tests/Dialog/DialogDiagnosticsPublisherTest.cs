@@ -58,7 +58,7 @@ public sealed class DialogDiagnosticsPublisherTest
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
         var diag = Assert.Single(Assert.Single(published).Diagnostics);
-        Assert.Contains("BOGUS_COMMAND", diag.Message);
+        Assert.Contains("BOGUS_COMMAND", diag.Message.Text());
         // A real id, not a single catch-all code: without one it could not be suppressed, nor told
         // apart from any other dialog problem.
         Assert.Equal(DiagnosticIds.DialogUnknownCommand.ToString(), diag.Code!.Value.String);
@@ -98,7 +98,7 @@ public sealed class DialogDiagnosticsPublisherTest
         await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
 
         var diag = Assert.Single(Assert.Single(published).Diagnostics);
-        Assert.Contains("chapter header", diag.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("chapter header", diag.Message.Text(), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
     }
 
@@ -147,7 +147,7 @@ public sealed class DialogDiagnosticsPublisherTest
         indexService.Raise(GameIndex.Empty);
 
         var diag = Assert.Single(Assert.Single(published).Diagnostics);
-        Assert.Contains("BOGUS", diag.Message);
+        Assert.Contains("BOGUS", diag.Message.Text());
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

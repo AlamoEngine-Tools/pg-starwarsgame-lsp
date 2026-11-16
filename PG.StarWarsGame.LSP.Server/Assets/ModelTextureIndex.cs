@@ -30,8 +30,9 @@ namespace PG.StarWarsGame.LSP.Server.Assets;
 ///         texture into the workspace clears the warning without touching this cache.
 ///     </para>
 ///     <para>
-///         Every name is the file name the game looks up (<see cref="GameTextureName.FileName" />):
-///         the shipped particle systems name theirs by the art machine's absolute path (#292).
+///         Every name is as WRITTEN: the shipped particle systems name theirs by the art machine's
+///         absolute path (#292), and the caller cuts the file name the game looks up
+///         (<see cref="GameTextureName.FileName" />) - the XML check needs the path to say so.
 ///     </para>
 /// </remarks>
 public sealed class ModelTextureIndex(
@@ -122,7 +123,7 @@ public sealed class ModelTextureIndex(
         foreach (var parameter in sub.Parameters)
             if (parameter.Type == AlamoShaderParameterType.Texture
                 && !string.IsNullOrWhiteSpace(parameter.Texture))
-                names.Add(GameTextureName.FileName(parameter.Texture));
+                names.Add(parameter.Texture);
 
         return names;
     }
@@ -134,10 +135,10 @@ public sealed class ModelTextureIndex(
         foreach (var emitter in AloParticleReader.Read(bytes).Emitters)
         {
             if (!string.IsNullOrWhiteSpace(emitter.ColorTexture))
-                names.Add(GameTextureName.FileName(emitter.ColorTexture));
+                names.Add(emitter.ColorTexture);
 
             if (!string.IsNullOrWhiteSpace(emitter.NormalTexture))
-                names.Add(GameTextureName.FileName(emitter.NormalTexture));
+                names.Add(emitter.NormalTexture);
         }
 
         return names;

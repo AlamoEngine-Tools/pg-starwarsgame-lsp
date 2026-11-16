@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -61,7 +62,7 @@ public abstract class StoryCompareMethodSmokeTestBase<TFixture> : IClassFixture<
         var diagnostics = await DiagnosticsAsync();
 
         var bugged = diagnostics
-            .Where(d => d.Message.Contains("NOT_EQUAL_TO", StringComparison.Ordinal))
+            .Where(d => d.Message.Text().Contains("NOT_EQUAL_TO", StringComparison.Ordinal))
             .ToList();
 
         Assert.True(bugged.Count > 0,
@@ -74,8 +75,8 @@ public abstract class StoryCompareMethodSmokeTestBase<TFixture> : IClassFixture<
         // The value alone is not actionable - an author who wanted "not equal" needs to be told what
         // the engine does with it, and that there is another way to write the condition.
         Assert.Contains(bugged, d =>
-            d.Message.Contains("never fires", StringComparison.OrdinalIgnoreCase)
-            || d.Message.Contains("different operator", StringComparison.OrdinalIgnoreCase));
+            d.Message.Text().Contains("never fires", StringComparison.OrdinalIgnoreCase)
+            || d.Message.Text().Contains("different operator", StringComparison.OrdinalIgnoreCase));
 
         // Suppressible by id like every other diagnostic, or an author who disagrees has no way out.
         Assert.Contains(bugged, d => d.Code?.String is { Length: > 0 });
@@ -89,7 +90,7 @@ public abstract class StoryCompareMethodSmokeTestBase<TFixture> : IClassFixture<
         var diagnostics = await DiagnosticsAsync();
 
         Assert.DoesNotContain(diagnostics,
-            d => d.Message.Contains("GREATER_THAN_EQUAL_TO", StringComparison.Ordinal));
+            d => d.Message.Text().Contains("GREATER_THAN_EQUAL_TO", StringComparison.Ordinal));
     }
 
     private async Task<IReadOnlyList<Diagnostic>> DiagnosticsAsync()

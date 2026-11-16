@@ -167,7 +167,7 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Equal(2, diag.Range.Start.Line);
         Assert.Equal(4, diag.Range.Start.Character);
         Assert.Equal(24, diag.Range.End.Character);
-        Assert.Contains("Story_Plots_Gone.xml", diag.Message);
+        Assert.Contains("Story_Plots_Gone.xml", diag.Message.Text());
     }
 
     [Fact]
@@ -323,7 +323,8 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
-        Assert.Contains(storyDiags, d => d.Message.Contains("Reward_Param1") && d.Message.Contains("ZOOM_IN"));
+        Assert.Contains(storyDiags,
+            d => d.Message.Text().Contains("Reward_Param1") && d.Message.Text().Contains("ZOOM_IN"));
     }
 
     [Fact]
@@ -343,7 +344,8 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
-        Assert.DoesNotContain(storyDiags, d => d.Message.Contains("is not used by") || d.Message.Contains("requires"));
+        Assert.DoesNotContain(storyDiags,
+            d => d.Message.Text().Contains("is not used by") || d.Message.Text().Contains("requires"));
     }
 
     [Fact]
@@ -372,7 +374,8 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
-        Assert.Contains(storyDiags, d => d.Message.Contains("Reward_Param1") && d.Message.Contains("ZOOM_IN"));
+        Assert.Contains(storyDiags,
+            d => d.Message.Text().Contains("Reward_Param1") && d.Message.Text().Contains("ZOOM_IN"));
     }
 
     [Fact]
@@ -394,7 +397,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
-        Assert.DoesNotContain(storyDiags, d => d.Message.Contains("Reward_Param1"));
+        Assert.DoesNotContain(storyDiags, d => d.Message.Text().Contains("Reward_Param1"));
     }
 
     // ── tag Notes hints ──────────────────────────────────────────────────────
@@ -424,7 +427,7 @@ public sealed class XmlDiagnosticsPublisherTest
         var diags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(diags);
         Assert.Contains(diags,
-            d => d.Severity == DiagnosticSeverity.Hint && d.Message.Contains("Never used in vanilla."));
+            d => d.Severity == DiagnosticSeverity.Hint && d.Message.Text().Contains("Never used in vanilla."));
     }
 
     // ── URI normalization ────────────────────────────────────────────────────
@@ -444,7 +447,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///A.xml");
         Assert.NotNull(pub);
-        Assert.Contains(pub.Diagnostics, d => d.Message.Contains("UNIT_A"));
+        Assert.Contains(pub.Diagnostics, d => d.Message.Text().Contains("UNIT_A"));
     }
 
     [Fact]
@@ -518,7 +521,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///a.xml");
         Assert.NotNull(pub);
-        Assert.DoesNotContain(pub.Diagnostics, d => d.Message.Contains("also defined"));
+        Assert.DoesNotContain(pub.Diagnostics, d => d.Message.Text().Contains("also defined"));
     }
 
     [Fact]
@@ -535,7 +538,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var pubB = published.FirstOrDefault(p => p.Uri.ToString() == "file:///b.xml");
         Assert.NotNull(pubB);
-        Assert.Contains(pubB.Diagnostics, d => d.Message.Contains("also defined"));
+        Assert.Contains(pubB.Diagnostics, d => d.Message.Text().Contains("also defined"));
     }
 
     // ── closed-file suppression ──────────────────────────────────────────────
@@ -563,7 +566,7 @@ public sealed class XmlDiagnosticsPublisherTest
         indexService.Raise(index);
 
         Assert.Equal(2, published.Count);
-        Assert.All(published, p => Assert.Contains(p.Diagnostics, d => d.Message.Contains("UNIT_A")));
+        Assert.All(published, p => Assert.Contains(p.Diagnostics, d => d.Message.Text().Contains("UNIT_A")));
     }
 
     /// <summary>

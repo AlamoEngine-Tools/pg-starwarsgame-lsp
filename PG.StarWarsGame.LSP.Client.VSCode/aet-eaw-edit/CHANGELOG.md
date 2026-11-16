@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+### Fixes
+
+- **A texture named by a path is said again** - the information that a particle system names its sprite sheet
+  by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
+  still cached: the texture names were cut to the file name as they were read, so the XML check never saw the
+  path. The names are kept as written and cut where they are looked up
+  ([#292](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/292))
+
 ## 0.5.2
 
 ### Fixes

@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -45,13 +46,13 @@ public abstract class ObjectNameCrcCollisionSmokeTestBase<TFixture>(TFixture fix
         });
 
         var collisions = (await received).Diagnostics
-            .Where(d => d.Message.Contains("same name hash", StringComparison.Ordinal))
+            .Where(d => d.Message.Text().Contains("same name hash", StringComparison.Ordinal))
             .ToList();
 
         Assert.Equal(2, collisions.Count);
         Assert.All(collisions, d => Assert.Equal(DiagnosticSeverity.Warning, d.Severity));
-        Assert.Contains(collisions, d => d.Message.StartsWith("'E2E_CRC_BXO9XL'", StringComparison.Ordinal)
-                                         && d.Message.Contains("'E2E_CRC_CDATBA' (0xC492BBC0)"));
-        Assert.Contains(collisions, d => d.Message.StartsWith("'E2E_CRC_CDATBA'", StringComparison.Ordinal));
+        Assert.Contains(collisions, d => d.Message.Text().StartsWith("'E2E_CRC_BXO9XL'", StringComparison.Ordinal)
+                                         && d.Message.Text().Contains("'E2E_CRC_CDATBA' (0xC492BBC0)"));
+        Assert.Contains(collisions, d => d.Message.Text().StartsWith("'E2E_CRC_CDATBA'", StringComparison.Ordinal));
     }
 }
