@@ -32,9 +32,11 @@
         <PackageReference Include="AlamoEngineTools.PG.StarWarsGame.Infrastructure"/>
         <PackageReference Include="AlamoEngineTools.PG.StarWarsGame.Infrastructure.Steam"/>
         <PackageReference Include="CsvHelper"/>
+        <PackageReference Include="JsonSchema.Net" VersionOverride="9.7.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
         <PackageReference Include="Microsoft.Extensions.Http"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Console"/>
+        <PackageReference Include="OmniSharp.Extensions.LanguageClient" />
         <PackageReference Include="OmniSharp.Extensions.LanguageServer"/>
         <PackageReference Include="Serilog"/>
         <PackageReference Include="Serilog.Extensions.Logging"/>
