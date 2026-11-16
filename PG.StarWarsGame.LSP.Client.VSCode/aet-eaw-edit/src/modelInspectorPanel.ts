@@ -16,11 +16,11 @@ import * as vscode from "vscode";
 
 import { subMeshGeometryReply } from "./lsp/subMeshGeometry";
 import { PanelProject } from "./panelProject";
-import {
-    PanelRegistry,
-    WebviewMessage,
-    WebviewPanelHost,
-} from "./webviewPanelHost";
+import type {
+    ModelInspectorToHost,
+    ModelInspectorToWebview,
+} from "./protocol/panels/modelInspector";
+import { PanelRegistry, WebviewPanelHost } from "./webviewPanelHost";
 
 /**
  * The page CSS the inspector needs before its bundle runs.
@@ -31,7 +31,10 @@ import {
 const MODEL_INSPECTOR_BODY_STYLE =
     "html, body, #root { height: 100%; margin: 0; padding: 0; }";
 
-export class ModelInspectorPanel extends WebviewPanelHost {
+export class ModelInspectorPanel extends WebviewPanelHost<
+    ModelInspectorToHost,
+    ModelInspectorToWebview
+> {
     static readonly viewType = "aetModelInspector";
 
     /**
@@ -109,7 +112,7 @@ export class ModelInspectorPanel extends WebviewPanelHost {
         ModelInspectorPanel.panels.disposeAll();
     }
 
-    protected async onMessage(message: WebviewMessage): Promise<void> {
+    protected async onMessage(message: ModelInspectorToHost): Promise<void> {
         switch (message.type) {
             case "ready":
                 this.live = true;
@@ -118,7 +121,9 @@ export class ModelInspectorPanel extends WebviewPanelHost {
 
             case "requestSubMeshGeometry":
                 this.post(
-                    await subMeshGeometryReply(this.project.gateway, message),
+                    await subMeshGeometryReply(this.project.gateway, {
+                        ...message,
+                    }),
                 );
                 return;
 

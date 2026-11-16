@@ -4,12 +4,12 @@
 import * as vscode from "vscode";
 
 import { PanelProject } from "./panelProject";
-import {
-    panelKey,
-    PanelRegistry,
-    WebviewMessage,
-    WebviewPanelHost,
-} from "./webviewPanelHost";
+import { panelKey, PanelRegistry, WebviewPanelHost } from "./webviewPanelHost";
+import type {
+    CreditsCrawl,
+    CreditsPreviewToHost,
+    CreditsPreviewToWebview,
+} from "./protocol/panels/creditsPreview";
 
 /**
  * The credits crawl in its own tab beside the editor, the way a Markdown or LaTeX preview opens.
@@ -18,11 +18,14 @@ import {
  * changing what it is showing. It holds no state of its own: the editor pushes rows in, and this
  * only decides where they are drawn.
  */
-export class CreditsPreviewPanel extends WebviewPanelHost {
+export class CreditsPreviewPanel extends WebviewPanelHost<
+    CreditsPreviewToHost,
+    CreditsPreviewToWebview
+> {
     private static readonly _panels = new PanelRegistry<CreditsPreviewPanel>();
 
     private _ready = false;
-    private _pending: unknown | null = null;
+    private _pending: CreditsCrawl | null = null;
 
     private constructor(
         label: string,
@@ -52,7 +55,7 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
         label: string,
         extensionUri: vscode.Uri,
         project: PanelProject,
-        payload: unknown,
+        payload: CreditsCrawl,
     ): void {
         const key = panelKey(filePath);
         let panel = CreditsPreviewPanel._panels.get(project.key, key);
@@ -73,7 +76,7 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
     static update(
         project: PanelProject,
         filePath: string,
-        payload: unknown,
+        payload: CreditsCrawl,
     ): void {
         CreditsPreviewPanel._panels
             .get(project.key, panelKey(filePath))
@@ -88,7 +91,7 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
         CreditsPreviewPanel._panels.disposeAll();
     }
 
-    protected onMessage(msg: WebviewMessage): void {
+    protected onMessage(msg: CreditsPreviewToHost): void {
         if (msg.type === "ready") {
             // Rows may have arrived before the webview finished loading; hold them until it
             // says it is listening, or the first preview opens empty.
@@ -103,7 +106,7 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
         }
     }
 
-    private _send(payload: unknown): void {
+    private _send(payload: CreditsCrawl): void {
         if (this._ready) {
             this.post(payload);
         } else {

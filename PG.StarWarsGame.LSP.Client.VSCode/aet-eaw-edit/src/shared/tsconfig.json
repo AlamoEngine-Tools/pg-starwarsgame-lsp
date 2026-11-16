@@ -1,4 +1,4 @@
-﻿{
+{
   // The modules both builds compile: the extension host (Node) and the webviews (browser). Checked
   // with neither the DOM nor Node's types, so a module here cannot lean on either - `document` or
   // `process` stays a compile error rather than a crash in the build that lacks it. The host's own

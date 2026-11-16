@@ -9,7 +9,6 @@ import {
     readDialogGeometry,
     saveDialogGeometry,
 } from "./dialogGeometryStorage";
-import { StoredGeometry } from "./shared/modalGeometry";
 import { LocalisationPanelState } from "./shared/localisationPanelState";
 import {
     KeyedCommand,
@@ -20,10 +19,16 @@ import { siblingsOf } from "./shared/localisationTreeModel";
 import {
     PanelRegistry,
     panelSetKey,
-    WebviewMessage,
     WebviewPanelHost,
 } from "./webviewPanelHost";
 import { PanelProject } from "./panelProject";
+import type { CreditsCrawl } from "./protocol/panels/creditsPreview";
+import type {
+    LocalisationEditorCrawlRows,
+    LocalisationEditorToHost,
+    LocalisationEditorToWebview,
+    LocalisationSeedSource,
+} from "./protocol/panels/localisationEditor";
 import {
     ApplyLocalisationBatchResult,
     CreateLocalisationLanguageFileResult,
@@ -32,7 +37,6 @@ import {
     GetLocalisationProjectsResult,
     GetLocalisationRowsResult,
     LOC_CATEGORY,
-    LocRowDto,
     ValidateLocalisationBatchResult,
 } from "./protocol";
 
@@ -58,7 +62,10 @@ interface Member {
  * Shares its close-time save prompt with {@link StoryGraphPanel} - a disposed webview cannot veto
  * its own close, so the queue is mirrored here as it changes.
  */
-export class LocalisationEditorPanel extends WebviewPanelHost {
+export class LocalisationEditorPanel extends WebviewPanelHost<
+    LocalisationEditorToHost,
+    LocalisationEditorToWebview
+> {
     private static readonly _panels =
         new PanelRegistry<LocalisationEditorPanel>();
 
@@ -240,22 +247,20 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         LocalisationEditorPanel._panels.disposeAll();
     }
 
-    protected async onMessage(msg: WebviewMessage): Promise<void> {
+    protected async onMessage(msg: LocalisationEditorToHost): Promise<void> {
         switch (msg.type) {
             case "ready":
             case "fetch":
                 await this._sendRows();
                 break;
             case "pendingSync":
-                this._state.syncPending(
-                    msg.commands as Record<string, unknown>[],
-                );
+                this._state.syncPending(msg.commands);
                 break;
             case "validateBatch":
-                await this._validate(msg.commands as Record<string, unknown>[]);
+                await this._validate(msg.commands);
                 break;
             case "saveBatch":
-                await this._save(msg.commands as Record<string, unknown>[]);
+                await this._save(msg.commands);
                 break;
             case "requestBaseline":
                 await this._sendBaseline();
@@ -264,16 +269,13 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
                 this._sendCrawlRows(msg);
                 break;
             case "convertFormat":
-                await this._convertFormat(msg.targetFormat as string);
+                await this._convertFormat(msg.targetFormat);
                 break;
             case "addLanguageFile":
-                await this._addLanguageFile(msg.language as string);
+                await this._addLanguageFile(msg.language);
                 break;
             case "saveDialogGeometry":
-                saveDialogGeometry(
-                    msg.id as string,
-                    msg.geometry as StoredGeometry,
-                );
+                saveDialogGeometry(msg.id, msg.geometry);
                 break;
             case "exportDat":
                 await vscode.commands.executeCommand(
@@ -301,15 +303,15 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
     }
 
     /** Forwards the editor's staged rows to the preview beside it, if one is open. */
-    private _sendCrawlRows(msg: Record<string, unknown>): void {
-        const payload = {
+    private _sendCrawlRows(msg: LocalisationEditorCrawlRows): void {
+        const payload: CreditsCrawl = {
             type: "crawl",
             rows: msg.rows,
             languages: msg.languages,
             language: msg.language,
         };
 
-        if (msg.open === true) {
+        if (msg.open) {
             CreditsPreviewPanel.show(
                 this._filePath,
                 this._label,
@@ -455,13 +457,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             return;
         }
 
-        const sources: {
-            filePath: string;
-            label: string;
-            language: string;
-            rowCount: number;
-            rows: LocRowDto[];
-        }[] = [];
+        const sources: LocalisationSeedSource[] = [];
 
         for (const sibling of siblingsOf(self, listed.projects ?? [])) {
             const read =

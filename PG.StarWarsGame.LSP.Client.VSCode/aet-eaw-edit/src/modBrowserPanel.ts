@@ -7,11 +7,12 @@ import { PanelProject } from "./panelProject";
 import { encyclopediaScreenParams } from "./encyclopediaScreenStorage";
 import { GET_ENCYCLOPEDIA_ENTRY } from "./protocol/encyclopedia";
 import { MOD_BROWSER_METHODS, SymbolOutline } from "./protocol/modBrowser";
-import {
-    PanelRegistry,
-    WebviewMessage,
-    WebviewPanelHost,
-} from "./webviewPanelHost";
+import type {
+    ModBrowserRun,
+    ModBrowserToHost,
+    ModBrowserToWebview,
+} from "./protocol/panels/modBrowser";
+import { PanelRegistry, WebviewPanelHost } from "./webviewPanelHost";
 
 /**
  * The commands an entry's actions run, each with the entry's id - a model preview with its name -
@@ -32,12 +33,16 @@ const ACTION_COMMANDS: Record<string, { command: string; byName?: true }> = {
  * request to its project's server - so a list of thousands is never held here, and paging stays the
  * server's.
  */
-export class ModBrowserPanel extends WebviewPanelHost {
+export class ModBrowserPanel extends WebviewPanelHost<
+    ModBrowserToHost,
+    ModBrowserToWebview
+> {
     /** The open panels, at most one per project - filed under the empty subject. */
     private static readonly _panels = new PanelRegistry<ModBrowserPanel>();
 
     private _ready = false;
     private _outline: SymbolOutline;
+    protected override readonly relayMethods = MOD_BROWSER_METHODS;
 
     private constructor(
         extensionUri: vscode.Uri,
@@ -88,13 +93,10 @@ export class ModBrowserPanel extends WebviewPanelHost {
         ModBrowserPanel._panels.disposeAll();
     }
 
-    protected async onMessage(msg: WebviewMessage): Promise<void> {
+    protected async onMessage(msg: ModBrowserToHost): Promise<void> {
         if (msg.type === "ready") {
             this._ready = true;
             this._sendOutline();
-        }
-        if (msg.type === "request") {
-            await this._relay(msg);
         }
         if (msg.type === "run") {
             await this._run(msg);
@@ -122,7 +124,7 @@ export class ModBrowserPanel extends WebviewPanelHost {
     }
 
     /** Runs one of an entry's actions; anything not in the set is ignored. */
-    private async _run(msg: WebviewMessage): Promise<void> {
+    private async _run(msg: ModBrowserRun): Promise<void> {
         const run =
             typeof msg.action === "string"
                 ? ACTION_COMMANDS[msg.action]
@@ -145,24 +147,10 @@ export class ModBrowserPanel extends WebviewPanelHost {
         }
     }
 
-    /** Passes one of the browser's requests to the server; anything else is answered with nothing. */
-    private async _relay(msg: WebviewMessage): Promise<void> {
-        const method = typeof msg.method === "string" ? msg.method : "";
-        // The embedded card is drawn for the same screen as the encyclopedia preview.
-        const params =
-            method === GET_ENCYCLOPEDIA_ENTRY
-                ? {
-                      ...(msg.params as object),
-                      ...encyclopediaScreenParams(),
-                  }
-                : msg.params;
-        const outcome = MOD_BROWSER_METHODS.includes(method)
-            ? await this.project.gateway.request<unknown>(method, params)
-            : undefined;
-        this.post({
-            type: "response",
-            id: msg.id,
-            result: outcome?.ok ? outcome.value : null,
-        });
+    /** The embedded card is drawn for the same screen as the encyclopedia preview. */
+    protected override relayParams(method: string, params: unknown): unknown {
+        return method === GET_ENCYCLOPEDIA_ENTRY
+            ? { ...(params as object), ...encyclopediaScreenParams() }
+            : params;
     }
 }

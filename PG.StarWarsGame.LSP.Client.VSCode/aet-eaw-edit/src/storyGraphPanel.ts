@@ -13,23 +13,22 @@ import {
     panelTitle,
     type StoryGraphTarget,
 } from "./storyGraphTarget";
-import {
-    PanelRegistry,
-    WebviewMessage,
-    WebviewPanelHost,
-} from "./webviewPanelHost";
+import { PanelRegistry, WebviewPanelHost } from "./webviewPanelHost";
+import type {
+    StoryCommandPayload,
+    StoryEditorMode,
+    StoryGraphToHost,
+    StoryGraphToWebview,
+} from "./protocol/panels/storyGraph";
 import {
     ApplyStoryCommandBatchResult,
     ExecuteStoryCommandResult,
     GetStoryDiagnosticsResult,
     GetStoryGraphResult,
     GetStoryLayoutResult,
-    GetStoryNodeDetailResult,
-    GetStoryParamOptionsResult,
     GetStorySchemaResult,
     GraphFilters,
     StoryLayoutEntryDto,
-    StoryParamOptionDto,
     StorySimStateResult,
     WorkspaceSettingsDto,
 } from "./protocol";
@@ -44,10 +43,13 @@ import {
  * `aet/storyGraphChanged` for this campaign (`invalidate` → the webview replays its filters so
  * the refreshed graph keeps the user's view).
  */
-export class StoryGraphPanel extends WebviewPanelHost {
+export class StoryGraphPanel extends WebviewPanelHost<
+    StoryGraphToHost,
+    StoryGraphToWebview
+> {
     private static readonly _panels = new PanelRegistry<StoryGraphPanel>();
     // offer to save if the tab is closed while dirty - the disposed webview can no longer prompt.
-    private _pendingCommands: Record<string, unknown>[] = [];
+    private _pendingCommands: StoryCommandPayload[] = [];
     // Cached "skip the delete-event confirmation" preference (undefined = not fetched yet).
     private _skipDeleteConfirm: boolean | undefined;
     // that did not exist yet.
@@ -56,6 +58,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
     // Mirror of the webview's staged command queue, kept in sync via 'pendingSync'. Lets the panel
     // simulation opens straight into its own session.
     private _pendingSimulate = false;
+
+    /** Parameter completion, which the webview asks for through the shared request relay. */
+    protected override readonly relayMethods = ["aet/getStoryParamOptions"];
 
     private constructor(
         private readonly _target: StoryGraphTarget,
@@ -145,7 +150,16 @@ export class StoryGraphPanel extends WebviewPanelHost {
             ?.post({ type: "simChanged" });
     }
 
-    protected async onMessage(msg: WebviewMessage): Promise<void> {
+    /** A completion request is for this panel's campaign faction, which only the host knows. */
+    protected override relayParams(_method: string, params: unknown): unknown {
+        return {
+            ...(params as object),
+            campaign: this._target.campaign,
+            faction: this._target.faction,
+        };
+    }
+
+    protected async onMessage(msg: StoryGraphToHost): Promise<void> {
         switch (msg.type) {
             case "ready":
                 this._sendAvailableModes();
@@ -155,68 +169,42 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 break;
             case "setLanePref":
                 await this._setLanePrefs(
-                    msg.showThreadLanes as boolean,
-                    msg.showChapterLanes as boolean,
+                    msg.showThreadLanes,
+                    msg.showChapterLanes,
                 );
                 break;
             case "fetch":
-                await this._sendGraph(msg.filters as GraphFilters);
-                break;
-            case "detail":
-                await this._sendDetail(msg.nodeId as string);
+                await this._sendGraph(msg.filters);
                 break;
             case "openXml":
-                await this._openXml(
-                    msg.threadUri as string,
-                    msg.line as number | undefined,
-                );
+                await this._openXml(msg.threadUri, msg.line);
                 break;
             case "command":
-                await this._runCommand(
-                    msg.payload as Record<string, unknown>,
-                    msg.confirm as string | undefined,
-                    msg.refreshDetail as string | undefined,
-                );
+                await this._runCommand(msg.payload, msg.confirm);
                 break;
             case "saveLayout":
-                await this._saveLayout(msg.entries as StoryLayoutEntryDto[]);
+                await this._saveLayout(msg.entries);
                 break;
             case "saveBatch":
-                await this._saveBatch(
-                    msg.commands as Record<string, unknown>[],
-                );
+                await this._saveBatch(msg.commands);
                 break;
             case "validateBatch":
-                await this._validateBatch(
-                    msg.commands as Record<string, unknown>[],
-                );
+                await this._validateBatch(msg.commands);
                 break;
             case "previewGraph":
-                await this._sendPreview(
-                    msg.commands as Record<string, unknown>[],
-                    msg.filters as GraphFilters,
-                );
+                await this._sendPreview(msg.commands, msg.filters);
                 break;
             case "pendingSync":
-                this._pendingCommands = msg.commands as Record<
-                    string,
-                    unknown
-                >[];
+                this._pendingCommands = msg.commands;
                 break;
             case "confirmStage":
-                await this._confirmStage(
-                    msg.payload as Record<string, unknown>,
-                    msg.confirm as string,
-                );
+                await this._confirmStage(msg.payload, msg.confirm);
                 break;
             case "confirmDirtyExit":
-                await this._confirmDirtyExit(msg.next as string);
+                await this._confirmDirtyExit(msg.next);
                 break;
             case "sim":
-                await this._runSim(
-                    msg.method as string,
-                    msg.args as Record<string, unknown> | undefined,
-                );
+                await this._runSim(msg.method, msg.args);
                 break;
             case "copy":
                 // The webview cannot reach the clipboard on every host; the extension can.
@@ -226,20 +214,8 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     2000,
                 );
                 break;
-            case "paramOptions":
-                await this._sendParamOptions(
-                    msg.requestId as number,
-                    msg.side as string,
-                    msg.typeName as string,
-                    msg.position as number,
-                    msg.query as string | undefined,
-                );
-                break;
             case "resolveRef":
-                await this._resolveRef(
-                    msg.value as string,
-                    msg.referenceType as string | undefined,
-                );
+                await this._resolveRef(msg.value, msg.referenceType);
                 break;
             case "openScope":
                 // A portal on the galactic graph: the battle's own panel. The stub's label is the
@@ -248,7 +224,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 StoryGraphPanel.show(
                     {
                         ...galacticOf(this._target),
-                        scope: msg.scope as string,
+                        scope: msg.scope,
                         scopeLabel: battleLabelOf(
                             String(msg.label ?? msg.scope),
                         ),
@@ -265,7 +241,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     galacticOf(this._target),
                     this._extensionUri,
                     this.project,
-                    msg.nodeId as string,
+                    msg.nodeId,
                     false,
                 );
                 break;
@@ -328,14 +304,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
     }
 
     /**
-     * Executes a mutation. `confirm` shows a modal first (destructive ops); `refreshDetail`
-     * re-fetches the given node's property view after success so the panel doesn't go stale
-     * while the graph re-render is still in flight.
+     * Executes a mutation. `confirm` shows a modal first (destructive ops).
      */
     private async _runCommand(
-        payload: Record<string, unknown>,
+        payload: StoryCommandPayload,
         confirm: string | undefined,
-        refreshDetail: string | undefined,
     ): Promise<void> {
         if (!this.project.gateway.requireRunning()) {
             return;
@@ -381,46 +354,6 @@ export class StoryGraphPanel extends WebviewPanelHost {
             this.post({ type: "invalidate" });
             return;
         }
-
-        if (refreshDetail) {
-            await this._sendDetail(refreshDetail);
-        }
-    }
-
-    /**
-     * Fetches completion candidates for one param slot. Always answers (empty on any failure) —
-     * the webview's suggestion dropdown awaits the requestId and must not hang on errors.
-     */
-    private async _sendParamOptions(
-        requestId: number,
-        side: string,
-        typeName: string,
-        position: number,
-        query: string | undefined,
-    ): Promise<void> {
-        // Always answers, empty on any failure - the webview's suggestion dropdown awaits this
-        // requestId and would hang forever on a silent return.
-        const result =
-            await this.project.gateway.requestOr<GetStoryParamOptionsResult>(
-                "aet/getStoryParamOptions",
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    side,
-                    typeName,
-                    position,
-                    query: query || undefined,
-                },
-                { options: [] },
-            );
-
-        this.post({
-            type: "paramOptions",
-            requestId,
-            options: (result.error
-                ? []
-                : (result.options ?? [])) satisfies StoryParamOptionDto[],
-        });
     }
 
     /** Go-to-definition for a reference-typed param value - opens the XML beside the graph. */
@@ -444,9 +377,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * `aet/storyGraphChanged` reconciles the graph; on failure the error (and which change failed)
      * is surfaced and the queue is kept so the user can fix and re-save.
      */
-    private async _saveBatch(
-        commands: Record<string, unknown>[],
-    ): Promise<void> {
+    private async _saveBatch(commands: StoryCommandPayload[]): Promise<void> {
         const result =
             await this.project.gateway.requestOrReport<ApplyStoryCommandBatchResult>(
                 "aet/applyStoryCommandBatch",
@@ -487,7 +418,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * `confirmStageResult` so the webview stages the command (or not).
      */
     private async _confirmStage(
-        payload: Record<string, unknown>,
+        payload: StoryCommandPayload,
         confirm: string,
     ): Promise<void> {
         if (this._skipDeleteConfirm === undefined) {
@@ -655,7 +586,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * webview, which owns the mode state. "Save" saves then switches; "Don't Save" discards and
      * switches; dismissing cancels.
      */
-    private async _confirmDirtyExit(next: string): Promise<void> {
+    private async _confirmDirtyExit(next: StoryEditorMode): Promise<void> {
         const choice = await vscode.window.showWarningMessage(
             vscode.l10n.t(
                 "Unsaved story changes. Save them before leaving Edit mode?",
@@ -679,7 +610,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * new prereq edges - appear before Save without the XML changing on disk.
      */
     private async _sendPreview(
-        commands: Record<string, unknown>[],
+        commands: StoryCommandPayload[],
         filters: GraphFilters,
     ): Promise<void> {
         const result =
@@ -721,7 +652,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
     /** Dry-runs the staged batch on the server and posts the resulting diagnostics for the pending state. */
     private async _validateBatch(
-        commands: Record<string, unknown>[],
+        commands: StoryCommandPayload[],
     ): Promise<void> {
         const result =
             await this.project.gateway.requestOrReport<GetStoryDiagnosticsResult>(
@@ -868,30 +799,6 @@ export class StoryGraphPanel extends WebviewPanelHost {
         // Diagnostics are NO LONGER pushed on every graph refresh - they were the "live"
         // validation that made editing sluggish. They now come only from the explicit Validate
         // action (aet/validateStoryCommandBatch), which reflects the staged/pending state.
-    }
-
-    private async _sendDetail(nodeId: string): Promise<void> {
-        const outcome =
-            await this.project.gateway.request<GetStoryNodeDetailResult>(
-                "aet/getStoryNodeDetail",
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    nodeId,
-                },
-            );
-
-        // The property view shows the failure in place; a notification would be a modal over a
-        // panel that is already able to say what is wrong.
-        this.post(
-            outcome.ok
-                ? {
-                      type: "detail",
-                      node: outcome.value.node ?? null,
-                      error: outcome.value.error ?? null,
-                  }
-                : { type: "detail", node: null, error: outcome.message },
-        );
     }
 
     private async _openXml(

@@ -30,14 +30,17 @@ import {
     sameGeometryKey,
 } from "./preview/inspectorSubject";
 import { dockChromeCss, inspectorCss } from "./shared/dockChrome";
+import type {
+    ModelInspectorToHost,
+    ModelInspectorToWebview,
+} from "../protocol/panels/modelInspector";
+import { poster, transport } from "./shared/vscodeApi";
 import {
     type GeometryTable,
     type GetSubMeshGeometryResult,
 } from "../protocol/modelPreview";
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
-const vscode = acquireVsCodeApi();
+const post = poster<ModelInspectorToHost>();
 
 const Shell = styled.div`
     ${dockChromeCss}
@@ -121,22 +124,18 @@ function ModelInspector(): React.JSX.Element {
     const asked = useRef<string | null>(null);
 
     useEffect(() => {
-        const handle = (event: MessageEvent): void => {
-            const message = event.data as {
-                type: string;
-                [key: string]: unknown;
-            };
+        const stop = transport.listen((data) => {
+            const message = data as ModelInspectorToWebview<InspectorSubject>;
 
             if (message.type === "setSubject") {
-                setSubject(message.subject as InspectorSubject | null);
+                setSubject(message.subject);
                 return;
             }
 
             if (message.type === "subMeshGeometry") {
                 // Wrapped in `result` the way every other host reply is - the request either
                 // answered or said why, and both halves travel together.
-                const result = (message.result ??
-                    {}) as GetSubMeshGeometryResult;
+                const result: GetSubMeshGeometryResult = message.result ?? {};
 
                 asked.current = null;
 
@@ -150,11 +149,9 @@ function ModelInspector(): React.JSX.Element {
 
                 setGeometryError(result.error ?? null);
             }
-        };
-
-        window.addEventListener("message", handle);
-        vscode.postMessage({ type: "ready" });
-        return () => window.removeEventListener("message", handle);
+        });
+        post({ type: "ready" });
+        return stop;
     }, []);
 
     // A page belongs to the sub-mesh it is OF, so it survives everything that does not change which
@@ -191,7 +188,7 @@ function ModelInspector(): React.JSX.Element {
 
             asked.current = wanted;
             setGeometryError(null);
-            vscode.postMessage({
+            post({
                 type: "requestSubMeshGeometry",
                 modelReference: key.modelReference,
                 meshIndex: key.meshIndex,

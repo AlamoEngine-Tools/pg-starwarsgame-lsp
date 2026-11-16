@@ -56,6 +56,10 @@ import {
 import { worstSeverity } from "./loc/validateState";
 import { collectTextureNames } from "./preview/materials";
 import { type InspectorSubject } from "./preview/inspectorSubject";
+import type {
+    ModelPreviewToHost,
+    ModelPreviewToWebview,
+} from "../protocol/panels/modelPreview";
 import {
     AssetLedger,
     isSubjectSystem,
@@ -323,6 +327,7 @@ import {
 import { RightDock } from "./shared/RightDock";
 
 import { initPanelLayout } from "./shared/panelLayoutBridge";
+import { poster, transport, vscodeApi } from "./shared/vscodeApi";
 import { SeverityTag } from "./shared/SeverityTag";
 
 /**
@@ -345,48 +350,11 @@ const DEATH_CLONE_PART = "deathclone:";
 /** Prefix for the persistent effect a piece of wreckage trails, so it can be stopped by key. */
 const WRECK_EFFECT = "wreckfire:";
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
-const vscode = acquireVsCodeApi();
+const post = poster<ModelPreviewToHost<InspectorSubject>>();
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
 // every drag back to it. Must run before anything measures itself.
-initPanelLayout(vscode);
-
-/** Messages the panel host sends in. */
-type HostMessage =
-    // `refresh` marks a re-read of the same subject after the tree behind it changed, as
-    // opposed to a subject being opened. The difference is what the reader already has on
-    // screen and must keep - the camera above all.
-    | { type: "scene"; scene: PreviewScene; refresh?: boolean }
-    | {
-          type: "glb";
-          partId: string;
-          attachToPartId?: string | null;
-          attachBone?: string | null;
-          result: GetModelGlbResult;
-      }
-    | { type: "texture"; name: string; result: GetModelTextureResult }
-    | {
-          type: "modelDetail";
-          modelReference: string;
-          result: GetModelDetailResult;
-      }
-    | { type: "inspectorClosed" }
-    | { type: "particleSystem"; name: string; result: GetParticleSystemResult }
-    | { type: "shader"; name: string; result: GetShaderSourceResult }
-    // The room, and this subject's own state from earlier in the session. Both arrive before the
-    // scene does, so nothing visibly snaps into place a frame after the model appears.
-    | {
-          type: "viewerSettings";
-          settings: unknown;
-          project: unknown;
-          subject: unknown;
-      }
-    | { type: "projectile"; name: string; result: GetProjectileResult }
-    // Which optional mechanics this preview shows. Only the extension host can read configuration,
-    // so it pushes - on open and again whenever the setting changes.
-    | { type: "previewFeatures"; features: unknown };
+initPanelLayout(vscodeApi);
 
 /** What each kind is called in the filter row - the shared tree row's names for them. */
 const KIND_LABELS = TREE_KIND_LABELS;
@@ -3620,7 +3588,7 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
-        vscode.postMessage({
+        post({
             type: "updateInspector",
             subject: inspectorSubject,
         });
@@ -3637,7 +3605,7 @@ function ModelPreview(): React.JSX.Element {
         (rowId: string): void => {
             setDetailsRow(rowId);
 
-            vscode.postMessage({
+            post({
                 type: "openInspector",
                 subject: {
                     rowId,
@@ -3787,7 +3755,7 @@ function ModelPreview(): React.JSX.Element {
                 return;
             }
 
-            vscode.postMessage({ type: "requestTexture", name });
+            post({ type: "requestTexture", name });
             syncTally();
         },
         [syncTally],
@@ -3800,7 +3768,7 @@ function ModelPreview(): React.JSX.Element {
                 return;
             }
 
-            vscode.postMessage({ type: "requestShader", name });
+            post({ type: "requestShader", name });
             setShaderRequested(true);
             syncTally();
         },
@@ -4047,7 +4015,7 @@ function ModelPreview(): React.JSX.Element {
                 }
 
                 requestedSystemsRef.current.add(name.toLowerCase());
-                vscode.postMessage({ type: "requestParticleSystem", name });
+                post({ type: "requestParticleSystem", name });
             }
         },
         [],
@@ -4301,7 +4269,7 @@ function ModelPreview(): React.JSX.Element {
                     once,
                     at,
                 });
-                vscode.postMessage({ type: "requestParticleSystem", name });
+                post({ type: "requestParticleSystem", name });
                 return;
             }
 
@@ -4447,9 +4415,9 @@ function ModelPreview(): React.JSX.Element {
 
                 // The key rides on `partId`, which the host echoes back verbatim. The reply carries no
                 // model name, and a breakoff must not be mistaken for a scene part - see the handler.
-                vscode.postMessage({
+                post({
                     type: "requestGlb",
-                    modelReference: prop.modelRef,
+                    modelReference: prop.modelRef ?? "",
                     partId: `${BREAKOFF_PART}${id}`,
                     // ITS OWN clips, not the subject's. A prop's model shares nothing with the hull's
                     // name, so the scene's list would never have held one of them.
@@ -4561,14 +4529,12 @@ function ModelPreview(): React.JSX.Element {
     // ── messages from the host ────────────────────────────────────────────────
     useEffect(() => {
         const onMessage = async (
-            event: MessageEvent<HostMessage>,
+            message: ModelPreviewToWebview,
         ): Promise<void> => {
             const viewport = viewportRef.current;
             if (viewport === null) {
                 return;
             }
-
-            const message = event.data;
 
             if (message.type === "scene") {
                 refreshingRef.current = message.refresh === true;
@@ -4663,14 +4629,14 @@ function ModelPreview(): React.JSX.Element {
                     particles.map((particle) => particle.systemRef),
                 )) {
                     requestedSystemsRef.current.add(name.toLowerCase());
-                    vscode.postMessage({ type: "requestParticleSystem", name });
+                    post({ type: "requestParticleSystem", name });
                 }
 
                 // A particle system is not geometry, so it takes getParticleSystem rather than
                 // getModelGlb. The server has already classified the file by its root chunk; the
                 // extension alone cannot tell the two apart.
                 if (message.scene.kind === PREVIEW_SCENE_KIND.particle) {
-                    vscode.postMessage({
+                    post({
                         type: "requestParticleSystem",
                         name: message.scene.subject,
                     });
@@ -4686,7 +4652,7 @@ function ModelPreview(): React.JSX.Element {
                 setModelDetail(null);
 
                 if (hull !== null) {
-                    vscode.postMessage({
+                    post({
                         type: "requestModelDetail",
                         modelReference: hull.modelRef,
                     });
@@ -4699,7 +4665,7 @@ function ModelPreview(): React.JSX.Element {
                         continue;
                     }
 
-                    vscode.postMessage({
+                    post({
                         type: "requestGlb",
                         partId: part.id,
                         modelReference: part.modelRef,
@@ -5243,16 +5209,13 @@ function ModelPreview(): React.JSX.Element {
             }
         };
 
-        // Wrapped rather than cast: an async handler is not an EventListener, and asserting it to be
-        // one hides that the rejection would go unhandled.
-        const listener = (event: Event): void => {
-            void onMessage(event as MessageEvent<HostMessage>);
-        };
+        // Wrapped: the handler is async, and its rejection must not go unhandled.
+        const stop = transport.listen((data) => {
+            void onMessage(data as ModelPreviewToWebview);
+        });
+        post({ type: "ready" });
 
-        globalThis.addEventListener("message", listener);
-        vscode.postMessage({ type: "ready" });
-
-        return () => globalThis.removeEventListener("message", listener);
+        return stop;
         // Deliberately NOT depending on `scene`: this effect posts 'ready', so re-running it asks
         // for another scene, which changes `scene`, which re-runs it. The handler reads the current
         // scene through a ref instead.
@@ -5602,7 +5565,7 @@ function ModelPreview(): React.JSX.Element {
         }
 
         requestedClonesRef.current.add(partId);
-        vscode.postMessage({
+        post({
             type: "requestGlb",
             modelReference: model,
             partId,
@@ -6696,7 +6659,7 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
-        vscode.postMessage({
+        post({
             type: "setViewerSettings",
             settings: {
                 ...DEFAULT_VIEWER_SETTINGS,
@@ -6764,7 +6727,7 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
-        vscode.postMessage({
+        post({
             type: "setProjectSettings",
             project: {
                 attacker,
@@ -6786,7 +6749,7 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
-        vscode.postMessage({
+        post({
             type: "setSubjectState",
             state: {
                 alt,
@@ -8512,7 +8475,7 @@ function ModelPreview(): React.JSX.Element {
                                                             "Fetch the .fx shader sources",
                                                         )}
                                                         onClick={() =>
-                                                            vscode.postMessage({
+                                                            post({
                                                                 type: "obtainShaders",
                                                             })
                                                         }
@@ -9162,7 +9125,7 @@ function ModelPreview(): React.JSX.Element {
                                                                 captureScenery,
                                                         });
 
-                                                    vscode.postMessage({
+                                                    post({
                                                         type: "saveCapture",
                                                         dataUrl,
                                                         // The unit's own icons are named the way the engine looks them up.
@@ -9657,9 +9620,11 @@ function ModelPreview(): React.JSX.Element {
                                                             ability,
                                                         )}
                                                         onClick={() =>
-                                                            vscode.postMessage({
+                                                            post({
                                                                 type: "revealDefinition",
-                                                                value: ability.definition,
+                                                                value:
+                                                                    ability.definition ??
+                                                                    "",
                                                                 referenceType:
                                                                     "SpecialAbility",
                                                             })
@@ -10236,12 +10201,10 @@ function ModelPreview(): React.JSX.Element {
                                                                 setProjectileNote(
                                                                     `Loading ${picked}...`,
                                                                 );
-                                                                vscode.postMessage(
-                                                                    {
-                                                                        type: "requestProjectile",
-                                                                        name: picked,
-                                                                    },
-                                                                );
+                                                                post({
+                                                                    type: "requestProjectile",
+                                                                    name: picked,
+                                                                });
                                                             }
                                                         }}
                                                     >
@@ -10631,7 +10594,7 @@ function ModelPreview(): React.JSX.Element {
                                             handoff.disabledReason ?? ""
                                         }
                                         onClick={() =>
-                                            vscode.postMessage({
+                                            post({
                                                 type: "openExternal",
                                                 tool: handoff.tool,
                                             })
@@ -11729,14 +11692,12 @@ ${becauseText(node.because)}`
                                                                         event,
                                                                     ) => {
                                                                         event.stopPropagation();
-                                                                        vscode.postMessage(
-                                                                            {
-                                                                                type: "revealDefinition",
-                                                                                value: card.id,
-                                                                                referenceType:
-                                                                                    "HardPoint",
-                                                                            },
-                                                                        );
+                                                                        post({
+                                                                            type: "revealDefinition",
+                                                                            value: card.id,
+                                                                            referenceType:
+                                                                                "HardPoint",
+                                                                        });
                                                                     }}
                                                                 >
                                                                     <Icon name="definition" />
@@ -12108,14 +12069,12 @@ ${becauseText(node.because)}`
                                                                 row.objectId,
                                                             )}
                                                             onClick={() =>
-                                                                vscode.postMessage(
-                                                                    {
-                                                                        type: "revealDefinition",
-                                                                        value: row.objectId,
-                                                                        referenceType:
-                                                                            "GameObject",
-                                                                    },
-                                                                )
+                                                                post({
+                                                                    type: "revealDefinition",
+                                                                    value: row.objectId,
+                                                                    referenceType:
+                                                                        "GameObject",
+                                                                })
                                                             }
                                                         >
                                                             <Icon name="definition" />

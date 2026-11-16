@@ -21,6 +21,11 @@ import * as vscode from "vscode";
 
 import { readPanelLayout, savePanelSize } from "./panelLayoutStorage";
 import { PanelProject, projectSubjectKey, projectTitle } from "./panelProject";
+import type {
+    CommonToHost,
+    HostRequest,
+    HostResponse,
+} from "./protocol/panels/common";
 
 /** What makes one panel different from another. */
 export interface WebviewPanelSpec {
@@ -61,10 +66,19 @@ export interface WebviewPanelSpec {
  *
  * Subclasses supply a spec and handle messages; everything about creating the panel, addressing its
  * webview and tearing it down lives here.
+ *
+ * Typed by the panel's protocol (#208): `TIn` is what its webview sends, `TOut` what it is sent, both
+ * declared once in `protocol/panels/` and imported by the webview as well, so the two sides cannot
+ * drift apart without the compiler noticing.
  */
-export abstract class WebviewPanelHost {
+export abstract class WebviewPanelHost<
+    TIn extends { type: string } = WebviewMessage,
+    TOut extends { type: string } = { type: string },
+> {
     /** Every open panel of every kind, so a change in the project count can retitle them. */
-    private static readonly _live = new Set<WebviewPanelHost>();
+    private static readonly _live = new Set<
+        WebviewPanelHost<{ type: string }, { type: string }>
+    >();
     private static _projectCount = 0;
 
     /**
@@ -92,6 +106,13 @@ export abstract class WebviewPanelHost {
      */
     readonly onDidDispose: vscode.Event<void>;
     protected readonly panel: vscode.WebviewPanel;
+
+    /**
+     * The server methods this panel's webview may call through {@link HostRequest}. A request for
+     * anything else is answered with null rather than passed on: the webview reaches the server only
+     * where its panel says it may.
+     */
+    protected readonly relayMethods: readonly string[] = [];
 
     /**
      * @param adopt A panel VS Code already created, for a custom editor. Custom editors are handed
@@ -162,7 +183,7 @@ export abstract class WebviewPanelHost {
         this._applyTitle();
         WebviewPanelHost._live.add(this);
         this.onDidDispose(() => WebviewPanelHost._live.delete(this));
-        this.panel.webview.onDidReceiveMessage((msg: WebviewMessage) => {
+        this.panel.webview.onDidReceiveMessage((msg: TIn | CommonToHost) => {
             // Handled here for every editor at once. A dock width is the base class's business -
             // no subclass has an opinion about it, and five identical cases in five switches is
             // exactly the duplication this class exists to prevent.
@@ -176,15 +197,49 @@ export abstract class WebviewPanelHost {
                 }
                 return;
             }
+            if (msg.type === "request") {
+                void this._relay(msg as HostRequest);
+                return;
+            }
             // Caught here, once, because a rejected handler used to vanish: the hand-off button
             // "did nothing" and nothing anywhere said why.
-            Promise.resolve(this.onMessage(msg)).catch((error: unknown) => {
-                console.error(
-                    `EaWEdit: Webview message '${msg.type}' failed`,
-                    error,
-                );
-            });
+            Promise.resolve(this.onMessage(msg as TIn)).catch(
+                (error: unknown) => {
+                    console.error(
+                        `EaWEdit: Webview message '${msg.type}' failed`,
+                        error,
+                    );
+                },
+            );
         });
+    }
+
+    /**
+     * Passes one of the webview's requests to the project's server and posts the answer back, null
+     * for a method off the allow-list or a failed request. Always answers: the webview's requester
+     * would otherwise wait for its timeout.
+     */
+    private async _relay(msg: HostRequest): Promise<void> {
+        const method = typeof msg.method === "string" ? msg.method : "";
+        const outcome = this.relayMethods.includes(method)
+            ? await this.project.gateway
+                  .request<unknown>(
+                      method,
+                      this.relayParams(method, msg.params),
+                  )
+                  .catch(() => undefined)
+            : undefined;
+        const response: HostResponse = {
+            type: "response",
+            id: msg.id,
+            result: outcome?.ok ? outcome.value : null,
+        };
+        void this.panel.webview.postMessage(response);
+    }
+
+    /** The params a relayed request goes to the server with; a panel adds what only the host knows. */
+    protected relayParams(_method: string, params: unknown): unknown {
+        return params;
     }
 
     /** Retitles the panel; the project's name is added while the window runs several. */
@@ -210,14 +265,14 @@ export abstract class WebviewPanelHost {
     }
 
     /** Handles one message from the webview. */
-    protected abstract onMessage(msg: WebviewMessage): void | Promise<void>;
+    protected abstract onMessage(msg: TIn): void | Promise<void>;
 
-    protected post(msg: unknown): void {
+    protected post(msg: TOut): void {
         void this.panel.webview.postMessage(msg);
     }
 }
 
-/** A message from a webview: a tagged union the subclass switches on. */
+/** An untyped message from a webview, for a panel whose protocol is not declared yet. */
 export interface WebviewMessage {
     type: string;
 
@@ -235,7 +290,9 @@ export interface WebviewMessage {
  * panels on two servers, and a lookup that ignored the project handed one project's tab to the
  * other.
  */
-export class PanelRegistry<T extends WebviewPanelHost> {
+export class PanelRegistry<
+    T extends WebviewPanelHost<{ type: string }, { type: string }>,
+> {
     private readonly _panels = new Map<string, T>();
 
     get all(): T[] {

@@ -18,26 +18,15 @@ import { createRoot } from "react-dom/client";
 import styled from "styled-components";
 
 import { tokensCss } from "./shared/tokens";
+import { poster, transport } from "./shared/vscodeApi";
 import { DISCUSSIONS_URL, ISSUES_URL, releaseUrl } from "./whatsNewLinks";
+import type {
+    WhatsNewPayload,
+    WhatsNewToHost,
+    WhatsNewToWebview,
+} from "../protocol/panels/whatsNew";
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
-const vscode = acquireVsCodeApi();
-
-interface Section {
-    version: string;
-    highlights?: string;
-    migration?: string;
-    body: string;
-}
-
-interface Payload {
-    type: "notes";
-    version: string;
-    preview: boolean;
-    current?: Section;
-    older: { version: string; markdown: string }[];
-}
+const post = poster<WhatsNewToHost>();
 
 const markdown = new MarkdownIt({
     html: false,
@@ -289,18 +278,17 @@ function Notes({
 }
 
 function App(): React.JSX.Element {
-    const [payload, setPayload] = useState<Payload | null>(null);
+    const [payload, setPayload] = useState<WhatsNewPayload | null>(null);
 
     useEffect(() => {
-        const handle = (event: MessageEvent): void => {
-            const msg = event.data as { type?: unknown };
+        const stop = transport.listen((data) => {
+            const msg = data as WhatsNewToWebview;
             if (msg.type === "notes") {
-                setPayload(event.data as Payload);
+                setPayload(msg);
             }
-        };
-        window.addEventListener("message", handle);
-        vscode.postMessage({ type: "ready" });
-        return () => window.removeEventListener("message", handle);
+        });
+        post({ type: "ready" });
+        return stop;
     }, []);
 
     if (payload === null) {

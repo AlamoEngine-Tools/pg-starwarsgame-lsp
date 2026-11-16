@@ -15,10 +15,13 @@ import { createRoot } from "react-dom/client";
 
 import { CreditsCrawl } from "./creditsCrawl";
 import { LocRow } from "./loc/locRow";
+import type {
+    CreditsPreviewToHost,
+    CreditsPreviewToWebview,
+} from "../protocol/panels/creditsPreview";
+import { poster, transport } from "./shared/vscodeApi";
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
-const vscode = acquireVsCodeApi();
+const post = poster<CreditsPreviewToHost>();
 
 interface CrawlPayload {
     rows: LocRow[];
@@ -30,21 +33,19 @@ function App(): React.JSX.Element {
     const [payload, setPayload] = useState<CrawlPayload | null>(null);
 
     useEffect(() => {
-        const handle = (event: MessageEvent): void => {
-            const msg = event.data as { type: string; [key: string]: unknown };
+        const stop = transport.listen((data) => {
+            const msg = data as CreditsPreviewToWebview;
             if (msg.type !== "crawl") {
                 return;
             }
             setPayload({
-                rows: msg.rows as LocRow[],
-                languages: msg.languages as string[],
-                language: msg.language as string,
+                rows: msg.rows,
+                languages: msg.languages,
+                language: msg.language,
             });
-        };
-
-        window.addEventListener("message", handle);
-        vscode.postMessage({ type: "ready" });
-        return () => window.removeEventListener("message", handle);
+        });
+        post({ type: "ready" });
+        return stop;
     }, []);
 
     if (payload === null) {
@@ -61,7 +62,7 @@ function App(): React.JSX.Element {
             languages={payload.languages}
             initialLanguage={payload.language}
             // Closing the crawl closes the panel: it is the only thing here.
-            onClose={() => vscode.postMessage({ type: "close" })}
+            onClose={() => post({ type: "close" })}
         />
     );
 }

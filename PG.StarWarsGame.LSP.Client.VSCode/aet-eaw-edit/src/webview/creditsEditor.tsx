@@ -43,11 +43,7 @@ import {
     creditsFileSeed,
     CreditsSeedRow,
 } from "./loc/creditsSeed";
-import {
-    BaselineEntryDto,
-    BaselineRow,
-    toBaselineRows,
-} from "./translationInherited";
+import { BaselineRow, toBaselineRows } from "./translationInherited";
 import { languageCopyValues } from "./loc/languageCopy";
 import { LocTile, LocTileGrid } from "./loc/LocTile";
 import { LocSearch } from "./loc/LocSearch";
@@ -61,6 +57,7 @@ import {
     post,
     useLocPanel,
 } from "./loc/useLocPanel";
+import type { LocalisationSeedSource } from "../protocol/panels/localisationEditor";
 import { DockSection } from "./shared/DockSection";
 import { buildRowFilter, FilterMode } from "./locFilter";
 
@@ -79,13 +76,7 @@ const STEP_MIME = "application/x-aet-credits-step";
  * It carries the rows, so picking one stages the copy locally like any other edit: nothing reaches
  * disk until Save, and discarding puts the file back to empty.
  */
-interface SeedSource {
-    filePath: string;
-    label: string;
-    language: string;
-    rowCount: number;
-    rows: LocRow[];
-}
+type SeedSource = LocalisationSeedSource;
 
 function App(): React.JSX.Element {
     const [filter, setFilter] = useState("");
@@ -106,14 +97,12 @@ function App(): React.JSX.Element {
     // LaTeX editors already put theirs.
     const onMessage = useCallback((msg: LocPanelMessage) => {
         if (msg.type === "baselineRows") {
-            setBaseline(
-                toBaselineRows((msg.entries as BaselineEntryDto[]) ?? []),
-            );
+            setBaseline(toBaselineRows(msg.entries ?? []));
             return;
         }
 
         if (msg.type === "seedSources") {
-            setSeedSources((msg.sources as SeedSource[]) ?? []);
+            setSeedSources(msg.sources ?? []);
             return;
         }
 

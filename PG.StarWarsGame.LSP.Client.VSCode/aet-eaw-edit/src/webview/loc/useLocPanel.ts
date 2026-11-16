@@ -11,28 +11,27 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { LocProblemDto } from "../../protocol";
+import type {
+    LocalisationEditorToHost,
+    LocalisationEditorToWebview,
+} from "../../protocol/panels/localisationEditor";
 import { loadDialogGeometry } from "../shared/dialogGeometryStore";
-import { StoredGeometry } from "../../shared/modalGeometry";
 import { LocRow } from "../loc/locRow";
 import { useDebounced, VALIDATE_DEBOUNCE_MS } from "./useDebounced";
 import { worstSeverity } from "./validateState";
 
 import { initPanelLayout } from "../shared/panelLayoutBridge";
-
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
-// Acquired once for the whole webview: calling it twice throws, so this module owns it and
-// everything else posts through `post`.
-const vscode = acquireVsCodeApi();
+import { poster, transport, vscodeApi } from "../shared/vscodeApi";
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
 // every drag back to it. Must run before anything measures itself.
-initPanelLayout(vscode);
+initPanelLayout(vscodeApi);
 
-/** Sends a message to the panel hosting this webview. */
-export function post(message: unknown): void {
-    vscode.postMessage(message);
-}
+/**
+ * Sends a message to the panel hosting this webview. The staged commands travel as `unknown`: each
+ * editor knows its own command type, and the host never looks inside one.
+ */
+export const post = poster<LocalisationEditorToHost<unknown>>();
 
 /**
  * A validation finding, in the editors' own vocabulary.
@@ -46,11 +45,8 @@ export type LocProblem = LocProblemDto;
 export type ValidationState =
     "unvalidated" | "ok" | "info" | "warning" | "error";
 
-export interface LocPanelMessage {
-    type: string;
-
-    [key: string]: unknown;
-}
+/** What the panel sends this webview; an editor sees the messages the shared hook leaves to it. */
+export type LocPanelMessage = LocalisationEditorToWebview;
 
 export interface LocPanel<C> {
     rows: LocRow[];
@@ -86,7 +82,7 @@ export interface LocPanel<C> {
     stage: (command: C) => void;
     save: () => void;
     validate: () => void;
-    post: (message: unknown) => void;
+    post: (message: LocalisationEditorToHost<unknown>) => void;
 }
 
 export function useLocPanel<C>(options: {
@@ -126,36 +122,25 @@ export function useLocPanel<C>(options: {
     const { onFileLoaded, onFocusLanguageChanged, onMessage } = options;
 
     useEffect(() => {
-        const handle = (event: MessageEvent): void => {
-            const msg = event.data as LocPanelMessage;
+        const stop = transport.listen((data) => {
+            const msg = data as LocPanelMessage;
 
             switch (msg.type) {
                 case "rows":
-                    setRows(msg.rows as LocRow[]);
-                    setLanguages(msg.languages as string[]);
-                    setOrdered(msg.ordered as boolean);
-                    setCategory(msg.category as string);
+                    setRows(msg.rows);
+                    setLanguages(msg.languages);
+                    setOrdered(msg.ordered);
+                    setCategory(msg.category);
                     setCanAddLanguage(msg.canAddLanguage === true);
-                    setFocusLanguage(
-                        (msg.focusLanguage as string | null) ?? null,
-                    );
+                    setFocusLanguage(msg.focusLanguage ?? null);
                     setAddLanguageCreatesFile(
                         msg.addLanguageCreatesFile === true,
                     );
-                    setSupportedLanguages(
-                        (msg.supportedLanguages as string[]) ?? [],
-                    );
+                    setSupportedLanguages(msg.supportedLanguages ?? []);
                     // Seeded here rather than on a message of its own: it arrives with the file,
                     // before any dialog can be opened, which is the only ordering that matters.
-                    loadDialogGeometry(
-                        msg.dialogGeometry as
-                            Record<string, StoredGeometry> | undefined,
-                        (id, geometry) =>
-                            vscode.postMessage({
-                                type: "saveDialogGeometry",
-                                id,
-                                geometry,
-                            }),
+                    loadDialogGeometry(msg.dialogGeometry, (id, geometry) =>
+                        post({ type: "saveDialogGeometry", id, geometry }),
                     );
                     setQueue([]);
                     setProblems([]);
@@ -168,16 +153,14 @@ export function useLocPanel<C>(options: {
                     // about before an edit is made rather than only after one. This also means the
                     // indicator says something true from the moment the file opens, instead of
                     // sitting inert until it is clicked.
-                    vscode.postMessage({ type: "validateBatch", commands: [] });
+                    post({ type: "validateBatch", commands: [] });
                     break;
 
                 case "problems":
-                    setProblems((msg.problems as LocProblem[]) ?? []);
+                    setProblems(msg.problems ?? []);
                     // The tag reads out the highest level reported - see worstSeverity, which is
                     // the rule the story graph editor's Validate button uses too.
-                    setValidation(
-                        worstSeverity((msg.problems as LocProblem[]) ?? []),
-                    );
+                    setValidation(worstSeverity(msg.problems ?? []));
                     break;
 
                 case "saveResult":
@@ -185,13 +168,13 @@ export function useLocPanel<C>(options: {
                         setQueue([]);
                         setProblems([]);
                         setValidation("unvalidated");
-                        vscode.postMessage({ type: "fetch" });
+                        post({ type: "fetch" });
                     }
                     break;
 
                 // The tab was re-aimed at one language of its set, or back at all of them.
                 case "focusLanguage":
-                    setFocusLanguage((msg.language as string | null) ?? null);
+                    setFocusLanguage(msg.language ?? null);
                     onFocusLanguageChanged?.();
                     break;
 
@@ -199,12 +182,12 @@ export function useLocPanel<C>(options: {
                     // Only re-read when nothing is staged: reloading over unsaved edits would
                     // discard work still on screen. A dirty tab keeps what it has until Save.
                     if (!msg.dirty) {
-                        vscode.postMessage({ type: "fetch" });
+                        post({ type: "fetch" });
                     }
                     break;
 
                 case "error":
-                    setError(msg.message as string);
+                    setError(msg.message);
                     setLoaded(true);
                     break;
 
@@ -212,16 +195,14 @@ export function useLocPanel<C>(options: {
                     onMessage?.(msg);
                     break;
             }
-        };
-
-        window.addEventListener("message", handle);
-        vscode.postMessage({ type: "ready" });
-        return () => window.removeEventListener("message", handle);
+        });
+        post({ type: "ready" });
+        return stop;
     }, [onFileLoaded, onFocusLanguageChanged, onMessage]);
 
     // The panel mirrors the queue so it can offer to save if the tab is closed while dirty.
     useEffect(() => {
-        vscode.postMessage({ type: "pendingSync", commands: queue });
+        post({ type: "pendingSync", commands: queue });
     }, [queue]);
 
     const { applyStaged, coalesce } = options;
@@ -240,7 +221,7 @@ export function useLocPanel<C>(options: {
         if (settledQueue.length === 0) {
             return;
         }
-        vscode.postMessage({
+        post({
             type: "validateBatch",
             commands: coalesce(settledQueue),
         });
@@ -258,11 +239,11 @@ export function useLocPanel<C>(options: {
     );
 
     const save = useCallback(() => {
-        vscode.postMessage({ type: "saveBatch", commands: coalesce(queue) });
+        post({ type: "saveBatch", commands: coalesce(queue) });
     }, [queue, coalesce]);
 
     const validate = useCallback(() => {
-        vscode.postMessage({
+        post({
             type: "validateBatch",
             commands: coalesce(queue),
         });
@@ -287,6 +268,6 @@ export function useLocPanel<C>(options: {
         stage,
         save,
         validate,
-        post: (message) => vscode.postMessage(message),
+        post,
     };
 }

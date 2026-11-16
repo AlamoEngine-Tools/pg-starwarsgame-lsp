@@ -23,6 +23,10 @@ import { createRoot } from "react-dom/client";
 import styled from "styled-components";
 
 import { GetEncyclopediaEntryResult } from "../protocol/encyclopedia";
+import type {
+    EncyclopediaToHost,
+    EncyclopediaToWebview,
+} from "../protocol/panels/encyclopedia";
 import { EncyclopediaCard } from "./encyclopediaCard";
 import { encyclopediaNotices, noticeSeverity } from "./encyclopediaNotices";
 import {
@@ -48,6 +52,7 @@ import { RightDock } from "./shared/RightDock";
 import { SelectField } from "./shared/SelectField";
 
 import { initPanelLayout } from "./shared/panelLayoutBridge";
+import { poster, transport, vscodeApi } from "./shared/vscodeApi";
 import { SeverityTag } from "./shared/SeverityTag";
 import { ModeSelector } from "./shared/ModeSelector";
 import {
@@ -57,13 +62,11 @@ import {
     factionSlotOf,
 } from "./encyclopediaModes";
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
-const vscode = acquireVsCodeApi();
+const post = poster<EncyclopediaToHost>();
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
 // every drag back to it. Must run before anything measures itself.
-initPanelLayout(vscode);
+initPanelLayout(vscodeApi);
 
 /**
  * Zoom range.
@@ -306,14 +309,8 @@ function App(): React.JSX.Element {
     }, []);
 
     useEffect(() => {
-        const handle = (event: MessageEvent): void => {
-            const msg = event.data as {
-                type: string;
-                entry?: GetEncyclopediaEntryResult;
-                multiplayer?: boolean;
-                screen?: unknown;
-                shipName?: string | null;
-            };
+        const stop = transport.listen((data) => {
+            const msg = data as EncyclopediaToWebview;
             if (msg.type !== "entry" || msg.entry === undefined) {
                 return;
             }
@@ -325,22 +322,20 @@ function App(): React.JSX.Element {
                 setMultiplayer(msg.multiplayer);
             }
             setScreen(encyclopediaScreenFrom(msg.screen));
-        };
-
-        window.addEventListener("message", handle);
-        vscode.postMessage({ type: "ready" });
-        return () => window.removeEventListener("message", handle);
+        });
+        post({ type: "ready" });
+        return stop;
     }, []);
 
     const onToggleMultiplayer = (next: boolean): void => {
         setMultiplayer(next);
-        vscode.postMessage({ type: "setMultiplayer", multiplayer: next });
+        post({ type: "setMultiplayer", multiplayer: next });
     };
 
     const onPickScreen = (id: string): void => {
         const next = encyclopediaScreenFrom(id);
         setScreen(next);
-        vscode.postMessage({ type: "setScreen", screen: next });
+        post({ type: "setScreen", screen: next });
     };
 
     const stage =

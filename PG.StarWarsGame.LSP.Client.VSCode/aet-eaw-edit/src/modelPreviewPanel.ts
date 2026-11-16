@@ -10,7 +10,6 @@
 
 import * as vscode from "vscode";
 
-import { subMeshGeometryReply } from "./lsp/subMeshGeometry";
 import { ModelInspectorPanel } from "./modelInspectorPanel";
 import { PanelProject, projectSubjectKey } from "./panelProject";
 import {
@@ -24,6 +23,12 @@ import {
     GetShaderSourceResult,
     PreviewSourceFile,
 } from "./protocol/modelPreview";
+import type {
+    ModelPreviewRequestGlb,
+    ModelPreviewSaveCapture,
+    ModelPreviewToHost,
+    ModelPreviewToWebview,
+} from "./protocol/panels/modelPreview";
 import { handoffFile, launchDetached } from "./externalTool";
 import { revealDefinition } from "./revealDefinition";
 import { type SubjectState, subjectStateFrom } from "./shared/subjectState";
@@ -35,12 +40,7 @@ import {
     readProjectSettings,
     saveProjectSettings,
 } from "./projectSettingsStorage";
-import {
-    panelKey,
-    PanelRegistry,
-    WebviewMessage,
-    WebviewPanelHost,
-} from "./webviewPanelHost";
+import { panelKey, PanelRegistry, WebviewPanelHost } from "./webviewPanelHost";
 
 /** What the preview is showing, and therefore what to ask the server for. */
 export type PreviewSubject =
@@ -84,7 +84,10 @@ export const MODEL_PREVIEW_BODY_STYLE =
  */
 const ENERGY_SETTING = "aet-eaw-edit.features.preview.energyPool";
 
-export class ModelPreviewPanel extends WebviewPanelHost {
+export class ModelPreviewPanel extends WebviewPanelHost<
+    ModelPreviewToHost,
+    ModelPreviewToWebview
+> {
     static readonly viewType = "aetModelPreview";
     private static readonly panels = new PanelRegistry<ModelPreviewPanel>();
     /**
@@ -242,7 +245,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         }
     }
 
-    protected async onMessage(message: WebviewMessage): Promise<void> {
+    protected async onMessage(message: ModelPreviewToHost): Promise<void> {
         switch (message.type) {
             case "ready":
                 // The room first, so the viewport is set up the way the reader left it before any
@@ -297,15 +300,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 return;
 
             case "requestModelDetail":
-                await this.sendModelDetail(
-                    String(message.modelReference ?? ""),
-                );
-                return;
-
-            case "requestSubMeshGeometry":
-                this.post(
-                    await subMeshGeometryReply(this.project.gateway, message),
-                );
+                await this.sendModelDetail(message.modelReference);
                 return;
 
             case "openInspector":
@@ -320,19 +315,19 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 return;
 
             case "requestTexture":
-                await this.sendTexture(String(message.name ?? ""));
+                await this.sendTexture(message.name);
                 return;
 
             case "requestParticleSystem":
-                await this.sendParticleSystem(String(message.name ?? ""));
+                await this.sendParticleSystem(message.name);
                 return;
 
             case "requestShader":
-                await this.sendShader(String(message.name ?? ""));
+                await this.sendShader(message.name);
                 return;
 
             case "requestProjectile":
-                await this.sendProjectile(String(message.name ?? ""));
+                await this.sendProjectile(message.name);
                 return;
 
             case "obtainShaders":
@@ -350,10 +345,8 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 // out of several files.
                 await revealDefinition(
                     this.project.gateway,
-                    String(message.value ?? ""),
-                    typeof message.referenceType === "string"
-                        ? message.referenceType
-                        : undefined,
+                    message.value,
+                    message.referenceType,
                 );
                 return;
 
@@ -394,8 +387,8 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * and a `data:` link in one is inert - the viewer's sandbox blocks a download the page starts.
      * So the picture is made where the GPU is and written where the API is.
      */
-    private async saveCapture(message: WebviewMessage): Promise<void> {
-        const dataUrl = String(message.dataUrl ?? "");
+    private async saveCapture(message: ModelPreviewSaveCapture): Promise<void> {
+        const dataUrl = message.dataUrl;
         const comma = dataUrl.indexOf(",");
 
         if (!dataUrl.startsWith("data:image/png;base64,") || comma < 0) {
@@ -406,9 +399,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         }
 
         const target = await vscode.window.showSaveDialog({
-            defaultUri: vscode.Uri.file(
-                String(message.fileName ?? "capture.png"),
-            ),
+            defaultUri: vscode.Uri.file(message.fileName),
             filters: { Images: ["png"] },
         });
 
@@ -516,8 +507,8 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         this.post({ type: "scene", scene: result.value.scene, refresh });
     }
 
-    private async sendGlb(message: WebviewMessage): Promise<void> {
-        const modelReference = String(message.modelReference ?? "");
+    private async sendGlb(message: ModelPreviewRequestGlb): Promise<void> {
+        const modelReference = message.modelReference;
 
         // A PASSIVE subject names its own clips on the request: a death clone and a piece of
         // wreckage are their own models, and the scene's list describes the one that was opened.
@@ -530,7 +521,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         // the clone's clip, so narrowing it without this guard was strictly worse.
         const own =
             Array.isArray(message.animations) && message.animations.length > 0
-                ? message.animations.map((name) => String(name))
+                ? message.animations
                 : null;
 
         const result = await this.project.gateway.request<GetModelGlbResult>(
