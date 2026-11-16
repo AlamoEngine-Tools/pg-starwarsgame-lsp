@@ -6,18 +6,23 @@ import { describe, it } from "node:test";
 
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { Icon } from "../shared/Icon";
 import { PathDirectionMenu, PathFilterMenu } from "./PathFilterMenu";
 import { PATH_DIRECTIONS } from "./pathDirection";
 
 const noop = (): void => undefined;
+
+/** The markup the icon seam draws for a meaning, to find in a rendered menu. */
+const glyph = (name: Parameters<typeof Icon>[0]["name"]): string =>
+    renderToStaticMarkup(<Icon name={name} />);
 
 describe("PathFilterMenu", () => {
     // Closed it is exactly what it replaced: one filter icon in the node's header.
     it("is a single filter button until it is opened", () => {
         const html = renderToStaticMarkup(<PathFilterMenu onPick={noop} />);
 
-        assert.match(html, /codicon-filter/);
-        assert.equal(/codicon-arrow-left/.test(html), false);
+        assert.ok(html.includes(glyph("filter")), html);
+        assert.equal(html.includes(glyph("incoming")), false);
         assert.match(html, /aria-haspopup="menu"/);
         assert.match(html, /aria-expanded="false"/);
     });
@@ -34,11 +39,7 @@ describe("PathFilterMenu", () => {
         const html = renderToStaticMarkup(<PathDirectionMenu onPick={noop} />);
 
         for (const choice of PATH_DIRECTIONS) {
-            assert.match(
-                html,
-                new RegExp(`codicon-${choice.icon}`),
-                choice.direction,
-            );
+            assert.ok(html.includes(glyph(choice.icon)), choice.direction);
             assert.match(
                 html,
                 new RegExp(choice.label.replace(/'/g, "&#x27;")),
@@ -52,10 +53,10 @@ describe("PathFilterMenu", () => {
             <PathDirectionMenu onPick={noop} active="Upstream" />,
         );
 
-        assert.match(
-            html,
-            /aria-checked="true"[^>]*>[\s\S]*?codicon-arrow-left/,
-        );
+        const checked = html.indexOf('aria-checked="true"');
+        assert.ok(checked >= 0, html);
+        const item = html.slice(checked, html.indexOf("</button>", checked));
+        assert.ok(item.includes(glyph("incoming")), item);
     });
 
     it("renders as a list of menu items", () => {

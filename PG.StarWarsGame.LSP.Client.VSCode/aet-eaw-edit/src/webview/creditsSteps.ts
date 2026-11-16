@@ -9,6 +9,7 @@
 
 import * as l10n from "@vscode/l10n";
 import { BLANK_SENTINEL_VALUE, CREDITS_DIRECTIVES } from "./creditsCrawlModel";
+import type { IconName } from "./shared/Icon";
 
 export interface CreditsStep {
     id: string;
@@ -25,7 +26,8 @@ export interface CreditsStep {
      * the sentinel, so it is the sentinel that identifies it, not its directive.
      */
     token: string;
-    codicon: string;
+    /** The tile's glyph, by meaning. */
+    icon: IconName;
 }
 
 /**
@@ -60,7 +62,7 @@ export const CREDITS_STEPS: CreditsStep[] = [
         key: CREDITS_DIRECTIVES[1],
         value: "",
         token: CREDITS_DIRECTIVES[1],
-        codicon: "symbol-key",
+        icon: "creditsLabel",
     },
     {
         id: "center",
@@ -69,7 +71,7 @@ export const CREDITS_STEPS: CreditsStep[] = [
         key: CREDITS_DIRECTIVES[0],
         value: "",
         token: CREDITS_DIRECTIVES[0],
-        codicon: "symbol-text",
+        icon: "creditsName",
     },
     {
         id: "blank",
@@ -78,7 +80,7 @@ export const CREDITS_STEPS: CreditsStep[] = [
         key: CREDITS_DIRECTIVES[0],
         value: BLANK_SENTINEL_VALUE,
         token: BLANK_SENTINEL_VALUE,
-        codicon: "dash",
+        icon: "creditsBlank",
     },
 ];
 

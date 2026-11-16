@@ -274,7 +274,7 @@ describe("rotarySwitchCss", () => {
         // measured across the two: resolve the token out of the scale rather than weakening the
         // assertion to "it names a token", which would stop checking the thing that matters.
         const named =
-            /\.rotary-pos \.codicon\s*\{[^}]*font-size:\s*var\((--[a-z0-9-]+)\)/.exec(
+            /\.rotary-pos svg\s*\{[^}]*width:\s*var\((--[a-z0-9-]+)\)/.exec(
                 rotarySwitchCss,
             );
         assert.ok(named !== null, "the glyph size is not taken from a token");

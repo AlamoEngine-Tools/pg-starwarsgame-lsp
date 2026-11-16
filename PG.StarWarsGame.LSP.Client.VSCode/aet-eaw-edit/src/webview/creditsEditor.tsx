@@ -681,7 +681,7 @@ function App(): React.JSX.Element {
                     {CREDITS_STEPS.map((step) => (
                         <LocTile
                             key={step.id}
-                            icon={step.codicon}
+                            icon={step.icon}
                             label={step.label}
                             // The token this becomes in the file, so the tile and the Format column
                             // are visibly the same thing.

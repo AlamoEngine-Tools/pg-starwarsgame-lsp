@@ -28,6 +28,7 @@ import {
     useState,
 } from "react";
 import { Combobox } from "./shared/Combobox";
+import { Icon, SeverityMark } from "./shared/Icon";
 import { ModalLayerContext } from "./shared/Modal";
 import { SelectField } from "./shared/SelectField";
 import {
@@ -3885,7 +3886,7 @@ function VirtualNodeView(props: {
                             editorHandleRef?.discardStagingJunction(dto.id)
                         }
                     >
-                        <span className="codicon codicon-close" />
+                        <Icon name="close" size={10} />
                     </button>
                 </Drag.NoDrag>
             ) : null}
@@ -3908,7 +3909,7 @@ function VirtualNodeView(props: {
                             )
                         }
                     >
-                        <span className="codicon codicon-arrow-right" />
+                        <Icon name="openSubgraph" size={10} />
                     </button>
                 </Drag.NoDrag>
             ) : null}
@@ -3931,7 +3932,7 @@ function VirtualNodeView(props: {
                             onRevealGalacticRequested(dto.portalTarget!)
                         }
                     >
-                        <span className="codicon codicon-arrow-left" />
+                        <Icon name="openParentGraph" size={10} />
                     </button>
                 </Drag.NoDrag>
             ) : null}
@@ -4622,7 +4623,7 @@ function EventParamRows(props: {
                                         })
                                     }
                                 >
-                                    <span className="codicon codicon-go-to-file" />
+                                    <Icon name="definition" />
                                 </button>
                             </Drag.NoDrag>
                         ) : null}
@@ -4668,8 +4669,9 @@ function SectionHead(props: {
                     }
                     onClick={() => toggleSection(props.nodeId, props.section)}
                 >
-                    <span
-                        className={`codicon codicon-chevron-${collapsed ? "right" : "down"}`}
+                    <Icon
+                        name={collapsed ? "collapsed" : "expanded"}
+                        size={13}
                     />{" "}
                     {label}
                     {collapsed && props.summary ? ` - ${props.summary}` : ""}
@@ -4717,9 +4719,12 @@ function TypeRow(props: {
                                 props.typeName,
                             )}
                         >
-                            <span
-                                className={`codicon ${props.kind === "trigger" ? "codicon-zap" : "codicon-gift"}`}
-                                aria-hidden="true"
+                            <Icon
+                                name={
+                                    props.kind === "trigger"
+                                        ? "trigger"
+                                        : "reward"
+                                }
                             />
                             <span className="type-chip-name">
                                 {props.typeName}
@@ -4750,7 +4755,7 @@ function TypeRow(props: {
                                     )
                                 }
                             >
-                                <span className="codicon codicon-close" />
+                                <Icon name="detach" />
                             </button>
                         </Drag.NoDrag>
                     )}
@@ -4983,7 +4988,7 @@ function EventForm(props: {
                                     commitTitle();
                                 }}
                             >
-                                <span className="codicon codicon-check" />
+                                <Icon name="check" />
                             </button>
                         </Drag.NoDrag>
                         <Drag.NoDrag>
@@ -4994,7 +4999,7 @@ function EventForm(props: {
                                     cancelRename();
                                 }}
                             >
-                                <span className="codicon codicon-close" />
+                                <Icon name="close" />
                             </button>
                         </Drag.NoDrag>
                     </>
@@ -5018,7 +5023,7 @@ function EventForm(props: {
                         className="ro-badge"
                         title={readOnlyMessage(dto.readOnlyOwner)}
                     >
-                        <span className="codicon codicon-lock" />
+                        <Icon name="readOnly" />
                         {dto.readOnlyOwner}
                     </span>
                 ) : null}
@@ -5028,7 +5033,7 @@ function EventForm(props: {
                             title={l10n.t("Rename this event")}
                             onClick={openRename}
                         >
-                            <span className="codicon codicon-edit" />
+                            <Icon name="rename" />
                         </button>
                     </Drag.NoDrag>
                 )}
@@ -5047,7 +5052,15 @@ function EventForm(props: {
                             .map((d) => d.message)
                             .join("\n")}
                     >
-                        <span className="codicon codicon-warning" />
+                        <SeverityMark
+                            severity={
+                                nodeDiagnostics
+                                    .get(dto.id)!
+                                    .some((d) => d.severity === "error")
+                                    ? "error"
+                                    : "warning"
+                            }
+                        />
                         {nodeDiagnostics.get(dto.id)!.length}
                     </span>
                 ) : null}
@@ -5063,7 +5076,7 @@ function EventForm(props: {
                             })
                         }
                     >
-                        <span className="codicon codicon-go-to-file" />
+                        <Icon name="definition" />
                     </button>
                 </Drag.NoDrag>
                 <Drag.NoDrag>
@@ -5099,7 +5112,7 @@ function EventForm(props: {
                                 )
                             }
                         >
-                            <span className="codicon codicon-trash" />
+                            <Icon name="remove" />
                         </button>
                     </Drag.NoDrag>
                 )}
@@ -5444,7 +5457,7 @@ const GlobalStyle = createGlobalStyle`
 
     /* Immutable-type chips - used in node bodies and the toolbar's create form. In a node body the
        chip is tinted by its trigger/reward family colour (stepColor/fadedBg, set inline) and leads
-       with a codicon; the create form leaves the default badge colours. */
+       with its trigger or reward glyph; the create form leaves the default badge colours. */
     .type-chip {
         display: inline-flex;
         align-items: center;
@@ -5459,8 +5472,9 @@ const GlobalStyle = createGlobalStyle`
         color: var(--colour-badge-ink);
     }
 
-    .type-chip .codicon {
-        font-size: var(--icon-size-12);
+    .type-chip svg {
+        width: var(--icon-size-12);
+        height: var(--icon-size-12);
         flex-shrink: 0;
     }
 
@@ -5674,23 +5688,23 @@ const Shell = styled.div`
         width: 100%;
     }
 
-    /* Codicons inherit their button's colour (never coloured individually) and scale per context. */
+    /* Icons inherit their button's colour (never coloured individually) and scale per context. An
+       SVG glyph sits on the middle of the line beside it, as the codicon font does. The dial sizes
+       its own glyphs in rotarySwitchCss. */
 
     .codicon {
         font-size: var(--icon-size-16);
         vertical-align: middle;
     }
 
+    button svg,
+    .section-toggle svg,
+    .ro-badge svg {
+        vertical-align: middle;
+    }
+
     .overview-tools .codicon {
         font-size: var(--icon-size-16);
-    }
-
-    .rotary-center .codicon {
-        font-size: var(--icon-size-22);
-    }
-
-    .rotary-pos .codicon {
-        font-size: var(--icon-size-14);
     }
 
     .resize-handle-w {
@@ -8135,12 +8149,11 @@ function ProblemsBar(props: {
                                     : "warning")
                             }
                         >
-                            <span
-                                className={
-                                    "codicon codicon-" +
-                                    (problem.severity === "error"
+                            <SeverityMark
+                                severity={
+                                    problem.severity === "error"
                                         ? "error"
-                                        : "warning")
+                                        : "warning"
                                 }
                             />
                         </span>
@@ -8168,7 +8181,7 @@ function ProblemsBar(props: {
                             }}
                             title={l10n.t("Open in XML")}
                         >
-                            <span className="codicon codicon-go-to-file" />
+                            <Icon name="definition" />
                         </button>
                     </div>
                 ))}
@@ -8184,9 +8197,14 @@ function ProblemsBar(props: {
  * here, and every request it makes would be refused server-side.
  */
 const STORY_MODES: RotaryMode<EditorMode>[] = [
-    { id: "view", icon: "eye", label: l10n.t("View"), angle: 210 },
-    { id: "edit", icon: "edit", label: l10n.t("Edit"), angle: 270 },
-    { id: "simulate", icon: "play", label: l10n.t("Simulation"), angle: 330 },
+    { id: "view", icon: "viewMode", label: l10n.t("View"), angle: 210 },
+    { id: "edit", icon: "editMode", label: l10n.t("Edit"), angle: 270 },
+    {
+        id: "simulate",
+        icon: "simulationMode",
+        label: l10n.t("Simulation"),
+        angle: 330,
+    },
 ];
 
 const MINIMAP_H = 118;
@@ -8720,7 +8738,7 @@ function NodePalette(props: {
                         {showBlank
                             ? tile(
                                   "blank",
-                                  <span className="codicon codicon-add" />,
+                                  <Icon name="add" />,
                                   l10n.t("New event"),
                                   { category: "blank", type: null },
                                   l10n.t(

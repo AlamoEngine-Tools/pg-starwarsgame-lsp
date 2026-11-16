@@ -14,6 +14,7 @@ import * as l10n from "@vscode/l10n";
 import * as React from "react";
 
 import { type ChoiceOption } from "./choice";
+import { Icon, type IconName } from "./Icon";
 
 /**
  * One position on the dial.
@@ -21,18 +22,13 @@ import { type ChoiceOption } from "./choice";
  * A choice option with a place on the arc. Everything a position shares with a joined-button option
  * - what it is called, what it is called at length, whether it can be taken - comes from the shared
  * model; the angle and the count are the parts that only mean something on a dial.
- *
- * The icon is the one field that does NOT come from there, and deliberately. It is a codicon name
- * rather than a meaning from the catalogue because these glyphs are calibrated as a set: the
- * positions are 24px circles inside a 40px readout, and previewMode.ts records that a dense or
- * already-round glyph fills its button edge to edge and the dial stops reading as a dial. Moving
- * them to the catalogue means choosing six new glyphs against that constraint, which is a look
- * decision rather than a refactor - so it is the last hole left in the icon seam, and it is open on
- * purpose until someone picks them.
  */
 export type RotaryMode<Id extends string> = Omit<ChoiceOption<Id>, "icon"> & {
-    /** A codicon name, without the `codicon-` prefix. See the note above. */
-    icon: string;
+    /**
+     * The position's glyph, by meaning. Required here where a choice option's is optional: a dial
+     * position has no room for a label. The dial meanings in Icon.tsx are drawn for a 24px circle.
+     */
+    icon: IconName;
     /** Degrees, 0 at 3 o'clock and 90 pointing down - so the arc above the centre is 180 to 360. */
     angle: number;
     /**
@@ -105,7 +101,7 @@ export function RotaryModeSwitch<Id extends string>(props: {
                         }
                         onClick={() => props.onSelect(mode.id)}
                     >
-                        <span className={"codicon codicon-" + mode.icon} />
+                        <Icon name={mode.icon} />
                     </button>
                 );
             })}
@@ -121,7 +117,7 @@ export function RotaryModeSwitch<Id extends string>(props: {
                 }
                 onClick={cycle}
             >
-                <span className={"codicon codicon-" + active.icon} />
+                <Icon name={active.icon} />
             </button>
         </div>
     );

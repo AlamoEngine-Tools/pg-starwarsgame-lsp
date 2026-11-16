@@ -90,6 +90,28 @@ describe('the lint run', () => {
         }
     });
 
+    it('fails on a codicon class outside the icon seam and passes it inside Icon.tsx (#207)', () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'styled-css-'));
+        try {
+            const shared = path.join(root, 'webview', 'shared');
+            fs.mkdirSync(shared, {recursive: true});
+            fs.copyFileSync(TOKENS, path.join(shared, 'tokens.ts'));
+            const raw = '\nexport const X = <span className="codicon codicon-close" />;\n';
+            fs.writeFileSync(path.join(root, 'webview', 'panel.tsx'), raw);
+            fs.writeFileSync(path.join(shared, 'Icon.tsx'), raw);
+
+            const run = spawnSync(process.execPath, [path.join(__dirname, 'lint-styled-css.js'), root],
+                {encoding: 'utf8'});
+
+            assert.equal(run.status, 1, run.stderr);
+            assert.match(run.stderr, /panel\.tsx:2 {2}codicon-close/);
+            assert.doesNotMatch(run.stderr, /Icon\.tsx:\d+/);
+            assert.match(run.stderr, /1 style problem\./);
+        } finally {
+            fs.rmSync(root, {recursive: true, force: true});
+        }
+    });
+
     it('passes on the shipped tree', () => {
         const run = spawnSync(process.execPath, [path.join(__dirname, 'lint-styled-css.js')], {encoding: 'utf8'});
         assert.equal(run.status, 0, run.stderr);

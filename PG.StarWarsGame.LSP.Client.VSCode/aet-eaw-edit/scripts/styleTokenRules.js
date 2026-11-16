@@ -168,4 +168,27 @@ function hostRoles(tokensText) {
     return roles;
 }
 
-module.exports = {KINDS, SCALE_PROPERTY, hostOffences, hostRoles, tokenOffences};
+/**
+ * Every codicon class a file names (#207).
+ *
+ * A glyph is asked for by MEANING through Icon.tsx, which decides whether Tabler or the editor's own
+ * codicons answer it. A `codicon-...` class anywhere else is a glyph picked past that table. A plain
+ * `.codicon` selector is not one - it styles whatever the seam hands out - and a comment line may
+ * name a codicon to say what used to be drawn.
+ *
+ * @param {string} text the whole file
+ */
+function codiconOffences(text) {
+    const found = [];
+    for (const m of text.matchAll(/codicon-[a-z0-9-]*/g)) {
+        const lineStart = text.lastIndexOf('\n', m.index) + 1;
+        const lead = text.slice(lineStart, m.index).trimStart();
+        if (lead.startsWith('//') || lead.startsWith('*') || lead.startsWith('/*')) {
+            continue;
+        }
+        found.push({index: m.index, line: text.slice(0, m.index).split('\n').length, name: m[0]});
+    }
+    return found;
+}
+
+module.exports = {KINDS, SCALE_PROPERTY, codiconOffences, hostOffences, hostRoles, tokenOffences};

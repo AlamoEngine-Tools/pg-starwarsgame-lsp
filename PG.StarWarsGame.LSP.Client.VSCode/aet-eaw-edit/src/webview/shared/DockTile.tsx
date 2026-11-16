@@ -10,7 +10,7 @@ import { ReactNode } from "react";
 import type { Enablement } from "./Button";
 
 export type DockTileProps = Enablement & {
-    /** The tile's icon: a Tabler Icon, or a codicon span where a loc dock still uses one. */
+    /** The tile's icon, drawn through the icon seam. */
     glyph: ReactNode;
     label: string;
     /**

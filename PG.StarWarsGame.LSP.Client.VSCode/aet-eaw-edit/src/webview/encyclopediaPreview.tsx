@@ -46,6 +46,7 @@ import {
 } from "./shared/dockChrome";
 import { DockSection } from "./shared/DockSection";
 import { Field } from "./shared/Field";
+import { SeverityMark } from "./shared/Icon";
 import { ProblemsPanel } from "./shared/ProblemsPanel";
 import { problemLook } from "./shared/problemLook";
 import { RightDock } from "./shared/RightDock";
@@ -393,14 +394,11 @@ function App(): React.JSX.Element {
                                     key={notice.message}
                                     className="problem-row"
                                 >
-                                    <span
-                                        className={
-                                            "codicon sev-" +
-                                            notice.severity +
-                                            " codicon-" +
-                                            problemLook(notice.severity).icon
+                                    <SeverityMark
+                                        severity={
+                                            problemLook(notice.severity).tone
                                         }
-                                        aria-hidden="true"
+                                        className={"sev-" + notice.severity}
                                     />
                                     <span className="problem-msg">
                                         {notice.message}

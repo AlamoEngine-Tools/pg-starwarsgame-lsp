@@ -24,6 +24,7 @@ import { createPortal } from "react-dom";
 import { createGlobalStyle } from "styled-components";
 
 import { tokensRootCss } from "../shared/tokens";
+import { Icon } from "../shared/Icon";
 import { placeTooltip, type TooltipPlacement } from "../shared/tooltipPlace";
 
 import { PATH_DIRECTIONS, type PathDirection } from "./pathDirection";
@@ -169,7 +170,7 @@ export function PathFilterMenu({
                 aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
             >
-                <span className="codicon codicon-filter" />
+                <Icon name="filter" />
             </button>
             {open &&
                 createPortal(
@@ -231,7 +232,7 @@ export function PathDirectionMenu({
                     aria-checked={active === choice.direction}
                     onClick={() => onPick(choice.direction)}
                 >
-                    <span className={`codicon codicon-${choice.icon}`} />
+                    <Icon name={choice.icon} />
                     {choice.label}
                 </button>
             ))}

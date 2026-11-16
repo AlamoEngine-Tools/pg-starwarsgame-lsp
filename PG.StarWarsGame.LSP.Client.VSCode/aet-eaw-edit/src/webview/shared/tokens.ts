@@ -56,10 +56,12 @@ export const scaleCss = `
     --radius-pill: 999px;
     --radius-round: 50%;
 
-    /* Icon sizes. A glyph box, NOT typography, even though the property setting it is font-size.
+    /* Icon sizes. A glyph box, NOT typography: a codicon takes it as its font-size and an SVG glyph
+       as its width and height.
        These were on the type scale until it became clear that running them through it shrank every
        inline severity icon by 2px, and that a future change to the reading size would drag every
-       icon along with it. 13px and 14px were the same intent one pixel apart. */
+       icon along with it. 13px and 14px were the same intent one pixel apart.
+
        Six steps for eight measured values is a thin consolidation, and deliberately so: an icon
        size tracks the size of the control holding it, and this extension genuinely has that many
        control sizes. Only the two clear drifts are folded - 13 into 14 and 15 into 16. The win here

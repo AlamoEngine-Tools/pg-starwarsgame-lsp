@@ -1,13 +1,14 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// Every icon the model preview draws, named by what it MEANS.
+// Every icon the webviews draw, named by what it MEANS.
 //
 // Call sites ask for `skeleton` or `damage`, never for a library's own name. That is the whole point
 // of this file: the mapping from a meaning to a glyph lives in one table, so re-drawing an icon, or
 // changing icon library altogether, is an edit here and nowhere else. The preview had icons from
 // three different naming schemes before this - a codicon class string, a pictogram, a bare word -
-// and no way to see what the set as a whole looked like.
+// and no way to see what the set as a whole looked like. A lint holds every other file to it:
+// `codicon-` is named here, in SeverityTag.tsx and in ProblemsPanel.tsx, and nowhere else.
 //
 // Tabler (MIT) rather than codicons for the preview specifically. Codicons is an EDITOR icon set:
 // 535 glyphs with no ground plane, no skeleton, no mesh, no LOD, no axes - the vocabulary a 3D
@@ -26,9 +27,13 @@ import {
     IconArrowBackUp,
     IconArrowDown,
     IconArrowForward,
+    IconArrowLeft,
+    IconArrowRight,
+    IconArrowsHorizontal,
     IconArrowUp,
     IconAsterisk,
     IconAxisX,
+    IconBolt,
     IconBone,
     IconBook,
     IconBox,
@@ -43,6 +48,7 @@ import {
     IconClipboardCopy,
     IconCloudDownload,
     IconCoins,
+    IconCopy,
     IconCrosshair,
     IconCube,
     IconCube3dSphere,
@@ -58,8 +64,10 @@ import {
     IconFilterOff,
     IconFlag,
     IconFlame,
+    IconGift,
     IconGridDots,
     IconHandClick,
+    IconHeading,
     IconHeartBroken,
     IconHierarchy,
     IconHistory,
@@ -71,11 +79,14 @@ import {
     IconLink,
     IconListDetails,
     IconListTree,
+    IconLock,
     IconMesh,
     IconMessage,
     IconMessageCheck,
     IconMinus,
     IconMovie,
+    IconPackage,
+    IconPackageExport,
     IconPencil,
     IconPerspective,
     IconPhoto,
@@ -101,6 +112,7 @@ import {
     IconSchema,
     IconScript,
     IconSearch,
+    IconSeparatorHorizontal,
     IconSettings,
     IconShadow,
     IconSparkles,
@@ -115,7 +127,9 @@ import {
     IconTexture,
     IconTimeline,
     IconTool,
+    IconTransform,
     IconTrash,
+    IconTypography,
     IconUsers,
     IconView360,
     IconVolume,
@@ -124,8 +138,6 @@ import {
     IconX,
 } from "@tabler/icons-react";
 import { type ComponentType } from "react";
-
-import { codiconFor } from "./iconSource";
 
 /**
  * What the preview can draw, by meaning.
@@ -257,7 +269,7 @@ const ICONS = {
     // Jumping to where a name is DECLARED, which is not the same as `open` - that one is an
     // external link and means "hand this to another application". Drawn as the EDITOR's own
     // go-to-file, because the story graph already draws it that way and one action must not look
-    // like two. `iconSource` routes it; the entry stays here so the meaning is still listed.
+    // like two. `CODICONS` below routes it; the entry stays here so the meaning is still listed.
     definition: IconFileCode,
     /** Shows a file in the operating system's file manager. */
     reveal: IconFolderOpen,
@@ -285,7 +297,7 @@ const ICONS = {
     chapterLanes: IconBook,
 
     // The find widget's three modes. Listed here so the whole set can be read in one place, but
-    // `iconSource` routes all three to the editor's own marks - see the note there.
+    // `CODICONS` below routes all three to the editor's own marks - see the note there.
     searchLiteral: IconLetterCase,
     searchWildcard: IconAsterisk,
     searchRegex: IconRegex,
@@ -318,6 +330,50 @@ const ICONS = {
     mediaCompletes: IconMessageCheck,
     // The tint that shows which edges the story has run along.
     flow: IconRoute,
+    // Stepping INTO a battle's own graph from its node, and back OUT to the campaign event that
+    // opens it. A pair of plain arrows: the two are a direction of travel between graphs.
+    openSubgraph: IconArrowRight,
+    openParentGraph: IconArrowLeft,
+    // What an event node's type chip is: the condition that arms it, or what it hands out.
+    trigger: IconBolt,
+    reward: IconGift,
+    // Taking the type off a node, which keeps the node. Not `remove`, which deletes and is a trash
+    // can: this one is undone by choosing a type again.
+    detach: IconX,
+    // A node another project owns, which this one can read and not change.
+    readOnly: IconLock,
+    // The three ways a path filter runs from an event: what leads to it, both, what it leads to.
+    incoming: IconArrowLeft,
+    bothDirections: IconArrowsHorizontal,
+    outgoing: IconArrowRight,
+
+    // ── the mode dials ────────────────────────────────────────────────────────
+    // A position is a 24px circle and the readout a 40px one, so these are thin, open glyphs: a
+    // dense or already-round one fills its button edge to edge and the dial stops reading as a
+    // dial. The same shapes the codicon set drew before (play, package, zap, eye, edit, play), so
+    // a reader who knew the dials finds every position where it was.
+    animationLens: IconPlayerPlay,
+    modelLens: IconPackage,
+    gameplayLens: IconBolt,
+    viewMode: IconEye,
+    editMode: IconPencil,
+    simulationMode: IconPlayerPlay,
+
+    // ── the localisation and credits docks ────────────────────────────────────
+    // Filling one language's empty entries from another's text.
+    fillLanguage: IconCopy,
+    convertFormat: IconTransform,
+    // Writing the files the game loads, which leave the editor as a package.
+    exportFile: IconPackageExport,
+    // The three kinds of credits line, by what each looks like on the crawl: a heading, a name in
+    // larger type, a gap.
+    creditsLabel: IconHeading,
+    creditsName: IconTypography,
+    creditsBlank: IconSeparatorHorizontal,
+    // The aside under a dialog's buttons. Not `details`, which opens more about one thing: this one
+    // is a sentence already on screen.
+    note: IconInfoCircle,
+
     // What the Mod Browser lists, by what each thing is. A game object is an object of an XML type,
     // never a unit: most of them are not units. `script` above is the Lua script, as the story's.
     gameObject: IconCategory,
@@ -337,6 +393,40 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS;
 
+// ── Which meanings the EDITOR already has a glyph for ─────────────────────────
+//
+// Tabler answers the domain because codicons has no 3D vocabulary - no ground plane, no skeleton,
+// no mesh, no LOD, no axes - and hand-drawing that set would be more work and worse. That argument
+// covers the DOMAIN and stops there.
+//
+// A handful of marks are the editor's own and a reader has learned them there. "Go to where this
+// is defined" is drawn by the editor as `go-to-file`; answering it with a different picture here
+// makes one action look like two. The table below routes those meanings past their Tabler entries,
+// so a call site still asks for a meaning and this decides which set answers it.
+
+/** Meanings that keep the editor's glyph rather than taking Tabler's. */
+const CODICONS = {
+    definition: "go-to-file",
+
+    // The find widget's three search modes, and the same argument again. A reader recognises Aa,
+    // the star and .* from the editor's own search box - they are not descriptions of anything,
+    // they are learned marks - so redrawing them in another set would make a control someone
+    // already knows look like a new one. Tabler entries exist for all three; this routes past them.
+    searchLiteral: "case-sensitive",
+    searchWildcard: "star-full",
+    searchRegex: "regex",
+} as const satisfies Partial<Record<IconName, string>>;
+
+type CodiconMeaning = keyof typeof CODICONS;
+
+/** Every meaning answered by a codicon, for the test that keeps this list honest. */
+export const CODICON_NAMES = Object.keys(CODICONS) as CodiconMeaning[];
+
+/** The codicon name for a meaning, or null when Tabler answers it. */
+export function codiconFor(name: string): string | null {
+    return CODICONS[name as CodiconMeaning] ?? null;
+}
+
 export interface IconProps_ {
     name: IconName;
 
@@ -348,8 +438,8 @@ export interface IconProps_ {
 }
 
 export function Icon({ name, size = 16 }: IconProps_): React.JSX.Element {
-    // An EDITOR action keeps the editor's own glyph - see `iconSource`. Only the domain icons are
-    // Tabler's, because those are the ones codicons has not got.
+    // An EDITOR mark keeps the editor's own glyph - see `CODICONS` above. Everything else is
+    // Tabler's.
     const codicon = codiconFor(name);
 
     if (codicon !== null) {
@@ -369,5 +459,30 @@ export function Icon({ name, size = 16 }: IconProps_): React.JSX.Element {
     // to a screen reader, which reads the control's own label instead.
     return (
         <Glyph size={size} stroke={2} color="currentColor" aria-hidden="true" />
+    );
+}
+
+/** The three severities a problem row can carry, which are also the editor's codicon names. */
+export type Severity = "error" | "warning" | "info";
+
+/**
+ * A problem's severity mark: the editor's own error, warning and info codicons.
+ *
+ * The one family drawn from codicons on purpose, so a finding here carries the mark the Problems view
+ * and the gutter show for the same finding. Coloured by the row it sits in; `className` adds the
+ * `sev-*` class where a row colours the mark itself.
+ */
+export function SeverityMark(props: {
+    severity: Severity;
+    className?: string;
+}): React.JSX.Element {
+    return (
+        <span
+            className={
+                `codicon codicon-${props.severity}` +
+                (props.className ? ` ${props.className}` : "")
+            }
+            aria-hidden="true"
+        />
     );
 }

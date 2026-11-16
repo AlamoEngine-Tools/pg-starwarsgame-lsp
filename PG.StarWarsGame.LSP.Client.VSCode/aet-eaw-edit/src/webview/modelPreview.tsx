@@ -76,7 +76,7 @@ import { Button, IconButton } from "./shared/Button";
 import { DockSection } from "./shared/DockSection";
 import { safeImageSource } from "./shared/safeImage";
 import { Field } from "./shared/Field";
-import { Icon, type IconName } from "./shared/Icon";
+import { Icon, type IconName, SeverityMark } from "./shared/Icon";
 import { TREE_KIND_ICONS, TREE_KIND_LABELS, TreeRow } from "./shared/TreeRow";
 import { addressingFor } from "./preview/textures";
 import {
@@ -10369,12 +10369,9 @@ function ModelPreview(): React.JSX.Element {
                                             key={index}
                                             className="problem-row"
                                         >
-                                            <span
-                                                className={
-                                                    `codicon codicon-${look.icon} ` +
-                                                    `sev-${look.tone}`
-                                                }
-                                                aria-hidden="true"
+                                            <SeverityMark
+                                                severity={look.tone}
+                                                className={`sev-${look.tone}`}
                                             />
                                             {where !== null && (
                                                 <span className="problem-where">

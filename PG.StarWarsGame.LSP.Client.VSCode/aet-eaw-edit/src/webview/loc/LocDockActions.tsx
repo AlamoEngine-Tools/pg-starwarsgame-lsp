@@ -192,7 +192,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         canCopy ||
                         canSeed) && (
                         <LocTile
-                            icon="copy"
+                            icon="fillLanguage"
                             label={l10n.t("Fill language")}
                             title={l10n.t(
                                 "Copy one language into the cells another has left empty",
@@ -233,7 +233,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         />
                     )}
                     <LocTile
-                        icon="replace-all"
+                        icon="convertFormat"
                         label={l10n.t("Convert")}
                         title={l10n.t(
                             "Write this file in another format, keeping the original",
@@ -241,7 +241,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         onClick={() => setDialog("convert")}
                     />
                     <LocTile
-                        icon="package"
+                        icon="exportFile"
                         label={l10n.t("Export DAT")}
                         title={l10n.t("Write the .dat files the game loads")}
                         onClick={() => setDialog("export")}

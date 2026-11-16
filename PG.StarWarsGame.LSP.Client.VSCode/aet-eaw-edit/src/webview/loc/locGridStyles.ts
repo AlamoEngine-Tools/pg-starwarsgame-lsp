@@ -241,12 +241,13 @@ export const Shell = styled.div`
         font-weight: 700;
     }
 
-    .head-row .codicon {
-        font-size: var(--icon-size-12);
+    .head-row svg {
+        width: var(--icon-size-12);
+        height: var(--icon-size-12);
         opacity: 0.6;
     }
 
-    .head-row .sorted .codicon {
+    .head-row .sorted svg {
         opacity: 1;
     }
 

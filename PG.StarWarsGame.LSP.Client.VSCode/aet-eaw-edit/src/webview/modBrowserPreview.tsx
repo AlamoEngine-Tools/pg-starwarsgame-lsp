@@ -51,7 +51,7 @@ import {
     visibleTreeRows,
 } from "./preview/previewTree";
 import { DockTile, DockTileGrid } from "./shared/DockTile";
-import { Icon, IconName } from "./shared/Icon";
+import { Icon, IconName, SeverityMark } from "./shared/Icon";
 import { Panel } from "./shared/Panel";
 import { problemLook, problemTag } from "./shared/problemLook";
 import { TreeRow } from "./shared/TreeRow";
@@ -471,9 +471,9 @@ function Problems({
                         disabled={!e.location}
                         onClick={() => e.location && onOpen(e.location)}
                     >
-                        <span
-                            className={`codicon codicon-${look.icon} sev-${look.tone}`}
-                            aria-hidden="true"
+                        <SeverityMark
+                            severity={look.tone}
+                            className={`sev-${look.tone}`}
                         />
                         <span className="problem-msg">{problemMessage(e)}</span>
                         {tag && (

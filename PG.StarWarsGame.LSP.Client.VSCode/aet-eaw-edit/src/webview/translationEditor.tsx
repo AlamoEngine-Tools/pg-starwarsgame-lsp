@@ -61,6 +61,7 @@ import { sortRows } from "./translationView";
 import { nextSort, SortState } from "./shared/tableSort";
 import { Button } from "./shared/Button";
 import { Field } from "./shared/Field";
+import { Icon, SeverityMark } from "./shared/Icon";
 
 function App(): React.JSX.Element {
     const [filter, setFilter] = useState("");
@@ -688,9 +689,12 @@ function HeadCell(props: {
         >
             <span className="head-label">{props.label}</span>
             {active && (
-                <span
-                    className={`codicon codicon-arrow-${active.direction === "asc" ? "up" : "down"}`}
-                    aria-hidden="true"
+                <Icon
+                    name={
+                        active.direction === "asc"
+                            ? "sortAscending"
+                            : "sortDescending"
+                    }
                 />
             )}
         </div>
@@ -820,10 +824,7 @@ function AddTranslationDialog(props: {
                     </Field>
                     {touched && error !== null && (
                         <p className="field-error">
-                            <span
-                                className="codicon codicon-error"
-                                aria-hidden="true"
-                            />
+                            <SeverityMark severity="error" />
                             {error}
                         </p>
                     )}
@@ -880,10 +881,7 @@ function AddTranslationDialog(props: {
                         untranslated cells are visible in the grid afterwards. On the button row so
                         it is still there when the language list has been scrolled past it. */}
                     <p className="modal-footnote">
-                        <span
-                            className="codicon codicon-info"
-                            aria-hidden="true"
-                        />
+                        <Icon name="note" />
                         {l10n.t("Languages left empty stay empty.")}
                     </p>
                     <Button onClick={props.onCancel}>{l10n.t("Cancel")}</Button>

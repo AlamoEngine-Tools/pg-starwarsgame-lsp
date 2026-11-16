@@ -139,7 +139,9 @@ ${tokensCss}
     .dock-tile:disabled .tile-badge { font-family: inherit; border: 0; padding: 0; }
     .dock-tile[draggable="true"] { cursor: grab; }
     .dock-tile[draggable="true"]:active { cursor: grabbing; }
-    .dock-tile .codicon, .dock-tile .tile-glyph { font-size: var(--icon-size-18); line-height: 1; opacity: 0.85; }
+    .dock-tile .tile-glyph { font-size: var(--icon-size-18); line-height: 1; opacity: 0.85; }
+    /* An SVG glyph takes no font size, so the tile states its box: every tile's glyph is one size. */
+    .dock-tile .tile-glyph svg { width: var(--icon-size-18); height: var(--icon-size-18); display: block; }
     /* A tile carrying a badge has three stacked things in it, so its label gets one line; without
        one it can have two. Either way the tile is the same height and nothing is cut off. */
     .dock-tile.with-badge .tile-label { -webkit-line-clamp: 1; }
@@ -542,7 +544,7 @@ ${tokensCss}
         font-size: var(--font-size-smaller);
         line-height: 1.35;
     }
-    .modal-footnote .codicon { font-size: var(--icon-size-14); opacity: 0.9; flex: 0 0 auto; }
+    .modal-footnote svg { width: var(--icon-size-14); height: var(--icon-size-14); opacity: 0.9; flex: 0 0 auto; }
 
     /* Aligned to the first line rather than centred: the message can wrap, and a centred icon then
        drifts into the middle of the text block. */
@@ -1363,8 +1365,8 @@ export const rotarySwitchCss = `
     /* Glyphs sized WELL inside their circles. At 22px across, a 13px icon covers three fifths of
        the face and the button stops reading as a round switch position - it reads as a smudge.
        These ratios (18/40 in the readout, 11/24 on a position) leave a visible ring of ground. */
-    .rotary-center .codicon { font-size: var(--icon-size-18); }
-    .rotary-pos .codicon { font-size: var(--icon-size-11); }
+    .rotary-center svg { width: var(--icon-size-18); height: var(--icon-size-18); display: block; }
+    .rotary-pos svg { width: var(--icon-size-11); height: var(--icon-size-11); display: block; }
 
     /* Rotary mode switch - large clickable readout (cycles modes) with the three modes on an arc above. */
     .rotary { position: relative; width: 108px; height: 80px; flex-shrink: 0; }

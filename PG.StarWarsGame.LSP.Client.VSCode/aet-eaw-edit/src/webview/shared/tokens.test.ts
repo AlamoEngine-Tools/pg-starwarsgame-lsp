@@ -295,3 +295,28 @@ describe("reaching the panels", () => {
         }
     });
 });
+
+// The line scan above reads a declaration wherever it sits, including after a comment that closed
+// early - which is how `--icon-size-11` went undefined in every panel while the tests still listed
+// it: a stray comment closer left a paragraph of prose as CSS, and the browser dropped the prose and
+// the declaration it ran into as one invalid declaration. This reads the blocks the way the browser
+// does.
+describe("the token blocks as the browser reads them", () => {
+    for (const [name, css] of [
+        ["scaleCss", scaleCss],
+        ["fittedCss", fittedCss],
+        ["colourCss", colourCss],
+    ] as const) {
+        it(`${name} is nothing but declarations once its comments are gone`, () => {
+            const chunks = css
+                .replace(/\/\*[\s\S]*?\*\//g, "")
+                .split(";")
+                .map((chunk) => chunk.trim())
+                .filter((chunk) => chunk !== "");
+
+            for (const chunk of chunks) {
+                assert.match(chunk, /^--[a-z0-9-]+\s*:/, chunk.slice(0, 120));
+            }
+        });
+    }
+});
