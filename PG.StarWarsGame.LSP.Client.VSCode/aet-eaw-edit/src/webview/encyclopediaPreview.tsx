@@ -30,7 +30,7 @@ import {
     ENCYCLOPEDIA_SCREENS,
     encyclopediaScreenFrom,
     encyclopediaScreenId,
-} from "./encyclopediaScreens";
+} from "../shared/encyclopediaScreens";
 import {
     comboboxCss,
     dockBodyCss,

@@ -17,7 +17,7 @@ import * as l10n from "@vscode/l10n";
 import { ReactNode } from "react";
 
 import { useEdgeResize } from "../useEdgeResize";
-import { readPanelSize, writePanelSize } from "./panelLayout";
+import { readPanelSize, writePanelSize } from "../../shared/panelLayout";
 
 export interface RightDockProps {
     /** Pinned above the scrolling content - mode switches, save/validate, whatever the editor needs. */

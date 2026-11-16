@@ -131,18 +131,13 @@ import {
 import { becauseText, setRow } from "./preview/visibility";
 import { type EyeState, rowEye } from "./preview/rowEye";
 import {
-    type CameraPreset,
     luaFor,
     nextPresetName,
     poseFromPreset,
     presetFromPose,
     renamePreset,
 } from "./preview/cameraPresets";
-import {
-    bindingFor,
-    type CameraBinding,
-    type PreviewSubject,
-} from "./preview/cameraBindings";
+import { bindingFor, type PreviewSubject } from "./preview/cameraBindings";
 import {
     CAPTURE_SIZES,
     captureFileName,
@@ -222,11 +217,9 @@ import {
 } from "./preview/reticles";
 import {
     armorFactor,
-    type Attacker,
     attackerFromProjectile,
     attackerProjectile as attackerProjectileSpec,
     damageSwitches,
-    DEFAULT_ATTACKER,
     fireBlast,
     fullPools,
     poolRows,
@@ -286,7 +279,7 @@ import {
 import { DEFAULT_HULL_CONSTRAINT, leashed } from "./preview/healthPools";
 import { blastVictims, candidatesFrom } from "./preview/blast";
 import { useEdgeResize } from "./useEdgeResize";
-import { readPanelSize, writePanelSize } from "./shared/panelLayout";
+import { readPanelSize, writePanelSize } from "../shared/panelLayout";
 import {
     type AnimationAction,
     clipNamingModel,
@@ -300,9 +293,11 @@ import { AnimationTile } from "./preview/AnimationTile";
 import { type ChoiceOption } from "./shared/choice";
 import { ModeSelector } from "./shared/ModeSelector";
 import { RotaryModeSwitch } from "./shared/RotaryModeSwitch";
-import { type SubjectState, subjectStateFrom } from "./preview/subjectState";
+import { type SubjectState, subjectStateFrom } from "../shared/subjectState";
 import {
     type BackgroundKind,
+    type CameraBinding,
+    type CameraPreset,
     colourFromHex,
     DEFAULT_LIGHTS,
     DEFAULT_VIEWER_SETTINGS,
@@ -314,11 +309,13 @@ import {
     type LightRig,
     viewerSettingsFrom,
     type Wind,
-} from "./preview/viewerSettings";
+} from "../shared/viewerSettings";
 import {
+    type Attacker,
     type AttackerPreset,
+    DEFAULT_ATTACKER,
     projectSettingsFrom,
-} from "./preview/projectSettings";
+} from "../shared/projectSettings";
 import {
     shadowTintReach,
     type ShadowTintReach,

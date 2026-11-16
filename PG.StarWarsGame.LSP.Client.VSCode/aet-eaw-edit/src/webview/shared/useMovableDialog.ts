@@ -29,7 +29,7 @@ import {
     resizeRect,
     Size,
     toStoredGeometry,
-} from "./modalGeometry";
+} from "../../shared/modalGeometry";
 
 /** Every edge and corner, in the order the handles are rendered. */
 export const RESIZE_DIRECTIONS: readonly ResizeDirection[] = [

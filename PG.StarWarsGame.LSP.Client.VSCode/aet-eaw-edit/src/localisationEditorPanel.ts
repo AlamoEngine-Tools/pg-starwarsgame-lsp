@@ -9,14 +9,14 @@ import {
     readDialogGeometry,
     saveDialogGeometry,
 } from "./dialogGeometryStorage";
-import { StoredGeometry } from "./webview/shared/modalGeometry";
-import { LocalisationPanelState } from "./webview/localisationPanelState";
+import { StoredGeometry } from "./shared/modalGeometry";
+import { LocalisationPanelState } from "./shared/localisationPanelState";
 import {
     KeyedCommand,
     mergeMembers,
     partitionCommands,
-} from "./webview/loc/locSetMerge";
-import { siblingsOf } from "./webview/localisationTreeModel";
+} from "./shared/locSetMerge";
+import { siblingsOf } from "./shared/localisationTreeModel";
 import {
     PanelRegistry,
     panelSetKey,

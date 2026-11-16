@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { LocProblemDto } from "../../protocol";
 import { loadDialogGeometry } from "../shared/dialogGeometryStore";
-import { StoredGeometry } from "../shared/modalGeometry";
+import { StoredGeometry } from "../../shared/modalGeometry";
 import { LocRow } from "../loc/locRow";
 import { useDebounced, VALIDATE_DEBOUNCE_MS } from "./useDebounced";
 import { worstSeverity } from "./validateState";

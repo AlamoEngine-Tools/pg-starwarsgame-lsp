@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { resetPanelLayoutForTests } from "./panelLayout";
+import { resetPanelLayoutForTests } from "../../shared/panelLayout";
 import {
     moveColumn,
     orderedKeys,

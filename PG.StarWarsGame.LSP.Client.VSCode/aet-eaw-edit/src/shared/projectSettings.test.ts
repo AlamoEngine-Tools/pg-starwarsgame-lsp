@@ -4,9 +4,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { DEFAULT_ATTACKER } from "./attacker";
 import { viewerSettingsFrom } from "./viewerSettings";
 import {
+    DEFAULT_ATTACKER,
     DEFAULT_PROJECT_SETTINGS,
     projectSettingsFrom,
 } from "./projectSettings";

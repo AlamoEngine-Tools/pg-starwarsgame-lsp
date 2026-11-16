@@ -92,7 +92,7 @@ import {
 import { Field } from "./shared/Field";
 import { Icon, IconName } from "./shared/Icon";
 import { ModeSelector } from "./shared/ModeSelector";
-import { readPanelSize, writePanelSize } from "./shared/panelLayout";
+import { readPanelSize, writePanelSize } from "../shared/panelLayout";
 import { initPanelLayout } from "./shared/panelLayoutBridge";
 import { treeStep } from "./shared/rovingFocus";
 import {

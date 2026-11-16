@@ -6,7 +6,7 @@
 // in - a width as itself, an order as each column's place counted from one - so it follows the
 // reader rather than the project, as every other size does. Pure, so it is testable without a DOM.
 
-import { readPanelSize, writePanelSize } from "./panelLayout";
+import { readPanelSize, writePanelSize } from "../../shared/panelLayout";
 
 /** How one table's columns are arranged: their keys in order, and the widths set by hand. */
 export interface ColumnLayout {

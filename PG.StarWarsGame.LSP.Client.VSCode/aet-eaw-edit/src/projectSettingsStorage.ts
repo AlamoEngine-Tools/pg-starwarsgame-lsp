@@ -6,7 +6,7 @@ import type { Memento } from "vscode";
 import {
     type ProjectSettings,
     projectSettingsFrom,
-} from "./webview/preview/projectSettings";
+} from "./shared/projectSettings";
 
 /**
  * What the preview remembers about ONE PROJECT: the weapon bench, the faction and its colour.

@@ -4,11 +4,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-    bindingFor,
-    type CameraBinding,
-    type PreviewSubject,
-} from "./cameraBindings";
+import { bindingFor, type PreviewSubject } from "./cameraBindings";
+import { type CameraBinding } from "../../shared/viewerSettings";
 
 const subject: PreviewSubject = {
     objectId: "Rebel_Xwing",

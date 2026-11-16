@@ -155,7 +155,7 @@ import {
     DEFAULT_VIEWER_SETTINGS,
     type LightRig,
     type Wind,
-} from "./viewerSettings";
+} from "../../shared/viewerSettings";
 import {
     type EmitterProbe,
     HEAT_LAYER,

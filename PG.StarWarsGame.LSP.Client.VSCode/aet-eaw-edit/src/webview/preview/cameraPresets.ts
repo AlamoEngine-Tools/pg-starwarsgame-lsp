@@ -16,30 +16,8 @@
 
 import * as l10n from "@vscode/l10n";
 
+import { type CameraPreset } from "../../shared/viewerSettings";
 import { type BoundingSphere, type Vec3 } from "./framing";
-
-/** A saved shot. */
-export interface CameraPreset {
-    id: string;
-    name: string;
-
-    /** How far out, as a multiple of the subject's radius. */
-    distance: number;
-
-    /** Degrees above the horizon; negative looks up from below, as the shipped keys do. */
-    pitch: number;
-
-    /** Degrees around, measured from +Z like every other angle in this panel. */
-    yaw: number;
-
-    /**
-     * A bone to frame instead of the whole subject, or null for its centre.
-     *
-     * Reserved for the binding work; nothing sets it yet. Stored from the start so a preset saved
-     * today survives the version that starts using it.
-     */
-    bone: string | null;
-}
 
 /** Where a preset puts the camera, and what it looks at. */
 export interface PresetPose {

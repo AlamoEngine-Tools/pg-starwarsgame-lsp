@@ -26,10 +26,7 @@ import {
 } from "./protocol/modelPreview";
 import { handoffFile, launchDetached } from "./externalTool";
 import { revealDefinition } from "./revealDefinition";
-import {
-    type SubjectState,
-    subjectStateFrom,
-} from "./webview/preview/subjectState";
+import { type SubjectState, subjectStateFrom } from "./shared/subjectState";
 import {
     readViewerSettings,
     saveViewerSettings,
