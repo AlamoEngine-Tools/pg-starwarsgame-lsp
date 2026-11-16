@@ -900,7 +900,7 @@
   "devDependencies": {
     "@types/markdown-it": "^14.2.0",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/three": "^0.185.4",
@@ -920,7 +920,7 @@
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "markdown-it": "^15.0.3",
-    "prettier": "3.9.10",
+    "prettier": "3.10.1",
     "typescript": "^6.0.0",
     "wdio-vscode-service": "^8.0.0",
     "webdriverio": "^9.32.0"
