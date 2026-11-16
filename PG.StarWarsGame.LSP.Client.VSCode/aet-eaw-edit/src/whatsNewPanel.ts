@@ -17,8 +17,12 @@ import path from "node:path";
 import * as vscode from "vscode";
 
 import { readPanelLayout } from "./panelLayoutStorage";
-import { buildWebviewHtml, WebviewMessage } from "./webviewPanelHost";
-import { buildWhatsNewPayload, WhatsNewPayload } from "./whatsNewModel";
+import type {
+    WhatsNewPayload,
+    WhatsNewToHost,
+} from "./protocol/panels/whatsNew";
+import { buildWebviewHtml } from "./webviewPanelHost";
+import { buildWhatsNewPayload } from "./whatsNewModel";
 
 /** Opens the page from the palette; the activation hook opens it once per new version. */
 export const OPEN_WHATS_NEW = "aet-eaw-edit.whatsNew.open";
@@ -77,7 +81,7 @@ export class WhatsNewPanel {
             false,
             readPanelLayout(),
         );
-        webview.onDidReceiveMessage((msg: WebviewMessage) =>
+        webview.onDidReceiveMessage((msg: WhatsNewToHost) =>
             this._onMessage(msg),
         );
         this._panel.onDidDispose(() => {
@@ -130,7 +134,7 @@ export class WhatsNewPanel {
         this._send();
     }
 
-    private _onMessage(msg: WebviewMessage): void {
+    private _onMessage(msg: WhatsNewToHost): void {
         // The one message: the page is listening. Links need nothing here - the webview host
         // opens every web link in the browser by itself.
         if (msg.type === "ready") {

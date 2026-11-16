@@ -178,37 +178,8 @@ public sealed record StoryGraphNodeDto(
 [PublicAPI]
 public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, string? Label);
 
-// ── aet/getStoryNodeDetail - full event payload for the property view ────────
-
-[Method("aet/getStoryNodeDetail", Direction.ClientToServer)]
-public sealed record GetStoryNodeDetailParams(string Campaign, string Faction, string NodeId)
-    : IRequest<GetStoryNodeDetailResult>;
-
-public sealed record GetStoryNodeDetailResult(StoryNodeDetailDto? Node, string? Error = null);
-
-[PublicAPI]
-public sealed record StoryNodeDetailDto(
-    string Id,
-    string Name,
-    string? ThreadUri,
-    int Line,
-    string? EventType,
-    string? EventFilter,
-    IReadOnlyList<StoryParamValueDto> EventParams,
-    string? RewardType,
-    IReadOnlyList<StoryParamValueDto> RewardParams,
-    IReadOnlyList<IReadOnlyList<string>> PrereqGroups,
-    string? Branch,
-    bool Perpetual,
-    string? StoryDialog,
-    int? StoryChapter,
-    IReadOnlyList<StoryTagDto> Tags);
-
 [PublicAPI]
 public sealed record StoryParamValueDto(int Position, string Value);
-
-[PublicAPI]
-public sealed record StoryTagDto(string Name, string Value);
 
 // ── aet/getStorySchema - the client hardcodes nothing ────────────────────────
 

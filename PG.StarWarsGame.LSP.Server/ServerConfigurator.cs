@@ -207,7 +207,6 @@ public static class ServerConfigurator
             .WithHandler<GetShaderSourceHandler>()
             .WithHandler<GetStoryPlotsHandler>()
             .WithHandler<GetStoryGraphHandler>()
-            .WithHandler<GetStoryNodeDetailHandler>()
             .WithHandler<GetStorySchemaHandler>()
             .WithHandler<GetStoryParamOptionsHandler>()
             .WithHandler<ResolveStoryReferenceHandler>()

@@ -120,6 +120,7 @@ import {
 import styled, { createGlobalStyle } from "styled-components";
 
 import {
+    GetStoryParamOptionsResult,
     StoryDiagnosticDto,
     StoryGraphEdgeDto,
     StoryGraphNodeDto,
@@ -154,6 +155,12 @@ import {
     TracePanel,
 } from "./storyGraph/SimDock";
 import { initPanelLayout } from "./shared/panelLayoutBridge";
+import { createRequester } from "./shared/hostRequest";
+import { poster, transport, vscodeApi } from "./shared/vscodeApi";
+import type {
+    StoryGraphToHost,
+    StoryGraphToWebview,
+} from "../protocol/panels/storyGraph";
 import { Button, IconButton } from "./shared/Button";
 import { DockSection } from "./shared/DockSection";
 import { colourResolver } from "./shared/resolveColour";
@@ -169,13 +176,12 @@ import {
     UNKNOWN_LIFECYCLE_TOKEN,
 } from "./storyGraph/palette";
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
-const vscode = acquireVsCodeApi();
+const post = poster<StoryGraphToHost>();
+const request = createRequester(transport);
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
 // every drag back to it. Must run before anything measures itself.
-initPanelLayout(vscode);
+initPanelLayout(vscodeApi);
 
 // The wire shapes come from ../protocol - one declaration shared with the extension host that
 // forwards them. The copy that used to sit here had already drifted from the host'"'"'s: it carried
@@ -200,7 +206,7 @@ interface FilterState {
 }
 
 function sendSim(method: string, args?: Record<string, unknown>): void {
-    vscode.postMessage({ type: "sim", method, args });
+    post({ type: "sim", method, args });
 }
 
 /**
@@ -297,39 +303,22 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Request broker for param completion candidates: each fetch posts a requestId to the extension
- * (which round-trips aet/getStoryParamOptions) and resolves when the matching 'paramOptions'
- * message returns. The timeout guarantees the suggestion dropdown never hangs on a lost reply.
+ * Completion candidates for one param slot, through the shared request relay (the panel adds the
+ * campaign and faction). Empty on any failure, and after three seconds without an answer, so the
+ * suggestion dropdown never hangs on a lost reply.
  */
-let optionRequestCounter = 0;
-const pendingOptionRequests = new Map<
-    number,
-    (options: StoryParamOptionDto[]) => void
->();
-
-function fetchParamOptions(
+async function fetchParamOptions(
     side: "event" | "reward",
     typeName: string,
     position: number,
     query: string,
 ): Promise<StoryParamOptionDto[]> {
-    const requestId = ++optionRequestCounter;
-    return new Promise((resolve) => {
-        pendingOptionRequests.set(requestId, resolve);
-        vscode.postMessage({
-            type: "paramOptions",
-            requestId,
-            side,
-            typeName,
-            position,
-            query,
-        });
-        window.setTimeout(() => {
-            if (pendingOptionRequests.delete(requestId)) {
-                resolve([]);
-            }
-        }, 3000);
-    });
+    const result = await request<GetStoryParamOptionsResult>(
+        "aet/getStoryParamOptions",
+        { side, typeName, position, query: query || undefined },
+        3000,
+    );
+    return result && !result.error ? (result.options ?? []) : [];
 }
 
 const EMPTY_FILTERS: FilterState = {
@@ -527,11 +516,7 @@ function baseName(uri: string | null | undefined): string {
  * queued (flushed to the server only on Save - see `stageCommand`); everything else posts straight
  * to the extension (which owns confirmation dialogs and error toasts). View/Simulate never mutate.
  */
-function sendCommand(
-    payload: Record<string, unknown>,
-    confirm?: string,
-    refreshDetail?: string,
-): void {
+function sendCommand(payload: Record<string, unknown>, confirm?: string): void {
     // A thread that comes in through a referenced project is read-only here. The controls for one
     // are disabled, so this only catches the gestures that have no control to disable - a wire
     // dragged onto a node, a type dropped on one - and it catches them before anything is staged.
@@ -546,13 +531,13 @@ function sendCommand(
         if (confirm) {
             // Destructive gesture: the extension owns the modal and the persisted "don't ask again"
             // preference, and replies with `confirmStageResult` telling us whether to stage.
-            vscode.postMessage({ type: "confirmStage", payload, confirm });
+            post({ type: "confirmStage", payload, confirm });
         } else {
             stageCommand(payload);
         }
         return;
     }
-    vscode.postMessage({ type: "command", payload, confirm, refreshDetail });
+    post({ type: "command", payload, confirm });
 }
 
 // ── Rete setup ───────────────────────────────────────────────────────────────────────────────────
@@ -1540,7 +1525,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             );
         }
         if (entries.length) {
-            vscode.postMessage({ type: "saveLayout", entries });
+            post({ type: "saveLayout", entries });
         }
     };
 
@@ -4645,7 +4630,7 @@ function EventParamRows(props: {
                                         referenceType,
                                     )}
                                     onClick={() =>
-                                        vscode.postMessage({
+                                        post({
                                             type: "resolveRef",
                                             value: firstToken,
                                             referenceType,
@@ -5085,9 +5070,10 @@ function EventForm(props: {
                     <button
                         title={l10n.t("Open in XML")}
                         onClick={() =>
-                            vscode.postMessage({
+                            post({
                                 type: "openXml",
-                                threadUri: dto.threadUri,
+                                // A node with no thread file opens nothing; the panel skips "".
+                                threadUri: dto.threadUri ?? "",
                                 line: dto.line ?? 0,
                             })
                         }
@@ -6643,7 +6629,7 @@ function App(): React.JSX.Element {
             setValidated(false); // the staged set changed → the last validation is stale
             // Mirror the queue to the extension so it can offer to save if the tab is closed while
             // dirty (a disposed webview can't prompt - the panel owns that).
-            vscode.postMessage({
+            post({
                 type: "pendingSync",
                 commands: [...pendingCommands],
             });
@@ -6660,14 +6646,14 @@ function App(): React.JSX.Element {
             return;
         }
         setSaving(true);
-        vscode.postMessage({
+        post({
             type: "saveBatch",
             commands: [...pendingCommands],
         });
     }, []);
 
     const validateEdits = useCallback(() => {
-        vscode.postMessage({
+        post({
             type: "validateBatch",
             commands: [...pendingCommands],
         });
@@ -6709,7 +6695,7 @@ function App(): React.JSX.Element {
             // Leaving Edit with unsaved staged changes → ask (the panel shows the modal and replies with
             // 'dirtyExitChoice'); the switch happens then. Simulate/View therefore run on committed text.
             if (mode === "edit" && next !== "edit" && hasPendingChanges()) {
-                vscode.postMessage({ type: "confirmDirtyExit", next });
+                post({ type: "confirmDirtyExit", next });
                 return;
             }
             doSwitchMode(next);
@@ -6893,7 +6879,7 @@ function App(): React.JSX.Element {
                         state.outcome,
                     );
                     if (target) {
-                        vscode.postMessage({
+                        post({
                             type: "revealScope",
                             nodeId: target,
                         });
@@ -7112,7 +7098,7 @@ function App(): React.JSX.Element {
             // The battle's own panel, straight into Simulation when the reader is entering it; the
             // resolution names the battle, and the answer is this panel's own scope.
             openBattle: (battleKey, label, simulate) =>
-                vscode.postMessage({
+                post({
                     type: "openScope",
                     scope: battleKey,
                     label,
@@ -7142,7 +7128,7 @@ function App(): React.JSX.Element {
             setMediaCompletes: (on) =>
                 sendSim("options", { assumeMediaCompletes: on }),
             centerNode: (nodeId) => editorRef.current?.centerNode(nodeId),
-            copy: (text) => vscode.postMessage({ type: "copy", text }),
+            copy: (text) => post({ type: "copy", text }),
         }),
         [],
     );
@@ -7175,7 +7161,7 @@ function App(): React.JSX.Element {
         };
         setFiltersState(next);
         fullRenderRef.current = true;
-        vscode.postMessage({ type: "fetch", filters: next });
+        post({ type: "fetch", filters: next });
     }, []);
 
     /** Runs setGraph, keeping the canvas covered for the duration of a full rebuild's auto-arrange. */
@@ -7270,28 +7256,28 @@ function App(): React.JSX.Element {
     useEffect(() => {
         onGraphDesynced = () => {
             // Re-fetch with the current filters; the incremental patch restores the view.
-            vscode.postMessage({ type: "fetch", filters: filtersRef.current });
+            post({ type: "fetch", filters: filtersRef.current });
         };
         onReachableFromRequested = (id, direction) =>
             setFilter({ reachableFrom: id, reachableDirection: direction });
         onOpenBattleRequested = (battleKey, label, simulate) =>
-            vscode.postMessage({
+            post({
                 type: "openScope",
                 scope: battleKey,
                 label,
                 simulate,
             });
         onRevealGalacticRequested = (galacticNodeId) =>
-            vscode.postMessage({ type: "revealScope", nodeId: galacticNodeId });
+            post({ type: "revealScope", nodeId: galacticNodeId });
         requestPreview = () =>
-            vscode.postMessage({
+            post({
                 type: "previewGraph",
                 commands: [...pendingCommands],
                 filters: filtersRef.current,
             });
 
-        const onMessage = (event: MessageEvent): void => {
-            const msg = event.data as { type: string; [key: string]: unknown };
+        const onMessage = (data: unknown): void => {
+            const msg = data as StoryGraphToWebview;
             switch (msg.type) {
                 case "schema": {
                     typeNotes.clear();
@@ -7455,31 +7441,6 @@ function App(): React.JSX.Element {
                     }
                     break;
                 }
-                case "paramOptions": {
-                    // The id is taken as a NUMBER before it is used as a key, and the value is
-                    // checked to be callable before it is called. Neither is theatre: the id
-                    // arrives over the message channel, and a Map lookup on an arbitrary key is
-                    // how a value of the wrong shape would reach a call position. The map only
-                    // ever holds resolvers we put there, so this costs nothing and removes the
-                    // question - see the js/unvalidated-dynamic-method-call alert.
-                    const requestId =
-                        typeof msg.requestId === "number"
-                            ? msg.requestId
-                            : null;
-                    if (requestId === null) {
-                        break;
-                    }
-
-                    const resolve = pendingOptionRequests.get(requestId);
-                    if (typeof resolve === "function") {
-                        pendingOptionRequests.delete(requestId);
-                        resolve(
-                            (msg.options as
-                                StoryParamOptionDto[] | undefined) ?? [],
-                        );
-                    }
-                    break;
-                }
                 case "diagnostics": {
                     const diags =
                         (msg.diagnostics as StoryDiagnosticDto[] | undefined) ??
@@ -7507,7 +7468,7 @@ function App(): React.JSX.Element {
                     break;
                 }
                 case "invalidate":
-                    vscode.postMessage({
+                    post({
                         type: "fetch",
                         filters: filtersRef.current,
                     });
@@ -7550,7 +7511,7 @@ function App(): React.JSX.Element {
                     } else if (msg.choice === "discard") {
                         clearPendingCommands();
                         // Staged edits were local-only - re-fetch to drop them and show committed state.
-                        vscode.postMessage({
+                        post({
                             type: "fetch",
                             filters: filtersRef.current,
                         });
@@ -7564,9 +7525,9 @@ function App(): React.JSX.Element {
                     break;
             }
         };
-        window.addEventListener("message", onMessage);
-        vscode.postMessage({ type: "ready" });
-        return () => window.removeEventListener("message", onMessage);
+        const stop = transport.listen(onMessage);
+        post({ type: "ready" });
+        return stop;
     }, [applyGraph, applySimOverlay, doSwitchMode, saveEdits]);
 
     useEffect(() => {
@@ -7623,7 +7584,7 @@ function App(): React.JSX.Element {
             which === "chapter" ? !showChapterLanes : showChapterLanes;
         setShowThreadLanes(nextThread);
         setShowChapterLanes(nextChapter);
-        vscode.postMessage({
+        post({
             type: "setLanePref",
             showThreadLanes: nextThread,
             showChapterLanes: nextChapter,
@@ -8234,7 +8195,7 @@ function ProblemsBar(props: {
                         <button
                             onClick={(e) => {
                                 e.stopPropagation(); // the XML button must not also trigger the row's jump
-                                vscode.postMessage({
+                                post({
                                     type: "openXml",
                                     threadUri: problem.uri,
                                     line: problem.line,

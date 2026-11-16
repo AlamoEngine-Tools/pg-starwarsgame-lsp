@@ -7,7 +7,10 @@
 // Split from `panelLayout.ts` so that module stays testable under `node --test`, which has no DOM
 // and no VS Code API.
 
-import { applyStoredLayout, setPanelSizeReporter } from "./panelLayout";
+import {
+    applyStoredLayout,
+    setPanelSizeReporter,
+} from "../../shared/panelLayout";
 
 /** The minimum of the VS Code webview API this needs. */
 interface MessagePoster {

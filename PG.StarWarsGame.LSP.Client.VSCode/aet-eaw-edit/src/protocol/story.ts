@@ -158,36 +158,6 @@ export interface GraphFilters {
     plotState?: string;
 }
 
-// ── aet/getStoryNodeDetail ───────────────────────────────────────────────────
-
-export interface StoryTagDto {
-    name: string;
-    value: string;
-}
-
-export interface StoryNodeDetailDto {
-    id: string;
-    name: string;
-    threadUri?: string | null;
-    line: number;
-    eventType?: string | null;
-    eventFilter?: string | null;
-    eventParams: StoryParamValueDto[];
-    rewardType?: string | null;
-    rewardParams: StoryParamValueDto[];
-    prereqGroups: string[][];
-    branch?: string | null;
-    perpetual: boolean;
-    storyDialog?: string | null;
-    storyChapter?: number | null;
-    tags: StoryTagDto[];
-}
-
-export interface GetStoryNodeDetailResult {
-    node?: StoryNodeDetailDto | null;
-    error?: string | null;
-}
-
 // ── aet/getStorySchema ───────────────────────────────────────────────────────
 
 /** `enumValues` ships inline so enum params render as dropdowns without a round trip. */

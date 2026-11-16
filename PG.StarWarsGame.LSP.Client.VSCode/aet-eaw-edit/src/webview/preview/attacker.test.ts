@@ -11,12 +11,10 @@ import type {
 
 import {
     armorFactor,
-    type Attacker,
     attackerFromProjectile,
     attackerProjectile,
     DAMAGE_SWITCHES,
     damageSwitches,
-    DEFAULT_ATTACKER,
     fireAtHardpoint,
     fireBlast,
     poolRows,
@@ -25,6 +23,7 @@ import {
     projectileChoices,
     resolveHit,
 } from "./attacker";
+import { type Attacker, DEFAULT_ATTACKER } from "../../shared/projectSettings";
 import { blastVictims } from "./blast";
 import { healthColour } from "./reticles";
 import { hullPool, unitDestroyed } from "./unitPool";

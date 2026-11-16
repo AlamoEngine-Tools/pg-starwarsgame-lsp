@@ -3,7 +3,7 @@
 
 import * as vscode from "vscode";
 
-import { StoredGeometry } from "./webview/shared/modalGeometry";
+import { StoredGeometry } from "./shared/modalGeometry";
 
 /**
  * Where each dialog was last put, kept per project.

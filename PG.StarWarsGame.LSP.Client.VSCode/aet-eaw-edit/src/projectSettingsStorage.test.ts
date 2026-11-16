@@ -9,7 +9,7 @@ import {
     readProjectSettings,
     saveProjectSettings,
 } from "./projectSettingsStorage";
-import { DEFAULT_PROJECT_SETTINGS } from "./webview/preview/projectSettings";
+import { DEFAULT_PROJECT_SETTINGS } from "./shared/projectSettings";
 
 /** The two members of `vscode.Memento` the store uses, over a plain map. */
 function memento() {

@@ -1,0 +1,25 @@
+{
+  // The modules both builds compile: the extension host (Node) and the webviews (browser). Checked
+  // with neither the DOM nor Node's types, so a module here cannot lean on either - `document` or
+  // `process` stays a compile error rather than a crash in the build that lacks it. The host's own
+  // tsconfig compiles them as well; this one only adds the stricter check.
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "target": "ES2022",
+    "lib": [
+      "ES2022"
+    ],
+    "types": [],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "./**/*"
+  ],
+  // The tests run under Node's test runner and need its types; the host tsconfig checks them.
+  "exclude": [
+    "./**/*.test.ts"
+  ]
+}

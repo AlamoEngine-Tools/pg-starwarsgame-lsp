@@ -185,40 +185,6 @@ public sealed class GetStoryGraphHandler(
     }
 }
 
-public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, IMessageCatalog messages)
-    : IJsonRpcRequestHandler<GetStoryNodeDetailParams, GetStoryNodeDetailResult>
-{
-    public Task<GetStoryNodeDetailResult> Handle(GetStoryNodeDetailParams request, CancellationToken ct)
-    {
-        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
-        var node = model?.Graph.Nodes.FirstOrDefault(n =>
-            n.Kind == StoryNodeKind.Event && n.Id == request.NodeId);
-        if (node?.Event is not { } storyEvent)
-            return Task.FromResult(new GetStoryNodeDetailResult(null,
-                messages.Format("StoryHandlers_NodeWasNotFoundCampaign", request.NodeId,
-                    request.Campaign)));
-
-        return Task.FromResult(new GetStoryNodeDetailResult(new StoryNodeDetailDto(
-            node.Id,
-            storyEvent.Name,
-            node.ThreadUri,
-            storyEvent.Range.StartLine,
-            storyEvent.EventType,
-            storyEvent.EventFilter,
-            storyEvent.EventParams.Select(p => new StoryParamValueDto(p.Position, p.RawValue)).ToList(),
-            storyEvent.RewardType,
-            storyEvent.RewardParams.Select(p => new StoryParamValueDto(p.Position, p.RawValue)).ToList(),
-            storyEvent.PrereqGroups
-                .Select(g => (IReadOnlyList<string>)g.Tokens.Select(t => t.Text).ToList())
-                .ToList(),
-            storyEvent.Branch,
-            storyEvent.Perpetual,
-            storyEvent.StoryDialog,
-            storyEvent.StoryChapter,
-            storyEvent.Tags.Select(t => new StoryTagDto(t.Name, t.Value)).ToList())));
-    }
-}
-
 public sealed class GetStoryLayoutHandler(
     IStoryLayoutStore store,
     IStoryModelService models)

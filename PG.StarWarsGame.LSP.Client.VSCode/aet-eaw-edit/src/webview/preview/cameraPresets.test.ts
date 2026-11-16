@@ -5,13 +5,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-    type CameraPreset,
     luaFor,
     nextPresetName,
     poseFromPreset,
     presetFromPose,
     renamePreset,
 } from "./cameraPresets";
+import { type CameraPreset } from "../../shared/viewerSettings";
 
 const sphere = { center: { x: 0, y: 0, z: 0 }, radius: 10 };
 const preset = (over: Partial<CameraPreset> = {}): CameraPreset => ({

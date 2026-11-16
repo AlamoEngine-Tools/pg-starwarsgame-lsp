@@ -6,7 +6,7 @@ import * as vscode from "vscode";
 import {
     type ViewerSettings,
     viewerSettingsFrom,
-} from "./webview/preview/viewerSettings";
+} from "./shared/viewerSettings";
 
 /**
  * How the reader likes the preview's ROOM: the grid, the floor, the lights, the background.

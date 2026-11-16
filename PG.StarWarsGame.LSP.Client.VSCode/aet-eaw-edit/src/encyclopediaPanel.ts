@@ -9,11 +9,11 @@ import {
     saveEncyclopediaScreen,
 } from "./encyclopediaScreenStorage";
 import { PanelProject } from "./panelProject";
-import {
-    PanelRegistry,
-    WebviewMessage,
-    WebviewPanelHost,
-} from "./webviewPanelHost";
+import type {
+    EncyclopediaToHost,
+    EncyclopediaToWebview,
+} from "./protocol/panels/encyclopedia";
+import { PanelRegistry, WebviewPanelHost } from "./webviewPanelHost";
 import { pickShipName } from "./shipNamePick";
 
 /**
@@ -28,12 +28,15 @@ import { pickShipName } from "./shipNamePick";
  * project had opened it last, so a card asked for in one project could be refreshed from another's
  * index.
  */
-export class EncyclopediaPanel extends WebviewPanelHost {
+export class EncyclopediaPanel extends WebviewPanelHost<
+    EncyclopediaToHost,
+    EncyclopediaToWebview
+> {
     /** The open panels, at most one per project - filed under the empty subject. */
     private static readonly _panels = new PanelRegistry<EncyclopediaPanel>();
 
     private _ready = false;
-    private _pending: unknown | null = null;
+    private _pending: EncyclopediaToWebview | null = null;
     /** Re-fetches the current object, for when the webview toggles between the SP and MP body. */
     private _reload: ((multiplayer: boolean) => void) | undefined;
     /**
@@ -129,7 +132,7 @@ export class EncyclopediaPanel extends WebviewPanelHost {
         EncyclopediaPanel._panels.disposeAll();
     }
 
-    protected onMessage(msg: WebviewMessage): void {
+    protected onMessage(msg: EncyclopediaToHost): void {
         if (msg.type === "ready") {
             // The entry may have been pushed before the bundle finished loading; hold it until the
             // webview says it is listening, or the first preview opens blank.
@@ -149,9 +152,6 @@ export class EncyclopediaPanel extends WebviewPanelHost {
             for (const panel of EncyclopediaPanel._panels.all) {
                 panel._reload?.(panel._multiplayer);
             }
-        }
-        if (msg.type === "close") {
-            this.dispose();
         }
     }
 
@@ -198,7 +198,7 @@ export class EncyclopediaPanel extends WebviewPanelHost {
         return drawn;
     }
 
-    private _send(payload: unknown): void {
+    private _send(payload: EncyclopediaToWebview): void {
         if (this._ready) {
             this.post(payload);
         } else {

@@ -13,9 +13,44 @@
 // trusts what it is handed: a missing field takes its default, a wrong one is refused, and nothing
 // throws. A preview that opens blank because of a bad string in a settings file has no way back.
 
-import { type CameraBinding } from "./cameraBindings";
-import { type CameraPreset } from "./cameraPresets";
 import { asRecord, boolean_, names, number_, string_ } from "./storedValue";
+
+/**
+ * A saved shot, stated the way the engine states a cinematic key - distance, pitch and yaw in degrees -
+ * except that distance is a multiple of the subject's radius. See the preview's cameraPresets for why.
+ */
+export interface CameraPreset {
+    id: string;
+    name: string;
+
+    /** How far out, as a multiple of the subject's radius. */
+    distance: number;
+
+    /** Degrees above the horizon; negative looks up from below, as the shipped keys do. */
+    pitch: number;
+
+    /** Degrees around, measured from +Z like every other angle in this panel. */
+    yaw: number;
+
+    /**
+     * A bone to frame instead of the whole subject, or null for its centre.
+     *
+     * Reserved for the binding work; nothing sets it yet. Stored from the start so a preset saved
+     * today survives the version that starts using it.
+     */
+    bone: string | null;
+}
+
+/** One rule tying a preset to a kind of subject; see the preview's cameraBindings for how it applies. */
+export interface CameraBinding {
+    id: string;
+
+    /** What the rule matches ON. Ordered by how specific it is: object, then type, then category. */
+    kind: "object" | "type" | "category";
+
+    value: string;
+    presetId: string;
+}
 
 /** Red, green and blue, each 0..1 - the range three.js and the effects both work in. */
 export type Colour = readonly [number, number, number];

@@ -39,7 +39,6 @@ import { ResizeHandles } from "./shared/ResizeHandles";
 import { useMovableDialog } from "./shared/useMovableDialog";
 import { buildRowFilter, FilterMode } from "./locFilter";
 import {
-    BaselineEntryDto,
     BaselineRow,
     baselineValuesFor,
     findInheritedKeys,
@@ -111,9 +110,7 @@ function App(): React.JSX.Element {
 
     const onMessage = useCallback((msg: LocPanelMessage) => {
         if (msg.type === "baselineRows") {
-            setBaseline(
-                toBaselineRows((msg.entries as BaselineEntryDto[]) ?? []),
-            );
+            setBaseline(toBaselineRows(msg.entries ?? []));
         }
     }, []);
 

@@ -2164,9 +2164,6 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="StoryHandlers_ChangeCanTBeStaged" xml:space="preserve">
     <value>Change {0} of {1} can't be staged: {2}</value>
   </data>
-  <data name="StoryHandlers_NodeWasNotFoundCampaign" xml:space="preserve">
-    <value>Node '{0}' was not found in campaign '{1}'.</value>
-  </data>
   <data name="StoryLayout_DroppedPositions" xml:space="preserve">
     <value>Saved node positions that named a story file no longer matching exactly one thread were dropped - {0}. Those events are arranged automatically the next time their graph opens.</value>
   </data>

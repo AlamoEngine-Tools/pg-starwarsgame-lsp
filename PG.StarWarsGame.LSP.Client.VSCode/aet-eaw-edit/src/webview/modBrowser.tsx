@@ -92,7 +92,7 @@ import {
 import { Field } from "./shared/Field";
 import { Icon, IconName } from "./shared/Icon";
 import { ModeSelector } from "./shared/ModeSelector";
-import { readPanelSize, writePanelSize } from "./shared/panelLayout";
+import { readPanelSize, writePanelSize } from "../shared/panelLayout";
 import { initPanelLayout } from "./shared/panelLayoutBridge";
 import { treeStep } from "./shared/rovingFocus";
 import {
@@ -104,11 +104,15 @@ import {
 import type { ColumnLayout } from "./shared/tableColumns";
 import type { SortState } from "./shared/tableSort";
 import { useEdgeResize } from "./useEdgeResize";
+import { createRequester } from "./shared/hostRequest";
+import { poster, transport, vscodeApi } from "./shared/vscodeApi";
+import type {
+    ModBrowserToHost,
+    ModBrowserToWebview,
+} from "../protocol/panels/modBrowser";
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
-const vscode = acquireVsCodeApi();
-initPanelLayout(vscode);
+const post = poster<ModBrowserToHost>();
+initPanelLayout(vscodeApi);
 
 /** The rail's and the search form's remembered sizes, as every panel keeps its own. */
 const RAIL_WIDTH_KEY = "modBrowser.rail";
@@ -120,32 +124,11 @@ const CARD_ZOOM = 2;
 /** How long the pointer rests on a row before its actions are asked for. */
 const HOVER_DELAY_MS = 250;
 
-// ── the request relay ──────────────────────────────────────────────────────
-
-let nextRequest = 1;
-const waiting = new Map<number, (result: unknown) => void>();
-
-window.addEventListener("message", (event: MessageEvent) => {
-    const msg = event.data as { type?: string; id?: unknown; result?: unknown };
-    if (msg.type !== "response" || typeof msg.id !== "number") {
-        return;
-    }
-    // Only an answer to a request this page made has a callback to call.
-    const answer = waiting.get(msg.id);
-    if (typeof answer === "function") {
-        waiting.delete(msg.id);
-        answer(msg.result ?? null);
-    }
-});
-
-/** One request to this panel's project's server; null when the server answered nothing. */
-function request<T>(method: string, params: unknown): Promise<T | null> {
-    const id = nextRequest++;
-    return new Promise((resolve) => {
-        waiting.set(id, (result) => resolve(result as T | null));
-        vscode.postMessage({ type: "request", id, method, params });
-    });
-}
+/**
+ * One request to this panel's project's server, relayed by the panel; null when the server answered
+ * nothing, or did not answer in time - the relay used to wait for ever on a lost reply.
+ */
+const request = createRequester(transport);
 
 /** A model's detail for its preview's tree: one function, so the tile asks once per model. */
 function loadModelDetail(model: string): Promise<GetModelDetailResult | null> {
@@ -373,11 +356,8 @@ function App(): React.JSX.Element {
     );
 
     useEffect(() => {
-        const handle = (event: MessageEvent) => {
-            const msg = event.data as {
-                type?: string;
-                outline?: SymbolOutline;
-            };
+        const stop = transport.listen((data) => {
+            const msg = data as ModBrowserToWebview;
             if (
                 msg.type === "outline" &&
                 msg.outline &&
@@ -403,10 +383,9 @@ function App(): React.JSX.Element {
                 setPreviews({});
                 setRefreshed((n) => n + 1);
             }
-        };
-        window.addEventListener("message", handle);
-        vscode.postMessage({ type: "ready" });
-        return () => window.removeEventListener("message", handle);
+        });
+        post({ type: "ready" });
+        return stop;
     }, []);
 
     const tops = useMemo<ListNode[]>(
@@ -603,7 +582,7 @@ function App(): React.JSX.Element {
     /** Goes to where a row's definition is, for one that names a place rather than a page. */
     const goToRow = (row: SymbolRow): void => {
         if (row.location) {
-            vscode.postMessage({
+            post({
                 type: "openLocation",
                 uri: row.location.uri,
                 line: row.location.line,
@@ -649,7 +628,7 @@ function App(): React.JSX.Element {
     /** Does one item of an entry's menu. */
     const act = async (action: string, node: EntryNode): Promise<void> => {
         if (action === "copyName") {
-            vscode.postMessage({ type: "copy", text: node.row.name });
+            post({ type: "copy", text: node.row.name });
             return;
         }
         if (!node.row.page) {
@@ -664,19 +643,19 @@ function App(): React.JSX.Element {
         } else if (action === "reveal") {
             const file = (await fetchNode(node))?.file;
             if (file) {
-                vscode.postMessage({ type: "reveal", path: file });
+                post({ type: "reveal", path: file });
             }
         } else if (action === "definition") {
             const location = (await fetchNode(node))?.location;
             if (location) {
-                vscode.postMessage({
+                post({
                     type: "openLocation",
                     uri: location.uri,
                     line: location.line,
                 });
             }
         } else {
-            vscode.postMessage({
+            post({
                 type: "run",
                 action,
                 id: node.row.id,
@@ -1598,7 +1577,7 @@ function TabContent({
                 onOpenRow: (row) => onOpen(reached(row)),
                 onOpenBase: openBase,
                 onOpenLocation: (location) =>
-                    vscode.postMessage({
+                    post({
                         type: "openLocation",
                         uri: location.uri,
                         line: location.line,

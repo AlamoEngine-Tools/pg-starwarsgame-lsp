@@ -3,10 +3,7 @@
 
 import * as vscode from "vscode";
 
-import {
-    type PanelLayout,
-    panelLayoutFrom,
-} from "./webview/shared/panelLayout";
+import { type PanelLayout, panelLayoutFrom } from "./shared/panelLayout";
 
 /**
  * How wide the reader likes each editor's dock, and how tall its drawer.

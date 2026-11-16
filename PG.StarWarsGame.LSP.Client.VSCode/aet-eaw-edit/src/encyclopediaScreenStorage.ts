@@ -6,7 +6,7 @@ import * as vscode from "vscode";
 import {
     type EncyclopediaScreen,
     encyclopediaScreenFrom,
-} from "./webview/encyclopediaScreens";
+} from "./shared/encyclopediaScreens";
 
 /**
  * The screen the encyclopedia card is drawn for.

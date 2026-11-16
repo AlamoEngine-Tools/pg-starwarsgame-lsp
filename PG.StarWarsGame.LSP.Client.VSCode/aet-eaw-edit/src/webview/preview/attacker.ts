@@ -20,6 +20,7 @@ import type { HullPool } from "./unitPool";
 import type { BlastHit } from "./blast";
 import { healthColour } from "./reticles";
 import { displayPercent } from "./healthPools";
+import { type Attacker } from "../../shared/projectSettings";
 
 /**
  * Which optional mechanics the panel is showing.
@@ -47,39 +48,6 @@ export interface PoolOptions {
 
 /** Off, which is what a caller that has not been told yet must assume. */
 const POOLS_OFF: PoolOptions = { energy: false };
-
-/** The weapon the reader has configured. */
-export interface Attacker {
-    damage: number;
-    damageType: string;
-    /** `Projectile_Does_Shield_Damage` and its two siblings, which decide what a hit touches. */
-    shield: boolean;
-    energy: boolean;
-    hitpoint: boolean;
-
-    /**
-     * `Projectile_Blast_Area_Damage`. Zero for a bolt that does not go off, which is most of them.
-     *
-     * Blast used to arrive ONLY with a picked projectile, read straight off the file - so a reader
-     * could type a damage number and a damage type and had no way at all to say "and it explodes".
-     * It is part of the weapon you build now, like every other field here.
-     */
-    blastDamage: number;
-
-    /** `Projectile_Blast_Area_Range`, in engine units. Zero reaches nothing but the target. */
-    blastRange: number;
-
-    /** `Projectile_Blast_Area_Dropoff` - whether the blast falls off with distance. */
-    blastDropoff: boolean;
-
-    /**
-     * `Projectile_Blast_Area_Dropoff_Tiers` - how many bands it falls off in.
-     *
-     * Only 10 of foc's 63 blast projectiles declare a dropoff at all, with 3, 4 or 5 tiers, so a
-     * FLAT blast inside a radius is the normal case and this is the exception.
-     */
-    blastDropoffTiers: number;
-}
 
 /** What is left of the target. Reset on open - the opening rules beat persistence. */
 export interface Pools {
@@ -147,27 +115,6 @@ export function fullPools(
         energy: scene?.defence?.energyCapacity ?? 0,
     };
 }
-
-/**
- * Where the panel starts.
- *
- * A plain hitpoint weapon, because that is the one every target can feel: shield-only against an
- * unshielded object does nothing at all, and opening on a configuration that visibly does nothing
- * reads as broken.
- */
-export const DEFAULT_ATTACKER: Attacker = {
-    damage: 100,
-    damageType: "Damage_Default",
-    shield: false,
-    energy: false,
-    hitpoint: true,
-    // No blast: a plain bolt that damages what it hits and nothing else, which is what 110 of foc's
-    // 173 projectiles are.
-    blastDamage: 0,
-    blastRange: 0,
-    blastDropoff: false,
-    blastDropoffTiers: 0,
-};
 
 /**
  * The weapon the reader built, shaped as a projectile so one code path resolves every shot.

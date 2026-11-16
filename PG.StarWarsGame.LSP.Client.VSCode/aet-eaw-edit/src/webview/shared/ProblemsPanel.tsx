@@ -12,7 +12,7 @@
 
 import * as l10n from "@vscode/l10n";
 import { useEdgeResize } from "../useEdgeResize";
-import { readPanelSize, writePanelSize } from "./panelLayout";
+import { readPanelSize, writePanelSize } from "../../shared/panelLayout";
 
 /** What the panel needs to draw and work the view filter. */
 export interface ProblemFilterControl {

@@ -442,33 +442,6 @@ public sealed class StoryProtocolHandlersTest
         Assert.Contains("Nope", result.Error);
     }
 
-    // ── aet/getStoryNodeDetail ───────────────────────────────────────────────
-
-    [Fact]
-    public async Task GetStoryNodeDetail_ReturnsFullEventPayload()
-    {
-        var result = await new GetStoryNodeDetailHandler(Models(), TestCatalogues.English)
-            .Handle(new GetStoryNodeDetailParams("GC", "Rebel", $"{ThreadUri}#next"), CancellationToken.None);
-
-        Assert.Null(result.Error);
-        var node = result.Node!;
-        Assert.Equal("Next", node.Name);
-        Assert.Equal("STORY_TRIGGER", node.EventType);
-        Assert.Equal([["Start"]], node.PrereqGroups);
-        Assert.Equal("Act1", node.Branch);
-        Assert.Contains(node.Tags, t => t.Name == "Event_Type");
-    }
-
-    [Fact]
-    public async Task GetStoryNodeDetail_UnknownNode_ReturnsError()
-    {
-        var result = await new GetStoryNodeDetailHandler(Models(), TestCatalogues.English)
-            .Handle(new GetStoryNodeDetailParams("GC", "Rebel", "ghost"), CancellationToken.None);
-
-        Assert.NotNull(result.Error);
-        Assert.Null(result.Node);
-    }
-
     // ── aet/getStorySchema ───────────────────────────────────────────────────
 
     [Fact]

@@ -10,7 +10,7 @@ import {
     CREDITS_CATEGORY,
     groupProjects,
     LocTreeNode,
-} from "./webview/localisationTreeModel";
+} from "./shared/localisationTreeModel";
 
 type LocNodeKind = "group" | "layer" | "fileset" | "file" | "info";
 

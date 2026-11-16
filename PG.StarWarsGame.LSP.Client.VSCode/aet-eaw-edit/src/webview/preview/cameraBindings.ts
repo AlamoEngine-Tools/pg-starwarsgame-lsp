@@ -11,6 +11,8 @@
 // Three kinds of rule, tried most specific first. That order is the design: a reader who bound one
 // unit meant THAT unit, and a category rule they wrote last month must not quietly take it back.
 
+import { type CameraBinding } from "../../shared/viewerSettings";
+
 /** What the subject is, as far as a rule can see. */
 export interface PreviewSubject {
     /** The game object's id, or null when a bare model is open. */
@@ -27,17 +29,6 @@ export interface PreviewSubject {
      * membership.
      */
     categories: readonly string[];
-}
-
-/** One rule tying a preset to a kind of subject. */
-export interface CameraBinding {
-    id: string;
-
-    /** What the rule matches ON. Ordered by how specific it is: object, then type, then category. */
-    kind: "object" | "type" | "category";
-
-    value: string;
-    presetId: string;
 }
 
 /** Most specific first. A per-object rule always beats a type, and a type always beats a category. */
