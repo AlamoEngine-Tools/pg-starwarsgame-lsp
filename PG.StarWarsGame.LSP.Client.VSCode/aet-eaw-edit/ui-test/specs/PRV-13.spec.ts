@@ -12,18 +12,17 @@ describe("PRV-13", () => {
         await serverReady();
     });
 
-    // The file's texture is named by an artist's Max path, which names no file (as PRV-17): a warning beside it.
+    // The file's texture is named by an artist's Max path; the game opens the part after the last backslash
+    // (#292), and so does the preview - no texture warning beside the note.
     it("draws P_smoke_med00 and notes the property the game reads past", async () => {
         await openInPreview(model("P_smoke_med00.alo"));
         await inNewestWebview(async () => {
             await emittersWhen((e) => e.some((x) => x.drawn > 0), 120_000, "The smoke was never drawn");
-            const notes = await previewNotes(2);
+            const notes = await previewNotes(1);
             const info = notes.filter((n) => n.tone === "info");
             expect(info.map((n) => n.id)).toEqual(["aetswg-014-0023"]);
             expect(info[0].text).toMatch(/: Emitter 0 - property 0x06, which the game reads past$/);
-            expect(notes.filter((n) => n.tone === "warning").map((n) => n.text)).toEqual([
-                expect.stringMatching(/^Texture 'c:\\art\\textures\\game\\p_particle_master\.tga' was not found\./),
-            ]);
+            expect(notes.filter((n) => n.tone === "warning")).toEqual([]);
         });
     });
 });

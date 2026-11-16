@@ -78,6 +78,10 @@ export const config: WebdriverIO.Config = {
                 ...(open === null ? {} : open.endsWith(".code-workspace") ? { filePath: open } : { workspacePath: open }),
                 // Traced always: a failure is read from the profile's logs afterwards (see protocol.ts).
                 userSettings: {
+                    // Every session under the driver is a first start (no state database survives one),
+                    // so What's New would open in each and be the webview a spec enters first. A test's
+                    // own settings still turn it back on.
+                    "aet-eaw-edit.whatsNew.openAfterUpdate": false,
                     ...readJson(userSettingsFile(id)),
                     "aet-eaw-edit.lsp.debug.trace.server": "verbose",
                     ...part.settings,

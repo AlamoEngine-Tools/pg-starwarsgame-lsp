@@ -1,6 +1,6 @@
-// PRV-17: with no game folder set the assembled frigate still finds the game's textures - all but one emitter's,
-// which names its texture by a path on the artist's machine and so names no file; energyPool shows only behind
-// @tag:advanced. How the textured hull looks stays a hand check.
+// PRV-17: with no game folder set the assembled frigate still finds the game's textures - every one, the emitter's
+// named by a path on the artist's machine included, since the game opens the part after the last backslash (#292);
+// energyPool shows only behind @tag:advanced. How the textured hull looks stays a hand check.
 import { browser, expect } from "@wdio/globals";
 import { closeAll, inNewestWebview } from "./storyGraph.js";
 import { command, serverReady, settingsFound, userSettingsJson } from "../protocol.js";
@@ -17,7 +17,7 @@ describe("PRV-17", () => {
         expect(settings["aet-eaw-edit.lsp.source.expansionDirectory"]).toBeUndefined();
     });
 
-    it("assembles the frigate missing only the texture named by a path on the artist's machine", async () => {
+    it("assembles the frigate missing no texture, the one named by a path on the artist's machine included", async () => {
         await command("aet-eaw-edit.lsp.previewAssembledUnit", "Nebulon_B_Frigate");
         await inNewestWebview(async () => {
             await (await browser.$(".stage-column")).waitForExist({ timeout: 120_000 });
@@ -35,8 +35,7 @@ describe("PRV-17", () => {
                 );
             }
             const missing = notes.filter((n) => /texture/i.test(n));
-            expect(missing).toHaveLength(1);
-            expect(missing[0].startsWith("Texture 'c:\\art\\textures\\game\\p_particle_master.tga' was not found.")).toBe(true);
+            expect(missing).toEqual([]);
         });
         await closeAll();
     });
