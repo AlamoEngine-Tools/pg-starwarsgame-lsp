@@ -191,18 +191,35 @@ describe("the colour block", () => {
      * Colour is the one scale where the name cannot carry the value, so these are role names. It is
      * also the whole of the host coupling: every --vscode-* reference in the layer is here, which is
      * what makes an IntelliJ port a matter of redefining one block.
+     *
+     * A fallback is a colour, or another role of this block for a host variable a theme may leave
+     * unset (#206) - never a host variable, which would put coupling outside the `from` column.
      */
-    it("routes every token through a host variable with a literal fallback", () => {
+    it("routes every token through a host variable with a colour or a role as its fallback", () => {
         assert.ok(colourTokens.length > 0);
+        const roles = new Set(colourTokens.map((t) => t.name));
 
         for (const token of colourTokens) {
             assert.match(token.name, /^--colour-[a-z0-9-]+$/, token.name);
             assert.match(token.from, /^--vscode-[a-zA-Z0-9.-]+$/, token.name);
-            assert.match(
-                token.fallback,
-                /^#[0-9a-f]{6}$/,
-                `${token.name} fallback`,
-            );
+            const role = /^var\((--colour-[a-z0-9-]+)\)$/.exec(token.fallback);
+            if (role) {
+                assert.ok(
+                    roles.has(role[1]),
+                    `${token.name} falls back to ${role[1]}, which is no role`,
+                );
+                assert.notEqual(
+                    role[1],
+                    token.name,
+                    `${token.name} falls back to itself`,
+                );
+            } else {
+                assert.match(
+                    token.fallback,
+                    /^#[0-9a-f]{6}([0-9a-f]{2})?$/,
+                    `${token.name} fallback`,
+                );
+            }
         }
     });
 
@@ -277,4 +294,29 @@ describe("reaching the panels", () => {
             );
         }
     });
+});
+
+// The line scan above reads a declaration wherever it sits, including after a comment that closed
+// early - which is how `--icon-size-11` went undefined in every panel while the tests still listed
+// it: a stray comment closer left a paragraph of prose as CSS, and the browser dropped the prose and
+// the declaration it ran into as one invalid declaration. This reads the blocks the way the browser
+// does.
+describe("the token blocks as the browser reads them", () => {
+    for (const [name, css] of [
+        ["scaleCss", scaleCss],
+        ["fittedCss", fittedCss],
+        ["colourCss", colourCss],
+    ] as const) {
+        it(`${name} is nothing but declarations once its comments are gone`, () => {
+            const chunks = css
+                .replace(/\/\*[\s\S]*?\*\//g, "")
+                .split(";")
+                .map((chunk) => chunk.trim())
+                .filter((chunk) => chunk !== "");
+
+            for (const chunk of chunks) {
+                assert.match(chunk, /^--[a-z0-9-]+\s*:/, chunk.slice(0, 120));
+            }
+        });
+    }
 });

@@ -10,22 +10,23 @@
 // infos across the preview, so the demoted case was not a rare one.
 
 import * as l10n from "@vscode/l10n";
-/** What the row shows for one severity: a codicon and a colour band. */
+
+import type { Severity } from "./Icon";
+
+/** What the row shows for one severity: the mark `SeverityMark` draws and its colour band. */
 export interface ProblemLook {
-    /** Codicon name, without the `codicon-` prefix. */
-    icon: string;
-    /** Which of the three colour bands the icon takes. */
-    tone: "error" | "warning" | "info";
+    /** Which of the three severities the row is drawn as. */
+    tone: Severity;
 }
 
 const LOOKS: Record<string, ProblemLook> = {
-    error: { icon: "error", tone: "error" },
-    warning: { icon: "warning", tone: "warning" },
-    info: { icon: "info", tone: "info" },
+    error: { tone: "error" },
+    warning: { tone: "warning" },
+    info: { tone: "info" },
 };
 
 /**
- * The icon and tone for a problem's severity.
+ * The tone for a problem's severity.
  *
  * `severity` crosses the wire as a plain string, so an unrecognised one is a question of which way
  * to be wrong. It is drawn as a WARNING: a finding the client does not understand is one the reader

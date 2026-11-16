@@ -48,24 +48,21 @@ export interface ModeActivity {
  */
 export function previewModes(counts: SubjectCounts): RotaryMode<PreviewMode>[] {
     return [
-        // Thin, simple glyphs. The positions are 24px circles and the readout a 40px one, so a
-        // dense or already-round icon - `play-circle` inside a circle, `symbol-structure`'s grid -
-        // fills its button edge to edge and the dial stops reading as a dial. The story graph's
-        // own three (`eye`, `edit`, `play`) are the calibration.
+        // The dial meanings in Icon.tsx: thin, open glyphs, because a position is a 24px circle.
         {
             id: "animation",
-            icon: "play",
+            icon: "animationLens",
             label: l10n.t("Animation"),
             angle: 210,
             count: counts.animations,
         },
-        { id: "model", icon: "package", label: l10n.t("Model"), angle: 270 },
+        { id: "model", icon: "modelLens", label: l10n.t("Model"), angle: 270 },
         {
             // Everything the lens can act on, not only the hardpoints. It counted hardpoints alone
             // until the lens grew weapons and abilities, which read 0 on a fighter that carries its
             // guns on the unit itself - a dial position claiming a subject has nothing to see.
             id: "gameplay",
-            icon: "zap",
+            icon: "gameplayLens",
             label: l10n.t("Gameplay"),
             angle: 330,
             count: counts.hardpoints + counts.weapons + counts.abilities,

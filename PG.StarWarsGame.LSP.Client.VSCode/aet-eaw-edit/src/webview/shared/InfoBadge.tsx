@@ -60,11 +60,11 @@ const TooltipStyles = createGlobalStyle`
         max-width: 290px;
         padding: var(--space-6) var(--space-8);
         border-radius: var(--radius-6);
-        border: var(--space-1) solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35));
-        background: var(--vscode-editorHoverWidget-background, #252526);
-        color: var(--vscode-editorHoverWidget-foreground, #ccc);
+        border: var(--space-1) solid var(--colour-hover-widget-line);
+        background: var(--colour-hover-widget);
+        color: var(--colour-hover-widget-ink);
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
-        font-family: var(--vscode-font-family);
+        font-family: var(--font-family-ui);
         font-size: var(--font-size-12);
         line-height: 1.4;
         /* A tooltip is never a target: it must not swallow the click that was heading for whatever
@@ -80,8 +80,8 @@ const TooltipStyles = createGlobalStyle`
         height: 8px;
         margin-left: -4px;
         transform: rotate(45deg);
-        background: var(--vscode-editorHoverWidget-background, #252526);
-        border: var(--space-1) solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35));
+        background: var(--colour-hover-widget);
+        border: var(--space-1) solid var(--colour-hover-widget-line);
     }
 
     /* Only the two edges facing the mark are drawn; the rest would cut a line across the bubble. */
@@ -100,11 +100,11 @@ const TooltipStyles = createGlobalStyle`
     /* A warning keeps the same bubble and takes a coloured edge. A wholly yellow panel of text is
        an alert; this is still a note, and it says which kind it is at a glance. */
     .info-tip.sev-warning {
-        border-color: var(--vscode-editorWarning-foreground, #cca700);
+        border-color: var(--colour-warning);
     }
 
     .info-tip.sev-error {
-        border-color: var(--vscode-editorError-foreground, #f14c4c);
+        border-color: var(--colour-error);
     }
 `;
 

@@ -56,7 +56,7 @@ const Shell = styled.div`
     padding: var(--space-12) var(--space-16) var(--space-16);
     box-sizing: border-box;
     font-size: var(--font-size-12);
-    color: var(--vscode-foreground);
+    color: var(--colour-ink);
 
     > .inspect-page-head,
     > .inspect-columns,
@@ -71,7 +71,7 @@ const Shell = styled.div`
         flex-wrap: wrap;
         margin: 0 0 var(--space-12);
         padding-bottom: var(--space-8);
-        border-bottom: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-bottom: var(--space-1) solid var(--colour-line);
     }
 
     .inspect-page-title {
@@ -82,7 +82,7 @@ const Shell = styled.div`
     }
 
     .inspect-page-subtitle {
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
         overflow-wrap: anywhere;
     }
 
@@ -106,7 +106,7 @@ const Shell = styled.div`
 
     .inspect-empty {
         max-width: 46em;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
     }
 `;
 

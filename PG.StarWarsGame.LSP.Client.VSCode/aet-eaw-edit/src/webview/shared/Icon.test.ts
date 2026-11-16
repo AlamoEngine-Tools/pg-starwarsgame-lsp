@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { CODICON_NAMES, codiconFor } from "./iconSource";
+import { CODICON_NAMES, codiconFor } from "./Icon";
 
 describe("codiconFor", () => {
     /**

@@ -1809,7 +1809,7 @@ const Shell = styled.div`
     height: 100vh;
     color: var(--colour-ink);
     background: var(--colour-editor-ground);
-    font: var(--font-size-body) / 1.4 var(--vscode-font-family, sans-serif);
+    font: var(--font-size-body) / 1.4 var(--font-family-ui);
 
     button {
         font: inherit;
@@ -1841,7 +1841,7 @@ const Shell = styled.div`
     }
     .resize-handle-e:hover,
     .resize-handle-e:active {
-        background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+        background: var(--colour-sash);
     }
     .rail {
         overflow: auto;
@@ -1873,8 +1873,7 @@ const Shell = styled.div`
         color: var(--colour-selected-ink);
     }
     .node:focus {
-        outline: var(--space-1) solid
-            var(--vscode-list-focusOutline, var(--vscode-focusBorder));
+        outline: var(--space-1) solid var(--colour-focus-outline);
         outline-offset: calc(-1 * var(--space-1));
     }
     .node.inert {
@@ -1894,10 +1893,7 @@ const Shell = styled.div`
                 var(--icon-size-16) / 2
         );
         width: var(--space-1);
-        background: var(
-            --vscode-tree-indentGuidesStroke,
-            var(--colour-line-strong)
-        );
+        background: var(--colour-indent-guide);
         opacity: 0;
     }
     .rail:hover .node .guide,
@@ -2112,7 +2108,7 @@ const Shell = styled.div`
     .entry-row.plain .entry-value {
         margin-left: var(--space-8);
         color: var(--colour-muted);
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--font-family-code);
     }
 
     @media (max-width: 700px) {

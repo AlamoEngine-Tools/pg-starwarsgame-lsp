@@ -108,7 +108,7 @@ describe("dockChromeCss", () => {
     it("gives a section count a readable colour of its own", () => {
         assert.match(
             dockChromeCss,
-            /\.dock-section-title \.section-count\s*\{[^}]*color:\s*var\(--vscode-foreground/,
+            /\.dock-section-title \.section-count\s*\{[^}]*color:\s*var\(--colour-ink\)/,
         );
         const count =
             dockChromeCss.match(
@@ -141,7 +141,7 @@ describe("dockChromeCss", () => {
     it("styles the note under a field as support text, not as content", () => {
         assert.match(
             dockChromeCss,
-            /\.field-note\s*\{[^}]*descriptionForeground/,
+            /\.field-note\s*\{[^}]*color:\s*var\(--colour-muted\)/,
         );
     });
 
@@ -153,7 +153,7 @@ describe("dockChromeCss", () => {
     it("gives a field note a warning colour without changing anything else about it", () => {
         assert.match(
             dockChromeCss,
-            /\.field-warn\s*\{[^}]*editorWarning-foreground/,
+            /\.field-warn\s*\{[^}]*color:\s*var\(--colour-warning\)/,
         );
         // The size comes off the type scale now. Still asserted, because the point of the rule is
         // that a warning note is a note that changed COLOUR and nothing else.
@@ -274,7 +274,7 @@ describe("rotarySwitchCss", () => {
         // measured across the two: resolve the token out of the scale rather than weakening the
         // assertion to "it names a token", which would stop checking the thing that matters.
         const named =
-            /\.rotary-pos \.codicon\s*\{[^}]*font-size:\s*var\((--[a-z0-9-]+)\)/.exec(
+            /\.rotary-pos svg\s*\{[^}]*width:\s*var\((--[a-z0-9-]+)\)/.exec(
                 rotarySwitchCss,
             );
         assert.ok(named !== null, "the glyph size is not taken from a token");

@@ -24,6 +24,7 @@ import { createPortal } from "react-dom";
 import { createGlobalStyle } from "styled-components";
 
 import { tokensRootCss } from "../shared/tokens";
+import { Icon } from "../shared/Icon";
 import { placeTooltip, type TooltipPlacement } from "../shared/tooltipPlace";
 
 import { PATH_DIRECTIONS, type PathDirection } from "./pathDirection";
@@ -40,11 +41,11 @@ const MenuStyles = createGlobalStyle`
         gap: var(--space-2);
         padding: var(--space-4);
         border-radius: var(--radius-6);
-        border: var(--space-1) solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35));
-        background: var(--vscode-editorHoverWidget-background, #252526);
-        color: var(--vscode-editorHoverWidget-foreground, #ccc);
+        border: var(--space-1) solid var(--colour-hover-widget-line);
+        background: var(--colour-hover-widget);
+        color: var(--colour-hover-widget-ink);
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
-        font-family: var(--vscode-font-family);
+        font-family: var(--font-family-ui);
         font-size: var(--font-size-12);
     }
 
@@ -66,13 +67,13 @@ const MenuStyles = createGlobalStyle`
     }
 
     .path-menu button:hover {
-        background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
+        background: var(--colour-toolbar-hover);
     }
 
     /* The direction already applied, so reopening the menu says where you are. */
     .path-menu button[aria-checked="true"] {
-        background: var(--vscode-list-activeSelectionBackground, rgba(9, 71, 113, 0.6));
-        color: var(--vscode-list-activeSelectionForeground, #fff);
+        background: var(--colour-selected);
+        color: var(--colour-selected-ink);
     }
 `;
 
@@ -169,7 +170,7 @@ export function PathFilterMenu({
                 aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
             >
-                <span className="codicon codicon-filter" />
+                <Icon name="filter" />
             </button>
             {open &&
                 createPortal(
@@ -231,7 +232,7 @@ export function PathDirectionMenu({
                     aria-checked={active === choice.direction}
                     onClick={() => onPick(choice.direction)}
                 >
-                    <span className={`codicon codicon-${choice.icon}`} />
+                    <Icon name={choice.icon} />
                     {choice.label}
                 </button>
             ))}

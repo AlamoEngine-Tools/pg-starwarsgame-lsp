@@ -9,6 +9,8 @@
 // above it.
 
 import * as l10n from "@vscode/l10n";
+import { SeverityMark } from "../shared/Icon";
+import { problemLook } from "../shared/problemLook";
 import { ProblemsPanel } from "../shared/ProblemsPanel";
 import { LocProblem } from "./useLocPanel";
 
@@ -53,15 +55,9 @@ export function LocProblemsBar(props: {
                             }
                             onClick={jump ?? undefined}
                         >
-                            <span
-                                className={`codicon codicon-${
-                                    problem.severity === "error"
-                                        ? "error"
-                                        : problem.severity === "info"
-                                          ? "info"
-                                          : "warning"
-                                } sev-${problem.severity}`}
-                                aria-hidden="true"
+                            <SeverityMark
+                                severity={problemLook(problem.severity).tone}
+                                className={`sev-${problem.severity}`}
                             />
                             <span className="problem-target">
                                 {props.labelOf(problem)}

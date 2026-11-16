@@ -22,7 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const {tokenOffences} = require('./styleTokenRules');
+const {codiconOffences, hostOffences, hostRoles, tokenOffences} = require('./styleTokenRules');
 
 // The tree to lint: src by default, or the folder named on the command line, which is how the test
 // runs the lint over a copy of a file with a backtick planted in it.
@@ -41,6 +41,16 @@ const TOKENS = path.join(ROOT, 'webview', 'shared', 'tokens.ts');
 const GAME_TRUTH = new Set([
     path.join(ROOT, 'webview', 'creditsCrawl.tsx'),
     path.join(ROOT, 'webview', 'encyclopediaCard.tsx'),
+]);
+
+/**
+ * The files that may name a codicon (#207): the icon seam, and the two controls that draw the
+ * editor's own severity, filter and close marks so they match the rest of the editor.
+ */
+const CODICON_SEAM = new Set([
+    path.join(ROOT, 'webview', 'shared', 'Icon.tsx'),
+    path.join(ROOT, 'webview', 'shared', 'SeverityTag.tsx'),
+    path.join(ROOT, 'webview', 'shared', 'ProblemsPanel.tsx'),
 ]);
 
 /** Every custom property the layer declares, for checking that a var() resolves to something. */
@@ -181,6 +191,7 @@ function main() {
     let failed = 0;
     let cutShort = 0;
     const defined = definedTokens();
+    const roles = hostRoles(fs.readFileSync(TOKENS, 'utf8'));
 
     for (const file of sources(ROOT)) {
         const text = fs.readFileSync(file, 'utf8');
@@ -197,6 +208,24 @@ function main() {
         // The token layer's own file writes the values; everything else references them.
         if (file === TOKENS) {
             continue;
+        }
+
+        // Nor does anything else read the host directly: the layer's roles stand for it (#206).
+        if (!/\.test\.tsx?$/.test(file)) {
+            for (const offence of hostOffences(text, roles)) {
+                console.error(`${where}:${offence.line}  var(${offence.name})`);
+                console.error(`    use ${offence.hint}`);
+                failed++;
+            }
+        }
+
+        // A glyph comes by meaning through the icon seam, which alone names codicons (#207).
+        if (!/\.test\.tsx?$/.test(file) && !CODICON_SEAM.has(file)) {
+            for (const offence of codiconOffences(text)) {
+                console.error(`${where}:${offence.line}  ${offence.name}`);
+                console.error('    use a meaning from src/webview/shared/Icon.tsx');
+                failed++;
+            }
         }
 
         const exempt = GAME_TRUTH.has(file);

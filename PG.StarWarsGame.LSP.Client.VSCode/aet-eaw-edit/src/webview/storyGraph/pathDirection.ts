@@ -12,14 +12,16 @@
 // always did.
 
 import * as l10n from "@vscode/l10n";
+
+import type { IconName } from "../shared/Icon";
 export type PathDirection = "Upstream" | "Both" | "Downstream";
 
 export interface PathDirectionChoice {
     readonly direction: PathDirection;
     /** What the reader sees: one word naming the edges kept, to pair with the in/both/out icons. */
     readonly label: string;
-    /** Codicon name, as the rest of an event node's header uses. */
-    readonly icon: string;
+    /** The direction's glyph, by meaning. */
+    readonly icon: IconName;
 }
 
 /**
@@ -30,9 +32,9 @@ export interface PathDirectionChoice {
  * paths are what it arms. Order is what the menu renders, so it is reading order and nothing else.
  */
 export const PATH_DIRECTIONS: readonly PathDirectionChoice[] = [
-    { direction: "Upstream", label: l10n.t("Incoming"), icon: "arrow-left" },
-    { direction: "Both", label: l10n.t("Both"), icon: "arrow-both" },
-    { direction: "Downstream", label: l10n.t("Outgoing"), icon: "arrow-right" },
+    { direction: "Upstream", label: l10n.t("Incoming"), icon: "incoming" },
+    { direction: "Both", label: l10n.t("Both"), icon: "bothDirections" },
+    { direction: "Downstream", label: l10n.t("Outgoing"), icon: "outgoing" },
 ];
 
 const DEFAULT_DIRECTION: PathDirection = "Downstream";

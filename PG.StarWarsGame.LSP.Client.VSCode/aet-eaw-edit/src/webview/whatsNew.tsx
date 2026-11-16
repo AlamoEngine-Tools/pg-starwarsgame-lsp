@@ -59,8 +59,8 @@ const Shell = styled.div`
     ${tokensCss}
     min-height: 100%;
     padding: var(--space-24) calc(var(--space-24) + var(--space-8));
-    font-family: var(--vscode-font-family);
-    font-size: calc(var(--vscode-font-size) * 1.05);
+    font-family: var(--font-family-ui);
+    font-size: calc(var(--font-size-body) * 1.05);
     line-height: 1.55;
     color: var(--colour-editor-ink);
     background: var(--colour-editor-ground);
@@ -110,8 +110,8 @@ const Shell = styled.div`
         line-height: 1.8;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        color: var(--vscode-badge-foreground, #ffffff);
-        background: var(--vscode-badge-background, #616161);
+        color: var(--colour-badge-ink);
+        background: var(--colour-badge);
         cursor: default;
     }
 
@@ -162,17 +162,17 @@ const Shell = styled.div`
     }
 
     .notes code {
-        font-family: var(--vscode-editor-font-family);
+        font-family: var(--font-family-code);
         font-size: 0.92em;
         padding: 0 var(--space-4);
         border-radius: var(--radius-3);
-        background: var(--vscode-textCodeBlock-background);
+        background: var(--colour-code-block);
     }
 
     .notes pre {
         padding: var(--space-12);
         border-radius: var(--radius-3);
-        background: var(--vscode-textCodeBlock-background);
+        background: var(--colour-code-block);
         overflow: auto;
     }
 

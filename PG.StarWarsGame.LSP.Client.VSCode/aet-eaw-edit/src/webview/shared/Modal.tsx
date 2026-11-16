@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { ResizeHandles } from "./ResizeHandles";
 import { useMovableDialog } from "./useMovableDialog";
 import { Button } from "./Button";
+import { Icon } from "./Icon";
 
 /**
  * Where a host wants its modals rendered. A modal opened from inside a positioned panel with its
@@ -121,10 +122,7 @@ export function Modal(props: ModalProps): React.JSX.Element {
                     )}
                     {props.footnote !== undefined && (
                         <p className="modal-footnote">
-                            <span
-                                className="codicon codicon-info"
-                                aria-hidden="true"
-                            />
+                            <Icon name="note" />
                             {props.footnote}
                         </p>
                     )}

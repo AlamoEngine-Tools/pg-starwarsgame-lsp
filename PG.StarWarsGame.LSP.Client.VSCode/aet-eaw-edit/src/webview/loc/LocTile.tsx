@@ -4,10 +4,11 @@
 import { ReactNode } from "react";
 
 import { DockTile, DockTileGrid } from "../shared/DockTile";
+import { Icon, type IconName } from "../shared/Icon";
 
 export interface LocTileProps {
-    /** Codicon name, without the `codicon-` prefix. */
-    icon: string;
+    /** The tile's glyph, by meaning. */
+    icon: IconName;
     label: string;
     /**
      * The raw token this tile stands for, shown under the label in the file's own monospace. Used
@@ -24,19 +25,14 @@ export interface LocTileProps {
 }
 
 /**
- * One tile in a {@link LocTileGrid}: the shared DockTile with the codicon the loc docks still name.
+ * One tile in a {@link LocTileGrid}: the shared DockTile, its glyph named by meaning.
  *
  * Both docks are built from these: the file-level actions in either editor, and the credits step
  * library. They were two different shapes - a centred icon-over-label cell beside a full-width row
  * with a description - which read as two unrelated control sets stacked in the same dock.
  */
 export function LocTile({ icon, ...tile }: LocTileProps): React.JSX.Element {
-    return (
-        <DockTile
-            glyph={<span className={`codicon codicon-${icon}`} />}
-            {...tile}
-        />
-    );
+    return <DockTile glyph={<Icon name={icon} />} {...tile} />;
 }
 
 /** The grid the tiles sit in - the shared DockTileGrid. */

@@ -4,7 +4,7 @@
 const assert = require('node:assert/strict');
 const {describe, it} = require('node:test');
 
-const {tokenOffences, KINDS} = require('./styleTokenRules');
+const {codiconOffences, hostOffences, tokenOffences, KINDS} = require('./styleTokenRules');
 
 /** Offence kinds found in a template body, in order. */
 function kinds(body, options) {
@@ -121,5 +121,49 @@ describe('reporting', () => {
         assert.equal(typeof offence.index, 'number');
         assert.match(offence.text, /7px/);
         assert.match(offence.hint, /--space-6|--space-8/);
+    });
+});
+
+// #206: a panel reads the host's colours and fonts through the layer's roles, so the host is named
+// once, in tokens.ts, and a theme problem is fixed in one place.
+describe('host variables outside the token layer', () => {
+    it('reports one in a stylesheet, at its line', () => {
+        const text = 'const Shell = styled.div`\n  color: var(--vscode-foreground, #ccc);\n`;\n';
+        assert.deepEqual(hostOffences(text).map(o => [o.line, o.name]), [[2, '--vscode-foreground']]);
+    });
+
+    it('reports one in a plain string, where a style object takes it', () => {
+        const text = 'export const BLUE = "var(--vscode-charts-blue)";\n';
+        assert.deepEqual(hostOffences(text).map(o => o.name), ['--vscode-charts-blue']);
+    });
+
+    it('names the role to use when the layer maps the variable', () => {
+        const roles = new Map([['--vscode-foreground', '--colour-ink']]);
+        const [offence] = hostOffences('color: var(--vscode-foreground);', roles);
+        assert.match(offence.hint, /var\(--colour-ink\)/);
+    });
+
+    it('leaves a comment alone, which may name what a role stands for', () => {
+        const text = '// --colour-muted is var(--vscode-descriptionForeground)\n * var(--vscode-foreground)\n';
+        assert.deepEqual(hostOffences(text), []);
+    });
+});
+
+// #207: a glyph is asked for by meaning through Icon.tsx, so the set it comes from is decided in one
+// table. A raw codicon class anywhere else is reported at its line.
+describe('codicon classes outside the icon seam', () => {
+    it('reports a codicon class in JSX, at its line', () => {
+        const text = 'const a = 1;\nreturn <span className="codicon codicon-close" />;\n';
+        assert.deepEqual(codiconOffences(text).map(o => [o.line, o.name]), [[2, 'codicon-close']]);
+    });
+
+    it('reports a class built from a template, by its prefix', () => {
+        const text = 'return <span className={`codicon codicon-${icon}`} />;\n';
+        assert.deepEqual(codiconOffences(text).map(o => o.name), ['codicon-']);
+    });
+
+    it('leaves a comment line and a plain codicon selector alone', () => {
+        const text = '// drawn as codicon-close before\n * the codicon-add glyph\n.dock-tile .codicon { font-size: 1px; }\n';
+        assert.deepEqual(codiconOffences(text), []);
     });
 });

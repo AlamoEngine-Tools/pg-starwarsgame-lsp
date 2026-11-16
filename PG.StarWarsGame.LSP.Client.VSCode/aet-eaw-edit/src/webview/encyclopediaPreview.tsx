@@ -46,6 +46,7 @@ import {
 } from "./shared/dockChrome";
 import { DockSection } from "./shared/DockSection";
 import { Field } from "./shared/Field";
+import { SeverityMark } from "./shared/Icon";
 import { ProblemsPanel } from "./shared/ProblemsPanel";
 import { problemLook } from "./shared/problemLook";
 import { RightDock } from "./shared/RightDock";
@@ -102,7 +103,7 @@ const Shell = styled.div`
     display: flex;
     flex-direction: row;
     min-height: 0;
-    font-family: var(--vscode-font-family);
+    font-family: var(--font-family-ui);
     font-size: var(--font-size-12);
 
     /* The stage column: the card, with the notes bar under it. The bar sits INSIDE this column so
@@ -204,12 +205,9 @@ const Shell = styled.div`
         flex: 1;
         min-height: 60px;
         overflow-y: auto;
-        border: var(--space-1) solid var(--vscode-panel-border, #444);
+        border: var(--space-1) solid var(--colour-line);
         border-radius: var(--radius-3);
-        background: var(
-            --vscode-editorWidget-background,
-            rgba(128, 128, 128, 0.06)
-        );
+        background: var(--colour-panel);
     }
 
     .name-list li {
@@ -225,11 +223,8 @@ const Shell = styled.div`
        what it means, and an outline alone reads as "selected", which would imply a choice. */
 
     .name-list li.drawn {
-        border-left-color: var(--vscode-focusBorder, #007fd4);
-        background: var(
-            --vscode-list-inactiveSelectionBackground,
-            rgba(128, 128, 128, 0.14)
-        );
+        border-left-color: var(--colour-focus);
+        background: var(--colour-selected-inactive);
         font-weight: 600;
     }
 
@@ -399,14 +394,11 @@ function App(): React.JSX.Element {
                                     key={notice.message}
                                     className="problem-row"
                                 >
-                                    <span
-                                        className={
-                                            "codicon sev-" +
-                                            notice.severity +
-                                            " codicon-" +
-                                            problemLook(notice.severity).icon
+                                    <SeverityMark
+                                        severity={
+                                            problemLook(notice.severity).tone
                                         }
-                                        aria-hidden="true"
+                                        className={"sev-" + notice.severity}
                                     />
                                     <span className="problem-msg">
                                         {notice.message}

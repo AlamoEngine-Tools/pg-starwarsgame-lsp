@@ -12,9 +12,9 @@ describe("problemLook", () => {
         // `severity === 'error' ? 'error' : 'warning'`, so every `info` arrived wearing the warning
         // triangle - and the reader could not tell whether an unbound ability effect was something
         // they had to fix. Two of the server's twenty preview problems are `info`.
-        assert.equal(problemLook("error").icon, "error");
-        assert.equal(problemLook("warning").icon, "warning");
-        assert.equal(problemLook("info").icon, "info");
+        assert.equal(problemLook("error").tone, "error");
+        assert.equal(problemLook("warning").tone, "warning");
+        assert.equal(problemLook("info").tone, "info");
     });
 
     it("gives each severity its own tone", () => {
@@ -27,8 +27,8 @@ describe("problemLook", () => {
     });
 
     it("reads a severity however it is cased or padded", () => {
-        assert.equal(problemLook(" Info ").icon, "info");
-        assert.equal(problemLook("ERROR").icon, "error");
+        assert.equal(problemLook(" Info ").tone, "info");
+        assert.equal(problemLook("ERROR").tone, "error");
     });
 
     it("shows an unknown severity as a warning rather than quietly playing it down", () => {

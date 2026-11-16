@@ -576,10 +576,10 @@ export interface PoolRow {
 }
 
 /** Shields. Blue, and from the theme so it tracks a light editor. */
-const SHIELD_COLOUR = "var(--vscode-charts-blue, #3794ff)";
+const SHIELD_COLOUR = "var(--colour-data-blue)";
 
 /** Energy. Deliberately neither of the other two - see {@link PoolRow.colour}. */
-const ENERGY_COLOUR = "var(--vscode-charts-purple, #b180d7)";
+const ENERGY_COLOUR = "var(--colour-data-purple)";
 
 /** How full, clamped at both ends. A capacity of zero reads as empty rather than dividing by it. */
 function fractionOf(left: number, capacity: number): number {
