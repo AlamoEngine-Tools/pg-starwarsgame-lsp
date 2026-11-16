@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -58,7 +59,7 @@ public sealed class LoadOrderSmokeTest(E2eLoadOrderServerFixture fixture) : ICla
         Assert.Contains(notUsed, d => lines[d.Range.Start.Line].Contains("E2E_LoadOrder_Twice") &&
                                       lines[d.Range.Start.Line + 1].Contains(">2<"));
 
-        var unresolved = diagnostics.Where(d => d.Code?.String == Unresolved).Select(d => d.Message).ToList();
+        var unresolved = diagnostics.Where(d => d.Code?.String == Unresolved).Select(d => d.Message.Text()).ToList();
         Assert.Contains(unresolved, m => m.Contains("Scout_Trooper"));
         Assert.Contains(unresolved, m => m.Contains("Executor_Super_Star_Destroyer"));
         Assert.Contains(unresolved, m => m.Contains("Bossk"));

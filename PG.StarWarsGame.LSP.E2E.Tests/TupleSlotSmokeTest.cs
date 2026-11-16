@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -45,7 +46,7 @@ public abstract class TupleSlotSmokeTestBase<TFixture>(TFixture fixture) : IClas
             TextDocument = new TextDocumentItem { Uri = uri, LanguageId = "xml", Version = 1, Text = text }
         });
 
-        var messages = (await received).Diagnostics.Select(d => d.Message).ToList();
+        var messages = (await received).Diagnostics.Select(d => d.Message.Text()).ToList();
 
         Assert.Contains(messages,
             m => m.Contains("'Not_A_Terrain' is not a MapEnvironment value", StringComparison.Ordinal));

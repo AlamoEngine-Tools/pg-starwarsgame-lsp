@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -53,7 +54,7 @@ public sealed class StoryDialogSmokeTest : IClassFixture<LspServerFixture>, IAsy
 
         var diags = await received;
         Assert.Contains(diags.Diagnostics, d =>
-            d.Message.Contains("TEXTCOLOR255", StringComparison.OrdinalIgnoreCase));
+            d.Message.Text().Contains("TEXTCOLOR255", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

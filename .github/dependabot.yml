@@ -43,6 +43,12 @@ updates:
       # `@typescript-eslint` supports TypeScript below 6.1 only; TypeScript 7 waits for it.
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
+      # `wdio-vscode-service` 8 accepts webdriverio 9 only, and the runner, the reporters and the
+      # service move as one; a major waits for the service, then goes in by hand, all together.
+      - dependency-name: webdriverio
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@wdio/*"
+        update-types: ["version-update:semver-major"]
 
   # The repository root holds one dev dependency, the esbuild the scripts use.
   - package-ecosystem: npm
@@ -83,6 +89,10 @@ updates:
       # importers, and the Lua debugger hashes the same datagram bytes as PG.Commons.
       - dependency-name: CsvHelper
       - dependency-name: System.IO.Hashing
+      # A Microsoft.Extensions major belongs to a .NET major; the family moves with the target
+      # framework, all at once - one package ahead of the rest is a package downgrade error.
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

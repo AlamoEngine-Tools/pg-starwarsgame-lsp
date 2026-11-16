@@ -37,7 +37,7 @@ public sealed class LuaVersionSyntaxAnalyzerTest
         Assert.Equal(DiagnosticIds.LuaSyntaxNotInLua50.ToString(), found.Code!.Value.String);
         Assert.Equal(DiagnosticSeverity.Error, found.Severity);
         Assert.Equal((0, 10, 11), (found.Range.Start.Line, found.Range.Start.Character, found.Range.End.Character));
-        Assert.Contains("table.getn", found.Message);
+        Assert.Contains("table.getn", found.Message.Text());
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class LuaVersionSyntaxAnalyzerTest
         var found = Assert.Single(Analyze("local m = a % b"));
 
         Assert.Equal(12, found.Range.Start.Character);
-        Assert.Contains("'%'", found.Message);
+        Assert.Contains("'%'", found.Message.Text());
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class LuaVersionSyntaxAnalyzerTest
         var found = Assert.Single(Analyze("function f(...)\n  local x = ...\nend"));
 
         Assert.Equal(1, found.Range.Start.Line);
-        Assert.Contains("arg", found.Message);
+        Assert.Contains("arg", found.Message.Text());
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class LuaVersionSyntaxAnalyzerTest
     {
         var found = Assert.Single(Analyze("local s = [==[ text ]==]"));
 
-        Assert.Contains("[[ ]]", found.Message);
+        Assert.Contains("[[ ]]", found.Message.Text());
     }
 
     // Measured on the game's lexer: "--[" opens a long comment only when another "[" follows, so
@@ -80,6 +80,6 @@ public sealed class LuaVersionSyntaxAnalyzerTest
         var found = Assert.Single(Analyze("--[=[ first\nsecond line ]=]\nlocal x = 1"));
 
         Assert.Equal(0, found.Range.Start.Line);
-        Assert.Contains("line comment", found.Message);
+        Assert.Contains("line comment", found.Message.Text());
     }
 }

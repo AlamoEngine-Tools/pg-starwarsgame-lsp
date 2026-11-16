@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.Json.Nodes;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests.Protocol;
 
@@ -68,7 +69,7 @@ public sealed class XmlSuppressionsProtocolTest
                 Assert.Equal(3, comment.Range.Start.Line);
                 Assert.Equal("Comment inside a value: The game cuts it out and joins the text on both sides, but " +
                              "standard XML readers return two separate text nodes, so other tools may read a " +
-                             "different value", comment.Message.TrimEnd('.'));
+                             "different value", comment.Message.Text().TrimEnd('.'));
                 Assert.Equal(optedIn, File.ReadAllText(Suppressions));
 
                 var move = Assert.Single(await document.CodeActionsAsync(comment),

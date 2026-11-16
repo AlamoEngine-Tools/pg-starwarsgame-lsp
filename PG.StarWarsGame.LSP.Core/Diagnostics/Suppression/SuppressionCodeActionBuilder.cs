@@ -136,7 +136,7 @@ public static class SuppressionCodeActionBuilder
         {
             ["id"] = id.ToString(),
             ["severity"] = (diagnostic.Severity ?? DiagnosticSeverity.Error).ToString(),
-            ["message"] = diagnostic.Message,
+            ["message"] = diagnostic.Message.Text(),
             ["fileName"] = path[(path.LastIndexOf('/') + 1)..],
             ["startLine"] = first,
             ["lines"] = new JArray(source.Cast<object>().ToArray())

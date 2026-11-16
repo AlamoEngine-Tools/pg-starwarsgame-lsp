@@ -6,6 +6,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Server.Preview;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests.Protocol;
 
@@ -215,7 +216,7 @@ public sealed class XmlEditorProtocolTest(XmlScratchFixture fixture) : IClassFix
         Assert.Equal("Hardpoint 'HP_Scratch_Dead' never fires. Fire_When_In_Rocket_Attack_Mode and " +
                      "Fire_When_In_Normal_Attack_Mode are both off, so no attack mode lets it fire.",
             On(20, "aetswg-007-0032").Message);
-        Assert.Single(hardpoints.WithCode("aetswg-007-0032"), d => d.Message.Contains("HP_Scratch_Dead"));
+        Assert.Single(hardpoints.WithCode("aetswg-007-0032"), d => d.Message.Text().Contains("HP_Scratch_Dead"));
 
         var units = await ProtocolDocument.OpenAsync(fixture, Xml("Scratch_Units.xml"));
         var onList = units.Diagnostics.Where(d => d.Range.Start.Line == 3 &&
@@ -236,7 +237,7 @@ public sealed class XmlEditorProtocolTest(XmlScratchFixture fixture) : IClassFix
         Assert.DoesNotContain(hardpoints.WithCode("aetswg-007-0032"), d => d.Range.Start.Line == 9);
         Assert.DoesNotContain(hardpoints.WithCode("aetswg-007-0031"), d => d.Range.Start.Line == 13);
         Assert.Contains("has FULL_SALVO in slot 3 of unit abilities DEFEND, ROCKET_ATTACK, FULL_SALVO",
-            On(5, "aetswg-007-0031").Message, StringComparison.Ordinal);
+            On(5, "aetswg-007-0031").Message.Text(), StringComparison.Ordinal);
         On(20, "aetswg-007-0032");
 
         var lines = units.Lines;

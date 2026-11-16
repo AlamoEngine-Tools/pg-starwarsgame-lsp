@@ -308,7 +308,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
         Assert.Equal(DiagnosticIds.LocalisationKeyExistence.ToString(), diag.Code?.String);
-        Assert.Contains("TEXT_MISSING", diag.Message);
+        Assert.Contains("TEXT_MISSING", diag.Message.Text());
     }
 
     [Fact]
@@ -459,7 +459,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
         Assert.Equal(DiagnosticIds.CaseOnlyMatch.ToString(), diag.Code?.String);
-        Assert.Contains("Rebel_M01_Start", diag.Message);
+        Assert.Contains("Rebel_M01_Start", diag.Message.Text());
     }
 
     [Fact]
@@ -487,8 +487,8 @@ public sealed class LuaDiagnosticsPublisherTest
 
         var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("UNIT_MISSING", diag.Message);
-        Assert.Contains("No object with this name exists", diag.Message);
+        Assert.Contains("UNIT_MISSING", diag.Message.Text());
+        Assert.Contains("No object with this name exists", diag.Message.Text());
     }
 
     // A reference whose type NOTHING indexes - no workspace file of it, none in the baseline - names
@@ -517,8 +517,8 @@ public sealed class LuaDiagnosticsPublisherTest
         var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Information, diag.Severity);
         Assert.Equal(DiagnosticIds.ReferenceTypeNotIndexed.ToString(), diag.Code?.String);
-        Assert.Contains("Cannot verify", diag.Message);
-        Assert.DoesNotContain("No object with this name exists", diag.Message);
+        Assert.Contains("Cannot verify", diag.Message.Text());
+        Assert.DoesNotContain("No object with this name exists", diag.Message.Text());
     }
 
     // ── suppression, end to end ───────────────────────────────────────────────
@@ -571,10 +571,10 @@ public sealed class LuaDiagnosticsPublisherTest
 
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
         Assert.Equal(0, warning.Range.Start.Line);
-        Assert.Contains("aetswg-1-21", warning.Message);
+        Assert.Contains("aetswg-1-21", warning.Message.Text());
 
         // And the diagnostic the user was trying to silence is still there.
-        Assert.Contains(diagnostics, d => d.Message.Contains("UNIT_MISSING"));
+        Assert.Contains(diagnostics, d => d.Message.Text().Contains("UNIT_MISSING"));
     }
 
     // Suppression complaints go through the same filter as everything else, so a user who has
@@ -597,7 +597,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         // Still only silencing what was asked for: the mistyped directive suppresses nothing, so
         // the reference error it named remains.
-        Assert.Contains(diagnostics, d => d.Message.Contains("UNIT_MISSING"));
+        Assert.Contains(diagnostics, d => d.Message.Text().Contains("UNIT_MISSING"));
     }
 
     [Fact]
@@ -628,8 +628,8 @@ public sealed class LuaDiagnosticsPublisherTest
 
         var diag = Assert.Single(Assert.Single(published).Diagnostics);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("UNIT_A", diag.Message);
-        Assert.Contains("Faction", diag.Message);
+        Assert.Contains("UNIT_A", diag.Message.Text());
+        Assert.Contains("Faction", diag.Message.Text());
     }
 
     [Fact]
@@ -759,7 +759,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         var pub = Assert.Single(published);
         Assert.Contains(pub.Diagnostics,
-            d => d.Severity == DiagnosticSeverity.Error && d.Message.Contains("MissingLib"));
+            d => d.Severity == DiagnosticSeverity.Error && d.Message.Text().Contains("MissingLib"));
     }
 
     [Fact]
@@ -808,7 +808,7 @@ public sealed class LuaDiagnosticsPublisherTest
 
         var pub = Assert.Single(published);
         Assert.Contains(pub.Diagnostics,
-            d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("RunStateMachine"));
+            d => d.Severity == DiagnosticSeverity.Warning && d.Message.Text().Contains("RunStateMachine"));
     }
 
     // ── open/close lifecycle ──────────────────────────────────────────────────

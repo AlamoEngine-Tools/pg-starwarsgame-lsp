@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -51,8 +52,8 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
         var diags = await received;
         Assert.NotNull(diags);
         Assert.Contains(diags.Diagnostics,
-            d => d.Message.Contains("HARD_POINT_WEAPON_LASER_NO_COMMA", StringComparison.OrdinalIgnoreCase)
-                 || d.Message.Contains("hard point", StringComparison.OrdinalIgnoreCase));
+            d => d.Message.Text().Contains("HARD_POINT_WEAPON_LASER_NO_COMMA", StringComparison.OrdinalIgnoreCase)
+                 || d.Message.Text().Contains("hard point", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -82,8 +83,8 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
         var diags = await received;
         Assert.NotNull(diags);
         Assert.DoesNotContain(diags.Diagnostics,
-            d => d.Message.Contains("hard point", StringComparison.OrdinalIgnoreCase)
-                 || d.Message.Contains("HardPoint", StringComparison.OrdinalIgnoreCase));
+            d => d.Message.Text().Contains("hard point", StringComparison.OrdinalIgnoreCase)
+                 || d.Message.Text().Contains("HardPoint", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void RequireEawWorkspace()

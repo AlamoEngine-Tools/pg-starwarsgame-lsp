@@ -100,8 +100,8 @@ public sealed class LuaUpvalueAnalyzerTest
         var result = Analyze(text);
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
-        Assert.Contains("counter", diag.Message);
-        Assert.Contains("Update_Thread", diag.Message);
+        Assert.Contains("counter", diag.Message.Text());
+        Assert.Contains("Update_Thread", diag.Message.Text());
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public sealed class LuaUpvalueAnalyzerTest
                             """;
         var result = Analyze(text);
         Assert.Equal(2, result.Count);
-        Assert.All(result, d => Assert.Contains("state", d.Message));
+        Assert.All(result, d => Assert.Contains("state", d.Message.Text()));
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class LuaUpvalueAnalyzerTest
                             """;
         var result = Analyze(text);
         var diag = Assert.Single(result);
-        Assert.Contains("counter", diag.Message);
+        Assert.Contains("counter", diag.Message.Text());
     }
 
     [Fact]
@@ -148,8 +148,8 @@ public sealed class LuaUpvalueAnalyzerTest
                             """;
         var result = Analyze(text);
         Assert.Equal(2, result.Count);
-        Assert.Contains(result, d => d.Message.Contains("'a'"));
-        Assert.Contains(result, d => d.Message.Contains("'b'"));
+        Assert.Contains(result, d => d.Message.Text().Contains("'a'"));
+        Assert.Contains(result, d => d.Message.Text().Contains("'b'"));
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class LuaUpvalueAnalyzerTest
                             """;
         var result = Analyze(text);
         var diag = Assert.Single(result);
-        Assert.Contains("state", diag.Message);
+        Assert.Contains("state", diag.Message.Text());
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class LuaUpvalueAnalyzerTest
         // Note: 'x' is a global (no local), 'count' IS a file-level local → warning for count
         var result = Analyze(text);
         var diag = Assert.Single(result);
-        Assert.Contains("count", diag.Message);
+        Assert.Contains("count", diag.Message.Text());
     }
 
     [Fact]
@@ -243,7 +243,7 @@ public sealed class LuaUpvalueAnalyzerTest
                             """;
         var result = Analyze(text);
         var diag = Assert.Single(result);
-        Assert.Contains("'b'", diag.Message);
+        Assert.Contains("'b'", diag.Message.Text());
     }
 
     // ── message quality ───────────────────────────────────────────────────────
@@ -259,7 +259,7 @@ public sealed class LuaUpvalueAnalyzerTest
                             """;
         var result = Analyze(text);
         var diag = Assert.Single(result);
-        Assert.Contains("Definitions", diag.Message);
+        Assert.Contains("Definitions", diag.Message.Text());
     }
 
     [Fact]
@@ -273,7 +273,7 @@ public sealed class LuaUpvalueAnalyzerTest
                             """;
         var result = Analyze(text);
         var diag = Assert.Single(result);
-        Assert.Contains("save", diag.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("save", diag.Message.Text(), StringComparison.OrdinalIgnoreCase);
     }
 
     // ── related information ───────────────────────────────────────────────────

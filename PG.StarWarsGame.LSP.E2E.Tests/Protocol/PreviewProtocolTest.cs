@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests.Protocol;
 
@@ -233,7 +234,7 @@ public sealed class FocPreviewProtocolTest(FocVanillaFixture fixture) : IClassFi
                 "Emitter 0 - property 0x49 not read by the game, skipped",
                 "Emitter 1 - property 0x49 not read by the game, skipped"
             ],
-            skipped["P_tactical_corrupt.alo"].Select(d => d.Message).Order());
+            skipped["P_tactical_corrupt.alo"].Select(d => d.Message.Text()).Order());
         Assert.Equal("Emitter 0 - property 0x49 not read by the game, skipped",
             Assert.Single(skipped["P_icon_corrupt.alo"]).Message);
         Assert.All(skipped.Values.SelectMany(l => l), d => Assert.Equal(DiagnosticSeverity.Warning, d.Severity));
@@ -295,7 +296,7 @@ public sealed class DottedBoneProtocolTest(DottedBoneFixture fixture) : IClassFi
             TimeSpan.FromSeconds(60)), ProtocolDocument.Near(document, line));
         var missing = Assert.Single(document.WithCode("aetswg-007-0004"), d => d.Range.Start.Line == line);
         Assert.StartsWith("<Attachment_Bone> names bone 'Spot01_Target', which does not exist on 'Ev_bike.alo', the " +
-                          "model of 'Scratch_Dotted_Bone' which attaches it", missing.Message);
+                          "model of 'Scratch_Dotted_Bone' which attaches it", missing.Message.Text());
 
         await document.ReplaceAsync(original);
         Assert.DoesNotContain(document.WithCode("aetswg-007-0004"), d => d.Range.Start.Line == line);

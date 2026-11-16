@@ -140,10 +140,11 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
         const string notRequired = "Global 'Define_State' is defined in 'Pgstatemachine' which is not required.";
         var script = await OpenLua(@"Data\Scripts\Miscellaneous\AetTest_NoRequire.lua");
         Assert.True(await script.UntilAsync(ds => ds.Any(d => d.Range.Start.Line == 3 &&
-                                                              d.Message.Contains("which is not required")), Analyzer),
+                                                              d.Message.Text().Contains("which is not required")),
+                Analyzer),
             "No 'not required' warning on line 4 of AetTest_NoRequire.lua: " +
             string.Join("; ", script.Diagnostics.Select(d => d.Message)));
-        var warning = Assert.Single(script.Diagnostics, d => d.Message.Contains("which is not required"));
+        var warning = Assert.Single(script.Diagnostics, d => d.Message.Text().Contains("which is not required"));
         Assert.Equal(notRequired, warning.Message);
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
         Assert.Equal(DiagnosticIds.LuaGlobalNotRequired.ToString(), warning.Code?.String);
@@ -151,7 +152,8 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
         var lines = script.Lines.ToList();
         lines.Insert(1, "require(\"PGStateMachine\")");
         await script.ReplaceAsync(string.Join("\n", lines));
-        Assert.True(await script.UntilAsync(ds => !ds.Any(d => d.Message.Contains("which is not required")), Analyzer));
+        Assert.True(await script.UntilAsync(ds => !ds.Any(d => d.Message.Text().Contains("which is not required")),
+            Analyzer));
         script.Close();
 
         var interdictor = await OpenLua(@"Data\Scripts\Gameobject\Interdictor.lua");
@@ -178,7 +180,7 @@ public sealed class LuaProtocolTest(EawLuaFixture fixture) : IClassFixture<EawLu
             await Task.Delay(TimeSpan.FromSeconds(5));
             await file.UntilAsync(_ => true, TimeSpan.FromSeconds(1));
             onDefinitions.AddRange(file.Diagnostics
-                .Where(d => d.Message.StartsWith("Global 'Definitions' is defined in", StringComparison.Ordinal))
+                .Where(d => d.Message.Text().StartsWith("Global 'Definitions' is defined in", StringComparison.Ordinal))
                 .Select(d => $"{library}:{d.Range.Start.Line + 1}: {d.Message}"));
             file.Close();
         }

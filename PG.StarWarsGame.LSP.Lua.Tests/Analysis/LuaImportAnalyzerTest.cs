@@ -6,6 +6,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis;
 
@@ -52,7 +53,7 @@ public sealed class LuaImportAnalyzerTest
             """require("MissingLibrary")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English);
         var diag = Assert.Single(result);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("MissingLibrary", diag.Message);
+        Assert.Contains("MissingLibrary", diag.Message.Text());
     }
 
     [Fact]

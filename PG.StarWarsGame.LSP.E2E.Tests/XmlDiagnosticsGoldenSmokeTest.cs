@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Xml.Commands;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -143,7 +144,7 @@ public static class XmlDiagnosticsGolden
                 d.Code is { } code ? code.IsString ? code.String ?? "" : code.Long.ToString() : "",
                 d.Severity?.ToString() ?? "",
                 d.Range.Start.Line, d.Range.Start.Character, d.Range.End.Line, d.Range.End.Character,
-                scrub.Replace(d.Message, "<ws>")))
+                scrub.Replace(d.Message.Text(), "<ws>")))
             .OrderBy(r => r.StartLine).ThenBy(r => r.StartCharacter)
             .ThenBy(r => r.Code, StringComparer.Ordinal).ThenBy(r => r.Message, StringComparer.Ordinal)
             .ToList();

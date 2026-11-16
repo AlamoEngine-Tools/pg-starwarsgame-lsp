@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Story.Model;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
@@ -54,7 +55,7 @@ internal static class StoryDiagnosticsCorrelator
                 storyEvent is not null ? nodeIdOf(storyEvent) : null,
                 side, position,
                 SeverityOf(diagnostic),
-                diagnostic.Message,
+                diagnostic.Message.Text(),
                 uri, line, column));
         }
     }

@@ -41,8 +41,8 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
             "SELECTABLE, REVEAL");
 
         var d = Assert.Single(diagnostics);
-        Assert.Contains("Ground_Barracks", d.Message);
-        Assert.Contains("SPECIAL_WEAPON", d.Message);
+        Assert.Contains("Ground_Barracks", d.Message.Text());
+        Assert.Contains("SPECIAL_WEAPON", d.Message.Text());
     }
 
     [Fact]
