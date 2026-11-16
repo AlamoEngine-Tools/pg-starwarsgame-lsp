@@ -37,9 +37,11 @@ public sealed class ModelBoneCatalogSnapshot
     ///     which would send the validator back to parsing every model on demand; 3 = entries say
     ///     whether the file is a particle system (#270) - a v2 snapshot would list every one as a
     ///     model; 4 = entries carry the model's proxy names (#270) - a v3 snapshot would name no
-    ///     model as a particle system's user.
+    ///     model as a particle system's user; 5 = textures as written again (#292 cut them to the
+    ///     file name on read, which hid the path a texture is named by) - a v4 snapshot may carry
+    ///     either form.
     /// </remarks>
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     [Key(0)] public int SchemaVersion { get; set; }
 
