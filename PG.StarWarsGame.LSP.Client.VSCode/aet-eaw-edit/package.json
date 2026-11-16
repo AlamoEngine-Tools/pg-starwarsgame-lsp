@@ -923,7 +923,7 @@
     "prettier": "3.9.10",
     "typescript": "^6.0.0",
     "wdio-vscode-service": "^8.0.0",
-    "webdriverio": "^9.32.0"
+    "webdriverio": "^10.2.0"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.46.0",
