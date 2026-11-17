@@ -8,30 +8,45 @@
 // Drives the viewport's loop by hand: headless Chromium under a virtual-time budget advances
 // timers but not requestAnimationFrame.
 import * as THREE from "three";
-import {DDSLoader} from "three/examples/jsm/loaders/DDSLoader.js";
+import { DDSLoader } from "three/examples/jsm/loaders/DDSLoader.js";
 
-import {translateEffect} from "../../src/webview/preview/fx/effect";
-import {parseFxManifest, selectTechnique} from "../../src/webview/preview/fx/fxParser";
-import {materialStateFrom} from "../../src/webview/preview/fx/renderState";
-import {emitter, properties, testSystem} from "../../src/webview/preview/particleFixture";
-import {PreviewViewport} from "../../src/webview/preview/viewport";
+import { translateEffect } from "../../src/webview/preview/fx/effect";
+import {
+    parseFxManifest,
+    selectTechnique,
+} from "../../src/webview/preview/fx/fxParser";
+import { materialStateFrom } from "../../src/webview/preview/fx/renderState";
+import {
+    emitter,
+    properties,
+    testSystem,
+} from "../../src/webview/preview/particleFixture";
+import { PreviewViewport } from "../../src/webview/preview/viewport";
 
 type Particle = { position: { x: number; y: number; z: number } };
 type Inner = {
     camera: THREE.PerspectiveCamera;
     loop: () => void;
-    renderFrame: () => void;
+    /** The pass chain, on the viewport's environment layer. */
+    environment: { renderFrame: () => void };
     renderer: THREE.WebGLRenderer;
-    controls: { target: THREE.Vector3; update: () => void; enableDamping: boolean };
+    controls: {
+        target: THREE.Vector3;
+        update: () => void;
+        enableDamping: boolean;
+    };
     /** The running systems, on the viewport's particle layer. */
     particles: {
-        particleSystems: Map<string, {
-            instance: {
-                emitters: unknown[];
-                emitterMesh: (i: number) => THREE.Mesh | null;
-                emitterParticles: (i: number) => Particle[]
+        particleSystems: Map<
+            string,
+            {
+                instance: {
+                    emitters: unknown[];
+                    emitterMesh: (i: number) => THREE.Mesh | null;
+                    emitterParticles: (i: number) => Particle[];
+                };
             }
-        }>;
+        >;
     };
 };
 
@@ -79,7 +94,7 @@ function frames(inner: Inner, n: number): Promise<void> {
 
 /** Renders one frame, counts the pixels that differ from the corner, keeps the frame as a PNG. */
 function readback(inner: Inner): string {
-    inner.renderFrame();
+    inner.environment.renderFrame();
     const gl = inner.renderer.getContext() as WebGL2RenderingContext;
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
@@ -99,7 +114,10 @@ function readback(inner: Inner): string {
     const ctx = canvas.getContext("2d")!;
     const image = ctx.createImageData(w, h);
     for (let y = 0; y < h; y++) {
-        image.data.set(pixels.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+        image.data.set(
+            pixels.subarray((h - 1 - y) * w * 4, (h - y) * w * 4),
+            y * w * 4,
+        );
     }
     ctx.putImageData(image, 0, 0);
     shots.push(canvas.toDataURL("image/png"));
@@ -110,12 +128,29 @@ function readback(inner: Inner): string {
 function decodeDds(data: string): { texture: THREE.Texture; summary: string } {
     const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
     const parsed = new DDSLoader().parse(bytes.buffer as ArrayBuffer, true);
-    const compressed = new Set<number>([THREE.RGB_S3TC_DXT1_Format, THREE.RGBA_S3TC_DXT1_Format, THREE.RGBA_S3TC_DXT3_Format, THREE.RGBA_S3TC_DXT5_Format]).has(parsed.format as number);
+    const compressed = new Set<number>([
+        THREE.RGB_S3TC_DXT1_Format,
+        THREE.RGBA_S3TC_DXT1_Format,
+        THREE.RGBA_S3TC_DXT3_Format,
+        THREE.RGBA_S3TC_DXT5_Format,
+    ]).has(parsed.format as number);
     const texture = compressed
-        ? new THREE.CompressedTexture(parsed.mipmaps as THREE.CompressedTextureMipmap[], parsed.width, parsed.height, parsed.format as THREE.CompressedPixelFormat)
-        : new THREE.DataTexture((parsed.mipmaps[0] as { data: Uint8Array }).data, parsed.width, parsed.height);
+        ? new THREE.CompressedTexture(
+              parsed.mipmaps as THREE.CompressedTextureMipmap[],
+              parsed.width,
+              parsed.height,
+              parsed.format as THREE.CompressedPixelFormat,
+          )
+        : new THREE.DataTexture(
+              (parsed.mipmaps[0] as { data: Uint8Array }).data,
+              parsed.width,
+              parsed.height,
+          );
     texture.needsUpdate = true;
-    return {texture, summary: `${parsed.width}x${parsed.height} format=${parsed.format} compressed=${compressed}`};
+    return {
+        texture,
+        summary: `${parsed.width}x${parsed.height} format=${parsed.format} compressed=${compressed}`,
+    };
 }
 
 function describeMesh(inner: Inner, label: string): void {
@@ -125,14 +160,21 @@ function describeMesh(inner: Inner, label: string): void {
         log(`${label}: no mesh`);
         return;
     }
-    const geometry = mesh.geometry as THREE.BufferGeometry & { instanceCount?: number };
+    const geometry = mesh.geometry as THREE.BufferGeometry & {
+        instanceCount?: number;
+    };
     const material = mesh.material as THREE.ShaderMaterial;
-    log(`${label}: material=${material.constructor.name} particles=${entry!.instance.emitterParticles(0).length} instanceCount=${geometry.instanceCount ?? "n/a"} drawRange=${geometry.drawRange.count} depthTest=${material.depthTest} blending=${material.blending}`);
+    log(
+        `${label}: material=${material.constructor.name} particles=${entry!.instance.emitterParticles(0).length} instanceCount=${geometry.instanceCount ?? "n/a"} drawRange=${geometry.drawRange.count} depthTest=${material.depthTest} blending=${material.blending}`,
+    );
 }
 
 async function main(): Promise<void> {
-    const sources = JSON.parse(document.getElementById("shaders")!.textContent!) as Record<string, string>;
-    const read = (name: string): string | null => sources[name.toLowerCase()] ?? null;
+    const sources = JSON.parse(
+        document.getElementById("shaders")!.textContent!,
+    ) as Record<string, string>;
+    const read = (name: string): string | null =>
+        sources[name.toLowerCase()] ?? null;
 
     const canvas = document.createElement("canvas");
     canvas.width = 640;
@@ -149,31 +191,37 @@ async function main(): Promise<void> {
 
     const fieldTag = document.getElementById("field");
     if (fieldTag !== null) {
-        const {field, textures, wind, intensity} = JSON.parse(fieldTag.textContent!) as {
+        const { field, textures, wind, intensity } = JSON.parse(
+            fieldTag.textContent!,
+        ) as {
             field: Parameters<PreviewViewport["addParticleSystem"]>[1];
             textures: Record<string, { format: string; data: string }>;
             wind: { heading: number; speed: number } | null;
             intensity: number | null;
         };
-        viewport.addParticleSystem("probe", field, {origin: "gameplay"});
+        viewport.addParticleSystem("probe", field, { origin: "gameplay" });
         if (wind !== null) {
             viewport.setWind(wind.heading, wind.speed);
             log(`wind from ${wind.heading} deg at ${wind.speed}`);
         }
         if (intensity !== null) {
             viewport.setWeatherIntensity(intensity);
-            log(`weather intensity ${intensity}, weather in scene ${viewport.hasWeather()}`);
+            log(
+                `weather intensity ${intensity}, weather in scene ${viewport.hasWeather()}`,
+            );
         }
-        for (const [name, {format, data}] of Object.entries(textures)) {
+        for (const [name, { format, data }] of Object.entries(textures)) {
             if (format !== "dds") {
                 log(`texture ${name}: .${format} is not handled by the probe`);
                 continue;
             }
-            const {texture, summary} = decodeDds(data);
+            const { texture, summary } = decodeDds(data);
             viewport.setParticleTexture(name, texture);
             log(`texture ${name}: ${summary}`);
         }
-        log(`system ${field.name}: ${field.emitters.map((e) => `${e.name} ${e.properties.blendMode} ${e.colorTexture}/${e.normalTexture ?? "-"}`).join("; ")}`);
+        log(
+            `system ${field.name}: ${field.emitters.map((e) => `${e.name} ${e.properties.blendMode} ${e.colorTexture}/${e.normalTexture ?? "-"}`).join("; ")}`,
+        );
     } else {
         viewport.addParticleSystem(
             "probe",
@@ -186,13 +234,16 @@ async function main(): Promise<void> {
                         particlesPerSecond: 20,
                         lifetime: 100,
                         freezeTime: 0.3,
-                        skipTime: 0.3
+                        skipTime: 0.3,
                     }),
                 }),
             ]),
-            {origin: "gameplay"},
+            { origin: "gameplay" },
         );
-        viewport.setParticleTexture("p_particle_master.tga", flat([255, 200, 120, 255]));
+        viewport.setParticleTexture(
+            "p_particle_master.tga",
+            flat([255, 200, 120, 255]),
+        );
         viewport.setParticleTexture("flat_n.tga", flat([128, 128, 255, 255]));
         log("system: synthetic bump emitter, flat textures");
     }
@@ -213,7 +264,9 @@ async function main(): Promise<void> {
             viewport.applyShaderState(name, materialStateFrom(pass));
         }
         const result = translateEffect(source, read);
-        log(`${name}: refusal=${result.refusal ?? "none"} missing=${JSON.stringify(result.missingIncludes)}`);
+        log(
+            `${name}: refusal=${result.refusal ?? "none"} missing=${JSON.stringify(result.missingIncludes)}`,
+        );
         if (result.effect !== null) {
             viewport.applyTranslatedEffect(name, result.effect);
         }
@@ -222,7 +275,11 @@ async function main(): Promise<void> {
 
     // A close-up on the first particle: both paths, one pose.
     const entry = inner.particles.particleSystems.get("probe")!;
-    const first = entry.instance.emitterParticles(0)[0]?.position ?? {x: 0, y: 0, z: 0};
+    const first = entry.instance.emitterParticles(0)[0]?.position ?? {
+        x: 0,
+        y: 0,
+        z: 0,
+    };
     const target = new THREE.Vector3(first.x, first.y, first.z);
     const pose = (): void => {
         inner.camera.position.set(target.x + 25, target.y + 15, target.z + 70);

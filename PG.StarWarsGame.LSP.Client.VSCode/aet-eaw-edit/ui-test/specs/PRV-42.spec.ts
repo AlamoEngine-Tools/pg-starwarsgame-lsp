@@ -25,22 +25,26 @@ async function bend(): Promise<Bent> {
     await browser.waitUntil(
         async () =>
             browser.execute(() => {
-                const v = (window as unknown as { aetDebugViewport?: { parts: Map<string, unknown> } })
-                    .aetDebugViewport;
+                const v = (
+                    window as unknown as {
+                        aetDebugViewport?: { parts: Map<string, unknown> };
+                    }
+                ).aetDebugViewport;
                 return v !== undefined && v.parts.size > 0;
             }),
         { timeout: 120_000, timeoutMsg: "The model did not load" },
     );
     await browser.pause(2_000);
     return browser.execute(() => {
-        const v = (window as unknown as { aetDebugViewport: any }).aetDebugViewport;
+        const v = (window as unknown as { aetDebugViewport: any })
+            .aetDebugViewport;
         const gl = v.renderer.getContext() as WebGL2RenderingContext;
         const width = gl.drawingBufferWidth;
         const height = gl.drawingBufferHeight;
 
         v.setHeat(true);
         v.setHeatDebug(true);
-        v.renderFrame();
+        v.environment.renderFrame();
         const field = new Uint8Array(4);
         gl.readPixels(4, 4, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, field);
         v.setHeatDebug(false);
@@ -50,10 +54,10 @@ async function bend(): Promise<Bent> {
         const plain = new Uint8Array(width * height * 4);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, plain);
 
-        v.heat.render(v.renderer, v.scene, v.camera, false);
+        v.environment.heat.render(v.renderer, v.scene, v.camera, false);
         const bent = new Uint8Array(width * height * 4);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, bent);
-        v.renderFrame();
+        v.environment.renderFrame();
 
         let differing = 0;
         for (let i = 0; i < plain.length; i += 4) {
@@ -80,7 +84,9 @@ describe("PRV-42", () => {
     });
 
     it("leaves the frame where it is when nothing bends it", async () => {
-        await openInPreview(path.join(foc, "Data", "Art", "Models", "Hp_turret_front_00.alo"));
+        await openInPreview(
+            path.join(foc, "Data", "Art", "Models", "Hp_turret_front_00.alo"),
+        );
         const bent = await inNewestWebview(bend);
         console.log(`PRV-42 ${JSON.stringify(bent)}`);
 

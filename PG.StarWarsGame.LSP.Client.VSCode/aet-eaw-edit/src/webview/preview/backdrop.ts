@@ -77,3 +77,15 @@ function seededRandom(seed: number): () => number {
         return ((state >>> 0) % 1000000) / 1000000;
     };
 }
+
+/**
+ * What the viewport clears to.
+ *
+ * The scene paints its OWN ground rather than letting the transparent canvas show the panel
+ * through. That is not only a theming choice: with nothing cleared behind it, any blended draw
+ * raises the canvas's ALPHA as well as its colour, so an additive quad whose texture is black
+ * turned the see-through background into an opaque black rectangle - it added no light, it just
+ * stopped the page showing through. Kept in step with the canvas background in `modelPreview.tsx`,
+ * which covers the moment before the first frame.
+ */
+export const VIEWPORT_BACKGROUND = 0x1b1d21;
