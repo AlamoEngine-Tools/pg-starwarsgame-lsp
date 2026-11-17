@@ -197,6 +197,7 @@ import {
     type ViewportStats,
 } from "./viewportTypes";
 import { CaptureRig } from "./captureRig";
+import { LevelGates } from "./levelGates";
 
 export type {
     AddPartOptions,
@@ -297,56 +298,12 @@ export class PreviewViewport {
     private billboards: THREE.Object3D[] = [];
     /** The framing: how far the camera sits, what it is fitted to, the model's own cameras and the clip planes. See `CameraRig`. */
     private readonly cameraRig: CameraRig;
-    private alt = 0;
-    private lod = 0;
+    /** The detail and damage level, and the gates on what is drawn at it. See `LevelGates`. */
+    private readonly levels: LevelGates;
     /** Labels, reticles, selection boxes, the skeleton and the bone axes. See `OverlayLayer`. */
     private readonly overlay: OverlayLayer;
     /** The firing arcs, the turret handles, the sweeps and the hand-set aims. See `TurretRig`. */
     private readonly turret: TurretRig;
-    /**
-     * Whether the last ALT change was downwards.
-     *
-     * A property of the transition, not of the state - the engine recomputes it on every SetALT and
-     * passes false for LOD changes.
-     */
-    private altDescending = false;
-    /**
-     * Damage decals, lowercased.
-     *
-     * `knownDecals` is every mesh some hardpoint names through `Damage_Decal`; `shownDecals` is the
-     * subset whose hardpoint is destroyed. Without the first, a level change would re-show a decal
-     * the model ships visible and every capital ship would open pre-scorched.
-     */
-    private knownDecals: ReadonlySet<string> = new Set();
-    private shownDecals: ReadonlySet<string> = new Set();
-    /**
-     * Meshes a hardpoint claims as its collision hull.
-     *
-     * Kept beside the decals because they are the same kind of fact - hardpoint XML deciding what a
-     * mesh IS - and settled in the same pass of the chain. Unlike a decal there is no "shown" half:
-     * the engine never draws one, whatever the damage state.
-     */
-    private collisionMeshes: ReadonlySet<string> = new Set();
-    /**
-     * Whether an active ability is holding the SHIELD MESH visible.
-     *
-     * The mesh ships hidden - `MeshShield.fx` carries `alamoHidden: true` - so this is the model
-     * being told it does draw it after all, which is why it flips `inFile` rather than adding a
-     * gate. The reader's own tick still sits above it.
-     */
-    private shieldRevealed = false;
-    /**
-     * Whether a cloak ability is engaged, in which case the STEALTH SHELL is the only thing drawn.
-     *
-     * A swap, not a reveal, and that is what makes it different from the shield above. The shell
-     * ships VISIBLE on all nine models that carry one, so with nothing to hide it the preview drew
-     * the cloak over the hull permanently - the see-through Vengeance. And when the cloak IS on,
-     * the hull, its effects and its shadow all go, because there is nothing else to see.
-     *
-     * False is the permanent answer for a unit that declares no cloak, so this one flag is also
-     * what keeps the shell off the models whose object never declares the ability.
-     */
-    private stealthed = false;
     /** The wreckage in the air and the death run of a ship spinning away. See `DestructionRig`. */
     private readonly destruction: DestructionRig;
     /** The parts: loading one into the scene, attaching it to its bone, hiding and removing it, and walking their meshes. See `PartAssembly`. */
@@ -392,9 +349,29 @@ export class PreviewViewport {
         // Live getters, not copies: the parts, the rows and the hull change with every subject, and
         // the layer reads them at the moment it draws.
         const viewport = this;
+        this.levels = new LevelGates({
+            get assembly() {
+                return viewport.assembly;
+            },
+            get environment() {
+                return viewport.environment;
+            },
+            get modelRoot() {
+                return viewport.modelRoot;
+            },
+            get particles() {
+                return viewport.particles;
+            },
+            get parts() {
+                return viewport.parts;
+            },
+            get rows() {
+                return viewport.rows;
+            },
+        });
         this.assembly = new PartAssembly({
             get alt() {
-                return viewport.alt;
+                return viewport.levels.alt;
             },
             get billboards() {
                 return viewport.billboards;
@@ -406,7 +383,7 @@ export class PreviewViewport {
                 return viewport.loader;
             },
             get lod() {
-                return viewport.lod;
+                return viewport.levels.lod;
             },
             get materials() {
                 return viewport.materials;
@@ -426,7 +403,7 @@ export class PreviewViewport {
             get subjects() {
                 return viewport.animation.subjects;
             },
-            applyLevels: () => viewport.applyLevels(),
+            applyLevels: () => viewport.levels.applyLevels(),
             bindLoadedTextures: (root) => viewport.bindLoadedTextures(root),
             dropRegistrations: (subjectId, root) =>
                 viewport.dropRegistrations(subjectId, root),
@@ -471,7 +448,7 @@ export class PreviewViewport {
             get rows() {
                 return viewport.rows;
             },
-            applyLevels: () => viewport.applyLevels(),
+            applyLevels: () => viewport.levels.applyLevels(),
             clearRowOverrides: () => viewport.clearRowOverrides(),
             setPartHidden: (partId, hidden) =>
                 viewport.setPartHidden(partId, hidden),
@@ -533,13 +510,13 @@ export class PreviewViewport {
             get renderer() {
                 return viewport.renderer;
             },
-            drawn: (mesh) => viewport.drawn(mesh),
+            drawn: (mesh) => viewport.levels.drawn(mesh),
             hull: () => viewport.assembly.hull(),
             updateBillboards: () => viewport.updateBillboards(),
         });
         this.environment = new EnvironmentRig({
             get alt() {
-                return viewport.alt;
+                return viewport.levels.alt;
             },
             get camera() {
                 return viewport.camera;
@@ -551,7 +528,7 @@ export class PreviewViewport {
                 return viewport.elapsed;
             },
             get lod() {
-                return viewport.lod;
+                return viewport.levels.lod;
             },
             get particles() {
                 return viewport.particles;
@@ -563,7 +540,7 @@ export class PreviewViewport {
                 return viewport.scene;
             },
             get stealthed() {
-                return viewport.stealthed;
+                return viewport.levels.stealthed;
             },
             boundingSphere: (includeEffects) =>
                 viewport.cameraRig.boundingSphere(includeEffects),
@@ -576,28 +553,28 @@ export class PreviewViewport {
                 return viewport.animation.active;
             },
             get alt() {
-                return viewport.alt;
+                return viewport.levels.alt;
             },
             get collisionMeshes() {
-                return viewport.collisionMeshes;
+                return viewport.levels.collisionMeshes;
             },
             get knownDecals() {
-                return viewport.knownDecals;
+                return viewport.levels.knownDecals;
             },
             get lod() {
-                return viewport.lod;
+                return viewport.levels.lod;
             },
             get particles() {
                 return viewport.particles;
             },
             get shieldRevealed() {
-                return viewport.shieldRevealed;
+                return viewport.levels.shieldRevealed;
             },
             get shownDecals() {
-                return viewport.shownDecals;
+                return viewport.levels.shownDecals;
             },
             get stealthed() {
-                return viewport.stealthed;
+                return viewport.levels.stealthed;
             },
             forEachPartMesh: (visit) =>
                 viewport.assembly.forEachPartMesh(visit),
@@ -674,7 +651,8 @@ export class PreviewViewport {
             get stencilShadowing() {
                 return viewport.environment.stencilShadowing;
             },
-            applyMeshVisibility: (mesh) => viewport.applyMeshVisibility(mesh),
+            applyMeshVisibility: (mesh) =>
+                viewport.levels.applyMeshVisibility(mesh),
             forEachDrawnMesh: (visit) =>
                 viewport.assembly.forEachDrawnMesh(visit),
             forEachPartMesh: (visit) =>
@@ -690,13 +668,13 @@ export class PreviewViewport {
         });
         this.particles = new ParticleHost({
             get alt() {
-                return viewport.alt;
+                return viewport.levels.alt;
             },
             get altDescending() {
-                return viewport.altDescending;
+                return viewport.levels.altDescending;
             },
             get lod() {
-                return viewport.lod;
+                return viewport.levels.lod;
             },
             get fitDistance() {
                 return viewport.cameraRig.fitDistance;
@@ -961,38 +939,22 @@ export class PreviewViewport {
         this.billboards = [];
         this.assembly.hiddenParts.clear();
         this.particles.transient.clear();
-        this.knownDecals = new Set();
-        this.shownDecals = new Set();
-        this.collisionMeshes = new Set();
-        this.shieldRevealed = false;
+        this.levels.forgetModel();
         // Every subject's clips, mixer, tracks, rest pose and node names at once. They hold nodes
         // of a model nobody is looking at any more, and keeping them would leak the whole graph.
         this.animation.forgetSubjects();
     }
 
-    /**
-     * Which decal meshes exist, and which of them are showing.
-     *
-     * Both together, because a decal that is not showing has to be actively hidden: the model ships
-     * these meshes VISIBLE - measured on Ev_stardestroyer.alo, where HP_F-L_Blast is both a bone and
-     * a mesh - so the engine hides them until the hardpoint is destroyed, and so must this.
-     */
+    /** Which decal meshes exist, and which of them are showing. See `LevelGates.setDecals`. */
     setDecals(known: ReadonlySet<string>, shown: ReadonlySet<string>): void {
-        this.knownDecals = known;
-        this.shownDecals = shown;
-        this.applyLevels();
+        this.levels.setDecals(known, shown);
     }
 
     /**
-     * Which meshes the hardpoints claim as collision hulls.
-     *
-     * Gated OFF rather than hidden outright, so the reader can still tick one on in the tree and
-     * look at it - which is exactly what someone opens a hull for. The material rules already catch
-     * most of these by name; this is the author's own word, for the ones they do not.
+     * Which meshes the hardpoints claim as collision hulls. See `LevelGates.setCollisionMeshes`.
      */
     setCollisionMeshes(names: ReadonlySet<string>): void {
-        this.collisionMeshes = names;
-        this.applyLevels();
+        this.levels.setCollisionMeshes(names);
     }
 
     /**
@@ -1005,25 +967,17 @@ export class PreviewViewport {
 
     /** Shows or hides the shield mesh, for the abilities that reveal it. */
     setShieldRevealed(revealed: boolean): void {
-        this.shieldRevealed = revealed;
-        this.applyLevels();
+        this.levels.setShieldRevealed(revealed);
     }
 
-    /**
-     * Cloaks the unit, or uncloaks it.
-     *
-     * Through `applyLevels` like the shield, because the row chain is the one writer of drawn state
-     * and this has to go through it rather than around it. Setting `visible` on the meshes here
-     * would be a second writer, and the chain would put them back on its next run.
-     */
+    /** Cloaks the unit, or uncloaks it. See `LevelGates.setStealthed`. */
     setStealthed(on: boolean): void {
-        this.stealthed = on;
-        this.applyLevels();
+        this.levels.setStealthed(on);
     }
 
     /** Whether a cloak is engaged, which every other visibility rule defers to. */
     isStealthed(): boolean {
-        return this.stealthed;
+        return this.levels.isStealthed();
     }
 
     /**
@@ -1191,22 +1145,11 @@ export class PreviewViewport {
     }
 
     /**
-     * Sets the damage state and detail level, the way the engine gates geometry.
-     *
-     * The DIRECTION matters, not just the value: the engine computes `altdesc = alt < m_alt` inside
-     * `SetALT` and hands it to `CheckAltLod`, where a proxy marked `altDecreaseStayHidden` is held
-     * back. A LOD change passes false, because winding detail down is not repairing anything.
+     * Sets the damage state and detail level, the way the engine gates geometry. See
+     * `LevelGates.setLevels`.
      */
     setLevels(alt: number, lod: number): void {
-        this.altDescending = alt < this.alt;
-        this.alt = alt;
-        this.lod = lod;
-
-        // The reader's word SURVIVES a level change. It used to be cleared, on the grounds that a
-        // different damage state is a different set of geometry - but viewport visibility is now
-        // deliberately independent of what the model draws, and the row that outlives the level is
-        // marked as one the model does not draw, so nothing is claimed that is not true.
-        this.applyLevels();
+        this.levels.setLevels(alt, lod);
     }
 
     /** The ALT and LOD levels the loaded parts and effects actually define. */
@@ -1260,7 +1203,7 @@ export class PreviewViewport {
             }
         });
 
-        return costByLevel(meshes, this.alt, levels);
+        return costByLevel(meshes, this.levels.alt, levels);
     }
 
     /**
@@ -1455,7 +1398,7 @@ export class PreviewViewport {
         let triangles = 0;
 
         this.modelRoot.traverse((node) => {
-            if (node instanceof THREE.Mesh && this.drawn(node)) {
+            if (node instanceof THREE.Mesh && this.levels.drawn(node)) {
                 meshes++;
                 triangles += triangleCount(node.geometry);
             }
@@ -1881,108 +1824,12 @@ export class PreviewViewport {
         this.billboards = this.billboards.filter((node) => !held.has(node));
     }
 
-    private applyLevels(): void {
-        // What the LEVEL knows, and nothing else. Deciding visibility here as well is what let two
-        // systems write the same thing: this one re-derived every mesh from the old override maps
-        // and undid whatever the row chain had just settled, so a mesh hidden from the tree came
-        // straight back on the next level or material refresh.
-        for (const entry of this.particles.particleSystems.values()) {
-            entry.levelVisible = proxyVisibleAt(
-                entry.levels,
-                this.alt,
-                this.lod,
-                this.altDescending,
-            );
-        }
-
-        // And what the stencil pass counts, which follows the level and the cloak rather than the
-        // reader. It was set at LOAD and by the pass's own setup and nowhere else, so a cloak
-        // engaged after the model was standing left all eight volumes casting - a shadow on the
-        // ground under a ship that is not being drawn. An ALT change had the same hole.
-        this.assembly.forEachPartMesh((mesh) => this.applyMeshVisibility(mesh));
-
-        // A passive subject has no rows, so `refreshRows` below will never speak for it. Its own
-        // file's rules are re-applied instead - the same sweep that ran when it loaded.
-        for (const part of this.parts.values()) {
-            if (part.subjectId !== ACTIVE_SUBJECT) {
-                this.assembly.applyOwnFileVisibility(part.subjectId, part.root);
-            }
-        }
-
-        this.rows.refreshRows();
-    }
-
-    /**
-     * Everything that can hide a mesh, decided together.
-     *
-     * Separate passes would fight each other: a level change would re-show a decal whose hardpoint
-     * is intact, and re-hide one whose hardpoint had just been blown off.
-     */
-    /**
-     * Applies BOTH halves of a sub-mesh's visibility: whether it is drawn, and - for a shadow
-     * volume - whether it is counted.
-     *
-     * The two are separate questions with the same answer source. A shadow volume is never drawn,
-     * so the drawn half always says no, while the level gating that decides which ALT's volume is
-     * the live one still has to reach the stencil pass. Splitting them across two sweeps is what
-     * let ALT1's volume mark a model showing ALT0.
-     */
-    private applyMeshVisibility(mesh: THREE.Mesh): void {
-        // NOT the drawn state - that belongs to the row chain, which is the only writer. This keeps
-        // the shadow-volume counting in step, which follows the LEVEL rather than the reader.
-
-        const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-        if (resolveMaterial(extras).archetype === "shadow-volume") {
-            // A cloaked unit casts nothing. The volume is never DRAWN either way, so this is the
-            // only place the cloak can reach it - and a stencil shadow lying on the ground under an
-            // invisible ship is exactly the "something else is still shown" the swap rules out.
-            this.environment.shadowVolumes.setCounting(
-                mesh,
-                !this.stealthed && isVisibleAt(extras, this.alt, this.lod),
-            );
-        }
-    }
-
     private refreshParticleVisibility(entry: ParticleEntry): void {
         // Deliberately does not decide anything itself. A system's row is in the chain like every
         // other row - the effects master vetoes it, its level gates it, the reader overrides it -
         // and a second opinion here would silently undo the first.
         void entry;
         this.rows.refreshRows();
-    }
-
-    /**
-     * Whether a mesh actually reaches the screen: its own flag AND every ancestor's.
-     *
-     * A mesh with no ALT or LOD tag is always drawn unless it is hidden itself or is attached to a hidden
-     * bone - and that second half is the part `node.visible` alone cannot answer, because three
-     * stops at the first invisible ancestor without touching the flag on anything below it. Counting
-     * only the node's own flag reported meshes as drawn while the screen showed nothing.
-     */
-    private drawn(mesh: THREE.Mesh): boolean {
-        // The mesh's own layer, then every ancestor's `visible`. Two mechanisms because they mean
-        // different things: a mesh switches ITSELF off without taking its bones with it, a bone
-        // switches off everything hanging beneath it. See `meshVisibility.ts`.
-        if (!meshDrawn(mesh)) {
-            return false;
-        }
-
-        for (
-            let at: THREE.Object3D | null = mesh;
-            at !== null;
-            at = at.parent
-        ) {
-            if (!at.visible) {
-                return false;
-            }
-
-            if (at === this.modelRoot) {
-                break;
-            }
-        }
-
-        return true;
     }
 
     private onPointerDown = (event: PointerEvent): void => {
