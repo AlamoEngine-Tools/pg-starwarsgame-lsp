@@ -22,7 +22,7 @@ import { missingTexture } from "./missingTexture";
 import { type BoundingSphere } from "./framing";
 import { type FxMaterialState } from "./fx/renderState";
 import { type TranslatedEffect } from "./fx/effect";
-import { type ParticlePlacement } from "./viewport";
+import { type ParticlePlacement } from "./viewportTypes";
 
 /** Splits a `systemId#index` emitter key. The id may itself contain a `#`, so split from the right. */
 function splitEmitterKey(key: string): [string, number] {

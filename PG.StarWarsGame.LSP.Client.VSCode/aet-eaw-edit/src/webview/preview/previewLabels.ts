@@ -13,7 +13,7 @@ import type { GroupState } from "./particleScene";
 import type { TreeKind } from "./previewTree";
 import type { EyeState } from "./rowEye";
 import type { ShadowTintReach } from "./shadowVolumePass";
-import type { PresetView } from "./viewport";
+import type { PresetView } from "./viewportTypes";
 
 /** What each kind is called in the filter row - the shared tree row's names for them. */
 export const KIND_LABELS = TREE_KIND_LABELS;

@@ -31,7 +31,7 @@ import { type MaterialBinder } from "./materialBinder";
 import { type ParticleHost } from "./particleHost";
 import { type NormalisedColour } from "./colour";
 import { type SubjectAnimation } from "./subjectAnimation";
-import { type AddPartOptions } from "./viewport";
+import { type AddPartOptions } from "./viewportTypes";
 
 /** Every mesh a model's own materials say is not drawn - collision hulls, shadow volumes. */
 function hiddenMeshes(root: THREE.Object3D): Set<THREE.Object3D> {

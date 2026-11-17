@@ -17,7 +17,7 @@ import {
 } from "./breakoff";
 import { BREAKOFF_ATTACHMENT, type LoadedPart } from "./loadedPart";
 import { disposeTree, type PartAssembly } from "./partAssembly";
-import { type AddPartOptions } from "./viewport";
+import { type AddPartOptions } from "./viewportTypes";
 import { spinAwayPose } from "./spinAway";
 
 /** One piece of wreckage in the air. */

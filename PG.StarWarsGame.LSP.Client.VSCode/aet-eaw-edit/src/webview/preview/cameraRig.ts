@@ -24,7 +24,7 @@ import { type EnvironmentRig } from "./environmentRig";
 import { type LoadedPart } from "./loadedPart";
 import { type MaterialBinder } from "./materialBinder";
 import { type ParticleHost } from "./particleHost";
-import { type PresetView } from "./viewport";
+import { type PresetView } from "./viewportTypes";
 
 const PRESETS: Record<PresetView, { azimuth: number; elevation: number }> = {
     front: { azimuth: 0, elevation: 0 },
