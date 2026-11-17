@@ -37,6 +37,8 @@ export interface RoomSettingsOptions {
     isPreset: (view: string) => boolean;
 }
 
+export type RoomSettings = ReturnType<typeof useRoomSettings>;
+
 export function useRoomSettings(options: RoomSettingsOptions) {
     const [grid, setGrid] = useState(true);
     // Off by default: a floor is the right backdrop for a walker and the wrong one for a
