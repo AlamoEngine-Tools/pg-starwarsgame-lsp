@@ -11,7 +11,7 @@
 // it was dragged to. That had been written twice, down to the class names.
 
 import * as l10n from "@vscode/l10n";
-import { useEdgeResize } from "../useEdgeResize";
+import { useEdgeResize } from "./useEdgeResize";
 import { readPanelSize, writePanelSize } from "../../shared/panelLayout";
 
 /** What the panel needs to draw and work the view filter. */

@@ -34,6 +34,7 @@ import { DockSection } from "../shared/DockSection";
 import { Field } from "../shared/Field";
 import { Icon, type IconName } from "../shared/Icon";
 import { ProblemsPanel } from "../shared/ProblemsPanel";
+import { TransportBar } from "../shared/TransportBar";
 
 import {
     armingLines,
@@ -1764,112 +1765,125 @@ export function SimTransport(props: {
     // Absent from an older server's state, where the session always assumed it.
     const mediaCompletes = state.assumeMediaCompletes !== false;
     return (
-        <div className="player sim-transport">
-            <div className="player-row">
-                <IconButton
-                    icon="firstFrame"
-                    title={l10n.t("Restart")}
-                    disabled={state.tick === 0 || frozen !== null}
-                    disabledReason={frozen ?? l10n.t("Already at tick 0")}
-                    onClick={actions.restart}
-                />
-                <IconButton
-                    icon="previousClip"
-                    title={l10n.t("Back one tick")}
-                    disabled={state.tick === 0 || frozen !== null}
-                    disabledReason={frozen ?? l10n.t("Already at tick 0")}
-                    onClick={actions.back}
-                />
-                <IconButton
-                    icon={playing ? "pause" : "play"}
-                    title={
-                        pace.mode === "step"
-                            ? l10n.t("One tick")
-                            : playing
-                              ? l10n.t("Pause")
-                              : halted
-                                ? l10n.t("Resume from the breakpoint")
-                                : idle
-                                  ? l10n.t("Play - clock idle")
-                                  : l10n.t("Play")
-                    }
-                    {...gate}
-                    onClick={actions.playPause}
-                />
-                <IconButton
-                    icon="nextClip"
-                    title={
-                        idle
-                            ? l10n.t("One tick - clock idle")
-                            : l10n.t("One tick")
-                    }
-                    {...gate}
-                    onClick={actions.tick}
-                />
-                <IconButton
-                    icon="lastFrame"
-                    title={l10n.t("Run to next decision or breakpoint")}
-                    {...gate}
-                    onClick={actions.runToDecision}
-                />
-                <IconButton
-                    icon="breakpoint"
-                    className={
-                        "sim-break-gates" +
-                        (state.breakOnGates ? " active" : "")
-                    }
-                    pressed={state.breakOnGates}
-                    title={l10n.t("Break on gates")}
-                    onClick={() =>
-                        actions.setBreakpoints(
-                            state.breakpoints,
-                            !state.breakOnGates,
-                        )
-                    }
-                />
-                <IconButton
-                    icon="autoResume"
-                    className={props.autoResume ? "active" : undefined}
-                    pressed={props.autoResume}
-                    title={l10n.t("Resume after an answer")}
-                    onClick={() => props.setAutoResume(!props.autoResume)}
-                />
-                <IconButton
-                    icon="mediaCompletes"
-                    className={mediaCompletes ? "active" : undefined}
-                    pressed={mediaCompletes}
-                    title={l10n.t("Speech and movies finish on their own")}
-                    onClick={() => actions.setMediaCompletes(!mediaCompletes)}
-                />
-            </div>
-            <SimStatus
-                state={state}
-                playing={playing}
-                labelOf={props.labelOf}
-                onSelect={props.onSelect}
-                onPlayPause={actions.playPause}
-                onRetry={actions.retryBattle}
-            />
-            {props.notice ? (
-                <span className="sim-notice" title={props.notice}>
-                    {props.notice}
-                </span>
-            ) : null}
-            <Field label={l10n.t("Speed")} value={speedLabel(pace)}>
-                <input
-                    type="range"
-                    min={0}
-                    max={SPEED_STOPS.length - 1}
-                    step={1}
-                    value={stop}
-                    title={l10n.t("Speed")}
-                    aria-label={l10n.t("Speed")}
-                    onChange={(e) =>
-                        props.setPace(SPEED_STOPS[Number(e.target.value)])
-                    }
-                />
-            </Field>
-        </div>
+        <TransportBar
+            className="sim-transport"
+            controls={
+                <>
+                    <IconButton
+                        icon="firstFrame"
+                        title={l10n.t("Restart")}
+                        disabled={state.tick === 0 || frozen !== null}
+                        disabledReason={frozen ?? l10n.t("Already at tick 0")}
+                        onClick={actions.restart}
+                    />
+                    <IconButton
+                        icon="previousClip"
+                        title={l10n.t("Back one tick")}
+                        disabled={state.tick === 0 || frozen !== null}
+                        disabledReason={frozen ?? l10n.t("Already at tick 0")}
+                        onClick={actions.back}
+                    />
+                    <IconButton
+                        icon={playing ? "pause" : "play"}
+                        title={
+                            pace.mode === "step"
+                                ? l10n.t("One tick")
+                                : playing
+                                  ? l10n.t("Pause")
+                                  : halted
+                                    ? l10n.t("Resume from the breakpoint")
+                                    : idle
+                                      ? l10n.t("Play - clock idle")
+                                      : l10n.t("Play")
+                        }
+                        {...gate}
+                        onClick={actions.playPause}
+                    />
+                    <IconButton
+                        icon="nextClip"
+                        title={
+                            idle
+                                ? l10n.t("One tick - clock idle")
+                                : l10n.t("One tick")
+                        }
+                        {...gate}
+                        onClick={actions.tick}
+                    />
+                    <IconButton
+                        icon="lastFrame"
+                        title={l10n.t("Run to next decision or breakpoint")}
+                        {...gate}
+                        onClick={actions.runToDecision}
+                    />
+                    <IconButton
+                        icon="breakpoint"
+                        className={
+                            "sim-break-gates" +
+                            (state.breakOnGates ? " active" : "")
+                        }
+                        pressed={state.breakOnGates}
+                        title={l10n.t("Break on gates")}
+                        onClick={() =>
+                            actions.setBreakpoints(
+                                state.breakpoints,
+                                !state.breakOnGates,
+                            )
+                        }
+                    />
+                    <IconButton
+                        icon="autoResume"
+                        className={props.autoResume ? "active" : undefined}
+                        pressed={props.autoResume}
+                        title={l10n.t("Resume after an answer")}
+                        onClick={() => props.setAutoResume(!props.autoResume)}
+                    />
+                    <IconButton
+                        icon="mediaCompletes"
+                        className={mediaCompletes ? "active" : undefined}
+                        pressed={mediaCompletes}
+                        title={l10n.t("Speech and movies finish on their own")}
+                        onClick={() =>
+                            actions.setMediaCompletes(!mediaCompletes)
+                        }
+                    />
+                </>
+            }
+            // The run's status stands in the scrubber's slot: a tick has no timeline to drag.
+            middle={
+                <>
+                    <SimStatus
+                        state={state}
+                        playing={playing}
+                        labelOf={props.labelOf}
+                        onSelect={props.onSelect}
+                        onPlayPause={actions.playPause}
+                        onRetry={actions.retryBattle}
+                    />
+                    {props.notice ? (
+                        <span className="sim-notice" title={props.notice}>
+                            {props.notice}
+                        </span>
+                    ) : null}
+                </>
+            }
+            speed={{
+                readout: speedLabel(pace),
+                slider: (
+                    <input
+                        type="range"
+                        min={0}
+                        max={SPEED_STOPS.length - 1}
+                        step={1}
+                        value={stop}
+                        title={l10n.t("Speed")}
+                        aria-label={l10n.t("Speed")}
+                        onChange={(e) =>
+                            props.setPace(SPEED_STOPS[Number(e.target.value)])
+                        }
+                    />
+                ),
+            }}
+        />
     );
 }
 

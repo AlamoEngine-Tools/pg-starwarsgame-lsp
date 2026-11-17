@@ -30,19 +30,14 @@ import {
     useState,
 } from "react";
 import { createRoot } from "react-dom/client";
-import styled from "styled-components";
-import * as THREE from "three";
 // Static, not dynamic: the webview is bundled as an IIFE, which cannot be code-split, so an
 // `await import()` here would not build.
-import { DDSLoader } from "three/examples/jsm/loaders/DDSLoader.js";
-import { TGALoader } from "three/examples/jsm/loaders/TGALoader.js";
 
 import type { PreviewBreakoffProp } from "../protocol/modelPreview";
 import {
     AlamoParticleContent,
     GetModelDetailResult,
     GetModelGlbResult,
-    GetModelTextureResult,
     GetParticleSystemResult,
     GetProjectileResult,
     GetShaderSourceResult,
@@ -61,7 +56,6 @@ import type {
     ModelPreviewToWebview,
 } from "../protocol/panels/modelPreview";
 import {
-    AssetLedger,
     isSubjectSystem,
     loadState,
     type LoadTally,
@@ -76,14 +70,16 @@ import { Button, IconButton } from "./shared/Button";
 import { DockSection } from "./shared/DockSection";
 import { safeImageSource } from "./shared/safeImage";
 import { Field } from "./shared/Field";
+import { StageFlyout, StageSlots } from "./shared/Stage";
+import { TransportBar } from "./shared/TransportBar";
+import { ViewRow } from "./shared/ViewRow";
+import { PartCard } from "./preview/PartCard";
 import { Icon, type IconName, SeverityMark } from "./shared/Icon";
 import { TREE_KIND_ICONS, TREE_KIND_LABELS, TreeRow } from "./shared/TreeRow";
-import { addressingFor } from "./preview/textures";
 import {
     ancestorsOf,
     type BoneAttachment,
     type FlatBone,
-    type LabelMode,
 } from "./preview/skeleton";
 import {
     boneIndexOfRow,
@@ -105,18 +101,7 @@ import {
     VIEWPORT_BACKGROUND,
     type ViewportStats,
 } from "./preview/viewport";
-import {
-    dockBodyCss,
-    dockChromeCss,
-    dockHeaderCss,
-    dockOverviewCss,
-    playerCss,
-    problemsPanelCss,
-    rightDockCss,
-    rotarySwitchCss,
-    stageChromeCss,
-    stageFlyoutCss,
-} from "./shared/dockChrome";
+import { Shell } from "./preview/previewShell";
 import { ProblemsPanel } from "./shared/ProblemsPanel";
 import {
     affiliationColour,
@@ -125,7 +110,6 @@ import {
     toHex,
 } from "./preview/colour";
 import { reviewFactionColour } from "./preview/colourUsability";
-import { translateEffect } from "./preview/fx/effect";
 import { lightBearing } from "./preview/lightBearing";
 import {
     cameraPose,
@@ -152,8 +136,9 @@ import {
 } from "./preview/capture";
 import { IntegerField } from "./shared/IntegerField";
 import { parseInteger } from "./shared/integerValue";
-import { parseFxManifest, selectTechnique } from "./preview/fx/fxParser";
-import { materialStateFrom } from "./preview/fx/renderState";
+import { PreviewAssetLoader } from "./preview/previewAssetLoader";
+import { useRoomSettings } from "./preview/useRoomSettings";
+import { useViewportSync } from "./preview/useViewportSync";
 import {
     collisionMeshNames,
     decalNames,
@@ -282,7 +267,7 @@ import {
 } from "./preview/unitPool";
 import { DEFAULT_HULL_CONSTRAINT, leashed } from "./preview/healthPools";
 import { blastVictims, candidatesFrom } from "./preview/blast";
-import { useEdgeResize } from "./useEdgeResize";
+import { useEdgeResize } from "./shared/useEdgeResize";
 import { readPanelSize, writePanelSize } from "../shared/panelLayout";
 import {
     type AnimationAction,
@@ -301,16 +286,12 @@ import { type SubjectState, subjectStateFrom } from "../shared/subjectState";
 import {
     type BackgroundKind,
     type CameraBinding,
-    type CameraPreset,
     colourFromHex,
-    DEFAULT_LIGHTS,
-    DEFAULT_VIEWER_SETTINGS,
     type DirectionalName,
     type DirectionalSetting,
     hexFromColour,
     LIGHT_LABELS,
     LIGHT_NAMES,
-    type LightRig,
     viewerSettingsFrom,
     type Wind,
 } from "../shared/viewerSettings";
@@ -420,1998 +401,6 @@ const NOTHING_DRAWN = l10n.t(
     "This model has no visible mesh at the current damage and detail level. Every sub-mesh is either tagged for another level, hidden in the file, or on a hidden bone.",
 );
 
-const Shell = styled.div`
-    ${dockChromeCss}
-    ${rotarySwitchCss}
-    ${rightDockCss}
-    ${dockHeaderCss}
-    ${dockBodyCss}
-    ${dockOverviewCss}
-    ${problemsPanelCss}
-
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-
-    /* The header keeps its full height from the first frame, before the dial that fills it has
-           anything to show.
-    
-           Without this it opened at the default height with only the two anchored buttons in it, then
-           grew when the scene arrived and the dial appeared - so the top of the dock visibly drew
-           itself in two steps. The story graph never did that because its dial is there from the start;
-           78px is its measurement, and the same dial goes here. */
-
-    .dock-header {
-        min-height: 78px;
-    }
-
-    /* The header's centre slot holds the dial ALONE, so it reads as centred rather than as one item
-       in a row - the graph's own layout, one anchored button either side. */
-
-    .header-modes {
-        display: inline-flex;
-        flex-direction: column;
-        align-items: center;
-        gap: var(--space-2);
-    }
-
-    /* The right edge as a column: the hand-off above the severity tag, the pair centred on the
-       header's height. The tag carries header-right for every other dock, which positions it on its
-       own; inside this column it is a plain item. */
-
-    .header-corner {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        right: 8px;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        justify-content: center;
-        gap: var(--space-2);
-    }
-
-    .header-corner .header-right {
-        position: static;
-    }
-
-    /* The model's identity, floating under the button that opens it. Anchored to the header, which
-       is position: relative and clips nothing - inside the content it would be trapped by that
-       panel's own scroll box. */
-
-    .model-info {
-        position: absolute;
-        top: calc(100% + 8px);
-        left: 6px;
-        z-index: 20;
-        min-width: 210px;
-        max-width: min(280px, calc(100vw - 24px));
-        padding: var(--space-8) var(--space-8);
-        text-align: left;
-        border: var(--space-1) solid var(--colour-line);
-        border-radius: var(--radius-3);
-        background: var(--colour-panel);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-    }
-
-    /* The caret, which is what makes it read as coming FROM the button rather than as a panel that
-       happens to be nearby. Two squares: the border first, then the fill a pixel over it. */
-
-    .model-info::before,
-    .model-info::after {
-        content: "";
-        position: absolute;
-        left: 12px;
-        width: 8px;
-        height: 8px;
-        transform: rotate(45deg);
-    }
-
-    .model-info::before {
-        top: -5px;
-        border: var(--space-1) solid var(--colour-line);
-        background: var(--colour-line);
-    }
-
-    .model-info::after {
-        top: -4px;
-        background: var(--colour-panel);
-    }
-
-    .model-info-name {
-        font-weight: 600;
-        word-break: break-all;
-        margin-bottom: var(--space-6);
-    }
-
-    /* With the tree, not in the foot: the text box and the kind chips narrow the same list, and
-       splitting them across two levels of the dock left the box acting on something out of sight. */
-    /* Room to breathe. Every control in this section had been tuned down to 1-2px of padding to
-           win back vertical space for the tree - which stopped being the trade the moment the tree got
-           the top of the panel to itself. Squeezed rows are harder to hit and harder to scan, and the
-           saving was a dozen pixels. */
-
-    .dock-section {
-        gap: var(--space-8);
-    }
-
-    /* The tree's search: a magnifier and, next to it, either the kind filters or the box.
-
-       One element rather than two blocks with a gap. border-box on the input because the loose one
-       was width 100% with its own padding on top, so it reached 10px PAST the section every other
-       control in the panel lines up with - which is a good part of why it read as adrift. */
-    /* A hardpoint card. A bordered block rather than a list row, because it carries four kinds of
-       thing - a name, the game's own words, its measurements and its switches - and a flat row put
-       them all on one line where none of them read. */
-
-    .hardpoint-cards {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-6);
-        margin: 0 0 var(--space-8);
-    }
-
-    /* A type heading over the cards it gathers. Quieter than the section's own title - this is a
-       division INSIDE the list, not another list. */
-
-    .card-group-title {
-        display: flex;
-        align-items: center;
-        gap: var(--space-6);
-        width: 100%;
-        padding: var(--space-2) var(--space-2);
-        border: none;
-        border-radius: var(--radius-3);
-        background: none;
-        cursor: pointer;
-        text-align: left;
-        margin: var(--space-4) 0 var(--space-4);
-        font-size: var(--font-size-11);
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        opacity: 0.6;
-        color: var(--colour-muted);
-    }
-
-    .card-group-title .section-count {
-        margin-left: auto;
-    }
-
-    .card-group-title:hover {
-        background: var(--colour-hover);
-        opacity: 0.9;
-    }
-
-    /* The hardpoint list's search sits in the flow above the cards rather than floating on them:
-       there is no list box here for it to float over, and the section already scrolls as one. */
-
-    .hardpoint-search {
-        position: static;
-        margin: var(--space-2) 0 var(--space-6);
-        padding: 0;
-        background: none;
-        border: none;
-    }
-
-    /* What the attacker is aimed at, said rather than chosen. */
-    /* Pressed. The one control on the stage that FIRES rather than latching, so it says so for a
-       moment and then goes quiet - red because that is what it just did to the model. */
-
-    .icon-btn.as-action.fired {
-        background: var(--colour-data-red);
-        border-color: var(--colour-data-red);
-        color: var(--colour-action-ink);
-    }
-
-    /* The log. Monospace, because the numbers are the point and a proportional font makes a
-       column of them impossible to compare down. Newest first, so the shot you just fired is the
-       line under your eye rather than the one you have to scroll to. */
-
-    .damage-log {
-        list-style: none;
-        margin: 0 0 var(--space-8);
-        padding: 0;
-        max-height: 220px;
-        overflow-y: auto;
-        font-family: var(--font-family-code);
-        font-size: var(--font-size-smaller);
-    }
-
-    .damage-log li {
-        padding: var(--space-2) var(--space-2);
-        border-bottom: var(--space-1) solid var(--colour-line);
-        /* Long names - a projectile, an armour column, a hardpoint id - must wrap rather than push
-           a horizontal scrollbar under the whole flyout. */
-        overflow-wrap: anywhere;
-    }
-
-    .damage-log li:last-child {
-        border-bottom: none;
-    }
-
-    /* The pools, above the shots that moved them. A definition list because that is what it is:
-       each pool named, then said in full. */
-    /* The pools, in one line above the shots that moved them. */
-
-    .pool-summary {
-        margin: 0 0 var(--space-4) 0;
-        padding: 0 0 var(--space-4) 0;
-        border-bottom: var(--space-1) solid var(--colour-line);
-        font-family: var(--font-family-code);
-        font-size: var(--font-size-smaller);
-        font-variant-numeric: tabular-nums;
-        white-space: pre-wrap;
-        opacity: 0.85;
-    }
-
-    /* Given a height by the grip, the LIST is what should grow - not the empty space under it.
-       Its own max-height was fixed at 220px, so dragging the flyout taller moved the Clear button
-       down and nothing else. */
-
-    .stage-flyout.sizeable .damage-log {
-        flex: 1 1 auto;
-        max-height: none;
-        min-height: 0;
-    }
-
-    /* The workings, subordinate to the sentence they explain. Monospace because they are numbers
-       lining up, and dimmed because the sentence is what a reader scans first. */
-
-    .damage-log .log-workings {
-        list-style: none;
-        margin: var(--space-1) 0 0 0;
-        padding: 0 0 0 var(--space-12);
-        font-family: var(--font-family-code);
-        font-size: 0.9em;
-        opacity: 0.7;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .damage-log .log-workings li {
-        padding: 0;
-        border-bottom: none;
-    }
-
-    /* The shot that finished something, and the shot that did nothing: the two lines a reader is
-       scanning for. Everything between them is ordinary and stays quiet. */
-
-    .damage-log .log-kill {
-        color: var(--colour-data-red);
-    }
-
-    .damage-log .log-nothing {
-        opacity: 0.55;
-    }
-
-    .fire-target {
-        font-family: var(--font-family-code);
-        opacity: 0.85;
-    }
-
-    /* Written as part-list li and not just hardpoint-card.
-
-       A card IS an li of a part list, and that selector - one class plus an element - OUTWEIGHS a
-       bare class. So this rule's own padding and gap never applied at all: every card in the panel
-       has been rendering at the list's 3px by 6px with a 1px gap, which is what "the health bar and
-       muzzle selectors are smashed together" was. The numbers below are the roomier ones the user
-       asked to carry over from the story graph's tiles. */
-
-    .part-list li.hardpoint-card {
-        display: flex;
-        flex-direction: column;
-        /* Lines within a group sit close; the GROUPS are pushed apart below. Not blank rows - just
-           enough air that the title block, the bar, the muzzles and the buttons read as four
-           things rather than one column of text. */
-        gap: var(--space-4);
-        padding: var(--space-8) var(--space-8);
-        border: var(--space-1) solid var(--colour-line-strong);
-        border-radius: var(--radius-6);
-        cursor: pointer;
-    }
-
-    .hardpoint-card:hover {
-        background: var(--colour-hover);
-    }
-
-    /* The selected card is the one the attacker is aimed at, which is the same state the Fire at
-       list and the targeting marks show. One fact, three places, one highlight. */
-
-    .hardpoint-card.selected {
-        background: var(--colour-selected);
-        border-color: var(--colour-focus);
-    }
-
-    /* Shot away. Dimmed rather than struck through or removed: it is still a card you can press to
-       put back, and a row that vanishes when destroyed takes the way back with it. */
-
-    .hardpoint-card.gone .part-name {
-        opacity: 0.5;
-        text-decoration: line-through;
-    }
-
-    /* A death clone card is a READING, not a control: the card itself does nothing and only the
-       jump in its corner does. So it drops the hardpoint card's pointer and its hover, both of
-       which promise a click that is not there. The SELECTED highlight stays - it says which clone
-       the weapon you have built would actually produce, and that is the section's whole question.
-
-       A unit weapon card is the same: pressing a hardpoint card aims the attacker at it, and a unit
-       weapon is not a target, so there is nothing for the card body itself to do. Its buttons are
-       still buttons. */
-
-    .clone-card,
-    .weapon-card {
-        cursor: default;
-    }
-
-    .clone-card:not(.selected):hover,
-    .weapon-card:hover {
-        background: none;
-    }
-
-    /* No wreck at all: the object is not defined anywhere, or it declares no tactical model. The
-       one thing worth saying on a clone card beyond the mapping itself. */
-
-    .card-unresolved {
-        color: var(--colour-warning);
-    }
-
-    /* Title line: the name, and the jump pushed to the far corner. */
-
-    .card-head {
-        display: flex;
-        align-items: center;
-        gap: var(--space-6);
-    }
-
-    .card-head .part-name {
-        font-weight: 600;
-    }
-
-    .card-head .goto-definition,
-    .card-head .icon-btn {
-        margin-left: auto;
-        flex-shrink: 0;
-    }
-
-    /* The Type, which is game data rather than prose - it picks the reticle and it is what a reader
-       greps their own files for. */
-
-    .card-type {
-        font-family: var(--font-family-code);
-        opacity: 0.75;
-    }
-
-    /* Small, and dimmed when the game would not draw it. The card says Is_Targetable in words as
-       well; this is the picture of the same fact. */
-
-    .card-reticle {
-        width: 16px;
-        height: 16px;
-        flex-shrink: 0;
-        image-rendering: pixelated;
-    }
-
-    /* The pool, as a bar with its own numbers on it. A bar alone cannot be checked against a file
-       and a number alone cannot be read at a glance, so it carries both. */
-
-    .card-health {
-        position: relative;
-        display: block;
-        height: 14px;
-        border-radius: var(--radius-3);
-        overflow: hidden;
-        background: var(--colour-input);
-    }
-
-    .card-health-fill {
-        display: block;
-        height: 100%;
-        transition: width 0.15s linear;
-    }
-
-    .card-health-label {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        padding-right: var(--space-4);
-        font-size: var(--font-size-smallest);
-        font-variant-numeric: tabular-nums;
-        /* Over both the filled and the empty half, so it has to carry its own contrast rather than
-           relying on whichever colour happens to be under it. */
-        color: var(--colour-ink);
-        text-shadow: 0 0 3px var(--colour-editor-ground);
-    }
-
-    /* One row per fire bone, full width: the slot on the left and the bone it names beside it. They
-       were inline pills showing the bone alone, which says where a shot leaves from but not which
-       of Fire_Bone_A and _B declared it. */
-
-    .bone-picks {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-    }
-
-    /* Where the turret is pointed, with the way back to rest beside it. A readout rather than a
-       control, so the numbers lead and the button sits at the end of the row. */
-
-    .turret-aim {
-        display: flex;
-        align-items: center;
-        gap: var(--space-6);
-        margin-top: var(--space-4);
-    }
-
-    .turret-aim .detail {
-        flex: 1;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .muzzle-row {
-        display: flex;
-        align-items: center;
-        gap: var(--space-6);
-        width: 100%;
-        padding: var(--space-2) var(--space-6);
-        border: var(--space-1) solid transparent;
-        border-radius: var(--radius-3);
-        background: var(--colour-action-2);
-        color: var(--colour-ink);
-        font-size: var(--font-size-smaller);
-        cursor: pointer;
-        text-align: left;
-    }
-
-    .muzzle-row:hover:not(:disabled) {
-        background: var(--colour-hover);
-    }
-
-    .muzzle-row.selected {
-        border-color: var(--colour-focus);
-        background: var(--colour-selected);
-    }
-
-    .muzzle-row:disabled {
-        opacity: 0.45;
-        cursor: default;
-    }
-
-    .muzzle-slot {
-        flex: 0 0 auto;
-        opacity: 0.75;
-    }
-
-    .muzzle-bone {
-        font-family: var(--font-family-code);
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    /* The measurements, behind the info button. A definition list because that is what it is - a
-       label and a value - and it lines the values up in a column the eye can run down. */
-
-    .card-info {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        gap: var(--space-2) var(--space-8);
-        margin: 0;
-        padding: var(--space-8) var(--space-8);
-        font-size: var(--font-size-smaller);
-    }
-
-    .card-info dt {
-        opacity: 0.65;
-    }
-
-    .card-info dd {
-        margin: 0;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .card-info dd:only-child,
-    .card-info dd:not(dt + dd) {
-        grid-column: 1 / -1;
-        opacity: 0.8;
-    }
-
-    /* Pushed to the far end: the three on its left DO something to the model, and this one only
-       says what the file holds. */
-
-    .card-actions .card-info-btn {
-        margin-left: auto;
-    }
-
-    /* The gaps that group the card. Each of these starts a new group, so the space goes above it. */
-
-    .hardpoint-card .card-health {
-        margin-top: var(--space-8);
-    }
-
-    .hardpoint-card .bone-picks {
-        margin-top: var(--space-8);
-    }
-
-    .card-actions {
-        margin-top: var(--space-8);
-    }
-
-    .tree-pane {
-        position: relative;
-    }
-
-    /* Drawn ON the list, hard against its bottom-right corner.
-
-       Closed, it is four icons hugging the right. Open, it also claims the left edge of the pane -
-       which is the whole reason for floating it: sharing a row with the icons, the field measured
-       58px of the 214 a docked panel has, and a bone name does not fit in 58px. Nothing moves when
-       it opens, because the icons are anchored to the right edge either way. */
-
-    .tree-search {
-        position: absolute;
-        right: 6px;
-        bottom: 6px;
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        /* Wraps, and the plate is anchored by its BOTTOM, so a line that does not fit is added
-           above the icons rather than below them. The icons therefore never move whatever the dock
-           is doing: wide, this is one row with the field to their left, which is the shape it was
-           designed as; narrow, the field takes a line of its own on top. Measured at a docked 214px
-           the field got 34px sharing the row - not enough to read a bone name in - and the same
-           layout at twice the width gives it 135px, which is. */
-        flex-wrap: wrap;
-        gap: var(--space-4);
-        padding: var(--space-2);
-        border-radius: var(--radius-6);
-        /* Its own plate. Rows run underneath it, and a transparent strip over a list of names is
-           unreadable in both directions. */
-        background: color-mix(in srgb, var(--colour-sidebar) 88%, transparent);
-        border: var(--space-1) solid var(--colour-line-strong);
-    }
-
-    .tree-search.open {
-        left: 6px;
-    }
-
-    /* The basis is what decides where it wraps: below this it is not worth having on the row, and
-       the whole line goes above the icons instead.
-
-       The editor's own input tokens, declared rather than inherited. Every other input in the
-       extension picks these up from the rule VS Code injects into a webview, but this one sits on
-       a plate of its own over a list, where an input that merely happens to look right is one host
-       stylesheet change away from looking wrong. Rounded to match the plate it stands in. */
-
-    .tree-search .tree-filter {
-        flex: 1 1 130px;
-        min-width: 0;
-        box-sizing: border-box;
-        /* The ICONS' height, exactly. Left to its own, the field came out 27px against their 22,
-           so opening it grew the row from 30 to 35 - and because the plate is anchored by its
-           bottom and its items are centred, the whole icon strip rose 2px under the pointer that
-           had just pressed it. Padding goes with it: an input centres its own text once it has a
-           height, so the vertical padding was only ever there to make one. */
-        height: 22px;
-        padding: 0 var(--space-8);
-        color: var(--colour-input-ink);
-        background: var(--colour-input);
-        border: var(--space-1) solid var(--colour-input-line);
-        border-radius: var(--radius-3);
-        font-family: inherit;
-        font-size: inherit;
-    }
-
-    /* Inset, so the ring is drawn ON the field rather than growing it - an outline that adds a
-       pixel each side would nudge the icons every time the box took focus. */
-
-    .tree-search .tree-filter:focus {
-        outline: var(--space-1) solid var(--colour-focus);
-        outline-offset: -1px;
-    }
-
-    .tree-search .tree-filter::placeholder {
-        color: var(--colour-placeholder);
-    }
-
-    /* The one button that never moves. Everything else in this row is what it opens onto, so it
-       keeps its width whichever of the two is showing. */
-
-    .tree-search .tree-search-toggle {
-        flex: 0 0 auto;
-    }
-
-    .tree-search-icons {
-        display: flex;
-        align-items: center;
-        gap: var(--space-4);
-        flex: 0 0 auto;
-    }
-
-    /* The empty message keeps the list's own shape rather than the row's - no hover, no pointer,
-       and it must not look like something you can click. */
-
-    .bone-tree .tree-empty {
-        list-style: none;
-        cursor: default;
-    }
-
-    /* Controls that describe the VIEW rather than the subject, docked to the stage's own corners.
-    
-           They belonged to nothing in the right-hand dock, which describes the MODEL, and between them
-           they filled it: the camera, five overlay pills, a faction dropdown with a colour well under
-           it and a renderer switch left no room for the one thing the foot is for, which is the
-           playback bar. On the stage each cluster sits next to what it acts on, and the dock is free.
-    
-           The plate itself is shared - see stageChromeCss. */
-
-    ${stageChromeCss}
-    /* Each EDGE is one row rather than two independently placed corners.
-        
-               Absolutely positioning a left cluster and a right cluster works until the stage is narrow -
-               and this panel is routinely docked beside code. A Star Destroyer offers twelve factions, so
-               its palette is fourteen swatches wide and would have run straight under the renderer switch.
-               As a row they meet in the middle and each plate wraps inside itself instead.
-        
-               pointer-events is load-bearing: the row spans the whole stage, so left as it is it would
-               swallow every camera drag that started anywhere near the top or bottom of the viewport. The
-               row is transparent to the mouse and only the plates on it are not. */
-    .stage-row {
-        position: absolute;
-        left: 8px;
-        right: 8px;
-        z-index: 2;
-        display: flex;
-        gap: var(--space-8);
-        pointer-events: none;
-    }
-
-    .stage-row > * {
-        pointer-events: auto;
-    }
-
-    .stage-row .stage-chrome {
-        position: static;
-    }
-
-    .stage-top {
-        top: 8px;
-        align-items: flex-start;
-    }
-
-    .stage-bottom {
-        bottom: 8px;
-        align-items: flex-end;
-    }
-
-    /* BOTH edges are three-slot rows now, and the middle slot is what the row is about: the colour
-           above, the ability command bar below.
-    
-           The bottom edge used to position two plates absolutely - a centred palette and a corner
-           switch - because as a flex row or a grid each squeezed the other, and below about 600px there
-           is genuinely not enough space for a centred strip AND a corner plate. That reasoning still
-           holds and is why the narrow case below still STACKS rather than compressing anything. What
-           changed is the count: the edge carries four groups now, and four absolutely-positioned plates
-           cannot be made to meet in the middle at all.
-    
-           The container query measures the STAGE rather than the window, which is the thing that
-           actually varies - this panel is usually docked beside code. */
-    @container (max-width: 700px) {
-        .stage-row {
-            flex-direction: column;
-            align-items: center;
-            gap: var(--space-6);
-        }
-
-        /* Stacked, a slot is one centred line rather than a third of a row. */
-        .stage-slot,
-        .stage-slot-end,
-        .stage-slot-mid {
-            flex: 0 0 auto;
-            width: auto;
-            max-width: 100%;
-            justify-content: center;
-        }
-
-        /* Read outwards from the model in both directions: the actions nearest the edge, the
-           standing choices furthest from it. Reversing the bottom keeps the attack tool closest to
-           the bottom of the stage, where it was before the stack. */
-        .stage-bottom {
-            flex-direction: column-reverse;
-        }
-    }
-
-    /* A COLUMN, which is the one arrangement that cannot squash.
-    
-           A wrapping flex row's intrinsic width is its largest item, not the sum - measured every way
-           round, this box reported 201px around 276px of children, unchanged by width: max-content,
-           min-width: max-content or an inline style, while a hard-coded width took effect. So as a row
-           it either clipped "Default | Game" into "Dif..|Ga..." or rendered the button outside its own
-           background, depending on how the wrapping was forced.
-    
-           Stacked, the intrinsic width IS the widest row and there is nothing left to get wrong.
-    
-           NOTE: the plate itself is gone - the switch lives in Scene > Effects now, where .field
-           already stacks. Kept as the record of why a segmented control cannot be laid out in a row
-           inside a max-width plate, in case anything else is ever put on that edge. */
-
-    /* A readout, not a control - so no hover, no pointer, and quieter than the switch above it. */
-
-    .shader-state {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: var(--space-4);
-        font-size: var(--font-size-smaller);
-        opacity: 0.7;
-        color: var(--colour-muted);
-    }
-
-    /* The two side slots are EQUAL, which is the whole of what centres the middle one.
-    
-           They were not: the leading spacer was flex 1 1 0 while the end slot took its natural
-           width, so the spacer grew to fill everything left over and shoved the palette rightwards into
-           the renderer switch instead of balancing it. A centred element needs the same amount of
-           nothing on both sides. */
-
-    .stage-slot {
-        flex: 1 1 0;
-        min-width: 0;
-        display: flex;
-        align-items: flex-start;
-        gap: var(--space-8);
-        flex-wrap: wrap;
-    }
-
-    .stage-slot-end {
-        justify-content: flex-end;
-    }
-
-    /* The middle slot centres its contents; the two side slots being EQUAL is what centres the
-       slot itself. */
-
-    .stage-slot-mid {
-        justify-content: center;
-    }
-
-    .stage-bottom .stage-slot {
-        align-items: flex-end;
-    }
-
-    /* Nothing in a side slot shrinks. Letting the renderer switch compress turned "Default | Game"
-       into "Dif..|Ga..." - a control you can neither read nor aim at - while the palette in the
-       middle wraps to another row perfectly well and stays centred doing it. */
-
-    .stage-slot .stage-chrome {
-        flex: 0 0 auto;
-    }
-
-    /* A mode selector sizes to its CONTENT on the stage, not to its container.
-
-       NOTE: no backticks anywhere in this comment - the whole block is a template literal, and one
-       backtick ends it. The error lands twenty lines away as a TS1443 about module declarations.
-
-       The shared rule is written for the dock, where one of these fills a field: full width,
-       segments at flex 1, and an ellipsis so a long label gives way when the panel is narrow. That
-       is right there and wrong here. A stage plate is one of several sharing a row and has no width
-       of its own to fill, so the dock's rule divided the group into equal 41px segments and clipped
-       Front to Fr... and Author to A...
-
-       The same trap the shader switch hit from the other side - see the .shader-corner note above,
-       which is all that is left of it. A segmented control on this stage needs its own width, or it
-       gets cut in half. */
-
-    .stage-chrome .mode-selector {
-        flex-shrink: 0;
-        width: auto;
-    }
-
-    .stage-chrome .mode-selector button {
-        flex: 0 0 auto;
-        min-width: max-content;
-        overflow: visible;
-        text-overflow: clip;
-        white-space: nowrap;
-    }
-
-    .faction-palette {
-        min-width: 0;
-        justify-content: center;
-    }
-
-    /* A labelled control on a stage plate: the label INLINE and small, not above a full-width
-       input the way the dock writes one. ALT and LOD are three letters and the number beside them
-       is the whole answer, so the pair fits in the 22px box everything else on the stage uses. */
-
-    .stage-field {
-        display: flex;
-        align-items: center;
-        gap: var(--space-4);
-        font-size: var(--font-size-smaller);
-        white-space: nowrap;
-    }
-
-    .stage-field > span {
-        opacity: 0.7;
-    }
-
-    /* A slider says WHERE you are on the axis but never WHAT that is, so the value beside it says
-       so - in the health band the stage covers on the damage axis, in meshes and triangles on the
-       detail one, and in words (undamaged, distant, close-up) wherever neither number is known.
-
-       Fixed width so the plate does not resize as the thumb moves, which would shove the ability
-       bar sideways mid-drag, and sized per axis rather than shared: 92px holds the damage axis's
-       longest, "0 (undamaged)" at 88px, and the detail axis needs 165 for a model with four figures
-       of meshes. Measured in this font by the harness probe measure-plate.js; do not guess. */
-
-    .stage-field .stage-value {
-        min-width: 92px;
-        opacity: 0.85;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .stage-field.detail .stage-value {
-        min-width: 165px;
-    }
-
-    /* Short enough that two of them plus the renderer fit the left slot on a docked panel. */
-
-    .stage-field input[type="range"] {
-        width: 84px;
-    }
-
-    /* The tier count sits inline after its word, so it is sized to the two digits it holds rather
-       than stretching like the fields above it. */
-
-    .stage-flyout .tier-count {
-        width: 52px;
-    }
-
-    .stage-chrome select {
-        height: 22px;
-        font-size: 1em;
-        color: var(--colour-dropdown-ink);
-        background: var(--colour-dropdown);
-        border: var(--space-1) solid var(--colour-dropdown-line);
-        border-radius: var(--radius-3);
-        padding: 0 var(--space-4);
-        max-width: 150px;
-    }
-
-    /* The command bar and the unit's pools, stacked. Two plates rather than one, so a subject with
-       no abilities still gets its bars and a bare model gets neither. */
-
-    .command-stack {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: var(--space-4);
-        max-width: 100%;
-    }
-
-    /* The command bar. Wraps rather than scrolls: a unit with fourteen abilities is rare and a
-       second row is cheap, while a bar that scrolls hides the very thing it exists to show.
-
-       The min-width is the user's: room for a SECOND key whether or not the unit has one, so the
-       bar does not resize as you move between units - and so the bars beneath it have a width worth
-       drawing. Two 30px keys, the details button, and the gaps between them. */
-
-    .ability-bar {
-        flex-wrap: wrap;
-        /* The keys pack from the LEFT, so ability one is leftmost whatever the unit has and a
-           second one appears beside it. Centred, they slid sideways every time the count changed -
-           the bar was the right width and the wrong arrangement. */
-        justify-content: flex-start;
-        max-width: 100%;
-        min-width: 148px;
-        box-sizing: border-box;
-    }
-
-    /* The reading matter, pinned to the far end. It is the one thing in the bar that is not an
-       ability, so it holds still while the keys grow towards it. */
-
-    .ability-bar > .icon-btn {
-        margin-left: auto;
-    }
-
-    /* What the unit has left. Bars only - the numbers are on the hover and in the attacker's own
-       readout, and three labelled rows under the command bar would be a panel rather than a
-       glance. */
-
-    .status-bars {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        width: 100%;
-        min-width: 148px;
-        box-sizing: border-box;
-    }
-
-    .status-bar {
-        display: block;
-        width: 100%;
-    }
-
-    .status-bar-track {
-        display: block;
-        width: 100%;
-        height: 5px;
-        border-radius: var(--radius-3);
-        overflow: hidden;
-        background: var(--colour-panel);
-    }
-
-    /* No transition on the width. A shot empties a pool in one step and the engine's own bars do
-       not slide; animating it would show a number the simulation never held. */
-
-    .status-bar-fill {
-        display: block;
-        height: 100%;
-    }
-
-    /* A KEY, sized to the art rather than to a word. The atlas slot is 26x26 and the game draws it
-       at that size; blown up, hand-drawn 26px art looks broken rather than large. */
-
-    .stage-chrome .ability-key {
-        width: 30px;
-        height: 30px;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--radius-3);
-        border: var(--space-1) solid transparent;
-        background: var(--colour-action-2);
-        color: var(--colour-action-2-ink);
-        cursor: pointer;
-        overflow: hidden;
-    }
-
-    .stage-chrome .ability-key:hover:not(:disabled) {
-        border-color: var(--colour-focus);
-    }
-
-    /* Active reads as PRESSED IN, not merely highlighted - it is a state you leave running while
-       you look at what it did, so it has to survive the pointer moving away. */
-
-    .stage-chrome .ability-key.active {
-        background: var(--colour-action);
-        color: var(--colour-action-ink);
-        border-color: var(--colour-focus);
-    }
-
-    /* An order - it drives nothing on this model. Dimmed rather than absent, and its tooltip says
-       why: what a unit CAN do is worth reading even where the answer is "nothing you can see". */
-
-    .stage-chrome .ability-key:disabled {
-        opacity: 0.4;
-        cursor: default;
-    }
-
-    /* The stand-in where no icon resolved: the first characters of the name, which at 30px is
-       enough to tell two keys apart when the tooltip carries the rest. */
-
-    .ability-key-text {
-        font-size: var(--font-size-smallest);
-        line-height: 1;
-        padding: 0 var(--space-2);
-        text-align: center;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 100%;
-    }
-
-    /* Icon-only plates are square-buttoned by the shared stageChromeCss. */
-
-    /* ONE height for everything on the stage, set here rather than left to each control's
-       contents. A glyph and a word are different heights, and the plates ended up stepped: the
-       scene globe stood taller than the preset words beside it and the camera button taller again.
-       The box is the same and what sits in it is centred. */
-
-    .stage-chrome .icon-btn,
-    .stage-chrome .swatch,
-    .stage-chrome .mode-selector button {
-        height: 22px;
-        font-size: var(--font-size-smaller);
-        padding: 0 var(--space-8);
-        /* A two-word label breaking in half makes the button taller than the plate it sits in,
-           which then reports a height nothing else expects. */
-        white-space: nowrap;
-    }
-
-    /* The SHAPE says which kind of control this is, and the two must not borrow each other's.
-
-       A pill is the panel's mark for a toggle - an overlay switch, a kind filter - each one holding
-       or releasing on its own. A mode switch is one choice out of several, and it says so by being
-       segments that share their borders and their ends: exactly what the Skeleton control in the
-       dock looks like. Rounding every segment to a pill made a radiogroup wear the toggles' clothes
-       while behaving as a radiogroup, which is the same mismatch as the aria-pressed it just lost.
-
-       The end radii come from the shared rule, which is interpolated above this one; all this has
-       to do is stop overriding them. */
-
-    .stage-chrome .icon-btn,
-    .stage-chrome .swatch {
-        border-radius: var(--radius-6);
-    }
-
-    .stage-chrome .mode-selector button {
-        border-radius: 0;
-    }
-
-    .stage-chrome .mode-selector button:first-child {
-        border-radius: var(--radius-3) 0 0 var(--radius-3);
-    }
-
-    .stage-chrome .mode-selector button:last-child {
-        border-radius: 0 var(--radius-3) var(--radius-3) 0;
-    }
-
-    /* Sized to the box above rather than to the glyph, which is what made the globe the odd one
-       out - a 16px icon in a row of 0.9em words. */
-    /* An icon is an SVG here, sized by the component. The stage's own buttons carry nothing else,
-       so this only has to stop a glyph stretching the 22px box it sits in. */
-
-    .stage-chrome .icon-btn svg {
-        flex-shrink: 0;
-    }
-
-    /* The colour IS the control, so the swatch carries no label - the faction's name is the title
-       and reaches both a hover and a screen reader. Square and generous enough to judge a colour
-       by, which a thin strip is not. */
-
-    .faction-palette .swatch {
-        width: 22px;
-        height: 22px;
-        padding: 0;
-        border: var(--space-1) solid var(--colour-line-strong);
-        border-radius: var(--radius-3);
-        cursor: pointer;
-        background-clip: padding-box;
-    }
-
-    /* The ring goes OUTSIDE the swatch. A border would eat into the colour being judged, and on a
-       dark faction it is the only thing that says which one is applied. */
-
-    .faction-palette .swatch.active {
-        outline: 2px solid var(--colour-focus);
-        outline-offset: 1px;
-    }
-
-    .faction-palette .swatch-plain {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--colour-muted);
-        background: transparent;
-    }
-
-    /* Always last, whatever the roster does - see the markup. A divider says it is not a faction. */
-
-    .faction-palette .swatch-custom {
-        margin-left: var(--space-4);
-        border-left: var(--space-1) solid var(--colour-line);
-        padding-left: var(--space-6);
-        width: 28px;
-        box-sizing: content-box;
-    }
-
-    /* The scene sits at the left of the stage and the camera at the right, mirroring the buttons
-       that open them. The flyout itself is shared - see stageFlyoutCss. */
-
-    ${stageFlyoutCss}
-    /* Everything below is the flyout being LESS CRAMPED, and every rule is scoped to it on purpose.
-           The .field and .dock-section rules come from shared/dockChrome.ts, which the story
-           graph, the localisation grid and the encyclopedia also wear - loosening them there is a
-           different decision from loosening this dialog, and not one this asked for.
-    
-           What was measured on the weapon flyout before this: sections 8px apart, a label 5px from its
-           control, checkbox rows 4px apart, and inputs on the browser's own padding - so the fields ran
-           together into one dense stack, and the projectile list drew its rows with no padding at all. */
-        /* A section is a GROUP. At 8px its fields butted into each other and the heading read as one
-           more row. */
-    .stage-flyout .dock-section {
-        gap: var(--space-12);
-    }
-
-    .stage-flyout .field {
-        gap: var(--space-6);
-    }
-
-    /* A row of switches needs more between them than a flex gap of 4, which put "Shield" and "Hull"
-       close enough to read as one control with two boxes. */
-
-    .stage-flyout .view-row {
-        gap: var(--space-8);
-    }
-
-    /* A note is prose and is the one thing here that wraps, so it gets the leading to match. */
-
-    .stage-flyout .field-note {
-        line-height: 1.45;
-    }
-
-    /* The controls themselves. Nothing gave these any padding, so a number sat hard against the
-       left edge of its box. Not applied to the stage plates - the stage-chrome select is a 22px
-       control on the stage edge and sets its own. */
-
-    .stage-flyout input[type="text"],
-    .stage-flyout input[type="number"],
-    .stage-flyout select {
-        padding: var(--space-4) var(--space-8);
-    }
-
-    /* A list box, where the padding has to go on the ROWS - padding on the select itself indents
-       the frame and leaves the rows as tight as they were. This is the control the report was
-       most obviously about. */
-
-    .stage-flyout select[size] {
-        padding: var(--space-2);
-    }
-
-    .stage-flyout select[size] option {
-        padding: var(--space-4) var(--space-6);
-        border-radius: var(--radius-3);
-    }
-
-    .body {
-        flex: 1;
-        display: flex;
-        min-height: 0;
-    }
-
-    /* min-height: 0 is load-bearing - without it the canvas refuses to shrink below its content and
-       shoves the problems bar off the bottom of the panel. */
-
-    .stage-column {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-        min-height: 0;
-    }
-
-    /* The canvas needs a positioned parent so the bone labels can sit over it - and the stage
-       chrome asks this element how wide it is, which is not the same question as how wide the
-       window is. */
-
-    .viewport {
-        position: relative;
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        container-type: inline-size;
-    }
-
-    /* The capture frame: its host is a size container over the canvas, so the frame can be the
-       largest box of the capture's shape that fits - full height or full width - in plain CSS. The
-       shadow dims everything outside it; the host clips the shadow to the viewport. Under the stage
-       chrome, and never under the pointer. */
-
-    .capture-frame-host {
-        position: absolute;
-        inset: 0;
-        container-type: size;
-        display: grid;
-        place-items: center;
-        overflow: hidden;
-        pointer-events: none;
-        z-index: 1;
-    }
-
-    .capture-frame {
-        position: relative;
-        width: min(100cqw, calc(100cqh * var(--capture-ratio)));
-        aspect-ratio: var(--capture-ratio);
-        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
-        outline: 1px dashed var(--colour-focus);
-    }
-
-    .capture-frame-size {
-        position: absolute;
-        top: var(--space-4);
-        left: var(--space-4);
-        padding: 0 var(--space-4);
-        font-size: var(--font-size-smaller);
-        font-variant-numeric: tabular-nums;
-        color: var(--colour-ink);
-        background: color-mix(in srgb, var(--colour-panel) 82%, transparent);
-        border-radius: var(--radius-3);
-    }
-
-    .capture-custom .integer-field {
-        flex: 1 1 0;
-        min-width: 0;
-    }
-
-    /* One line per preset whatever its name: the name gives way, the row's actions never wrap. */
-
-    .preset-list .view-row {
-        flex-wrap: nowrap;
-    }
-
-    .preset-name,
-    .preset-apply {
-        flex: 1 1 0;
-        min-width: 0;
-    }
-
-    /* The button is a flex row, so the ellipsis belongs to the name inside it. */
-
-    .preset-apply {
-        justify-content: flex-start;
-    }
-
-    .preset-apply-name {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    /* The cover over a subject that is still assembling.
-
-       OPAQUE, not a translucent scrim: the whole point is that the half-built model underneath is
-       not worth looking at, and a scrim shows exactly the black untextured hull the reader
-       complained about, only dimmer. It sits under the stage chrome's z-index so the view controls
-       stay reachable - they act on the room, which is ready whether or not the model is. */
-
-    .load-cover {
-        position: absolute;
-        inset: 0;
-        z-index: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: var(--space-8);
-        background: var(--colour-editor-ground);
-        color: var(--colour-muted);
-        font-size: var(--font-size-12);
-    }
-
-    .load-spinner {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        border: 2px solid var(--colour-line-strong);
-        border-top-color: var(--colour-progress);
-        animation: load-spin 0.9s linear infinite;
-    }
-
-    /* A reader who has asked for no motion gets none: the ring holds still and the counts
-       underneath are what says the load is moving. */
-    @media (prefers-reduced-motion: reduce) {
-        .load-spinner {
-            animation: none;
-        }
-    }
-
-    @keyframes load-spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-
-    .load-label {
-        letter-spacing: 0.02em;
-    }
-
-    .load-detail {
-        font-variant-numeric: tabular-nums;
-        opacity: 0.7;
-    }
-
-    /* Absolutely positioned, NOT a flex child. The renderer sets the canvas width ATTRIBUTE, which
-       becomes a flex item's min-content width, so the canvas could never shrink below its last size -
-       and since it then measured wider than its parent, every resize made it bigger again. It reached
-       1400px inside an 839px column. Taking it out of flow breaks the loop: it can only ever be the
-       size of .viewport. */
-
-    canvas {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        display: block;
-        /* The scene paints its own ground. Without this the canvas borrows the panel background and
-           an unlit hull on a dark theme is invisible. Deliberately NOT a themed colour - see the
-           token's own note in tokens.ts. */
-        background: var(--colour-scene-ground);
-    }
-
-    /* Labels are DOM, not sprites: they stay crisp at any zoom, theme themselves, and can be read by
-       a screen reader. pointer-events off, or they would swallow the drags that orbit the camera. */
-
-    .bone-labels {
-        position: absolute;
-        inset: 0;
-        overflow: hidden;
-        pointer-events: none;
-    }
-
-    .bone-label {
-        position: absolute;
-        top: 0;
-        left: 0;
-        margin: -9px 0 0 var(--space-8);
-        padding: 0 var(--space-2);
-        font-size: var(--font-size-10);
-        white-space: nowrap;
-        color: var(--colour-editor-ink);
-        background: color-mix(
-            in srgb,
-            var(--colour-editor-ground) 70%,
-            transparent
-        );
-        border-radius: var(--radius-3);
-    }
-
-    .bone-label.selected {
-        color: var(--colour-editor-ground);
-        background: var(--colour-focus);
-    }
-
-    /* The targeting marks. Shares the label layer, so it inherits pointer-events: none and the
-       clipping - a reticle must never swallow the drag that orbits the camera. Sized in JS, from
-       the fraction of the screen the game declares, so nothing here sets a width. */
-
-    .reticle-mark {
-        position: absolute;
-        top: 0;
-        left: 0;
-        /* The ICON is a mask and the colour is the background, so the mark can be tinted by the
-           hardpoint's health - the game runs it bright green through yellow and orange to red, and an
-           <img> cannot be recoloured. Both properties are set from JS per mark. */
-        mask-repeat: no-repeat;
-        -webkit-mask-repeat: no-repeat;
-        mask-size: contain;
-        -webkit-mask-size: contain;
-    }
-
-    /* A deep skeleton indents far enough that nowrap rows widened the WHOLE panel: the dock's
-       min-content width won over its set width, .body grew past the window, and the canvas stretched
-       to 1400px inside an 1100px viewport. min-width: 0 lets the dock hold its size; the tree scrolls
-       inside it instead. */
-
-    .right-dock {
-        min-width: 0;
-    }
-
-    .dock-content {
-        min-width: 0;
-    }
-
-    /* Toggle buttons in the icon-btn / .active language the localisation search and the story
-       graph's lane switches already use, rather than a checkbox row of their own invention.
-       No backticks in here: this is a styled-components template literal.
-
-       .kind-filter and .selection-actions were the two blocks this pass folded away - the kinds
-       into the search element, Reset into the section title - so only the overlay strip is left. */
-
-    .view-toggles {
-        display: flex;
-        gap: var(--space-4);
-        flex-wrap: wrap;
-    }
-
-    .tree-search .icon-btn,
-    .view-toggles .icon-btn {
-        font-size: var(--font-size-smaller);
-        padding: var(--space-2) var(--space-8);
-        border-radius: var(--radius-6);
-    }
-
-    /* A row's twisty, kind picture and name are dockChromeCss's .tree-row, shared with the Mod
-       Browser; what follows is this tree's own - its list, its selection, its gating, its eye. */
-
-    /* Scrolls inside itself rather than growing without limit.
-    
-           The controls belong under the list, and a Star Destroyer's fifty rows would otherwise put the
-           filter fifty rows down the panel - "below" has to still mean "reachable". The list keeps the
-           top of the section, takes as much room as it needs up to this, and hands the rest back. */
-    /* Scrolls DOWN only. Rows are nowrap so a name never breaks in half, which used to mean a
-       deep tree with long hardpoint ids pushed the list sideways and put a horizontal scrollbar
-       under it - and a tree you have to scroll sideways to read is a tree you cannot scan. The
-       name gives up its tail instead; the whole of it is on the row's tooltip and in its details. */
-
-    .bone-tree {
-        list-style: none;
-        margin: 0 0 var(--space-2);
-        /* The foot pad is the floating search strip's height. Without it the last row can never be
-           scrolled out from under the strip, and on a model whose last row is the one you want -
-           the tree is ordered, so that happens - it is simply unreachable. */
-        padding: var(--space-2) 0 var(--space-24);
-        overflow-y: auto;
-        overflow-x: hidden;
-        max-height: 48vh;
-    }
-
-    .bone-row {
-        cursor: pointer;
-    }
-
-    .bone-row.selected {
-        background: var(--colour-selected);
-    }
-
-    .bone-row.hidden-bone .tree-name {
-        opacity: 0.55;
-        font-style: italic;
-    }
-
-    /* A row the filter kept only to reach a match below it. The WHOLE row recedes - name, kind
-       icon and controls together - because the complaint was about weight, not about text: an
-       ancestor bone drew its icon in full colour beside the greyed, italic effect rows that were
-       actually being looked for, so the scaffolding was the loudest thing in a filtered tree.
-
-       Recessive, never removed. These rows are the only thing holding the hierarchy together, and
-       they are still real rows worth hiding or inspecting - they just are not the answer. Hover
-       brings the row back to full weight, so acting on one is never a fight. */
-
-    .bone-row.scaffold {
-        opacity: 0.42;
-    }
-
-    .bone-row.scaffold:hover,
-    .bone-row.scaffold.selected,
-    .bone-row.scaffold:focus-within {
-        opacity: 1;
-    }
-
-    .bone-row .bone-attach {
-        color: var(--colour-muted);
-        font-size: var(--font-size-smaller);
-    }
-
-    /* The eye, and the pair of buttons it heads. Pushed to the far edge so they line up in a
-       column whatever the names do - the eye first, then the row's details, which is the order the
-       reader asked for.
-
-       The eye does NOT dim with its neighbour. It is the row's state as well as its control, so a
-       tree of dimmed eyes would be a tree that will not say what it is showing; the details button
-       beside it only ever offers an action. */
-
-    .bone-row .row-eye {
-        margin-left: auto;
-        flex-shrink: 0;
-        min-width: 18px;
-        height: 18px;
-        padding: 0 var(--space-2);
-        opacity: 0.85;
-    }
-
-    .bone-row .row-eye:hover {
-        opacity: 1;
-    }
-
-    /* An open eye is the ordinary state and stays quiet. A CLOSED one is the reader's own doing
-       nine times in ten, so it keeps full weight - a hidden row you cannot find the eye on is the
-       tick that "did nothing" all over again. */
-
-    .bone-row .row-eye.eye-shown {
-        opacity: 0.7;
-    }
-
-    .bone-row:hover .row-eye.eye-shown {
-        opacity: 1;
-    }
-
-    /* Inherited: dimmed and inert, the way Blender greys an eye whose collection is hidden. The
-       title says which ancestor, because a dead control that cannot explain itself is worse than
-       no control. */
-
-    .bone-row .row-eye.eye-inherited {
-        opacity: 0.4;
-    }
-
-    .bone-row .row-eye.eye-inherited:disabled {
-        cursor: default;
-    }
-
-    /* Dim until the row is under the pointer - a deep tree has to read as a list of names, not a
-       column of controls. Never hidden outright: a button that only exists on hover is one nobody
-       finds, which is what the reader reported about this one. Raised from 0.25, where it was
-       invisible against the default dark theme until hovered. */
-
-    .bone-row .row-details {
-        flex-shrink: 0;
-        opacity: 0.45;
-        /* An explicit box rather than one the glyph gives it. A button sized by its icon has no
-           size at all if the icon font has not loaded, which makes it unclickable rather than
-           merely unlabelled. */
-        min-width: 18px;
-        height: 18px;
-        padding: 0 var(--space-2);
-    }
-
-    .bone-row:hover .row-details,
-    .bone-row .row-details:focus-visible,
-    .bone-row .row-details.active {
-        opacity: 1;
-    }
-
-    /* Pinned against the WINDOW, because the row it belongs to lives inside a scroller that would
-       clip it. placeInfo and placeCardInfo supply the corner; everything here is the box itself. */
-
-    .details-flyout {
-        position: fixed;
-        z-index: 6;
-        width: 320px;
-        max-height: 62vh;
-        display: flex;
-        flex-direction: column;
-        border: var(--space-1) solid var(--colour-line-strong);
-        border-radius: var(--radius-6);
-        background: var(--colour-panel);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-    }
-
-    .details-head {
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-6);
-        padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
-        border-bottom: var(--space-1) solid var(--colour-line);
-        font-size: var(--font-size-11);
-    }
-
-    .details-title {
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    /* Takes what is left and gives it back: the title is what identifies the row, so it is the
-       half that survives a narrow box. */
-
-    .details-subtitle {
-        flex: 1;
-        min-width: 0;
-        color: var(--colour-muted);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .details-head .icon-btn {
-        margin-left: auto;
-        align-self: center;
-    }
-
-    .details-body {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-8);
-        padding: var(--space-8) var(--space-8) var(--space-8);
-        overflow-y: auto;
-    }
-
-    /* Word for word what the localisation and encyclopedia problem bars are, because it is the
-       same bar in the same place. The relative position is the one that matters most: the shared
-       panel renders its drag handle absolutely positioned, so without it the handle anchors to
-       some ancestor and the panel cannot be resized at all. */
-
-    /* The band and its prose rows are problemsPanelCss's .problems-band and .prose-problems: this
-       editor's findings are prose, not the short entry labels the loc grids report. */
-
-    /* A row's diagnostic id is problemsPanelCss's .problem-id. */
-
-    /* Which hardpoint, when the sentence does not already say so - see problemWhere. */
-
-    .problem-where {
-        flex-shrink: 0;
-        padding: 0 var(--space-4);
-        border-radius: var(--radius-3);
-        font-family: var(--font-family-code);
-        font-size: var(--font-size-smaller);
-        background: var(--colour-badge);
-        color: var(--colour-badge-ink);
-    }
-
-    /* A readout, not a menu: no hover state and no pointer, because nothing here is clickable yet.
-       A row that looks pressable is a promise of interaction. */
-
-    .part-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-    }
-
-    .part-list li {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
-        padding: var(--space-2) var(--space-6);
-        min-width: 0;
-        cursor: default;
-    }
-
-    .part-list li .field-label {
-        min-width: 0;
-        align-items: flex-start;
-    }
-
-    .part-list li .field-label input[type="checkbox"] {
-        margin-top: var(--space-2);
-        flex-shrink: 0;
-    }
-
-    /* The name WRAPS; only the detail under it is clipped. Alamo hardpoint ids share a long prefix
-       and differ in their last two characters, so one clipped line gave ten rows all reading
-       "HP_Star_Destroyer_Weapon_..." - which is worse than a taller row, because it is the same
-       row ten times. Two lines hold every id the shipped models use. */
-
-    .part-list .part-name {
-        overflow-wrap: anywhere;
-        line-height: 1.25;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    /* Indented to sit under the name rather than under its checkbox, and clipped to one line: a
-       hardpoint's detail is a bone and a hitpoint count, which fits. */
-
-    .part-list li .detail {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        padding-left: var(--space-24);
-        font-size: var(--font-size-smaller);
-        color: var(--colour-muted);
-    }
-
-    /* A weapon's is four separate facts - reach, cone, cadence, damage - and clipping them at the
-       dock's width ended the row on "3 sho...", which says nothing about the cadence it is there
-       to state. Wrapping costs a line; clipping costs the answer. */
-
-    .part-list li .detail.wraps {
-        white-space: normal;
-        overflow: visible;
-    }
-
-    /* The command bar's own icon, at the size the atlas holds it. Blowing a 26x26 slot up makes
-       hand-drawn art look broken; the game draws it at native size and so does this. */
-
-    .ability-row-head {
-        display: flex;
-        align-items: flex-start;
-        gap: var(--space-6);
-        min-width: 0;
-    }
-
-    .ability-row-head .field-label,
-    .ability-row-head .part-name {
-        flex: 1;
-    }
-
-    .ability-icon {
-        width: 26px;
-        height: 26px;
-        flex-shrink: 0;
-        image-rendering: pixelated;
-        display: block;
-    }
-
-    /* The tooltip text the game shows. Wraps - it is a sentence, and clipping it to the dock's
-       width would end most of them mid-word. */
-
-    .part-list li .ability-description {
-        font-style: italic;
-    }
-
-    /* An ability row carries four things now - art, name, what it drives, what the game calls it -
-       where the list this styling comes from carries two. At the 1px gap and 3px padding the rest
-       of .part-list uses, those four ran together into a paragraph and the rows stopped reading as
-       separate abilities at all. Relaxed here rather than on .part-list itself, which the weapon
-       and hardpoint lists share and which is correctly tight for a name and one line under it.
-
-       NOTE: no backticks in this block - it lives inside a styled.div template literal, and one
-       terminates it. That mistake reports itself as "Shell cannot be used as a JSX component". */
-
-    .ability-list li {
-        gap: var(--space-4);
-        padding: var(--space-8) var(--space-6);
-    }
-
-    .ability-list li + li {
-        border-top: var(--space-1) solid var(--colour-line-strong);
-    }
-
-    /* How a jump LOOKS. Where it goes is the card head's business, and this used to decide that
-       too: align-self flex-start and a 21px left margin put it under the text, indented past the
-       icon, which is where it sat before the rows became cards.
-       NOTE: no backticks in this comment - one ends the template literal the stylesheet lives in.
-
-       Those two lines outlived the layout they were written for, and being the more specific rule
-       they beat the head's own auto margin - so the jump on BOTH cards sat 21px after the name
-       instead of at the right edge. Position removed; appearance kept. */
-
-    .part-list li .goto-definition {
-        padding: 0;
-        border: none;
-        background: none;
-        font: inherit;
-        font-size: var(--font-size-smaller);
-        color: var(--colour-heading);
-        cursor: pointer;
-    }
-
-    .part-list li .goto-definition:hover:not(:disabled) {
-        text-decoration: underline;
-    }
-
-    .part-list li .goto-definition:disabled {
-        color: var(--colour-faint);
-        cursor: default;
-    }
-
-    /* Full width now, one row per fire bone - the 21px indent it carried lined it up with a jump
-       that no longer sits under the name. */
-
-    .part-list li .bone-picks {
-        margin-top: var(--space-2);
-    }
-
-    /* A count that can be pressed. Same type as the count beside it so the header does not jump
-       when a selection appears, but with an affordance so it reads as the way out. */
-    /* Pushed to the far end of the title, past the count. The class is the dock's own name for
-       this position - the problems button uses it - so the two corners agree.
-       NOTE: no backticks in this comment; one would end the template literal the whole stylesheet
-       lives in, and the error surfaces far away as a TS1005. */
-
-    .dock-section-title .header-right {
-        margin-left: var(--space-6);
-        flex: 0 0 auto;
-        min-width: 20px;
-        height: 18px;
-        padding: 0 var(--space-2);
-    }
-
-    .dock-section-title .header-right:disabled {
-        opacity: 0.35;
-    }
-
-    .section-count.as-button {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-2);
-        border: var(--space-1) solid var(--colour-line-strong);
-        border-radius: var(--radius-6);
-        padding: 0 var(--space-4);
-        background: none;
-        color: inherit;
-        font: inherit;
-        cursor: pointer;
-    }
-
-    .section-count.as-button:hover {
-        background: var(--colour-hover);
-    }
-
-    /* A picked bone is boxed on the model, so its button carries the same weight as the active
-       segment of a mode selector - it is a current state, not an action waiting to be taken. */
-
-    .btn.selected {
-        background: var(--colour-action);
-        color: var(--colour-action-ink);
-        border-color: var(--colour-action);
-    }
-
-    .stat-row {
-        display: flex;
-        justify-content: space-between;
-        gap: var(--space-12);
-        padding: var(--space-1) var(--space-6);
-        font-variant-numeric: tabular-nums;
-    }
-
-    .stat-row .value {
-        color: var(--colour-muted);
-    }
-
-    .view-row {
-        display: flex;
-        align-items: center;
-        gap: var(--space-4);
-        flex-wrap: wrap;
-    }
-
-    /* The transport itself is shared chrome (playerCss); the story graph's tick transport is the
-       same row. Only the preview's own field sliders are pinned here.
-       (No backticks in here: this is a styled-components template literal.) */
-
-    ${playerCss}
-    .field input[type=range] {
-        direction: ltr;
-    }
-
-    /* No padding of its own now that it lives in the foot - the foot lays its children out with a
-       gap. The old top padding was there to hold it off the tree it used to sit under. */
-
-    .anim-list {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-    }
-
-    /* A family, folded or open. The heading is the whole hit area, not just the chevron - a 13px
-       target beside a word that obviously names the thing being folded is a target people miss. */
-
-    .anim-family {
-        gap: var(--space-4);
-        margin-bottom: var(--space-8);
-    }
-
-    .anim-family:last-child {
-        margin-bottom: 0;
-    }
-
-    .dock-section-title.as-fold {
-        cursor: pointer;
-        user-select: none;
-    }
-
-    .dock-section-title.as-fold:hover {
-        color: var(--colour-ink);
-    }
-
-    /* An ACTION, as a full-width card down a list.
-
-       It was a tile on the dock's shared grid. The user's verdict: the idea "was good on paper, in
-       reality we have a lot of animations where that works and some where the number of alternate
-       indexes escalates so drastically that it is not usable that way". A 128px tile held about
-       four take chips and put the rest behind a sideways scrollbar - which is precisely the case
-       worth looking at. Full width, and the chips WRAP.
-
-       The shape is the user's: play state left and vertically centred, name on the top row left
-       aligned, takes on the bottom row left aligned and filling right. */
-
-    .anim-list {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-    }
-
-    .anim-card {
-        display: flex;
-        align-items: center;
-        gap: var(--space-8);
-        padding: var(--space-8) var(--space-8);
-        border: var(--space-1) solid var(--colour-line-strong);
-        border-radius: var(--radius-6);
-        background: var(--colour-panel);
-    }
-
-    .anim-card:hover {
-        background: var(--colour-hover);
-    }
-
-    .anim-card.active {
-        border-color: var(--colour-action);
-        background: color-mix(in srgb, var(--colour-action) 22%, transparent);
-    }
-
-    /* Its own column, so it is centred across BOTH rows rather than sitting beside the name. */
-
-    .anim-play {
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 28px;
-        height: 28px;
-        padding: 0;
-        border: none;
-        border-radius: var(--radius-3);
-        background: none;
-        color: inherit;
-        cursor: pointer;
-    }
-
-    .anim-play:hover {
-        background: var(--colour-toolbar-hover);
-    }
-
-    .anim-play svg {
-        flex-shrink: 0;
-        opacity: 0.85;
-    }
-
-    /* min-width 0, or a long action name refuses to wrap and pushes the card wider than the dock. */
-
-    .anim-card-body {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        gap: var(--space-2);
-        min-width: 0;
-    }
-
-    .anim-name {
-        text-align: left;
-        overflow-wrap: anywhere;
-    }
-
-    /* WRAPS, where the tile scrolled. Nine idle takes fit on one line at full width and a model
-       with thirty gets a second - which is readable, and a scrollbar over thirty was not. */
-
-    .anim-takes {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        gap: var(--space-2);
-        width: 100%;
-    }
-
-    .anim-take {
-        flex: 0 0 auto;
-        min-width: 20px;
-        padding: var(--space-1) var(--space-4);
-        border: var(--space-1) solid transparent;
-        border-radius: var(--radius-3);
-        background: none;
-        color: var(--colour-muted);
-        font-family: var(--font-family-code);
-        font-size: var(--font-size-smallest);
-        cursor: pointer;
-    }
-
-    .anim-take:hover {
-        background: var(--colour-hover);
-    }
-
-    .anim-take.active {
-        background: var(--colour-action);
-        color: var(--colour-action-ink);
-    }
-
-    .anim-row {
-        display: flex;
-        align-items: center;
-        gap: var(--space-6);
-        width: 100%;
-        padding: var(--space-4) var(--space-8);
-        border: var(--space-1) solid transparent;
-        border-radius: var(--radius-3);
-        background: var(--colour-panel);
-        color: var(--colour-ink);
-        font-family: var(--font-family-ui);
-        font-size: var(--font-size-body);
-        text-align: left;
-        cursor: pointer;
-    }
-
-    .anim-row:hover {
-        background: var(--colour-toolbar-hover);
-        border-color: var(--colour-focus);
-    }
-
-    .anim-row.active {
-        background: var(--colour-action);
-        color: var(--colour-action-ink);
-    }
-
-    .anim-row svg {
-        flex-shrink: 0;
-        opacity: 0.8;
-    }
-
-    .anim-row .anim-name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-`;
-
 /** What a faction with no colour of its own is drawn as, and the custom well's starting point. */
 const NEUTRAL_COLOUR: PreviewRgba = { r: 184, g: 184, b: 184, a: 255 };
 
@@ -2443,36 +432,65 @@ function ModelPreview(): React.JSX.Element {
     const [stats, setStats] = useState<ViewportStats | null>(null);
     const [problems, setProblems] = useState<PreviewProblem[]>([]);
     const [problemsOpen, setProblemsOpen] = useState(false);
-    const [grid, setGrid] = useState(true);
-    // Off by default: a floor is the right backdrop for a walker and the wrong one for a
-    // capital ship, and most of what opens here is in space.
-    const [floor, setFloor] = useState(false);
-    /** Where the ground sits. Not every model is authored standing on the origin. */
-    const [floorLevel, setFloorLevel] = useState(
-        DEFAULT_VIEWER_SETTINGS.floorLevel,
-    );
-    const [wireframe, setWireframe] = useState(
-        DEFAULT_VIEWER_SETTINGS.wireframe,
-    );
-    const [heatOn, setHeatOn] = useState(DEFAULT_VIEWER_SETTINGS.heat);
-    const [heatDebug, setHeatDebug] = useState(
-        DEFAULT_VIEWER_SETTINGS.heatDebug,
-    );
-    const [bloom, setBloom] = useState(DEFAULT_VIEWER_SETTINGS.bloom);
-    const [lights, setLights] = useState<LightRig>(DEFAULT_LIGHTS);
+    /** Nothing is written back until the stored room has been applied, or we would save defaults. */
+    const restoredRef = useRef(false);
 
-    /**
-     * The reader's own camera presets.
-     *
-     * Tier 1, with the rest of the room: a preset exists to frame a ROSTER the same way, so it has
-     * to outlive the subject it was built on.
-     */
-    const [cameraPresets, setCameraPresets] = useState<CameraPreset[]>([]);
+    // The room: every Tier 1 value, its restore, its reset and its save. See `useRoomSettings`.
+    const {
+        grid,
+        setGrid,
+        floor,
+        setFloor,
+        floorLevel,
+        setFloorLevel,
+        wireframe,
+        setWireframe,
+        heatOn,
+        setHeatOn,
+        heatDebug,
+        setHeatDebug,
+        bloom,
+        setBloom,
+        lights,
+        setLights,
+        cameraPresets,
+        setCameraPresets,
+        cameraBindings,
+        setCameraBindings,
+        wind,
+        setWind,
+        weatherIntensity,
+        setWeatherIntensity,
+        background,
+        setBackground,
+        cameraView,
+        setCameraView,
+        drawDistance,
+        setDrawDistance,
+        skeletonOn,
+        setSkeletonOn,
+        labelMode,
+        setLabelMode,
+        folded,
+        setFolded,
+        translatedOn,
+        setTranslatedOn,
+        particlesOn,
+        setParticlesOn,
+        particleSpeed,
+        setParticleSpeed,
+        fireArcs,
+        setFireArcs,
+        applyRoom,
+        resetRoom,
+    } = useRoomSettings({
+        restored: () => restoredRef.current,
+        save: (settings) => post({ type: "setViewerSettings", settings }),
+        isPreset: (view) => PRESETS.some((p) => p.view === view),
+    });
+
     /** The preset whose name is being edited in its row, if any. */
     const [renamingPreset, setRenamingPreset] = useState<string | null>(null);
-
-    /** Which camera preset a kind of subject opens with. Tier 1 with the presets they point at. */
-    const [cameraBindings, setCameraBindings] = useState<CameraBinding[]>([]);
 
     /**
      * How big a capture is written - one of the game's icon sizes, or a custom one - and whether it
@@ -2505,26 +523,8 @@ function ModelPreview(): React.JSX.Element {
     })();
     const [captureTransparent, setCaptureTransparent] = useState(true);
     const [captureScenery, setCaptureScenery] = useState(false);
-    const [wind, setWind] = useState<Wind>(DEFAULT_VIEWER_SETTINGS.wind);
-    const [weatherIntensity, setWeatherIntensity] = useState(
-        DEFAULT_VIEWER_SETTINGS.weatherIntensity,
-    );
     /** Whether the scene holds a weather field - the one thing the intensity reaches. */
     const [hasWeather, setHasWeather] = useState(false);
-    const [background, setBackground] = useState<BackgroundKind>(
-        DEFAULT_VIEWER_SETTINGS.background,
-    );
-
-    /**
-     * The camera preset in force.
-     *
-     * Held rather than fired and forgotten: the presets are a one-of-N choice, and a segmented
-     * control that never shows which one you picked is just four buttons in a box.
-     *
-     * Null once the camera is dragged. A preset is a place to jump to, not a mode the camera stays
-     * in, so keeping "Front" lit while you look at the model from underneath would be a lie.
-     */
-    const [cameraView, setCameraView] = useState<string | null>("threeQuarter");
 
     /**
      * Which lens the dock is showing.
@@ -2666,44 +666,6 @@ function ModelPreview(): React.JSX.Element {
     );
 
     /**
-     * Puts the whole room back to its defaults.
-     *
-     * Every Tier 1 value at once rather than one control at a time: the settings that need
-     * recovering are the ones a reader has already lost track of, and hunting fourteen of them down
-     * individually is the problem rather than the fix. The subject's own state is left alone - it
-     * is not part of the room, and resetting it would undo a damage state the reader set on purpose.
-     *
-     * The weapon bench is left alone for the same reason, and this changed when it moved tiers: it
-     * belongs to the PROJECT now, so throwing away a mod's saved weapons is not something "reset
-     * the room" should ever do.
-     */
-    const resetRoom = (): void => {
-        const room = DEFAULT_VIEWER_SETTINGS;
-
-        setGrid(room.grid);
-        setFloor(room.floor);
-        setFloorLevel(room.floorLevel);
-        setWireframe(room.wireframe);
-        setHeatOn(room.heat);
-        setHeatDebug(room.heatDebug);
-        setBloom(room.bloom);
-        setBackground(room.background);
-        setDrawDistance(room.drawDistance);
-        setLights(room.lights);
-        setCameraPresets(room.cameraPresets);
-        setCameraBindings(room.cameraBindings);
-        setFolded(new Set(room.collapsedPanels));
-        setWind(room.wind);
-        setWeatherIntensity(room.weatherIntensity);
-        setSkeletonOn(room.skeleton);
-        setLabelMode(room.boneLabels as LabelMode);
-        setFireArcs(room.fireArcs);
-        setTranslatedOn(room.effectShaders);
-        setParticlesOn(room.particles);
-        setParticleSpeed(room.particleSpeed);
-    };
-
-    /**
      * The reader's own word about how to tint the hull, recorded as well as applied.
      *
      * The refs hold what they CHOSE; the state holds what this subject could honour. They have to be
@@ -2729,19 +691,10 @@ function ModelPreview(): React.JSX.Element {
             [name]: { ...current[name], ...change },
         }));
 
-    // How much further than the subject the camera can see. Fitted to the model AND its effects, so
-    // 1 already clears a flamethrower's throw; the multiplier is for the trails no fit anticipates.
-    const [drawDistance, setDrawDistance] = useState(
-        DEFAULT_VIEWER_SETTINGS.drawDistance,
-    );
-
     /** The faction the reader last chose, by name, until this subject's own list arrives. */
     const storedFactionRef = useRef<string | null>(null);
     /** The colour they picked by hand instead, which every subject can wear. */
     const storedCustomColourRef = useRef<string | null>(null);
-
-    /** Nothing is written back until the stored room has been applied, or we would save defaults. */
-    const restoredRef = useRef(false);
 
     /**
      * This subject's state from earlier in the session, until the scene arrives to apply it to.
@@ -2793,8 +746,6 @@ function ModelPreview(): React.JSX.Element {
     const [attachments, setAttachments] = useState<
         Map<number, BoneAttachment[]>
     >(new Map());
-    const [skeletonOn, setSkeletonOn] = useState(false);
-    const [labelMode, setLabelMode] = useState<LabelMode>("selected");
     /* No `selectedBone` state. It was a single index kept beside `selected`, which is a set of
        rows - two pieces of state for one fact, and the smaller one won: picking a second fire bone
        drew its axes and silently took the first one's away. The indices are DERIVED below. */
@@ -2802,15 +753,6 @@ function ModelPreview(): React.JSX.Element {
 
     /** Whether the room's controls are unfolded. Closed on open: they are not why you came here. */
     const [worldOpen, setWorldOpen] = useState(false);
-
-    /**
-     * The flyout sections folded shut, by id.
-     *
-     * Held as the FOLDED ones rather than the open ones, so a section added later arrives open - a
-     * control that appears already hidden is one nobody discovers. Tier 1: which groups you keep
-     * shut describes how you work, not the model in front of you.
-     */
-    const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
 
     /**
      * Drops the selection, and with it the box drawn round it in the viewport.
@@ -3126,16 +1068,6 @@ function ModelPreview(): React.JSX.Element {
     const passiveEffectIdsRef = useRef(new Set<string>());
 
     /**
-     * What has been asked for and what has come back, per kind.
-     *
-     * They dedupe - a ten-part unit must not request its shared hull texture ten times - and they
-     * are also what the loading cover counts. Two ledgers rather than one so a texture and an
-     * effect that happen to share a name cannot settle each other.
-     */
-    const textureLedger = useRef(new AssetLedger());
-    const shaderLedger = useRef(new AssetLedger());
-
-    /**
      * How far into loading this subject the preview is.
      *
      * The viewport is covered while it runs - see `loadProgress` for why the load is worth hiding
@@ -3148,17 +1080,6 @@ function ModelPreview(): React.JSX.Element {
         settledAssets: 0,
         timedOut: false,
     });
-
-    /**
-     * Every `.fx` and `.fxh` fetched, by lower-cased file name. Null means "asked for, not there".
-     *
-     * Headers arrive over the same channel as the effects that include them and in no fixed order,
-     * so translation is retried against this whole map each time anything new lands.
-     */
-    const shaderSourcesRef = useRef(new Map<string, string | null>());
-
-    /** Effects already handed to the viewport, so a retry does not rebuild materials for nothing. */
-    const translatedShadersRef = useRef(new Set<string>());
 
     /**
      * Whether any `.fx` source was reachable at all.
@@ -3192,19 +1113,40 @@ function ModelPreview(): React.JSX.Element {
         }[]
     >([]);
 
-    /**
-     * Draw with the effects' own translated shaders, rather than the archetype reading of them.
-     *
-     * On by default: that is the point of the feature, and anything that cannot translate - a
-     * mod-authored effect, or one of the eleven that are render state only - falls back to the
-     * archetype on its own. The switch stays so the two can be compared.
-     */
-    const [translatedOn, setTranslatedOn] = useState(true);
-
     /** How many sub-meshes that actually reaches, out of how many are loaded. */
     const [translatedCount, setTranslatedCount] = useState({
         translated: 0,
         total: 0,
+    });
+
+    /**
+     * The textures and effects the geometry needs in order to be drawn: asked for once each,
+     * counted for the loading cover, and applied to the viewport as the replies land. See
+     * `preview/previewAssetLoader.ts`; the panel only hears about what it shows.
+     */
+    const [assets] = useState(() => {
+        const loader: PreviewAssetLoader = new PreviewAssetLoader(
+            () => viewportRef.current,
+            {
+                post: (message) => post(message),
+                ledgersChanged: () =>
+                    setTally((current) => ({
+                        ...current,
+                        requestedAssets: loader.requested,
+                        settledAssets: loader.settled,
+                    })),
+                shaderRequested: () => setShaderRequested(true),
+                shaderSourceFound: () => setAnyShaderSource(true),
+                translated: (coverage) => setTranslatedCount(coverage),
+                problem: (severity, message) =>
+                    setProblems((current) =>
+                        current.some((p) => p.message === message)
+                            ? current
+                            : [...current, { severity, message }],
+                    ),
+            },
+        );
+        return loader;
     });
 
     /** Everything the model is made of, for the one tree. */
@@ -3229,9 +1171,7 @@ function ModelPreview(): React.JSX.Element {
     const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
     const [anchor, setAnchor] = useState<string | null>(null);
 
-    const [particlesOn, setParticlesOn] = useState(true);
     const [particlesPaused, setParticlesPaused] = useState(false);
-    const [particleSpeed, setParticleSpeed] = useState(1);
     /** Emitter names in file order. Names repeat, so the index is the identity, not the name. */
     const [emitters, setEmitters] = useState<string[]>([]);
     const [hiddenEmitters, setHiddenEmitters] = useState<ReadonlySet<number>>(
@@ -3240,8 +1180,6 @@ function ModelPreview(): React.JSX.Element {
 
     /** Hardpoints currently blown off. */
     const [destroyed, setDestroyed] = useState<ReadonlySet<string>>(new Set());
-
-    const [fireArcs, setFireArcs] = useState(false);
 
     const [reticlesOn, setReticlesOn] = useState(false);
 
@@ -3681,51 +1619,6 @@ function ModelPreview(): React.JSX.Element {
         tally.expectedParts,
     ]);
 
-    /** Publishes what the ledgers now hold, which is what the cover reads. */
-    const syncTally = useCallback((): void => {
-        setTally((current) => ({
-            ...current,
-            requestedAssets:
-                textureLedger.current.requested +
-                shaderLedger.current.requested,
-            settledAssets:
-                textureLedger.current.settled + shaderLedger.current.settled,
-        }));
-    }, []);
-
-    /**
-     * Asks for one texture, once.
-     *
-     * The gate is the ledger's rather than a bare Set because the count and the deduplication have
-     * to agree: the host answers a repeat with nothing, so a name posted twice and counted twice
-     * would leave the cover waiting on a reply that is never coming.
-     */
-    const askForTexture = useCallback(
-        (name: string): void => {
-            if (!textureLedger.current.request(name)) {
-                return;
-            }
-
-            post({ type: "requestTexture", name });
-            syncTally();
-        },
-        [syncTally],
-    );
-
-    /** The same, for an effect or one of its headers. */
-    const askForShader = useCallback(
-        (name: string): void => {
-            if (!shaderLedger.current.request(name)) {
-                return;
-            }
-
-            post({ type: "requestShader", name });
-            setShaderRequested(true);
-            syncTally();
-        },
-        [syncTally],
-    );
-
     const refreshStats = useCallback(() => {
         const viewport = viewportRef.current;
         setStats(viewport?.stats() ?? null);
@@ -3816,62 +1709,6 @@ function ModelPreview(): React.JSX.Element {
      * Damage smoke starts off: the hardpoint is intact, and a ship that smokes from every hardpoint the
      * moment you open it tells the author nothing. Chunk 14's destroy switches it on.
      */
-
-    /**
-     * Translates every effect whose headers have all arrived, and hands the result to the viewport.
-     *
-     * Retried on each arrival rather than tracked as a dependency graph: there are a handful of
-     * headers, they are shared, and re-running a pure translation is cheaper than the bookkeeping.
-     */
-    const translatePending = useCallback((): void => {
-        const viewport = viewportRef.current;
-        if (viewport === null) {
-            return;
-        }
-
-        const read = (name: string): string | null =>
-            shaderSourcesRef.current.get(name.toLowerCase()) ?? null;
-
-        for (const [name, source] of shaderSourcesRef.current) {
-            if (
-                source === null ||
-                !name.endsWith(".fx") ||
-                translatedShadersRef.current.has(name)
-            ) {
-                continue;
-            }
-
-            const result = translateEffect(source, read);
-
-            // Ask for the headers this one needs. Each is requested once; an absent one comes back
-            // as null and stops the retries rather than looping.
-            for (const missing of result.missingIncludes) {
-                askForShader(missing);
-            }
-
-            if (result.effect !== null) {
-                translatedShadersRef.current.add(name);
-                viewport.applyTranslatedEffect(name, result.effect);
-                setTranslatedCount(viewport.translatedCoverage());
-
-                // A sampler reading nothing draws black, which looks like a translation bug and is
-                // usually a texture that did not resolve. Say so rather than leave it on screen.
-                for (const problem of viewport.shaderTextureProblems()) {
-                    setProblems((current) =>
-                        current.some((p) => p.message === problem)
-                            ? current
-                            : [
-                                  ...current,
-                                  { severity: "info", message: problem },
-                              ],
-                    );
-                }
-            } else if (result.missingIncludes.length === 0) {
-                // Nothing more is coming for this one; the archetype is what it draws with.
-                translatedShadersRef.current.add(name);
-            }
-        }
-    }, []);
 
     /**
      * Whether one effect should be drawing right now.
@@ -4049,16 +1886,16 @@ function ModelPreview(): React.JSX.Element {
         refreshStats();
 
         for (const name of viewport.particleTextureNames()) {
-            askForTexture(name);
+            assets.requestTexture(name);
         }
         // The effects too: a system names the engine effect it is drawn with, and the geometry
         // paths asked for shaders before any system existed. Without this a field opened on its
         // own never asks for its effect, and the preview's own shader stays - with nothing to say
         // so. Measured on the asteroid field, as "no difference" after two shader fixes.
         for (const shader of viewport.shaderNames()) {
-            askForShader(shader);
+            assets.requestShader(shader);
         }
-    }, [refreshStats, effectDrawsNow, askForShader]);
+    }, [refreshStats, effectDrawsNow, assets]);
 
     /**
      * Switches one weapon's arc on or off.
@@ -4114,14 +1951,14 @@ function ModelPreview(): React.JSX.Element {
     const requestMaterialAssets = useCallback(
         (viewport: PreviewViewport): void => {
             for (const name of collectTextureNames(viewport.materialExtras())) {
-                askForTexture(name);
+                assets.requestTexture(name);
             }
 
             for (const shader of viewport.shaderNames()) {
-                askForShader(shader);
+                assets.requestShader(shader);
             }
         },
-        [askForTexture, askForShader],
+        [assets],
     );
 
     /**
@@ -4550,8 +2387,7 @@ function ModelPreview(): React.JSX.Element {
                 systemsRef.current.clear();
                 systemScalesRef.current.clear();
                 requestedSystemsRef.current.clear();
-                textureLedger.current.clear();
-                shaderLedger.current.clear();
+                assets.clearLedgers();
 
                 // Cover the viewport again for the new subject. The expected count is the parts
                 // that RESOLVED, because those are the only ones a GLB is asked for - counting the
@@ -4913,10 +2749,10 @@ function ModelPreview(): React.JSX.Element {
                     // Asked for only now, because the system is what names them - the effect it
                     // is drawn with as much as its textures.
                     for (const name of viewport.particleTextureNames()) {
-                        askForTexture(name);
+                        assets.requestTexture(name);
                     }
                     for (const shader of viewport.shaderNames()) {
-                        askForShader(shader);
+                        assets.requestShader(shader);
                     }
 
                     return;
@@ -5001,36 +2837,7 @@ function ModelPreview(): React.JSX.Element {
                 storedFactionRef.current = project.faction;
                 storedCustomColourRef.current = project.customColour;
 
-                setGrid(room.grid);
-                setFloor(room.floor);
-                setFloorLevel(room.floorLevel);
-                setWireframe(room.wireframe);
-                setHeatOn(room.heat);
-                setHeatDebug(room.heatDebug);
-                setBloom(room.bloom);
-                setLights(room.lights);
-                setCameraPresets(room.cameraPresets);
-                setCameraBindings(room.cameraBindings);
-                setFolded(new Set(room.collapsedPanels));
-                setWind(room.wind);
-                setWeatherIntensity(room.weatherIntensity);
-                setBackground(room.background);
-                // Only a PRESET is restorable. A camera id names a bone in whatever model was
-                // open at the time, and a stored `camera:1` would light a button for a camera this
-                // subject may not have - so anything else comes back as "no preset", which is what
-                // a dragged camera already looks like.
-                setCameraView(
-                    PRESETS.some((p) => p.view === room.cameraPreset)
-                        ? room.cameraPreset
-                        : null,
-                );
-                setDrawDistance(room.drawDistance);
-                setSkeletonOn(room.skeleton);
-                setLabelMode(room.boneLabels as LabelMode);
-                setFireArcs(room.fireArcs);
-                setTranslatedOn(room.effectShaders);
-                setParticlesOn(room.particles);
-                setParticleSpeed(room.particleSpeed);
+                applyRoom(room);
 
                 storedSubjectRef.current =
                     message.subject === null
@@ -5066,97 +2873,16 @@ function ModelPreview(): React.JSX.Element {
             }
 
             if (message.type === "shader") {
-                const source = message.result.source ?? null;
-                shaderSourcesRef.current.set(
-                    message.name.toLowerCase(),
-                    source,
+                assets.receiveShader(
+                    message.name,
+                    message.result.source ?? null,
                 );
-
-                // Settled before any of the branches below, several of which return early. An
-                // effect that is simply not there is still an answer, and the wait is over.
-                shaderLedger.current.settle(message.name);
-                syncTally();
-
-                if (source !== null) {
-                    setAnyShaderSource(true);
-                }
-
-                if (source === null) {
-                    // No copy of this effect is reachable. The archetype material stands, which is
-                    // the same thing that happens for any mod-authored shader.
-                    return;
-                }
-
-                const technique = selectTechnique(parseFxManifest(source));
-                const pass = technique?.passes[0];
-
-                if (pass !== undefined) {
-                    viewport.applyShaderState(
-                        message.name,
-                        materialStateFrom(pass),
-                    );
-                }
-
-                // Eleven of the shipped effects are render state and nothing else - `MeshAlpha.fx`
-                // among them, whose two programmable techniques are commented out in the file. That
-                // used to be reported as an info problem per effect. It is a true statement about
-                // the DATA that the reader can do nothing with, and eleven of them crowd out the
-                // problems that mean something; the translated count in the dock already says how
-                // much of the model draws with its own shaders.
-
-                // A header may have arrived after the effect that wanted it, so every effect still
-                // waiting is retried whenever anything new lands.
-                translatePending();
 
                 return;
             }
 
             if (message.type === "texture") {
-                // Before the decode, and regardless of how it goes: a texture that did not resolve
-                // is an ANSWER. The problems bar is what tells the reader it is missing; the cover
-                // only needs to know it is no longer waiting.
-                textureLedger.current.settle(message.name);
-                syncTally();
-
-                const texture =
-                    (message.result.data ?? null) === null
-                        ? null
-                        : decodeTexture(message.result);
-
-                if (texture !== null) {
-                    // Offered to both: a name resolves to one texture whichever kind of thing samples
-                    // it, and the shell does not track which asked.
-                    viewport.setTexture(message.name, texture);
-                    viewport.setParticleTexture(message.name, texture);
-                } else {
-                    // The reply IS the answer - the server sends no data when the name did not
-                    // resolve. Dropping it silently left every emitter naming that texture drawing
-                    // a plain tinted quad, which is exactly what a soft coloured puff is supposed
-                    // to look like. A decode that fails counts the same: either way the reader
-                    // cannot see the texture, and needs to know that rather than guess.
-                    viewport.setParticleTextureMissing(message.name);
-
-                    // And said in words, not only drawn. The marker tells you SOMETHING is missing
-                    // at the place it is missing from; the problems bar is what names the file. The
-                    // server-side ModelTextureExistence diagnostic covers the same ground without
-                    // opening the preview, but only for a texture a model names statically - this
-                    // also catches one the server resolved and the client could not decode.
-                    const missing =
-                        message.result.error ??
-                        l10n.t(
-                            "Texture '{0}' was not found. Anything that draws with it shows the AET logo instead.",
-                            message.name,
-                        );
-
-                    setProblems((current) =>
-                        current.some((p) => p.message === missing)
-                            ? current
-                            : [
-                                  ...current,
-                                  { severity: "warning", message: missing },
-                              ],
-                    );
-                }
+                assets.receiveTexture(message.name, message.result);
             }
         };
 
@@ -5171,51 +2897,6 @@ function ModelPreview(): React.JSX.Element {
         // for another scene, which changes `scene`, which re-runs it. The handler reads the current
         // scene through a ref instead.
     }, [attachPending, refreshStats]);
-
-    useEffect(() => {
-        viewportRef.current?.setGridVisible(grid);
-    }, [grid]);
-
-    useEffect(() => {
-        viewportRef.current?.setFloorVisible(floor);
-    }, [floor]);
-
-    useEffect(() => {
-        viewportRef.current?.setFloorLevel(floorLevel);
-    }, [floorLevel]);
-
-    useEffect(() => {
-        viewportRef.current?.setWireframe(wireframe);
-    }, [wireframe]);
-
-    useEffect(() => {
-        viewportRef.current?.setHeat(heatOn);
-    }, [heatOn]);
-
-    useEffect(() => {
-        viewportRef.current?.setHeatDebug(heatDebug);
-    }, [heatDebug]);
-
-    useEffect(() => {
-        viewportRef.current?.setBloom(bloom);
-    }, [bloom]);
-
-    useEffect(() => {
-        viewportRef.current?.setLightRig(lights);
-        viewportRef.current?.setShadowColour(hexFromColour(lights.shadow));
-    }, [lights]);
-
-    useEffect(() => {
-        viewportRef.current?.setWind(wind.heading, wind.speed);
-    }, [wind]);
-
-    useEffect(() => {
-        viewportRef.current?.setWeatherIntensity(weatherIntensity);
-    }, [weatherIntensity]);
-
-    useEffect(() => {
-        viewportRef.current?.setBackground(background);
-    }, [background]);
 
     /**
      * Starting a clip puts the MODEL back first.
@@ -5262,10 +2943,6 @@ function ModelPreview(): React.JSX.Element {
         // adding it would reset the model every time the defined levels were recomputed - which
         // happens on every load and every level change.
     }, [animation]);
-
-    useEffect(() => {
-        viewportRef.current?.setSkeletonVisible(skeletonOn);
-    }, [skeletonOn]);
 
     /**
      * Which particle ids each ability drives.
@@ -6259,7 +3936,7 @@ function ModelPreview(): React.JSX.Element {
         const moved = aim.yaw !== 0 || aim.pitch !== 0;
 
         return (
-            <span className="view-row turret-aim">
+            <ViewRow className="turret-aim">
                 <span className="detail">{aimText(handle, aim)}</span>
                 <IconButton
                     icon="reset"
@@ -6275,7 +3952,7 @@ function ModelPreview(): React.JSX.Element {
                         viewportRef.current?.resetTurretAim(row.id);
                     }}
                 />
-            </span>
+            </ViewRow>
         );
     };
 
@@ -6473,31 +4150,6 @@ function ModelPreview(): React.JSX.Element {
         );
     }, [faction, customColour, scene, stats]);
 
-    useEffect(() => {
-        viewportRef.current?.setLevels(alt, lod);
-        // Geometry may have been hidden or shown, which changes the stat line - and the tree's
-        // checkboxes, since a level change drops every hand-set visibility along with it.
-        setStats(viewportRef.current?.stats() ?? null);
-        setAttachments(viewportRef.current?.attachmentsByBone() ?? new Map());
-        setTreeItems(viewportRef.current?.treeItems() ?? []);
-    }, [alt, lod]);
-
-    useEffect(() => {
-        viewportRef.current?.setParticlesVisible(particlesOn);
-    }, [particlesOn]);
-
-    useEffect(() => {
-        viewportRef.current?.setAnimationSpeed(animationSpeed);
-    }, [animationSpeed]);
-
-    useEffect(() => {
-        viewportRef.current?.setAnimationLoop(animationLoop);
-    }, [animationLoop]);
-
-    useEffect(() => {
-        viewportRef.current?.setPaused(animationPaused);
-    }, [animationPaused, animation]);
-
     /**
      * Follows the playhead while a clip is loaded.
      *
@@ -6524,38 +4176,6 @@ function ModelPreview(): React.JSX.Element {
 
         return () => clearInterval(tick);
     }, [mode, animation]);
-
-    useEffect(() => {
-        const viewport = viewportRef.current;
-        if (viewport === null) {
-            return;
-        }
-
-        viewport.setTranslatedShaders(translatedOn);
-
-        // Game mode shadows the way the ENGINE does: stencil volumes cast by the model's own
-        // authored shadow mesh, with the shadow colour reaching the hull as well as the ground.
-        // Default mode keeps three's shadow mapping, which is the right answer for the 63% of
-        // models that author no volume at all.
-        viewport.setShadowVolumes(translatedOn);
-        setTranslatedCount(viewport.translatedCoverage());
-    }, [translatedOn]);
-
-    useEffect(() => {
-        viewportRef.current?.setParticlesPaused(particlesPaused);
-    }, [particlesPaused]);
-
-    useEffect(() => {
-        viewportRef.current?.setParticleSpeed(particleSpeed);
-    }, [particleSpeed]);
-
-    useEffect(() => {
-        viewportRef.current?.setLabelMode(labelMode);
-    }, [labelMode]);
-
-    useEffect(() => {
-        viewportRef.current?.setDrawDistance(drawDistance);
-    }, [drawDistance]);
 
     /**
      * Folds the scaffolding away the first time a subject's rows arrive.
@@ -6596,72 +4216,6 @@ function ModelPreview(): React.JSX.Element {
             setTreeItems(viewportRef.current?.treeItems() ?? []);
         }
     }, [treeItems, loading.covered]);
-
-    /**
-     * Remembers the room.
-     *
-     * One effect over every Tier 1 value rather than a write beside each control: a setting is
-     * remembered because of what it IS, not because whoever added its checkbox remembered to save
-     * it. Skipped until the stored room has been applied, or the first frame would overwrite it
-     * with defaults.
-     */
-    useEffect(() => {
-        if (!restoredRef.current) {
-            return;
-        }
-
-        post({
-            type: "setViewerSettings",
-            settings: {
-                ...DEFAULT_VIEWER_SETTINGS,
-                grid,
-                floor,
-                floorLevel,
-                drawDistance,
-                wireframe,
-                heat: heatOn,
-                heatDebug,
-                bloom,
-                skeleton: skeletonOn,
-                boneLabels: labelMode,
-                fireArcs,
-                effectShaders: translatedOn,
-                particles: particlesOn,
-                particleSpeed,
-                lights,
-                cameraPresets,
-                cameraBindings,
-                collapsedPanels: [...folded],
-                wind,
-                weatherIntensity,
-                background,
-                cameraPreset: cameraView ?? "",
-            },
-        });
-    }, [
-        grid,
-        floor,
-        floorLevel,
-        wireframe,
-        heatOn,
-        heatDebug,
-        bloom,
-        drawDistance,
-        lights,
-        wind,
-        weatherIntensity,
-        cameraPresets,
-        cameraBindings,
-        folded,
-        background,
-        cameraView,
-        skeletonOn,
-        labelMode,
-        fireArcs,
-        translatedOn,
-        particlesOn,
-        particleSpeed,
-    ]);
 
     /**
      * Records what belongs to the PROJECT rather than to the person.
@@ -6737,9 +4291,47 @@ function ModelPreview(): React.JSX.Element {
         [selected],
     );
 
-    useEffect(() => {
-        viewportRef.current?.setSelectedBones(selectedBones);
-    }, [selectedBones]);
+    // Everything the dock pushes into the viewport. See `useViewportSync`; after the renderer's own
+    // effect above, so the viewport starts with every value the panel holds.
+    useViewportSync(
+        viewportRef,
+        {
+            grid,
+            floor,
+            floorLevel,
+            wireframe,
+            heat: heatOn,
+            heatDebug,
+            bloom,
+            lights,
+            wind,
+            weatherIntensity,
+            background,
+            skeleton: skeletonOn,
+            labelMode,
+            drawDistance,
+            selectedBones,
+            alt,
+            lod,
+            particles: particlesOn,
+            particlesPaused,
+            particleSpeed,
+            animation,
+            animationSpeed,
+            animationLoop,
+            animationPaused,
+            translated: translatedOn,
+        },
+        {
+            levelsApplied: (viewport) => {
+                setStats(viewport.stats());
+                setAttachments(viewport.attachmentsByBone());
+                setTreeItems(viewport.treeItems());
+            },
+            translatedApplied: (viewport) =>
+                setTranslatedCount(viewport.translatedCoverage()),
+        },
+    );
 
     // Depends on `treeItems` as well as on the selection, because the rows a box spans are only
     // known once the tree has been built - a selection restored before the model arrives would
@@ -7528,27 +5120,29 @@ function ModelPreview(): React.JSX.Element {
                             stage's own corner says "this is about the room you are looking into";
                             the same controls in the right-hand dock read as properties of the
                             model, and buried three quarters of that dock while open. */}
-                        <div className="stage-row stage-top">
-                            <span className="stage-slot">
-                                {/* Its own plate. The scene settings OPEN something, while the toggles beside
+                        <StageSlots
+                            edge="top"
+                            start={
+                                <>
+                                    {/* Its own plate. The scene settings OPEN something, while the toggles beside
                             them switch something - putting all of it on one bar said they were one
                             group of related switches, which the flyout button is not. */}
-                                <div className="stage-chrome">
-                                    <IconButton
-                                        icon="scene"
-                                        className={
-                                            "world-globe" +
-                                            (worldOpen ? " active" : "")
-                                        }
-                                        expanded={worldOpen}
-                                        title={l10n.t("Scene settings")}
-                                        onClick={() =>
-                                            setWorldOpen((open) => !open)
-                                        }
-                                    />
-                                </div>
+                                    <div className="stage-chrome">
+                                        <IconButton
+                                            icon="scene"
+                                            className={
+                                                "world-globe" +
+                                                (worldOpen ? " active" : "")
+                                            }
+                                            expanded={worldOpen}
+                                            title={l10n.t("Scene settings")}
+                                            onClick={() =>
+                                                setWorldOpen((open) => !open)
+                                            }
+                                        />
+                                    </div>
 
-                                {/* The grid, the ground and the effects master describe the ROOM the model
+                                    {/* The grid, the ground and the effects master describe the ROOM the model
                             is standing in - so they belong on the stage rather than in a dock that
                             describes the subject. Their persistence is unchanged: every one was
                             already a Tier 1 viewer setting, and moving a control does not move
@@ -7557,32 +5151,36 @@ function ModelPreview(): React.JSX.Element {
                             Icon only. These are the same switch repeated, so the icon is what tells
                             them apart and the words only made the bar long enough to reach the
                             camera. The name leads the tooltip. */}
-                                <div className="stage-chrome icon-only">
-                                    {overlays.map((overlay) => (
-                                        <IconButton
-                                            key={overlay.id}
-                                            icon={overlay.icon}
-                                            className={
-                                                overlay.on
-                                                    ? "active"
-                                                    : undefined
-                                            }
-                                            pressed={overlay.on}
-                                            label={overlay.label}
-                                            title={overlay.title}
-                                            disabled={overlay.disabled ?? false}
-                                            // The overlay's own title already says why when it is off:
-                                            // each one phrases its state, so there is nothing to add here.
-                                            disabledReason={overlay.title}
-                                            onClick={() =>
-                                                overlay.set(!overlay.on)
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                            </span>
-
-                            {/* The faction palette, centred over the model.
+                                    <div className="stage-chrome icon-only">
+                                        {overlays.map((overlay) => (
+                                            <IconButton
+                                                key={overlay.id}
+                                                icon={overlay.icon}
+                                                className={
+                                                    overlay.on
+                                                        ? "active"
+                                                        : undefined
+                                                }
+                                                pressed={overlay.on}
+                                                label={overlay.label}
+                                                title={overlay.title}
+                                                disabled={
+                                                    overlay.disabled ?? false
+                                                }
+                                                // The overlay's own title already says why when it is off:
+                                                // each one phrases its state, so there is nothing to add here.
+                                                disabledReason={overlay.title}
+                                                onClick={() =>
+                                                    overlay.set(!overlay.on)
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            }
+                            middle={
+                                <>
+                                    {/* The faction palette, centred over the model.
 
                             It sits with the room and the camera because all three answer HOW YOU
                             ARE LOOKING at the subject rather than what the subject is - a tint is
@@ -7596,86 +5194,97 @@ function ModelPreview(): React.JSX.Element {
 
                             Not gated on the lens. It is stage chrome, and a corner that empties
                             when you change lens makes the stage feel like it is coming apart. */}
-                            <span className="stage-slot stage-slot-mid">
-                                {(scene?.factions.length ?? 0) > 0 && (
-                                    <div
-                                        className="stage-chrome faction-palette"
-                                        role="group"
-                                        aria-label={l10n.t("Faction colour")}
-                                    >
-                                        <button
-                                            type="button"
-                                            className={
-                                                "swatch swatch-plain" +
-                                                (faction === "" &&
-                                                customColour === null
-                                                    ? " active"
-                                                    : "")
-                                            }
-                                            title={l10n.t("No team colour")}
-                                            onClick={() => chooseTint("", null)}
+                                    {(scene?.factions.length ?? 0) > 0 && (
+                                        <div
+                                            className="stage-chrome faction-palette"
+                                            role="group"
+                                            aria-label={l10n.t(
+                                                "Faction colour",
+                                            )}
                                         >
-                                            <Icon name="none" />
-                                        </button>
-
-                                        {scene?.factions.map((entry) => (
                                             <button
-                                                key={entry.name}
                                                 type="button"
                                                 className={
-                                                    "swatch" +
-                                                    (faction === entry.name &&
+                                                    "swatch swatch-plain" +
+                                                    (faction === "" &&
                                                     customColour === null
                                                         ? " active"
                                                         : "")
                                                 }
-                                                style={{
-                                                    background: toHex(
-                                                        entry.color ??
-                                                            NEUTRAL_COLOUR,
-                                                    ),
-                                                }}
-                                                title={entry.name}
-                                                // Picking a faction drops a custom colour, or the strip
-                                                // would highlight one and the hull show another.
+                                                title={l10n.t("No team colour")}
                                                 onClick={() =>
-                                                    chooseTint(entry.name, null)
+                                                    chooseTint("", null)
+                                                }
+                                            >
+                                                <Icon name="none" />
+                                            </button>
+
+                                            {scene?.factions.map((entry) => (
+                                                <button
+                                                    key={entry.name}
+                                                    type="button"
+                                                    className={
+                                                        "swatch" +
+                                                        (faction ===
+                                                            entry.name &&
+                                                        customColour === null
+                                                            ? " active"
+                                                            : "")
+                                                    }
+                                                    style={{
+                                                        background: toHex(
+                                                            entry.color ??
+                                                                NEUTRAL_COLOUR,
+                                                        ),
+                                                    }}
+                                                    title={entry.name}
+                                                    // Picking a faction drops a custom colour, or the strip
+                                                    // would highlight one and the hull show another.
+                                                    onClick={() =>
+                                                        chooseTint(
+                                                            entry.name,
+                                                            null,
+                                                        )
+                                                    }
+                                                />
+                                            ))}
+
+                                            <input
+                                                type="color"
+                                                className={
+                                                    "swatch swatch-custom" +
+                                                    (customColour !== null
+                                                        ? " active"
+                                                        : "")
+                                                }
+                                                value={
+                                                    customColour ??
+                                                    toHex(
+                                                        scene?.factions.find(
+                                                            (f) =>
+                                                                f.name ===
+                                                                faction,
+                                                        )?.color ??
+                                                            NEUTRAL_COLOUR,
+                                                    )
+                                                }
+                                                title={l10n.t(
+                                                    "Pick a custom colour",
+                                                )}
+                                                onChange={(e) =>
+                                                    chooseTint(
+                                                        faction,
+                                                        e.target.value,
+                                                    )
                                                 }
                                             />
-                                        ))}
-
-                                        <input
-                                            type="color"
-                                            className={
-                                                "swatch swatch-custom" +
-                                                (customColour !== null
-                                                    ? " active"
-                                                    : "")
-                                            }
-                                            value={
-                                                customColour ??
-                                                toHex(
-                                                    scene?.factions.find(
-                                                        (f) =>
-                                                            f.name === faction,
-                                                    )?.color ?? NEUTRAL_COLOUR,
-                                                )
-                                            }
-                                            title={l10n.t(
-                                                "Pick a custom colour",
-                                            )}
-                                            onChange={(e) =>
-                                                chooseTint(
-                                                    faction,
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                )}
-                            </span>
-
-                            {/* Where you are looking FROM is a property of the view, not of the model,
+                                        </div>
+                                    )}
+                                </>
+                            }
+                            end={
+                                <>
+                                    {/* Where you are looking FROM is a property of the view, not of the model,
                             so it sits on the stage like the scene controls opposite.
 
                             The presets read as words rather than pictograms, because no icon says
@@ -7689,84 +5298,89 @@ function ModelPreview(): React.JSX.Element {
                             camera is in one place at a time. Choosing any of them releases
                             whichever was chosen before, which is what a radiogroup says and a row
                             of toggles denies. */}
-                            <span className="stage-slot stage-slot-end">
-                                <div className="stage-chrome">
-                                    <ModeSelector
-                                        label={l10n.t(
-                                            "Where the camera looks from",
-                                        )}
-                                        value={cameraView}
-                                        options={cameraViews}
-                                        onSelect={(id) => {
-                                            // The model's own cameras are the ones this panel did not
-                                            // invent, and only they can refuse: a bone can be missing from
-                                            // the skeleton that was loaded, and a view that did not take
-                                            // must not be marked as the one you are looking from.
-                                            const authored = authorCameras.find(
-                                                (entry) => entry.id === id,
-                                            );
+                                    <div className="stage-chrome">
+                                        <ModeSelector
+                                            label={l10n.t(
+                                                "Where the camera looks from",
+                                            )}
+                                            value={cameraView}
+                                            options={cameraViews}
+                                            onSelect={(id) => {
+                                                // The model's own cameras are the ones this panel did not
+                                                // invent, and only they can refuse: a bone can be missing from
+                                                // the skeleton that was loaded, and a view that did not take
+                                                // must not be marked as the one you are looking from.
+                                                const authored =
+                                                    authorCameras.find(
+                                                        (entry) =>
+                                                            entry.id === id,
+                                                    );
 
-                                            if (authored === undefined) {
-                                                setCameraView(id as PresetView);
-                                                viewportRef.current?.frameAll(
-                                                    id as PresetView,
+                                                if (authored === undefined) {
+                                                    setCameraView(
+                                                        id as PresetView,
+                                                    );
+                                                    viewportRef.current?.frameAll(
+                                                        id as PresetView,
+                                                    );
+                                                    return;
+                                                }
+
+                                                // The pose the SERVER resolved, turned into the scene's axes.
+                                                //
+                                                // It used to ask the viewport to find the pair by name -
+                                                // Camera01 and Camera01.Target - and the bone in the GLB is
+                                                // Camera01Target, the dot having not survived the export. So
+                                                // the lookup failed, applyModelCamera returned false, and the
+                                                // entry did nothing at all, silently, on every model with one.
+                                                //
+                                                // The turn matters as much as the numbers: those are Alamo
+                                                // Z-up and the scene is glTF Y-up. See `cameraPose`.
+                                                const pose =
+                                                    cameraPose(authored);
+
+                                                if (pose === null) {
+                                                    return;
+                                                }
+
+                                                viewportRef.current?.applyCameraPose(
+                                                    pose.position,
+                                                    pose.target,
                                                 );
-                                                return;
-                                            }
+                                                setCameraView(id);
+                                            }}
+                                        />
+                                    </div>
 
-                                            // The pose the SERVER resolved, turned into the scene's axes.
-                                            //
-                                            // It used to ask the viewport to find the pair by name -
-                                            // Camera01 and Camera01.Target - and the bone in the GLB is
-                                            // Camera01Target, the dot having not survived the export. So
-                                            // the lookup failed, applyModelCamera returned false, and the
-                                            // entry did nothing at all, silently, on every model with one.
-                                            //
-                                            // The turn matters as much as the numbers: those are Alamo
-                                            // Z-up and the scene is glTF Y-up. See `cameraPose`.
-                                            const pose = cameraPose(authored);
-
-                                            if (pose === null) {
-                                                return;
-                                            }
-
-                                            viewportRef.current?.applyCameraPose(
-                                                pose.position,
-                                                pose.target,
-                                            );
-                                            setCameraView(id);
-                                        }}
-                                    />
-                                </div>
-
-                                {/* The mirror of the scene button opposite: the presets are the switches,
+                                    {/* The mirror of the scene button opposite: the presets are the switches,
                             this OPENS something, and the two are not the same kind of control. Last
                             on the right as the scene is first on the left, so the stage reads
                             outwards from the model in both directions. */}
-                                <div className="stage-chrome">
-                                    <IconButton
-                                        icon="camera"
-                                        className={
-                                            cameraOpen ? "active" : undefined
-                                        }
-                                        expanded={cameraOpen}
-                                        title={l10n.t("Camera settings")}
-                                        onClick={() =>
-                                            setCameraOpen((open) => !open)
-                                        }
-                                    />
-                                </div>
-                            </span>
-                        </div>
+                                    <div className="stage-chrome">
+                                        <IconButton
+                                            icon="camera"
+                                            className={
+                                                cameraOpen
+                                                    ? "active"
+                                                    : undefined
+                                            }
+                                            expanded={cameraOpen}
+                                            title={l10n.t("Camera settings")}
+                                            onClick={() =>
+                                                setCameraOpen((open) => !open)
+                                            }
+                                        />
+                                    </div>
+                                </>
+                            }
+                        />
 
                         {worldOpen && (
-                            <div
-                                className="stage-flyout on-left"
-                                role="dialog"
+                            <StageFlyout
+                                title={l10n.t("Scene")}
+                                at="left"
                                 ref={worldRef}
-                            >
-                                <div className="stage-flyout-head">
-                                    {l10n.t("Scene")}
+                                tools={
                                     <IconButton
                                         icon="reset"
                                         title={l10n.t(
@@ -7774,373 +5388,344 @@ function ModelPreview(): React.JSX.Element {
                                         )}
                                         onClick={resetRoom}
                                     />
-                                    <IconButton
-                                        icon="close"
-                                        title={l10n.t("Close")}
-                                        onClick={() => setWorldOpen(false)}
-                                    />
-                                </div>
-                                <div className="stage-flyout-body">
-                                    <DockSection
-                                        id="scene.room"
-                                        title={l10n.t("Room")}
-                                        collapsed={folded.has("scene.room")}
-                                        onToggle={toggleSection}
+                                }
+                                onClose={() => setWorldOpen(false)}
+                            >
+                                <DockSection
+                                    id="scene.room"
+                                    title={l10n.t("Room")}
+                                    collapsed={folded.has("scene.room")}
+                                    onToggle={toggleSection}
+                                >
+                                    <Field
+                                        label={l10n.t("Backdrop")}
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Never lit and never in the depth buffer, so a backdrop cannot be mistaken for part of the model",
+                                                )}
+                                            </>
+                                        }
                                     >
-                                        <Field
+                                        <ModeSelector
                                             label={l10n.t("Backdrop")}
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "Never lit and never in the depth buffer, so a backdrop cannot be mistaken for part of the model",
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            <ModeSelector
-                                                label={l10n.t("Backdrop")}
-                                                value={background}
-                                                options={
-                                                    [
-                                                        {
-                                                            id: "flat",
-                                                            label: l10n.t(
-                                                                "Flat",
-                                                            ),
-                                                            title: l10n.t(
-                                                                "A plain, neutral field",
-                                                            ),
-                                                        },
-                                                        {
-                                                            id: "starfield",
-                                                            label: l10n.t(
-                                                                "Stars",
-                                                            ),
-                                                            title: l10n.t(
-                                                                "A starfield",
-                                                            ),
-                                                        },
-                                                        {
-                                                            id: "sky",
-                                                            label: l10n.t(
-                                                                "Sky",
-                                                            ),
-                                                            title: l10n.t(
-                                                                "A sky with a horizon",
-                                                            ),
-                                                        },
-                                                    ] satisfies ChoiceOption<BackgroundKind>[]
-                                                }
-                                                onSelect={setBackground}
-                                            />
-                                        </Field>
-
-                                        <Field
-                                            label={l10n.t("Ground height")}
-                                            value={floorLevel}
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "Zero is the middle of the track - the plane the model itself stands on. The ends are one model radius either way, so the control means the same thing on a trooper and on a Star Destroyer. The grid moves with it: It is the ruler for the ground, not for the origin.",
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            {/* The tick marks where the model stands. Zero is always the exact middle, because
-                the track is symmetrical by construction - see `groundRange`. */}
-                                            <span className="detent-track">
-                                                <input
-                                                    type="range"
-                                                    min={-ground.limit}
-                                                    max={ground.limit}
-                                                    step={ground.step}
-                                                    value={floorLevel}
-                                                    disabled={!floor}
-                                                    title={
-                                                        floor
-                                                            ? l10n.t(
-                                                                  "Where the ground and its grid sit, in model units. The track runs {0} either side of the origin, which is the middle, and catches there when dragged.",
-                                                                  ground.limit,
-                                                              )
-                                                            : l10n.t(
-                                                                  "Switch the ground on to place it",
-                                                              )
-                                                    }
-                                                    onPointerDown={() => {
-                                                        groundDragging.current = true;
-                                                    }}
-                                                    onPointerUp={() => {
-                                                        groundDragging.current = false;
-                                                    }}
-                                                    onPointerCancel={() => {
-                                                        groundDragging.current = false;
-                                                    }}
-                                                    onKeyDown={() => {
-                                                        groundDragging.current = false;
-                                                    }}
-                                                    onChange={(e) =>
-                                                        setFloorLevel(
-                                                            snapToZero(
-                                                                Number(
-                                                                    e.target
-                                                                        .value,
-                                                                ),
-                                                                ground.step,
-                                                                groundDragging.current
-                                                                    ? 1
-                                                                    : 0,
-                                                            ),
-                                                        )
-                                                    }
-                                                />
-                                            </span>
-                                        </Field>
-                                    </DockSection>
-
-                                    <DockSection
-                                        id="scene.light"
-                                        title={l10n.t("Light")}
-                                        collapsed={folded.has("scene.light")}
-                                        onToggle={toggleSection}
-                                    >
-                                        <Field
-                                            label={l10n.t("Light")}
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "The engine's own rig: A sun that casts the shadow and two fills that do not. All three reach the translated shaders.",
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            <ModeSelector
-                                                label={l10n.t(
-                                                    "Light being edited",
-                                                )}
-                                                value={editing}
-                                                options={LIGHT_NAMES.map(
-                                                    (name) => ({
-                                                        id: name,
-                                                        label: LIGHT_LABELS[
-                                                            name
-                                                        ],
+                                            value={background}
+                                            options={
+                                                [
+                                                    {
+                                                        id: "flat",
+                                                        label: l10n.t("Flat"),
                                                         title: l10n.t(
-                                                            "Edit the {0}",
-                                                            LIGHT_LABELS[
-                                                                name
-                                                            ].toLowerCase(),
+                                                            "A plain, neutral field",
                                                         ),
-                                                    }),
-                                                )}
-                                                onSelect={setEditing}
-                                            />
-                                        </Field>
+                                                    },
+                                                    {
+                                                        id: "starfield",
+                                                        label: l10n.t("Stars"),
+                                                        title: l10n.t(
+                                                            "A starfield",
+                                                        ),
+                                                    },
+                                                    {
+                                                        id: "sky",
+                                                        label: l10n.t("Sky"),
+                                                        title: l10n.t(
+                                                            "A sky with a horizon",
+                                                        ),
+                                                    },
+                                                ] satisfies ChoiceOption<BackgroundKind>[]
+                                            }
+                                            onSelect={setBackground}
+                                        />
+                                    </Field>
 
-                                        <Field
-                                            label={l10n.t("Light around")}
-                                            value={
-                                                <>
-                                                    {l10n.t(
-                                                        "{0}{1}deg, {2}",
-                                                        lights[editing].azimuth,
-                                                        " ",
-                                                        bearing.from,
-                                                    )}
-                                                </>
+                                    <Field
+                                        label={l10n.t("Ground height")}
+                                        value={floorLevel}
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Zero is the middle of the track - the plane the model itself stands on. The ends are one model radius either way, so the control means the same thing on a trooper and on a Star Destroyer. The grid moves with it: It is the ruler for the ground, not for the origin.",
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        {/* The tick marks where the model stands. Zero is always the exact middle, because
+                the track is symmetrical by construction - see `groundRange`. */}
+                                        <span className="detent-track">
+                                            <input
+                                                type="range"
+                                                min={-ground.limit}
+                                                max={ground.limit}
+                                                step={ground.step}
+                                                value={floorLevel}
+                                                disabled={!floor}
+                                                title={
+                                                    floor
+                                                        ? l10n.t(
+                                                              "Where the ground and its grid sit, in model units. The track runs {0} either side of the origin, which is the middle, and catches there when dragged.",
+                                                              ground.limit,
+                                                          )
+                                                        : l10n.t(
+                                                              "Switch the ground on to place it",
+                                                          )
+                                                }
+                                                onPointerDown={() => {
+                                                    groundDragging.current = true;
+                                                }}
+                                                onPointerUp={() => {
+                                                    groundDragging.current = false;
+                                                }}
+                                                onPointerCancel={() => {
+                                                    groundDragging.current = false;
+                                                }}
+                                                onKeyDown={() => {
+                                                    groundDragging.current = false;
+                                                }}
+                                                onChange={(e) =>
+                                                    setFloorLevel(
+                                                        snapToZero(
+                                                            Number(
+                                                                e.target.value,
+                                                            ),
+                                                            ground.step,
+                                                            groundDragging.current
+                                                                ? 1
+                                                                : 0,
+                                                        ),
+                                                    )
+                                                }
+                                            />
+                                        </span>
+                                    </Field>
+                                </DockSection>
+
+                                <DockSection
+                                    id="scene.light"
+                                    title={l10n.t("Light")}
+                                    collapsed={folded.has("scene.light")}
+                                    onToggle={toggleSection}
+                                >
+                                    <Field
+                                        label={l10n.t("Light")}
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "The engine's own rig: A sun that casts the shadow and two fills that do not. All three reach the translated shaders.",
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <ModeSelector
+                                            label={l10n.t("Light being edited")}
+                                            value={editing}
+                                            options={LIGHT_NAMES.map(
+                                                (name) => ({
+                                                    id: name,
+                                                    label: LIGHT_LABELS[name],
+                                                    title: l10n.t(
+                                                        "Edit the {0}",
+                                                        LIGHT_LABELS[
+                                                            name
+                                                        ].toLowerCase(),
+                                                    ),
+                                                }),
+                                            )}
+                                            onSelect={setEditing}
+                                        />
+                                    </Field>
+
+                                    <Field
+                                        label={l10n.t("Light around")}
+                                        value={
+                                            <>
+                                                {l10n.t(
+                                                    "{0}{1}deg, {2}",
+                                                    lights[editing].azimuth,
+                                                    " ",
+                                                    bearing.from,
+                                                )}
+                                            </>
+                                        }
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Turns round the model the way the stage does, from the same zero: At 0 the light stands at the Front view's camera, and it moves clockwise seen from above.",
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={360}
+                                            step={5}
+                                            value={lights[editing].azimuth}
+                                            onChange={(e) =>
+                                                setLight(editing, {
+                                                    azimuth: Number(
+                                                        e.target.value,
+                                                    ),
+                                                })
                                             }
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "Turns round the model the way the stage does, from the same zero: At 0 the light stands at the Front view's camera, and it moves clockwise seen from above.",
-                                                    )}
-                                                </>
+                                        />
+                                    </Field>
+
+                                    <Field
+                                        label={l10n.t("Light height")}
+                                        infoSeverity={
+                                            bearing.belowGround
+                                                ? "warning"
+                                                : "info"
+                                        }
+                                        info={
+                                            <>
+                                                {bearing.belowGround
+                                                    ? editing === "sun"
+                                                        ? l10n.t(
+                                                              "Under the ground plane. The floor is between the sun and the model, so it lights the hull from beneath and casts nothing onto the ground.",
+                                                          )
+                                                        : l10n.t(
+                                                              "Under the ground plane, which is where the engine puts both of its own fills. They cast no shadow, so nothing is hidden by it.",
+                                                          )
+                                                    : l10n.t(
+                                                          "The sun drives the shadow. Straight overhead flattens the hull and hides the shadow under it; raking is what makes panel lines read.",
+                                                      )}
+                                            </>
+                                        }
+                                        value={
+                                            <>
+                                                {l10n.t(
+                                                    "{0}{1}deg, {2}",
+                                                    lights[editing].elevation,
+                                                    " ",
+                                                    bearing.height,
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <input
+                                            type="range"
+                                            min={-90}
+                                            max={90}
+                                            step={5}
+                                            value={lights[editing].elevation}
+                                            onChange={(e) =>
+                                                setLight(editing, {
+                                                    elevation: Number(
+                                                        e.target.value,
+                                                    ),
+                                                })
                                             }
-                                        >
+                                        />
+                                    </Field>
+
+                                    <Field
+                                        label={l10n.t("Light colour")}
+                                        value={
+                                            <>
+                                                {l10n.t(
+                                                    "{0}x",
+                                                    lights[
+                                                        editing
+                                                    ].intensity.toFixed(2),
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <ViewRow>
+                                            <input
+                                                type="color"
+                                                value={hexFromColour(
+                                                    lights[editing].colour,
+                                                )}
+                                                onChange={(e) =>
+                                                    setLight(editing, {
+                                                        colour: colourFromHex(
+                                                            e.target.value,
+                                                        ),
+                                                    })
+                                                }
+                                            />
                                             <input
                                                 type="range"
                                                 min={0}
-                                                max={360}
-                                                step={5}
-                                                value={lights[editing].azimuth}
-                                                onChange={(e) =>
-                                                    setLight(editing, {
-                                                        azimuth: Number(
-                                                            e.target.value,
-                                                        ),
-                                                    })
-                                                }
-                                            />
-                                        </Field>
-
-                                        <Field
-                                            label={l10n.t("Light height")}
-                                            infoSeverity={
-                                                bearing.belowGround
-                                                    ? "warning"
-                                                    : "info"
-                                            }
-                                            info={
-                                                <>
-                                                    {bearing.belowGround
-                                                        ? editing === "sun"
-                                                            ? l10n.t(
-                                                                  "Under the ground plane. The floor is between the sun and the model, so it lights the hull from beneath and casts nothing onto the ground.",
-                                                              )
-                                                            : l10n.t(
-                                                                  "Under the ground plane, which is where the engine puts both of its own fills. They cast no shadow, so nothing is hidden by it.",
-                                                              )
-                                                        : l10n.t(
-                                                              "The sun drives the shadow. Straight overhead flattens the hull and hides the shadow under it; raking is what makes panel lines read.",
-                                                          )}
-                                                </>
-                                            }
-                                            value={
-                                                <>
-                                                    {l10n.t(
-                                                        "{0}{1}deg, {2}",
-                                                        lights[editing]
-                                                            .elevation,
-                                                        " ",
-                                                        bearing.height,
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            <input
-                                                type="range"
-                                                min={-90}
-                                                max={90}
-                                                step={5}
+                                                max={4}
+                                                step={0.05}
                                                 value={
-                                                    lights[editing].elevation
+                                                    lights[editing].intensity
                                                 }
                                                 onChange={(e) =>
                                                     setLight(editing, {
-                                                        elevation: Number(
+                                                        intensity: Number(
                                                             e.target.value,
                                                         ),
                                                     })
                                                 }
                                             />
-                                        </Field>
+                                        </ViewRow>
+                                    </Field>
 
-                                        <Field
-                                            label={l10n.t("Light colour")}
-                                            value={
-                                                <>
-                                                    {l10n.t(
-                                                        "{0}x",
-                                                        lights[
-                                                            editing
-                                                        ].intensity.toFixed(2),
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            <span className="view-row">
-                                                <input
-                                                    type="color"
-                                                    value={hexFromColour(
-                                                        lights[editing].colour,
-                                                    )}
-                                                    onChange={(e) =>
-                                                        setLight(editing, {
+                                    <Field
+                                        label={l10n.t("Ambient")}
+                                        value={
+                                            <>
+                                                {l10n.t(
+                                                    "{0}x",
+                                                    lights.ambient.intensity.toFixed(
+                                                        2,
+                                                    ),
+                                                )}
+                                            </>
+                                        }
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "What reaches the parts no light does. Too much and the model reads flat; none at all and its shadowed side is black.",
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <ViewRow>
+                                            <input
+                                                type="color"
+                                                value={hexFromColour(
+                                                    lights.ambient.colour,
+                                                )}
+                                                onChange={(e) =>
+                                                    setLights((current) => ({
+                                                        ...current,
+                                                        ambient: {
+                                                            ...current.ambient,
                                                             colour: colourFromHex(
                                                                 e.target.value,
                                                             ),
-                                                        })
-                                                    }
-                                                />
-                                                <input
-                                                    type="range"
-                                                    min={0}
-                                                    max={4}
-                                                    step={0.05}
-                                                    value={
-                                                        lights[editing]
-                                                            .intensity
-                                                    }
-                                                    onChange={(e) =>
-                                                        setLight(editing, {
+                                                        },
+                                                    }))
+                                                }
+                                            />
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={2}
+                                                step={0.05}
+                                                value={lights.ambient.intensity}
+                                                onChange={(e) =>
+                                                    setLights((current) => ({
+                                                        ...current,
+                                                        ambient: {
+                                                            ...current.ambient,
                                                             intensity: Number(
                                                                 e.target.value,
                                                             ),
-                                                        })
-                                                    }
-                                                />
-                                            </span>
-                                        </Field>
+                                                        },
+                                                    }))
+                                                }
+                                            />
+                                        </ViewRow>
+                                    </Field>
 
-                                        <Field
-                                            label={l10n.t("Ambient")}
-                                            value={
-                                                <>
-                                                    {l10n.t(
-                                                        "{0}x",
-                                                        lights.ambient.intensity.toFixed(
-                                                            2,
-                                                        ),
-                                                    )}
-                                                </>
-                                            }
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "What reaches the parts no light does. Too much and the model reads flat; none at all and its shadowed side is black.",
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            <span className="view-row">
-                                                <input
-                                                    type="color"
-                                                    value={hexFromColour(
-                                                        lights.ambient.colour,
-                                                    )}
-                                                    onChange={(e) =>
-                                                        setLights(
-                                                            (current) => ({
-                                                                ...current,
-                                                                ambient: {
-                                                                    ...current.ambient,
-                                                                    colour: colourFromHex(
-                                                                        e.target
-                                                                            .value,
-                                                                    ),
-                                                                },
-                                                            }),
-                                                        )
-                                                    }
-                                                />
-                                                <input
-                                                    type="range"
-                                                    min={0}
-                                                    max={2}
-                                                    step={0.05}
-                                                    value={
-                                                        lights.ambient.intensity
-                                                    }
-                                                    onChange={(e) =>
-                                                        setLights(
-                                                            (current) => ({
-                                                                ...current,
-                                                                ambient: {
-                                                                    ...current.ambient,
-                                                                    intensity:
-                                                                        Number(
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        ),
-                                                                },
-                                                            }),
-                                                        )
-                                                    }
-                                                />
-                                            </span>
-                                        </Field>
-
-                                        {/* The swatch rides IN the label, not under it.
+                                    {/* The swatch rides IN the label, not under it.
 
             A colour input carries `margin-left: auto` so it sits at the far edge of its row - which
             is what the swatch beside a slider wants. Under a `.field`, though, the row is a COLUMN,
@@ -8152,187 +5737,181 @@ function ModelPreview(): React.JSX.Element {
             composites its whole subtree as a group, so a swatch in there renders a colour that is
             not the one stored - measured, a stored #ffffff drew as #bdbdbd. A sibling keeps its
             own colour and still reaches the far edge, because the well carries the auto margin. */}
-                                        <Field
-                                            label={l10n.t("Shadow colour")}
-                                            inline
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "Alamo's one shadow colour, and it MULTIPLIES: 0.5 grey means half as bright. In Game mode it tints the stencil volume, so it reaches the hull's own self-shadowing as well as the ground. In Default mode only the ground can catch it.",
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            <input
-                                                type="color"
-                                                value={hexFromColour(
-                                                    lights.shadow,
+                                    <Field
+                                        label={l10n.t("Shadow colour")}
+                                        inline
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Alamo's one shadow colour, and it MULTIPLIES: 0.5 grey means half as bright. In Game mode it tints the stencil volume, so it reaches the hull's own self-shadowing as well as the ground. In Default mode only the ground can catch it.",
                                                 )}
-                                                /* Dead ONLY when nothing can show it. It was gated on the floor alone, which
+                                            </>
+                                        }
+                                    >
+                                        <input
+                                            type="color"
+                                            value={hexFromColour(lights.shadow)}
+                                            /* Dead ONLY when nothing can show it. It was gated on the floor alone, which
                                                    disabled a working control: in Game mode the stencil darken tints the hull's
                                                    own self-shadowing with no ground under it at all. */
-                                                disabled={
-                                                    shadowReach === "none"
-                                                }
-                                                title={
-                                                    SHADOW_TINT_TITLE[
-                                                        shadowReach
-                                                    ]
-                                                }
-                                                onChange={(e) =>
-                                                    setLights((current) => ({
-                                                        ...current,
-                                                        shadow: colourFromHex(
-                                                            e.target.value,
-                                                        ),
-                                                    }))
-                                                }
-                                            />
-                                        </Field>
-
-                                        <Field
-                                            label={l10n.t("Highlight colour")}
-                                            inline
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "One global specular for all three lights, as the engine keeps it. Only the translated effect shaders read it.",
-                                                    )}
-                                                </>
+                                            disabled={shadowReach === "none"}
+                                            title={
+                                                SHADOW_TINT_TITLE[shadowReach]
                                             }
-                                        >
-                                            <input
-                                                type="color"
-                                                value={hexFromColour(
-                                                    lights.specular,
+                                            onChange={(e) =>
+                                                setLights((current) => ({
+                                                    ...current,
+                                                    shadow: colourFromHex(
+                                                        e.target.value,
+                                                    ),
+                                                }))
+                                            }
+                                        />
+                                    </Field>
+
+                                    <Field
+                                        label={l10n.t("Highlight colour")}
+                                        inline
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "One global specular for all three lights, as the engine keeps it. Only the translated effect shaders read it.",
                                                 )}
-                                                onChange={(e) =>
-                                                    setLights((current) => ({
-                                                        ...current,
-                                                        specular: colourFromHex(
-                                                            e.target.value,
-                                                        ),
-                                                    }))
-                                                }
-                                            />
-                                        </Field>
-                                    </DockSection>
-
-                                    <DockSection
-                                        id="scene.weather"
-                                        title={l10n.t("Weather")}
-                                        collapsed={folded.has("scene.weather")}
-                                        onToggle={toggleSection}
+                                            </>
+                                        }
                                     >
-                                        <Field
-                                            label={l10n.t("Wind direction")}
-                                            value={
-                                                <>
-                                                    {l10n.t(
-                                                        "{0} deg",
-                                                        wind.heading,
-                                                    )}
-                                                </>
+                                        <input
+                                            type="color"
+                                            value={hexFromColour(
+                                                lights.specular,
+                                            )}
+                                            onChange={(e) =>
+                                                setLights((current) => ({
+                                                    ...current,
+                                                    specular: colourFromHex(
+                                                        e.target.value,
+                                                    ),
+                                                }))
                                             }
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "Heading the wind blows towards",
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            <input
-                                                type="range"
-                                                min={0}
-                                                max={360}
-                                                step={1}
-                                                value={wind.heading}
-                                                onChange={(e) =>
-                                                    setWind((current) => ({
-                                                        ...current,
-                                                        heading: Number(
-                                                            e.target.value,
-                                                        ),
-                                                    }))
-                                                }
-                                            />
-                                        </Field>
+                                        />
+                                    </Field>
+                                </DockSection>
 
-                                        <Field
-                                            label={l10n.t("Wind speed")}
-                                            value={wind.speed.toFixed(1)}
-                                            info={
+                                <DockSection
+                                    id="scene.weather"
+                                    title={l10n.t("Weather")}
+                                    collapsed={folded.has("scene.weather")}
+                                    onToggle={toggleSection}
+                                >
+                                    <Field
+                                        label={l10n.t("Wind direction")}
+                                        value={
+                                            <>
+                                                {l10n.t(
+                                                    "{0} deg",
+                                                    wind.heading,
+                                                )}
+                                            </>
+                                        }
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Heading the wind blows towards",
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={360}
+                                            step={1}
+                                            value={wind.heading}
+                                            onChange={(e) =>
+                                                setWind((current) => ({
+                                                    ...current,
+                                                    heading: Number(
+                                                        e.target.value,
+                                                    ),
+                                                }))
+                                            }
+                                        />
+                                    </Field>
+
+                                    <Field
+                                        label={l10n.t("Wind speed")}
+                                        value={wind.speed.toFixed(1)}
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Bends foliage and carries the emitters and weather declared affected by wind",
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={10}
+                                            step={0.1}
+                                            value={wind.speed}
+                                            onChange={(e) =>
+                                                setWind((current) => ({
+                                                    ...current,
+                                                    speed: Number(
+                                                        e.target.value,
+                                                    ),
+                                                }))
+                                            }
+                                        />
+                                    </Field>
+
+                                    <Field
+                                        label={l10n.t("Weather intensity")}
+                                        value={
+                                            hasWeather
+                                                ? `${Math.round(weatherIntensity * 100)}%`
+                                                : "no weather"
+                                        }
+                                        info={
+                                            hasWeather ? (
                                                 <>
                                                     {l10n.t(
-                                                        "Bends foliage and carries the emitters and weather declared affected by wind",
+                                                        "Share of a weather field drawn, as a weather phase sets it",
                                                     )}
                                                 </>
-                                            }
-                                        >
-                                            <input
-                                                type="range"
-                                                min={0}
-                                                max={10}
-                                                step={0.1}
-                                                value={wind.speed}
-                                                onChange={(e) =>
-                                                    setWind((current) => ({
-                                                        ...current,
-                                                        speed: Number(
-                                                            e.target.value,
-                                                        ),
-                                                    }))
-                                                }
-                                            />
-                                        </Field>
-
-                                        <Field
-                                            label={l10n.t("Weather intensity")}
-                                            value={
-                                                hasWeather
-                                                    ? `${Math.round(weatherIntensity * 100)}%`
-                                                    : "no weather"
-                                            }
-                                            info={
-                                                hasWeather ? (
-                                                    <>
-                                                        {l10n.t(
-                                                            "Share of a weather field drawn, as a weather phase sets it",
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        {l10n.t(
-                                                            "No weather emitter in this scene",
-                                                        )}
-                                                    </>
+                                            ) : (
+                                                <>
+                                                    {l10n.t(
+                                                        "No weather emitter in this scene",
+                                                    )}
+                                                </>
+                                            )
+                                        }
+                                    >
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={1}
+                                            step={0.05}
+                                            disabled={!hasWeather}
+                                            value={weatherIntensity}
+                                            onChange={(e) =>
+                                                setWeatherIntensity(
+                                                    Number(e.target.value),
                                                 )
                                             }
-                                        >
-                                            <input
-                                                type="range"
-                                                min={0}
-                                                max={1}
-                                                step={0.05}
-                                                disabled={!hasWeather}
-                                                value={weatherIntensity}
-                                                onChange={(e) =>
-                                                    setWeatherIntensity(
-                                                        Number(e.target.value),
-                                                    )
-                                                }
-                                            />
-                                        </Field>
-                                    </DockSection>
+                                        />
+                                    </Field>
+                                </DockSection>
 
-                                    <DockSection
-                                        id="scene.effects"
-                                        title={l10n.t("Effects")}
-                                        collapsed={folded.has("scene.effects")}
-                                        onToggle={toggleSection}
-                                    >
-                                        {/* Which renderer draws the model - one or the other, never both, so a segmented
+                                <DockSection
+                                    id="scene.effects"
+                                    title={l10n.t("Effects")}
+                                    collapsed={folded.has("scene.effects")}
+                                    onToggle={toggleSection}
+                                >
+                                    {/* Which renderer draws the model - one or the other, never both, so a segmented
             control rather than a tick box.
 
             First in the section because it decides how every SURFACE is drawn, and the two below
@@ -8342,326 +5921,261 @@ function ModelPreview(): React.JSX.Element {
             On a particle file as well: its emitters are drawn through the engine's own Prim effects
             under Game and by the preview's sprite shader under Default, so the switch decides how
             they are drawn too. It was withheld there from before the particle effects existed. */}
-                                        {scene !== null && (
-                                            <Field
-                                                label={l10n.t("Renderer")}
-                                                info={
-                                                    <>
-                                                        {l10n.t(
-                                                            "Default reads each sub-mesh's shader NAME and draws the archetype it names - never wrong about geometry, only about how a surface is lit. Game draws the model the way the engine does: Its own effect shaders, translated, and stencil shadow volumes cast by its authored shadow mesh. Only the shaders need the .fx sources; the shadows work without them. An emitter follows the same switch: the engine's effect for its blend mode under Game, the preview's own sprite shader under Default.",
-                                                        )}
-                                                    </>
-                                                }
-                                            >
-                                                <ModeSelector
-                                                    label={l10n.t(
-                                                        "Which renderer draws the model",
+                                    {scene !== null && (
+                                        <Field
+                                            label={l10n.t("Renderer")}
+                                            info={
+                                                <>
+                                                    {l10n.t(
+                                                        "Default reads each sub-mesh's shader NAME and draws the archetype it names - never wrong about geometry, only about how a surface is lit. Game draws the model the way the engine does: Its own effect shaders, translated, and stencil shadow volumes cast by its authored shadow mesh. Only the shaders need the .fx sources; the shadows work without them. An emitter follows the same switch: the engine's effect for its blend mode under Game, the preview's own sprite shader under Default.",
                                                     )}
-                                                    /* What is actually RUNNING, not what could be fully delivered. The stencil
+                                                </>
+                                            }
+                                        >
+                                            <ModeSelector
+                                                label={l10n.t(
+                                                    "Which renderer draws the model",
+                                                )}
+                                                /* What is actually RUNNING, not what could be fully delivered. The stencil
                                                        shadow pass follows this switch alone and needs no .fx sources, so a reader
                                                        with none was shown Default while the engine's own shadows were being cast -
                                                        and told by the problems list, in the same breath, that they were in Game
                                                        mode with nothing to translate. */
-                                                    value={
-                                                        translatedOn
-                                                            ? "game"
-                                                            : "default"
-                                                    }
-                                                    options={[
-                                                        {
-                                                            id: "default",
-                                                            label: l10n.t(
-                                                                "Default",
-                                                            ),
-                                                            title: l10n.t(
-                                                                "Every sub-mesh drawn with the archetype reading of its shader name. Never wrong about geometry - only about how a surface is lit.",
-                                                            ),
-                                                        },
-                                                        {
-                                                            id: "game",
-                                                            label: l10n.t(
-                                                                "Game",
-                                                            ),
-                                                            // Selectable with no sources, because the mode still
-                                                            // DOES something without them: the stencil shadows
-                                                            // follow this switch and need no .fx at all. It was
-                                                            // disabled here, which - once the value above began
-                                                            // reporting the real mode - would have left a reader
-                                                            // who stepped to Default unable to return to the mode
-                                                            // the panel opens in.
-                                                            title: anyShaderSource
-                                                                ? l10n.t(
-                                                                      "The model's own effect shaders, translated, and the engine's stencil shadows. {0} of {1} sub-meshes and emitters are drawn this way.",
-                                                                      translatedCount.translated,
-                                                                      translatedCount.total,
-                                                                  )
-                                                                : l10n.t(
-                                                                      "The engine's stencil shadows, which need no sources. For its effect shaders as well, set the .fx sources up.",
-                                                                  ),
-                                                        },
-                                                    ]}
-                                                    onSelect={(id) =>
-                                                        setTranslatedOn(
-                                                            id === "game",
-                                                        )
-                                                    }
-                                                />
+                                                value={
+                                                    translatedOn
+                                                        ? "game"
+                                                        : "default"
+                                                }
+                                                options={[
+                                                    {
+                                                        id: "default",
+                                                        label: l10n.t(
+                                                            "Default",
+                                                        ),
+                                                        title: l10n.t(
+                                                            "Every sub-mesh drawn with the archetype reading of its shader name. Never wrong about geometry - only about how a surface is lit.",
+                                                        ),
+                                                    },
+                                                    {
+                                                        id: "game",
+                                                        label: l10n.t("Game"),
+                                                        // Selectable with no sources, because the mode still
+                                                        // DOES something without them: the stencil shadows
+                                                        // follow this switch and need no .fx at all. It was
+                                                        // disabled here, which - once the value above began
+                                                        // reporting the real mode - would have left a reader
+                                                        // who stepped to Default unable to return to the mode
+                                                        // the panel opens in.
+                                                        title: anyShaderSource
+                                                            ? l10n.t(
+                                                                  "The model's own effect shaders, translated, and the engine's stencil shadows. {0} of {1} sub-meshes and emitters are drawn this way.",
+                                                                  translatedCount.translated,
+                                                                  translatedCount.total,
+                                                              )
+                                                            : l10n.t(
+                                                                  "The engine's stencil shadows, which need no sources. For its effect shaders as well, set the .fx sources up.",
+                                                              ),
+                                                    },
+                                                ]}
+                                                onSelect={(id) =>
+                                                    setTranslatedOn(
+                                                        id === "game",
+                                                    )
+                                                }
+                                            />
 
-                                                {/* Always here, in one of two states - never absent.
+                                            {/* Always here, in one of two states - never absent.
 
                     The setup flow is a command, and a command nobody can find is not a path out of
                     "nothing translated"; but a button that appears only while something is wrong is
                     a control the reader never sees working. So the row always says where the
                     sources stand, and only the wording changes. */}
-                                                {anyShaderSource ? (
-                                                    <span className="shader-state">
-                                                        <Icon name="check" />
-                                                        {l10n.t(
-                                                            "Shader sources ready",
-                                                        )}
-                                                    </span>
-                                                ) : (
-                                                    <Button
-                                                        title={l10n.t(
-                                                            "Fetch the .fx shader sources",
-                                                        )}
-                                                        onClick={() =>
-                                                            post({
-                                                                type: "obtainShaders",
-                                                            })
-                                                        }
-                                                    >
-                                                        <Icon name="download" />
-                                                        {l10n.t(
-                                                            "Set up shader sources",
-                                                        )}
-                                                    </Button>
-                                                )}
-                                            </Field>
-                                        )}
-
-                                        <Field
-                                            label={l10n.t("Heat distortion")}
-                                            info={
-                                                <>
+                                            {anyShaderSource ? (
+                                                <span className="shader-state">
+                                                    <Icon name="check" />
                                                     {l10n.t(
-                                                        "Debug draws the heat BUFFER instead of the bent picture - the only way to see which pixels a distortion covers, since its whole effect is a displacement. Red and green carry the direction, blue the strength, and ALL BLACK means nothing on this model is distorting anything. It keeps the buffers alive while it is on.",
+                                                        "Shader sources ready",
                                                     )}
-                                                </>
-                                            }
-                                        >
-                                            <span className="view-row">
-                                                <label className="field-label">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={heatOn}
-                                                        onChange={(e) =>
-                                                            setHeatOn(
-                                                                e.target
-                                                                    .checked,
-                                                            )
-                                                        }
-                                                    />
-                                                    {l10n.t("Bend the frame")}
-                                                </label>
-                                                <label className="field-label">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={heatDebug}
-                                                        disabled={!heatOn}
-                                                        onChange={(e) =>
-                                                            setHeatDebug(
-                                                                e.target
-                                                                    .checked,
-                                                            )
-                                                        }
-                                                    />
-                                                    {l10n.t("Debug")}
-                                                </label>
-                                            </span>
+                                                </span>
+                                            ) : (
+                                                <Button
+                                                    title={l10n.t(
+                                                        "Fetch the .fx shader sources",
+                                                    )}
+                                                    onClick={() =>
+                                                        post({
+                                                            type: "obtainShaders",
+                                                        })
+                                                    }
+                                                >
+                                                    <Icon name="download" />
+                                                    {l10n.t(
+                                                        "Set up shader sources",
+                                                    )}
+                                                </Button>
+                                            )}
                                         </Field>
+                                    )}
 
-                                        <Field
-                                            // The checkbox and its word are one <label>, so pressing the word toggles it -
-                                            // and the mark stays OUTSIDE that label, or pressing the mark would toggle it too.
-                                            label={
-                                                <label className="field-label">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={bloom}
-                                                        onChange={(e) =>
-                                                            setBloom(
-                                                                e.target
-                                                                    .checked,
-                                                            )
-                                                        }
-                                                    />
-                                                    {l10n.t("Bloom")}
-                                                </label>
-                                            }
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "Off by default, as it is in the game. It runs after the heat pass, so the two compose in that order rather than fighting over the frame.",
-                                                    )}
-                                                </>
-                                            }
-                                        />
-                                    </DockSection>
-                                </div>
-                            </div>
+                                    <Field
+                                        label={l10n.t("Heat distortion")}
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Debug draws the heat BUFFER instead of the bent picture - the only way to see which pixels a distortion covers, since its whole effect is a displacement. Red and green carry the direction, blue the strength, and ALL BLACK means nothing on this model is distorting anything. It keeps the buffers alive while it is on.",
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <ViewRow>
+                                            <label className="field-label">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={heatOn}
+                                                    onChange={(e) =>
+                                                        setHeatOn(
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                />
+                                                {l10n.t("Bend the frame")}
+                                            </label>
+                                            <label className="field-label">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={heatDebug}
+                                                    disabled={!heatOn}
+                                                    onChange={(e) =>
+                                                        setHeatDebug(
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                />
+                                                {l10n.t("Debug")}
+                                            </label>
+                                        </ViewRow>
+                                    </Field>
+
+                                    <Field
+                                        // The checkbox and its word are one <label>, so pressing the word toggles it -
+                                        // and the mark stays OUTSIDE that label, or pressing the mark would toggle it too.
+                                        label={
+                                            <label className="field-label">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={bloom}
+                                                    onChange={(e) =>
+                                                        setBloom(
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                />
+                                                {l10n.t("Bloom")}
+                                            </label>
+                                        }
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Off by default, as it is in the game. It runs after the heat pass, so the two compose in that order rather than fighting over the frame.",
+                                                )}
+                                            </>
+                                        }
+                                    />
+                                </DockSection>
+                            </StageFlyout>
                         )}
 
                         {/* Where you look FROM. The mirror of the scene panel opposite, down to the
                             corner it hangs in and the reset in its head - the two are the same kind
                             of thing about different halves of the picture. */}
                         {cameraOpen && (
-                            <div
-                                className="stage-flyout on-right"
-                                role="dialog"
+                            <StageFlyout
+                                title={l10n.t("Camera")}
+                                at="right"
                                 ref={cameraRef}
+                                onClose={() => setCameraOpen(false)}
                             >
-                                <div className="stage-flyout-head">
-                                    {l10n.t("Camera")}
-                                    <IconButton
-                                        icon="close"
-                                        title={l10n.t("Close")}
-                                        onClick={() => setCameraOpen(false)}
-                                    />
-                                </div>
-                                <div className="stage-flyout-body">
-                                    <DockSection
-                                        id="camera.shots"
-                                        title={l10n.t("Camera presets")}
-                                        count={cameraPresets.length}
-                                        end={
-                                            <InfoBadge>
-                                                {l10n.t(
-                                                    "Kept in radii, not game units, so one preset frames a trooper and a Star Destroyer the same way. Copy as Lua works the distance out for the model on screen.",
-                                                )}
-                                            </InfoBadge>
-                                        }
-                                        collapsed={folded.has("camera.shots")}
-                                        onToggle={toggleSection}
-                                    >
-                                        <div className="preset-list">
-                                            {cameraPresets.map((saved) => (
-                                                <span
-                                                    className="view-row"
-                                                    key={saved.id}
-                                                >
-                                                    {renamingPreset ===
-                                                    saved.id ? (
-                                                        // Enter or leaving the field keeps the name, Escape keeps the old one; an
-                                                        // empty name keeps the old one too (renamePreset).
-                                                        <input
-                                                            type="text"
-                                                            className="preset-name"
-                                                            aria-label={l10n.t(
-                                                                "Preset name",
-                                                            )}
-                                                            defaultValue={
-                                                                saved.name
-                                                            }
-                                                            autoFocus
-                                                            onFocus={(e) =>
-                                                                e.currentTarget.select()
-                                                            }
-                                                            onKeyDown={(e) => {
-                                                                if (
-                                                                    e.key ===
-                                                                    "Enter"
-                                                                ) {
-                                                                    e.currentTarget.blur();
-                                                                } else if (
-                                                                    e.key ===
-                                                                    "Escape"
-                                                                ) {
-                                                                    e.stopPropagation();
-                                                                    setRenamingPreset(
-                                                                        null,
-                                                                    );
-                                                                }
-                                                            }}
-                                                            onBlur={(e) => {
-                                                                const name =
-                                                                    e
-                                                                        .currentTarget
-                                                                        .value;
-                                                                setCameraPresets(
-                                                                    (current) =>
-                                                                        renamePreset(
-                                                                            current,
-                                                                            saved.id,
-                                                                            name,
-                                                                        ),
-                                                                );
+                                <DockSection
+                                    id="camera.shots"
+                                    title={l10n.t("Camera presets")}
+                                    count={cameraPresets.length}
+                                    end={
+                                        <InfoBadge>
+                                            {l10n.t(
+                                                "Kept in radii, not game units, so one preset frames a trooper and a Star Destroyer the same way. Copy as Lua works the distance out for the model on screen.",
+                                            )}
+                                        </InfoBadge>
+                                    }
+                                    collapsed={folded.has("camera.shots")}
+                                    onToggle={toggleSection}
+                                >
+                                    <div className="preset-list">
+                                        {cameraPresets.map((saved) => (
+                                            <ViewRow key={saved.id}>
+                                                {renamingPreset === saved.id ? (
+                                                    // Enter or leaving the field keeps the name, Escape keeps the old one; an
+                                                    // empty name keeps the old one too (renamePreset).
+                                                    <input
+                                                        type="text"
+                                                        className="preset-name"
+                                                        aria-label={l10n.t(
+                                                            "Preset name",
+                                                        )}
+                                                        defaultValue={
+                                                            saved.name
+                                                        }
+                                                        autoFocus
+                                                        onFocus={(e) =>
+                                                            e.currentTarget.select()
+                                                        }
+                                                        onKeyDown={(e) => {
+                                                            if (
+                                                                e.key ===
+                                                                "Enter"
+                                                            ) {
+                                                                e.currentTarget.blur();
+                                                            } else if (
+                                                                e.key ===
+                                                                "Escape"
+                                                            ) {
+                                                                e.stopPropagation();
                                                                 setRenamingPreset(
                                                                     null,
                                                                 );
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <Button
-                                                            className="preset-apply"
-                                                            title={l10n.t(
-                                                                "Frame this model the way {0} does: {1} radii out, pitch {2}, yaw {3}",
-                                                                saved.name,
-                                                                saved.distance.toFixed(
-                                                                    1,
-                                                                ),
-                                                                Math.round(
-                                                                    saved.pitch,
-                                                                ),
-                                                                Math.round(
-                                                                    saved.yaw,
-                                                                ),
-                                                            )}
-                                                            onClick={() => {
-                                                                const viewport =
-                                                                    viewportRef.current;
-                                                                if (
-                                                                    viewport ===
-                                                                    null
-                                                                ) {
-                                                                    return;
-                                                                }
-
-                                                                const pose =
-                                                                    poseFromPreset(
-                                                                        saved,
-                                                                        viewport.subjectSphere,
-                                                                    );
-                                                                viewport.applyCameraPose(
-                                                                    pose.position,
-                                                                    pose.target,
-                                                                );
-                                                                setCameraView(
-                                                                    null,
-                                                                );
-                                                            }}
-                                                        >
-                                                            <span className="preset-apply-name">
-                                                                {saved.name}
-                                                            </span>
-                                                        </Button>
-                                                    )}
-                                                    <IconButton
-                                                        icon="rename"
-                                                        title={l10n.t(
-                                                            "Rename {0}",
-                                                            saved.name,
-                                                        )}
-                                                        onClick={() =>
+                                                            }
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            const name =
+                                                                e.currentTarget
+                                                                    .value;
+                                                            setCameraPresets(
+                                                                (current) =>
+                                                                    renamePreset(
+                                                                        current,
+                                                                        saved.id,
+                                                                        name,
+                                                                    ),
+                                                            );
                                                             setRenamingPreset(
-                                                                saved.id,
-                                                            )
-                                                        }
+                                                                null,
+                                                            );
+                                                        }}
                                                     />
-                                                    <IconButton
-                                                        icon="copy"
+                                                ) : (
+                                                    <Button
+                                                        className="preset-apply"
                                                         title={l10n.t(
-                                                            "Copy as Lua - Set_Cinematic_Camera_Key, distance for the model on screen",
+                                                            "Frame this model the way {0} does: {1} radii out, pitch {2}, yaw {3}",
+                                                            saved.name,
+                                                            saved.distance.toFixed(
+                                                                1,
+                                                            ),
+                                                            Math.round(
+                                                                saved.pitch,
+                                                            ),
+                                                            Math.round(
+                                                                saved.yaw,
+                                                            ),
                                                         )}
                                                         onClick={() => {
                                                             const viewport =
@@ -8673,438 +6187,458 @@ function ModelPreview(): React.JSX.Element {
                                                                 return;
                                                             }
 
-                                                            void navigator.clipboard.writeText(
-                                                                luaFor(
+                                                            const pose =
+                                                                poseFromPreset(
                                                                     saved,
                                                                     viewport.subjectSphere,
-                                                                    sceneRef
-                                                                        .current
-                                                                        ?.kind ===
-                                                                        "Object"
-                                                                        ? sceneRef
-                                                                              .current
-                                                                              .subject
-                                                                        : null,
-                                                                ),
+                                                                );
+                                                            viewport.applyCameraPose(
+                                                                pose.position,
+                                                                pose.target,
                                                             );
+                                                            setCameraView(null);
                                                         }}
-                                                    />
-                                                    <IconButton
-                                                        icon="remove"
-                                                        title={l10n.t(
-                                                            "Delete {0}",
-                                                            saved.name,
-                                                        )}
-                                                        onClick={() =>
-                                                            setCameraPresets(
-                                                                (current) =>
-                                                                    current.filter(
-                                                                        (p) =>
-                                                                            p.id !==
-                                                                            saved.id,
-                                                                    ),
-                                                            )
-                                                        }
-                                                    />
-                                                </span>
-                                            ))}
-
-                                            <Button
-                                                onClick={() => {
-                                                    const viewport =
-                                                        viewportRef.current;
-                                                    if (viewport === null) {
-                                                        return;
+                                                    >
+                                                        <span className="preset-apply-name">
+                                                            {saved.name}
+                                                        </span>
+                                                    </Button>
+                                                )}
+                                                <IconButton
+                                                    icon="rename"
+                                                    title={l10n.t(
+                                                        "Rename {0}",
+                                                        saved.name,
+                                                    )}
+                                                    onClick={() =>
+                                                        setRenamingPreset(
+                                                            saved.id,
+                                                        )
                                                     }
+                                                />
+                                                <IconButton
+                                                    icon="copy"
+                                                    title={l10n.t(
+                                                        "Copy as Lua - Set_Cinematic_Camera_Key, distance for the model on screen",
+                                                    )}
+                                                    onClick={() => {
+                                                        const viewport =
+                                                            viewportRef.current;
+                                                        if (viewport === null) {
+                                                            return;
+                                                        }
 
-                                                    // Named after the first free number rather than prompting; the
-                                                    // row's pencil renames it in place.
-                                                    const saved =
-                                                        presetFromPose(
-                                                            nextPresetName(
-                                                                cameraPresets,
+                                                        void navigator.clipboard.writeText(
+                                                            luaFor(
+                                                                saved,
+                                                                viewport.subjectSphere,
+                                                                sceneRef.current
+                                                                    ?.kind ===
+                                                                    "Object"
+                                                                    ? sceneRef
+                                                                          .current
+                                                                          .subject
+                                                                    : null,
                                                             ),
-                                                            viewport.cameraPosition,
-                                                            viewport.subjectSphere,
                                                         );
+                                                    }}
+                                                />
+                                                <IconButton
+                                                    icon="remove"
+                                                    title={l10n.t(
+                                                        "Delete {0}",
+                                                        saved.name,
+                                                    )}
+                                                    onClick={() =>
+                                                        setCameraPresets(
+                                                            (current) =>
+                                                                current.filter(
+                                                                    (p) =>
+                                                                        p.id !==
+                                                                        saved.id,
+                                                                ),
+                                                        )
+                                                    }
+                                                />
+                                            </ViewRow>
+                                        ))}
 
-                                                    setCameraPresets(
+                                        <Button
+                                            onClick={() => {
+                                                const viewport =
+                                                    viewportRef.current;
+                                                if (viewport === null) {
+                                                    return;
+                                                }
+
+                                                // Named after the first free number rather than prompting; the
+                                                // row's pencil renames it in place.
+                                                const saved = presetFromPose(
+                                                    nextPresetName(
+                                                        cameraPresets,
+                                                    ),
+                                                    viewport.cameraPosition,
+                                                    viewport.subjectSphere,
+                                                );
+
+                                                setCameraPresets((current) => [
+                                                    ...current,
+                                                    saved,
+                                                ]);
+                                            }}
+                                        >
+                                            <Icon name="add" />
+                                            {l10n.t("New camera preset")}
+                                        </Button>
+                                    </div>
+
+                                    <Field
+                                        label={l10n.t("Opens with")}
+                                        infoSeverity={
+                                            bindTargets.length === 0
+                                                ? "warning"
+                                                : "info"
+                                        }
+                                        info={
+                                            <>
+                                                {bindTargets.length === 0
+                                                    ? l10n.t(
+                                                          "A model opened on its own has no object, type or category to bind to. Open it through a game object to bind a preset to a whole roster.",
+                                                      )
+                                                    : l10n.t(
+                                                          "A bound preset is applied when the model opens, most specific rule first: This object beats its type, and its type beats a category. Moving the camera afterwards is always allowed.",
+                                                      )}
+                                            </>
+                                        }
+                                        value={
+                                            boundRule === null
+                                                ? "nothing"
+                                                : (cameraPresets.find(
+                                                      (p) =>
+                                                          p.id ===
+                                                          boundRule.presetId,
+                                                  )?.name ?? "a deleted preset")
+                                        }
+                                    >
+                                        {/* Bind the LAST camera preset: with no preset there is nothing to bind, and picking
+                which one belongs in a list rather than in three buttons. */}
+                                        {bindTargets.map((target) => (
+                                            <Button
+                                                key={target.kind}
+                                                title={l10n.t(
+                                                    "Open every {0} with {1}",
+                                                    target.what,
+                                                    cameraPresets.length === 0
+                                                        ? "a camera preset"
+                                                        : cameraPresets[
+                                                              cameraPresets.length -
+                                                                  1
+                                                          ].name,
+                                                )}
+                                                disabled={
+                                                    cameraPresets.length === 0
+                                                }
+                                                disabledReason={l10n.t(
+                                                    "No camera preset to bind",
+                                                )}
+                                                onClick={() => {
+                                                    const preset =
+                                                        cameraPresets[
+                                                            cameraPresets.length -
+                                                                1
+                                                        ];
+                                                    setCameraBindings(
                                                         (current) => [
-                                                            ...current,
-                                                            saved,
+                                                            // Replacing rather than appending: two rules of one kind on the same
+                                                            // value would leave the second permanently unreachable, since the first
+                                                            // match wins.
+                                                            ...current.filter(
+                                                                (b) =>
+                                                                    !(
+                                                                        b.kind ===
+                                                                            target.kind &&
+                                                                        b.value.toLowerCase() ===
+                                                                            target.value.toLowerCase()
+                                                                    ),
+                                                            ),
+                                                            {
+                                                                id: `bind-${Date.now().toString(36)}-${target.kind}`,
+                                                                kind: target.kind,
+                                                                value: target.value,
+                                                                presetId:
+                                                                    preset.id,
+                                                            },
                                                         ],
                                                     );
                                                 }}
                                             >
-                                                <Icon name="add" />
-                                                {l10n.t("New camera preset")}
+                                                {target.label}
                                             </Button>
-                                        </div>
+                                        ))}
 
-                                        <Field
-                                            label={l10n.t("Opens with")}
-                                            infoSeverity={
-                                                bindTargets.length === 0
-                                                    ? "warning"
-                                                    : "info"
-                                            }
-                                            info={
-                                                <>
-                                                    {bindTargets.length === 0
-                                                        ? l10n.t(
-                                                              "A model opened on its own has no object, type or category to bind to. Open it through a game object to bind a preset to a whole roster.",
-                                                          )
-                                                        : l10n.t(
-                                                              "A bound preset is applied when the model opens, most specific rule first: This object beats its type, and its type beats a category. Moving the camera afterwards is always allowed.",
-                                                          )}
-                                                </>
-                                            }
-                                            value={
-                                                boundRule === null
-                                                    ? "nothing"
-                                                    : (cameraPresets.find(
-                                                          (p) =>
-                                                              p.id ===
-                                                              boundRule.presetId,
-                                                      )?.name ??
-                                                      "a deleted preset")
-                                            }
-                                        >
-                                            {/* Bind the LAST camera preset: with no preset there is nothing to bind, and picking
-                which one belongs in a list rather than in three buttons. */}
-                                            {bindTargets.map((target) => (
-                                                <Button
-                                                    key={target.kind}
-                                                    title={l10n.t(
-                                                        "Open every {0} with {1}",
-                                                        target.what,
-                                                        cameraPresets.length ===
-                                                            0
-                                                            ? "a camera preset"
-                                                            : cameraPresets[
-                                                                  cameraPresets.length -
-                                                                      1
-                                                              ].name,
-                                                    )}
-                                                    disabled={
-                                                        cameraPresets.length ===
-                                                        0
-                                                    }
-                                                    disabledReason={l10n.t(
-                                                        "No camera preset to bind",
-                                                    )}
-                                                    onClick={() => {
-                                                        const preset =
-                                                            cameraPresets[
-                                                                cameraPresets.length -
-                                                                    1
-                                                            ];
-                                                        setCameraBindings(
-                                                            (current) => [
-                                                                // Replacing rather than appending: two rules of one kind on the same
-                                                                // value would leave the second permanently unreachable, since the first
-                                                                // match wins.
-                                                                ...current.filter(
-                                                                    (b) =>
-                                                                        !(
-                                                                            b.kind ===
-                                                                                target.kind &&
-                                                                            b.value.toLowerCase() ===
-                                                                                target.value.toLowerCase()
-                                                                        ),
-                                                                ),
-                                                                {
-                                                                    id: `bind-${Date.now().toString(36)}-${target.kind}`,
-                                                                    kind: target.kind,
-                                                                    value: target.value,
-                                                                    presetId:
-                                                                        preset.id,
-                                                                },
-                                                            ],
-                                                        );
-                                                    }}
-                                                >
-                                                    {target.label}
-                                                </Button>
-                                            ))}
+                                        {boundRule !== null && (
+                                            <Button
+                                                title={l10n.t(
+                                                    "Stop opening {0} with a camera preset",
+                                                    boundRule.kind === "object"
+                                                        ? "this object"
+                                                        : `every ${
+                                                              boundRule.value
+                                                          }`,
+                                                )}
+                                                onClick={() =>
+                                                    setCameraBindings(
+                                                        (current) =>
+                                                            current.filter(
+                                                                (b) =>
+                                                                    b.id !==
+                                                                    boundRule.id,
+                                                            ),
+                                                    )
+                                                }
+                                            >
+                                                <Icon name="remove" />
+                                                {l10n.t("Unbind")}
+                                            </Button>
+                                        )}
+                                    </Field>
+                                </DockSection>
 
-                                            {boundRule !== null && (
-                                                <Button
-                                                    title={l10n.t(
-                                                        "Stop opening {0} with a camera preset",
-                                                        boundRule.kind ===
-                                                            "object"
-                                                            ? "this object"
-                                                            : `every ${
-                                                                  boundRule.value
-                                                              }`,
-                                                    )}
-                                                    onClick={() =>
-                                                        setCameraBindings(
-                                                            (current) =>
-                                                                current.filter(
-                                                                    (b) =>
-                                                                        b.id !==
-                                                                        boundRule.id,
-                                                                ),
-                                                        )
-                                                    }
-                                                >
-                                                    <Icon name="remove" />
-                                                    {l10n.t("Unbind")}
-                                                </Button>
-                                            )}
-                                        </Field>
-                                    </DockSection>
-
-                                    <DockSection
-                                        id="camera.view"
-                                        title={l10n.t("View")}
-                                        collapsed={folded.has("camera.view")}
-                                        onToggle={toggleSection}
+                                <DockSection
+                                    id="camera.view"
+                                    title={l10n.t("View")}
+                                    collapsed={folded.has("camera.view")}
+                                    onToggle={toggleSection}
+                                >
+                                    <Field
+                                        label={l10n.t("Draw distance")}
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "The fit already reaches the end of the effects, not just the hull. A long trail needs more reach; a huge model may z-fight then.",
+                                                )}
+                                            </>
+                                        }
                                     >
-                                        <Field
+                                        <ModeSelector
                                             label={l10n.t("Draw distance")}
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "The fit already reaches the end of the effects, not just the hull. A long trail needs more reach; a huge model may z-fight then.",
-                                                    )}
-                                                </>
+                                            value={String(drawDistance)}
+                                            options={[
+                                                {
+                                                    id: "1",
+                                                    label: l10n.t("Fit"),
+                                                    title: l10n.t(
+                                                        "Fit the model and its effects",
+                                                    ),
+                                                },
+                                                {
+                                                    id: "2",
+                                                    label: l10n.t("2x"),
+                                                    title: l10n.t(
+                                                        "Twice the fitted distance",
+                                                    ),
+                                                },
+                                                {
+                                                    id: "4",
+                                                    label: l10n.t("4x"),
+                                                    title: l10n.t("Four times"),
+                                                },
+                                                {
+                                                    id: "8",
+                                                    label: l10n.t("8x"),
+                                                    title: l10n.t(
+                                                        "Eight times",
+                                                    ),
+                                                },
+                                            ]}
+                                            onSelect={(value) =>
+                                                setDrawDistance(Number(value))
                                             }
-                                        >
-                                            <ModeSelector
-                                                label={l10n.t("Draw distance")}
-                                                value={String(drawDistance)}
-                                                options={[
-                                                    {
-                                                        id: "1",
-                                                        label: l10n.t("Fit"),
-                                                        title: l10n.t(
-                                                            "Fit the model and its effects",
-                                                        ),
-                                                    },
-                                                    {
-                                                        id: "2",
-                                                        label: l10n.t("2x"),
-                                                        title: l10n.t(
-                                                            "Twice the fitted distance",
-                                                        ),
-                                                    },
-                                                    {
-                                                        id: "4",
-                                                        label: l10n.t("4x"),
-                                                        title: l10n.t(
-                                                            "Four times",
-                                                        ),
-                                                    },
-                                                    {
-                                                        id: "8",
-                                                        label: l10n.t("8x"),
-                                                        title: l10n.t(
-                                                            "Eight times",
-                                                        ),
-                                                    },
-                                                ]}
-                                                onSelect={(value) =>
-                                                    setDrawDistance(
-                                                        Number(value),
+                                        />
+                                    </Field>
+                                </DockSection>
+
+                                <DockSection
+                                    id="camera.capture"
+                                    title={l10n.t("Capture")}
+                                    collapsed={folded.has("camera.capture")}
+                                    onToggle={toggleSection}
+                                >
+                                    <Field
+                                        label={l10n.t("Capture")}
+                                        value={
+                                            captureDims
+                                                ? `${captureDims.width} x ${captureDims.height}`
+                                                : "-"
+                                        }
+                                        info={
+                                            <>
+                                                {l10n.t(
+                                                    "Writes the framed area at the chosen size. Grid, floor, effects and annotations stay out unless kept.",
+                                                )}
+                                            </>
+                                        }
+                                    >
+                                        <ModeSelector
+                                            label={l10n.t("Capture size")}
+                                            value={captureSizeId}
+                                            options={[
+                                                ...CAPTURE_SIZES.map(
+                                                    (size) => ({
+                                                        id: size.id,
+                                                        label: size.label,
+                                                        title: size.title,
+                                                    }),
+                                                ),
+                                                {
+                                                    id: "custom",
+                                                    label: l10n.t("Custom"),
+                                                    title: l10n.t(
+                                                        "Custom - up to {0}",
+                                                        MAX_SIDE,
+                                                    ),
+                                                },
+                                            ]}
+                                            onSelect={setCaptureSizeId}
+                                        />
+
+                                        <ViewRow className="capture-custom">
+                                            <IntegerField
+                                                value={customCapture.width}
+                                                ariaLabel={l10n.t("Width")}
+                                                disabled={
+                                                    captureSizeId !== "custom"
+                                                }
+                                                disabledReason={l10n.t(
+                                                    "Custom size only",
+                                                )}
+                                                onChange={(width) =>
+                                                    setCustomCapture((c) => ({
+                                                        ...c,
+                                                        width,
+                                                    }))
+                                                }
+                                            />
+                                            {l10n.t("x")}
+                                            <IntegerField
+                                                value={customCapture.height}
+                                                ariaLabel={l10n.t("Height")}
+                                                disabled={
+                                                    captureSizeId !== "custom"
+                                                }
+                                                disabledReason={l10n.t(
+                                                    "Custom size only",
+                                                )}
+                                                onChange={(height) =>
+                                                    setCustomCapture((c) => ({
+                                                        ...c,
+                                                        height,
+                                                    }))
+                                                }
+                                            />
+                                        </ViewRow>
+
+                                        <label className="check-row">
+                                            <input
+                                                type="checkbox"
+                                                checked={captureTransparent}
+                                                onChange={(e) =>
+                                                    setCaptureTransparent(
+                                                        e.target.checked,
                                                     )
                                                 }
                                             />
-                                        </Field>
-                                    </DockSection>
+                                            {l10n.t("Transparent background")}
+                                        </label>
 
-                                    <DockSection
-                                        id="camera.capture"
-                                        title={l10n.t("Capture")}
-                                        collapsed={folded.has("camera.capture")}
-                                        onToggle={toggleSection}
-                                    >
-                                        <Field
-                                            label={l10n.t("Capture")}
-                                            value={
-                                                captureDims
-                                                    ? `${captureDims.width} x ${captureDims.height}`
-                                                    : "-"
-                                            }
-                                            info={
-                                                <>
-                                                    {l10n.t(
-                                                        "Writes the framed area at the chosen size. Grid, floor, effects and annotations stay out unless kept.",
-                                                    )}
-                                                </>
-                                            }
-                                        >
-                                            <ModeSelector
-                                                label={l10n.t("Capture size")}
-                                                value={captureSizeId}
-                                                options={[
-                                                    ...CAPTURE_SIZES.map(
-                                                        (size) => ({
-                                                            id: size.id,
-                                                            label: size.label,
-                                                            title: size.title,
-                                                        }),
-                                                    ),
-                                                    {
-                                                        id: "custom",
-                                                        label: l10n.t("Custom"),
-                                                        title: l10n.t(
-                                                            "Custom - up to {0}",
-                                                            MAX_SIDE,
-                                                        ),
-                                                    },
-                                                ]}
-                                                onSelect={setCaptureSizeId}
+                                        <label className="check-row">
+                                            <input
+                                                type="checkbox"
+                                                checked={captureScenery}
+                                                onChange={(e) =>
+                                                    setCaptureScenery(
+                                                        e.target.checked,
+                                                    )
+                                                }
                                             />
+                                            {l10n.t(
+                                                "Keep the grid, floor, effects and markers",
+                                            )}
+                                        </label>
 
-                                            <span className="view-row capture-custom">
-                                                <IntegerField
-                                                    value={customCapture.width}
-                                                    ariaLabel={l10n.t("Width")}
-                                                    disabled={
-                                                        captureSizeId !==
-                                                        "custom"
-                                                    }
-                                                    disabledReason={l10n.t(
-                                                        "Custom size only",
-                                                    )}
-                                                    onChange={(width) =>
-                                                        setCustomCapture(
-                                                            (c) => ({
-                                                                ...c,
-                                                                width,
-                                                            }),
-                                                        )
-                                                    }
-                                                />
-                                                {l10n.t("x")}
-                                                <IntegerField
-                                                    value={customCapture.height}
-                                                    ariaLabel={l10n.t("Height")}
-                                                    disabled={
-                                                        captureSizeId !==
-                                                        "custom"
-                                                    }
-                                                    disabledReason={l10n.t(
-                                                        "Custom size only",
-                                                    )}
-                                                    onChange={(height) =>
-                                                        setCustomCapture(
-                                                            (c) => ({
-                                                                ...c,
-                                                                height,
-                                                            }),
-                                                        )
-                                                    }
-                                                />
-                                            </span>
+                                        <Button
+                                            disabled={captureDims === null}
+                                            disabledReason={l10n.t(
+                                                "Width and height must be whole numbers from 1 to {0}",
+                                                MAX_SIDE,
+                                            )}
+                                            onClick={() => {
+                                                const viewport =
+                                                    viewportRef.current;
+                                                if (viewport === null) {
+                                                    return;
+                                                }
 
-                                            <label className="check-row">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={captureTransparent}
-                                                    onChange={(e) =>
-                                                        setCaptureTransparent(
-                                                            e.target.checked,
-                                                        )
-                                                    }
-                                                />
-                                                {l10n.t(
-                                                    "Transparent background",
-                                                )}
-                                            </label>
-
-                                            <label className="check-row">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={captureScenery}
-                                                    onChange={(e) =>
-                                                        setCaptureScenery(
-                                                            e.target.checked,
-                                                        )
-                                                    }
-                                                />
-                                                {l10n.t(
-                                                    "Keep the grid, floor, effects and markers",
-                                                )}
-                                            </label>
-
-                                            <Button
-                                                disabled={captureDims === null}
-                                                disabledReason={l10n.t(
-                                                    "Width and height must be whole numbers from 1 to {0}",
-                                                    MAX_SIDE,
-                                                )}
-                                                onClick={() => {
-                                                    const viewport =
-                                                        viewportRef.current;
-                                                    if (viewport === null) {
-                                                        return;
-                                                    }
-
-                                                    if (captureDims === null) {
-                                                        return;
-                                                    }
-                                                    const size = captureSize(
-                                                        captureDims.width,
-                                                        captureDims.height,
-                                                    );
-                                                    const dataUrl =
-                                                        viewport.capture({
-                                                            ...size,
-                                                            // The reader's own backdrop when they asked to keep the room, so what they
-                                                            // see is what they get; otherwise nothing at all, which is what an icon
-                                                            // going onto a mega texture wants.
-                                                            // The viewport's own backdrop when a flat one is wanted, so an opaque
-                                                            // capture matches what is on screen rather than inventing a colour.
-                                                            background:
-                                                                captureTransparent
-                                                                    ? null
-                                                                    : `#${VIEWPORT_BACKGROUND.toString(16).padStart(6, "0")}`,
-                                                            grid:
-                                                                captureScenery &&
-                                                                grid,
-                                                            floor:
-                                                                captureScenery &&
-                                                                floor,
-                                                            particles:
-                                                                captureScenery &&
-                                                                particlesOn,
-                                                            annotations:
-                                                                captureScenery,
-                                                        });
-
-                                                    post({
-                                                        type: "saveCapture",
-                                                        dataUrl,
-                                                        // The unit's own icons are named the way the engine looks them up.
-                                                        fileName:
-                                                            iconFileName(
-                                                                CAPTURE_SIZES.find(
-                                                                    (s) =>
-                                                                        s.id ===
-                                                                        captureSizeId,
-                                                                ) ?? null,
-                                                                scene?.iconName,
-                                                            ) ??
-                                                            captureFileName(
-                                                                scene?.subject ??
-                                                                    "capture",
-                                                                size.width,
-                                                                size.height,
-                                                            ),
+                                                if (captureDims === null) {
+                                                    return;
+                                                }
+                                                const size = captureSize(
+                                                    captureDims.width,
+                                                    captureDims.height,
+                                                );
+                                                const dataUrl =
+                                                    viewport.capture({
+                                                        ...size,
+                                                        // The reader's own backdrop when they asked to keep the room, so what they
+                                                        // see is what they get; otherwise nothing at all, which is what an icon
+                                                        // going onto a mega texture wants.
+                                                        // The viewport's own backdrop when a flat one is wanted, so an opaque
+                                                        // capture matches what is on screen rather than inventing a colour.
+                                                        background:
+                                                            captureTransparent
+                                                                ? null
+                                                                : `#${VIEWPORT_BACKGROUND.toString(16).padStart(6, "0")}`,
+                                                        grid:
+                                                            captureScenery &&
+                                                            grid,
+                                                        floor:
+                                                            captureScenery &&
+                                                            floor,
+                                                        particles:
+                                                            captureScenery &&
+                                                            particlesOn,
+                                                        annotations:
+                                                            captureScenery,
                                                     });
-                                                }}
-                                            >
-                                                <Icon name="capture" />
-                                                {l10n.t("Save a picture")}
-                                            </Button>
-                                        </Field>
-                                    </DockSection>
-                                </div>
-                            </div>
+
+                                                post({
+                                                    type: "saveCapture",
+                                                    dataUrl,
+                                                    // The unit's own icons are named the way the engine looks them up.
+                                                    fileName:
+                                                        iconFileName(
+                                                            CAPTURE_SIZES.find(
+                                                                (s) =>
+                                                                    s.id ===
+                                                                    captureSizeId,
+                                                            ) ?? null,
+                                                            scene?.iconName,
+                                                        ) ??
+                                                        captureFileName(
+                                                            scene?.subject ??
+                                                                "capture",
+                                                            size.width,
+                                                            size.height,
+                                                        ),
+                                                });
+                                            }}
+                                        >
+                                            <Icon name="capture" />
+                                            {l10n.t("Save a picture")}
+                                        </Button>
+                                    </Field>
+                                </DockSection>
+                            </StageFlyout>
                         )}
 
                         {/* The bottom edge: what the subject is DOING.
@@ -9118,9 +6652,11 @@ function ModelPreview(): React.JSX.Element {
                             choice about how the PICTURE is drawn, not about what the subject is
                             doing, so it lives in Scene > Effects beside heat and bloom. What is
                             left on this edge is the subject's own state. */}
-                        <div className="stage-row stage-bottom">
-                            <span className="stage-slot">
-                                {/* Which damage state and which detail level the subject is shown at.
+                        <StageSlots
+                            edge="bottom"
+                            start={
+                                <>
+                                    {/* Which damage state and which detail level the subject is shown at.
 
                             On the stage rather than in the dock because it is the SUBJECT'S state,
                             and the bottom edge is what the subject is doing.
@@ -9135,109 +6671,113 @@ function ModelPreview(): React.JSX.Element {
                             Re-authored compactly rather than moved as it stood - the dock's
                             `.field` is a label above a full-width control, which is a shape a 22px
                             stage plate does not have. */}
-                                {(levels.alt.length > 1 ||
-                                    levels.lod.length > 1) && (
-                                    <div
-                                        className="stage-chrome subject-state"
-                                        role="group"
-                                        aria-label={l10n.t("Model state")}
-                                    >
-                                        {levels.alt.length > 1 && (
-                                            <label
-                                                className="stage-field"
-                                                title={
-                                                    altDrivenByHull
-                                                        ? l10n.t(
-                                                              "Damage state follows the hull in Gameplay",
-                                                          )
-                                                        : l10n.t(
-                                                              "Set damage state - 0 is undamaged",
-                                                          )
-                                                }
-                                            >
-                                                <Icon name="damage" />
-                                                <input
-                                                    type="range"
-                                                    min={0}
-                                                    max={altSteps.count - 1}
-                                                    step={1}
-                                                    value={altSteps.positionOf(
-                                                        alt,
-                                                    )}
-                                                    disabled={altDrivenByHull}
-                                                    onChange={(e) =>
-                                                        setAlt(
-                                                            altSteps.levelAt(
-                                                                Number(
-                                                                    e.target
-                                                                        .value,
-                                                                ),
-                                                            ),
-                                                        )
+                                    {(levels.alt.length > 1 ||
+                                        levels.lod.length > 1) && (
+                                        <div
+                                            className="stage-chrome subject-state"
+                                            role="group"
+                                            aria-label={l10n.t("Model state")}
+                                        >
+                                            {levels.alt.length > 1 && (
+                                                <label
+                                                    className="stage-field"
+                                                    title={
+                                                        altDrivenByHull
+                                                            ? l10n.t(
+                                                                  "Damage state follows the hull in Gameplay",
+                                                              )
+                                                            : l10n.t(
+                                                                  "Set damage state - 0 is undamaged",
+                                                              )
                                                     }
-                                                />
-                                                <span className="stage-value">
-                                                    {levelLabel(
-                                                        "alt",
-                                                        alt,
-                                                        levels.alt,
-                                                        {
-                                                            table:
-                                                                scene?.damageTable ??
-                                                                [],
-                                                        },
-                                                    )}
-                                                </span>
-                                            </label>
-                                        )}
-
-                                        {levels.lod.length > 1 && (
-                                            <label
-                                                className="stage-field detail"
-                                                title={l10n.t(
-                                                    "Set LOD - 0 is lowest detail in EaW",
-                                                )}
-                                            >
-                                                <Icon name="detail" />
-                                                <input
-                                                    type="range"
-                                                    min={0}
-                                                    max={lodSteps.count - 1}
-                                                    step={1}
-                                                    value={lodSteps.positionOf(
-                                                        lod,
-                                                    )}
-                                                    onChange={(e) => {
-                                                        lodChosenRef.current = true;
-                                                        setLod(
-                                                            lodSteps.levelAt(
-                                                                Number(
-                                                                    e.target
-                                                                        .value,
+                                                >
+                                                    <Icon name="damage" />
+                                                    <input
+                                                        type="range"
+                                                        min={0}
+                                                        max={altSteps.count - 1}
+                                                        step={1}
+                                                        value={altSteps.positionOf(
+                                                            alt,
+                                                        )}
+                                                        disabled={
+                                                            altDrivenByHull
+                                                        }
+                                                        onChange={(e) =>
+                                                            setAlt(
+                                                                altSteps.levelAt(
+                                                                    Number(
+                                                                        e.target
+                                                                            .value,
+                                                                    ),
                                                                 ),
-                                                            ),
-                                                        );
-                                                    }}
-                                                />
-                                                <span className="stage-value">
-                                                    {levelLabel(
-                                                        "lod",
-                                                        lod,
-                                                        levels.lod,
-                                                        {
-                                                            cost: lodCost.get(
-                                                                lod,
-                                                            ),
-                                                        },
-                                                    )}
-                                                </span>
-                                            </label>
-                                        )}
-                                    </div>
-                                )}
-                            </span>
+                                                            )
+                                                        }
+                                                    />
+                                                    <span className="stage-value">
+                                                        {levelLabel(
+                                                            "alt",
+                                                            alt,
+                                                            levels.alt,
+                                                            {
+                                                                table:
+                                                                    scene?.damageTable ??
+                                                                    [],
+                                                            },
+                                                        )}
+                                                    </span>
+                                                </label>
+                                            )}
 
-                            {/* The ability command bar - the game's own arrangement, and the reason
+                                            {levels.lod.length > 1 && (
+                                                <label
+                                                    className="stage-field detail"
+                                                    title={l10n.t(
+                                                        "Set LOD - 0 is lowest detail in EaW",
+                                                    )}
+                                                >
+                                                    <Icon name="detail" />
+                                                    <input
+                                                        type="range"
+                                                        min={0}
+                                                        max={lodSteps.count - 1}
+                                                        step={1}
+                                                        value={lodSteps.positionOf(
+                                                            lod,
+                                                        )}
+                                                        onChange={(e) => {
+                                                            lodChosenRef.current = true;
+                                                            setLod(
+                                                                lodSteps.levelAt(
+                                                                    Number(
+                                                                        e.target
+                                                                            .value,
+                                                                    ),
+                                                                ),
+                                                            );
+                                                        }}
+                                                    />
+                                                    <span className="stage-value">
+                                                        {levelLabel(
+                                                            "lod",
+                                                            lod,
+                                                            levels.lod,
+                                                            {
+                                                                cost: lodCost.get(
+                                                                    lod,
+                                                                ),
+                                                            },
+                                                        )}
+                                                    </span>
+                                                </label>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            }
+                            middle={
+                                <>
+                                    {/* The ability command bar - the game's own arrangement, and the reason
                             the icons were worth resolving at all. One key per ability, pressed to
                             activate, centred under the model it acts on.
 
@@ -9249,157 +6789,165 @@ function ModelPreview(): React.JSX.Element {
                             of the shipped types are ORDERS, and a unit's repertoire is worth
                             reading whole. Those keys are DISABLED and say why in their tooltip
                             rather than being left out. */}
-                            <span className="stage-slot stage-slot-mid">
-                                <span className="command-stack">
-                                    {mode === "gameplay" &&
-                                        abilities.length > 0 && (
-                                            <div
-                                                className="stage-chrome ability-bar"
-                                                role="group"
-                                                aria-label={l10n.t("Abilities")}
-                                            >
-                                                {abilities.map((ability) => (
-                                                    <button
-                                                        key={ability.type}
-                                                        type="button"
-                                                        className={
-                                                            "ability-key" +
-                                                            (activeAbilities.has(
-                                                                ability.type,
-                                                            )
-                                                                ? " active"
-                                                                : "")
-                                                        }
-                                                        aria-pressed={activeAbilities.has(
-                                                            ability.type,
-                                                        )}
-                                                        aria-label={
-                                                            ability.label
-                                                        }
-                                                        disabled={
-                                                            !ability.drivesSomething
-                                                        }
-                                                        title={abilityBarTitle(
-                                                            ability,
-                                                        )}
-                                                        onClick={() =>
-                                                            setAbilityActive(
-                                                                ability.type,
-                                                                !activeAbilities.has(
+                                    <span className="command-stack">
+                                        {mode === "gameplay" &&
+                                            abilities.length > 0 && (
+                                                <div
+                                                    className="stage-chrome ability-bar"
+                                                    role="group"
+                                                    aria-label={l10n.t(
+                                                        "Abilities",
+                                                    )}
+                                                >
+                                                    {abilities.map(
+                                                        (ability) => (
+                                                            <button
+                                                                key={
+                                                                    ability.type
+                                                                }
+                                                                type="button"
+                                                                className={
+                                                                    "ability-key" +
+                                                                    (activeAbilities.has(
+                                                                        ability.type,
+                                                                    )
+                                                                        ? " active"
+                                                                        : "")
+                                                                }
+                                                                aria-pressed={activeAbilities.has(
                                                                     ability.type,
-                                                                ),
-                                                            )
-                                                        }
-                                                    >
-                                                        {/* The icon IS the key. Where none resolved the label
+                                                                )}
+                                                                aria-label={
+                                                                    ability.label
+                                                                }
+                                                                disabled={
+                                                                    !ability.drivesSomething
+                                                                }
+                                                                title={abilityBarTitle(
+                                                                    ability,
+                                                                )}
+                                                                onClick={() =>
+                                                                    setAbilityActive(
+                                                                        ability.type,
+                                                                        !activeAbilities.has(
+                                                                            ability.type,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                            >
+                                                                {/* The icon IS the key. Where none resolved the label
                                             stands in rather than an empty slot: the engine
                                             hardcodes these names, so a miss usually means we
                                             cannot guess the name, not that the game draws
                                             nothing. */}
-                                                        {ability.iconDataUri !==
-                                                        null ? (
-                                                            <img
-                                                                className="ability-icon"
-                                                                src={safeImageSource(
-                                                                    ability.iconDataUri,
+                                                                {ability.iconDataUri !==
+                                                                null ? (
+                                                                    <img
+                                                                        className="ability-icon"
+                                                                        src={safeImageSource(
+                                                                            ability.iconDataUri,
+                                                                        )}
+                                                                        alt=""
+                                                                    />
+                                                                ) : (
+                                                                    <span className="ability-key-text">
+                                                                        {
+                                                                            ability.label
+                                                                        }
+                                                                    </span>
                                                                 )}
-                                                                alt=""
-                                                            />
-                                                        ) : (
-                                                            <span className="ability-key-text">
-                                                                {ability.label}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                ))}
+                                                            </button>
+                                                        ),
+                                                    )}
 
-                                                {/* The reading matter the dock list used to carry. A bar of icons
+                                                    {/* The reading matter the dock list used to carry. A bar of icons
                                     cannot hold a tooltip's worth of text per ability, and the jump
                                     to a definition needs a control of its own - so both live one
                                     press away instead of being dropped. */}
-                                                <IconButton
-                                                    icon="details"
-                                                    className={
-                                                        abilitiesOpen
-                                                            ? "active"
-                                                            : undefined
-                                                    }
-                                                    expanded={abilitiesOpen}
-                                                    title={l10n.t(
-                                                        "Show abilities",
-                                                    )}
-                                                    onClick={() =>
-                                                        setAbilitiesOpen(
-                                                            (open) => !open,
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                        )}
+                                                    <IconButton
+                                                        icon="details"
+                                                        className={
+                                                            abilitiesOpen
+                                                                ? "active"
+                                                                : undefined
+                                                        }
+                                                        expanded={abilitiesOpen}
+                                                        title={l10n.t(
+                                                            "Show abilities",
+                                                        )}
+                                                        onClick={() =>
+                                                            setAbilitiesOpen(
+                                                                (open) => !open,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                            )}
 
-                                    {/* What the unit has LEFT, under the keys that act on it - the user's own
+                                        {/* What the unit has LEFT, under the keys that act on it - the user's own
                             arrangement. The same three pools the attacker's readout lists, said as
                             bars: shields blue, the hull on the hardpoints' own ramp so a bar and a
                             targeting mark agree, and energy a hue neither of them uses.
 
                             Energy is absent unless its setting is on - see `poolOptions`. */}
-                                    {mode === "gameplay" &&
-                                        poolRows(
-                                            scene?.defence,
-                                            livePools,
-                                            hull,
-                                            poolOptions,
-                                            hardpointHealthPool,
-                                        ).length > 0 && (
-                                            <div
-                                                className="stage-chrome status-bars"
-                                                role="group"
-                                                aria-label={l10n.t(
-                                                    "What the unit has left",
-                                                )}
-                                            >
-                                                {poolRows(
-                                                    scene?.defence,
-                                                    livePools,
-                                                    hull,
-                                                    poolOptions,
-                                                    hardpointHealthPool,
-                                                ).map((row) => (
-                                                    <span
-                                                        key={row.id}
-                                                        className="status-bar"
-                                                        title={`${row.label}: ${row.detail}`}
-                                                    >
-                                                        <span className="status-bar-track">
-                                                            <span
-                                                                className="status-bar-fill"
-                                                                style={{
-                                                                    width: `${Math.round(row.fraction * 100)}%`,
-                                                                    background:
-                                                                        row.colour,
-                                                                }}
-                                                            />
+                                        {mode === "gameplay" &&
+                                            poolRows(
+                                                scene?.defence,
+                                                livePools,
+                                                hull,
+                                                poolOptions,
+                                                hardpointHealthPool,
+                                            ).length > 0 && (
+                                                <div
+                                                    className="stage-chrome status-bars"
+                                                    role="group"
+                                                    aria-label={l10n.t(
+                                                        "What the unit has left",
+                                                    )}
+                                                >
+                                                    {poolRows(
+                                                        scene?.defence,
+                                                        livePools,
+                                                        hull,
+                                                        poolOptions,
+                                                        hardpointHealthPool,
+                                                    ).map((row) => (
+                                                        <span
+                                                            key={row.id}
+                                                            className="status-bar"
+                                                            title={`${row.label}: ${row.detail}`}
+                                                        >
+                                                            <span className="status-bar-track">
+                                                                <span
+                                                                    className="status-bar-fill"
+                                                                    style={{
+                                                                        width: `${Math.round(row.fraction * 100)}%`,
+                                                                        background:
+                                                                            row.colour,
+                                                                    }}
+                                                                />
+                                                            </span>
                                                         </span>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                </span>
-                            </span>
-
-                            {/* The attack tool. A LENS, like the command bar beside it: absent
+                                                    ))}
+                                                </div>
+                                            )}
+                                    </span>
+                                </>
+                            }
+                            end={
+                                <>
+                                    {/* The attack tool. A LENS, like the command bar beside it: absent
                             outside Gameplay rather than disabled, because its absence says which
                             lens you are in and not something about this model.
 
                             A button rather than the form itself - ten fields laid along the bottom
                             edge would take a third of the viewport permanently, to show a tool that
                             is used in bursts. */}
-                            <span className="stage-slot stage-slot-end">
-                                {mode === "gameplay" &&
-                                    scene?.defence !== null &&
-                                    scene?.defence !== undefined && (
-                                        <div className="stage-chrome">
-                                            {/* The two ACTIONS, on the edge rather than inside the flyout -
+                                    {mode === "gameplay" &&
+                                        scene?.defence !== null &&
+                                        scene?.defence !== undefined && (
+                                            <div className="stage-chrome">
+                                                {/* The two ACTIONS, on the edge rather than inside the flyout -
                                     the same arrangement the scene controls and the camera presets
                                     use. `as-action`, not the plain toolbar glyph: neither ever
                                     latches, and a bare icon beside controls that do reads as a
@@ -9413,97 +6961,105 @@ function ModelPreview(): React.JSX.Element {
                                     the reason, rather than firing into nothing. The title also
                                     names the target, which the flyout's own readout used to be
                                     the only place to see. */}
-                                            <IconButton
-                                                icon="fire"
-                                                className={
-                                                    "as-action" +
-                                                    (justFired ? " fired" : "")
-                                                }
-                                                title={l10n.t(
-                                                    "Fire at {0}",
-                                                    fireTarget === "hull"
-                                                        ? "the whole unit"
-                                                        : fireTarget,
-                                                )}
-                                                disabled={
-                                                    fireTarget === "hull" &&
-                                                    !shipTargetable
-                                                }
-                                                disabledReason={l10n.t(
-                                                    "Fire - pick a hardpoint to fire at",
-                                                )}
-                                                onClick={fire}
-                                            />
-                                            <IconButton
-                                                icon="repair"
-                                                className="as-action"
-                                                title={l10n.t(
-                                                    "Repair the target",
-                                                )}
-                                                onClick={() => {
-                                                    repairTarget();
-                                                    destroyAll(false, false);
-                                                }}
-                                            />
-                                        </div>
-                                    )}
+                                                <IconButton
+                                                    icon="fire"
+                                                    className={
+                                                        "as-action" +
+                                                        (justFired
+                                                            ? " fired"
+                                                            : "")
+                                                    }
+                                                    title={l10n.t(
+                                                        "Fire at {0}",
+                                                        fireTarget === "hull"
+                                                            ? "the whole unit"
+                                                            : fireTarget,
+                                                    )}
+                                                    disabled={
+                                                        fireTarget === "hull" &&
+                                                        !shipTargetable
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "Fire - pick a hardpoint to fire at",
+                                                    )}
+                                                    onClick={fire}
+                                                />
+                                                <IconButton
+                                                    icon="repair"
+                                                    className="as-action"
+                                                    title={l10n.t(
+                                                        "Repair the target",
+                                                    )}
+                                                    onClick={() => {
+                                                        repairTarget();
+                                                        destroyAll(
+                                                            false,
+                                                            false,
+                                                        );
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
 
-                                {/* Its own band, the way the camera corner does it: Fire and Repair ACT on
+                                    {/* Its own band, the way the camera corner does it: Fire and Repair ACT on
                             the model, this OPENS something, and the two are not the same kind of
                             control. Last on the right, so the stage reads outwards from the model
                             in both directions. */}
-                                {mode === "gameplay" &&
-                                    scene?.defence !== null &&
-                                    scene?.defence !== undefined && (
-                                        <div className="stage-chrome">
-                                            <IconButton
-                                                icon="settings"
-                                                className={
-                                                    attackOpen
-                                                        ? "active"
-                                                        : undefined
-                                                }
-                                                expanded={attackOpen}
-                                                title={l10n.t(
-                                                    "Weapon settings",
-                                                )}
-                                                onClick={() =>
-                                                    setAttackOpen(
-                                                        (open) => !open,
-                                                    )
-                                                }
-                                            />
+                                    {mode === "gameplay" &&
+                                        scene?.defence !== null &&
+                                        scene?.defence !== undefined && (
+                                            <div className="stage-chrome">
+                                                <IconButton
+                                                    icon="settings"
+                                                    className={
+                                                        attackOpen
+                                                            ? "active"
+                                                            : undefined
+                                                    }
+                                                    expanded={attackOpen}
+                                                    title={l10n.t(
+                                                        "Weapon settings",
+                                                    )}
+                                                    onClick={() =>
+                                                        setAttackOpen(
+                                                            (open) => !open,
+                                                        )
+                                                    }
+                                                />
 
-                                            {/* Beside the settings, because it is the same kind of control -
+                                                {/* Beside the settings, because it is the same kind of control -
                                     it OPENS something. What each shot actually did, so a reader
                                     can see WHY a number came out the way it did rather than
                                     watching a bar move and guessing. */}
-                                            <IconButton
-                                                icon="log"
-                                                className={
-                                                    logOpen
-                                                        ? "active"
-                                                        : undefined
-                                                }
-                                                expanded={logOpen}
-                                                title={l10n.t("Damage log")}
-                                                disabled={
-                                                    damageLog.length === 0
-                                                }
-                                                // Names the control even when it is disabled: a tooltip that
-                                                // gives only the reason leaves a reader who has never opened it
-                                                // no idea what it is.
-                                                disabledReason={l10n.t(
-                                                    "Damage log - nothing fired yet",
-                                                )}
-                                                onClick={() =>
-                                                    setLogOpen((open) => !open)
-                                                }
-                                            />
-                                        </div>
-                                    )}
-                            </span>
-                        </div>
+                                                <IconButton
+                                                    icon="log"
+                                                    className={
+                                                        logOpen
+                                                            ? "active"
+                                                            : undefined
+                                                    }
+                                                    expanded={logOpen}
+                                                    title={l10n.t("Damage log")}
+                                                    disabled={
+                                                        damageLog.length === 0
+                                                    }
+                                                    // Names the control even when it is disabled: a tooltip that
+                                                    // gives only the reason leaves a reader who has never opened it
+                                                    // no idea what it is.
+                                                    disabledReason={l10n.t(
+                                                        "Damage log - nothing fired yet",
+                                                    )}
+                                                    onClick={() =>
+                                                        setLogOpen(
+                                                            (open) => !open,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                </>
+                            }
+                        />
                         {/* What the command bar cannot say in an icon.
 
                             One row per ability: the art, the words the game shows, what it drives
@@ -9511,33 +7067,39 @@ function ModelPreview(): React.JSX.Element {
                             above owns that, and offering it twice would be two controls for one
                             fact. */}
                         {abilitiesOpen && (
-                            <div
-                                className="stage-flyout from-bottom on-mid"
-                                role="dialog"
+                            <StageFlyout
+                                title={l10n.t("Abilities")}
+                                at="mid"
+                                fromBottom
                                 ref={abilitiesRef}
+                                count={abilities.length}
+                                onClose={() => setAbilitiesOpen(false)}
                             >
-                                <div className="stage-flyout-head">
-                                    {l10n.t("Abilities")}
-                                    {/* Pushed right, as every other count in the panel is. Beside
-                                        the word it read as part of the title. */}
-                                    <span className="section-count header-right">
-                                        {abilities.length}
-                                    </span>
-                                    <IconButton
-                                        icon="close"
-                                        title={l10n.t("Close")}
-                                        onClick={() => setAbilitiesOpen(false)}
-                                    />
-                                </div>
-                                <div className="stage-flyout-body">
-                                    <ul className="part-list ability-list">
-                                        {abilities.map((ability) => (
-                                            <li
-                                                key={ability.type}
-                                                data-ability={ability.type}
-                                                className="hardpoint-card"
-                                            >
-                                                <div className="card-head">
+                                <ul className="part-list ability-list">
+                                    {abilities.map((ability) => (
+                                        <PartCard
+                                            key={ability.type}
+                                            data={{ ability: ability.type }}
+                                            definition={{
+                                                title: gotoDefinitionTitle(
+                                                    ability,
+                                                ),
+                                                disabled:
+                                                    ability.definition === null,
+                                                onGo: () =>
+                                                    post({
+                                                        type: "revealDefinition",
+                                                        value:
+                                                            ability.definition ??
+                                                            "",
+                                                        referenceType:
+                                                            "SpecialAbility",
+                                                    }),
+                                            }}
+                                            // The tag, in the card's monospace: it is what binds a proxy and what a reader greps for.
+                                            type={ability.type}
+                                            lead={
+                                                <>
                                                     {ability.iconDataUri !==
                                                         null && (
                                                         <img
@@ -9548,60 +7110,11 @@ function ModelPreview(): React.JSX.Element {
                                                             alt=""
                                                         />
                                                     )}
-                                                    <span className="part-name">
-                                                        {ability.label}
-                                                    </span>
-
-                                                    {/* In the HEAD, where an action belongs. It
-                                                        was appended under the text, which put a
-                                                        button at the end of a paragraph.
-
-                                                        Disabled, not absent, where the ability
-                                                        names no block: most shipped abilities name
-                                                        none, and a jump that came and went would
-                                                        teach nobody it is there. */}
-                                                    <button
-                                                        type="button"
-                                                        className="goto-definition"
-                                                        disabled={
-                                                            ability.definition ===
-                                                            null
-                                                        }
-                                                        title={gotoDefinitionTitle(
-                                                            ability,
-                                                        )}
-                                                        onClick={() =>
-                                                            post({
-                                                                type: "revealDefinition",
-                                                                value:
-                                                                    ability.definition ??
-                                                                    "",
-                                                                referenceType:
-                                                                    "SpecialAbility",
-                                                            })
-                                                        }
-                                                    >
-                                                        <Icon name="definition" />
-                                                    </button>
-                                                </div>
-
-                                                {/* The tag, in the card's monospace: it is what
-                                                    binds a proxy and what a reader greps for. */}
-                                                <span className="detail card-type">
-                                                    {ability.type}
-                                                </span>
-
-                                                {/* What the game tells the PLAYER it does. The one
-                                                    line here not written for a modder, and now the
-                                                    only one on the card's face. */}
-                                                {ability.description !==
-                                                    null && (
-                                                    <span className="detail wraps ability-description">
-                                                        {ability.description}
-                                                    </span>
-                                                )}
-
-                                                <span className="view-row card-actions">
+                                                </>
+                                            }
+                                            name={ability.label}
+                                            actions={
+                                                <>
                                                     <IconButton
                                                         icon="details"
                                                         className={
@@ -9634,12 +7147,21 @@ function ModelPreview(): React.JSX.Element {
                                                             )
                                                         }
                                                     />
+                                                </>
+                                            }
+                                        >
+                                            {/* What the game tells the PLAYER it does. The one
+                                                    line here not written for a modder, and now the
+                                                    only one on the card's face. */}
+                                            {ability.description !== null && (
+                                                <span className="detail wraps ability-description">
+                                                    {ability.description}
                                                 </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </div>
+                                            )}
+                                        </PartCard>
+                                    ))}
+                                </ul>
+                            </StageFlyout>
                         )}
 
                         {/* The panel is INVERTED against the rest of the lens: everything else
@@ -9654,284 +7176,260 @@ function ModelPreview(): React.JSX.Element {
                             Its own flyout beside the settings, not a panel inside them: a log is
                             read after the fact and the settings are set before it. */}
                         {logOpen && (
-                            <div
-                                className="stage-flyout from-bottom on-right sizeable"
-                                role="dialog"
+                            <StageFlyout
+                                title={l10n.t("Damage log")}
+                                at="right"
+                                fromBottom
+                                className="sizeable"
                                 ref={logRef}
                                 style={{ height: logHeight, width: logWidth }}
+                                edges={
+                                    <>
+                                        <div
+                                            className="resize-handle-n"
+                                            title={l10n.t("Drag to resize")}
+                                            {...logResizeN}
+                                        />
+                                        <div
+                                            className="resize-handle-w"
+                                            title={l10n.t("Drag to resize")}
+                                            {...logResizeW}
+                                        />
+                                    </>
+                                }
+                                count={damageLog.length}
+                                onClose={() => setLogOpen(false)}
                             >
-                                <div
-                                    className="resize-handle-n"
-                                    title={l10n.t("Drag to resize")}
-                                    {...logResizeN}
-                                />
-                                <div
-                                    className="resize-handle-w"
-                                    title={l10n.t("Drag to resize")}
-                                    {...logResizeW}
-                                />
-                                <div className="stage-flyout-head">
-                                    {l10n.t("Damage log")}
-                                    <span className="section-count header-right">
-                                        {damageLog.length}
-                                    </span>
-                                    <IconButton
-                                        icon="close"
-                                        title={l10n.t("Close")}
-                                        onClick={() => setLogOpen(false)}
-                                    />
-                                </div>
-                                <div className="stage-flyout-body">
-                                    {/* Only the numbers that move. What they are and what
+                                {/* Only the numbers that move. What they are and what
                                         governs them is fixed for the subject, so it rides on the
                                         tooltip rather than costing four rows of height. */}
-                                    {poolSummary(
-                                        scene?.defence,
-                                        hull,
-                                        hardpointHealthPool,
-                                    ) && (
-                                        <p
-                                            className="pool-summary"
-                                            title={
-                                                poolSummary(
-                                                    scene?.defence,
-                                                    hull,
-                                                    hardpointHealthPool,
-                                                )!.title
+                                {poolSummary(
+                                    scene?.defence,
+                                    hull,
+                                    hardpointHealthPool,
+                                ) && (
+                                    <p
+                                        className="pool-summary"
+                                        title={
+                                            poolSummary(
+                                                scene?.defence,
+                                                hull,
+                                                hardpointHealthPool,
+                                            )!.title
+                                        }
+                                    >
+                                        {
+                                            poolSummary(
+                                                scene?.defence,
+                                                hull,
+                                                hardpointHealthPool,
+                                            )!.text
+                                        }
+                                    </p>
+                                )}
+                                <ol className="damage-log">
+                                    {damageLog.map((entry, index) => (
+                                        <li
+                                            key={`${index}:${entry.target}`}
+                                            className={
+                                                entry.destroyed
+                                                    ? "log-kill"
+                                                    : entry.amount > 0
+                                                      ? undefined
+                                                      : "log-nothing"
                                             }
                                         >
-                                            {
-                                                poolSummary(
-                                                    scene?.defence,
-                                                    hull,
-                                                    hardpointHealthPool,
-                                                )!.text
-                                            }
-                                        </p>
-                                    )}
-                                    <ol className="damage-log">
-                                        {damageLog.map((entry, index) => (
-                                            <li
-                                                key={`${index}:${entry.target}`}
-                                                className={
-                                                    entry.destroyed
-                                                        ? "log-kill"
-                                                        : entry.amount > 0
-                                                          ? undefined
-                                                          : "log-nothing"
-                                                }
-                                            >
-                                                {damageLine(entry)}
-                                                {/* The arithmetic under the sentence: the factor
+                                            {damageLine(entry)}
+                                            {/* The arithmetic under the sentence: the factor
                                                     that scaled it, how a blast was divided, and
                                                     where each pool stood before and after. */}
-                                                {(entry.workings ?? []).length >
-                                                    0 && (
-                                                    <ul className="log-workings">
-                                                        {(
-                                                            entry.workings ?? []
-                                                        ).map((line, at) => (
+                                            {(entry.workings ?? []).length >
+                                                0 && (
+                                                <ul className="log-workings">
+                                                    {(entry.workings ?? []).map(
+                                                        (line, at) => (
                                                             <li key={at}>
                                                                 {line}
                                                             </li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ol>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ol>
 
-                                    <span className="view-row">
-                                        <Button
-                                            compact
-                                            title={l10n.t("Empty the log")}
-                                            onClick={() => setDamageLog([])}
-                                        >
-                                            <Icon name="remove" />
-                                            {l10n.t("Clear")}
-                                        </Button>
-                                    </span>
-                                </div>
-                            </div>
+                                <ViewRow>
+                                    <Button
+                                        compact
+                                        title={l10n.t("Empty the log")}
+                                        onClick={() => setDamageLog([])}
+                                    >
+                                        <Icon name="remove" />
+                                        {l10n.t("Clear")}
+                                    </Button>
+                                </ViewRow>
+                            </StageFlyout>
                         )}
 
                         {attackOpen && (
-                            <div
-                                className="stage-flyout from-bottom on-right"
-                                role="dialog"
+                            <StageFlyout
+                                title={l10n.t("Weapon")}
+                                at="right"
+                                fromBottom
                                 ref={attackRef}
+                                onClose={() => setAttackOpen(false)}
                             >
-                                <div className="stage-flyout-head">
-                                    {l10n.t("Weapon")}
-                                    <IconButton
-                                        icon="close"
-                                        title={l10n.t("Close")}
-                                        onClick={() => setAttackOpen(false)}
-                                    />
-                                </div>
-                                <div className="stage-flyout-body">
-                                    {mode === "gameplay" &&
-                                        scene?.defence !== null &&
-                                        scene?.defence !== undefined && (
-                                            <DockSection
-                                                title={l10n.t("Attacker")}
-                                                count={
-                                                    scene.defence.isShielded
-                                                        ? "shielded"
-                                                        : "unshielded"
-                                                }
-                                            >
-                                                <div className="field-note">
-                                                    {l10n.t(
-                                                        "The model on stage is the TARGET. Build a weapon here and fire it at the unit or at one hardpoint.",
-                                                    )}
-                                                </div>
+                                {mode === "gameplay" &&
+                                    scene?.defence !== null &&
+                                    scene?.defence !== undefined && (
+                                        <DockSection
+                                            title={l10n.t("Attacker")}
+                                            count={
+                                                scene.defence.isShielded
+                                                    ? "shielded"
+                                                    : "unshielded"
+                                            }
+                                        >
+                                            <div className="field-note">
+                                                {l10n.t(
+                                                    "The model on stage is the TARGET. Build a weapon here and fire it at the unit or at one hardpoint.",
+                                                )}
+                                            </div>
 
-                                                <Field label={l10n.t("Damage")}>
-                                                    <input
-                                                        type="number"
-                                                        min={0}
-                                                        value={attacker.damage}
-                                                        onChange={(e) =>
-                                                            setAttacker(
-                                                                (current) => ({
-                                                                    ...current,
-                                                                    damage: Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ),
-                                                                }),
-                                                            )
-                                                        }
-                                                    />
-                                                </Field>
+                                            <Field label={l10n.t("Damage")}>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={attacker.damage}
+                                                    onChange={(e) =>
+                                                        setAttacker(
+                                                            (current) => ({
+                                                                ...current,
+                                                                damage: Number(
+                                                                    e.target
+                                                                        .value,
+                                                                ),
+                                                            }),
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
 
-                                                <Field
-                                                    label={l10n.t(
-                                                        "Damage type",
-                                                    )}
-                                                    valueTitle={l10n.t(
-                                                        "What the damage table says against this target's armor. A pair the table does not name is 1.0, which is over half of them.",
-                                                    )}
-                                                    value={
-                                                        <>
-                                                            {/* Off the LIVE defence: a ship whose generators are
+                                            <Field
+                                                label={l10n.t("Damage type")}
+                                                valueTitle={l10n.t(
+                                                    "What the damage table says against this target's armor. A pair the table does not name is 1.0, which is over half of them.",
+                                                )}
+                                                value={
+                                                    <>
+                                                        {/* Off the LIVE defence: a ship whose generators are
                                             gone is unshielded, so the factor a shot would
                                             actually take is the hull's. Reading the scene's
                                             own copy showed the shield column beside a bar
                                             that had just gone flat. */}
-                                                            {l10n.t(
-                                                                "x{0}",
-                                                                armorFactor(
-                                                                    attacker.shield &&
-                                                                        liveDefence?.isShielded ===
-                                                                            true
-                                                                        ? scene
-                                                                              .defence
-                                                                              .shieldFactors
-                                                                        : scene
-                                                                              .defence
-                                                                              .hullFactors,
-                                                                    attacker.damageType,
-                                                                ),
-                                                            )}
-                                                        </>
-                                                    }
-                                                >
-                                                    <select
-                                                        value={
-                                                            attacker.damageType
-                                                        }
-                                                        onChange={(e) =>
-                                                            setAttacker(
-                                                                (current) => ({
-                                                                    ...current,
-                                                                    damageType:
-                                                                        e.target
-                                                                            .value,
-                                                                }),
-                                                            )
-                                                        }
-                                                        title={l10n.t(
-                                                            "Which damage type the shot does",
-                                                        )}
-                                                    >
-                                                        {/* The reader's own value first when the tree does not
-                                            declare it - a preset saved against another mod must not
-                                            silently become whatever happens to sort first. */}
-                                                        {!scene.defence.damageTypes.includes(
-                                                            attacker.damageType,
-                                                        ) && (
-                                                            <option
-                                                                value={
-                                                                    attacker.damageType
-                                                                }
-                                                            >
-                                                                {l10n.t(
-                                                                    "{0}{1}(not in this tree)",
-                                                                    attacker.damageType,
-                                                                    " ",
-                                                                )}
-                                                            </option>
-                                                        )}
-                                                        {scene.defence.damageTypes.map(
-                                                            (type) => (
-                                                                <option
-                                                                    key={type}
-                                                                    value={type}
-                                                                >
-                                                                    {type}
-                                                                </option>
+                                                        {l10n.t(
+                                                            "x{0}",
+                                                            armorFactor(
+                                                                attacker.shield &&
+                                                                    liveDefence?.isShielded ===
+                                                                        true
+                                                                    ? scene
+                                                                          .defence
+                                                                          .shieldFactors
+                                                                    : scene
+                                                                          .defence
+                                                                          .hullFactors,
+                                                                attacker.damageType,
                                                             ),
                                                         )}
-                                                    </select>
-                                                </Field>
-
-                                                {/* The three switches a projectile carries. They decide entirely
-                                    what a hit touches - see `attacker.ts` for the four rules. */}
-                                                <div className="view-row">
-                                                    {damageSwitches(
-                                                        poolOptions,
-                                                    ).map(
-                                                        ({
-                                                            id,
-                                                            label,
-                                                            title,
-                                                        }) => (
-                                                            <label
-                                                                key={id}
-                                                                className="field-label"
-                                                                title={title}
+                                                    </>
+                                                }
+                                            >
+                                                <select
+                                                    value={attacker.damageType}
+                                                    onChange={(e) =>
+                                                        setAttacker(
+                                                            (current) => ({
+                                                                ...current,
+                                                                damageType:
+                                                                    e.target
+                                                                        .value,
+                                                            }),
+                                                        )
+                                                    }
+                                                    title={l10n.t(
+                                                        "Which damage type the shot does",
+                                                    )}
+                                                >
+                                                    {/* The reader's own value first when the tree does not
+                                            declare it - a preset saved against another mod must not
+                                            silently become whatever happens to sort first. */}
+                                                    {!scene.defence.damageTypes.includes(
+                                                        attacker.damageType,
+                                                    ) && (
+                                                        <option
+                                                            value={
+                                                                attacker.damageType
+                                                            }
+                                                        >
+                                                            {l10n.t(
+                                                                "{0}{1}(not in this tree)",
+                                                                attacker.damageType,
+                                                                " ",
+                                                            )}
+                                                        </option>
+                                                    )}
+                                                    {scene.defence.damageTypes.map(
+                                                        (type) => (
+                                                            <option
+                                                                key={type}
+                                                                value={type}
                                                             >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={
-                                                                        attacker[
-                                                                            id
-                                                                        ]
-                                                                    }
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) =>
-                                                                        setAttacker(
-                                                                            (
-                                                                                current,
-                                                                            ) => ({
-                                                                                ...current,
-                                                                                [id]: e
-                                                                                    .target
-                                                                                    .checked,
-                                                                            }),
-                                                                        )
-                                                                    }
-                                                                />
-                                                                {label}
-                                                            </label>
+                                                                {type}
+                                                            </option>
                                                         ),
                                                     )}
-                                                </div>
+                                                </select>
+                                            </Field>
 
-                                                {/* AREA DAMAGE. A blast reaches everything within its range as
+                                            {/* The three switches a projectile carries. They decide entirely
+                                    what a hit touches - see `attacker.ts` for the four rules. */}
+                                            <ViewRow>
+                                                {damageSwitches(
+                                                    poolOptions,
+                                                ).map(
+                                                    ({ id, label, title }) => (
+                                                        <label
+                                                            key={id}
+                                                            className="field-label"
+                                                            title={title}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={
+                                                                    attacker[id]
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setAttacker(
+                                                                        (
+                                                                            current,
+                                                                        ) => ({
+                                                                            ...current,
+                                                                            [id]: e
+                                                                                .target
+                                                                                .checked,
+                                                                        }),
+                                                                    )
+                                                                }
+                                                            />
+                                                            {label}
+                                                        </label>
+                                                    ),
+                                                )}
+                                            </ViewRow>
+
+                                            {/* AREA DAMAGE. A blast reaches everything within its range as
                                     well as the thing it hit, and the two numbers are independent -
                                     `Proj_Veers_AT_AT_Max_Power_Laser_Red` declares a direct damage
                                     of 0.0 alongside a blast of 40, so a weapon can do all of its
@@ -9941,400 +7439,365 @@ function ModelPreview(): React.JSX.Element {
                                     range reaches nobody and the fields below it are moot - they
                                     disable rather than vanish, since a reader who has typed a
                                     damage and seen nothing happen needs to see the reason. */}
-                                                <Field
-                                                    label={l10n.t(
-                                                        "Blast damage",
+                                            <Field
+                                                label={l10n.t("Blast damage")}
+                                            >
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={attacker.blastDamage}
+                                                    title={l10n.t(
+                                                        "Projectile_Blast_Area_Damage - applied to the target AND to everything inside the range below",
+                                                    )}
+                                                    onChange={(e) =>
+                                                        setAttacker(
+                                                            (current) => ({
+                                                                ...current,
+                                                                blastDamage:
+                                                                    Number(
+                                                                        e.target
+                                                                            .value,
+                                                                    ),
+                                                            }),
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+
+                                            <Field
+                                                label={l10n.t("Blast range")}
+                                            >
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={attacker.blastRange}
+                                                    title={l10n.t(
+                                                        "Projectile_Blast_Area_Range, in engine units. The target itself is always hit.",
+                                                    )}
+                                                    onChange={(e) =>
+                                                        setAttacker(
+                                                            (current) => ({
+                                                                ...current,
+                                                                blastRange:
+                                                                    Number(
+                                                                        e.target
+                                                                            .value,
+                                                                    ),
+                                                            }),
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+
+                                            <ViewRow>
+                                                <label
+                                                    className="field-label"
+                                                    title={l10n.t(
+                                                        "Projectile_Blast_Area_Dropoff - the blast weakens with distance instead of being flat",
                                                     )}
                                                 >
                                                     <input
-                                                        type="number"
-                                                        min={0}
-                                                        value={
-                                                            attacker.blastDamage
+                                                        type="checkbox"
+                                                        checked={
+                                                            attacker.blastDropoff
                                                         }
-                                                        title={l10n.t(
-                                                            "Projectile_Blast_Area_Damage - applied to the target AND to everything inside the range below",
-                                                        )}
+                                                        disabled={
+                                                            attacker.blastRange <=
+                                                            0
+                                                        }
                                                         onChange={(e) =>
                                                             setAttacker(
                                                                 (current) => ({
                                                                     ...current,
-                                                                    blastDamage:
-                                                                        Number(
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        ),
+                                                                    blastDropoff:
+                                                                        e.target
+                                                                            .checked,
                                                                 }),
                                                             )
                                                         }
                                                     />
-                                                </Field>
+                                                    {l10n.t("Falls off")}
+                                                </label>
 
-                                                <Field
-                                                    label={l10n.t(
-                                                        "Blast range",
+                                                <label
+                                                    className="field-label"
+                                                    title={l10n.t(
+                                                        "Projectile_Blast_Area_Dropoff_Tiers - how many bands it falls off in. Shipped values are 3, 4 or 5.",
                                                     )}
                                                 >
+                                                    {l10n.t("Tiers")}
                                                     <input
                                                         type="number"
                                                         min={0}
+                                                        max={16}
+                                                        className="tier-count"
                                                         value={
-                                                            attacker.blastRange
+                                                            attacker.blastDropoffTiers
                                                         }
-                                                        title={l10n.t(
-                                                            "Projectile_Blast_Area_Range, in engine units. The target itself is always hit.",
-                                                        )}
-                                                        onChange={(e) =>
-                                                            setAttacker(
-                                                                (current) => ({
-                                                                    ...current,
-                                                                    blastRange:
-                                                                        Number(
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        ),
-                                                                }),
-                                                            )
-                                                        }
-                                                    />
-                                                </Field>
-
-                                                <div className="view-row">
-                                                    <label
-                                                        className="field-label"
-                                                        title={l10n.t(
-                                                            "Projectile_Blast_Area_Dropoff - the blast weakens with distance instead of being flat",
-                                                        )}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={
-                                                                attacker.blastDropoff
-                                                            }
-                                                            disabled={
-                                                                attacker.blastRange <=
+                                                        disabled={
+                                                            !attacker.blastDropoff ||
+                                                            attacker.blastRange <=
                                                                 0
-                                                            }
-                                                            onChange={(e) =>
-                                                                setAttacker(
-                                                                    (
-                                                                        current,
-                                                                    ) => ({
-                                                                        ...current,
-                                                                        blastDropoff:
+                                                        }
+                                                        onChange={(e) =>
+                                                            setAttacker(
+                                                                (current) => ({
+                                                                    ...current,
+                                                                    blastDropoffTiers:
+                                                                        Number(
                                                                             e
                                                                                 .target
-                                                                                .checked,
-                                                                    }),
-                                                                )
-                                                            }
-                                                        />
-                                                        {l10n.t("Falls off")}
-                                                    </label>
+                                                                                .value,
+                                                                        ),
+                                                                }),
+                                                            )
+                                                        }
+                                                    />
+                                                </label>
+                                            </ViewRow>
 
-                                                    <label
-                                                        className="field-label"
-                                                        title={l10n.t(
-                                                            "Projectile_Blast_Area_Dropoff_Tiers - how many bands it falls off in. Shipped values are 3, 4 or 5.",
-                                                        )}
-                                                    >
-                                                        {l10n.t("Tiers")}
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            max={16}
-                                                            className="tier-count"
-                                                            value={
-                                                                attacker.blastDropoffTiers
-                                                            }
-                                                            disabled={
-                                                                !attacker.blastDropoff ||
-                                                                attacker.blastRange <=
-                                                                    0
-                                                            }
-                                                            onChange={(e) =>
-                                                                setAttacker(
-                                                                    (
-                                                                        current,
-                                                                    ) => ({
-                                                                        ...current,
-                                                                        blastDropoffTiers:
-                                                                            Number(
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                            ),
-                                                                    }),
-                                                                )
-                                                            }
-                                                        />
-                                                    </label>
-                                                </div>
-
-                                                {/* Disabled rather than absent when the subject fires nothing: a
+                                            {/* Disabled rather than absent when the subject fires nothing: a
                                     control that comes and goes reads as a feature that does. */}
-                                                {/* EVERY projectile in the tree, not the handful this subject
+                                            {/* EVERY projectile in the tree, not the handful this subject
                                     fires - you are building a weapon to shoot AT it, so its own
                                     armament is the wrong list. 105 of them, so the search is the
                                     way through rather than an optional extra. */}
-                                                <Field
-                                                    label={l10n.t(
-                                                        "Fill from a projectile",
+                                            <Field
+                                                label={l10n.t(
+                                                    "Fill from a projectile",
+                                                )}
+                                                value={
+                                                    <>
+                                                        {scene.projectileCatalog
+                                                            ?.length ?? 0}
+                                                    </>
+                                                }
+                                            >
+                                                <input
+                                                    type="text"
+                                                    placeholder={l10n.t(
+                                                        "Search projectiles",
                                                     )}
-                                                    value={
-                                                        <>
-                                                            {scene
-                                                                .projectileCatalog
-                                                                ?.length ?? 0}
-                                                        </>
+                                                    value={projectileSearch}
+                                                    onChange={(e) =>
+                                                        setProjectileSearch(
+                                                            e.target.value,
+                                                        )
                                                     }
+                                                />
+                                                <select
+                                                    value=""
+                                                    size={6}
+                                                    disabled={
+                                                        (scene.projectileCatalog
+                                                            ?.length ?? 0) === 0
+                                                    }
+                                                    onChange={(e) => {
+                                                        const picked =
+                                                            e.target.value;
+                                                        const bolt =
+                                                            scene.projectiles?.find(
+                                                                (p) =>
+                                                                    p.id ===
+                                                                    picked,
+                                                            );
+
+                                                        if (
+                                                            bolt !== undefined
+                                                        ) {
+                                                            // A COPY. Edits afterwards stick.
+                                                            setAttacker(
+                                                                attackerFromProjectile(
+                                                                    bolt,
+                                                                    attacker,
+                                                                ),
+                                                            );
+                                                            // Except the blast area, which has no field to edit
+                                                            // and is read off the bolt when the shot resolves.
+                                                            setAttackerProjectile(
+                                                                bolt.id,
+                                                            );
+                                                            setProjectileNote(
+                                                                null,
+                                                            );
+                                                        } else if (
+                                                            picked !== ""
+                                                        ) {
+                                                            // Everything the subject does not fire is a NAME
+                                                            // until it is fetched. It used to stop here and say
+                                                            // so, which made the catalogue read as broken - and
+                                                            // as incomplete, since 104 of its 105 entries do
+                                                            // nothing on any given subject. Now it asks.
+                                                            setProjectileNote(
+                                                                `Loading ${picked}...`,
+                                                            );
+                                                            post({
+                                                                type: "requestProjectile",
+                                                                name: picked,
+                                                            });
+                                                        }
+                                                    }}
                                                 >
-                                                    <input
-                                                        type="text"
-                                                        placeholder={l10n.t(
-                                                            "Search projectiles",
-                                                        )}
-                                                        value={projectileSearch}
-                                                        onChange={(e) =>
-                                                            setProjectileSearch(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <select
-                                                        value=""
-                                                        size={6}
-                                                        disabled={
-                                                            (scene
-                                                                .projectileCatalog
-                                                                ?.length ??
-                                                                0) === 0
-                                                        }
-                                                        onChange={(e) => {
-                                                            const picked =
-                                                                e.target.value;
-                                                            const bolt =
-                                                                scene.projectiles?.find(
-                                                                    (p) =>
-                                                                        p.id ===
-                                                                        picked,
-                                                                );
+                                                    {projectileChoices(
+                                                        scene.projectileCatalog ??
+                                                            [],
+                                                        projectileSearch,
+                                                    ).map((name) => (
+                                                        <option
+                                                            key={name}
+                                                            value={name}
+                                                        >
+                                                            {name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {projectileNote !== null && (
+                                                    <span className="field-note">
+                                                        {projectileNote}
+                                                    </span>
+                                                )}
+                                            </Field>
 
-                                                            if (
-                                                                bolt !==
-                                                                undefined
-                                                            ) {
-                                                                // A COPY. Edits afterwards stick.
-                                                                setAttacker(
-                                                                    attackerFromProjectile(
-                                                                        bolt,
-                                                                        attacker,
-                                                                    ),
-                                                                );
-                                                                // Except the blast area, which has no field to edit
-                                                                // and is read off the bolt when the shot resolves.
-                                                                setAttackerProjectile(
-                                                                    bolt.id,
-                                                                );
-                                                                setProjectileNote(
-                                                                    null,
-                                                                );
-                                                            } else if (
-                                                                picked !== ""
-                                                            ) {
-                                                                // Everything the subject does not fire is a NAME
-                                                                // until it is fetched. It used to stop here and say
-                                                                // so, which made the catalogue read as broken - and
-                                                                // as incomplete, since 104 of its 105 entries do
-                                                                // nothing on any given subject. Now it asks.
-                                                                setProjectileNote(
-                                                                    `Loading ${picked}...`,
-                                                                );
-                                                                post({
-                                                                    type: "requestProjectile",
-                                                                    name: picked,
-                                                                });
-                                                            }
-                                                        }}
-                                                    >
-                                                        {projectileChoices(
-                                                            scene.projectileCatalog ??
-                                                                [],
-                                                            projectileSearch,
-                                                        ).map((name) => (
-                                                            <option
-                                                                key={name}
-                                                                value={name}
-                                                            >
-                                                                {name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    {projectileNote !==
-                                                        null && (
-                                                        <span className="field-note">
-                                                            {projectileNote}
-                                                        </span>
-                                                    )}
-                                                </Field>
-
-                                                {/* Presets are TIER 1: they describe the reader's testing habits,
+                                            {/* Presets are TIER 1: they describe the reader's testing habits,
                                     not this model, so they live in globalState beside the camera
                                     presets and survive opening a different ship. */}
-                                                <Field
-                                                    label={l10n.t(
-                                                        "Saved weapons",
-                                                    )}
-                                                    value={
-                                                        <>
-                                                            {
-                                                                attackerPresets.length
-                                                            }
-                                                        </>
+                                            <Field
+                                                label={l10n.t("Saved weapons")}
+                                                value={
+                                                    <>
+                                                        {attackerPresets.length}
+                                                    </>
+                                                }
+                                            >
+                                                <select
+                                                    value=""
+                                                    disabled={
+                                                        attackerPresets.length ===
+                                                        0
+                                                    }
+                                                    onChange={(e) => {
+                                                        const saved =
+                                                            attackerPresets.find(
+                                                                (p) =>
+                                                                    p.id ===
+                                                                    e.target
+                                                                        .value,
+                                                            );
+
+                                                        if (
+                                                            saved !== undefined
+                                                        ) {
+                                                            const {
+                                                                id,
+                                                                name,
+                                                                ...weapon
+                                                            } = saved;
+                                                            setAttacker(weapon);
+                                                        }
+                                                    }}
+                                                    title={
+                                                        attackerPresets.length ===
+                                                        0
+                                                            ? l10n.t(
+                                                                  "Name a configuration below to save it here",
+                                                              )
+                                                            : l10n.t(
+                                                                  "Loads a saved weapon into the fields above",
+                                                              )
                                                     }
                                                 >
-                                                    <select
-                                                        value=""
-                                                        disabled={
-                                                            attackerPresets.length ===
-                                                            0
-                                                        }
-                                                        onChange={(e) => {
-                                                            const saved =
-                                                                attackerPresets.find(
+                                                    <option value="">
+                                                        {l10n.t(
+                                                            "Recall a weapon...",
+                                                        )}
+                                                    </option>
+                                                    {attackerPresets.map(
+                                                        (saved) => (
+                                                            <option
+                                                                key={saved.id}
+                                                                value={saved.id}
+                                                            >
+                                                                {saved.name}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
+                                            </Field>
+
+                                            <ViewRow>
+                                                <input
+                                                    type="text"
+                                                    placeholder={l10n.t(
+                                                        "Name this weapon",
+                                                    )}
+                                                    value={presetName}
+                                                    onChange={(e) =>
+                                                        setPresetName(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                <Button
+                                                    compact
+                                                    title={l10n.t(
+                                                        "Saves these values under that name, for any model",
+                                                    )}
+                                                    disabled={
+                                                        presetName.trim() === ""
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "Give the weapon a name to save it",
+                                                    )}
+                                                    onClick={() => {
+                                                        const name =
+                                                            presetName.trim();
+
+                                                        setAttackerPresets(
+                                                            (current) => [
+                                                                // Saving over a name REPLACES it. Two rows reading
+                                                                // the same thing is worse than losing the old one,
+                                                                // which is what the reader just asked for anyway.
+                                                                ...current.filter(
                                                                     (p) =>
-                                                                        p.id ===
-                                                                        e.target
-                                                                            .value,
-                                                                );
-
-                                                            if (
-                                                                saved !==
-                                                                undefined
-                                                            ) {
-                                                                const {
-                                                                    id,
-                                                                    name,
-                                                                    ...weapon
-                                                                } = saved;
-                                                                setAttacker(
-                                                                    weapon,
-                                                                );
-                                                            }
-                                                        }}
-                                                        title={
-                                                            attackerPresets.length ===
-                                                            0
-                                                                ? l10n.t(
-                                                                      "Name a configuration below to save it here",
-                                                                  )
-                                                                : l10n.t(
-                                                                      "Loads a saved weapon into the fields above",
-                                                                  )
-                                                        }
-                                                    >
-                                                        <option value="">
-                                                            {l10n.t(
-                                                                "Recall a weapon...",
-                                                            )}
-                                                        </option>
-                                                        {attackerPresets.map(
-                                                            (saved) => (
-                                                                <option
-                                                                    key={
-                                                                        saved.id
-                                                                    }
-                                                                    value={
-                                                                        saved.id
-                                                                    }
-                                                                >
-                                                                    {saved.name}
-                                                                </option>
-                                                            ),
-                                                        )}
-                                                    </select>
-                                                </Field>
-
-                                                <span className="view-row">
-                                                    <input
-                                                        type="text"
-                                                        placeholder={l10n.t(
-                                                            "Name this weapon",
-                                                        )}
-                                                        value={presetName}
-                                                        onChange={(e) =>
-                                                            setPresetName(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <Button
-                                                        compact
-                                                        title={l10n.t(
-                                                            "Saves these values under that name, for any model",
-                                                        )}
-                                                        disabled={
-                                                            presetName.trim() ===
-                                                            ""
-                                                        }
-                                                        disabledReason={l10n.t(
-                                                            "Give the weapon a name to save it",
-                                                        )}
-                                                        onClick={() => {
-                                                            const name =
-                                                                presetName.trim();
-
-                                                            setAttackerPresets(
-                                                                (current) => [
-                                                                    // Saving over a name REPLACES it. Two rows reading
-                                                                    // the same thing is worse than losing the old one,
-                                                                    // which is what the reader just asked for anyway.
-                                                                    ...current.filter(
-                                                                        (p) =>
-                                                                            p.name !==
-                                                                            name,
-                                                                    ),
-                                                                    {
-                                                                        ...attacker,
-                                                                        id: `atk-${Date.now()}`,
+                                                                        p.name !==
                                                                         name,
-                                                                    },
-                                                                ],
-                                                            );
-                                                            setPresetName("");
-                                                        }}
-                                                    >
-                                                        <Icon name="save" />
-                                                        {l10n.t("Save")}
-                                                    </Button>
-                                                    <Button
-                                                        compact
-                                                        title={l10n.t(
-                                                            "Remove every saved weapon",
-                                                        )}
-                                                        disabled={
-                                                            attackerPresets.length ===
-                                                            0
-                                                        }
-                                                        disabledReason={l10n.t(
-                                                            "No saved weapons to remove",
-                                                        )}
-                                                        onClick={() =>
-                                                            setAttackerPresets(
-                                                                [],
-                                                            )
-                                                        }
-                                                    >
-                                                        <Icon name="remove" />
-                                                        {l10n.t("Clear")}
-                                                    </Button>
-                                                </span>
-                                            </DockSection>
-                                        )}
-                                </div>
-                            </div>
+                                                                ),
+                                                                {
+                                                                    ...attacker,
+                                                                    id: `atk-${Date.now()}`,
+                                                                    name,
+                                                                },
+                                                            ],
+                                                        );
+                                                        setPresetName("");
+                                                    }}
+                                                >
+                                                    <Icon name="save" />
+                                                    {l10n.t("Save")}
+                                                </Button>
+                                                <Button
+                                                    compact
+                                                    title={l10n.t(
+                                                        "Remove every saved weapon",
+                                                    )}
+                                                    disabled={
+                                                        attackerPresets.length ===
+                                                        0
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "No saved weapons to remove",
+                                                    )}
+                                                    onClick={() =>
+                                                        setAttackerPresets([])
+                                                    }
+                                                >
+                                                    <Icon name="remove" />
+                                                    {l10n.t("Clear")}
+                                                </Button>
+                                            </ViewRow>
+                                        </DockSection>
+                                    )}
+                            </StageFlyout>
                         )}
                     </div>
 
@@ -10407,6 +7870,7 @@ function ModelPreview(): React.JSX.Element {
 
                 <RightDock
                     memoKey="modelPreview.dock"
+                    headerHoldsDial
                     initialWidth={260}
                     minWidth={200}
                     maxWidth={460}
@@ -11286,28 +8750,99 @@ ${becauseText(node.because)}`
                                     often more of them than a hardpoint carries. */}
                                     <ul className="part-list hardpoint-cards">
                                         {looseWeapons.map((row) => (
-                                            <li
+                                            <PartCard
                                                 key={row.id}
-                                                className="hardpoint-card weapon-card"
-                                                data-card={row.id}
+                                                variant="weapon-card"
+                                                data={{ card: row.id }}
                                                 title={row.id}
+                                                // What the file calls it. The hardpoint card puts its Type here for the same reason: it is
+                                                // game data a reader greps for, not prose.
+                                                type={
+                                                    row.label !== "" &&
+                                                    row.label !== row.name
+                                                        ? row.label
+                                                        : null
+                                                }
+                                                name={row.name}
+                                                actions={
+                                                    <>
+                                                        {weaponToggles(row)}
+
+                                                        {/* The sweep, which until now lived ONLY on a
+                                                    hardpoint card - so the AT-AA, whose turret is
+                                                    on its weapon and which has no hardpoints at
+                                                    all, had nothing to press. */}
+                                                        <IconButton
+                                                            icon="loop"
+                                                            className={
+                                                                sweeping.has(
+                                                                    row.id,
+                                                                )
+                                                                    ? "active"
+                                                                    : undefined
+                                                            }
+                                                            pressed={sweeping.has(
+                                                                row.id,
+                                                            )}
+                                                            title={l10n.t(
+                                                                "Move turret",
+                                                            )}
+                                                            disabled={
+                                                                !sweepable.some(
+                                                                    (s) =>
+                                                                        s.id ===
+                                                                        row.id,
+                                                                )
+                                                            }
+                                                            disabledReason={l10n.t(
+                                                                "No traverse declared",
+                                                            )}
+                                                            onClick={(
+                                                                event,
+                                                            ) => {
+                                                                event.stopPropagation();
+                                                                setSweeping(
+                                                                    (current) =>
+                                                                        toggleSelected(
+                                                                            current,
+                                                                            row.id,
+                                                                        ),
+                                                                );
+                                                            }}
+                                                        />
+
+                                                        <IconButton
+                                                            icon="details"
+                                                            className={
+                                                                "card-info-btn" +
+                                                                (infoCard ===
+                                                                row.id
+                                                                    ? " active"
+                                                                    : "")
+                                                            }
+                                                            expanded={
+                                                                infoCard ===
+                                                                row.id
+                                                            }
+                                                            title={l10n.t(
+                                                                "Info",
+                                                            )}
+                                                            onClick={(
+                                                                event,
+                                                            ) => {
+                                                                event.stopPropagation();
+                                                                setInfoCard(
+                                                                    (open) =>
+                                                                        open ===
+                                                                        row.id
+                                                                            ? null
+                                                                            : row.id,
+                                                                );
+                                                            }}
+                                                        />
+                                                    </>
+                                                }
                                             >
-                                                <div className="card-head">
-                                                    <span className="part-name">
-                                                        {row.name}
-                                                    </span>
-                                                </div>
-
-                                                {/* What the file calls it. The hardpoint card puts its
-                                                Type here for the same reason: it is game data a
-                                                reader greps for, not prose. */}
-                                                {row.label !== "" &&
-                                                    row.label !== row.name && (
-                                                        <span className="detail card-type">
-                                                            {row.label}
-                                                        </span>
-                                                    )}
-
                                                 {/* The turret, where it declares one. No bone line: a
                                                 unit weapon hangs off the hull rather than an
                                                 attachment bone of its own. */}
@@ -11325,74 +8860,7 @@ ${becauseText(node.because)}`
                                                 {turretAimRow(row)}
 
                                                 {fireBoneButtons(row)}
-
-                                                <span className="view-row card-actions">
-                                                    {weaponToggles(row)}
-
-                                                    {/* The sweep, which until now lived ONLY on a
-                                                    hardpoint card - so the AT-AA, whose turret is
-                                                    on its weapon and which has no hardpoints at
-                                                    all, had nothing to press. */}
-                                                    <IconButton
-                                                        icon="loop"
-                                                        className={
-                                                            sweeping.has(row.id)
-                                                                ? "active"
-                                                                : undefined
-                                                        }
-                                                        pressed={sweeping.has(
-                                                            row.id,
-                                                        )}
-                                                        title={l10n.t(
-                                                            "Move turret",
-                                                        )}
-                                                        disabled={
-                                                            !sweepable.some(
-                                                                (s) =>
-                                                                    s.id ===
-                                                                    row.id,
-                                                            )
-                                                        }
-                                                        disabledReason={l10n.t(
-                                                            "No traverse declared",
-                                                        )}
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            setSweeping(
-                                                                (current) =>
-                                                                    toggleSelected(
-                                                                        current,
-                                                                        row.id,
-                                                                    ),
-                                                            );
-                                                        }}
-                                                    />
-
-                                                    <IconButton
-                                                        icon="details"
-                                                        className={
-                                                            "card-info-btn" +
-                                                            (infoCard === row.id
-                                                                ? " active"
-                                                                : "")
-                                                        }
-                                                        expanded={
-                                                            infoCard === row.id
-                                                        }
-                                                        title={l10n.t("Info")}
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            setInfoCard(
-                                                                (open) =>
-                                                                    open ===
-                                                                    row.id
-                                                                        ? null
-                                                                        : row.id,
-                                                            );
-                                                        }}
-                                                    />
-                                                </span>
-                                            </li>
+                                            </PartCard>
                                         ))}
                                     </ul>
                                 </DockSection>
@@ -11569,97 +9037,208 @@ ${becauseText(node.because)}`
                                             {!foldedGroups.has(group.type) && (
                                                 <ul className="part-list hardpoint-cards">
                                                     {group.cards.map((card) => (
-                                                        <li
+                                                        <PartCard
                                                             key={card.id}
-                                                            data-card={card.id}
-                                                            className={
-                                                                "hardpoint-card" +
-                                                                (fireTarget ===
+                                                            data={{
+                                                                card: card.id,
+                                                            }}
+                                                            selected={
+                                                                fireTarget ===
                                                                 card.id
-                                                                    ? " selected"
-                                                                    : "") +
-                                                                (card.destroyed
-                                                                    ? " gone"
-                                                                    : "")
                                                             }
-                                                            /* Picking the card aims at it, which is the same act
-                                                           as picking it in the attacker's Fire at list and
-                                                           the same act as clicking its targeting mark. One
-                                                           meaning, three ways in. */
+                                                            gone={
+                                                                card.destroyed
+                                                            }
+                                                            // Picking the card aims at it, which is the same act as picking it in the attacker's Fire at
+                                                            // list and the same act as clicking its targeting mark. One meaning, three ways in.
                                                             onClick={() =>
                                                                 selectHardpoint(
                                                                     card.id,
                                                                 )
                                                             }
-                                                        >
-                                                            <div className="card-head">
-                                                                {/* The art the GAME draws over this hardpoint,
+                                                            definition={{
+                                                                title: l10n.t(
+                                                                    "Go to where {0} is defined",
+                                                                    card.id,
+                                                                ),
+                                                                onGo: () =>
+                                                                    post({
+                                                                        type: "revealDefinition",
+                                                                        value: card.id,
+                                                                        referenceType:
+                                                                            "HardPoint",
+                                                                    }),
+                                                            }}
+                                                            // The game's own words for it. The Type is what picks its reticle; the tooltip is what a
+                                                            // player reads.
+                                                            type={card.type}
+                                                            lead={
+                                                                <>
+                                                                    {/* The art the GAME draws over this hardpoint,
                                                     the same image the marks on the model use. It
                                                     is picked by Type, so seeing it here is how a
                                                     reader checks that the Type they wrote resolves
                                                     to the mark they expected. */}
-                                                                {reticleFor(
-                                                                    scene?.reticles,
-                                                                    card.type,
-                                                                ) !== null && (
-                                                                    <img
-                                                                        className="card-reticle"
-                                                                        src={safeImageSource(
-                                                                            reticleFor(
-                                                                                scene?.reticles,
-                                                                                card.type,
-                                                                            ),
-                                                                        )}
-                                                                        alt=""
+                                                                    {reticleFor(
+                                                                        scene?.reticles,
+                                                                        card.type,
+                                                                    ) !==
+                                                                        null && (
+                                                                        <img
+                                                                            className="card-reticle"
+                                                                            src={safeImageSource(
+                                                                                reticleFor(
+                                                                                    scene?.reticles,
+                                                                                    card.type,
+                                                                                ),
+                                                                            )}
+                                                                            alt=""
+                                                                            title={
+                                                                                card.isTargetable
+                                                                                    ? l10n.t(
+                                                                                          "The mark the game draws over this",
+                                                                                      )
+                                                                                    : l10n.t(
+                                                                                          "Is_Targetable is off, so the game draws no mark over this",
+                                                                                      )
+                                                                            }
+                                                                        />
+                                                                    )}
+                                                                </>
+                                                            }
+                                                            name={card.id}
+                                                            actions={
+                                                                <>
+                                                                    {/* The glyph follows the tooltip: a wrench once it
+                                                    is destroyed, because that is what pressing it
+                                                    does now. Alive, it is the same reticle the
+                                                    stage's Fire wears - shooting a hardpoint off
+                                                    and pressing this are one outcome, and two
+                                                    glyphs for it said they were different things. */}
+                                                                    <IconButton
+                                                                        icon={
+                                                                            card.destroyed
+                                                                                ? "repair"
+                                                                                : "fire"
+                                                                        }
+                                                                        className={
+                                                                            card.destroyed
+                                                                                ? "active"
+                                                                                : undefined
+                                                                        }
+                                                                        pressed={
+                                                                            card.destroyed
+                                                                        }
                                                                         title={
-                                                                            card.isTargetable
+                                                                            card.destroyed
                                                                                 ? l10n.t(
-                                                                                      "The mark the game draws over this",
+                                                                                      "Repair hardpoint",
                                                                                   )
                                                                                 : l10n.t(
-                                                                                      "Is_Targetable is off, so the game draws no mark over this",
+                                                                                      "Destroy hardpoint",
                                                                                   )
                                                                         }
+                                                                        disabled={
+                                                                            !card.isDestroyable
+                                                                        }
+                                                                        disabledReason={l10n.t(
+                                                                            "Is_Destroyable is off",
+                                                                        )}
+                                                                        onClick={(
+                                                                            event,
+                                                                        ) => {
+                                                                            event.stopPropagation();
+                                                                            setHardpointDestroyed(
+                                                                                card.id,
+                                                                                !card.destroyed,
+                                                                            );
+                                                                        }}
                                                                     />
-                                                                )}
-                                                                <span className="part-name">
-                                                                    {card.id}
-                                                                </span>
 
-                                                                {/* Top right, away from the switches: this leaves
-                                                    the panel, and a jump standing in a row of
-                                                    toggles reads as another toggle. */}
-                                                                <button
-                                                                    type="button"
-                                                                    className="goto-definition"
-                                                                    title={l10n.t(
-                                                                        "Go to where {0} is defined",
-                                                                        card.id,
-                                                                    )}
-                                                                    onClick={(
-                                                                        event,
-                                                                    ) => {
-                                                                        event.stopPropagation();
-                                                                        post({
-                                                                            type: "revealDefinition",
-                                                                            value: card.id,
-                                                                            referenceType:
-                                                                                "HardPoint",
-                                                                        });
-                                                                    }}
-                                                                >
-                                                                    <Icon name="definition" />
-                                                                </button>
-                                                            </div>
+                                                                    {card.weapon !==
+                                                                        null &&
+                                                                        weaponToggles(
+                                                                            card.weapon,
+                                                                        )}
 
-                                                            {/* The game's own words for it. The Type is what picks
-                                                its reticle; the tooltip is what a player reads. */}
-                                                            {card.type !==
-                                                                null && (
-                                                                <span className="detail card-type">
-                                                                    {card.type}
-                                                                </span>
-                                                            )}
+                                                                    {/* The sweep belongs to the hardpoint that
+                                                    declares the traverse. One button swinging
+                                                    everything at once could not say what it would
+                                                    do on a hull whose hardpoints differ. */}
+                                                                    <IconButton
+                                                                        icon="loop"
+                                                                        className={
+                                                                            sweeping.has(
+                                                                                card.id,
+                                                                            )
+                                                                                ? "active"
+                                                                                : undefined
+                                                                        }
+                                                                        pressed={sweeping.has(
+                                                                            card.id,
+                                                                        )}
+                                                                        title={l10n.t(
+                                                                            "Move turret",
+                                                                        )}
+                                                                        disabled={
+                                                                            !card.sweepable
+                                                                        }
+                                                                        disabledReason={l10n.t(
+                                                                            "No traverse declared",
+                                                                        )}
+                                                                        onClick={(
+                                                                            event,
+                                                                        ) => {
+                                                                            event.stopPropagation();
+                                                                            setSweeping(
+                                                                                (
+                                                                                    current,
+                                                                                ) =>
+                                                                                    toggleSelected(
+                                                                                        current,
+                                                                                        card.id,
+                                                                                    ),
+                                                                            );
+                                                                        }}
+                                                                    />
+
+                                                                    {/* Pushed to the far end: the three on the
+                                                        left DO something to the model, and this
+                                                        one only says what the file holds. */}
+                                                                    <IconButton
+                                                                        icon="details"
+                                                                        className={
+                                                                            "card-info-btn" +
+                                                                            (infoCard ===
+                                                                            card.id
+                                                                                ? " active"
+                                                                                : "")
+                                                                        }
+                                                                        expanded={
+                                                                            infoCard ===
+                                                                            card.id
+                                                                        }
+                                                                        title={l10n.t(
+                                                                            "Info",
+                                                                        )}
+                                                                        onClick={(
+                                                                            event,
+                                                                        ) => {
+                                                                            event.stopPropagation();
+                                                                            setInfoCard(
+                                                                                (
+                                                                                    open,
+                                                                                ) =>
+                                                                                    open ===
+                                                                                    card.id
+                                                                                        ? null
+                                                                                        : card.id,
+                                                                            );
+                                                                        }}
+                                                                    />
+                                                                </>
+                                                            }
+                                                        >
                                                             {/* What a PLAYER reads, with the key the author wrote
                                                 on the hover. The card showed the key itself before
                                                 the server resolved it, which is the one line on a
@@ -11769,137 +9348,7 @@ ${becauseText(node.because)}`
                                                                 fireBoneButtons(
                                                                     card.weapon,
                                                                 )}
-
-                                                            <span className="view-row card-actions">
-                                                                {/* The glyph follows the tooltip: a wrench once it
-                                                    is destroyed, because that is what pressing it
-                                                    does now. Alive, it is the same reticle the
-                                                    stage's Fire wears - shooting a hardpoint off
-                                                    and pressing this are one outcome, and two
-                                                    glyphs for it said they were different things. */}
-                                                                <IconButton
-                                                                    icon={
-                                                                        card.destroyed
-                                                                            ? "repair"
-                                                                            : "fire"
-                                                                    }
-                                                                    className={
-                                                                        card.destroyed
-                                                                            ? "active"
-                                                                            : undefined
-                                                                    }
-                                                                    pressed={
-                                                                        card.destroyed
-                                                                    }
-                                                                    title={
-                                                                        card.destroyed
-                                                                            ? l10n.t(
-                                                                                  "Repair hardpoint",
-                                                                              )
-                                                                            : l10n.t(
-                                                                                  "Destroy hardpoint",
-                                                                              )
-                                                                    }
-                                                                    disabled={
-                                                                        !card.isDestroyable
-                                                                    }
-                                                                    disabledReason={l10n.t(
-                                                                        "Is_Destroyable is off",
-                                                                    )}
-                                                                    onClick={(
-                                                                        event,
-                                                                    ) => {
-                                                                        event.stopPropagation();
-                                                                        setHardpointDestroyed(
-                                                                            card.id,
-                                                                            !card.destroyed,
-                                                                        );
-                                                                    }}
-                                                                />
-
-                                                                {card.weapon !==
-                                                                    null &&
-                                                                    weaponToggles(
-                                                                        card.weapon,
-                                                                    )}
-
-                                                                {/* The sweep belongs to the hardpoint that
-                                                    declares the traverse. One button swinging
-                                                    everything at once could not say what it would
-                                                    do on a hull whose hardpoints differ. */}
-                                                                <IconButton
-                                                                    icon="loop"
-                                                                    className={
-                                                                        sweeping.has(
-                                                                            card.id,
-                                                                        )
-                                                                            ? "active"
-                                                                            : undefined
-                                                                    }
-                                                                    pressed={sweeping.has(
-                                                                        card.id,
-                                                                    )}
-                                                                    title={l10n.t(
-                                                                        "Move turret",
-                                                                    )}
-                                                                    disabled={
-                                                                        !card.sweepable
-                                                                    }
-                                                                    disabledReason={l10n.t(
-                                                                        "No traverse declared",
-                                                                    )}
-                                                                    onClick={(
-                                                                        event,
-                                                                    ) => {
-                                                                        event.stopPropagation();
-                                                                        setSweeping(
-                                                                            (
-                                                                                current,
-                                                                            ) =>
-                                                                                toggleSelected(
-                                                                                    current,
-                                                                                    card.id,
-                                                                                ),
-                                                                        );
-                                                                    }}
-                                                                />
-
-                                                                {/* Pushed to the far end: the three on the
-                                                        left DO something to the model, and this
-                                                        one only says what the file holds. */}
-                                                                <IconButton
-                                                                    icon="details"
-                                                                    className={
-                                                                        "card-info-btn" +
-                                                                        (infoCard ===
-                                                                        card.id
-                                                                            ? " active"
-                                                                            : "")
-                                                                    }
-                                                                    expanded={
-                                                                        infoCard ===
-                                                                        card.id
-                                                                    }
-                                                                    title={l10n.t(
-                                                                        "Info",
-                                                                    )}
-                                                                    onClick={(
-                                                                        event,
-                                                                    ) => {
-                                                                        event.stopPropagation();
-                                                                        setInfoCard(
-                                                                            (
-                                                                                open,
-                                                                            ) =>
-                                                                                open ===
-                                                                                card.id
-                                                                                    ? null
-                                                                                    : card.id,
-                                                                        );
-                                                                    }}
-                                                                />
-                                                            </span>
-                                                        </li>
+                                                        </PartCard>
                                                     ))}
                                                 </ul>
                                             )}
@@ -11932,47 +9381,45 @@ ${becauseText(node.because)}`
                                         {scene?.spinAway !== null &&
                                             scene?.spinAway !== undefined && (
                                                 <ul className="part-list hardpoint-cards">
-                                                    <li
-                                                        className={
-                                                            "hardpoint-card clone-card" +
-                                                            ((scene?.deathClones
+                                                    <PartCard
+                                                        variant="clone-card"
+                                                        selected={
+                                                            (scene?.deathClones
                                                                 ?.length ??
                                                                 0) === 0
-                                                                ? " selected"
-                                                                : "")
                                                         }
                                                         title={l10n.t(
                                                             "Spin_Away_On_Death",
                                                         )}
-                                                    >
-                                                        <div className="card-head">
-                                                            {(scene?.deathClones
-                                                                ?.length ??
-                                                                0) === 0 && (
-                                                                <Icon name="check" />
-                                                            )}
-                                                            <span className="part-name">
-                                                                {l10n.t(
-                                                                    "Spins away",
-                                                                )}
-                                                            </span>
-                                                        </div>
-
-                                                        <span className="detail card-type">
-                                                            {scene.spinAway
+                                                        type={
+                                                            scene.spinAway
                                                                 .explosion ??
-                                                                scene.deathExplosions ??
-                                                                l10n.t(
-                                                                    "no explosion named",
+                                                            scene.deathExplosions ??
+                                                            l10n.t(
+                                                                "no explosion named",
+                                                            )
+                                                        }
+                                                        lead={
+                                                            <>
+                                                                {(scene
+                                                                    ?.deathClones
+                                                                    ?.length ??
+                                                                    0) ===
+                                                                    0 && (
+                                                                    <Icon name="check" />
                                                                 )}
-                                                        </span>
-
+                                                            </>
+                                                        }
+                                                        name={l10n.t(
+                                                            "Spins away",
+                                                        )}
+                                                    >
                                                         <span className="detail">
                                                             {spinAwaySummary(
                                                                 scene.spinAway,
                                                             )}
                                                         </span>
-                                                    </li>
+                                                    </PartCard>
                                                 </ul>
                                             )}
 
@@ -11991,50 +9438,35 @@ ${becauseText(node.because)}`
                                                 scene?.deathClones ?? [],
                                                 attacker.damageType,
                                             ).map((row) => (
-                                                <li
+                                                <PartCard
                                                     key={`${row.label}:${row.objectId}`}
-                                                    className={
-                                                        "hardpoint-card clone-card" +
-                                                        (row.selected
-                                                            ? " selected"
-                                                            : "")
-                                                    }
+                                                    variant="clone-card"
+                                                    selected={row.selected}
                                                     title={row.objectId}
-                                                >
-                                                    <div className="card-head">
-                                                        {row.selected && (
-                                                            <Icon name="check" />
-                                                        )}
-                                                        <span className="part-name">
-                                                            {row.label}
-                                                        </span>
-
-                                                        <button
-                                                            type="button"
-                                                            className="goto-definition"
-                                                            title={l10n.t(
-                                                                "Go to where {0} is defined",
-                                                                row.objectId,
+                                                    definition={{
+                                                        title: l10n.t(
+                                                            "Go to where {0} is defined",
+                                                            row.objectId,
+                                                        ),
+                                                        onGo: () =>
+                                                            post({
+                                                                type: "revealDefinition",
+                                                                value: row.objectId,
+                                                                referenceType:
+                                                                    "GameObject",
+                                                            }),
+                                                    }}
+                                                    // The object it names, in the monospace a reader would grep their own files in.
+                                                    type={row.objectId}
+                                                    lead={
+                                                        <>
+                                                            {row.selected && (
+                                                                <Icon name="check" />
                                                             )}
-                                                            onClick={() =>
-                                                                post({
-                                                                    type: "revealDefinition",
-                                                                    value: row.objectId,
-                                                                    referenceType:
-                                                                        "GameObject",
-                                                                })
-                                                            }
-                                                        >
-                                                            <Icon name="definition" />
-                                                        </button>
-                                                    </div>
-
-                                                    {/* The object it names, in the monospace a reader would
-                                                grep their own files in. */}
-                                                    <span className="detail card-type">
-                                                        {row.objectId}
-                                                    </span>
-
+                                                        </>
+                                                    }
+                                                    name={row.label}
+                                                >
                                                     {/* The one thing worth saying beyond the mapping: there
                                                 is no wreck. Either the object is not defined at all
                                                 - a typo the game is silent about - or it declares
@@ -12046,7 +9478,7 @@ ${becauseText(node.because)}`
                                                             )}
                                                         </span>
                                                     )}
-                                                </li>
+                                                </PartCard>
                                             ))}
                                         </ul>
                                     </DockSection>
@@ -12159,182 +9591,196 @@ ${becauseText(node.because)}`
                                     {/* The layout every media player has had for thirty years, because
                                 it needs no explaining: transport on the left, time on the right,
                                 the scrub bar across the bottom. */}
-                                    <div className="player">
-                                        {/* The order and the glyphs a CD player uses, which is the
+                                    <TransportBar
+                                        controls={
+                                            <>
+                                                {/* The order and the glyphs a CD player uses, which is the
                                     reader's own reference: |<< to the previous clip, |< to this
                                     clip's first frame, play, >| to its last frame, >>| to the next
                                     clip, then the repeat latch. Last frame used to draw a bare play
                                     triangle - the same glyph as Play, saying the opposite of what
                                     it did. */}
-                                        <div className="player-row">
-                                            {/* Every one of these says why it cannot be pressed. Four of
+                                                {/* Every one of these says why it cannot be pressed. Four of
                                         them used to go quiet instead - "Previous clip" on a control
                                         that could not step - and only Play had ever been given the
                                         sentence. Its wording is reused rather than reinvented: it
                                         is already this panel's way of saying the same state. */}
-                                            <IconButton
-                                                icon="previousClip"
-                                                title={l10n.t("Previous clip")}
-                                                disabled={
-                                                    orderedClips.length < 2
-                                                }
-                                                disabledReason={l10n.t(
-                                                    "Only one clip",
-                                                )}
-                                                onClick={() => step(-1)}
-                                            />
-                                            <IconButton
-                                                icon="firstFrame"
-                                                title={l10n.t("First frame")}
-                                                disabled={animation === null}
-                                                disabledReason={l10n.t(
-                                                    "Pick a clip below to play it",
-                                                )}
-                                                onClick={() => seek(0)}
-                                            />
-                                            <IconButton
-                                                icon={
-                                                    playing ? "pause" : "play"
-                                                }
-                                                title={
-                                                    playing
-                                                        ? l10n.t("Pause")
-                                                        : atEnd &&
-                                                            !animationLoop
-                                                          ? l10n.t(
-                                                                "Play again from the first frame",
-                                                            )
-                                                          : l10n.t("Play")
-                                                }
-                                                disabled={animation === null}
-                                                disabledReason={l10n.t(
-                                                    "Pick a clip below to play it",
-                                                )}
-                                                onClick={togglePlay}
-                                            />
-                                            <IconButton
-                                                icon="lastFrame"
-                                                title={l10n.t("Last frame")}
-                                                disabled={animation === null}
-                                                disabledReason={l10n.t(
-                                                    "Pick a clip below to play it",
-                                                )}
-                                                onClick={() =>
-                                                    seek(playhead.duration)
-                                                }
-                                            />
-                                            <IconButton
-                                                icon="nextClip"
-                                                title={l10n.t("Next clip")}
-                                                disabled={
-                                                    orderedClips.length < 2
-                                                }
-                                                disabledReason={l10n.t(
-                                                    "Only one clip",
-                                                )}
-                                                onClick={() => step(1)}
-                                            />
-                                            <IconButton
-                                                icon="loop"
-                                                className={
-                                                    animationLoop
-                                                        ? "active"
-                                                        : undefined
-                                                }
-                                                pressed={animationLoop}
-                                                title={
-                                                    animationLoop
-                                                        ? l10n.t(
-                                                              "Looping. Press to play the clip once and hold its last frame.",
-                                                          )
-                                                        : l10n.t(
-                                                              "Playing once and holding the last frame. Press to loop.",
-                                                          )
-                                                }
-                                                disabled={animation === null}
-                                                disabledReason={l10n.t(
-                                                    "Pick a clip below to play it",
-                                                )}
-                                                onClick={() =>
-                                                    setAnimationLoop(
-                                                        (current) => !current,
-                                                    )
-                                                }
-                                            />
-
-                                            <span className="player-time">
-                                                {l10n.t(
-                                                    "{0}{1}{2}s",
-                                                    playhead.time.toFixed(2),
-                                                    " / ",
-                                                    playhead.duration.toFixed(
-                                                        2,
-                                                    ),
-                                                )}
-                                            </span>
-                                        </div>
-
-                                        <input
-                                            className="player-scrub"
-                                            type="range"
-                                            disabled={animation === null}
-                                            min={0}
-                                            max={Math.max(
-                                                playhead.duration,
-                                                0.001,
-                                            )}
-                                            step={0.001}
-                                            value={playhead.time}
-                                            title={l10n.t("Drag to a frame")}
-                                            onPointerDown={() => {
-                                                scrubbingRef.current = true;
-                                            }}
-                                            onPointerUp={() => {
-                                                scrubbingRef.current = false;
-                                            }}
-                                            onChange={(e) => {
-                                                const time = Number(
-                                                    e.target.value,
-                                                );
-                                                viewportRef.current?.seekAnimation(
-                                                    time,
-                                                );
-                                                setPlayhead((current) => ({
-                                                    ...current,
-                                                    time,
-                                                }));
-                                            }}
-                                        />
-
-                                        <Field
-                                            label={l10n.t("Speed")}
-                                            value={
-                                                <>
-                                                    {l10n.t(
-                                                        "{0}x",
-                                                        animationSpeed.toFixed(
-                                                            2,
-                                                        ),
+                                                <IconButton
+                                                    icon="previousClip"
+                                                    title={l10n.t(
+                                                        "Previous clip",
                                                     )}
-                                                </>
-                                            }
-                                        >
+                                                    disabled={
+                                                        orderedClips.length < 2
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "Only one clip",
+                                                    )}
+                                                    onClick={() => step(-1)}
+                                                />
+                                                <IconButton
+                                                    icon="firstFrame"
+                                                    title={l10n.t(
+                                                        "First frame",
+                                                    )}
+                                                    disabled={
+                                                        animation === null
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "Pick a clip below to play it",
+                                                    )}
+                                                    onClick={() => seek(0)}
+                                                />
+                                                <IconButton
+                                                    icon={
+                                                        playing
+                                                            ? "pause"
+                                                            : "play"
+                                                    }
+                                                    title={
+                                                        playing
+                                                            ? l10n.t("Pause")
+                                                            : atEnd &&
+                                                                !animationLoop
+                                                              ? l10n.t(
+                                                                    "Play again from the first frame",
+                                                                )
+                                                              : l10n.t("Play")
+                                                    }
+                                                    disabled={
+                                                        animation === null
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "Pick a clip below to play it",
+                                                    )}
+                                                    onClick={togglePlay}
+                                                />
+                                                <IconButton
+                                                    icon="lastFrame"
+                                                    title={l10n.t("Last frame")}
+                                                    disabled={
+                                                        animation === null
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "Pick a clip below to play it",
+                                                    )}
+                                                    onClick={() =>
+                                                        seek(playhead.duration)
+                                                    }
+                                                />
+                                                <IconButton
+                                                    icon="nextClip"
+                                                    title={l10n.t("Next clip")}
+                                                    disabled={
+                                                        orderedClips.length < 2
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "Only one clip",
+                                                    )}
+                                                    onClick={() => step(1)}
+                                                />
+                                                <IconButton
+                                                    icon="loop"
+                                                    className={
+                                                        animationLoop
+                                                            ? "active"
+                                                            : undefined
+                                                    }
+                                                    pressed={animationLoop}
+                                                    title={
+                                                        animationLoop
+                                                            ? l10n.t(
+                                                                  "Looping. Press to play the clip once and hold its last frame.",
+                                                              )
+                                                            : l10n.t(
+                                                                  "Playing once and holding the last frame. Press to loop.",
+                                                              )
+                                                    }
+                                                    disabled={
+                                                        animation === null
+                                                    }
+                                                    disabledReason={l10n.t(
+                                                        "Pick a clip below to play it",
+                                                    )}
+                                                    onClick={() =>
+                                                        setAnimationLoop(
+                                                            (current) =>
+                                                                !current,
+                                                        )
+                                                    }
+                                                />
+                                            </>
+                                        }
+                                        clock={l10n.t(
+                                            "{0}{1}{2}s",
+                                            playhead.time.toFixed(2),
+                                            " / ",
+                                            playhead.duration.toFixed(2),
+                                        )}
+                                        middle={
                                             <input
+                                                className="player-scrub"
                                                 type="range"
                                                 disabled={animation === null}
                                                 min={0}
-                                                max={2}
-                                                step={0.05}
-                                                value={animationSpeed}
-                                                title={l10n.t("Playback speed")}
-                                                onChange={(e) =>
-                                                    setAnimationSpeed(
-                                                        Number(e.target.value),
-                                                    )
-                                                }
+                                                max={Math.max(
+                                                    playhead.duration,
+                                                    0.001,
+                                                )}
+                                                step={0.001}
+                                                value={playhead.time}
+                                                title={l10n.t(
+                                                    "Drag to a frame",
+                                                )}
+                                                onPointerDown={() => {
+                                                    scrubbingRef.current = true;
+                                                }}
+                                                onPointerUp={() => {
+                                                    scrubbingRef.current = false;
+                                                }}
+                                                onChange={(e) => {
+                                                    const time = Number(
+                                                        e.target.value,
+                                                    );
+                                                    viewportRef.current?.seekAnimation(
+                                                        time,
+                                                    );
+                                                    setPlayhead((current) => ({
+                                                        ...current,
+                                                        time,
+                                                    }));
+                                                }}
                                             />
-                                        </Field>
-                                    </div>
+                                        }
+                                        speed={{
+                                            readout: l10n.t(
+                                                "{0}x",
+                                                animationSpeed.toFixed(2),
+                                            ),
+                                            slider: (
+                                                <input
+                                                    type="range"
+                                                    disabled={
+                                                        animation === null
+                                                    }
+                                                    min={0}
+                                                    max={2}
+                                                    step={0.05}
+                                                    value={animationSpeed}
+                                                    title={l10n.t(
+                                                        "Playback speed",
+                                                    )}
+                                                    onChange={(e) =>
+                                                        setAnimationSpeed(
+                                                            Number(
+                                                                e.target.value,
+                                                            ),
+                                                        )
+                                                    }
+                                                />
+                                            ),
+                                        }}
+                                    />
                                 </div>
                             )}
                         </>
@@ -12465,91 +9911,6 @@ ${becauseText(node.because)}`
             </div>
         </Shell>
     );
-}
-
-const S3TC_FORMATS = new Set<number>([
-    THREE.RGB_S3TC_DXT1_Format,
-    THREE.RGBA_S3TC_DXT1_Format,
-    THREE.RGBA_S3TC_DXT3_Format,
-    THREE.RGBA_S3TC_DXT5_Format,
-]);
-
-/**
- * Applies the addressing mode the game's samplers ask for.
- *
- * The rule itself lives in `preview/textures.ts` so it can be unit tested; this only carries the
- * answer onto the texture.
- */
-function applyAddressing(
-    texture: THREE.Texture,
-    width: number | undefined,
-    height: number | undefined,
-): THREE.Texture {
-    if (addressingFor(width, height) === "repeat") {
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-    }
-
-    return texture;
-}
-
-/**
- * Turns raw texture bytes into a three.js texture.
- *
- * The server sends the file undecoded, so the format picks the decoder. DDS keeps its compressed
- * blocks all the way to the GPU - decoding it would inflate a 2048x2048 texture several times over
- * for no gain - while TGA has to be unpacked, because no GPU samples it directly.
- */
-function decodeTexture(result: GetModelTextureResult): THREE.Texture | null {
-    const bytes = Uint8Array.from(atob(result.data ?? ""), (c) =>
-        c.charCodeAt(0),
-    );
-
-    if (result.format === "dds") {
-        const parsed = new DDSLoader().parse(bytes.buffer as ArrayBuffer, true);
-
-        // Not every .dds is compressed - the loader hands back a plain pixel format for the
-        // uncompressed ones, and a CompressedTexture cannot carry those.
-        if (S3TC_FORMATS.has(parsed.format as number)) {
-            const texture = new THREE.CompressedTexture(
-                parsed.mipmaps as THREE.CompressedTextureMipmap[],
-                parsed.width,
-                parsed.height,
-                parsed.format as THREE.CompressedPixelFormat,
-            );
-            texture.needsUpdate = true;
-            return applyAddressing(texture, parsed.width, parsed.height);
-        }
-
-        const level = parsed.mipmaps[0] as { data: Uint8Array } | undefined;
-        if (level === undefined) {
-            return null;
-        }
-
-        const texture = new THREE.DataTexture(
-            level.data,
-            parsed.width,
-            parsed.height,
-        );
-        texture.needsUpdate = true;
-        return applyAddressing(texture, parsed.width, parsed.height);
-    }
-
-    if (result.format === "tga") {
-        const parsed = new TGALoader().parse(bytes.buffer as ArrayBuffer);
-
-        const texture = new THREE.DataTexture(
-            parsed.data,
-            parsed.width,
-            parsed.height,
-        );
-        texture.needsUpdate = true;
-        // TGA rows run bottom-up, which is also how the game stores them.
-        texture.flipY = true;
-        return applyAddressing(texture, parsed.width, parsed.height);
-    }
-
-    return null;
 }
 
 createRoot(document.getElementById("root")!).render(<ModelPreview />);

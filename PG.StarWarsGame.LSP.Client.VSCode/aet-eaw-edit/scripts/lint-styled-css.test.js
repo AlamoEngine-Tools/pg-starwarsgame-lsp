@@ -116,4 +116,45 @@ describe('the lint run', () => {
         const run = spawnSync(process.execPath, [path.join(__dirname, 'lint-styled-css.js')], {encoding: 'utf8'});
         assert.equal(run.status, 0, run.stderr);
     });
+
+    // #320: the model preview sets `--capture-ratio` from JS in the component and reads it in the
+    // stylesheet that moved to its own file. A property set from JS anywhere in the tree counts.
+    it('accepts a custom property that another file sets from JS', () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'styled-css-'));
+        try {
+            const shared = path.join(root, 'webview', 'shared');
+            fs.mkdirSync(shared, {recursive: true});
+            fs.copyFileSync(TOKENS, path.join(shared, 'tokens.ts'));
+            fs.writeFileSync(path.join(root, 'webview', 'shell.ts'),
+                'export const Shell = styled.div`\n    aspect-ratio: var(--probe-ratio);\n`;\n');
+            fs.writeFileSync(path.join(root, 'webview', 'panel.tsx'),
+                'export const X = <div style={{ ["--probe-ratio" as string]: 2 }} />;\n');
+
+            const run = spawnSync(process.execPath, [path.join(__dirname, 'lint-styled-css.js'), root],
+                {encoding: 'utf8'});
+
+            assert.equal(run.status, 0, run.stderr);
+        } finally {
+            fs.rmSync(root, {recursive: true, force: true});
+        }
+    });
+
+    it('still refuses a custom property nothing sets', () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'styled-css-'));
+        try {
+            const shared = path.join(root, 'webview', 'shared');
+            fs.mkdirSync(shared, {recursive: true});
+            fs.copyFileSync(TOKENS, path.join(shared, 'tokens.ts'));
+            fs.writeFileSync(path.join(root, 'webview', 'shell.ts'),
+                'export const Shell = styled.div`\n    aspect-ratio: var(--probe-ratio);\n`;\n');
+
+            const run = spawnSync(process.execPath, [path.join(__dirname, 'lint-styled-css.js'), root],
+                {encoding: 'utf8'});
+
+            assert.equal(run.status, 1, run.stderr);
+            assert.match(run.stderr, /shell\.ts:2 {2}var\(--probe-ratio\)/);
+        } finally {
+            fs.rmSync(root, {recursive: true, force: true});
+        }
+    });
 });

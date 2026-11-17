@@ -19,6 +19,7 @@ import { ReactNode } from "react";
 
 import { type BadgeSeverity } from "./badges";
 import { InfoBadge } from "./InfoBadge";
+import { ViewRow } from "./ViewRow";
 
 export interface FieldProps {
     label: ReactNode;
@@ -121,7 +122,7 @@ export function Field({
 
     return (
         <Box className="field">
-            {inline ? <span className="view-row">{named}</span> : named}
+            {inline ? <ViewRow>{named}</ViewRow> : named}
 
             {note !== undefined && (
                 <p className={warn ? "field-warn" : "field-note"}>{note}</p>
