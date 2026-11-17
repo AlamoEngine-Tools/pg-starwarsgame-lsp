@@ -36,3 +36,13 @@ export interface LoadedPart {
  * runs its own clips, and never answers a question about the model being previewed.
  */
 export const ACTIVE_SUBJECT = "subject";
+
+/**
+ * The `partId` prefix a piece of wreckage is loaded and addressed under.
+ *
+ * Both its part id and its subject id, because a wreck is one model and one subject. Kept here
+ * rather than shared with the client's own `breakoff:` request prefix on purpose: that one names a
+ * pending GLB request, this one names geometry already in the scene, and the two happening to read
+ * alike is not a reason to tie them together.
+ */
+export const BREAKOFF_ATTACHMENT = "wreck:";
