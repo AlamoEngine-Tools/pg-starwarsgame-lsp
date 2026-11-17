@@ -148,7 +148,6 @@ import {
 import { boxRoots, boxTargetFor, rowsInBox } from "./selectionBox";
 import { skyGradient, starPositions } from "./backdrop";
 import { concreteNoise, GROUND_TEXTURE_SIZE } from "./groundTexture";
-import { missingTexture } from "./missingTexture";
 import {
     type BackgroundKind,
     DEFAULT_LIGHTS,
@@ -176,6 +175,7 @@ import { type ParticleEntry } from "./particleEntry";
 export { ACTIVE_SUBJECT };
 import { TurretRig } from "./turretRig";
 import { ParticleHost } from "./particleHost";
+import { MaterialBinder } from "./materialBinder";
 
 /**
  * Where a system being loaded goes, and what it is.
@@ -297,22 +297,6 @@ export const VIEWPORT_BACKGROUND = 0x1b1d21;
 
 /** Fixed, so the sky is the same one every session and a screenshot can be compared to another. */
 const STAR_SEED = 20260817;
-
-/** The flat grey an untinted mesh draws in, until the real shaders land. */
-const UNTINTED = 0xb8b8b8;
-
-/**
- * How solid a collision hull or shadow volume draws.
- *
- * Both are seen THROUGH, and for a collision hull that is the entire reason to look at one: the
- * question being asked is whether the hull encloses the model, which you can only answer if the
- * geometry inside it is visible and anything poking out of it reads immediately.
- *
- * Lower than it looks, because the value COMPOUNDS. A rancor carries three shadow volumes and two
- * collision hulls, and at the effects' own alpha - the ShadowVolume ones ask for FULL - the five of
- * them stacked into a solid block with the model nowhere in it.
- */
-const DEBUG_HULL_OPACITY = 0.3;
 
 /** A replacement subject's own death clip, and what it says about visibility. */
 /**
@@ -560,10 +544,8 @@ export class PreviewViewport {
     private readonly scaledRoot = new THREE.Group();
     /** The subject's `Scale_Factor`, or 1. Read by everything that counter-scales. */
     private modelScale = 1;
-    /** Effects that translated, by lower-cased shader name. */
-    private readonly translated = new Map<string, TranslatedEffect>();
-    /** Declared render state per shader, so a material rebuilt later is not left on the defaults. */
-    private readonly shaderStates = new Map<string, FxMaterialState>();
+    /** The materials: what every mesh is drawn with, the textures and effects bound to them, and the team tint. See `MaterialBinder`. */
+    private readonly materials: MaterialBinder;
     /**
      * What one tree row controls.
      *
@@ -599,10 +581,6 @@ export class PreviewViewport {
     private rowResolutions = new Map<string, Resolution>();
     /** The same, for what each row does to everything BENEATH it - see `subtreeFacts`. */
     private rowSubtrees = new Map<string, Resolution>();
-    /** Every decoded texture, kept so a material rebuilt later can be handed them again. */
-    private readonly textures = new Map<string, THREE.Texture>();
-    /** Draw with a translated shader wherever one is available. */
-    private translatedShaders = true;
     /** Seconds since the viewport opened, for the effects that read the clock. */
     private elapsed = 0;
 
@@ -683,7 +661,6 @@ export class PreviewViewport {
     private frameCopy: THREE.FramebufferTexture | null = null;
     /** Draw the heat BUFFER rather than the bent picture. */
     private heatDebug = false;
-    private wireframe = false;
     /**
      * A shadow-only plane over the floor.
      *
@@ -735,13 +712,6 @@ export class PreviewViewport {
      * subset whose hardpoint is destroyed. Without the first, a level change would re-show a decal
      * the model ships visible and every capital ship would open pre-scorched.
      */
-    /**
-     * The team tint, or null for the model's own colours.
-     *
-     * Kept here rather than applied and forgotten, because materials are rebuilt whenever a part
-     * loads - a turret arriving after the faction was picked has to come in already tinted.
-     */
-    private colorization: NormalisedColour | null = null;
     private knownDecals: ReadonlySet<string> = new Set();
     private shownDecals: ReadonlySet<string> = new Set();
     /**
@@ -805,8 +775,6 @@ export class PreviewViewport {
         position: THREE.Vector3;
         quaternion: THREE.Quaternion;
     } | null = null;
-    /** Textures the server has told us do not resolve. */
-    private readonly missingTextures = new Set<string>();
 
     constructor(
         private readonly canvas: HTMLCanvasElement,
@@ -970,6 +938,31 @@ export class PreviewViewport {
                 viewport.fireBoneAttachment(partId, bone),
             modelSpan: () => viewport.modelSpan(),
         });
+        this.materials = new MaterialBinder({
+            get camera() {
+                return viewport.camera;
+            },
+            get modelRoot() {
+                return viewport.modelRoot;
+            },
+            get particles() {
+                return viewport.particles;
+            },
+            get stencilShadowing() {
+                return viewport.stencilShadowing;
+            },
+            applyMeshVisibility: (mesh) => viewport.applyMeshVisibility(mesh),
+            forEachDrawnMesh: (visit) => viewport.forEachDrawnMesh(visit),
+            forEachPartMesh: (visit) => viewport.forEachPartMesh(visit),
+            frameFor: (mesh, view, projection, viewProjection, eyeWorld) =>
+                viewport.frameFor(
+                    mesh,
+                    view,
+                    projection,
+                    viewProjection,
+                    eyeWorld,
+                ),
+        });
         this.particles = new ParticleHost({
             get alt() {
                 return viewport.alt;
@@ -995,17 +988,14 @@ export class PreviewViewport {
             get hiddenParts() {
                 return viewport.hiddenParts;
             },
-            get missingTextures() {
-                return viewport.missingTextures;
-            },
             get shaderStates() {
-                return viewport.shaderStates;
+                return viewport.materials.shaderStates;
             },
             get translated() {
-                return viewport.translated;
+                return viewport.materials.translated;
             },
             get translatedShaders() {
-                return viewport.translatedShaders;
+                return viewport.materials.translatedShaders;
             },
             applyClipPlanes: (sphere, distance) =>
                 viewport.applyClipPlanes(sphere, distance),
@@ -1013,7 +1003,6 @@ export class PreviewViewport {
                 viewport.attachmentFor(partId, bone, boneIndex),
             boundingSphere: (includeEffects) =>
                 viewport.boundingSphere(includeEffects),
-            markMissing: (name) => viewport.markMissing(name),
             partRootOf: (partId) => viewport.partRootOf(partId),
             refreshParticleVisibility: (entry) =>
                 viewport.refreshParticleVisibility(entry),
@@ -1305,8 +1294,9 @@ export class PreviewViewport {
                 continue;
             }
 
-            // Off the MATERIAL, which is where the exporter puts them and where `applyMaterial`
-            // reads them from - that has not run yet, so `node.userData.alamo` is still empty.
+            // Off the MATERIAL, which is where the exporter puts them and where
+            // `MaterialBinder.applyMaterial` reads them from - that has not run yet, so
+            // `node.userData.alamo` is still empty.
             const source = Array.isArray(node.material)
                 ? node.material[0]
                 : node.material;
@@ -1326,7 +1316,7 @@ export class PreviewViewport {
         // Pass three: materials, over the graph as it now stands.
         root.traverse((node) => {
             if (node instanceof THREE.Mesh) {
-                this.applyMaterial(node);
+                this.materials.applyMaterial(node);
             }
         });
 
@@ -1398,19 +1388,19 @@ export class PreviewViewport {
         // running it a few lines earlier - where the materials are built - swept everything except
         // the part that had just been given them, and a turret arriving late came in solid while
         // the hull beside it was edges.
-        this.applyWireframe();
+        this.materials.applyWireframe();
 
         // And the render state every already-translated effect declares. A material built now gets
         // three's DEFAULTS, not the effect's - and `RSkinBumpColorize.fx` declares its cull mode
         // there, so a part arriving after its shader had was drawn with every triangle facing away
         // and rendered NOTHING. That is what made a death clone invisible with shaders switched on
         // and perfect with them off. `addBreakoff` has always done this; `addPart` never did.
-        for (const [shader, state] of this.shaderStates) {
-            this.applyStoredShaderState(shader, state);
+        for (const [shader, state] of this.materials.shaderStates) {
+            this.materials.applyStoredShaderState(shader, state);
         }
 
-        if (this.colorization !== null) {
-            this.setColorization(this.colorization);
+        if (this.materials.colorization !== null) {
+            this.setColorization(this.materials.colorization);
         }
         this.collectShadowVolumes(root);
 
@@ -1518,99 +1508,22 @@ export class PreviewViewport {
      * guess is better than a wrong one.
      */
     applyShaderState(shaderName: string, state: FxMaterialState): void {
-        this.shaderStates.set(shaderName.toLowerCase(), state);
-        this.applyStoredShaderState(shaderName.toLowerCase(), state);
-        this.applyParticleEffects();
+        this.materials.applyShaderState(shaderName, state);
     }
 
     /** Every distinct shader name the loaded geometry names, so each is fetched once. */
     shaderNames(): string[] {
-        const names = new Set<string>();
-
-        this.modelRoot.traverse((node) => {
-            if (!(node instanceof THREE.Mesh)) {
-                return;
-            }
-
-            const shader =
-                (node.userData.alamo as MaterialExtras | undefined)
-                    ?.alamoShader ?? "";
-            if (shader !== "") {
-                names.add(shader);
-            }
-        });
-
-        // The particle systems' effects too: an emitter is drawn through the engine's own
-        // `Prim*.fx` for its render mode, fetched and translated like any mesh effect.
-        for (const entry of this.particles.particleSystems.values()) {
-            for (const name of entry.instance.effectNames()) {
-                names.add(name);
-            }
-        }
-
-        return [...names].sort();
-    }
-
-    /**
-     * Hands every particle system the translated effects in hand, or takes them away.
-     *
-     * Rerun whenever an effect or a pass state arrives and when the translation toggle moves: a
-     * system built before its effect came back has to pick it up the same as one built after.
-     */
-    private applyParticleEffects(): void {
-        for (const entry of this.particles.particleSystems.values()) {
-            entry.instance.applyEffects(
-                this.translated,
-                this.shaderStates,
-                this.translatedShaders,
-            );
-        }
+        return this.materials.shaderNames();
     }
 
     /** Sets the team tint, or clears it back to the model's own colours. */
     setColorization(colour: NormalisedColour | null): void {
-        this.colorization = colour;
-
-        this.forEachDrawnMesh((node) => {
-            const material = node.material;
-
-            if (material instanceof AlamoMaterial) {
-                // The effect masks the tint itself; it only needs the colour.
-                material.setColorization(colour);
-            } else if (
-                material instanceof THREE.MeshStandardMaterial ||
-                material instanceof THREE.MeshBasicMaterial
-            ) {
-                // Basic as well as standard: an FC_ mesh on an additive shader is unlit and still
-                // takes the team colour, so checking only for standard left it untinted.
-                this.tint(material);
-            }
-        });
+        this.materials.setColorization(colour);
     }
 
     /** Which distinct sub-mesh names take the team colour, for the dock to report. */
     colorizedMeshes(): string[] {
-        const names = new Set<string>();
-
-        this.modelRoot.traverse((node) => {
-            if (!(node instanceof THREE.Mesh)) {
-                return;
-            }
-
-            const data = node.material as {
-                userData?: { spec?: { colorize?: boolean } };
-            };
-            const extras = node.userData.alamo as MaterialExtras | undefined;
-
-            if (
-                data.userData?.spec?.colorize === true &&
-                extras?.alamoMesh !== undefined
-            ) {
-                names.add(extras.alamoMesh);
-            }
-        });
-
-        return [...names].sort();
+        return this.materials.colorizedMeshes();
     }
 
     /**
@@ -1622,21 +1535,12 @@ export class PreviewViewport {
      * the only way to see what the translation is actually changing.
      */
     applyTranslatedEffect(shaderName: string, effect: TranslatedEffect): void {
-        this.translated.set(shaderName.toLowerCase(), effect);
-
-        if (this.translatedShaders) {
-            this.rebuildMaterials();
-        }
+        this.materials.applyTranslatedEffect(shaderName, effect);
     }
 
     /** Whether to draw with translated shaders where one is available. */
     setTranslatedShaders(enabled: boolean): void {
-        if (this.translatedShaders === enabled) {
-            return;
-        }
-
-        this.translatedShaders = enabled;
-        this.rebuildMaterials();
+        this.materials.setTranslatedShaders(enabled);
     }
 
     /**
@@ -1644,27 +1548,7 @@ export class PreviewViewport {
      * there are. The emitters count because a particle file has no sub-meshes at all.
      */
     translatedCoverage(): { translated: number; total: number } {
-        let translated = 0;
-        let total = 0;
-
-        this.forEachPartMesh((mesh) => {
-            if (!meshDrawn(mesh)) {
-                return;
-            }
-
-            total++;
-            if (mesh.material instanceof AlamoMaterial) {
-                translated++;
-            }
-        });
-
-        for (const entry of this.particles.particleSystems.values()) {
-            const coverage = entry.instance.effectCoverage();
-            translated += coverage.translated;
-            total += coverage.total;
-        }
-
-        return { translated, total };
+        return this.materials.translatedCoverage();
     }
 
     /**
@@ -1674,55 +1558,12 @@ export class PreviewViewport {
      * wrong - the sort of thing that looks like a translation bug and is actually a missing file.
      */
     shaderTextureProblems(): string[] {
-        const problems = new Set<string>();
-
-        this.forEachPartMesh((mesh) => {
-            if (!(mesh.material instanceof AlamoMaterial)) {
-                return;
-            }
-
-            const shader = (mesh.userData.alamo as MaterialExtras | undefined)
-                ?.alamoShader;
-
-            for (const { sampler, file } of mesh.material.unboundSamplers()) {
-                problems.add(
-                    shader === undefined
-                        ? l10n.t(
-                              "A shader: Sampler '{0}' is still waiting for '{1}'.",
-                              sampler,
-                              file,
-                          )
-                        : l10n.t(
-                              "{0}: Sampler '{1}' is still waiting for '{2}'.",
-                              shader,
-                              sampler,
-                              file,
-                          ),
-                );
-            }
-            for (const sampler of mesh.material.unnamedSamplers) {
-                problems.add(
-                    shader === undefined
-                        ? l10n.t(
-                              "A shader: Sampler '{0}' has no texture on this sub-mesh.",
-                              sampler,
-                          )
-                        : l10n.t(
-                              "{0}: Sampler '{1}' has no texture on this sub-mesh.",
-                              shader,
-                              sampler,
-                          ),
-                );
-            }
-        });
-
-        return [...problems];
+        return this.materials.shaderTextureProblems();
     }
 
     /** Applies a decoded texture wherever a material asked for it by name. */
     setTexture(name: string, texture: THREE.Texture): void {
-        this.textures.set(name, texture);
-        this.bindTextureIn(this.modelRoot, name, texture);
+        this.materials.setTexture(name, texture);
     }
 
     /**
@@ -1735,9 +1576,7 @@ export class PreviewViewport {
      * already in hand, and it dropped as a black shape every time.
      */
     bindLoadedTextures(root: THREE.Object3D): void {
-        for (const [name, texture] of this.textures) {
-            this.bindTextureIn(root, name, texture);
-        }
+        this.materials.bindLoadedTextures(root);
     }
 
     /** Removes everything, so a new subject starts from an empty scene. */
@@ -1833,17 +1672,7 @@ export class PreviewViewport {
      * solid geometry rather than a field, and that is worth saying once.
      */
     shieldMeshesOffShader(): string[] {
-        const names = new Set<string>();
-
-        this.forEachPartMesh((mesh) => {
-            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-            if (shieldMeshOffShader(extras)) {
-                names.add(extras.alamoMesh ?? alamoNodeName(mesh));
-            }
-        });
-
-        return [...names];
+        return this.materials.shieldMeshesOffShader();
     }
 
     /** Shows or hides the shield mesh, for the abilities that reveal it. */
@@ -2928,8 +2757,7 @@ export class PreviewViewport {
      * says nothing about the model.
      */
     setWireframe(on: boolean): void {
-        this.wireframe = on;
-        this.applyWireframe();
+        this.materials.setWireframe(on);
     }
 
     /**
@@ -3249,18 +3077,7 @@ export class PreviewViewport {
      * never fall out of step with what was actually loaded.
      */
     materialExtras(): MaterialExtras[] {
-        const all: MaterialExtras[] = [];
-
-        this.modelRoot.traverse((node) => {
-            if (
-                node instanceof THREE.Mesh &&
-                node.userData.alamo !== undefined
-            ) {
-                all.push(node.userData.alamo as MaterialExtras);
-            }
-        });
-
-        return all;
+        return this.materials.materialExtras();
     }
 
     /**
@@ -4097,374 +3914,6 @@ export class PreviewViewport {
         );
     }
 
-    /**
-     * Replaces a loaded mesh's material with what the seam says to draw.
-     *
-     * The glTF material is only a carrier - the exporter puts the Alamo shader name and its parameters
-     * in `extras` precisely because glTF cannot express them.
-     */
-    private applyMaterial(mesh: THREE.Mesh): void {
-        // On the FIRST pass the glTF material is the carrier. After that this mesh's material is one
-        // we made, whose userData is `{ spec, extras }` - reading extras off it again would find no
-        // shader name at all, which silently drops every texture and every translated effect.
-        const source = Array.isArray(mesh.material)
-            ? mesh.material[0]
-            : mesh.material;
-        const extras = (mesh.userData.alamo ??
-            source?.userData ??
-            {}) as MaterialExtras;
-        const spec = resolveMaterial(extras);
-
-        mesh.userData.alamo = extras;
-
-        // `meshVisible`, not `!spec.hidden`: that is the single authority, and it also weighs the
-        // current ALT/LOD and whether a damage decal has been blown open. Setting visibility from
-        // the material spec alone was harmless while this only ran at load time, and became a real
-        // bug once the shader toggle started rebuilding materials - it re-showed every mesh the
-        // level gating had hidden, including the collision and shadow hulls, and nothing put them
-        // back because toggling again simply re-ran the same wrong assignment.
-        this.applyMeshVisibility(mesh);
-
-        // Only SOLID geometry casts. A collision hull and a shadow volume are overlays and would
-        // throw a second silhouette over the model; an additive glow or an alpha-blended girder has
-        // no opaque body to cast from, and a shadow map has no way to express a partial one - an
-        // engine flare casting a hard black shadow is worse than it casting none.
-        // Once a model authors a shadow volume, the volume IS the shadow - the hull stops casting
-        // into the map, exactly as the engine does it. Recomputed for every mesh whenever a part
-        // arrives, because a volume can turn up after the geometry that it belongs to.
-        mesh.castShadow = castsShadowMap({
-            hasVolumes: this.stencilShadowing,
-            hidden: spec.hidden,
-            blend: spec.blend,
-        });
-        mesh.receiveShadow = !spec.hidden;
-
-        // A collision hull or a shadow volume draws NOTHING in the engine - the shadow techniques
-        // literally set `ColorWriteEnable = 0` and write only stencil. But the reason to tick one
-        // on in a preview is to LOOK at it, so it gets the debug colour its own effect declares:
-        // `MeshCollision.fx` ships `Color = {0, 0, 1, 0.5}` and both ShadowVolume effects ship
-        // `DebugColor = {0, 1, 1, 1}`. Left on the glTF material they came in on, both drew as
-        // flat white, which is the one thing they are definitely not.
-        if (spec.hidden) {
-            mesh.material = this.debugMaterial(extras, spec);
-            return;
-        }
-
-        // The effect's own shader when there is one and it is switched on, the archetype otherwise.
-        const effect = this.translated.get(
-            (extras.alamoShader ?? "").toLowerCase(),
-        );
-        if (this.translatedShaders && effect !== undefined) {
-            const translated = new AlamoMaterial(effect, extras);
-
-            // A rebuild makes new materials, so the current tint has to be put back on them.
-            if (spec.colorize) {
-                translated.setColorization(this.colorization);
-            }
-
-            translated.userData = { spec, extras };
-            mesh.material = translated;
-            return;
-        }
-
-        const shared = {
-            transparent: spec.blend !== "opaque",
-            depthWrite: spec.depthWrite,
-            side: THREE.FrontSide,
-
-            // The cutoff the effect declares, carried by the archetype because the shader itself is
-            // usually not reachable - the base shaders are Petroglyph's and are never shipped. Zero
-            // discards nothing, which is what drew `Tree.fx` foliage as solid slabs. Overridden by
-            // `applyShaderState` for anyone who does have the effect in hand.
-            alphaTest: spec.alphaTest ?? 0,
-        };
-
-        // Unlit for the additive family, and it has to be a different MATERIAL rather than a
-        // brighter light: a standard material's dielectric specular is not multiplied by the base
-        // colour, so a black texel still reflects about 4% of the key light. Under an additive
-        // blend that 4% is the muzzle flash's whole quad showing as a grey rectangle around the
-        // flare. `Additive.fxh` is `texel * constant`, so basic is not an approximation here - it
-        // is what the effect does.
-        const material = spec.lit
-            ? new THREE.MeshStandardMaterial({
-                  ...shared,
-                  color: UNTINTED,
-                  metalness: 0,
-                  roughness: 0.85,
-              })
-            : // White, not UNTINTED: nothing is going to light this, so any grey here just dims the
-              // texture the effect meant to show at full strength.
-              new THREE.MeshBasicMaterial({ ...shared, color: 0xffffff });
-
-        // The archetype's own blend and depth, through the single place that knows how each one is
-        // expressed in three. An additive ARCHETYPE means the engine's ONE, ONE - the same thing
-        // the effect would have declared - so the two routes to a material cannot disagree, and a
-        // mesh does not shift when its effect finally arrives.
-        applyBlend(material, spec.blend);
-        applyDepth(material, {
-            depthTest: true,
-            depthWrite: spec.depthWrite,
-            depthFunc: "lessEqual",
-        });
-
-        material.userData = { spec, extras };
-        this.tint(material);
-        mesh.material = material;
-
-        // The effect's own declared blend, depth and cull state, if we have read it. Applied here
-        // and not only when the shader arrives, because every material rebuild - a shader toggle, a
-        // faction change - throws the previous one away and would otherwise silently fall back to
-        // the archetype's guess for the rest of the session.
-        const state = this.shaderStates.get(
-            (extras.alamoShader ?? "").toLowerCase(),
-        );
-        if (state !== undefined) {
-            this.applyStoredShaderState(
-                (extras.alamoShader ?? "").toLowerCase(),
-                state,
-            );
-        }
-    }
-
-    /**
-     * How a non-visual hull is drawn when the reader asks to see it.
-     *
-     * Neither of these is drawn by the engine at all - the shadow techniques set
-     * `ColorWriteEnable = 0` and write only stencil - so there is no "correct" appearance to copy,
-     * only a useful one. The COLOUR is still the effect's own: `MeshCollision.fx` ships
-     * `Color = {0, 0, 1, 0.5}` and both ShadowVolume effects ship `DebugColor = {0, 1, 1, 1}`, and
-     * a mod is free to change either.
-     *
-     * The two differ in what they ARE, so they differ in how they draw:
-     *
-     * - a COLLISION hull is a closed solid standing in for the model, and nobody switches one on by
-     *   accident, so it draws solid and occludes - which is what makes its shape readable;
-     * - a SHADOW VOLUME is an extruded silhouette whose interior is the point, so it stays
-     *   translucent and writes no depth.
-     */
-    private debugMaterial(
-        extras: MaterialExtras,
-        spec: MaterialSpec,
-    ): THREE.Material {
-        // The effect's own declared colour where there is one, and the colour that effect DEFAULTS
-        // to otherwise. A hull authored on `alDefault.fx` - 174 of them across the shipped models -
-        // declares no swatch at all, so the fallback has to come from what KIND of hull this is, or
-        // the Nebulon-B's `COLLISION` draws in the shadow volume's cyan.
-        const volume = spec.archetype === "shadow-volume";
-        const colour =
-            debugColour(extras) ??
-            (volume ? { r: 0, g: 1, b: 1, a: 1 } : { r: 0, g: 0, b: 1, a: 1 });
-
-        const material = new THREE.MeshBasicMaterial({
-            color: new THREE.Color(colour.r, colour.g, colour.b),
-            opacity: Math.min(colour.a, DEBUG_HULL_OPACITY),
-            transparent: true,
-            // No depth write, so the hull layers OVER the model rather than carving it out - the
-            // model has to stay visible through it for the enclosure to be readable.
-            depthWrite: false,
-            // Front faces only. Double-sided doubles the translucent layers to see through, and a
-            // closed hull's back faces add nothing to reading its shape.
-            side: THREE.FrontSide,
-        });
-
-        material.userData = { spec, extras };
-        return material;
-    }
-
-    /**
-     * Applies the team colour to one material, if that material takes it.
-     *
-     * Which materials do is the seam's business: a `*Colorize` shader, or an `FC_`-prefixed mesh,
-     * which takes the colour whatever its shader says.
-     *
-     * PER PIXEL, weighted by the base texture's ALPHA - not a flat tint over the whole sub-mesh.
-     * That is what the shipped shaders do, `lerp(base.rgb, Colorization * base.rgb, base.a)`, and
-     * it is the difference between an Imperial hull with coloured markings and an Imperial hull
-     * painted entirely green. `material.color` therefore stays white; the tint is injected into the
-     * standard material's own fragment shader, because nothing three offers expresses "multiply by
-     * this colour only where the map's alpha says so".
-     */
-    private tint(
-        material: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial,
-    ): void {
-        const spec = (material.userData as { spec?: { colorize?: boolean } })
-            .spec;
-        if (spec?.colorize !== true) {
-            return;
-        }
-
-        material.color.setHex(0xffffff);
-        this.installColorization(material);
-
-        const uniform = (
-            material.userData as { colorization?: { value: THREE.Color } }
-        ).colorization;
-        if (uniform === undefined) {
-            return;
-        }
-
-        // White is the identity for a multiply, so an untinted mesh keeps its texture exactly.
-        if (this.colorization === null) {
-            uniform.value.setRGB(1, 1, 1);
-            return;
-        }
-
-        uniform.value.setRGB(
-            this.colorization.r,
-            this.colorization.g,
-            this.colorization.b,
-        );
-    }
-
-    /**
-     * Teaches one standard material to tint by the base map's alpha.
-     *
-     * `sampledDiffuseColor` is declared by three's own `map_fragment` chunk and is still in scope
-     * after it, so the mask is the texture's real alpha rather than anything already multiplied
-     * into `diffuseColor`.
-     */
-    private installColorization(
-        material: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial,
-    ): void {
-        const data = material.userData as {
-            colorization?: { value: THREE.Color };
-        };
-        if (data.colorization !== undefined) {
-            return;
-        }
-
-        const colorization = { value: new THREE.Color(1, 1, 1) };
-        data.colorization = colorization;
-
-        material.onBeforeCompile = (shader) => {
-            shader.uniforms.aetColorization = colorization;
-
-            shader.fragmentShader = shader.fragmentShader
-                .replace(
-                    "void main() {",
-                    "uniform vec3 aetColorization;\nvoid main() {",
-                )
-                .replace(
-                    "#include <map_fragment>",
-                    `#include <map_fragment>
-#ifdef USE_MAP
-    diffuseColor.rgb = mix(
-        diffuseColor.rgb, aetColorization * diffuseColor.rgb, sampledDiffuseColor.a);
-#endif`,
-                );
-        };
-
-        // three caches programs by this key, so two materials differing only in the injection would
-        // otherwise share one compiled shader.
-        material.customProgramCacheKey = () => "aet-colorize";
-    }
-
-    /**
-     * Puts one shader's render state onto every material currently using it.
-     *
-     * Both kinds: a translated `AlamoMaterial` needs the blend and depth state just as much as the
-     * archetype does, and skipping it drew meshes that should be alpha-blended with depth writes on
-     * - which is how an inner hull ends up occluding the model around it.
-     */
-    private applyStoredShaderState(
-        wanted: string,
-        state: FxMaterialState,
-    ): void {
-        this.forEachDrawnMesh((node) => {
-            const material = node.material;
-            const extras = node.userData.alamo as MaterialExtras | undefined;
-
-            if (
-                Array.isArray(material) ||
-                !(material instanceof THREE.Material) ||
-                (extras?.alamoShader ?? "").toLowerCase() !== wanted
-            ) {
-                return;
-            }
-
-            // A collision hull or shadow volume is not drawn by the engine at all, so the state its
-            // effect declares describes a pass we are not running - `MeshCollision.fx` asks for
-            // opaque depth writes, which turned the translucent blue debug hull back into a solid
-            // box over the model. The debug material keeps its own state.
-            if (resolveMaterial(extras ?? {}).hidden) {
-                return;
-            }
-
-            applyDepth(material, state);
-            material.side =
-                state.cull === "none"
-                    ? THREE.DoubleSide
-                    : state.cull === "front"
-                      ? THREE.BackSide
-                      : THREE.FrontSide;
-
-            // Two different mechanisms for the same declaration. An archetype material is one of
-            // three's own, which reads `alphaTest` and injects the discard itself; a translated
-            // effect is a RawShaderMaterial, which gets no such chunk and needs the threshold as a
-            // uniform. Missing the second is what drew `Tree.fx`'s palm fronds - a leaf texture on
-            // a plain rectangle - as solid green cards.
-            if (material instanceof AlamoMaterial) {
-                material.setAlphaTest(state.alphaTest);
-            } else {
-                // Cleared rather than left, so a material that inherited a cutoff does not keep
-                // one the effect never asked for.
-                material.alphaTest = state.alphaTest ?? 0;
-            }
-
-            applyBlend(material, state.blend);
-
-            // The fixed-function stage scale. Only the archetype path needs it: a translated effect
-            // is running the effect's own HLSL, which does its own doubling, and `colourScale` is 1
-            // for any pass carrying a shader precisely so this cannot apply twice.
-            if (!(material instanceof AlamoMaterial)) {
-                applyColourScale(material, state.colourScale);
-            }
-
-            material.needsUpdate = true;
-        });
-    }
-
-    /**
-     * Feeds every translated material what the engine would recompute this frame.
-     *
-     * Per mesh rather than per scene, because half the contract is object-relative: WORLD and
-     * WORLDVIEWPROJECTION differ for a turret attached on a hull, and a shader working in object
-     * space wants the eye and the lights transformed into ITS space, not the hull's.
-     */
-    private updateAlamoUniforms(): void {
-        const materials: { mesh: THREE.Mesh; material: AlamoMaterial }[] = [];
-
-        this.modelRoot.traverse((node) => {
-            if (
-                node instanceof THREE.Mesh &&
-                node.material instanceof AlamoMaterial &&
-                node.visible
-            ) {
-                materials.push({ mesh: node, material: node.material });
-            }
-        });
-
-        if (materials.length === 0) {
-            return;
-        }
-
-        this.camera.updateMatrixWorld();
-
-        const view = this.camera.matrixWorldInverse;
-        const projection = this.camera.projectionMatrix;
-        const viewProjection = new THREE.Matrix4().multiplyMatrices(
-            projection,
-            view,
-        );
-        const eyeWorld = this.camera.getWorldPosition(new THREE.Vector3());
-
-        for (const { mesh, material } of materials) {
-            material.updateFrame(
-                this.frameFor(mesh, view, projection, viewProjection, eyeWorld),
-            );
-        }
-    }
-
     /** The engine's per-frame contract, as it stands for one mesh. */
     private frameFor(
         mesh: THREE.Mesh,
@@ -4678,107 +4127,6 @@ export class PreviewViewport {
         }
 
         return palette;
-    }
-
-    // ── animation ─────────────────────────────────────────────────────────────
-
-    /** Rebuilds every mesh's material for the current translated/archetype choice. */
-    private rebuildMaterials(): void {
-        this.forEachDrawnMesh((mesh) => this.applyMaterial(mesh));
-
-        // Same reason as after a part loads: these are different material objects, and a flag set
-        // on the ones they replace is gone.
-        this.applyWireframe();
-
-        // New material objects, so everything already known has to be applied to them again.
-        for (const [shader, state] of this.shaderStates) {
-            this.applyStoredShaderState(shader, state);
-        }
-
-        // Materials are new objects, so everything already decoded has to be handed over again.
-        for (const [name, texture] of this.textures) {
-            this.setTexture(name, texture);
-        }
-        this.applyParticleEffects();
-    }
-
-    /**
-     * Whether any mesh in the MODEL draws this texture with one of three's own materials.
-     *
-     * Asked of `modelRoot` rather than of whatever subtree is being bound: the texture is shared
-     * across the whole scene, so a newly added prop must not flip an answer the rest of the model
-     * has already been drawn with.
-     */
-    private archetypeWants(wanted: string): boolean {
-        let found = false;
-
-        this.modelRoot.traverse((node) => {
-            if (
-                found ||
-                !(node instanceof THREE.Mesh) ||
-                node.material instanceof AlamoMaterial
-            ) {
-                return;
-            }
-
-            const spec = (node.material as THREE.Material).userData?.spec as
-                { textures?: { base?: string } } | undefined;
-
-            if (spec?.textures?.base?.toLowerCase() === wanted) {
-                found = true;
-            }
-        });
-
-        return found;
-    }
-
-    private bindTextureIn(
-        root: THREE.Object3D,
-        name: string,
-        texture: THREE.Texture,
-    ): void {
-        const wanted = name.toLowerCase();
-
-        // ONE answer for the texture, taken from the whole model before anything is bound. The
-        // cache holds a single THREE.Texture per name and shares it, so the decode is a property of
-        // the TEXTURE and cannot be decided per material - and it cannot be decided as we go
-        // either, because textures bind while every material is still an archetype and the
-        // translated ones only replace them once the shaders arrive.
-        applyBaseMapColourSpace(texture, this.archetypeWants(wanted));
-
-        root.traverse((node) => {
-            if (!(node instanceof THREE.Mesh)) {
-                return;
-            }
-
-            if (node.material instanceof AlamoMaterial) {
-                node.material.bindTexture(name, texture);
-                return;
-            }
-
-            const material = node.material as
-                THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
-            const spec = material.userData?.spec;
-            if (spec === undefined) {
-                return;
-            }
-
-            if (spec.textures.base?.toLowerCase() === wanted) {
-                material.map = texture;
-                material.color.setHex(0xffffff);
-                material.needsUpdate = true;
-            }
-
-            // Only a lit material has a normal map to put this in; an unlit one has no normal to
-            // perturb, and assigning it would be a silent no-op that reads as a working bind.
-            if (
-                spec.textures.normal?.toLowerCase() === wanted &&
-                material instanceof THREE.MeshStandardMaterial
-            ) {
-                material.normalMap = texture;
-                material.needsUpdate = true;
-            }
-        });
     }
 
     /**
@@ -5608,29 +4956,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Puts the current wireframe state onto whatever materials exist now.
-     *
-     * Called again after a part loads and after a renderer switch, because both replace materials
-     * wholesale - and a flag set on the materials that came before is simply gone.
-     */
-    private applyWireframe(): void {
-        this.forEachDrawnMesh((mesh) => {
-            for (const material of Array.isArray(mesh.material)
-                ? mesh.material
-                : [mesh.material]) {
-                if (
-                    material instanceof THREE.Material &&
-                    "wireframe" in material
-                ) {
-                    (
-                        material as THREE.Material & { wireframe: boolean }
-                    ).wireframe = this.wireframe;
-                }
-            }
-        });
-    }
-
-    /**
      * Advances every PASSIVE subject's clip and applies what it says about visibility.
      *
      * The active subject is not here: its mixer is ticked by the loop and its visibility goes
@@ -5768,20 +5093,6 @@ export class PreviewViewport {
         return partId === undefined
             ? this.modelRoot
             : (this.parts.get(partId)?.root ?? null);
-    }
-
-    private async markMissing(name: string): Promise<void> {
-        const marker = await missingTexture();
-
-        // Still missing? A real texture can land while the marker is being decoded, and the answer
-        // that arrived last is the one that is true.
-        if (!this.missingTextures.has(name.toLowerCase())) {
-            return;
-        }
-
-        for (const entry of this.particles.particleSystems.values()) {
-            entry.instance.setMissingTexture(name, marker);
-        }
     }
 
     /**
@@ -6020,7 +5331,7 @@ export class PreviewViewport {
 
         // The engine's per-frame contract, including the matrices. Last, not first, so it sees the
         // bone transforms the animation and skeleton work above have already settled.
-        this.updateAlamoUniforms();
+        this.materials.updateAlamoUniforms();
         this.updateBillboards();
 
         // The sky dome travels with the camera and keeps its own orientation, so the horizon stays

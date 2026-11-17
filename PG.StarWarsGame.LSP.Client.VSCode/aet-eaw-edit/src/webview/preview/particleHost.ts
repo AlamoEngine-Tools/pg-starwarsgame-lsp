@@ -18,6 +18,7 @@ import { proxyVisibleAt } from "./levels";
 import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
 import { emissionMeshFor } from "./emissionSource";
+import { missingTexture } from "./missingTexture";
 import { type BoundingSphere } from "./framing";
 import { type FxMaterialState } from "./fx/renderState";
 import { type TranslatedEffect } from "./fx/effect";
@@ -44,8 +45,6 @@ export interface ParticleViewport {
     readonly fitDistance: number;
     readonly hiddenParts: ReadonlySet<string>;
     readonly lod: number;
-    markMissing(name: string): Promise<void>;
-    readonly missingTextures: Set<string>;
     readonly modelRoot: THREE.Group;
     partRootOf(partId?: string): THREE.Object3D | null;
     readonly parts: ReadonlyMap<string, LoadedPart>;
@@ -83,6 +82,8 @@ export class ParticleHost {
      */
     private fadingParticles: ParticleSystemInstance[] = [];
     private readonly particleTextures = new Map<string, THREE.Texture>();
+    /** Textures the server has told us do not resolve. */
+    private readonly missingTextures = new Set<string>();
     particlesVisible = true;
     private particlesPaused = false;
     /** One-shot systems - death explosions - removed once they burn out. */
@@ -375,7 +376,7 @@ export class ParticleHost {
     /** Hands a fetched texture to whichever emitters named it, now and after a restart. */
     setParticleTexture(name: string, texture: THREE.Texture): void {
         this.particleTextures.set(name.toLowerCase(), texture);
-        this.host.missingTextures.delete(name.toLowerCase());
+        this.missingTextures.delete(name.toLowerCase());
 
         for (const entry of this.particleSystems.values()) {
             entry.instance.setTexture(name, texture);
@@ -390,9 +391,9 @@ export class ParticleHost {
      * because it happened to be late.
      */
     setParticleTextureMissing(name: string): void {
-        this.host.missingTextures.add(name.toLowerCase());
+        this.missingTextures.add(name.toLowerCase());
 
-        void this.host.markMissing(name);
+        void this.markMissing(name);
     }
 
     setParticlesVisible(visible: boolean): void {
@@ -663,8 +664,8 @@ export class ParticleHost {
 
         // A system built after the answers came back still has to show the marker: a hardpoint
         // blowing up spawns one long after the textures were asked for.
-        for (const name of this.host.missingTextures) {
-            void this.host.markMissing(name);
+        for (const name of this.missingTextures) {
+            void this.markMissing(name);
         }
 
         for (const key of this.hiddenEmitters) {
@@ -704,5 +705,19 @@ export class ParticleHost {
         }
 
         return reach;
+    }
+
+    private async markMissing(name: string): Promise<void> {
+        const marker = await missingTexture();
+
+        // Still missing? A real texture can land while the marker is being decoded, and the answer
+        // that arrived last is the one that is true.
+        if (!this.missingTextures.has(name.toLowerCase())) {
+            return;
+        }
+
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.setMissingTexture(name, marker);
+        }
     }
 }

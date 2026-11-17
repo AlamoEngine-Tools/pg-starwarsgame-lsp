@@ -24,7 +24,6 @@ function hostWith(): { particles: ParticleHost; modelRoot: THREE.Group } {
         modelRoot,
         parts: new Map(),
         hiddenParts: new Set(),
-        missingTextures: new Set(),
         shaderStates: new Map(),
         translated: new Map(),
         translatedShaders: false,
@@ -32,7 +31,6 @@ function hostWith(): { particles: ParticleHost; modelRoot: THREE.Group } {
         partRootOf: () => null,
         boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
         applyClipPlanes: () => undefined,
-        markMissing: async () => undefined,
         refreshParticleVisibility: () => undefined,
         refreshRows: () => undefined,
     } as unknown as ParticleViewport;
@@ -94,5 +92,27 @@ describe("ParticleHost", () => {
 
         assert.doesNotThrow(() => particles.step(1 / 30, new THREE.Matrix4()));
         assert.deepEqual(particles.particleSystemIds(), ["fx"]);
+    });
+    it("keeps its own record of the textures that will never arrive", () => {
+        // The marker is decoded through the DOM; here the decode never settles, so nothing is drawn
+        // and nothing rejects. What is under test is that the viewport is not asked for a set.
+        const image = globalThis as unknown as { Image?: unknown };
+        const saved = image.Image;
+        image.Image = class {
+            src = "";
+            decode(): Promise<void> {
+                return new Promise(() => undefined);
+            }
+        };
+        try {
+            const { particles } = hostWith();
+
+            particles.setParticleTextureMissing("P_Spark.tga");
+            particles.setParticleTexture("P_Spark.tga", new THREE.Texture());
+
+            assert.deepEqual(particles.particleTextureNames(), []);
+        } finally {
+            image.Image = saved;
+        }
     });
 });
