@@ -96,3 +96,15 @@ export function drawnBounds(
 
     return box;
 }
+
+/**
+ * How many triangles one geometry draws.
+ *
+ * An indexed geometry draws its INDEX buffer, not its vertices - reading the vertex count would
+ * under-report every shipped mesh, all of which are indexed.
+ */
+export function triangleCount(geometry: THREE.BufferGeometry): number {
+    const vertices = geometry.getAttribute("position")?.count ?? 0;
+
+    return Math.floor((geometry.getIndex()?.count ?? vertices) / 3);
+}
