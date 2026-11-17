@@ -294,6 +294,13 @@ ${tokensCss}
         cursor: pointer;
     }
     .field input[type=range] { flex: 1; min-width: 0; }
+    /* Controls side by side on one line - a colour well beside its name, a card's buttons. See ViewRow. */
+    .view-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        flex-wrap: wrap;
+    }
     .check-field {
         display: flex;
         align-items: flex-start;
@@ -1457,6 +1464,126 @@ export const stageChromeCss = `
         width: 22px;
         padding: 0;
         border-radius: var(--radius-3);
+    }
+`;
+
+/**
+ * The stage's edges: a row of three slots along the top and along the bottom, the plates sitting
+ * in them. See StageSlots. Shared with the component, which is shared.
+ */
+export const stageRowCss = `
+    /* Each EDGE is one row rather than two independently placed corners.
+        
+               Absolutely positioning a left cluster and a right cluster works until the stage is narrow -
+               and this panel is routinely docked beside code. A Star Destroyer offers twelve factions, so
+               its palette is fourteen swatches wide and would have run straight under the renderer switch.
+               As a row they meet in the middle and each plate wraps inside itself instead.
+        
+               pointer-events is load-bearing: the row spans the whole stage, so left as it is it would
+               swallow every camera drag that started anywhere near the top or bottom of the viewport. The
+               row is transparent to the mouse and only the plates on it are not. */
+    .stage-row {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        z-index: 2;
+        display: flex;
+        gap: var(--space-8);
+        pointer-events: none;
+    }
+
+    .stage-row > * {
+        pointer-events: auto;
+    }
+
+    .stage-row .stage-chrome {
+        position: static;
+    }
+
+    .stage-top {
+        top: 8px;
+        align-items: flex-start;
+    }
+
+    .stage-bottom {
+        bottom: 8px;
+        align-items: flex-end;
+    }
+
+    /* BOTH edges are three-slot rows now, and the middle slot is what the row is about: the colour
+           above, the ability command bar below.
+    
+           The bottom edge used to position two plates absolutely - a centred palette and a corner
+           switch - because as a flex row or a grid each squeezed the other, and below about 600px there
+           is genuinely not enough space for a centred strip AND a corner plate. That reasoning still
+           holds and is why the narrow case below still STACKS rather than compressing anything. What
+           changed is the count: the edge carries four groups now, and four absolutely-positioned plates
+           cannot be made to meet in the middle at all.
+    
+           The container query measures the STAGE rather than the window, which is the thing that
+           actually varies - this panel is usually docked beside code. */
+    @container (max-width: 700px) {
+        .stage-row {
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-6);
+        }
+
+        /* Stacked, a slot is one centred line rather than a third of a row. */
+        .stage-slot,
+        .stage-slot-end,
+        .stage-slot-mid {
+            flex: 0 0 auto;
+            width: auto;
+            max-width: 100%;
+            justify-content: center;
+        }
+
+        /* Read outwards from the model in both directions: the actions nearest the edge, the
+           standing choices furthest from it. Reversing the bottom keeps the attack tool closest to
+           the bottom of the stage, where it was before the stack. */
+        .stage-bottom {
+            flex-direction: column-reverse;
+        }
+    }
+
+    /* The two side slots are EQUAL, which is the whole of what centres the middle one.
+    
+           They were not: the leading spacer was flex 1 1 0 while the end slot took its natural
+           width, so the spacer grew to fill everything left over and shoved the palette rightwards into
+           the renderer switch instead of balancing it. A centred element needs the same amount of
+           nothing on both sides. */
+
+    .stage-slot {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-8);
+        flex-wrap: wrap;
+    }
+
+    .stage-slot-end {
+        justify-content: flex-end;
+    }
+
+    /* The middle slot centres its contents; the two side slots being EQUAL is what centres the
+       slot itself. */
+
+    .stage-slot-mid {
+        justify-content: center;
+    }
+
+    .stage-bottom .stage-slot {
+        align-items: flex-end;
+    }
+
+    /* Nothing in a side slot shrinks. Letting the renderer switch compress turned "Default | Game"
+       into "Dif..|Ga..." - a control you can neither read nor aim at - while the palette in the
+       middle wraps to another row perfectly well and stays centred doing it. */
+
+    .stage-slot .stage-chrome {
+        flex: 0 0 auto;
     }
 `;
 
