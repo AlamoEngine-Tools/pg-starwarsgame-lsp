@@ -199,6 +199,7 @@ import {
 import { CaptureRig } from "./captureRig";
 import { LevelGates } from "./levelGates";
 import { ModelQueries } from "./modelQueries";
+import { type ViewportContext } from "./viewportContext";
 
 export type {
     AddPartOptions,
@@ -344,390 +345,114 @@ export class PreviewViewport {
         this.modelRoot.add(this.scaledRoot);
         this.scene.add(this.modelRoot);
 
-        // Live getters, not copies: the parts, the rows and the hull change with every subject, and
-        // the layer reads them at the moment it draws.
         const viewport = this;
-        this.levels = new LevelGates({
+        // One context for every layer: the scene objects, made once and never replaced, and the layers
+        // themselves, so one layer asks another directly. The layers are getters because they are built
+        // below one after another. What a layer still asks of the viewport itself - its clock, its scale,
+        // its callbacks - is that layer's own host, read live at the moment the layer needs it.
+        const context: ViewportContext = {
+            scene: this.scene,
+            camera: this.camera,
+            renderer: this.renderer,
+            canvas,
+            controls: this.controls,
+            loader: this.loader,
+            modelRoot: this.modelRoot,
+            scaledRoot: this.scaledRoot,
+            parts: this.parts,
+            labelLayer,
+            get levels() {
+                return viewport.levels;
+            },
+            get queries() {
+                return viewport.queries;
+            },
             get assembly() {
                 return viewport.assembly;
             },
+            get destruction() {
+                return viewport.destruction;
+            },
+            get animation() {
+                return viewport.animation;
+            },
+            get capturer() {
+                return viewport.capturer;
+            },
+            get cameraRig() {
+                return viewport.cameraRig;
+            },
             get environment() {
                 return viewport.environment;
-            },
-            get modelRoot() {
-                return viewport.modelRoot;
-            },
-            get particles() {
-                return viewport.particles;
-            },
-            get parts() {
-                return viewport.parts;
             },
             get rows() {
                 return viewport.rows;
             },
-        });
-        this.queries = new ModelQueries({
-            get animation() {
-                return viewport.animation;
-            },
-            get assembly() {
-                return viewport.assembly;
-            },
-            get levels() {
-                return viewport.levels;
-            },
-            get modelRoot() {
-                return viewport.modelRoot;
-            },
-            get particles() {
-                return viewport.particles;
-            },
-            get parts() {
-                return viewport.parts;
-            },
-        });
-        this.assembly = new PartAssembly({
-            get alt() {
-                return viewport.levels.alt;
-            },
-            get billboards() {
-                return viewport.billboards;
-            },
-            get environment() {
-                return viewport.environment;
-            },
-            get loader() {
-                return viewport.loader;
-            },
-            get lod() {
-                return viewport.levels.lod;
-            },
             get materials() {
                 return viewport.materials;
             },
-            get modelRoot() {
-                return viewport.modelRoot;
-            },
             get particles() {
                 return viewport.particles;
             },
-            get parts() {
-                return viewport.parts;
+            get overlay() {
+                return viewport.overlay;
             },
-            get scaledRoot() {
-                return viewport.scaledRoot;
+            get turret() {
+                return viewport.turret;
             },
-            get subjects() {
-                return viewport.animation.subjects;
+        };
+        this.levels = new LevelGates(context);
+        this.queries = new ModelQueries(context);
+        this.assembly = new PartAssembly(context, {
+            get billboards() {
+                return viewport.billboards;
             },
-            applyLevels: () => viewport.levels.applyLevels(),
-            bindLoadedTextures: (root) => viewport.bindLoadedTextures(root),
             dropRegistrations: (subjectId, root) =>
                 viewport.dropRegistrations(subjectId, root),
-            removeParticleSystem: (id, immediate) =>
-                viewport.removeParticleSystem(id, immediate),
-            setColorization: (colour) => viewport.setColorization(colour),
-            subjectAnimation: (subjectId) =>
-                viewport.animation.subjectAnimation(subjectId),
         });
-        this.destruction = new DestructionRig({
-            get assembly() {
-                return viewport.assembly;
-            },
+        this.destruction = new DestructionRig(context, {
             get modelScale() {
                 return viewport.modelScale;
             },
             get onBreakoffExpired() {
                 return viewport.onBreakoffExpired;
             },
-            get parts() {
-                return viewport.parts;
-            },
-            addPart: (id, glbBase64, attachToPartId, attachBone, options) =>
-                viewport.addPart(
-                    id,
-                    glbBase64,
-                    attachToPartId,
-                    attachBone,
-                    options,
-                ),
             dropRegistrations: (subjectId, root) =>
                 viewport.dropRegistrations(subjectId, root),
-            removePart: (partId) => viewport.removePart(partId),
         });
-        this.animation = new AnimationRig({
-            get assembly() {
-                return viewport.assembly;
-            },
-            get particles() {
-                return viewport.particles;
-            },
-            get rows() {
-                return viewport.rows;
-            },
-            applyLevels: () => viewport.levels.applyLevels(),
-            clearRowOverrides: () => viewport.clearRowOverrides(),
-            setPartHidden: (partId, hidden) =>
-                viewport.setPartHidden(partId, hidden),
-        });
-        this.capturer = new CaptureRig({
-            get camera() {
-                return viewport.camera;
-            },
-            get cameraRig() {
-                return viewport.cameraRig;
-            },
-            get canvas() {
-                return viewport.canvas;
-            },
-            get environment() {
-                return viewport.environment;
-            },
-            get overlay() {
-                return viewport.overlay;
-            },
-            get particles() {
-                return viewport.particles;
-            },
-            get renderer() {
-                return viewport.renderer;
-            },
-            get scene() {
-                return viewport.scene;
-            },
-            get turret() {
-                return viewport.turret;
-            },
+        this.animation = new AnimationRig(context);
+        this.capturer = new CaptureRig(context, {
             resize: () => viewport.resize(),
-            setFireArcsVisible: (visible) =>
-                viewport.setFireArcsVisible(visible),
-            setParticlesVisible: (visible) =>
-                viewport.setParticlesVisible(visible),
         });
-        // First: the environment places its key light against the framing sphere as it is built.
-        this.cameraRig = new CameraRig({
-            get camera() {
-                return viewport.camera;
-            },
-            get controls() {
-                return viewport.controls;
-            },
-            get environment() {
-                return viewport.environment;
-            },
-            get materials() {
-                return viewport.materials;
-            },
-            get modelRoot() {
-                return viewport.modelRoot;
-            },
-            get particles() {
-                return viewport.particles;
-            },
-            get renderer() {
-                return viewport.renderer;
-            },
-            drawn: (mesh) => viewport.levels.drawn(mesh),
-            hull: () => viewport.assembly.hull(),
+        // Before the environment, which places its key light against the framing sphere as it is built.
+        this.cameraRig = new CameraRig(context, {
             updateBillboards: () => viewport.updateBillboards(),
         });
-        this.environment = new EnvironmentRig({
-            get alt() {
-                return viewport.levels.alt;
-            },
-            get camera() {
-                return viewport.camera;
-            },
-            get canvas() {
-                return viewport.canvas;
-            },
+        this.environment = new EnvironmentRig(context, {
             get elapsed() {
                 return viewport.elapsed;
             },
-            get lod() {
-                return viewport.levels.lod;
-            },
-            get particles() {
-                return viewport.particles;
-            },
-            get renderer() {
-                return viewport.renderer;
-            },
-            get scene() {
-                return viewport.scene;
-            },
-            get stealthed() {
-                return viewport.levels.stealthed;
-            },
-            boundingSphere: (includeEffects) =>
-                viewport.cameraRig.boundingSphere(includeEffects),
-            forEachDrawnMesh: (visit) =>
-                viewport.assembly.forEachDrawnMesh(visit),
-            skinPalette: (mesh) => viewport.animation.skinPalette(mesh),
         });
-        this.rows = new ModelRows({
-            get active() {
-                return viewport.animation.active;
+        this.rows = new ModelRows(context);
+        this.overlay = new OverlayLayer(context, {
+            get onReticleClicked() {
+                return viewport.onReticleClicked;
             },
-            get alt() {
-                return viewport.levels.alt;
-            },
-            get collisionMeshes() {
-                return viewport.levels.collisionMeshes;
-            },
-            get knownDecals() {
-                return viewport.levels.knownDecals;
-            },
-            get lod() {
-                return viewport.levels.lod;
-            },
-            get particles() {
-                return viewport.particles;
-            },
-            get shieldRevealed() {
-                return viewport.levels.shieldRevealed;
-            },
-            get shownDecals() {
-                return viewport.levels.shownDecals;
-            },
-            get stealthed() {
-                return viewport.levels.stealthed;
-            },
-            forEachPartMesh: (visit) =>
-                viewport.assembly.forEachPartMesh(visit),
-            hull: () => viewport.assembly.hull(),
-            skeleton: () => viewport.queries.skeleton(),
         });
-
-        this.overlay = new OverlayLayer(
-            {
-                get camera() {
-                    return viewport.camera;
-                },
-                get canvas() {
-                    return viewport.canvas;
-                },
-                get labelLayer() {
-                    return viewport.labelLayer;
-                },
-                get parts() {
-                    return viewport.parts;
-                },
-                get rowParents() {
-                    return viewport.rows.rowParents;
-                },
-                get rowTargets() {
-                    return viewport.rows.rowTargets;
-                },
-                get onReticleClicked() {
-                    return viewport.onReticleClicked;
-                },
-                bonePosition: (partId, bone) =>
-                    viewport.queries.bonePosition(partId, bone),
-                boundingSphere: (includeEffects) =>
-                    viewport.cameraRig.boundingSphere(includeEffects),
-                hull: () => viewport.assembly.hull(),
-                modelSpan: () => viewport.cameraRig.modelSpan(),
-                skeleton: () => viewport.queries.skeleton(),
-            },
-            this.scene,
-        );
-        this.turret = new TurretRig({
-            get camera() {
-                return viewport.camera;
-            },
-            get canvas() {
-                return viewport.canvas;
-            },
-            get modelRoot() {
-                return viewport.modelRoot;
-            },
+        this.turret = new TurretRig(context, {
             get modelScale() {
                 return viewport.modelScale;
-            },
-            get parts() {
-                return viewport.parts;
             },
             get onTurretAimed() {
                 return viewport.onTurretAimed;
             },
             fireBoneAttachment: (partId, bone) =>
                 viewport.fireBoneAttachment(partId, bone),
-            modelSpan: () => viewport.cameraRig.modelSpan(),
         });
-        this.materials = new MaterialBinder({
-            get camera() {
-                return viewport.camera;
-            },
-            get modelRoot() {
-                return viewport.modelRoot;
-            },
-            get particles() {
-                return viewport.particles;
-            },
-            get stencilShadowing() {
-                return viewport.environment.stencilShadowing;
-            },
-            applyMeshVisibility: (mesh) =>
-                viewport.levels.applyMeshVisibility(mesh),
-            forEachDrawnMesh: (visit) =>
-                viewport.assembly.forEachDrawnMesh(visit),
-            forEachPartMesh: (visit) =>
-                viewport.assembly.forEachPartMesh(visit),
-            frameFor: (mesh, view, projection, viewProjection, eyeWorld) =>
-                viewport.environment.frameFor(
-                    mesh,
-                    view,
-                    projection,
-                    viewProjection,
-                    eyeWorld,
-                ),
-        });
-        this.particles = new ParticleHost({
-            get alt() {
-                return viewport.levels.alt;
-            },
-            get altDescending() {
-                return viewport.levels.altDescending;
-            },
-            get lod() {
-                return viewport.levels.lod;
-            },
-            get fitDistance() {
-                return viewport.cameraRig.fitDistance;
-            },
-            get cameraPosition() {
-                return viewport.cameraRig.cameraPosition;
-            },
-            get modelRoot() {
-                return viewport.modelRoot;
-            },
-            get parts() {
-                return viewport.parts;
-            },
-            get hiddenParts() {
-                return viewport.assembly.hiddenParts;
-            },
-            get shaderStates() {
-                return viewport.materials.shaderStates;
-            },
-            get translated() {
-                return viewport.materials.translated;
-            },
-            get translatedShaders() {
-                return viewport.materials.translatedShaders;
-            },
-            applyClipPlanes: (sphere, distance) =>
-                viewport.cameraRig.applyClipPlanes(sphere, distance),
-            attachmentFor: (partId, bone, boneIndex) =>
-                viewport.assembly.attachmentFor(partId, bone, boneIndex),
-            boundingSphere: (includeEffects) =>
-                viewport.cameraRig.boundingSphere(includeEffects),
-            partRootOf: (partId) => viewport.assembly.partRootOf(partId),
+        this.materials = new MaterialBinder(context);
+        this.particles = new ParticleHost(context, {
             refreshParticleVisibility: (entry) =>
                 viewport.refreshParticleVisibility(entry),
-            refreshRows: () => viewport.rows.refreshRows(),
         });
 
         // CAPTURE phase, so a grabbed turret knob is claimed before `OrbitControls` - registered on

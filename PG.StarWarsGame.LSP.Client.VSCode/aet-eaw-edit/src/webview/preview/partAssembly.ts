@@ -25,13 +25,8 @@ import { billboardTypeOf } from "./billboards";
 import { visibilityTracks } from "./boneVisibility";
 import { isOverlay } from "./modelBounds";
 import { setMeshDrawn } from "./meshVisibility";
-import { type EnvironmentRig } from "./environmentRig";
-import { type GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { type MaterialBinder } from "./materialBinder";
-import { type ParticleHost } from "./particleHost";
-import { type NormalisedColour } from "./colour";
-import { type SubjectAnimation } from "./subjectAnimation";
 import { type AddPartOptions } from "./viewportTypes";
+import { type ViewportContext } from "./viewportContext";
 
 /** Every mesh a model's own materials say is not drawn - collision hulls, shadow volumes. */
 function hiddenMeshes(root: THREE.Object3D): Set<THREE.Object3D> {
@@ -76,25 +71,10 @@ export function disposeTree(root: THREE.Object3D): void {
     });
 }
 
-/** What PartAssembly reads from the viewport it belongs to. */
+/** What PartAssembly still asks of the viewport itself: what only the viewport has. */
 export interface AssemblyViewport {
-    readonly alt: number;
-    applyLevels(): void;
     readonly billboards: THREE.Object3D[];
-    bindLoadedTextures(root: THREE.Object3D): void;
     dropRegistrations(subjectId: string, root: THREE.Object3D): void;
-    readonly environment: EnvironmentRig;
-    readonly loader: GLTFLoader;
-    readonly lod: number;
-    readonly materials: MaterialBinder;
-    readonly modelRoot: THREE.Group;
-    readonly particles: ParticleHost;
-    readonly parts: Map<string, LoadedPart>;
-    removeParticleSystem(id: string, immediate?: boolean): void;
-    readonly scaledRoot: THREE.Group;
-    setColorization(colour: NormalisedColour | null): void;
-    subjectAnimation(subjectId: string): SubjectAnimation;
-    readonly subjects: Map<string, SubjectAnimation>;
 }
 
 export class PartAssembly {
@@ -103,7 +83,10 @@ export class PartAssembly {
     /** Parts broken off by a destroyed hardpoint. */
     readonly hiddenParts = new Set<string>();
 
-    constructor(private readonly host: AssemblyViewport) {}
+    constructor(
+        private readonly context: ViewportContext,
+        private readonly host: AssemblyViewport,
+    ) {}
 
     /**
      * Adds a model, attached to a bone of an already-loaded part when asked.
@@ -134,7 +117,7 @@ export class PartAssembly {
         // active subject and will never speak for this one.
         const passive = subjectId !== ACTIVE_SUBJECT;
 
-        const gltf = await this.host.loader.parseAsync(
+        const gltf = await this.context.loader.parseAsync(
             decodeBase64(glbBase64),
             "",
         );
@@ -208,7 +191,7 @@ export class PartAssembly {
         // Pass three: materials, over the graph as it now stands.
         root.traverse((node) => {
             if (node instanceof THREE.Mesh) {
-                this.host.materials.applyMaterial(node);
+                this.context.materials.applyMaterial(node);
             }
         });
 
@@ -224,12 +207,12 @@ export class PartAssembly {
         // to the hull's branch and take the SHIP's, which is wrong for 59 of 265 shipped pairs.
         const parent =
             options.pose !== undefined
-                ? this.host.modelRoot
+                ? this.context.modelRoot
                 : attachToPartId !== undefined
                   ? this.attachmentFor(attachToPartId, attachBone)
                   : passive
-                    ? this.host.modelRoot
-                    : this.host.scaledRoot;
+                    ? this.context.modelRoot
+                    : this.context.scaledRoot;
 
         if (
             options.scale !== undefined &&
@@ -262,7 +245,13 @@ export class PartAssembly {
         // replaces did not - see `stampTreeKeys`.
         stampTreeKeys(root, bonesByIndex, id);
 
-        this.host.parts.set(id, { id, root, bones, bonesByIndex, subjectId });
+        this.context.parts.set(id, {
+            id,
+            root,
+            bones,
+            bonesByIndex,
+            subjectId,
+        });
 
         // Its own file's word, because the row chain will never speak for it - see
         // `LoadedPart.subjectId`. Debris needs exactly this too: outside the chain, nothing else
@@ -273,28 +262,30 @@ export class PartAssembly {
 
             // The host answers a texture name ONCE, and a wreck is the same ship - so every map it
             // needs was already sent for the hull and its own request comes back silent.
-            this.host.bindLoadedTextures(root);
+            this.context.materials.bindLoadedTextures(root);
         }
 
         // AFTER the part is registered, never before: `applyWireframe` sweeps `this.parts`, so
         // running it a few lines earlier - where the materials are built - swept everything except
         // the part that had just been given them, and a turret arriving late came in solid while
         // the hull beside it was edges.
-        this.host.materials.applyWireframe();
+        this.context.materials.applyWireframe();
 
         // And the render state every already-translated effect declares. A material built now gets
         // three's DEFAULTS, not the effect's - and `RSkinBumpColorize.fx` declares its cull mode
         // there, so a part arriving after its shader had was drawn with every triangle facing away
         // and rendered NOTHING. That is what made a death clone invisible with shaders switched on
         // and perfect with them off. `addBreakoff` has always done this; `addPart` never did.
-        for (const [shader, state] of this.host.materials.shaderStates) {
-            this.host.materials.applyStoredShaderState(shader, state);
+        for (const [shader, state] of this.context.materials.shaderStates) {
+            this.context.materials.applyStoredShaderState(shader, state);
         }
 
-        if (this.host.materials.colorization !== null) {
-            this.host.setColorization(this.host.materials.colorization);
+        if (this.context.materials.colorization !== null) {
+            this.context.materials.setColorization(
+                this.context.materials.colorization,
+            );
         }
-        this.host.environment.collectShadowVolumes(root);
+        this.context.environment.collectShadowVolumes(root);
 
         // The handful of bones that turn to face something. Collected once per part rather than
         // searched for each frame: across the shipped models 268 bones out of 22866 declare a mode
@@ -312,7 +303,7 @@ export class PartAssembly {
         // Everything the animation needs goes to THIS PART'S SUBJECT, never to the scene. One path
         // for the hull, an attached turret, a death clone and a piece of wreckage alike - what used
         // to differ between them was only which of these maps they were allowed into.
-        const subject = this.host.subjectAnimation(subjectId);
+        const subject = this.context.animation.subjectAnimation(subjectId);
 
         // Before any clip can touch it. Recorded for the whole part, not only for the bones this
         // GLB's own clips drive - a later part of the same subject can reach in here too.
@@ -355,7 +346,7 @@ export class PartAssembly {
             }
         }
 
-        this.host.applyLevels();
+        this.context.levels.applyLevels();
 
         return root;
     }
@@ -372,7 +363,7 @@ export class PartAssembly {
         const problems: string[] = [];
 
         for (const request of this.attachRequests.values()) {
-            const parent = this.host.parts.get(request.partId);
+            const parent = this.context.parts.get(request.partId);
             const found = {
                 part: parent !== undefined,
                 bone:
@@ -400,12 +391,12 @@ export class PartAssembly {
             this.hiddenParts.delete(partId);
         }
 
-        const part = this.host.parts.get(partId);
+        const part = this.context.parts.get(partId);
         if (part !== undefined) {
             part.root.visible = !hidden;
         }
 
-        this.host.particles.holdEffectsOf(partId);
+        this.context.particles.holdEffectsOf(partId);
     }
 
     /**
@@ -416,7 +407,7 @@ export class PartAssembly {
      * way; it lives as long as the subject does and is hidden instead.
      */
     removePart(partId: string): void {
-        const part = this.host.parts.get(partId);
+        const part = this.context.parts.get(partId);
         if (part === undefined) {
             return;
         }
@@ -425,16 +416,16 @@ export class PartAssembly {
         // They no longer live inside the part's subtree, so nothing else would ever take them:
         // before, disposing the part quietly freed their buffers underneath them, which left every
         // entry in `particleSystems` still being stepped against disposed geometry.
-        for (const [id, entry] of [...this.host.particles.particleSystems]) {
+        for (const [id, entry] of [...this.context.particles.particleSystems]) {
             if (entry.attachToPartId === partId) {
-                this.host.removeParticleSystem(id);
+                this.context.particles.removeParticleSystem(id);
             }
         }
 
         this.host.dropRegistrations(part.subjectId, part.root);
         part.root.removeFromParent();
         disposeTree(part.root);
-        this.host.parts.delete(partId);
+        this.context.parts.delete(partId);
         this.hiddenParts.delete(partId);
 
         // The subject goes with its last part. A repair removes the wreck, and a mixer left behind
@@ -444,13 +435,13 @@ export class PartAssembly {
             part.subjectId !== ACTIVE_SUBJECT &&
             this.rootPartOf(part.subjectId) === null
         ) {
-            this.host.subjects.delete(part.subjectId);
+            this.context.animation.subjects.delete(part.subjectId);
         }
     }
 
     /** Whether a part's geometry has arrived, so something can be attached to its bones. */
     hasPart(partId: string): boolean {
-        return this.host.parts.has(partId);
+        return this.context.parts.has(partId);
     }
 
     /** The object a part is attached to: a named bone of another part, or the scene root. */
@@ -460,14 +451,14 @@ export class PartAssembly {
         boneIndex?: number,
     ): THREE.Object3D {
         if (partId === undefined) {
-            return this.host.modelRoot;
+            return this.context.modelRoot;
         }
 
         this.noteAttachment(partId, bone, boneIndex);
 
-        const parent = this.host.parts.get(partId);
+        const parent = this.context.parts.get(partId);
         if (parent === undefined) {
-            return this.host.modelRoot;
+            return this.context.modelRoot;
         }
 
         if (bone === undefined) {
@@ -519,7 +510,7 @@ export class PartAssembly {
 
         // The maps still point at the mesh. Both are re-pointed, or the next lookup hands out the
         // node that was just taken apart - and the mount would hang on it again.
-        for (const part of this.host.parts.values()) {
+        for (const part of this.context.parts.values()) {
             for (const [key, held] of part.bones) {
                 if (held === anchor) {
                     part.bones.set(key, bone);
@@ -576,7 +567,7 @@ export class PartAssembly {
 
     /** The roots of the subject that opened the scene. */
     activeSubjectRoots(): THREE.Object3D[] {
-        return [...this.host.parts.values()]
+        return [...this.context.parts.values()]
             .filter((part) => part.subjectId === ACTIVE_SUBJECT)
             .map((part) => part.root);
     }
@@ -600,7 +591,7 @@ export class PartAssembly {
         // Every subject: how a mesh draws - its blend, its wireframe, its team tint - is the same
         // question whoever owns it. Only WHETHER it draws differs.
         this.walkModelMeshes(
-            [...this.host.parts.values()].map((part) => part.root),
+            [...this.context.parts.values()].map((part) => part.root),
             visit,
         );
     }
@@ -645,8 +636,8 @@ export class PartAssembly {
     /** Where the climb for an emission mesh has to stop: the model the system was attached to. */
     partRootOf(partId?: string): THREE.Object3D | null {
         return partId === undefined
-            ? this.host.modelRoot
-            : (this.host.parts.get(partId)?.root ?? null);
+            ? this.context.modelRoot
+            : (this.context.parts.get(partId)?.root ?? null);
     }
 
     /**
@@ -663,7 +654,7 @@ export class PartAssembly {
 
     /** The first-loaded part of one subject - its hull. */
     private rootPartOf(subjectId: string): LoadedPart | null {
-        for (const part of this.host.parts.values()) {
+        for (const part of this.context.parts.values()) {
             if (part.subjectId === subjectId) {
                 return part;
             }
@@ -674,7 +665,7 @@ export class PartAssembly {
 
     /** Every part belonging to one subject. */
     partsOf(subjectId: string): LoadedPart[] {
-        return [...this.host.parts.values()].filter(
+        return [...this.context.parts.values()].filter(
             (part) => part.subjectId === subjectId,
         );
     }
@@ -698,7 +689,7 @@ export class PartAssembly {
      * active subject.
      */
     applyOwnFileVisibility(subjectId: string, root: THREE.Object3D): void {
-        const subject = this.host.subjectAnimation(subjectId);
+        const subject = this.context.animation.subjectAnimation(subjectId);
         const action = subject.action;
         const track =
             action === null
@@ -722,7 +713,11 @@ export class PartAssembly {
             setMeshDrawn(
                 node,
                 !resolveMaterial(extras).hidden &&
-                    isVisibleAt(extras, this.host.alt, this.host.lod),
+                    isVisibleAt(
+                        extras,
+                        this.context.levels.alt,
+                        this.context.levels.lod,
+                    ),
             );
         });
     }

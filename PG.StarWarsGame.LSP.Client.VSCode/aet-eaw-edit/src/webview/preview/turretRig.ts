@@ -28,7 +28,7 @@ import {
     knobPoint,
 } from "./turretTrack";
 import { sweepAngles } from "./deathClone";
-import { type LoadedPart } from "./loadedPart";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * The firing-arc gizmo's look.
@@ -298,16 +298,11 @@ const TRAVERSE_AXIS = new THREE.Vector3(0, 0, 1);
 
 const ELEVATION_AXIS = new THREE.Vector3(0, 1, 0);
 
-/** What TurretRig reads from the viewport it belongs to. */
+/** What TurretRig still asks of the viewport itself: what only the viewport has. */
 export interface TurretHost {
-    readonly camera: THREE.PerspectiveCamera;
-    readonly canvas: HTMLCanvasElement;
     fireBoneAttachment(partId: string, bone: string): THREE.Object3D;
-    readonly modelRoot: THREE.Group;
     readonly modelScale: number;
-    modelSpan(): number;
     readonly onTurretAimed: ((id: string, aim: TurretAim) => void) | null;
-    readonly parts: ReadonlyMap<string, LoadedPart>;
 }
 
 export class TurretRig {
@@ -393,7 +388,7 @@ export class TurretRig {
             return;
         }
 
-        const rect = this.host.canvas.getBoundingClientRect();
+        const rect = this.context.canvas.getBoundingClientRect();
         const found = this.turretKnobAt(
             event.clientX - rect.left,
             event.clientY - rect.top,
@@ -420,14 +415,17 @@ export class TurretRig {
         this.paintTurretHandles();
     };
 
-    constructor(private readonly host: TurretHost) {}
+    constructor(
+        private readonly context: ViewportContext,
+        private readonly host: TurretHost,
+    ) {}
 
     /**
      * Takes a pointer-down that lands on a turret knob, and starts the drag; false when it missed every
      * knob and the event is the viewport's to handle.
      */
     grabKnob(event: PointerEvent): boolean {
-        const rect0 = this.host.canvas.getBoundingClientRect();
+        const rect0 = this.context.canvas.getBoundingClientRect();
         const grabbed = this.turretKnobAt(
             event.clientX - rect0.left,
             event.clientY - rect0.top,
@@ -449,7 +447,7 @@ export class TurretRig {
 
             // Keep the moves coming when the drag leaves the canvas, which a fast one does; the
             // controls would have captured the pointer here and no longer do.
-            this.host.canvas.setPointerCapture(event.pointerId);
+            this.context.canvas.setPointerCapture(event.pointerId);
 
             this.turretDrag = {
                 id: grabbed.id,
@@ -504,7 +502,7 @@ export class TurretRig {
 
         // How BIG the subject is, so a 2000-unit reach on a 600-unit hull is drawn at a length the
         // reader can stand outside of. See `drawnConeRange` - the row still states the true range.
-        const modelSize = this.host.modelSpan();
+        const modelSize = this.context.cameraRig.modelSpan();
 
         for (const arc of arcs) {
             const boneNode = this.host.fireBoneAttachment(arc.partId, arc.bone);
@@ -542,13 +540,13 @@ export class TurretRig {
             // orientation. Not the root's raw axes - the nose is +Z there, and the cone is built
             // along +X. See `hullFrameBasis`.
             const parent =
-                arc.frame === "hull" ? this.host.modelRoot : boneNode;
+                arc.frame === "hull" ? this.context.modelRoot : boneNode;
 
             if (arc.frame === "hull") {
                 boneNode.updateWorldMatrix(true, false);
-                this.host.modelRoot.updateWorldMatrix(true, false);
+                this.context.modelRoot.updateWorldMatrix(true, false);
                 mesh.position.copy(
-                    this.host.modelRoot.worldToLocal(
+                    this.context.modelRoot.worldToLocal(
                         boneNode.getWorldPosition(new THREE.Vector3()),
                     ),
                 );
@@ -634,7 +632,7 @@ export class TurretRig {
                 restKey(pose.partId, pose.turretBone),
                 pose.rest,
             );
-            const part = this.host.parts.get(pose.partId);
+            const part = this.context.parts.get(pose.partId);
             const turret = part?.bones.get(pose.turretBone.toLowerCase());
             if (turret === undefined) {
                 continue;
@@ -676,7 +674,7 @@ export class TurretRig {
         const swinging = new Set<THREE.Object3D>();
 
         for (const sweep of sweeps) {
-            const part = this.host.parts.get(sweep.partId);
+            const part = this.context.parts.get(sweep.partId);
             const turret = part?.bones.get(sweep.turretBone.toLowerCase());
             const barrel =
                 sweep.barrelBone === null
@@ -736,7 +734,7 @@ export class TurretRig {
             this.turretDrag = null;
         }
 
-        const radius = trackRadius(this.host.modelSpan());
+        const radius = trackRadius(this.context.cameraRig.modelSpan());
 
         for (const handle of handles) {
             if (this.turretHandleNodes.has(handle.id)) {
@@ -843,14 +841,14 @@ export class TurretRig {
             return;
         }
 
-        this.host.modelRoot.updateWorldMatrix(true, false);
+        this.context.modelRoot.updateWorldMatrix(true, false);
 
         for (const { mesh, muzzle } of this.hullArcs) {
             // Fresh, because the mixer has moved the bone but world matrices are only recomputed at
             // render time.
             muzzle.updateWorldMatrix(true, false);
             mesh.position.copy(
-                this.host.modelRoot.worldToLocal(
+                this.context.modelRoot.worldToLocal(
                     muzzle.getWorldPosition(this.muzzleScratch),
                 ),
             );
@@ -1021,8 +1019,8 @@ export class TurretRig {
         bone: string,
     ): THREE.Object3D | undefined {
         return (
-            this.host.parts.get("hull")?.bones.get(bone.toLowerCase()) ??
-            this.host.parts.get(partId)?.bones.get(bone.toLowerCase())
+            this.context.parts.get("hull")?.bones.get(bone.toLowerCase()) ??
+            this.context.parts.get(partId)?.bones.get(bone.toLowerCase())
         );
     }
 
@@ -1136,7 +1134,7 @@ export class TurretRig {
             }
 
             const pose = sweepAngles(sweep.turret, this.sweepPhase);
-            const part = this.host.parts.get(sweep.partId);
+            const part = this.context.parts.get(sweep.partId);
 
             const turret = part?.bones.get(sweep.turretBone.toLowerCase());
             if (turret !== undefined) {
@@ -1231,7 +1229,7 @@ export class TurretRig {
         x: number,
         y: number,
     ): { id: string; axis: TurretAxis } | null {
-        const rect = this.host.canvas.getBoundingClientRect();
+        const rect = this.context.canvas.getBoundingClientRect();
         const world = new THREE.Vector3();
         let best: { id: string; axis: TurretAxis; distance: number } | null =
             null;
@@ -1241,7 +1239,7 @@ export class TurretRig {
                 const knob = nodes[axis].knob;
 
                 knob.getWorldPosition(world);
-                const ndc = world.project(this.host.camera);
+                const ndc = world.project(this.context.camera);
 
                 // Behind the camera. Projection mirrors such a point to the front, so without this
                 // a turret on the far side of the ship is pickable at a place it is not.

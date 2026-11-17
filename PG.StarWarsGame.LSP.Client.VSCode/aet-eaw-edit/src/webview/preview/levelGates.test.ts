@@ -6,8 +6,9 @@ import { describe, it } from "node:test";
 
 import * as THREE from "three";
 
-import { type LevelsViewport, LevelGates } from "./levelGates";
+import { LevelGates } from "./levelGates";
 import { setMeshDrawn } from "./meshVisibility";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * Gates over a stand-in viewport: one tagged particle system, one shadow-volume mesh, no parts. What the
@@ -37,7 +38,7 @@ function gatesWith(): {
     };
     const counting: boolean[] = [];
     let refreshes = 0;
-    const host = {
+    const context = {
         modelRoot,
         parts: new Map(),
         particles: { particleSystems: new Map([["fx", system]]) },
@@ -57,9 +58,9 @@ function gatesWith(): {
                 refreshes++;
             },
         },
-    } as unknown as LevelsViewport;
+    } as unknown as ViewportContext;
     return {
-        levels: new LevelGates(host),
+        levels: new LevelGates(context),
         modelRoot,
         system,
         counting,

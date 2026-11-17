@@ -13,6 +13,7 @@ import {
     BREAKOFF_ATTACHMENT,
     type LoadedPart,
 } from "./loadedPart";
+import { type ViewportContext } from "./viewportContext";
 
 const PROP: PreviewBreakoffProp = {
     id: "Hardpoint_Breakoff_Test",
@@ -61,48 +62,52 @@ function rigWith(): {
     const removed: string[] = [];
     const expired: string[] = [];
     let last = new THREE.Group();
-    const host = {
-        assembly: { attachmentFor: () => bone },
-        modelScale: 1,
-        parts,
-        onBreakoffExpired: (key: string) => expired.push(key),
-        addPart: async (
-            id: string,
-            _glb: string,
-            _to?: string,
-            _bone?: string,
-            options?: {
-                subjectId?: string;
-                pose?: { position: THREE.Vector3 };
+    const context = {
+        assembly: {
+            attachmentFor: () => bone,
+            addPart: async (
+                id: string,
+                _glb: string,
+                _to?: string,
+                _bone?: string,
+                options?: {
+                    subjectId?: string;
+                    pose?: { position: THREE.Vector3 };
+                },
+            ) => {
+                added.push({
+                    id,
+                    subjectId: options?.subjectId,
+                    at: options?.pose?.position,
+                });
+                last = new THREE.Group();
+                last.add(
+                    new THREE.Mesh(
+                        new THREE.BufferGeometry(),
+                        new THREE.MeshBasicMaterial(),
+                    ),
+                );
+                modelRoot.add(last);
+                parts.set(id, {
+                    id,
+                    root: last,
+                    bones: new Map(),
+                    bonesByIndex: new Map(),
+                    subjectId: id,
+                });
+                return last;
             },
-        ) => {
-            added.push({
-                id,
-                subjectId: options?.subjectId,
-                at: options?.pose?.position,
-            });
-            last = new THREE.Group();
-            last.add(
-                new THREE.Mesh(
-                    new THREE.BufferGeometry(),
-                    new THREE.MeshBasicMaterial(),
-                ),
-            );
-            modelRoot.add(last);
-            parts.set(id, {
-                id,
-                root: last,
-                bones: new Map(),
-                bonesByIndex: new Map(),
-                subjectId: id,
-            });
-            return last;
+            removePart: (partId: string) => removed.push(partId),
         },
+        parts,
+    } as unknown as ViewportContext;
+    const host = {
+        modelScale: 1,
+        onBreakoffExpired: (key: string) => expired.push(key),
         dropRegistrations: () => undefined,
-        removePart: (partId: string) => removed.push(partId),
     } as unknown as DestructionViewport;
     return {
-        destruction: new DestructionRig(host),
+        destruction: new DestructionRig(context, host),
         hull,
         added,
         removed,

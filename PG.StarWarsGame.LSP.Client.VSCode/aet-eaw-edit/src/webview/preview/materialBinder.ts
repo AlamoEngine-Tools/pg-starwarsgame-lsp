@@ -27,8 +27,7 @@ import {
     applyColourScale,
     applyBaseMapColourSpace,
 } from "./materialState";
-import { type AlamoFrame } from "./fx/uniforms";
-import { type ParticleHost } from "./particleHost";
+import { type ViewportContext } from "./viewportContext";
 
 /** The flat grey an untinted mesh draws in, until the real shaders land. */
 const UNTINTED = 0xb8b8b8;
@@ -45,24 +44,6 @@ const UNTINTED = 0xb8b8b8;
  * them stacked into a solid block with the model nowhere in it.
  */
 const DEBUG_HULL_OPACITY = 0.3;
-
-/** What MaterialBinder reads from the viewport it belongs to. */
-export interface MaterialViewport {
-    applyMeshVisibility(mesh: THREE.Mesh): void;
-    readonly camera: THREE.PerspectiveCamera;
-    forEachDrawnMesh(visit: (mesh: THREE.Mesh) => void): void;
-    forEachPartMesh(visit: (mesh: THREE.Mesh) => void): void;
-    frameFor(
-        mesh: THREE.Mesh,
-        view: THREE.Matrix4,
-        projection: THREE.Matrix4,
-        viewProjection: THREE.Matrix4,
-        eyeWorld: THREE.Vector3,
-    ): AlamoFrame;
-    readonly modelRoot: THREE.Group;
-    readonly particles: Pick<ParticleHost, "particleSystems">;
-    readonly stencilShadowing: boolean;
-}
 
 export class MaterialBinder {
     /** Effects that translated, by lower-cased shader name. */
@@ -82,7 +63,7 @@ export class MaterialBinder {
      */
     colorization: NormalisedColour | null = null;
 
-    constructor(private readonly host: MaterialViewport) {}
+    constructor(private readonly context: ViewportContext) {}
 
     /**
      * Applies a shader's declared render state to every material using it.
@@ -101,7 +82,7 @@ export class MaterialBinder {
     shaderNames(): string[] {
         const names = new Set<string>();
 
-        this.host.modelRoot.traverse((node) => {
+        this.context.modelRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
@@ -116,7 +97,7 @@ export class MaterialBinder {
 
         // The particle systems' effects too: an emitter is drawn through the engine's own
         // `Prim*.fx` for its render mode, fetched and translated like any mesh effect.
-        for (const entry of this.host.particles.particleSystems.values()) {
+        for (const entry of this.context.particles.particleSystems.values()) {
             for (const name of entry.instance.effectNames()) {
                 names.add(name);
             }
@@ -132,7 +113,7 @@ export class MaterialBinder {
      * system built before its effect came back has to pick it up the same as one built after.
      */
     private applyParticleEffects(): void {
-        for (const entry of this.host.particles.particleSystems.values()) {
+        for (const entry of this.context.particles.particleSystems.values()) {
             entry.instance.applyEffects(
                 this.translated,
                 this.shaderStates,
@@ -145,7 +126,7 @@ export class MaterialBinder {
     setColorization(colour: NormalisedColour | null): void {
         this.colorization = colour;
 
-        this.host.forEachDrawnMesh((node) => {
+        this.context.assembly.forEachDrawnMesh((node) => {
             const material = node.material;
 
             if (material instanceof AlamoMaterial) {
@@ -166,7 +147,7 @@ export class MaterialBinder {
     colorizedMeshes(): string[] {
         const names = new Set<string>();
 
-        this.host.modelRoot.traverse((node) => {
+        this.context.modelRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
@@ -221,7 +202,7 @@ export class MaterialBinder {
         let translated = 0;
         let total = 0;
 
-        this.host.forEachPartMesh((mesh) => {
+        this.context.assembly.forEachPartMesh((mesh) => {
             if (!meshDrawn(mesh)) {
                 return;
             }
@@ -232,7 +213,7 @@ export class MaterialBinder {
             }
         });
 
-        for (const entry of this.host.particles.particleSystems.values()) {
+        for (const entry of this.context.particles.particleSystems.values()) {
             const coverage = entry.instance.effectCoverage();
             translated += coverage.translated;
             total += coverage.total;
@@ -250,7 +231,7 @@ export class MaterialBinder {
     shaderTextureProblems(): string[] {
         const problems = new Set<string>();
 
-        this.host.forEachPartMesh((mesh) => {
+        this.context.assembly.forEachPartMesh((mesh) => {
             if (!(mesh.material instanceof AlamoMaterial)) {
                 return;
             }
@@ -296,7 +277,7 @@ export class MaterialBinder {
     /** Applies a decoded texture wherever a material asked for it by name. */
     setTexture(name: string, texture: THREE.Texture): void {
         this.textures.set(name, texture);
-        this.bindTextureIn(this.host.modelRoot, name, texture);
+        this.bindTextureIn(this.context.modelRoot, name, texture);
     }
 
     /**
@@ -324,7 +305,7 @@ export class MaterialBinder {
     shieldMeshesOffShader(): string[] {
         const names = new Set<string>();
 
-        this.host.forEachPartMesh((mesh) => {
+        this.context.assembly.forEachPartMesh((mesh) => {
             const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
 
             if (shieldMeshOffShader(extras)) {
@@ -358,7 +339,7 @@ export class MaterialBinder {
     materialExtras(): MaterialExtras[] {
         const all: MaterialExtras[] = [];
 
-        this.host.modelRoot.traverse((node) => {
+        this.context.modelRoot.traverse((node) => {
             if (
                 node instanceof THREE.Mesh &&
                 node.userData.alamo !== undefined
@@ -396,7 +377,7 @@ export class MaterialBinder {
         // bug once the shader toggle started rebuilding materials - it re-showed every mesh the
         // level gating had hidden, including the collision and shadow hulls, and nothing put them
         // back because toggling again simply re-ran the same wrong assignment.
-        this.host.applyMeshVisibility(mesh);
+        this.context.levels.applyMeshVisibility(mesh);
 
         // Only SOLID geometry casts. A collision hull and a shadow volume are overlays and would
         // throw a second silhouette over the model; an additive glow or an alpha-blended girder has
@@ -406,7 +387,7 @@ export class MaterialBinder {
         // into the map, exactly as the engine does it. Recomputed for every mesh whenever a part
         // arrives, because a volume can turn up after the geometry that it belongs to.
         mesh.castShadow = castsShadowMap({
-            hasVolumes: this.host.stencilShadowing,
+            hasVolumes: this.context.environment.stencilShadowing,
             hidden: spec.hidden,
             blend: spec.blend,
         });
@@ -640,7 +621,7 @@ export class MaterialBinder {
      * - which is how an inner hull ends up occluding the model around it.
      */
     applyStoredShaderState(wanted: string, state: FxMaterialState): void {
-        this.host.forEachDrawnMesh((node) => {
+        this.context.assembly.forEachDrawnMesh((node) => {
             const material = node.material;
             const extras = node.userData.alamo as MaterialExtras | undefined;
 
@@ -704,7 +685,7 @@ export class MaterialBinder {
     updateAlamoUniforms(): void {
         const materials: { mesh: THREE.Mesh; material: AlamoMaterial }[] = [];
 
-        this.host.modelRoot.traverse((node) => {
+        this.context.modelRoot.traverse((node) => {
             if (
                 node instanceof THREE.Mesh &&
                 node.material instanceof AlamoMaterial &&
@@ -718,19 +699,21 @@ export class MaterialBinder {
             return;
         }
 
-        this.host.camera.updateMatrixWorld();
+        this.context.camera.updateMatrixWorld();
 
-        const view = this.host.camera.matrixWorldInverse;
-        const projection = this.host.camera.projectionMatrix;
+        const view = this.context.camera.matrixWorldInverse;
+        const projection = this.context.camera.projectionMatrix;
         const viewProjection = new THREE.Matrix4().multiplyMatrices(
             projection,
             view,
         );
-        const eyeWorld = this.host.camera.getWorldPosition(new THREE.Vector3());
+        const eyeWorld = this.context.camera.getWorldPosition(
+            new THREE.Vector3(),
+        );
 
         for (const { mesh, material } of materials) {
             material.updateFrame(
-                this.host.frameFor(
+                this.context.environment.frameFor(
                     mesh,
                     view,
                     projection,
@@ -745,7 +728,9 @@ export class MaterialBinder {
 
     /** Rebuilds every mesh's material for the current translated/archetype choice. */
     private rebuildMaterials(): void {
-        this.host.forEachDrawnMesh((mesh) => this.applyMaterial(mesh));
+        this.context.assembly.forEachDrawnMesh((mesh) =>
+            this.applyMaterial(mesh),
+        );
 
         // Same reason as after a part loads: these are different material objects, and a flag set
         // on the ones they replace is gone.
@@ -773,7 +758,7 @@ export class MaterialBinder {
     private archetypeWants(wanted: string): boolean {
         let found = false;
 
-        this.host.modelRoot.traverse((node) => {
+        this.context.modelRoot.traverse((node) => {
             if (
                 found ||
                 !(node instanceof THREE.Mesh) ||
@@ -849,7 +834,7 @@ export class MaterialBinder {
      * wholesale - and a flag set on the materials that came before is simply gone.
      */
     applyWireframe(): void {
-        this.host.forEachDrawnMesh((mesh) => {
+        this.context.assembly.forEachDrawnMesh((mesh) => {
             for (const material of Array.isArray(mesh.material)
                 ? mesh.material
                 : [mesh.material]) {

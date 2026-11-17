@@ -38,7 +38,7 @@ import {
     castsShadowMap,
 } from "./materials";
 import { HEAT_LAYER } from "./particleRenderer";
-import { type ParticleHost } from "./particleHost";
+import { type ViewportContext } from "./viewportContext";
 
 /** Fixed, so the sky is the same one every session and a screenshot can be compared to another. */
 const STAR_SEED = 20260817;
@@ -68,23 +68,9 @@ const GROUND_TILES = 14;
 const FRAME_SIZE = new THREE.Vector2();
 
 /** What EnvironmentRig reads from the viewport it belongs to. */
-/** What EnvironmentRig reads from the viewport it belongs to. */
+/** What EnvironmentRig still asks of the viewport itself: what only the viewport has. */
 export interface EnvironmentViewport {
-    readonly alt: number;
-    boundingSphere(includeEffects?: boolean): BoundingSphere;
-    readonly camera: THREE.PerspectiveCamera;
-    readonly canvas: HTMLCanvasElement;
     readonly elapsed: number;
-    forEachDrawnMesh(visit: (mesh: THREE.Mesh) => void): void;
-    readonly lod: number;
-    readonly particles: Pick<
-        ParticleHost,
-        "particleSystems" | "particlesVisible" | "wind"
-    >;
-    readonly renderer: THREE.WebGLRenderer;
-    readonly scene: THREE.Scene;
-    skinPalette(mesh: THREE.SkinnedMesh): Float32Array;
-    readonly stealthed: boolean;
 }
 
 export class EnvironmentRig {
@@ -196,7 +182,10 @@ export class EnvironmentRig {
     readonly shadowCatcher: THREE.Mesh;
     private readonly shadowMaterial: THREE.ShadowMaterial;
 
-    constructor(private readonly host: EnvironmentViewport) {
+    constructor(
+        private readonly context: ViewportContext,
+        private readonly host: EnvironmentViewport,
+    ) {
         this.addLighting();
 
         this.grid = new THREE.GridHelper(100, 20);
@@ -261,13 +250,13 @@ export class EnvironmentRig {
         this.shadowCatcher.visible = false;
         this.floor.receiveShadow = true;
 
-        this.host.scene.add(
+        this.context.scene.add(
             this.grid,
             this.axes,
             this.floor,
             this.shadowCatcher,
         );
-        this.host.scene.add(this.shadowVolumes.darken);
+        this.context.scene.add(this.shadowVolumes.darken);
     }
 
     /**
@@ -342,7 +331,7 @@ export class EnvironmentRig {
 
         // Space is black behind the stars; the flat backdrop keeps the neutral grey that reads as
         // "no background at all" rather than as a choice.
-        this.host.scene.background = new THREE.Color(
+        this.context.scene.background = new THREE.Color(
             kind === "starfield" ? 0x05070c : VIEWPORT_BACKGROUND,
         );
     }
@@ -457,7 +446,7 @@ export class EnvironmentRig {
             0xffffff,
             DEFAULT_LIGHTS.ambient.intensity,
         );
-        this.host.scene.add(this.ambient);
+        this.context.scene.add(this.ambient);
 
         const key = new THREE.DirectionalLight(0xffffff, 1.6);
 
@@ -478,7 +467,7 @@ export class EnvironmentRig {
         const fill1 = new THREE.DirectionalLight(0xffffff, 0.5);
         const fill2 = new THREE.DirectionalLight(0xffffff, 0.25);
 
-        this.host.scene.add(key, fill1, fill2, key.target);
+        this.context.scene.add(key, fill1, fill2, key.target);
 
         this.keyLight = key;
 
@@ -503,7 +492,7 @@ export class EnvironmentRig {
             return;
         }
 
-        const sphere = this.host.boundingSphere();
+        const sphere = this.context.cameraRig.boundingSphere();
         const direction = lightDirection(
             this.lightAzimuth,
             this.lightElevation,
@@ -531,7 +520,7 @@ export class EnvironmentRig {
         // the shadow falls - and their reach is fitted to the model for the same reason the shadow
         // camera is.
         this.shadowVolumes.setLight(direction);
-        this.shadowVolumes.setScale(sphere.radius, this.host.camera.far);
+        this.shadowVolumes.setScale(sphere.radius, this.context.camera.far);
 
         const camera = light.shadow.camera;
         camera.left = -frustum.extent;
@@ -571,8 +560,8 @@ export class EnvironmentRig {
         // plane the model has been fitted with.
         stars.frustumCulled = false;
         stars.renderOrder = -1;
-        this.host.camera.add(stars);
-        this.host.scene.add(this.host.camera);
+        this.context.camera.add(stars);
+        this.context.scene.add(this.context.camera);
 
         return stars;
     }
@@ -607,7 +596,7 @@ export class EnvironmentRig {
         // as a painted backdrop stuck to the screen.
         sky.frustumCulled = false;
         sky.renderOrder = -1;
-        this.host.scene.add(sky);
+        this.context.scene.add(sky);
 
         return sky;
     }
@@ -738,11 +727,11 @@ export class EnvironmentRig {
         // turret's barrel flew off and its dome collapsed.
         const skinMatrices =
             mesh instanceof THREE.SkinnedMesh
-                ? this.host.skinPalette(mesh)
+                ? this.context.animation.skinPalette(mesh)
                 : null;
 
         return {
-            wind: this.host.particles.wind,
+            wind: this.context.particles.wind,
             matrices: {
                 world: world.elements,
                 worldInverse: worldInverse.elements,
@@ -754,7 +743,7 @@ export class EnvironmentRig {
                     world,
                 ).elements,
                 view: view.elements,
-                viewInverse: this.host.camera.matrixWorld.elements,
+                viewInverse: this.context.camera.matrixWorld.elements,
                 viewProjection: viewProjection.elements,
                 projection: projection.elements,
             },
@@ -774,8 +763,8 @@ export class EnvironmentRig {
             lightScale: [1, 1, 1, 1],
             time: this.host.elapsed,
             resolution: [
-                this.host.canvas.clientWidth,
-                this.host.canvas.clientHeight,
+                this.context.canvas.clientWidth,
+                this.context.canvas.clientHeight,
                 0,
                 0,
             ],
@@ -845,8 +834,12 @@ export class EnvironmentRig {
             // stealthed does not start out casting. Same pair as `applyMeshVisibility`.
             this.shadowVolumes.setCounting(
                 mesh,
-                !this.host.stealthed &&
-                    isVisibleAt(extras, this.host.alt, this.host.lod),
+                !this.context.levels.stealthed &&
+                    isVisibleAt(
+                        extras,
+                        this.context.levels.alt,
+                        this.context.levels.lod,
+                    ),
             );
         }
 
@@ -857,7 +850,7 @@ export class EnvironmentRig {
 
     /** Re-decides which meshes cast into the shadow map, now that the volumes are known. */
     private refreshShadowCasting(): void {
-        this.host.forEachDrawnMesh((mesh) => {
+        this.context.assembly.forEachDrawnMesh((mesh) => {
             if (mesh.userData.aetShadowVolume === true) {
                 return;
             }
@@ -902,21 +895,24 @@ export class EnvironmentRig {
         if (bending) {
             this.heat ??= new HeatPass(HEAT_LAYER);
             this.heat.render(
-                this.host.renderer,
-                this.host.scene,
-                this.host.camera,
+                this.context.renderer,
+                this.context.scene,
+                this.context.camera,
                 this.heatDebug,
             );
         } else {
-            this.host.renderer.setRenderTarget(null);
-            this.host.renderer.render(this.host.scene, this.host.camera);
+            this.context.renderer.setRenderTarget(null);
+            this.context.renderer.render(
+                this.context.scene,
+                this.context.camera,
+            );
         }
 
         if (bloom !== null) {
             const frame = this.frameBuffer();
 
-            this.host.renderer.copyFramebufferToTexture(frame);
-            bloom.render(this.host.renderer, frame);
+            this.context.renderer.copyFramebufferToTexture(frame);
+            bloom.render(this.context.renderer, frame);
         }
     }
 
@@ -928,7 +924,7 @@ export class EnvironmentRig {
      * sampler it is sRGB would have the hardware decode pixels that are already where they belong.
      */
     private frameBuffer(): THREE.FramebufferTexture {
-        this.host.renderer.getDrawingBufferSize(FRAME_SIZE);
+        this.context.renderer.getDrawingBufferSize(FRAME_SIZE);
         const width = Math.max(1, FRAME_SIZE.x);
         const height = Math.max(1, FRAME_SIZE.y);
 
@@ -954,11 +950,11 @@ export class EnvironmentRig {
             return true;
         }
 
-        if (!this.heatEnabled || !this.host.particles.particlesVisible) {
+        if (!this.heatEnabled || !this.context.particles.particlesVisible) {
             return false;
         }
 
-        for (const entry of this.host.particles.particleSystems.values()) {
+        for (const entry of this.context.particles.particleSystems.values()) {
             if (entry.instance.hasVisibleHeat) {
                 return true;
             }

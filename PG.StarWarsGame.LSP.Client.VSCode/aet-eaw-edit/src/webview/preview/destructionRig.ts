@@ -15,10 +15,10 @@ import {
     breakoffLifetime,
     breakoffPose,
 } from "./breakoff";
-import { BREAKOFF_ATTACHMENT, type LoadedPart } from "./loadedPart";
-import { disposeTree, type PartAssembly } from "./partAssembly";
-import { type AddPartOptions } from "./viewportTypes";
+import { BREAKOFF_ATTACHMENT } from "./loadedPart";
+import { disposeTree } from "./partAssembly";
 import { spinAwayPose } from "./spinAway";
+import { type ViewportContext } from "./viewportContext";
 
 /** One piece of wreckage in the air. */
 interface BreakoffInstance {
@@ -42,22 +42,12 @@ interface BreakoffInstance {
 }
 
 /** What DestructionRig reads from the viewport it belongs to. */
-/** What DestructionRig reads from the viewport it belongs to. */
+/** What DestructionRig still asks of the viewport itself: what only the viewport has. */
 export interface DestructionViewport {
-    addPart(
-        id: string,
-        glbBase64: string,
-        attachToPartId?: string,
-        attachBone?: string,
-        options?: AddPartOptions,
-    ): Promise<THREE.Object3D>;
-    readonly assembly: PartAssembly;
     dropRegistrations(subjectId: string, root: THREE.Object3D): void;
     readonly modelScale: number;
     readonly onBreakoffExpired:
         ((key: string, prop: PreviewBreakoffProp) => void) | null;
-    readonly parts: ReadonlyMap<string, LoadedPart>;
-    removePart(partId: string): void;
 }
 
 export class DestructionRig {
@@ -89,7 +79,10 @@ export class DestructionRig {
         quaternion: THREE.Quaternion;
     } | null = null;
 
-    constructor(private readonly host: DestructionViewport) {}
+    constructor(
+        private readonly context: ViewportContext,
+        private readonly host: DestructionViewport,
+    ) {}
 
     /**
      * Drops a piece of wreckage where a hardpoint used to be.
@@ -113,7 +106,7 @@ export class DestructionRig {
         // WHICH node that is, is `breakoffAnchor`'s decision and not this one's: a hardpoint model can
         // carry a copy of the hull's own bones, and resolving the attachment bone by name inside it
         // applied the offset twice.
-        const anchor = this.host.assembly.attachmentFor(
+        const anchor = this.context.assembly.attachmentFor(
             at.partId,
             at.bone,
             at.boneIndex,
@@ -125,7 +118,7 @@ export class DestructionRig {
         // and one subject, and the effects it trails already address it by this name.
         const wreckId = `${BREAKOFF_ATTACHMENT}${key}`;
 
-        const root = await this.host.addPart(
+        const root = await this.context.assembly.addPart(
             wreckId,
             glbBase64,
             undefined,
@@ -164,7 +157,7 @@ export class DestructionRig {
                 continue;
             }
 
-            this.host.removePart(this.breakoffs[at].partId);
+            this.context.assembly.removePart(this.breakoffs[at].partId);
             this.breakoffs.splice(at, 1);
         }
     }
@@ -172,7 +165,7 @@ export class DestructionRig {
     /** Clears every piece of wreckage - a repair puts the hardpoints back, so the debris goes. */
     clearBreakoffs(): void {
         for (const debris of this.breakoffs) {
-            this.host.removePart(debris.partId);
+            this.context.assembly.removePart(debris.partId);
         }
 
         this.breakoffs.length = 0;
@@ -189,7 +182,7 @@ export class DestructionRig {
         spin: PreviewSpinAway,
         onDone: () => void,
     ): void {
-        const part = this.host.parts.get(partId);
+        const part = this.context.parts.get(partId);
         if (part === undefined) {
             // Nothing to fly. Report it over at once rather than leaving the caller waiting on a
             // callback that can never come.
@@ -219,7 +212,7 @@ export class DestructionRig {
             return;
         }
 
-        const part = this.host.parts.get(home.partId);
+        const part = this.context.parts.get(home.partId);
         if (part !== undefined) {
             part.root.position.copy(home.position);
             part.root.quaternion.copy(home.quaternion);
@@ -257,7 +250,7 @@ export class DestructionRig {
                 // finished, and once the root is gone nothing in the scene knows where that was -
                 // which is why the wreck simply vanished with no blast at all.
                 const subjectId =
-                    this.host.parts.get(debris.partId)?.subjectId ??
+                    this.context.parts.get(debris.partId)?.subjectId ??
                     debris.partId;
 
                 for (const child of [...debris.root.children]) {
@@ -305,7 +298,7 @@ export class DestructionRig {
 
         flying.elapsed += dt;
 
-        const part = this.host.parts.get(flying.partId);
+        const part = this.context.parts.get(flying.partId);
         const home = this.spinRestore;
         const pose = spinAwayPose(flying.spin, flying.elapsed);
 

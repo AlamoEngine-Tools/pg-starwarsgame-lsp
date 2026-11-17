@@ -23,11 +23,7 @@ import {
     alamoNodeName,
     type BoneAttachment,
 } from "./skeleton";
-import { type AnimationRig } from "./animationRig";
-import { type PartAssembly } from "./partAssembly";
-import { type LevelGates } from "./levelGates";
-import { type ParticleHost } from "./particleHost";
-import { type LoadedPart } from "./loadedPart";
+import { type ViewportContext } from "./viewportContext";
 
 /** A three vector as the plain shape the wire and the arithmetic use. */
 function vectorOf(at: THREE.Vector3): { x: number; y: number; z: number } {
@@ -35,24 +31,14 @@ function vectorOf(at: THREE.Vector3): { x: number; y: number; z: number } {
 }
 
 /** What ModelQueries reads from the viewport it belongs to. */
-/** What ModelQueries reads from the viewport it belongs to. */
-export interface QueriesViewport {
-    readonly animation: AnimationRig;
-    readonly assembly: PartAssembly;
-    readonly levels: LevelGates;
-    readonly modelRoot: THREE.Group;
-    readonly particles: ParticleHost;
-    readonly parts: ReadonlyMap<string, LoadedPart>;
-}
-
 export class ModelQueries {
-    constructor(private readonly host: QueriesViewport) {}
+    constructor(private readonly context: ViewportContext) {}
 
     /** The ALT and LOD levels the loaded parts and effects actually define. */
     definedLevels(): DefinedLevels {
         const tagged: LevelTagged[] = [];
 
-        this.host.modelRoot.traverse((node) => {
+        this.context.modelRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
@@ -67,7 +53,7 @@ export class ModelQueries {
             }
         });
 
-        for (const entry of this.host.particles.particleSystems.values()) {
+        for (const entry of this.context.particles.particleSystems.values()) {
             tagged.push(entry.levels);
         }
 
@@ -85,7 +71,7 @@ export class ModelQueries {
     costByLod(levels: readonly number[]): Map<number, LevelCost> {
         const meshes: { extras: MaterialExtras; triangles: number }[] = [];
 
-        this.host.modelRoot.traverse((node) => {
+        this.context.modelRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
@@ -99,15 +85,15 @@ export class ModelQueries {
             }
         });
 
-        return costByLevel(meshes, this.host.levels.alt, levels);
+        return costByLevel(meshes, this.context.levels.alt, levels);
     }
 
     stats(): ViewportStats {
         let meshes = 0;
         let triangles = 0;
 
-        this.host.modelRoot.traverse((node) => {
-            if (node instanceof THREE.Mesh && this.host.levels.drawn(node)) {
+        this.context.modelRoot.traverse((node) => {
+            if (node instanceof THREE.Mesh && this.context.levels.drawn(node)) {
                 meshes++;
                 triangles += triangleCount(node.geometry);
             }
@@ -116,14 +102,14 @@ export class ModelQueries {
         return {
             // The ACTIVE subject's, not the scene's. These stats describe the model being
             // previewed, and a wreck it shed or the clone it became is not another part of it.
-            parts: this.host.assembly.activeSubjectRoots().length,
+            parts: this.context.assembly.activeSubjectRoots().length,
             meshes,
             triangles: Math.round(triangles),
             // From the same source as the tree. Counting THREE.Bone instead reported ZERO for any
             // model with no skinned mesh - the loader only creates Bone objects for skin joints, so
             // the Star Destroyer's 71 bones read as none while the tree beside it listed all of them.
             bones: this.skeleton().length,
-            animations: this.host.animation.animationNames,
+            animations: this.context.animation.animationNames,
         };
     }
 
@@ -140,16 +126,16 @@ export class ModelQueries {
     ): { x: number; y: number; z: number } | null {
         if (partId === undefined) {
             return vectorOf(
-                this.host.modelRoot.getWorldPosition(new THREE.Vector3()),
+                this.context.modelRoot.getWorldPosition(new THREE.Vector3()),
             );
         }
 
         // Recorded even though this refuses to place anything: the request was made, and it is the
         // REQUEST that gets reported. The early return below used to happen before `attachmentFor`
         // was ever reached, so a hardpoint that had not loaded left no trace anywhere.
-        this.host.assembly.noteAttachment(partId, bone);
+        this.context.assembly.noteAttachment(partId, bone);
 
-        const part = this.host.parts.get(partId);
+        const part = this.context.parts.get(partId);
         if (part === undefined) {
             return null;
         }
@@ -177,7 +163,7 @@ export class ModelQueries {
      * its own skeleton, and merging them would produce a tree whose indices match no single model.
      */
     skeleton(): FlatBone[] {
-        const hull = this.host.assembly.hull();
+        const hull = this.context.assembly.hull();
         if (hull === null) {
             return [];
         }
@@ -218,7 +204,7 @@ export class ModelQueries {
     /** What is attached to each bone of the hull, keyed by bone index. */
     attachmentsByBone(): Map<number, BoneAttachment[]> {
         const attachments = new Map<number, BoneAttachment[]>();
-        const hull = this.host.assembly.hull();
+        const hull = this.context.assembly.hull();
         if (hull === null) {
             return attachments;
         }
@@ -265,7 +251,7 @@ export class ModelQueries {
             }
 
             // A attached part is a separate root parented onto the bone, so it reads as a hardpoint.
-            for (const part of this.host.parts.values()) {
+            for (const part of this.context.parts.values()) {
                 if (part.root.parent === node) {
                     found.push({ kind: "hardpoint", label: part.id });
                 }

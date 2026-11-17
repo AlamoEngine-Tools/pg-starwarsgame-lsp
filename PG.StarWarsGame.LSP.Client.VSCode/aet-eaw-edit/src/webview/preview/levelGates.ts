@@ -6,26 +6,13 @@
 // answer per mesh of whether it is drawn at all. It owns those values; every other layer reads them here.
 
 import { proxyVisibleAt } from "./levels";
-import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
+import { ACTIVE_SUBJECT } from "./loadedPart";
 import * as THREE from "three";
 import { type MaterialExtras, resolveMaterial, isVisibleAt } from "./materials";
 import { meshDrawn } from "./meshVisibility";
-import { type PartAssembly } from "./partAssembly";
-import { type EnvironmentRig } from "./environmentRig";
-import { type ParticleHost } from "./particleHost";
-import { type ModelRows } from "./modelRows";
+import { type ViewportContext } from "./viewportContext";
 
 /** What LevelGates reads from the viewport it belongs to. */
-/** What LevelGates reads from the viewport it belongs to. */
-export interface LevelsViewport {
-    readonly assembly: PartAssembly;
-    readonly environment: EnvironmentRig;
-    readonly modelRoot: THREE.Group;
-    readonly particles: ParticleHost;
-    readonly parts: ReadonlyMap<string, LoadedPart>;
-    readonly rows: ModelRows;
-}
-
 export class LevelGates {
     alt = 0;
     lod = 0;
@@ -74,7 +61,7 @@ export class LevelGates {
      */
     stealthed = false;
 
-    constructor(private readonly host: LevelsViewport) {}
+    constructor(private readonly context: ViewportContext) {}
 
     /** Drops the decals, collision meshes and shield state of a model that is no longer shown. */
     forgetModel(): void {
@@ -156,7 +143,7 @@ export class LevelGates {
         // systems write the same thing: this one re-derived every mesh from the old override maps
         // and undid whatever the row chain had just settled, so a mesh hidden from the tree came
         // straight back on the next level or material refresh.
-        for (const entry of this.host.particles.particleSystems.values()) {
+        for (const entry of this.context.particles.particleSystems.values()) {
             entry.levelVisible = proxyVisibleAt(
                 entry.levels,
                 this.alt,
@@ -169,22 +156,22 @@ export class LevelGates {
         // reader. It was set at LOAD and by the pass's own setup and nowhere else, so a cloak
         // engaged after the model was standing left all eight volumes casting - a shadow on the
         // ground under a ship that is not being drawn. An ALT change had the same hole.
-        this.host.assembly.forEachPartMesh((mesh) =>
+        this.context.assembly.forEachPartMesh((mesh) =>
             this.applyMeshVisibility(mesh),
         );
 
         // A passive subject has no rows, so `refreshRows` below will never speak for it. Its own
         // file's rules are re-applied instead - the same sweep that ran when it loaded.
-        for (const part of this.host.parts.values()) {
+        for (const part of this.context.parts.values()) {
             if (part.subjectId !== ACTIVE_SUBJECT) {
-                this.host.assembly.applyOwnFileVisibility(
+                this.context.assembly.applyOwnFileVisibility(
                     part.subjectId,
                     part.root,
                 );
             }
         }
 
-        this.host.rows.refreshRows();
+        this.context.rows.refreshRows();
     }
 
     /**
@@ -212,7 +199,7 @@ export class LevelGates {
             // A cloaked unit casts nothing. The volume is never DRAWN either way, so this is the
             // only place the cloak can reach it - and a stencil shadow lying on the ground under an
             // invisible ship is exactly the "something else is still shown" the swap rules out.
-            this.host.environment.shadowVolumes.setCounting(
+            this.context.environment.shadowVolumes.setCounting(
                 mesh,
                 !this.stealthed && isVisibleAt(extras, this.alt, this.lod),
             );
@@ -244,7 +231,7 @@ export class LevelGates {
                 return false;
             }
 
-            if (at === this.host.modelRoot) {
+            if (at === this.context.modelRoot) {
                 break;
             }
         }

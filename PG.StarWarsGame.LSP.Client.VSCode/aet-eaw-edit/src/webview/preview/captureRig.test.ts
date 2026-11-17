@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { type CaptureViewport, CaptureRig } from "./captureRig";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * A rig over a stand-in viewport: a real scene and camera, a renderer that records its size, and the
@@ -15,7 +16,7 @@ import { type CaptureViewport, CaptureRig } from "./captureRig";
  */
 function rigWith(throwOnDraw = false): {
     capturer: CaptureRig;
-    host: CaptureViewport;
+    context: ViewportContext;
     shots: Record<string, boolean | number | null>[];
     room: {
         grid: THREE.Object3D;
@@ -54,7 +55,7 @@ function rigWith(throwOnDraw = false): {
     };
     const turret = { arcsShown: true };
     const shots: Record<string, boolean | number | null>[] = [];
-    const host = {
+    const context = {
         scene,
         camera,
         canvas: {
@@ -95,18 +96,28 @@ function rigWith(throwOnDraw = false): {
             },
         },
         overlay,
-        particles,
-        turret,
+        particles: Object.assign(particles, {
+            setParticlesVisible: (visible: boolean) => {
+                particles.particlesVisible = visible;
+            },
+        }),
+        turret: Object.assign(turret, {
+            setFireArcsVisible: (visible: boolean) => {
+                turret.arcsShown = visible;
+            },
+        }),
         cameraRig: { prepareForCamera: () => undefined },
+    } as unknown as ViewportContext;
+    const host = {
         resize: () => undefined,
-        setFireArcsVisible: (visible: boolean) => {
-            turret.arcsShown = visible;
-        },
-        setParticlesVisible: (visible: boolean) => {
-            particles.particlesVisible = visible;
-        },
     } as unknown as CaptureViewport;
-    return { capturer: new CaptureRig(host), host, shots, room, overlay };
+    return {
+        capturer: new CaptureRig(context, host),
+        context,
+        shots,
+        room,
+        overlay,
+    };
 }
 
 const ICON = {
@@ -141,27 +152,30 @@ describe("CaptureRig", () => {
     });
 
     it("puts every toggle, the background and the pixel ratio back afterwards", () => {
-        const { capturer, host, room, overlay } = rigWith();
+        const { capturer, context, room, overlay } = rigWith();
 
         capturer.capture(ICON);
 
-        assert.equal((host.scene.background as THREE.Color).getHex(), 0x1b1d21);
-        assert.equal(host.renderer.getPixelRatio(), 2);
+        assert.equal(
+            (context.scene.background as THREE.Color).getHex(),
+            0x1b1d21,
+        );
+        assert.equal(context.renderer.getPixelRatio(), 2);
         assert.equal(room.grid.visible, true);
         assert.equal(room.axes.visible, true);
         assert.equal(overlay.joints.visible, true);
-        assert.equal(host.particles.particlesVisible, true);
-        assert.equal(host.turret.arcsShown, true);
-        assert.equal(host.camera.view?.enabled ?? false, false);
+        assert.equal(context.particles.particlesVisible, true);
+        assert.equal(context.turret.arcsShown, true);
+        assert.equal(context.camera.view?.enabled ?? false, false);
     });
 
     it("puts everything back when the shot itself fails", () => {
-        const { capturer, room, host } = rigWith(true);
+        const { capturer, room, context } = rigWith(true);
 
         assert.throws(() => capturer.capture(ICON), /lost the context/);
 
         assert.equal(room.grid.visible, true);
-        assert.equal(host.particles.particlesVisible, true);
-        assert.equal(host.renderer.getPixelRatio(), 2);
+        assert.equal(context.particles.particlesVisible, true);
+        assert.equal(context.renderer.getPixelRatio(), 2);
     });
 });

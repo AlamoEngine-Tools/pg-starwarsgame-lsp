@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { type BoundingSphere } from "./framing";
 import { type CameraViewport, CameraRig } from "./cameraRig";
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * A rig over a stand-in viewport: a model root, the hull as one part rooted on it, every mesh drawn, no
@@ -32,21 +33,29 @@ function rigWith(): {
         bonesByIndex: new Map(),
         subjectId: ACTIVE_SUBJECT,
     };
-    const host = {
+    const context = {
         camera,
         controls: { target, update: () => undefined },
-        drawn: () => true,
+        levels: { drawn: () => true },
         environment: {
             rebuildGrid: (sphere: BoundingSphere) => grids.push(sphere),
         },
-        hull: () => hull,
+        assembly: { hull: () => hull },
         materials: {},
         modelRoot,
         particles: { particleSystems: new Map(), effectReach: () => 0 },
         renderer: null,
+    } as unknown as ViewportContext;
+    const host = {
         updateBillboards: () => undefined,
     } as unknown as CameraViewport;
-    return { cameraRig: new CameraRig(host), camera, target, modelRoot, grids };
+    return {
+        cameraRig: new CameraRig(context, host),
+        camera,
+        target,
+        modelRoot,
+        grids,
+    };
 }
 
 /** A unit cube's worth of mesh centred on a point. */

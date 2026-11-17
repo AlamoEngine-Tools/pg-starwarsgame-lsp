@@ -8,7 +8,8 @@ import * as THREE from "three";
 
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
 import { meshDrawn } from "./meshVisibility";
-import { type RowsViewport, ModelRows } from "./modelRows";
+import { ModelRows } from "./modelRows";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * Rows over a stand-in viewport: a hull with a root bone and one child bone carrying a mesh of its own
@@ -52,39 +53,47 @@ function rowsWith(): { rows: ModelRows; mesh: THREE.Mesh; extra: THREE.Mesh } {
         ]),
         subjectId: ACTIVE_SUBJECT,
     };
-    const host = {
-        active: {
-            mixer: null,
-            clips: [],
-            visibility: new Map(),
-            nodeByName: new Map(),
-            restPose: new Map(),
-            action: null,
-            fileHidden: new Set(),
+    const context = {
+        animation: {
+            active: {
+                mixer: null,
+                clips: [],
+                visibility: new Map(),
+                nodeByName: new Map(),
+                restPose: new Map(),
+                action: null,
+                fileHidden: new Set(),
+            },
         },
-        alt: 0,
-        lod: 0,
-        collisionMeshes: new Set(),
-        knownDecals: new Set(),
-        shownDecals: new Set(),
-        shieldRevealed: false,
-        stealthed: false,
+        levels: {
+            alt: 0,
+            lod: 0,
+            collisionMeshes: new Set(),
+            knownDecals: new Set(),
+            shownDecals: new Set(),
+            shieldRevealed: false,
+            stealthed: false,
+        },
         particles: {
             particleSystems: new Map(),
             particlesVisible: true,
             setParticleSystemDrawn: () => undefined,
         },
-        forEachPartMesh: (visit: (mesh: THREE.Mesh) => void) => {
-            visit(mesh);
-            visit(extra);
+        assembly: {
+            forEachPartMesh: (visit: (mesh: THREE.Mesh) => void) => {
+                visit(mesh);
+                visit(extra);
+            },
+            hull: () => hull,
         },
-        hull: () => hull,
-        skeleton: () => [
-            { index: 0, name: "Root", parent: -1, visible: true },
-            { index: 1, name: "Turret", parent: 0, visible: true },
-        ],
-    } as unknown as RowsViewport;
-    return { rows: new ModelRows(host), mesh, extra };
+        queries: {
+            skeleton: () => [
+                { index: 0, name: "Root", parent: -1, visible: true },
+                { index: 1, name: "Turret", parent: 0, visible: true },
+            ],
+        },
+    } as unknown as ViewportContext;
+    return { rows: new ModelRows(context), mesh, extra };
 }
 
 describe("ModelRows", () => {

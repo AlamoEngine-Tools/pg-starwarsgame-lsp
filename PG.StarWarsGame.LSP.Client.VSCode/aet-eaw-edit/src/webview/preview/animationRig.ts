@@ -11,24 +11,12 @@ import { ACTIVE_SUBJECT } from "./loadedPart";
 import { deathClip } from "./visibility";
 import * as THREE from "three";
 import { hiddenAt } from "./boneVisibility";
-import { type PartAssembly } from "./partAssembly";
-import { type ParticleHost } from "./particleHost";
-import { type ModelRows } from "./modelRows";
+import { type ViewportContext } from "./viewportContext";
 
 /** Scratch for the bone-palette maths, so a per-frame loop allocates nothing. */
 const SKIN_WORK = new THREE.Matrix4();
 
 /** What AnimationRig reads from the viewport it belongs to. */
-/** What AnimationRig reads from the viewport it belongs to. */
-export interface AnimationViewport {
-    applyLevels(): void;
-    readonly assembly: PartAssembly;
-    clearRowOverrides(): void;
-    readonly particles: ParticleHost;
-    readonly rows: ModelRows;
-    setPartHidden(partId: string, hidden: boolean): void;
-}
-
 export class AnimationRig {
     /** Reused per frame so building the bone palette does not allocate on every draw. */
     private skinScratch = new Float32Array(0);
@@ -53,7 +41,7 @@ export class AnimationRig {
     /** Whether a clip is currently driving bone visibility, so the release happens exactly once. */
     private overridingVisibility = false;
 
-    constructor(private readonly host: AnimationViewport) {}
+    constructor(private readonly context: ViewportContext) {}
 
     /** Drops every subject's animation and the visibility a clip was driving, for a new scene. */
     forgetSubjects(): void {
@@ -151,7 +139,7 @@ export class AnimationRig {
         // it - so every row goes back to what the model says. The master toggles are untouched:
         // effects switched off because they obstruct the view are the one thing worth keeping off
         // while a clip runs. See `clearedForPlayback`.
-        this.host.clearRowOverrides();
+        this.context.rows.clearRowOverrides();
 
         if (name === null || this.active.mixer === null) {
             return false;
@@ -212,12 +200,12 @@ export class AnimationRig {
         // what the model looked like before the clip took over.
         if (this.overridingVisibility) {
             this.overridingVisibility = false;
-            this.host.applyLevels();
+            this.context.levels.applyLevels();
         }
 
         // Only the CLIP's hold: the clip has stopped having an opinion, which says nothing about a
         // part that is hidden or a system that has been released to finish.
-        for (const entry of this.host.particles.particleSystems.values()) {
+        for (const entry of this.context.particles.particleSystems.values()) {
             entry.instance.hold("clip", false);
         }
     }
@@ -358,7 +346,7 @@ export class AnimationRig {
             // The same gate the active subject gets, on this subject's own clip. Without it the
             // clip decides only what is SEEN: a burst switched off at this moment goes on burning,
             // and is spent long before the frame that was meant to set it off.
-            this.host.particles.applyEmitterGating(subjectId, track, action);
+            this.context.particles.applyEmitterGating(subjectId, track, action);
 
             // Gone at the end of it. A death clone is what dying LOOKS like, not what is left
             // afterwards - the engine takes the object away when the clip is done.
@@ -367,10 +355,10 @@ export class AnimationRig {
                 // `p_explosion_huge00` ignite at 59.7s of a 60.1s clip - the detonation the whole
                 // minute builds to - and hiding the part they are attached to cut them 0.4s in, so the
                 // end of a death was 719 particles alive and NONE of them on screen.
-                this.host.particles.releaseSubjectEffects(subjectId);
+                this.context.particles.releaseSubjectEffects(subjectId);
 
-                for (const part of this.host.assembly.partsOf(subjectId)) {
-                    this.host.setPartHidden(part.id, true);
+                for (const part of this.context.assembly.partsOf(subjectId)) {
+                    this.context.assembly.setPartHidden(part.id, true);
                 }
             }
         }
@@ -402,14 +390,14 @@ export class AnimationRig {
             // The symptom that gave it away: with the per-frame writer missing its lookup, the only
             // resolve was the one `play` does at frame 0 - so a muzzle whose track began `1111` sat
             // on for the whole clip and the one beginning `0000` never lit.
-            this.host.rows.resolveRows();
+            this.context.rows.resolveRows();
             this.overridingVisibility = true;
         } else if (this.overridingVisibility) {
             this.overridingVisibility = false;
-            this.host.applyLevels();
+            this.context.levels.applyLevels();
         }
 
-        this.host.particles.applyEmitterGating(
+        this.context.particles.applyEmitterGating(
             ACTIVE_SUBJECT,
             track,
             active.action,

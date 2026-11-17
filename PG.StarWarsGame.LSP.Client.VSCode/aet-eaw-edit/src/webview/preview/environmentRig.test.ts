@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { VIEWPORT_BACKGROUND } from "./backdrop";
 import { type EnvironmentViewport, EnvironmentRig } from "./environmentRig";
 import { shadowCatcherOpacity } from "./materialState";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * A rig over a stand-in viewport: an empty scene, a camera, a unit model at the origin and no particle
@@ -16,11 +17,8 @@ import { shadowCatcherOpacity } from "./materialState";
  */
 function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
     const scene = new THREE.Scene();
-    const host = {
-        alt: 0,
-        lod: 0,
-        elapsed: 0,
-        stealthed: false,
+    const context = {
+        levels: { alt: 0, lod: 0, stealthed: false },
         camera: new THREE.PerspectiveCamera(45, 1, 0.1, 10000),
         canvas: { clientWidth: 100, clientHeight: 100 },
         renderer: null,
@@ -30,11 +28,16 @@ function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
             particlesVisible: true,
             wind: { heading: 0, speed: 0 },
         },
-        boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
-        forEachDrawnMesh: () => undefined,
-        skinPalette: () => new Float32Array(0),
+        cameraRig: {
+            boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
+        },
+        assembly: { forEachDrawnMesh: () => undefined },
+        animation: { skinPalette: () => new Float32Array(0) },
+    } as unknown as ViewportContext;
+    const host = {
+        elapsed: 0,
     } as unknown as EnvironmentViewport;
-    return { environment: new EnvironmentRig(host), scene };
+    return { environment: new EnvironmentRig(context, host), scene };
 }
 
 const keyLightOf = (scene: THREE.Scene): THREE.DirectionalLight => {

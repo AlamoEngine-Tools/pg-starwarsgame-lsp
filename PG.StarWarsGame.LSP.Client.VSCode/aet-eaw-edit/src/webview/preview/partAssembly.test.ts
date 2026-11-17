@@ -8,6 +8,7 @@ import * as THREE from "three";
 
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
 import { type AssemblyViewport, PartAssembly } from "./partAssembly";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * An assembly over a stand-in viewport whose scene already holds a hull - a root with a turret bone at
@@ -46,26 +47,27 @@ function assemblyWith(): {
     };
     const held: string[] = [];
     const dropped: string[] = [];
-    const host = {
-        alt: 0,
-        lod: 0,
-        billboards: [],
+    const context = {
+        levels: { alt: 0, lod: 0 },
         modelRoot,
         scaledRoot: modelRoot,
         parts: new Map([
             ["hull", hull],
             ["wreck:1", wreck],
         ]),
-        subjects: new Map(),
+        animation: { subjects: new Map() },
         particles: {
             holdEffectsOf: (id: string) => held.push(id),
             particleSystems: new Map(),
+            removeParticleSystem: () => undefined,
         },
+    } as unknown as ViewportContext;
+    const host = {
+        billboards: [],
         dropRegistrations: (subjectId: string) => dropped.push(subjectId),
-        removeParticleSystem: () => undefined,
     } as unknown as AssemblyViewport;
     return {
-        assembly: new PartAssembly(host),
+        assembly: new PartAssembly(context, host),
         modelRoot,
         hull,
         wreck,

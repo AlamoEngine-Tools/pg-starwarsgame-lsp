@@ -7,7 +7,8 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { type MaterialExtras } from "./materials";
-import { type MaterialViewport, MaterialBinder } from "./materialBinder";
+import { MaterialBinder } from "./materialBinder";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * A binder over a stand-in viewport: a model root whose meshes are all drawn, no stencil shadows, no
@@ -21,19 +22,20 @@ function binderWith(): { materials: MaterialBinder; modelRoot: THREE.Group } {
                 visit(node);
             }
         });
-    const host = {
+    const context = {
         camera: new THREE.PerspectiveCamera(),
         modelRoot,
         particles: { particleSystems: new Map() },
-        stencilShadowing: false,
-        applyMeshVisibility: () => undefined,
-        forEachDrawnMesh: eachMesh,
-        forEachPartMesh: eachMesh,
-        frameFor: () => {
-            throw new Error("no frame is drawn here");
+        environment: {
+            stencilShadowing: false,
+            frameFor: () => {
+                throw new Error("no frame is drawn here");
+            },
         },
-    } as unknown as MaterialViewport;
-    return { materials: new MaterialBinder(host), modelRoot };
+        levels: { applyMeshVisibility: () => undefined },
+        assembly: { forEachDrawnMesh: eachMesh, forEachPartMesh: eachMesh },
+    } as unknown as ViewportContext;
+    return { materials: new MaterialBinder(context), modelRoot };
 }
 
 /** A sub-mesh as the exporter hands it over: the Alamo shader and its parameters in the extras. */

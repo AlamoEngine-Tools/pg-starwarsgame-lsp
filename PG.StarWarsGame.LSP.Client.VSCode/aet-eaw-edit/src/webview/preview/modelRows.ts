@@ -5,7 +5,6 @@
 // the facts it shows (levels, decals, stealth, skinning, animated visibility), the inspection a row opens, and
 // the reader's show and hide overrides. It reads the parts, the skeleton and the particle systems; nothing else.
 
-import { type SubjectAnimation } from "./subjectAnimation";
 import * as THREE from "three";
 import { type BoneId, resolveBoneId } from "./boneIds";
 import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
@@ -43,9 +42,8 @@ import { billboardTypeOf } from "./billboards";
 import { type AbilityOwnership } from "./abilityRows";
 import { skinHiddenByClip } from "./skinVisibility";
 import { type ParticleEntry } from "./particleEntry";
-import { type LoadedPart } from "./loadedPart";
-import { type ParticleHost } from "./particleHost";
 import { triangleCount } from "./modelBounds";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * The scene node an effect is described by: the bone it is anchored on.
@@ -59,25 +57,6 @@ function anchorNodeOf(entry: ParticleEntry): THREE.Object3D {
 }
 
 /** What ModelRows reads from the viewport it belongs to. */
-/** What ModelRows reads from the viewport it belongs to. */
-export interface RowsViewport {
-    readonly active: SubjectAnimation;
-    readonly alt: number;
-    readonly collisionMeshes: ReadonlySet<string>;
-    forEachPartMesh(visit: (mesh: THREE.Mesh) => void): void;
-    hull(): LoadedPart | null;
-    readonly knownDecals: ReadonlySet<string>;
-    readonly lod: number;
-    readonly particles: Pick<
-        ParticleHost,
-        "particleSystems" | "particlesVisible" | "setParticleSystemDrawn"
-    >;
-    readonly shieldRevealed: boolean;
-    readonly shownDecals: ReadonlySet<string>;
-    skeleton(): FlatBone[];
-    readonly stealthed: boolean;
-}
-
 export class ModelRows {
     /**
      * What one tree row controls.
@@ -130,7 +109,7 @@ export class ModelRows {
         }
     >();
 
-    constructor(private readonly host: RowsViewport) {}
+    constructor(private readonly context: ViewportContext) {}
 
     treeItems(): TreeItem[] {
         const items: TreeItem[] = [];
@@ -140,7 +119,7 @@ export class ModelRows {
         // merge rule is exactly the sort of thing that drifts when it lives twice.
         this.inspectSources.clear();
 
-        const hull = this.host.hull();
+        const hull = this.context.assembly.hull();
         if (hull === null) {
             return items;
         }
@@ -199,7 +178,7 @@ export class ModelRows {
         this.rowParents.clear();
         this.rowNames.clear();
 
-        const bones = this.host.skeleton();
+        const bones = this.context.queries.skeleton();
         const roots = new Set(
             bones.filter((bone) => bone.parent < 0).map((bone) => bone.index),
         );
@@ -212,7 +191,7 @@ export class ModelRows {
                       alamoNodeName(node));
         };
 
-        this.host.forEachPartMesh((mesh) => {
+        this.context.assembly.forEachPartMesh((mesh) => {
             // The loader guarantees a mesh is never a bone node itself, so its owner is simply the
             // nearest bone above it. `meshPlacement` decides on the two NAMES from there.
             const owner = ownerOf(mesh);
@@ -241,7 +220,8 @@ export class ModelRows {
         // The same question for the effects, before any row is claimed: a system whose proxy bone
         // carries its name IS that row. A bone with two of them keeps the first, exactly as it
         // keeps the first of two meshes.
-        for (const [systemId, entry] of this.host.particles.particleSystems) {
+        for (const [systemId, entry] of this.context.particles
+            .particleSystems) {
             if (!listedInModelTree(entry.origin)) {
                 continue;
             }
@@ -268,7 +248,11 @@ export class ModelRows {
                 visible: meshDrawn(mesh),
                 gatedOff:
                     resolveMaterial(extras).hidden ||
-                    !isVisibleAt(extras, this.host.alt, this.host.lod),
+                    !isVisibleAt(
+                        extras,
+                        this.context.levels.alt,
+                        this.context.levels.lod,
+                    ),
             };
         };
 
@@ -352,7 +336,8 @@ export class ModelRows {
         // the whole effect - a proxy is either playing on this hull or it is not - and the emitters
         // a system is built from are the particle editor's business, not this one's. Listing them
         // here put twenty dead rows under a Star Destroyer's damage bones.
-        for (const [systemId, entry] of this.host.particles.particleSystems) {
+        for (const [systemId, entry] of this.context.particles
+            .particleSystems) {
             // The Gameplay lens's own. A death explosion and a wreck's trailing fire are asked for
             // by NAME at the moment they are needed, so they are in no proxy list and hang off no
             // bone - `ownerOf` falls back to the root and filed them there, giving the reader a
@@ -439,7 +424,7 @@ export class ModelRows {
         }
 
         const found: Inspection[] = [];
-        const bones = this.host.skeleton();
+        const bones = this.context.queries.skeleton();
         const nameOf = (index: number): string =>
             bones.find((bone) => bone.index === index)?.name ?? "";
 
@@ -471,7 +456,9 @@ export class ModelRows {
             const bone = bones.find(
                 (entry) => entry.index === source.boneIndex,
             );
-            const node = this.host.hull()?.bonesByIndex.get(source.boneIndex);
+            const node = this.context.assembly
+                .hull()
+                ?.bonesByIndex.get(source.boneIndex);
 
             if (bone !== undefined) {
                 found.push({
@@ -488,7 +475,7 @@ export class ModelRows {
         }
 
         if (source.systemId !== undefined) {
-            const entry = this.host.particles.particleSystems.get(
+            const entry = this.context.particles.particleSystems.get(
                 source.systemId,
             );
 
@@ -669,7 +656,7 @@ export class ModelRows {
         // rebuilds its list by walking the whole hull - which was affordable when this only ran on
         // a change and is not at sixty frames a second.
         const bones = new Map(
-            this.host.skeleton().map((bone) => [bone.index, bone]),
+            this.context.queries.skeleton().map((bone) => [bone.index, bone]),
         );
 
         // The SUBTREE answer, which a merged row needs as well as its own - see `subtreeFacts`.
@@ -709,7 +696,7 @@ export class ModelRows {
             }
 
             if (target.boneIndex !== undefined) {
-                const node = this.host
+                const node = this.context.assembly
                     .hull()
                     ?.bonesByIndex.get(target.boneIndex);
 
@@ -722,7 +709,7 @@ export class ModelRows {
             }
 
             if (target.particleId !== undefined) {
-                this.host.particles.setParticleSystemDrawn(
+                this.context.particles.setParticleSystemDrawn(
                     target.particleId,
                     visible,
                 );
@@ -788,27 +775,38 @@ export class ModelRows {
             const stealth = isStealthMesh(extras);
 
             facts.inFile = shield
-                ? this.host.shieldRevealed
+                ? this.context.levels.shieldRevealed
                 : stealth
-                  ? this.host.stealthed
+                  ? this.context.levels.stealthed
                   : extras.alamoHidden !== true;
 
             facts.gated =
                 spec.hidden ||
                 !(shield
-                    ? isVisibleAtLevel(extras, this.host.alt, this.host.lod)
-                    : isVisibleAt(extras, this.host.alt, this.host.lod)) ||
+                    ? isVisibleAtLevel(
+                          extras,
+                          this.context.levels.alt,
+                          this.context.levels.lod,
+                      )
+                    : isVisibleAt(
+                          extras,
+                          this.context.levels.alt,
+                          this.context.levels.lod,
+                      )) ||
                 this.collisionGatedOff(extras) ||
-                (this.host.stealthed && !stealth);
+                (this.context.levels.stealthed && !stealth);
 
             // A damage decal's bottom of the chain is the DAMAGE RULE, not the file - see
             // `damageMeshFacts`. It used to enter as a `gated` veto beside the level gates, which
             // reached the same answer only because no shipped decal is marked hidden.
             const decal = (extras.alamoMesh ?? "").toLowerCase();
-            if (this.host.knownDecals.has(decal)) {
+            if (this.context.levels.knownDecals.has(decal)) {
                 Object.assign(
                     facts,
-                    damageMeshFacts(facts, this.host.shownDecals.has(decal)),
+                    damageMeshFacts(
+                        facts,
+                        this.context.levels.shownDecals.has(decal),
+                    ),
                 );
             }
 
@@ -825,7 +823,7 @@ export class ModelRows {
             const skin = this.skinBonesOf(target.mesh);
 
             if (skin.length > 0) {
-                const playing = this.host.active.action !== null;
+                const playing = this.context.animation.active.action !== null;
                 const asked = skinHiddenByClip(
                     skin,
                     playing
@@ -852,7 +850,7 @@ export class ModelRows {
             // switch, and what the model says about it is said by the clip, below.
             // The canonical id off the NODE, never the display name the tree shows. Two bones can
             // share a name; only the id separates them - see `boneIds.ts`.
-            const id = this.host
+            const id = this.context.assembly
                 .hull()
                 ?.bonesByIndex.get(target.boneIndex)?.name;
 
@@ -864,7 +862,7 @@ export class ModelRows {
             // clip that shows a part the idle hides lost to the idle. Yoda's hilt is that: his
             // `attack_00` shows `b_hilt` and his `idle_00` hides it, and the hilt stayed away.
             facts.resting =
-                this.host.active.action === null
+                this.context.animation.active.action === null
                     ? this.restingVisibilityOf(id)
                     : undefined;
         }
@@ -885,7 +883,7 @@ export class ModelRows {
      * proxy the current ALT/LOD gates off was drawing too.
      */
     private effectFacts(facts: RowFacts, systemId: string): RowFacts {
-        const entry = this.host.particles.particleSystems.get(systemId);
+        const entry = this.context.particles.particleSystems.get(systemId);
 
         return {
             // Which drops the ancestors the MODEL hides: an effect answers to its own bone, as the
@@ -895,7 +893,7 @@ export class ModelRows {
             // The one master anyone legitimately keeps switched off while watching a clip: effects
             // are what obstructs the view of the thing being checked.
             masters: [
-                { id: "effects", on: this.host.particles.particlesVisible },
+                { id: "effects", on: this.context.particles.particlesVisible },
             ],
             inFile: entry?.gateVisible ?? true,
 
@@ -909,14 +907,14 @@ export class ModelRows {
             // leaves `gateVisible` holding what the effect rules last decided - so uncloaking
             // restores exactly what was playing rather than a guess at it.
             gated:
-                this.host.stealthed ||
+                this.context.levels.stealthed ||
                 (entry !== undefined && !entry.levelVisible),
         };
     }
 
     /** A mesh a hardpoint names as its collision hull, which the engine never draws. */
     private collisionGatedOff(extras: MaterialExtras): boolean {
-        return this.host.collisionMeshes.has(
+        return this.context.levels.collisionMeshes.has(
             (extras.alamoMesh ?? "").toLowerCase(),
         );
     }
@@ -948,7 +946,7 @@ export class ModelRows {
      * change while the subject's clips do not, so it is memoised against the map it reads.
      */
     private restingClipName(): string | undefined {
-        const clips = this.host.active.visibility;
+        const clips = this.context.animation.active.visibility;
 
         if (this.restingClipFor !== clips) {
             this.restingClipFor = clips;
@@ -959,12 +957,12 @@ export class ModelRows {
     }
 
     private animatedVisibilityOf(id: BoneId | undefined): boolean | undefined {
-        return this.host.active.action === null
+        return this.context.animation.active.action === null
             ? undefined
             : this.trackedAt(
-                  this.host.active.action.getClip().name,
+                  this.context.animation.active.action.getClip().name,
                   id,
-                  this.host.active.action.time,
+                  this.context.animation.active.action.time,
               );
     }
 
@@ -1008,7 +1006,7 @@ export class ModelRows {
         id: BoneId | undefined,
         seconds: number,
     ): boolean | undefined {
-        const track = this.host.active.visibility.get(clip);
+        const track = this.context.animation.active.visibility.get(clip);
 
         if (id === undefined || track === undefined) {
             return undefined;
@@ -1032,7 +1030,7 @@ export class ModelRows {
      * something, and flagging it would read as a broken effect rather than an honest limitation.
      */
     private effectRowName(systemId: string): string {
-        const entry = this.host.particles.particleSystems.get(systemId);
+        const entry = this.context.particles.particleSystems.get(systemId);
         if (entry === undefined) {
             return "";
         }

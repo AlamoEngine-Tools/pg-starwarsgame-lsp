@@ -6,8 +6,9 @@ import { describe, it } from "node:test";
 
 import * as THREE from "three";
 
-import { type AnimationViewport, AnimationRig } from "./animationRig";
+import { AnimationRig } from "./animationRig";
 import { ACTIVE_SUBJECT } from "./loadedPart";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * A rig over a stand-in viewport whose active subject has a mixer on a root with one bone, its rest pose
@@ -20,17 +21,17 @@ function rigWith(): {
     cleared: () => number;
 } {
     let clears = 0;
-    const host = {
-        assembly: {},
-        rows: {},
-        particles: { particleSystems: new Map() },
-        applyLevels: () => undefined,
-        clearRowOverrides: () => {
-            clears++;
+    const context = {
+        assembly: { setPartHidden: () => undefined },
+        rows: {
+            clearRowOverrides: () => {
+                clears++;
+            },
         },
-        setPartHidden: () => undefined,
-    } as unknown as AnimationViewport;
-    const animation = new AnimationRig(host);
+        particles: { particleSystems: new Map() },
+        levels: { applyLevels: () => undefined },
+    } as unknown as ViewportContext;
+    const animation = new AnimationRig(context);
 
     const root = new THREE.Group();
     const bone = new THREE.Object3D();

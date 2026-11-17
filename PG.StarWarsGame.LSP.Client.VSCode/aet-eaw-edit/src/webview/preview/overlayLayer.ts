@@ -11,12 +11,10 @@ import {
     alamoBoneName,
     alamoNodeName,
     labelCandidates,
-    type FlatBone,
 } from "./skeleton";
 import { type ReticleMark, reticleSizePx, healthColour } from "./reticles";
 import { boxTargetFor, boxRoots, rowsInBox } from "./selectionBox";
-import { type BoundingSphere } from "./framing";
-import { type LoadedPart } from "./loadedPart";
+import { type ViewportContext } from "./viewportContext";
 
 /** Smallest gap between two bone labels, in pixels, before the further one is dropped. */
 const LABEL_SPACING = 26;
@@ -74,26 +72,9 @@ function setPositions(geometry: THREE.BufferGeometry, values: number[]): void {
 /** How often the label overlay is repositioned. Labels do not need the frame rate. */
 const LABEL_INTERVAL_MS = 80;
 
-/** What OverlayLayer reads from the viewport it belongs to. */
+/** What OverlayLayer still asks of the viewport itself: what only the viewport has. */
 export interface OverlayHost {
-    bonePosition(
-        partId?: string,
-        bone?: string,
-    ): { x: number; y: number; z: number } | null;
-    boundingSphere(includeEffects?: boolean): BoundingSphere;
-    readonly camera: THREE.PerspectiveCamera;
-    readonly canvas: HTMLCanvasElement;
-    hull(): LoadedPart | null;
-    readonly labelLayer: HTMLElement;
-    modelSpan(): number;
     readonly onReticleClicked: ((hardpointId: string) => void) | null;
-    readonly parts: ReadonlyMap<string, LoadedPart>;
-    readonly rowParents: ReadonlyMap<string, string | null>;
-    readonly rowTargets: ReadonlyMap<
-        string,
-        { boneIndex?: number; mesh?: THREE.Mesh; particleId?: string }
-    >;
-    skeleton(): FlatBone[];
 }
 
 export class OverlayLayer {
@@ -132,8 +113,8 @@ export class OverlayLayer {
     private fireBones: ReadonlySet<string> = new Set();
 
     constructor(
+        private readonly context: ViewportContext,
         private readonly host: OverlayHost,
-        scene: THREE.Scene,
     ) {
         // Drawn on top of the model rather than inside it: a joint buried in a hull is not a joint
         // you can click, and the point of the skeleton view is reaching the bones.
@@ -165,7 +146,7 @@ export class OverlayLayer {
         this.selectionBoxes.renderOrder = 999;
         this.selectionBoxes.frustumCulled = false;
         this.selectionBoxes.visible = false;
-        scene.add(this.selectionBoxes);
+        context.scene.add(this.selectionBoxes);
 
         // The selected bone's own AXES. A box says where a bone is and nothing about which way it
         // faces, which is the question that actually matters here - a fire bone aims along its
@@ -181,7 +162,7 @@ export class OverlayLayer {
         this.boneAxes.renderOrder = 1000;
         this.boneAxes.frustumCulled = false;
         this.boneAxes.visible = false;
-        scene.add(this.boneAxes);
+        context.scene.add(this.boneAxes);
 
         this.joints.renderOrder = 999;
         this.jointLines.renderOrder = 999;
@@ -189,7 +170,7 @@ export class OverlayLayer {
         this.jointLines.visible = false;
         this.joints.frustumCulled = false;
         this.jointLines.frustumCulled = false;
-        scene.add(this.joints, this.jointLines);
+        context.scene.add(this.joints, this.jointLines);
     }
 
     /**
@@ -311,7 +292,7 @@ export class OverlayLayer {
     setSelectedHardpoint(partId: string | null, boneRow: string | null): void {
         // Decided HERE rather than by the caller, because the answer depends on which parts are in
         // the scene - and that is this object's own state, arriving one GLB at a time.
-        const target = boxTargetFor(partId, new Set(this.host.parts.keys()));
+        const target = boxTargetFor(partId, new Set(this.context.parts.keys()));
 
         this.selectedParts = target.kind === "part" ? [target.id] : [];
 
@@ -351,7 +332,7 @@ export class OverlayLayer {
      * under an animation, and the box beside it is already rebuilt on that path.
      */
     private updateBoneAxes(): void {
-        const hull = this.host.hull();
+        const hull = this.context.assembly.hull();
         const nodes = [...this.selectedBones]
             .map((index) => hull?.bonesByIndex.get(index))
             .filter((node): node is THREE.Object3D => node !== undefined);
@@ -364,7 +345,7 @@ export class OverlayLayer {
         // The SUBJECT's size, cached. This runs per frame while a clip plays, and
         // `Box3.setFromObject` walks every vertex of the hull - recomputing it there was a full
         // geometry traversal at sixty frames a second.
-        const length = Math.max(1, this.host.modelSpan() * 0.06);
+        const length = Math.max(1, this.context.cameraRig.modelSpan() * 0.06);
 
         const positions: number[] = [];
         const colours: number[] = [];
@@ -475,7 +456,7 @@ export class OverlayLayer {
             (row) => row !== this.unboxedRow,
         );
 
-        for (const root of boxRoots(boxable, this.host.rowParents)) {
+        for (const root of boxRoots(boxable, this.context.rows.rowParents)) {
             const box = this.boxAround(root);
 
             if (box !== null) {
@@ -503,7 +484,7 @@ export class OverlayLayer {
      * than the turret it belongs to - would push the outline out past the thing the reader sees.
      */
     private boxAroundPart(partId: string): THREE.Box3 | null {
-        const part = this.host.parts.get(partId);
+        const part = this.context.parts.get(partId);
 
         if (part === undefined) {
             return null;
@@ -528,11 +509,11 @@ export class OverlayLayer {
     /** What one box encloses, in world space, or null when the row owns nothing locatable. */
     private boxAround(root: string): THREE.Box3 | null {
         const box = new THREE.Box3();
-        const hull = this.host.hull();
+        const hull = this.context.assembly.hull();
         let found = false;
 
-        for (const row of rowsInBox(root, this.host.rowParents)) {
-            const target = this.host.rowTargets.get(row);
+        for (const row of rowsInBox(root, this.context.rows.rowParents)) {
+            const target = this.context.rows.rowTargets.get(row);
 
             if (target?.mesh !== undefined) {
                 // `setFromObject` walks the world matrices, which is what puts the box where an
@@ -563,7 +544,10 @@ export class OverlayLayer {
 
         if (Math.max(size.x, size.y, size.z) < 1e-4) {
             box.expandByScalar(
-                Math.max(this.host.boundingSphere().radius * 0.02, 1e-3),
+                Math.max(
+                    this.context.cameraRig.boundingSphere().radius * 0.02,
+                    1e-3,
+                ),
             );
         }
 
@@ -572,7 +556,7 @@ export class OverlayLayer {
 
     /** Rebuilds the joint and line buffers from where the bones currently are. */
     private updateSkeletonGeometry(): void {
-        const hull = this.host.hull();
+        const hull = this.context.assembly.hull();
         if (hull === null) {
             return;
         }
@@ -629,14 +613,14 @@ export class OverlayLayer {
      * the user is looking at.
      */
     private updateLabels(): void {
-        const hull = this.host.hull();
+        const hull = this.context.assembly.hull();
         if (hull === null || !this.skeletonVisible) {
             this.clearLabels();
             return;
         }
 
         const wanted = labelCandidates(
-            this.host.skeleton(),
+            this.context.queries.skeleton(),
             this.labelMode,
             this.selectedBones,
         );
@@ -645,8 +629,8 @@ export class OverlayLayer {
             return;
         }
 
-        const width = this.host.canvas.clientWidth;
-        const height = this.host.canvas.clientHeight;
+        const width = this.context.canvas.clientWidth;
+        const height = this.context.canvas.clientHeight;
         const world = new THREE.Vector3();
 
         const projected: {
@@ -663,7 +647,7 @@ export class OverlayLayer {
             }
 
             node.getWorldPosition(world);
-            const ndc = world.clone().project(this.host.camera);
+            const ndc = world.clone().project(this.context.camera);
 
             // Behind the camera or off screen: projecting those puts labels on the wrong edge.
             if (
@@ -741,8 +725,8 @@ export class OverlayLayer {
      * its bone, and that bone is the hull's.
      */
     private updateReticles(): void {
-        const width = this.host.canvas.clientWidth;
-        const height = this.host.canvas.clientHeight;
+        const width = this.context.canvas.clientWidth;
+        const height = this.context.canvas.clientHeight;
         const size = reticleSizePx(this.reticleScreenSize, width, height);
         const world = new THREE.Vector3();
         let used = 0;
@@ -753,7 +737,7 @@ export class OverlayLayer {
                 continue;
             }
 
-            const ndc = RETICLE_NDC.copy(anchor).project(this.host.camera);
+            const ndc = RETICLE_NDC.copy(anchor).project(this.context.camera);
 
             // Behind the camera or off screen. Projecting those puts the mark on the wrong edge, and
             // a reticle in the corner of a ship you are looking past is worse than none.
@@ -831,7 +815,7 @@ export class OverlayLayer {
         // missing PART, and a missing BONE falls back to the owning part's root instead - so a
         // mark whose bone was absent was drawn at that model's origin rather than dropped, and
         // every such mark piled up in the same place.
-        const at = this.host.bonePosition(mark.partId, mark.bone);
+        const at = this.context.queries.bonePosition(mark.partId, mark.bone);
 
         return at === null ? null : into.set(at.x, at.y, at.z);
     }
@@ -866,7 +850,7 @@ export class OverlayLayer {
                     this.host.onReticleClicked?.(id);
                 }
             });
-            this.host.labelLayer.appendChild(element);
+            this.context.labelLayer.appendChild(element);
             this.reticlePool.push(element);
         }
 
@@ -884,7 +868,7 @@ export class OverlayLayer {
         while (this.labelPool.length <= index) {
             const element = document.createElement("div");
             element.className = "bone-label";
-            this.host.labelLayer.appendChild(element);
+            this.context.labelLayer.appendChild(element);
             this.labelPool.push(element);
         }
 

@@ -19,12 +19,8 @@ import { alamoNodeName } from "./skeleton";
 import { resolveBoneId } from "./boneIds";
 import { drawnBounds, isOverlay } from "./modelBounds";
 import { type MaterialExtras, resolveMaterial } from "./materials";
-import { type OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { type EnvironmentRig } from "./environmentRig";
-import { type LoadedPart } from "./loadedPart";
-import { type MaterialBinder } from "./materialBinder";
-import { type ParticleHost } from "./particleHost";
 import { type PresetView } from "./viewportTypes";
+import { type ViewportContext } from "./viewportContext";
 
 const PRESETS: Record<PresetView, { azimuth: number; elevation: number }> = {
     front: { azimuth: 0, elevation: 0 },
@@ -44,17 +40,8 @@ function isShadowVolume(mesh: THREE.Mesh): boolean {
 }
 
 /** What CameraRig reads from the viewport it belongs to. */
-/** What CameraRig reads from the viewport it belongs to. */
+/** What CameraRig still asks of the viewport itself: what only the viewport has. */
 export interface CameraViewport {
-    readonly camera: THREE.PerspectiveCamera;
-    readonly controls: OrbitControls;
-    drawn(mesh: THREE.Mesh): boolean;
-    readonly environment: EnvironmentRig;
-    hull(): LoadedPart | null;
-    readonly materials: MaterialBinder;
-    readonly modelRoot: THREE.Group;
-    readonly particles: ParticleHost;
-    readonly renderer: THREE.WebGLRenderer;
     updateBillboards(): void;
 }
 
@@ -66,7 +53,10 @@ export class CameraRig {
     /** See {@link modelSpan}. Cleared with the scene. */
     private cachedSpan: number | null = null;
 
-    constructor(private readonly host: CameraViewport) {}
+    constructor(
+        private readonly context: ViewportContext,
+        private readonly host: CameraViewport,
+    ) {}
 
     /** Drops the remembered span, for when the model it measured has changed. */
     forgetSpan(): void {
@@ -76,9 +66,9 @@ export class CameraRig {
     /** Where the camera stands now, for saving the current shot as a preset. */
     get cameraPosition(): Vector3Like {
         return {
-            x: this.host.camera.position.x,
-            y: this.host.camera.position.y,
-            z: this.host.camera.position.z,
+            x: this.context.camera.position.x,
+            y: this.context.camera.position.y,
+            z: this.context.camera.position.z,
         };
     }
 
@@ -90,8 +80,8 @@ export class CameraRig {
      * buffer still holds the frame.
      */
     canvasCoverage(): { lit: number; total: number } {
-        this.host.environment.renderFrame();
-        const gl = this.host.renderer.getContext();
+        this.context.environment.renderFrame();
+        const gl = this.context.renderer.getContext();
         const width = gl.drawingBufferWidth;
         const height = gl.drawingBufferHeight;
         const pixels = new Uint8Array(width * height * 4);
@@ -180,15 +170,15 @@ export class CameraRig {
         );
         this.applyClipPlanes(this.boundingSphere(true), this.fitDistance);
 
-        this.host.camera.position.set(position.x, position.y, position.z);
-        this.host.controls.target.set(target.x, target.y, target.z);
-        this.host.controls.update();
+        this.context.camera.position.set(position.x, position.y, position.z);
+        this.context.controls.target.set(target.x, target.y, target.z);
+        this.context.controls.update();
     }
 
     frameAll(preset: PresetView = "threeQuarter"): void {
         const sphere = this.boundingSphere();
         const { azimuth, elevation } = PRESETS[preset];
-        const aspect = this.host.camera.aspect;
+        const aspect = this.context.camera.aspect;
 
         const pose = frameSphere(
             sphere,
@@ -206,21 +196,21 @@ export class CameraRig {
         this.fitDistance = distance;
         this.applyClipPlanes(this.boundingSphere(true), distance);
 
-        this.host.camera.position.set(
+        this.context.camera.position.set(
             pose.position.x,
             pose.position.y,
             pose.position.z,
         );
-        this.host.controls.target.set(
+        this.context.controls.target.set(
             pose.target.x,
             pose.target.y,
             pose.target.z,
         );
-        this.host.controls.update();
+        this.context.controls.update();
 
         // The grid is a sense of scale, so it has to grow with the subject: a fixed 100-unit grid is
         // invisible under a capital ship and swallows a fighter.
-        this.host.environment.rebuildGrid(sphere);
+        this.context.environment.rebuildGrid(sphere);
     }
 
     /**
@@ -243,7 +233,7 @@ export class CameraRig {
      * in the others. `resolveBoneId` knows the fallbacks; nothing else needs to.
      */
     private boneNodeFor(key: string): THREE.Object3D | undefined {
-        const hull = this.host.hull();
+        const hull = this.context.assembly.hull();
 
         if (hull === null) {
             return undefined;
@@ -277,7 +267,7 @@ export class CameraRig {
             ? 0
             : Math.max(
                   0,
-                  ...[...this.host.particles.particleSystems.values()].map(
+                  ...[...this.context.particles.particleSystems.values()].map(
                       (entry) => entry.instance.extent(),
                   ),
               );
@@ -291,8 +281,8 @@ export class CameraRig {
         // look like they were choosing at random. Someone who ticks it on wants to SEE it, not to
         // have the camera measure the subject by it.
         const box = drawnBounds(
-            this.host.modelRoot,
-            (mesh) => this.host.drawn(mesh) && !isShadowVolume(mesh),
+            this.context.modelRoot,
+            (mesh) => this.context.levels.drawn(mesh) && !isShadowVolume(mesh),
             // The arcs and handles are drawn and are meshes, so `drawn` alone let them in whenever
             // they were on screen: measured on the Gargantuan with its arcs showing, the framing
             // radius was 508 against a hull of 99, and every camera preset stood five times too far
@@ -327,7 +317,7 @@ export class CameraRig {
             return this.cachedSpan;
         }
 
-        const hull = this.host.hull();
+        const hull = this.context.assembly.hull();
         if (hull === null) {
             return 100;
         }
@@ -360,22 +350,27 @@ export class CameraRig {
      * is the camera now", which is the one thing a capture changes.
      */
     prepareForCamera(): void {
-        this.host.camera.updateMatrixWorld();
+        this.context.camera.updateMatrixWorld();
 
         // The engine's per-frame contract, including the matrices. Last, not first, so it sees the
         // bone transforms the animation and skeleton work above have already settled.
-        this.host.materials.updateAlamoUniforms();
+        this.context.materials.updateAlamoUniforms();
         this.host.updateBillboards();
 
         // The sky dome travels with the camera and keeps its own orientation, so the horizon stays
         // level and infinitely far however the camera is turned.
         if (
-            this.host.environment.sky !== null &&
-            this.host.environment.sky.visible
+            this.context.environment.sky !== null &&
+            this.context.environment.sky.visible
         ) {
-            this.host.environment.sky.position.copy(this.host.camera.position);
-            this.host.environment.sky.scale.setScalar(
-                Math.max(this.host.camera.near * 4, this.host.camera.far * 0.4),
+            this.context.environment.sky.position.copy(
+                this.context.camera.position,
+            );
+            this.context.environment.sky.scale.setScalar(
+                Math.max(
+                    this.context.camera.near * 4,
+                    this.context.camera.far * 0.4,
+                ),
             );
         }
 
@@ -385,11 +380,14 @@ export class CameraRig {
         // model, so the moment the hardpoint rotation was corrected and the bounds shrank, the
         // whole sky fell outside it and the stars simply went out.
         if (
-            this.host.environment.stars !== null &&
-            this.host.environment.stars.visible
+            this.context.environment.stars !== null &&
+            this.context.environment.stars.visible
         ) {
-            this.host.environment.stars.scale.setScalar(
-                Math.max(this.host.camera.near * 4, this.host.camera.far * 0.4),
+            this.context.environment.stars.scale.setScalar(
+                Math.max(
+                    this.context.camera.near * 4,
+                    this.context.camera.far * 0.4,
+                ),
             );
         }
     }
@@ -405,12 +403,12 @@ export class CameraRig {
         const planes = clipPlanes(
             sphere,
             distance,
-            this.host.particles.effectReach(),
+            this.context.particles.effectReach(),
             this.drawDistance,
         );
 
-        this.host.camera.near = planes.near;
-        this.host.camera.far = planes.far;
-        this.host.camera.updateProjectionMatrix();
+        this.context.camera.near = planes.near;
+        this.context.camera.far = planes.far;
+        this.context.camera.updateProjectionMatrix();
     }
 }

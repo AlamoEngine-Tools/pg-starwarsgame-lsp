@@ -8,6 +8,7 @@ import * as THREE from "three";
 
 import { emitter, testSystem } from "./particleFixture";
 import { type ParticleViewport, ParticleHost } from "./particleHost";
+import { type ViewportContext } from "./viewportContext";
 
 /**
  * A host over a stand-in viewport: a model root to hang systems on, nothing translated, no part to
@@ -15,26 +16,32 @@ import { type ParticleViewport, ParticleHost } from "./particleHost";
  */
 function hostWith(): { particles: ParticleHost; modelRoot: THREE.Group } {
     const modelRoot = new THREE.Group();
-    const host = {
-        alt: 0,
-        altDescending: false,
-        lod: 0,
-        fitDistance: 1,
-        cameraPosition: { x: 0, y: 0, z: 10 },
+    const context = {
+        levels: { alt: 0, altDescending: false, lod: 0 },
+        cameraRig: {
+            fitDistance: 1,
+            cameraPosition: { x: 0, y: 0, z: 10 },
+            boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
+            applyClipPlanes: () => undefined,
+        },
         modelRoot,
         parts: new Map(),
-        hiddenParts: new Set(),
-        shaderStates: new Map(),
-        translated: new Map(),
-        translatedShaders: false,
-        attachmentFor: () => modelRoot,
-        partRootOf: () => null,
-        boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
-        applyClipPlanes: () => undefined,
+        assembly: {
+            hiddenParts: new Set(),
+            attachmentFor: () => modelRoot,
+            partRootOf: () => null,
+        },
+        materials: {
+            shaderStates: new Map(),
+            translated: new Map(),
+            translatedShaders: false,
+        },
+        rows: { refreshRows: () => undefined },
+    } as unknown as ViewportContext;
+    const host = {
         refreshParticleVisibility: () => undefined,
-        refreshRows: () => undefined,
     } as unknown as ParticleViewport;
-    return { particles: new ParticleHost(host), modelRoot };
+    return { particles: new ParticleHost(context, host), modelRoot };
 }
 
 const systemsUnder = (root: THREE.Object3D): number =>

@@ -16,13 +16,11 @@ import { type Vector3 as Vector3Like } from "./lighting";
 import { type AlamoParticleContent } from "../../protocol/modelPreview";
 import { proxyVisibleAt } from "./levels";
 import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
-import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
+import { ACTIVE_SUBJECT } from "./loadedPart";
 import { emissionMeshFor } from "./emissionSource";
 import { missingTexture } from "./missingTexture";
-import { type BoundingSphere } from "./framing";
-import { type FxMaterialState } from "./fx/renderState";
-import { type TranslatedEffect } from "./fx/effect";
 import { type ParticlePlacement } from "./viewportTypes";
+import { type ViewportContext } from "./viewportContext";
 
 /** Splits a `systemId#index` emitter key. The id may itself contain a `#`, so split from the right. */
 function splitEmitterKey(key: string): [string, number] {
@@ -30,29 +28,9 @@ function splitEmitterKey(key: string): [string, number] {
     return [key.slice(0, at), Number(key.slice(at + 1))];
 }
 
-/** What ParticleHost reads from the viewport it belongs to. */
+/** What ParticleHost still asks of the viewport itself: what only the viewport has. */
 export interface ParticleViewport {
-    readonly alt: number;
-    readonly altDescending: boolean;
-    applyClipPlanes(sphere: BoundingSphere, distance: number): void;
-    attachmentFor(
-        partId?: string,
-        bone?: string,
-        boneIndex?: number,
-    ): THREE.Object3D;
-    boundingSphere(includeEffects?: boolean): BoundingSphere;
-    readonly cameraPosition: Vector3Like;
-    readonly fitDistance: number;
-    readonly hiddenParts: ReadonlySet<string>;
-    readonly lod: number;
-    readonly modelRoot: THREE.Group;
-    partRootOf(partId?: string): THREE.Object3D | null;
-    readonly parts: ReadonlyMap<string, LoadedPart>;
     refreshParticleVisibility(entry: ParticleEntry): void;
-    refreshRows(): void;
-    readonly shaderStates: ReadonlyMap<string, FxMaterialState>;
-    readonly translated: ReadonlyMap<string, TranslatedEffect>;
-    readonly translatedShaders: boolean;
 }
 
 export class ParticleHost {
@@ -104,7 +82,10 @@ export class ParticleHost {
      */
     private particleSpeed = 1;
 
-    constructor(private readonly host: ParticleViewport) {}
+    constructor(
+        private readonly context: ViewportContext,
+        private readonly host: ParticleViewport,
+    ) {}
 
     /**
      * Runs every system one frame on, and finishes the ones fading out - nothing while effects are
@@ -156,7 +137,7 @@ export class ParticleHost {
         systems: { id: string; emitters: EmitterProbe[] }[];
     } {
         return {
-            camera: this.host.cameraPosition,
+            camera: this.context.cameraRig.cameraPosition,
             systems: [...this.particleSystems.values()].map((entry) => ({
                 id: entry.id,
                 emitters: entry.instance.probe(),
@@ -270,9 +251,9 @@ export class ParticleHost {
             levels,
             levelVisible: proxyVisibleAt(
                 levels,
-                this.host.alt,
-                this.host.lod,
-                this.host.altDescending,
+                this.context.levels.alt,
+                this.context.levels.lod,
+                this.context.levels.altDescending,
             ),
             scaleFactor,
             origin,
@@ -292,7 +273,7 @@ export class ParticleHost {
         // anyone sees it.
         if (
             attachToPartId !== undefined &&
-            this.host.hiddenParts.has(attachToPartId)
+            this.context.assembly.hiddenParts.has(attachToPartId)
         ) {
             entry.instance.hold("part", true);
         }
@@ -306,9 +287,9 @@ export class ParticleHost {
         // The depth range again, because the effects reach further than the model and they arrive
         // AFTER the camera was fitted to it. Without this, Boba Fett's flamethrower - 206 units of
         // throw on a seven-unit model - was culled at 156 and looked like a flame that stops.
-        this.host.applyClipPlanes(
-            this.host.boundingSphere(),
-            this.host.fitDistance,
+        this.context.cameraRig.applyClipPlanes(
+            this.context.cameraRig.boundingSphere(),
+            this.context.cameraRig.fitDistance,
         );
     }
 
@@ -351,9 +332,9 @@ export class ParticleHost {
 
         // And back in again once the effect is gone, so a one-off explosion does not leave the
         // depth range stretched for the rest of the session.
-        this.host.applyClipPlanes(
-            this.host.boundingSphere(),
-            this.host.fitDistance,
+        this.context.cameraRig.applyClipPlanes(
+            this.context.cameraRig.boundingSphere(),
+            this.context.cameraRig.fitDistance,
         );
     }
 
@@ -425,7 +406,7 @@ export class ParticleHost {
         }
 
         entry.gateVisible = visible;
-        this.host.refreshRows();
+        this.context.rows.refreshRows();
     }
 
     /** The emitters of one system, in file order. */
@@ -499,7 +480,7 @@ export class ParticleHost {
      * playing subject frame by frame, and a subject with no clip is released as it is shown.
      */
     holdEffectsOf(partId: string): void {
-        const hidden = this.host.hiddenParts.has(partId);
+        const hidden = this.context.assembly.hiddenParts.has(partId);
 
         for (const entry of this.particleSystems.values()) {
             if (entry.attachToPartId === partId) {
@@ -597,7 +578,7 @@ export class ParticleHost {
     private subjectOfSystem(entry: ParticleEntry): string {
         return entry.attachToPartId === undefined
             ? ACTIVE_SUBJECT
-            : (this.host.parts.get(entry.attachToPartId)?.subjectId ??
+            : (this.context.parts.get(entry.attachToPartId)?.subjectId ??
                   ACTIVE_SUBJECT);
     }
 
@@ -621,12 +602,12 @@ export class ParticleHost {
 
         if (anchor !== null && at !== undefined) {
             anchor.position.set(at.x, at.y, at.z);
-            this.host.modelRoot.add(anchor);
+            this.context.modelRoot.add(anchor);
         }
 
         const attachment =
             anchor ??
-            this.host.attachmentFor(
+            this.context.assembly.attachmentFor(
                 attachToPartId,
                 attachBone,
                 attachBoneIndex,
@@ -638,7 +619,7 @@ export class ParticleHost {
         // a level switch that swapped the geometry underneath.
         const source = emissionMeshFor(
             attachment,
-            this.host.partRootOf(attachToPartId),
+            this.context.assembly.partRootOf(attachToPartId),
         );
 
         // The model root is the space the particles are simulated in, so an effect the file does
@@ -650,16 +631,16 @@ export class ParticleHost {
             this.particleTextures,
             1,
             source,
-            this.host.modelRoot,
+            this.context.modelRoot,
             scaleFactor,
         );
         instance.attachTo(attachment);
         instance.setVisible(this.particlesVisible);
         // Built after its effects came back, as a hardpoint's blast is: it takes what is in hand.
         instance.applyEffects(
-            this.host.translated,
-            this.host.shaderStates,
-            this.host.translatedShaders,
+            this.context.materials.translated,
+            this.context.materials.shaderStates,
+            this.context.materials.translatedShaders,
         );
 
         // A system built after the answers came back still has to show the marker: a hardpoint
@@ -683,7 +664,7 @@ export class ParticleHost {
         //
         // Flagged all the same, so the model-mesh walk prunes it wherever it is reached from.
         instance.root.userData.aetParticleSystem = true;
-        this.host.modelRoot.add(instance.root);
+        this.context.modelRoot.add(instance.root);
         return instance;
     }
 
