@@ -249,11 +249,6 @@ function textColor(c: EncyclopediaRgba): string {
     return `rgb(${c.r}, ${c.g}, ${c.b})`;
 }
 
-/** Fills and tints, where the alpha does matter. */
-function rgba(c: EncyclopediaRgba): string {
-    return `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a / 255).toFixed(3)})`;
-}
-
 /**
  * Splits a game font name into a CSS family and weight/style.
  *

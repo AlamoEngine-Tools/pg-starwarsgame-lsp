@@ -10,6 +10,7 @@
     ],
     "jsx": "react-jsx",
     "strict": true,
+    "noUnusedLocals": true,
     "skipLibCheck": true,
     "noEmit": true,
     // The missing-texture marker is imported straight from resources/icons as a data URI.

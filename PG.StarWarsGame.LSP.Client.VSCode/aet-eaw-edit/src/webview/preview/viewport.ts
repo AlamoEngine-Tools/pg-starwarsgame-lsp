@@ -10,164 +10,41 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import * as l10n from "@vscode/l10n";
 
-import {
-    type BoundingSphere,
-    clipPlanes,
-    DEFAULT_AZIMUTH_DEGREES,
-    DEFAULT_ELEVATION_DEGREES,
-    frameSphere,
-    FIELD_OF_VIEW,
-} from "./framing";
+import { FIELD_OF_VIEW } from "./framing";
 import type {
     AlamoParticleContent,
     PreviewBreakoffProp,
     PreviewSpinAway,
     PreviewTurret,
 } from "../../protocol/modelPreview";
-import { spinAwayPose } from "./spinAway";
 import type { NormalisedColour } from "./colour";
-import { attachmentProblem, type AttachmentRequest } from "./attachments";
-import {
-    drawnConeRange,
-    fireConeOutline,
-    fireConeSurface,
-    hullFrameBasis,
-} from "./fireArc";
 import type { FxMaterialState } from "./fx/renderState";
-import {
-    costByLevel,
-    definedLevels,
-    type DefinedLevels,
-    type LevelCost,
-    type LevelTagged,
-    proxyVisibleAt,
-} from "./levels";
-import { AlamoMaterial } from "./alamoMaterial";
+import { type DefinedLevels, type LevelCost } from "./levels";
 import type { TranslatedEffect } from "./fx/effect";
-import {
-    type AlamoFrame,
-    engineLight,
-    type ProbeLight,
-    sphericalHarmonics,
-} from "./fx/uniforms";
-import {
-    castsShadowMap,
-    debugColour,
-    isShieldMesh,
-    isStealthMesh,
-    isVisibleAt,
-    isVisibleAtLevel,
-    type MaterialExtras,
-    type MaterialSpec,
-    resolveMaterial,
-    shieldMeshOffShader,
-} from "./materials";
-import {
-    DEFAULT_LIGHT_AZIMUTH_DEGREES,
-    DEFAULT_LIGHT_ELEVATION_DEGREES,
-    lightDirection,
-    shadowFrustum,
-    type Vector3 as Vector3Like,
-} from "./lighting";
-import {
-    cancelRootCorrection,
-    outermostRoots,
-    splitGeometryFromBone,
-    stampTreeKeys,
-    treeKeyOf,
-} from "./boneNodes";
-import { captureFrame } from "./capture";
-import { meshDrawn, setMeshDrawn } from "./meshVisibility";
-import {
-    boneRowId,
-    effectPlacement,
-    meshPlacement,
-    type TreeItem,
-} from "./previewTree";
-import { healthColour, type ReticleMark, reticleSizePx } from "./reticles";
-import {
-    type BreakoffAnchor,
-    breakoffLifetime,
-    breakoffPose,
-} from "./breakoff";
-import { sweepAngles } from "./deathClone";
-import {
-    dragToAim,
-    TURRET_AT_REST,
-    type TurretAim,
-    type TurretAxis,
-    type TurretAxisRange,
-    type TurretHandle,
-} from "./turretHandles";
-import {
-    knobPoint,
-    stopTicks,
-    trackRadius,
-    trackSegments,
-} from "./turretTrack";
+import { type MaterialExtras } from "./materials";
+import { lightDirection, type Vector3 as Vector3Like } from "./lighting";
+import { type TreeItem } from "./previewTree";
+import { type ReticleMark } from "./reticles";
+import { type BreakoffAnchor } from "./breakoff";
+import { type TurretAim, type TurretHandle } from "./turretHandles";
 import { type Inspection } from "./inspector";
-import { emissionMeshFor } from "./emissionSource";
 import {
     billboardLocalRotation,
     billboardRotation,
     billboardTypeOf,
 } from "./billboards";
-import {
-    hiddenAt,
-    type VisibilityTrack,
-    visibilityTracks,
-} from "./boneVisibility";
-import { skinHiddenByClip } from "./skinVisibility";
-import { type SubjectAnimation } from "./subjectAnimation";
-import { drawnBounds, isOverlay, triangleCount } from "./modelBounds";
-import { HeatPass } from "./heatPass";
-import { BloomPass } from "./bloomPass";
-import { ShadowVolumePass } from "./shadowVolumePass";
-import {
-    applyBaseMapColourSpace,
-    applyBlend,
-    applyColourScale,
-    applyDepth,
-    shadowCatcherOpacity,
-} from "./materialState";
-import { type BoneId, resolveBoneId } from "./boneIds";
 import { type AbilityOwnership } from "./abilityRows";
-import { listedInModelTree, type ParticleOrigin } from "./particleScene";
-import {
-    damageMeshFacts,
-    deathClip,
-    effectFacts as effectRowFacts,
-    type OverrideChange,
-    type Resolution,
-    resolveRow,
-    restingClip,
-    type RowFacts,
-    type RowOverride,
-    subtreeFacts,
-} from "./visibility";
-import { boxRoots, boxTargetFor, rowsInBox } from "./selectionBox";
-import { skyGradient, starPositions } from "./backdrop";
-import { concreteNoise, GROUND_TEXTURE_SIZE } from "./groundTexture";
+import { type OverrideChange, type RowOverride } from "./visibility";
 import {
     type BackgroundKind,
-    DEFAULT_LIGHTS,
-    DEFAULT_VIEWER_SETTINGS,
     type LightRig,
-    type Wind,
 } from "../../shared/viewerSettings";
+import { type EmitterProbe } from "./particleRenderer";
 import {
-    type EmitterProbe,
-    HEAT_LAYER,
-    ParticleSystemInstance,
-} from "./particleRenderer";
-import {
-    alamoBoneName,
     alamoNodeName,
     type BoneAttachment,
     type FlatBone,
-    labelCandidates,
     type LabelMode,
 } from "./skeleton";
 import { OverlayLayer } from "./overlayLayer";
@@ -311,7 +188,7 @@ export class PreviewViewport {
     constructor(
         private readonly canvas: HTMLCanvasElement,
         /** Absolutely-positioned container the bone labels are written into. */
-        private readonly labelLayer: HTMLElement,
+        labelLayer: HTMLElement,
     ) {
         // `stencil` is NOT on by default in this three - it defaults to false, and without a
         // stencil buffer every stencil op is a silent no-op, so the shadow-volume count never

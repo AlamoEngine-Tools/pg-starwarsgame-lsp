@@ -91,8 +91,6 @@ export class ModelRows {
     private readonly rowOverrides = new Map<string, RowOverride>();
     /** The last resolution per row, so the tree can report why a row looks as it does. */
     private rowResolutions = new Map<string, Resolution>();
-    /** The same, for what each row does to everything BENEATH it - see `subtreeFacts`. */
-    private rowSubtrees = new Map<string, Resolution>();
     /**
      * What each tree row stands for, so the inspector can describe it.
      *
@@ -683,7 +681,6 @@ export class ModelRows {
         }
 
         this.rowResolutions = resolutions;
-        this.rowSubtrees = subtree;
 
         for (const [rowId, target] of this.rowTargets) {
             const visible = resolutions.get(rowId)?.visible ?? true;
@@ -842,9 +839,7 @@ export class ModelRows {
         }
 
         if (target.boneIndex !== undefined) {
-            const bone = bones.get(target.boneIndex);
-
-            // Deliberately NOT `bone.visible`: that reads the scene node this chain WRITES, so a
+            // Deliberately NOT the bone's `visible`: that reads the scene node this chain WRITES, so a
             // bone hidden once resolved as hidden-in-the-file ever after and clearing the override
             // could never bring it back. A bone is always in the file - a bone row is a subtree
             // switch, and what the model says about it is said by the clip, below.

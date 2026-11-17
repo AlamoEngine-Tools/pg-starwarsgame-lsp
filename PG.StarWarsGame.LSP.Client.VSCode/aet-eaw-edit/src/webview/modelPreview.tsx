@@ -70,11 +70,7 @@ import { useAbilities } from "./preview/useAbilities";
 import { useAnimationTransport } from "./preview/useAnimationTransport";
 import { useCombatLens } from "./preview/useCombatLens";
 import { WRECK_EFFECT } from "./preview/partIds";
-import {
-    ancestorsOf,
-    type BoneAttachment,
-    type FlatBone,
-} from "./preview/skeleton";
+import { ancestorsOf } from "./preview/skeleton";
 import {
     boneIndexOfRow,
     toggleSelected,
@@ -280,11 +276,6 @@ function ModelPreview(): React.JSX.Element {
         scrubbingRef,
     } = player;
 
-    const [bones, setBones] = useState<FlatBone[]>([]);
-    const [attachments, setAttachments] = useState<
-        Map<number, BoneAttachment[]>
-    >(new Map());
-
     /**
      * Drops the selection, and with it the box drawn round it in the viewport.
      *
@@ -444,7 +435,8 @@ function ModelPreview(): React.JSX.Element {
         hardpointSearchPressed,
     } = flyouts;
 
-    const [particlesPaused, setParticlesPaused] = useState(false);
+    // Nothing sets this yet: #289 adds the particle transport that pauses them.
+    const [particlesPaused] = useState(false);
     /** Emitter names in file order. Names repeat, so the index is the identity, not the name. */
     const [emitters, setEmitters] = useState<string[]>([]);
     const [hiddenEmitters, setHiddenEmitters] = useState<ReadonlySet<number>>(
@@ -734,9 +726,7 @@ function ModelPreview(): React.JSX.Element {
         const viewport = viewportRef.current;
         setStats(viewport?.stats() ?? null);
         setHasWeather(viewport?.hasWeather() ?? false);
-        setBones(viewport?.skeleton() ?? []);
         setTreeItems(viewport?.treeItems() ?? []);
-        setAttachments(viewport?.attachmentsByBone() ?? new Map());
         // The geometry's own tags, WIDENED by what the object declares. A damage stage may touch
         // no geometry at all - see `withDeclaredStages` - so the model alone under-reports it.
         const defined = withDeclaredStages(
@@ -1249,7 +1239,6 @@ function ModelPreview(): React.JSX.Element {
         {
             levelsApplied: (viewport) => {
                 setStats(viewport.stats());
-                setAttachments(viewport.attachmentsByBone());
                 setTreeItems(viewport.treeItems());
             },
             translatedApplied: (viewport) =>
