@@ -25,19 +25,15 @@ async function bend(): Promise<Bent> {
     await browser.waitUntil(
         async () =>
             browser.execute(() => {
-                const v = (
-                    window as unknown as {
-                        aetDebugViewport?: { parts: Map<string, unknown> };
-                    }
-                ).aetDebugViewport;
+                const v = (window as unknown as { aetDebugViewport?: { parts: Map<string, unknown> } })
+                    .aetDebugViewport;
                 return v !== undefined && v.parts.size > 0;
             }),
         { timeout: 120_000, timeoutMsg: "The model did not load" },
     );
     await browser.pause(2_000);
     return browser.execute(() => {
-        const v = (window as unknown as { aetDebugViewport: any })
-            .aetDebugViewport;
+        const v = (window as unknown as { aetDebugViewport: any }).aetDebugViewport;
         const gl = v.renderer.getContext() as WebGL2RenderingContext;
         const width = gl.drawingBufferWidth;
         const height = gl.drawingBufferHeight;
@@ -84,9 +80,7 @@ describe("PRV-42", () => {
     });
 
     it("leaves the frame where it is when nothing bends it", async () => {
-        await openInPreview(
-            path.join(foc, "Data", "Art", "Models", "Hp_turret_front_00.alo"),
-        );
+        await openInPreview(path.join(foc, "Data", "Art", "Models", "Hp_turret_front_00.alo"));
         const bent = await inNewestWebview(bend);
         console.log(`PRV-42 ${JSON.stringify(bent)}`);
 
