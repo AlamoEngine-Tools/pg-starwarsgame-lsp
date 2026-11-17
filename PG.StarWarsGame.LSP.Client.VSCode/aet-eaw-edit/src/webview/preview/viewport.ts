@@ -18,6 +18,7 @@ import {
     DEFAULT_AZIMUTH_DEGREES,
     DEFAULT_ELEVATION_DEGREES,
     frameSphere,
+    FIELD_OF_VIEW,
 } from "./framing";
 import type {
     AlamoParticleContent,
@@ -120,7 +121,7 @@ import {
 } from "./boneVisibility";
 import { skinHiddenByClip } from "./skinVisibility";
 import { type SubjectAnimation } from "./subjectAnimation";
-import { drawnBounds, triangleCount } from "./modelBounds";
+import { drawnBounds, isOverlay, triangleCount } from "./modelBounds";
 import { HeatPass } from "./heatPass";
 import { BloomPass } from "./bloomPass";
 import { ShadowVolumePass } from "./shadowVolumePass";
@@ -181,6 +182,7 @@ import { ParticleHost } from "./particleHost";
 import { MaterialBinder } from "./materialBinder";
 import { EnvironmentRig } from "./environmentRig";
 import { ModelRows } from "./modelRows";
+import { CameraRig } from "./cameraRig";
 
 /**
  * Where a system being loaded goes, and what it is.
@@ -219,9 +221,6 @@ export interface ParticlePlacement {
     at?: { x: number; y: number; z: number };
 }
 
-/** Vertical field of view, in degrees. Narrow enough to keep perspective distortion off a long hull. */
-const FIELD_OF_VIEW = 50;
-
 /** What the stats readout shows. */
 export interface ViewportStats {
     parts: number;
@@ -233,16 +232,6 @@ export interface ViewportStats {
 
 /** A named camera angle the toolbar can jump to. */
 export type PresetView = "front" | "side" | "top" | "threeQuarter";
-
-const PRESETS: Record<PresetView, { azimuth: number; elevation: number }> = {
-    front: { azimuth: 0, elevation: 0 },
-    side: { azimuth: 90, elevation: 0 },
-    top: { azimuth: 0, elevation: 89.9 },
-    threeQuarter: {
-        azimuth: DEFAULT_AZIMUTH_DEGREES,
-        elevation: DEFAULT_ELEVATION_DEGREES,
-    },
-};
 
 /** Anything about a loaded model beyond the bone it is attached to. */
 export interface AddPartOptions {
@@ -422,10 +411,8 @@ export class PreviewViewport {
     private disposed = false;
     /** Bone nodes whose geometry turns to face the camera, the light or the wind. */
     private billboards: THREE.Object3D[] = [];
-    /** How far the camera stands off, kept so the depth range can be redone without reframing. */
-    private fitDistance = 1;
-    /** The reader's own multiplier on the fitted far plane. */
-    private drawDistance = 1;
+    /** The framing: how far the camera sits, what it is fitted to, the model's own cameras and the clip planes. See `CameraRig`. */
+    private readonly cameraRig: CameraRig;
     private alt = 0;
     private lod = 0;
     /** Labels, reticles, selection boxes, the skeleton and the bone axes. See `OverlayLayer`. */
@@ -476,8 +463,6 @@ export class PreviewViewport {
      * what keeps the shell off the models whose object never declares the ability.
      */
     private stealthed = false;
-    /** See {@link modelSpan}. Cleared with the scene. */
-    private cachedSpan: number | null = null;
     /** Wreckage currently in the air, each on its own clock. */
     private readonly breakoffs: BreakoffInstance[] = [];
     /** Every named attachment a caller has asked for, so {@link unresolvedAttachments} can check. */
@@ -550,6 +535,33 @@ export class PreviewViewport {
         // Live getters, not copies: the parts, the rows and the hull change with every subject, and
         // the layer reads them at the moment it draws.
         const viewport = this;
+        // First: the environment places its key light against the framing sphere as it is built.
+        this.cameraRig = new CameraRig({
+            get camera() {
+                return viewport.camera;
+            },
+            get controls() {
+                return viewport.controls;
+            },
+            get environment() {
+                return viewport.environment;
+            },
+            get materials() {
+                return viewport.materials;
+            },
+            get modelRoot() {
+                return viewport.modelRoot;
+            },
+            get particles() {
+                return viewport.particles;
+            },
+            get renderer() {
+                return viewport.renderer;
+            },
+            drawn: (mesh) => viewport.drawn(mesh),
+            hull: () => viewport.hull(),
+            updateBillboards: () => viewport.updateBillboards(),
+        });
         this.environment = new EnvironmentRig({
             get alt() {
                 return viewport.alt;
@@ -579,7 +591,7 @@ export class PreviewViewport {
                 return viewport.stealthed;
             },
             boundingSphere: (includeEffects) =>
-                viewport.boundingSphere(includeEffects),
+                viewport.cameraRig.boundingSphere(includeEffects),
             forEachDrawnMesh: (visit) => viewport.forEachDrawnMesh(visit),
             skinPalette: (mesh) => viewport.skinPalette(mesh),
         });
@@ -642,9 +654,9 @@ export class PreviewViewport {
                 bonePosition: (partId, bone) =>
                     viewport.bonePosition(partId, bone),
                 boundingSphere: (includeEffects) =>
-                    viewport.boundingSphere(includeEffects),
+                    viewport.cameraRig.boundingSphere(includeEffects),
                 hull: () => viewport.hull(),
-                modelSpan: () => viewport.modelSpan(),
+                modelSpan: () => viewport.cameraRig.modelSpan(),
                 skeleton: () => viewport.skeleton(),
             },
             this.scene,
@@ -670,7 +682,7 @@ export class PreviewViewport {
             },
             fireBoneAttachment: (partId, bone) =>
                 viewport.fireBoneAttachment(partId, bone),
-            modelSpan: () => viewport.modelSpan(),
+            modelSpan: () => viewport.cameraRig.modelSpan(),
         });
         this.materials = new MaterialBinder({
             get camera() {
@@ -708,10 +720,10 @@ export class PreviewViewport {
                 return viewport.lod;
             },
             get fitDistance() {
-                return viewport.fitDistance;
+                return viewport.cameraRig.fitDistance;
             },
             get cameraPosition() {
-                return viewport.cameraPosition;
+                return viewport.cameraRig.cameraPosition;
             },
             get modelRoot() {
                 return viewport.modelRoot;
@@ -732,11 +744,11 @@ export class PreviewViewport {
                 return viewport.materials.translatedShaders;
             },
             applyClipPlanes: (sphere, distance) =>
-                viewport.applyClipPlanes(sphere, distance),
+                viewport.cameraRig.applyClipPlanes(sphere, distance),
             attachmentFor: (partId, bone, boneIndex) =>
                 viewport.attachmentFor(partId, bone, boneIndex),
             boundingSphere: (includeEffects) =>
-                viewport.boundingSphere(includeEffects),
+                viewport.cameraRig.boundingSphere(includeEffects),
             partRootOf: (partId) => viewport.partRootOf(partId),
             refreshParticleVisibility: (entry) =>
                 viewport.refreshParticleVisibility(entry),
@@ -760,11 +772,7 @@ export class PreviewViewport {
 
     /** Where the camera stands now, for saving the current shot as a preset. */
     get cameraPosition(): Vector3Like {
-        return {
-            x: this.camera.position.x,
-            y: this.camera.position.y,
-            z: this.camera.position.z,
-        };
+        return this.cameraRig.cameraPosition;
     }
 
     /**
@@ -787,47 +795,12 @@ export class PreviewViewport {
      * buffer still holds the frame.
      */
     canvasCoverage(): { lit: number; total: number } {
-        this.environment.renderFrame();
-        const gl = this.renderer.getContext();
-        const width = gl.drawingBufferWidth;
-        const height = gl.drawingBufferHeight;
-        const pixels = new Uint8Array(width * height * 4);
-        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-        const counts = new Map<number, number>();
-        for (let i = 0; i < pixels.length; i += 4) {
-            const key =
-                (pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2];
-            counts.set(key, (counts.get(key) ?? 0) + 1);
-        }
-        let dominant = 0;
-        let most = -1;
-        for (const [key, count] of counts) {
-            if (count > most) {
-                most = count;
-                dominant = key;
-            }
-        }
-        const [r, g, b] = [
-            (dominant >> 16) & 255,
-            (dominant >> 8) & 255,
-            dominant & 255,
-        ];
-        let lit = 0;
-        for (let i = 0; i < pixels.length; i += 4) {
-            const departure =
-                Math.abs(pixels[i] - r) +
-                Math.abs(pixels[i + 1] - g) +
-                Math.abs(pixels[i + 2] - b);
-            if (departure > 3) {
-                lit++;
-            }
-        }
-        return { lit, total: width * height };
+        return this.cameraRig.canvasCoverage();
     }
 
     /** The bounding sphere a preset is resolved against, so the caller sizes the shot correctly. */
     get subjectSphere(): { center: Vector3Like; radius: number } {
-        return this.boundingSphere();
+        return this.cameraRig.subjectSphere;
     }
 
     get animationNames(): string[] {
@@ -1310,7 +1283,7 @@ export class PreviewViewport {
         // A new subject asks for its own bones. Keeping the old subject's requests would report a
         // Star Destroyer's missing hardpoint against a Mon Calamari Cruiser for the rest of the session.
         this.attachRequests.clear();
-        this.cachedSpan = null;
+        this.cameraRig.forgetSpan();
         // The marks name parts that are about to stop existing; leaving them would draw a reticle
         // over the next model's geometry at whatever the last one's bounds happened to be.
         this.overlay.dropReticles();
@@ -1406,11 +1379,14 @@ export class PreviewViewport {
 
         // The span is measured off world matrices, so it changes with the scale - and everything
         // sized against the subject reads it.
-        this.cachedSpan = null;
+        this.cameraRig.forgetSpan();
 
         this.turret.applyModelScale();
 
-        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+        this.cameraRig.applyClipPlanes(
+            this.cameraRig.boundingSphere(),
+            this.cameraRig.fitDistance,
+        );
     }
 
     /**
@@ -1928,22 +1904,7 @@ export class PreviewViewport {
      * @returns false when the model does not carry that bone pair, so the caller can say so.
      */
     applyModelCamera(name: string): boolean {
-        const eye = this.boneNodeFor(name);
-        const at = this.boneNodeFor(`${name}.Target`);
-
-        if (eye === undefined || at === undefined) {
-            return false;
-        }
-
-        eye.updateWorldMatrix(true, false);
-        at.updateWorldMatrix(true, false);
-
-        this.applyCameraPose(
-            new THREE.Vector3().setFromMatrixPosition(eye.matrixWorld),
-            new THREE.Vector3().setFromMatrixPosition(at.matrixWorld),
-        );
-
-        return true;
+        return this.cameraRig.applyModelCamera(name);
     }
 
     /**
@@ -1955,50 +1916,11 @@ export class PreviewViewport {
      * the previous framing chose and the model disappears.
      */
     applyCameraPose(position: Vector3Like, target: Vector3Like): void {
-        this.fitDistance = Math.hypot(
-            position.x - target.x,
-            position.y - target.y,
-            position.z - target.z,
-        );
-        this.applyClipPlanes(this.boundingSphere(true), this.fitDistance);
-
-        this.camera.position.set(position.x, position.y, position.z);
-        this.controls.target.set(target.x, target.y, target.z);
-        this.controls.update();
+        this.cameraRig.applyCameraPose(position, target);
     }
 
     frameAll(preset: PresetView = "threeQuarter"): void {
-        const sphere = this.boundingSphere();
-        const { azimuth, elevation } = PRESETS[preset];
-        const aspect = this.camera.aspect;
-
-        const pose = frameSphere(
-            sphere,
-            FIELD_OF_VIEW,
-            aspect,
-            azimuth,
-            elevation,
-        );
-        const distance = Math.hypot(
-            pose.position.x - sphere.center.x,
-            pose.position.y - sphere.center.y,
-            pose.position.z - sphere.center.z,
-        );
-
-        this.fitDistance = distance;
-        this.applyClipPlanes(this.boundingSphere(true), distance);
-
-        this.camera.position.set(
-            pose.position.x,
-            pose.position.y,
-            pose.position.z,
-        );
-        this.controls.target.set(pose.target.x, pose.target.y, pose.target.z);
-        this.controls.update();
-
-        // The grid is a sense of scale, so it has to grow with the subject: a fixed 100-unit grid is
-        // invisible under a capital ship and swallows a fighter.
-        this.environment.rebuildGrid(sphere);
+        this.cameraRig.frameAll(preset);
     }
 
     setGridVisible(visible: boolean): void {
@@ -2720,7 +2642,7 @@ export class PreviewViewport {
                 this.setFireArcsVisible(false);
             }
 
-            this.prepareForCamera();
+            this.cameraRig.prepareForCamera();
 
             // A sprite is oriented against the VIEW matrix - a streak's length is a screen-space
             // measurement - so it has to be re-aimed for this camera. A zero step re-aims without
@@ -2756,7 +2678,7 @@ export class PreviewViewport {
             this.camera.aspect = before.aspect;
             this.camera.updateProjectionMatrix();
             this.resize();
-            this.prepareForCamera();
+            this.cameraRig.prepareForCamera();
             this.environment.renderFrame();
         }
     }
@@ -2798,8 +2720,7 @@ export class PreviewViewport {
      * touch the camera.
      */
     setDrawDistance(multiplier: number): void {
-        this.drawDistance = multiplier;
-        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+        this.cameraRig.setDrawDistance(multiplier);
     }
 
     dispose(): void {
@@ -3295,92 +3216,12 @@ export class PreviewViewport {
         }
     }
 
-    /**
-     * The scene node for any way of naming a bone.
-     *
-     * The one place a name becomes a node. It used to be three different places with three
-     * different rules - a lowercased map for cameras, a canonical-id map for the animation tracks,
-     * a stripped-name lookup for the row chain - and a key that suited one of them matched nothing
-     * in the others. `resolveBoneId` knows the fallbacks; nothing else needs to.
-     */
-    private boneNodeFor(key: string): THREE.Object3D | undefined {
-        const hull = this.hull();
-
-        if (hull === null) {
-            return undefined;
-        }
-
-        const byId = new Map(
-            [...hull.bonesByIndex.values()].map(
-                (node) => [alamoNodeName(node), node] as const,
-            ),
-        );
-        const id = resolveBoneId(byId.keys(), key);
-
-        return id === undefined ? undefined : byId.get(id);
-    }
-
     private refreshParticleVisibility(entry: ParticleEntry): void {
         // Deliberately does not decide anything itself. A system's row is in the chain like every
         // other row - the effects master vetoes it, its level gates it, the reader overrides it -
         // and a second opinion here would silently undo the first.
         void entry;
         this.rows.refreshRows();
-    }
-
-    /**
-     * A sphere around the subject.
-     *
-     * `includeEffects` separates two questions that were being answered with one number. Where the
-     * CAMERA goes is about the model: a firing arc is a weapon's range and a smoke plume is where
-     * the smoke has drifted to, and neither should push the hull into the distance. What the FAR
-     * PLANE is set to is about reach: cull at the hull and a long trail is chopped off in mid-air,
-     * which is what put this in in the first place.
-     */
-    private boundingSphere(includeEffects = false): BoundingSphere {
-        // How far the particles will get. Their geometry is allocated full of zeros and filled in over
-        // the following seconds, so a box around it measures a point at the origin however large the
-        // effect is about to be - and a zero radius puts the camera on its own target, which draws
-        // nothing at all, grid included.
-        const particleReach = !includeEffects
-            ? 0
-            : Math.max(
-                  0,
-                  ...[...this.particles.particleSystems.values()].map((entry) =>
-                      entry.instance.extent(),
-                  ),
-              );
-
-        // Only what is on screen, and only geometry. See `modelBounds.ts` - the firing-arc cones
-        // under this same root are thousands of units across and are not the model.
-        //
-        // The SHADOW volume is excluded even when it is on screen. It is an extruded silhouette,
-        // routinely larger than the hull it belongs to and offset from it, so a model that draws
-        // one framed itself around a shape nobody was looking at - which is what made the presets
-        // look like they were choosing at random. Someone who ticks it on wants to SEE it, not to
-        // have the camera measure the subject by it.
-        const box = drawnBounds(
-            this.modelRoot,
-            (mesh) => this.drawn(mesh) && !isShadowVolume(mesh),
-            // The arcs and handles are drawn and are meshes, so `drawn` alone let them in whenever
-            // they were on screen: measured on the Gargantuan with its arcs showing, the framing
-            // radius was 508 against a hull of 99, and every camera preset stood five times too far
-            // off. The defect this function exists for, still open whenever the arcs were visible.
-            isOverlay,
-        );
-        const sphere = box.isEmpty()
-            ? { center: { x: 0, y: 0, z: 0 }, radius: 0 }
-            : (() => {
-                  const s = box.getBoundingSphere(new THREE.Sphere());
-                  return {
-                      center: { x: s.center.x, y: s.center.y, z: s.center.z },
-                      radius: s.radius,
-                  };
-              })();
-
-        // Guards NaN as well as zero: `>` is false for NaN, so the fallback wins.
-        const radius = Math.max(particleReach, sphere.radius);
-        return { center: sphere.center, radius: radius > 0 ? radius : 1 };
     }
 
     /**
@@ -3627,36 +3468,6 @@ export class PreviewViewport {
         return made;
     }
 
-    /**
-     * How big the subject is, across its diagonal, cached until the scene changes.
-     *
-     * `Box3.setFromObject` walks every vertex, so anything asking per frame - the bone axes did -
-     * turns a size lookup into a full geometry traversal. The hull does not change size while it is
-     * loaded; an animation moves it. The one thing that does change it is `setModelScale`, which
-     * drops the cache, because the span is measured in WORLD units.
-     */
-    private modelSpan(): number {
-        if (this.cachedSpan !== null) {
-            return this.cachedSpan;
-        }
-
-        const hull = this.hull();
-        if (hull === null) {
-            return 100;
-        }
-
-        // Every mesh the hull carries, drawn or not, as before - but NOT the overlays hung inside it.
-        // `setFromObject` measured those too, and on the Gargantuan with its arcs on the span came out
-        // at 1015 against a hull of 204. The span sizes the turret handles and caps how long an arc
-        // is drawn, so that fed back: handles sized against the arcs, arcs capped against themselves.
-        const bounds = drawnBounds(hull.root, () => true, isOverlay);
-        this.cachedSpan = bounds.isEmpty()
-            ? 100
-            : bounds.getSize(new THREE.Vector3()).length();
-
-        return this.cachedSpan;
-    }
-
     private onPointerDown = (event: PointerEvent): void => {
         if (this.turret.grabKnob(event)) {
             return;
@@ -3731,57 +3542,13 @@ export class PreviewViewport {
         this.particles.step(dt, this.camera.matrixWorldInverse);
 
         this.overlay.beforeCamera(this.active.mixer !== null);
-        this.prepareForCamera();
+        this.cameraRig.prepareForCamera();
         // After the camera's matrix is updated, so the marks are projected through THIS frame's view.
         // See `OverlayLayer.afterCamera`.
         this.overlay.afterCamera();
 
         this.environment.renderFrame();
     };
-
-    /**
-     * Everything that has to be recomputed for the camera AS IT STANDS, before anything is drawn.
-     *
-     * Its own method because there are two callers and they must not drift: the animation loop, and
-     * `capture`, which moves the camera and changes the aspect before rendering a single frame.
-     * Capture used to call `renderFrame` on its own, and the result did not represent the scene at
-     * all - the translated materials still held the PREVIOUS frame's projection, so every mesh
-     * drawn by one landed in the wrong place or off the edge while the floor and the grid, which
-     * are ordinary three materials, drew correctly against the new one. Meshes ghosting off to the
-     * side with the back and the engines missing is exactly what a stale WORLDVIEWPROJECTION looks
-     * like.
-     *
-     * Time is NOT advanced here. Nothing in this method simulates anything - it only answers "where
-     * is the camera now", which is the one thing a capture changes.
-     */
-    private prepareForCamera(): void {
-        this.camera.updateMatrixWorld();
-
-        // The engine's per-frame contract, including the matrices. Last, not first, so it sees the
-        // bone transforms the animation and skeleton work above have already settled.
-        this.materials.updateAlamoUniforms();
-        this.updateBillboards();
-
-        // The sky dome travels with the camera and keeps its own orientation, so the horizon stays
-        // level and infinitely far however the camera is turned.
-        if (this.environment.sky !== null && this.environment.sky.visible) {
-            this.environment.sky.position.copy(this.camera.position);
-            this.environment.sky.scale.setScalar(
-                Math.max(this.camera.near * 4, this.camera.far * 0.4),
-            );
-        }
-
-        // The stars need the same treatment, and for a reason that took a regression to notice:
-        // parenting them to the CAMERA exempts them from frustum CULLING but not from the far
-        // plane, which clips their vertices like anything else's. The far plane is fitted to the
-        // model, so the moment the hardpoint rotation was corrected and the bounds shrank, the
-        // whole sky fell outside it and the stars simply went out.
-        if (this.environment.stars !== null && this.environment.stars.visible) {
-            this.environment.stars.scale.setScalar(
-                Math.max(this.camera.near * 4, this.camera.far * 0.4),
-            );
-        }
-    }
 
     /**
      * Turns each billboarded bone's geometry to face whatever it is meant to face.
@@ -3836,26 +3603,6 @@ export class PreviewViewport {
             }
         }
     }
-
-    /**
-     * Sets the depth range from the model, its effects and the reader's own draw distance.
-     *
-     * The camera is framed on the MODEL - fitting it to the effects would push a trooper into the
-     * distance to make room for his flamethrower - but the far PLANE has to clear both, or the
-     * flame is culled halfway along and reads as an effect that stops.
-     */
-    private applyClipPlanes(sphere: BoundingSphere, distance: number): void {
-        const planes = clipPlanes(
-            sphere,
-            distance,
-            this.particles.effectReach(),
-            this.drawDistance,
-        );
-
-        this.camera.near = planes.near;
-        this.camera.far = planes.far;
-        this.camera.updateProjectionMatrix();
-    }
 }
 
 function decodeBase64(value: string): ArrayBuffer {
@@ -3865,32 +3612,6 @@ function decodeBase64(value: string): ArrayBuffer {
         bytes[i] = binary.charCodeAt(i);
     }
     return bytes.buffer;
-}
-
-/**
- * The root of something this viewport DRAWS OVER the model - a firing arc, a turret handle - rather
- * than part of it.
- *
- * One flag for every overlay, checked everywhere the model is walked or measured: the mesh walk the
- * tree, the stats, the shader rebuild, the wireframe and the tint go through, plus the framing sphere
- * and the subject span. Both kinds of overlay hang INSIDE the model on bones, and both are meshes, so
- * neither a type test nor scoping to the part roots keeps them out - the same trap the particle
- * systems fell into first.
- *
- * Measured on the Gargantuan with both showing, before this: 24 overlay meshes walked as geometry,
- * 24 phantom tree rows, shader coverage counting 35 meshes where the model has 11, the knob handed a
- * model material on a shader rebuild and swept by the wireframe, the span five times the hull's and
- * the camera framing five times too far.
- */
-function isOverlay(node: THREE.Object3D): boolean {
-    return node.userData.aetOverlay === true;
-}
-
-/** A mesh the exporter marked as a shadow volume, rather than part of the model's own shape. */
-function isShadowVolume(mesh: THREE.Mesh): boolean {
-    const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-    return resolveMaterial(extras).archetype === "shadow-volume";
 }
 
 /** Releases GPU memory for a subtree; the renderer does not do it on removal. */

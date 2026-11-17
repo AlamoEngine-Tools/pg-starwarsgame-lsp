@@ -152,3 +152,6 @@ export function sphereFromBounds(min: Vec3, max: Vec3): BoundingSphere {
 
     return { center, radius };
 }
+
+/** Vertical field of view, in degrees. Narrow enough to keep perspective distortion off a long hull. */
+export const FIELD_OF_VIEW = 50;
