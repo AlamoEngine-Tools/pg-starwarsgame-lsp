@@ -776,8 +776,7 @@ export class PreviewViewport {
 
     /**
      * Every running particle system's emitters as their last frame left them, and where the camera
-     * stands. For the UI tests, through the page's debug handle: whether a field is full, drifts,
-     * stays frozen or is drawn back to front is a question about the simulation, not the pixels.
+     * stands. See `ParticleHost.particleProbe`.
      */
     particleProbe(): {
         camera: Vector3Like;
@@ -787,11 +786,8 @@ export class PreviewViewport {
     }
 
     /**
-     * Renders one frame and counts the canvas pixels that differ from its dominant colour, for the UI
-     * tests. With the heat Debug view on, the dominant colour is the neutral field and the rest is the
-     * heat the camera sees - whether a hull in front of a haze hides it is a depth test on the GPU, so
-     * the pixels are the only place to read it. Read in the same task as the render, so the drawing
-     * buffer still holds the frame.
+     * Renders one frame and counts the canvas pixels that differ from its dominant colour, for the
+     * UI tests. See `CameraRig.canvasCoverage`.
      */
     canvasCoverage(): { lit: number; total: number } {
         return this.cameraRig.canvasCoverage();
@@ -807,54 +803,32 @@ export class PreviewViewport {
     }
 
     /**
-     * Moves the key light, in the same azimuth/elevation terms as the camera presets.
-     *
-     * The light drives the translated shaders too - they read it as DIR_LIGHT_VEC_0 - so this is one
-     * dial for the shading and the shadow both, rather than a viewer-only conceit.
+     * Moves the key light, in the same azimuth/elevation terms as the camera presets. See
+     * `EnvironmentRig.setLightAngles`.
      */
     setLightAngles(azimuthDegrees: number, elevationDegrees: number): void {
         this.environment.setLightAngles(azimuthDegrees, elevationDegrees);
     }
 
     /**
-     * Takes the whole rig: three directionals with their own colours, plus the global terms.
-     *
-     * The same shape AloViewer's settings dialog offers, because it is the engine's own - a sun and
-     * two fills, each with a heading, a tilt, a colour and a brightness. Colour and brightness are
-     * kept apart so a light can be dimmed without desaturating it.
+     * Takes the whole rig: three directionals with their own colours, plus the global terms. See
+     * `EnvironmentRig.setLightRig`.
      */
     setLightRig(rig: LightRig): void {
         this.environment.setLightRig(rig);
     }
 
-    /**
-     * Chooses what is behind the model.
-     *
-     * A flat grey is honest but makes a hull hard to judge; a starfield gives a space model
-     * something to sit against and a sky does the same for a ground one. Both are BACKDROPS: never
-     * lit, never in the depth buffer, and they follow the camera so they read as infinitely far.
-     */
+    /** Chooses what is behind the model. See `EnvironmentRig.setBackground`. */
     setBackground(kind: BackgroundKind): void {
         this.environment.setBackground(kind);
     }
 
-    /**
-     * Sets the one wind the scene has.
-     *
-     * Read by the foliage shaders through their own semantics and by the 484 emitters that set
-     * `affectedByWind`: an ordinary one gains half of it as speed every frame, a weather field
-     * drifts with five times it - see `stepParticle` and the weather step.
-     */
+    /** Sets the one wind the scene has. See `ParticleHost.setWind`. */
     setWind(headingDegrees: number, speed: number): void {
         this.particles.setWind(headingDegrees, speed);
     }
 
-    /**
-     * Sets the weather phase's intensity.
-     *
-     * Measured: a phase sets it as the energy of the weather system's group, so it reaches the
-     * systems that hold a weather field and no other effect, which stays at 1.0.
-     */
+    /** Sets the weather phase's intensity. See `ParticleHost.setWeatherIntensity`. */
     setWeatherIntensity(intensity: number): void {
         this.particles.setWeatherIntensity(intensity);
     }
@@ -865,20 +839,8 @@ export class PreviewViewport {
     }
 
     /**
-     * Adds a model, attached to a bone of an already-loaded part when asked.
-     *
-     * Attaching to the bone's Object3D rather than copying its transform is what makes an attached
-     * turret follow the hull's animation for free.
-     *
-     * THE one loader. Every model in the scene comes through here - the hull, its hardpoint
-     * models, a death clone, a piece of wreckage - because the alternative was measured and it is
-     * a parallel pipeline that converges on this one a bug at a time. `addBreakoff` had hand
-     * copies of six of the steps below, four of them added on a single day off user reports, and
-     * was still missing nine others; the wreck cast no stencil shadow, had no tree keys, ignored
-     * the detail levels and could not carry a clip. What differs between one model and the next is
-     * which SUBJECT it belongs to, which is {@link AddPartOptions}, not which loader it uses.
-     *
-     * Hands back the root it built, for a caller that has its own state to keep beside it.
+     * Adds a model, attached to a bone of an already-loaded part when asked. See
+     * `PartAssembly.addPart`.
      */
     async addPart(
         id: string,
@@ -897,23 +859,16 @@ export class PreviewViewport {
     }
 
     /**
-     * Every named attachment that still does not resolve, in words.
-     *
-     * RECOMPUTED rather than logged at the moment of the miss, because most misses are temporary:
-     * geometry arrives asynchronously and a hardpoint routinely asks for its bone before the hull
-     * carrying it has landed. A request that resolves later simply stops being reported, so this
-     * can be read at any time without a stale backlog.
+     * Every named attachment that still does not resolve, in words. See
+     * `PartAssembly.unresolvedAttachments`.
      */
     unresolvedAttachments(): string[] {
         return this.assembly.unresolvedAttachments();
     }
 
     /**
-     * Applies a shader's declared render state to every material using it.
-     *
-     * This is the fidelity that needs no shader translation: the effects spell their blend, depth
-     * and cull state out declaratively. A `custom` blend is left alone deliberately - the archetype
-     * guess is better than a wrong one.
+     * Applies a shader's declared render state to every material using it. See
+     * `MaterialBinder.applyShaderState`.
      */
     applyShaderState(shaderName: string, state: FxMaterialState): void {
         this.materials.applyShaderState(shaderName, state);
@@ -935,12 +890,8 @@ export class PreviewViewport {
     }
 
     /**
-     * Draws with a translated effect instead of its archetype, wherever that effect is used.
-     *
-     * Kept alongside the archetype rather than replacing it: a mod-authored `.fx` will never
-     * translate, the eleven fixed-function effects have no shader at all, and the archetype is what
-     * both fall back to. `setTranslatedShaders(false)` puts everything back on that path, which is
-     * the only way to see what the translation is actually changing.
+     * Draws with a translated effect instead of its archetype, wherever that effect is used. See
+     * `MaterialBinder.applyTranslatedEffect`.
      */
     applyTranslatedEffect(shaderName: string, effect: TranslatedEffect): void {
         this.materials.applyTranslatedEffect(shaderName, effect);
@@ -953,17 +904,15 @@ export class PreviewViewport {
 
     /**
      * How many loaded sub-meshes and emitters a translated effect actually reaches, out of how many
-     * there are. The emitters count because a particle file has no sub-meshes at all.
+     * there are. See `MaterialBinder.translatedCoverage`.
      */
     translatedCoverage(): { translated: number; total: number } {
         return this.materials.translatedCoverage();
     }
 
     /**
-     * Samplers on translated materials that are reading nothing, in words.
-     *
-     * A sampler with no texture reads black, and the shader then draws something plausible and
-     * wrong - the sort of thing that looks like a translation bug and is actually a missing file.
+     * Samplers on translated materials that are reading nothing, in words. See
+     * `MaterialBinder.shaderTextureProblems`.
      */
     shaderTextureProblems(): string[] {
         return this.materials.shaderTextureProblems();
@@ -975,13 +924,8 @@ export class PreviewViewport {
     }
 
     /**
-     * Binds every texture already decoded into a subtree that has only just been added.
-     *
-     * `setTexture` binds at the moment the texture ARRIVES, so geometry added afterwards gets
-     * nothing - and asking the host again does not help, because it remembers what it has already
-     * sent and answers a repeat request with silence. Wreckage is the case that exposed this: a
-     * breakoff prop is usually a piece of the hull it fell off, so its textures are always ones
-     * already in hand, and it dropped as a black shape every time.
+     * Binds every texture already decoded into a subtree that has only just been added. See
+     * `MaterialBinder.bindLoadedTextures`.
      */
     bindLoadedTextures(root: THREE.Object3D): void {
         this.materials.bindLoadedTextures(root);
@@ -1072,11 +1016,8 @@ export class PreviewViewport {
     }
 
     /**
-     * Shield meshes the model names but does not draw with a shield shader.
-     *
-     * Reported to the reader rather than corrected: the NAME is what decides which mesh a shield
-     * ability reveals, so the author's word stands - but a bubble on a hull shader will read as
-     * solid geometry rather than a field, and that is worth saying once.
+     * Shield meshes the model names but does not draw with a shield shader. See
+     * `MaterialBinder.shieldMeshesOffShader`.
      */
     shieldMeshesOffShader(): string[] {
         return this.materials.shieldMeshesOffShader();
@@ -1134,12 +1075,7 @@ export class PreviewViewport {
         );
     }
 
-    /**
-     * Draws the firing arcs, replacing whatever was there.
-     *
-     * Off by default, and for good reason: a Star Destroyer's arcs reach 2000 units on a hull about
-     * 600 long, so leaving them on hides the ship inside its own cones.
-     */
+    /** Draws the firing arcs, replacing whatever was there. See `TurretRig.setFireArcs`. */
     setFireArcs(
         arcs: readonly {
             partId: string;
@@ -1158,19 +1094,7 @@ export class PreviewViewport {
         this.turret.setFireArcsVisible(visible);
     }
 
-    /**
-     * Poses turrets at their rest angle.
-     *
-     * COMPOSED on the pose the model authored, through the same `aimBone` the sweep and the
-     * handles use: the game applies a turret's turn on top of the bone it computed from the file,
-     * so a rest angle is a turn off the authored pose and never a replacement for it. Writing the
-     * angle into the bone's Z rotation outright threw the authored yaw away and turned every turret
-     * whose bone the exporter had oriented - a quarter turn on most (#389).
-     *
-     * Traverse is about the bone's local Z. Alamo is Z-up, and the exporter's Z-up-to-Y-up rotation
-     * sits on the ROOT node, so a bone's own axes still follow the file's convention - the same one
-     * the fire bones showed: X forward, Y lateral, Z up.
-     */
+    /** Poses turrets at their rest angle. See `TurretRig.setTurretRestAngles`. */
     setTurretRestAngles(
         poses: readonly {
             partId: string;
@@ -1183,15 +1107,7 @@ export class PreviewViewport {
     }
 
     /**
-     * Sweeps the turrets through the traverse their XML declares.
-     *
-     * The pose is recomputed per frame from `sweepAngles`, so what is on screen is always the
-     * declared extent rather than an accumulated one - an incremental turn drifts, and a turret that
-     * drifts past its own end stops is exactly the thing this exists to disprove.
-     *
-     * Traverse is about the bone's local Z and elevation about its X. Alamo is Z-up and the
-     * exporter's Z-up-to-Y-up rotation sits on the ROOT node, so a bone's own axes still follow the
-     * file's convention - the same one the fire bones showed.
+     * Sweeps the turrets through the traverse their XML declares. See `TurretRig.setTurretSweep`.
      */
     setTurretSweep(
         sweeps: readonly {
@@ -1205,14 +1121,8 @@ export class PreviewViewport {
     }
 
     /**
-     * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest.
-     *
-     * Two axes and no third: the engine has no roll on a turret -
-     * the turret-angle calculation returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
-     *
-     * Each track spans only what the engine allows, so the stop is visible before it is reached.
-     * Which turrets these are is {@link turretHandles}' decision, off the arc toggle, and not this
-     * class's.
+     * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest. See
+     * `TurretRig.setTurretHandles`.
      */
     setTurretHandles(handles: readonly TurretHandle[]): void {
         this.turret.setTurretHandles(handles);
@@ -1225,28 +1135,12 @@ export class PreviewViewport {
 
     // ── damage ────────────────────────────────────────────────────────────────
 
-    /**
-     * Puts one turret back where the model authored it.
-     *
-     * Needed because releasing a drag deliberately does NOT spring back - a handle that reset
-     * itself would be a momentary readout rather than a control - so there has to be a way home.
-     */
+    /** Puts one turret back where the model authored it. See `TurretRig.resetTurretAim`. */
     resetTurretAim(id: string): void {
         this.turret.resetTurretAim(id);
     }
 
-    /**
-     * Drops a piece of wreckage where a hardpoint used to be.
-     *
-     * A PASSIVE SUBJECT loaded by the one loader, which is all that is left here that is specific
-     * to debris: where the hardpoint was, and the clock it runs on. It used to load itself, and the
-     * hand copy drifted - four of its six duplicated steps were added one bug report at a time,
-     * and nine more were simply missing.
-     *
-     * Its own subject rather than another piece of the ship: debris is transient, it is removed on
-     * its own clock, it is drawn by its own file's rules, and re-parenting the hardpoint's own model
-     * would fight the destruction rules that hid it.
-     */
+    /** Drops a piece of wreckage where a hardpoint used to be. See `DestructionRig.addBreakoff`. */
     async addBreakoff(
         key: string,
         glbBase64: string,
@@ -1256,13 +1150,7 @@ export class PreviewViewport {
         return this.destruction.addBreakoff(key, glbBase64, at, prop);
     }
 
-    /**
-     * Clears the wreckage ONE hardpoint shed.
-     *
-     * Repairing a single hardpoint from its own card has to take its debris with it, exactly as
-     * repairing the whole target does - otherwise the hardpoint is back on the hull and its wreck
-     * is still tumbling away beside it.
-     */
+    /** Clears the wreckage ONE hardpoint shed. See `DestructionRig.clearBreakoff`. */
     clearBreakoff(key: string): void {
         this.destruction.clearBreakoff(key);
     }
@@ -1277,7 +1165,7 @@ export class PreviewViewport {
         return this.destruction.hasBreakoff(key);
     }
 
-    /** Starts the wreck on its way. `onDone` fires once, at the end of the declared time. */
+    /** Starts the wreck on its way. See `DestructionRig.startSpinAway`. */
     startSpinAway(
         partId: string,
         spin: PreviewSpinAway,
@@ -1296,23 +1184,12 @@ export class PreviewViewport {
         this.assembly.setPartHidden(partId, hidden);
     }
 
-    /**
-     * Removes one loaded part and frees its geometry.
-     *
-     * For parts that come and go with a STATE rather than with the subject - a death clone appears
-     * when the ship dies and goes again when it is repaired. A scene part is never removed this
-     * way; it lives as long as the subject does and is hidden instead.
-     */
+    /** Removes one loaded part and frees its geometry. See `PartAssembly.removePart`. */
     removePart(partId: string): void {
         this.assembly.removePart(partId);
     }
 
-    /**
-     * Plays a system once and forgets it.
-     *
-     * A death explosion is an event, not a state: it fires as the hardpoint is destroyed and must not
-     * come back when the effect list is toggled or the levels change.
-     */
+    /** Plays a system once and forgets it. See `ParticleHost.playOnce`. */
     playOnce(
         id: string,
         system: AlamoParticleContent,
@@ -1423,65 +1300,37 @@ export class PreviewViewport {
         return this.rows.treeItems();
     }
 
-    /**
-     * The row that owns one effect.
-     *
-     * A merged proxy row is anchored on its bone, so an effect's row id is not derivable from its
-     * system id. Asked of the row table, which is the only thing that knows.
-     */
+    /** The row that owns one effect. See `ModelRows.rowForSystem`. */
     rowForSystem(systemId: string): string {
         return this.rows.rowForSystem(systemId);
     }
 
-    /**
-     * What a tree row actually is, for the inspector.
-     *
-     * A list because a merged row is two things at once. Empty for a row the tree no longer has -
-     * a selection can outlive a reload or a level change.
-     */
+    /** What a tree row actually is, for the inspector. See `ModelRows.inspectionOf`. */
     inspectionOf(id: string): Inspection[] {
         return this.rows.inspectionOf(id);
     }
 
-    /**
-     * The rows the reader has switched off by hand.
-     *
-     * The OVERRIDES, not what happens to be invisible: a mesh gated off by the current damage level
-     * is not something anyone chose, and writing it down would turn a level's own rule into an
-     * explicit hide that outlives the level. Restorable now that a mesh key survives a reload.
-     */
+    /** The rows the reader has switched off by hand. See `ModelRows.hiddenItemIds`. */
     hiddenItemIds(): string[] {
         return this.rows.hiddenItemIds();
     }
 
-    /**
-     * The rows the reader has switched ON by hand.
-     *
-     * Both directions are carried now. A mesh is usually drawn until someone hides it, but a
-     * shadow volume or a collision hull is gated off until someone asks for it - and asking for it
-     * is exactly the deliberate act worth surviving a reopen.
-     */
+    /** The rows the reader has switched ON by hand. See `ModelRows.shownItemIds`. */
     shownItemIds(): string[] {
         return this.rows.shownItemIds();
     }
 
     /**
-     * Shows or hides any mix of bones, meshes and particle systems at once.
-     *
-     * One entry point, because the tree selects across kinds and a multi-select toggle has to move
-     * all of them together. A bone carries what is attached to it, so switching one off takes its
-     * subtree with it - which is what the reader is asking for when they untick a limb.
+     * Shows or hides any mix of bones, meshes and particle systems at once. See
+     * `ModelRows.setItemsVisible`.
      */
     setItemsVisible(ids: readonly string[], visible: boolean): void {
         this.rows.setItemsVisible(ids, visible);
     }
 
     /**
-     * Records the reader's word on a set of rows and re-runs the chain.
-     *
-     * `null` gives a row back to the model. One entry point and one map, because the old code kept
-     * three - meshes by tree key, bones by index, systems by id - and a row anchored on a bone's id
-     * while standing for a mesh wrote one and reported the other.
+     * Records the reader's word on a set of rows and re-runs the chain. See
+     * `ModelRows.applyRowOverrides`.
      */
     applyRowOverrides(changes: readonly OverrideChange[]): void {
         this.rows.applyRowOverrides(changes);
@@ -1492,30 +1341,13 @@ export class PreviewViewport {
         return this.rows.rowOverrideEntries();
     }
 
-    /**
-     * Hands every row back to the model.
-     *
-     * Called when a clip starts: watching an animation is checking whether the animation works, and
-     * that can only be answered against the model as authored. The clip already resets the pose
-     * each time it runs; the visibilities are part of that pose. Master toggles are untouched - see
-     * `clearedForPlayback`.
-     */
+    /** Hands every row back to the model. See `ModelRows.clearRowOverrides`. */
     clearRowOverrides(): void {
         this.rows.clearRowOverrides();
     }
 
     /**
-     * Hands the rows ONE ability speaks for back to the model.
-     *
-     * Every channel an ability drives - a proxy's `gateVisible`, the shield mesh's and the shell's
-     * `inFile` - enters the chain at the `file` link, four below the reader. So one tick on such a
-     * row outranked the ability for good: the switch fired, the chain ignored it, and nothing but a
-     * whole-model Reset could undo it. Switching the ability now takes its own rows back, which is
-     * the same rule a starting clip already follows.
-     *
-     * Scoped, unlike {@link clearRowOverrides}. A clip may be global because it resets the entire
-     * pose; an ability is one statement about a handful of rows, and a mesh the reader hid for an
-     * unrelated reason has to survive it.
+     * Hands the rows ONE ability speaks for back to the model. See `ModelRows.releaseAbilityRows`.
      */
     releaseAbilityRows(ownership: AbilityOwnership): void {
         this.rows.releaseAbilityRows(ownership);
@@ -1523,28 +1355,14 @@ export class PreviewViewport {
 
     /** Frames whatever is currently loaded. */
     /**
-     * Puts the camera where the model's own authored camera stands, looking where it looks.
-     *
-     * Placed from the camera's own BONE NODES rather than from the coordinates the server sent.
-     * Both describe the same point, but the bone is already in the scene and has been through
-     * exactly the transform the geometry went through - including the root's Z-up to Y-up rotation,
-     * which is the one thing certain to be got wrong if it is applied a second time by hand. A shot
-     * a quarter turn out looks like a broken camera rather than a broken conversion.
-     *
-     * @returns false when the model does not carry that bone pair, so the caller can say so.
+     * Puts the camera where the model's own authored camera stands, looking where it looks. See
+     * `CameraRig.applyModelCamera`.
      */
     applyModelCamera(name: string): boolean {
         return this.cameraRig.applyModelCamera(name);
     }
 
-    /**
-     * Points the camera at a place, from a place.
-     *
-     * The one path every framing goes through - the presets, the model's own camera and the
-     * reader's saved shots - so the clip planes are refitted the same way for all of them. Without
-     * that a camera parked 653 units out, which `Eb_icc`'s own camera is, lands outside the range
-     * the previous framing chose and the model disappears.
-     */
+    /** Points the camera at a place, from a place. See `CameraRig.applyCameraPose`. */
     applyCameraPose(position: Vector3Like, target: Vector3Like): void {
         this.cameraRig.applyCameraPose(position, target);
     }
@@ -1557,43 +1375,27 @@ export class PreviewViewport {
         this.environment.setGridVisible(visible);
     }
 
-    /** Shows or hides the ground plane. Independent of the grid: either is useful without it. */
+    /** Shows or hides the ground plane. See `EnvironmentRig.setFloorVisible`. */
     setFloorVisible(visible: boolean): void {
         this.environment.setFloorVisible(visible);
     }
 
     /**
-     * Moves the ground, and the grid measuring it, to a height in model units.
-     *
-     * Both together, always. The grid is the ruler for the ground plane, and leaving it at zero
-     * while the floor moved would draw a measurement of somewhere the floor is not. Not every model
-     * is authored standing on the origin - `Eb_icc_landingpad` and the props dug into terrain are
-     * not - so a floor pinned to zero cuts through them or floats beneath them.
+     * Moves the ground, and the grid measuring it, to a height in model units. See
+     * `EnvironmentRig.setFloorLevel`.
      */
     setFloorLevel(level: number): void {
         this.environment.setFloorLevel(level);
     }
 
-    /**
-     * Draws every part mesh as its edges.
-     *
-     * Reaches the translated effects as well as the archetype materials: `wireframe` is declared on
-     * `THREE.Material`, and a `RawShaderMaterial` inherits it through `ShaderMaterial`, so the flag
-     * is honoured whichever renderer the reader has chosen. Particle systems are pruned by
-     * `forEachPartMesh` and stay as they are - a wireframe billboard is a pair of triangles and
-     * says nothing about the model.
-     */
+    /** Draws every part mesh as its edges. See `MaterialBinder.setWireframe`. */
     setWireframe(on: boolean): void {
         this.materials.setWireframe(on);
     }
 
     /**
-     * Whether the engine's stencil shadows are being cast right now.
-     *
-     * Public because the shadow COLOUR control has to know. The tint reaches the hull through this
-     * pass with no ground involved, so gating that control on the floor alone disabled it while it
-     * was working. Both halves matter here for the same reason they do inside: Game mode with no
-     * authored volume casts nothing, and 63% of models author none.
+     * Whether the engine's stencil shadows are being cast right now. See
+     * `EnvironmentRig.castsStencilShadows`.
      */
     castsStencilShadows(): boolean {
         return this.environment.castsStencilShadows();
@@ -1609,37 +1411,12 @@ export class PreviewViewport {
         this.environment.setShadowVolumes(on);
     }
 
-    /**
-     * Tints the shadow, wherever it can be seen.
-     *
-     * TWO sinks, which the control above has to know about. Under three's shadow mapping there is
-     * no colour to set at all, so a dedicated catcher plane over the floor is the only place the
-     * tint can be expressed - that one needs the ground. The stencil darken really does multiply,
-     * the way Alamo's own does, and it reaches the MODEL as well: a hull self-shadows in its tint
-     * with no ground under it whatsoever. See `shadowTintReach`, which is the rule both halves and
-     * the control are read from.
-     */
+    /** Tints the shadow, wherever it can be seen. See `EnvironmentRig.setShadowColour`. */
     setShadowColour(colour: THREE.ColorRepresentation): void {
         this.environment.setShadowColour(colour);
     }
 
-    /**
-     * Starts a passive subject's own death clip, once.
-     *
-     * ONCE, and clamped: the user's word is that a death clone is spawned at the exact position of
-     * the model it replaces and plays through a single time. There is no picker for it and no loop
-     * - it is not something the reader chose, it is what dying looks like.
-     *
-     * Separate from LOADING it so the geometry can be fetched early and held: asking for a capital
-     * ship's three-megabyte clone at the moment of death left a visible gap between the ship going
-     * and the wreck arriving. Idempotent - a second call does not restart a clip already running,
-     * because it is the same wreck.
-     *
-     * This is `play` for a subject nobody is driving. It is the same machinery: the subject's own
-     * mixer, the subject's own clips, the subject's own tracks. It used to be a second
-     * implementation of all three, because the scene-wide maps it would have had to use were
-     * already full of the hull's answers.
-     */
+    /** Starts a passive subject's own death clip, once. See `AnimationRig.startDeathClip`. */
     startDeathClip(subjectId: string): void {
         this.animation.startDeathClip(subjectId);
     }
@@ -1655,15 +1432,7 @@ export class PreviewViewport {
      * The rest pose is restored before anything starts, so a clip never plays on top of the pose
      * another one left behind.
      */
-    /**
-     * Starts a clip by name, answering whether one actually started.
-     *
-     * The answer matters and used to be thrown away. A name no loaded clip carries returned here in
-     * silence while the panel went on showing that clip as the one playing - which is exactly what
-     * an ability's deploy did on every model, since the XML names an `.ala` FILE and the clips are
-     * held under their stems. Silence is right for the viewport, which cannot know whether a miss is
-     * a fault; reporting it lets the caller stop claiming otherwise.
-     */
+    /** Starts a clip by name, answering whether one actually started. See `AnimationRig.play`. */
     play(name: string | null): boolean {
         return this.animation.play(name);
     }
@@ -1674,18 +1443,7 @@ export class PreviewViewport {
         this.animation.setPaused(paused);
     }
 
-    /**
-     * Puts every animated node back where the model file had it.
-     *
-     * three.js does restore a binding's "original state" when an action is deactivated - but the
-     * original it restores is whatever the node held when that binding was FIRST created, and a
-     * binding for a clip you start mid-way through another clip captures the other clip's pose. So
-     * stopping left the model in a pose no file describes, and switching clips carried the previous
-     * one's residue into every bone the new clip does not drive.
-     *
-     * Snapshotting at load and writing it back explicitly sidesteps all of that: the rest pose is
-     * the file's pose, by definition, and it cannot drift.
-     */
+    /** Puts every animated node back where the model file had it. See `AnimationRig.resetPose`. */
     resetPose(): void {
         this.animation.resetPose();
     }
@@ -1699,17 +1457,15 @@ export class PreviewViewport {
         this.animation.setAnimationLoop(loop);
     }
 
-    /**
-     * Moves the playhead, in seconds.
-     *
-     * `paused` is left alone: scrubbing a running clip should keep it running from where you
-     * dropped it, and scrubbing a held one should leave it held on the frame you chose.
-     */
+    /** Moves the playhead, in seconds. See `AnimationRig.seekAnimation`. */
     seekAnimation(seconds: number): void {
         this.animation.seekAnimation(seconds);
     }
 
-    /** Where the playhead is and how long the clip runs, for the scrubber. Zeroes when idle. */
+    /**
+     * Where the playhead is and how long the clip runs, for the scrubber. See
+     * `AnimationRig.animationProgress`.
+     */
     animationProgress(): { time: number; duration: number; running: boolean } {
         return this.animation.animationProgress();
     }
@@ -1781,21 +1537,14 @@ export class PreviewViewport {
             : vectorOf(node.getWorldPosition(new THREE.Vector3()));
     }
 
-    /**
-     * The Alamo extras of every loaded material.
-     *
-     * Read back off the scene rather than tracked alongside it, so the texture request list can
-     * never fall out of step with what was actually loaded.
-     */
+    /** The Alamo extras of every loaded material. See `MaterialBinder.materialExtras`. */
     materialExtras(): MaterialExtras[] {
         return this.materials.materialExtras();
     }
 
     /**
-     * Starts a particle system, optionally attached to a bone of a loaded part.
-     *
-     * Parented rather than positioned: a damaged hardpoint's smoke has to follow the hull as it
-     * animates, and parenting gets that for nothing.
+     * Starts a particle system, optionally attached to a bone of a loaded part. See
+     * `ParticleHost.addParticleSystem`.
      */
     addParticleSystem(
         id: string,
@@ -1807,13 +1556,7 @@ export class PreviewViewport {
 
     // ── levels ────────────────────────────────────────────────────────────────
 
-    /**
-     * Takes a system out of the scene.
-     *
-     * What it does with the particles ALREADY IN THE AIR is the file's word: see
-     * the fading list in `ParticleHost`. `immediate` overrides it, and only two things may - replacing a
-     * system under the same id, and a wholesale reset of the scene or the renderer.
-     */
+    /** Takes a system out of the scene. See `ParticleHost.removeParticleSystem`. */
     removeParticleSystem(id: string, immediate = false): void {
         this.particles.removeParticleSystem(id, immediate);
     }
@@ -1839,11 +1582,8 @@ export class PreviewViewport {
     }
 
     /**
-     * Says a texture will never arrive, so every emitter naming it shows the marker.
-     *
-     * Remembered, not just applied: a system can be built after the answer came back - a hardpoint
-     * blowing up spawns one - and it has to show the marker too rather than sitting on a blank quad
-     * because it happened to be late.
+     * Says a texture will never arrive, so every emitter naming it shows the marker. See
+     * `ParticleHost.setParticleTextureMissing`.
      */
     setParticleTextureMissing(name: string): void {
         this.particles.setParticleTextureMissing(name);
@@ -1854,16 +1594,8 @@ export class PreviewViewport {
     }
 
     /**
-     * What the game's rules say about a system: the opening rule and the current damage state.
-     *
-     * The RULES path, called on attach and again whenever a hardpoint is destroyed or repaired -
-     * never in response to a click. A hand-set override survives this, so switching one effect on
-     * does not get undone by an unrelated hardpoint blowing up.
-     *
-     * What the rules say is `inFile` for this row - the model's own word - and the chain weighs it
-     * against everything else. It does NOT clear a hand-set override: the reader's word is taken
-     * back only by the reader or by a clip starting, and a row standing against the rules is marked
-     * as one the model does not draw, so nothing here is claimed that is not true.
+     * What the game's rules say about a system: the opening rule and the current damage state. See
+     * `ParticleHost.setParticleSystemVisible`.
      */
     setParticleSystemVisible(id: string, visible: boolean): void {
         this.particles.setParticleSystemVisible(id, visible);
@@ -1883,17 +1615,12 @@ export class PreviewViewport {
         this.particles.setParticlesPaused(paused);
     }
 
-    /** Multiplier on particle time. 1 is real time. */
+    /** Multiplier on particle time. See `ParticleHost.setParticleSpeed`. */
     setParticleSpeed(speed: number): void {
         this.particles.setParticleSpeed(speed);
     }
 
-    /**
-     * Replays every system from nothing.
-     *
-     * Rebuilt rather than rewound: a burst emitter's whole point is the first half second, and there
-     * is no way back to it from the middle of a run short of discarding the state.
-     */
+    /** Replays every system from nothing. See `ParticleHost.restartParticles`. */
     restartParticles(): void {
         this.particles.restartParticles();
     }
@@ -2017,10 +1744,8 @@ export class PreviewViewport {
     }
 
     /**
-     * Which bones a weapon fires from, so the triad can mark the aim axis.
-     *
-     * By NAME, because that is what a weapon declares. The axis itself is local X and that is
-     * measured rather than assumed - see `AlamoFireBone.AimDirection`.
+     * Which bones a weapon fires from, so the triad can mark the aim axis. See
+     * `OverlayLayer.setFireBones`.
      */
     setFireBones(names: ReadonlySet<string>): void {
         this.overlay.setFireBones(names);
@@ -2030,37 +1755,20 @@ export class PreviewViewport {
         this.overlay.setSelectedBones(indices);
     }
 
-    /**
-     * Draws a box round what the tree has selected.
-     *
-     * Selecting a bone boxes its whole SUBTREE, not its origin: a bone is where something is
-     * attached, so a box around the point itself would be a dot in the middle of the thing being
-     * pointed at. A row whose ancestor is selected too gets no box of its own - one box around the
-     * arm beats a second one nested inside it around the hand.
-     */
+    /** Draws a box round what the tree has selected. See `OverlayLayer.setSelectedRows`. */
     setSelectedRows(ids: readonly string[]): void {
         this.overlay.setSelectedRows(ids);
     }
 
     /**
-     * Parts to outline whole, beside whatever rows are boxed.
-     *
-     * A hardpoint that attaches a model is one of these: its geometry is its own part, and boxing
-     * the hull bone it is attached to gathers that bone's whole subtree instead - the turret's meshes and
-     * every empty fire-point bone under it, which on the Executor stretched the box to 2211 units
-     * on a 5094 hull. See `boxTargetFor`.
+     * Parts to outline whole, beside whatever rows are boxed. See
+     * `OverlayLayer.setSelectedHardpoint`.
      */
     setSelectedHardpoint(partId: string | null, boneRow: string | null): void {
         this.overlay.setSelectedHardpoint(partId, boneRow);
     }
 
-    /**
-     * The targeting marks to draw, and how big.
-     *
-     * Replaced wholesale rather than diffed: the list is one per targetable hardpoint - ten on the Star
-     * Destroyer, and never more than a few hundred - and it changes only when the scene, the state
-     * or the damage does.
-     */
+    /** The targeting marks to draw, and how big. See `OverlayLayer.setReticles`. */
     setReticles(
         marks: readonly ReticleMark[],
         screenSize: number | null | undefined,
@@ -2219,14 +1927,7 @@ export class PreviewViewport {
         this.environment.setHeat(on);
     }
 
-    /**
-     * Draws the heat buffer rather than the bent picture.
-     *
-     * Forces the heat path on while it is on, even with nothing distorting: a debug view that shows
-     * an ordinary frame until something happens to be burning is a control the reader cannot tell
-     * is working. It costs the two heat buffers for as long as it is switched on, which is the
-     * bargain a debug view is.
-     */
+    /** Draws the heat buffer rather than the bent picture. See `EnvironmentRig.setHeatDebug`. */
     setHeatDebug(on: boolean): void {
         this.environment.setHeatDebug(on);
     }
@@ -2235,12 +1936,7 @@ export class PreviewViewport {
         this.environment.setBloom(on);
     }
 
-    /**
-     * The reader's draw-distance multiplier.
-     *
-     * Applied on the next reframe as well as at once, so a change is visible without having to
-     * touch the camera.
-     */
+    /** The reader's draw-distance multiplier. See `CameraRig.setDrawDistance`. */
     setDrawDistance(multiplier: number): void {
         this.cameraRig.setDrawDistance(multiplier);
     }
