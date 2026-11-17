@@ -15,7 +15,7 @@ export interface LoadedPart {
     /** Bones by their model bone index, in index order, for the skeleton view. */
     bonesByIndex: Map<number, THREE.Object3D>;
     /**
-     * The subject this part belongs to - `ACTIVE_SUBJECT` (viewport.ts) for the one that opened the scene.
+     * The subject this part belongs to - {@link ACTIVE_SUBJECT} for the one that opened the scene.
      *
      * A death clone and a piece of wreckage are their own subjects, not further pieces of the one
      * being previewed. Run through the ACTIVE subject's row chain they inherit its answers by
@@ -27,3 +27,12 @@ export interface LoadedPart {
      */
     subjectId: string;
 }
+
+/**
+ * The subject that opened the scene: the one the tree, the stats and the row chain describe.
+ *
+ * Exactly one subject is ACTIVE at a time and it is always this one. Everything else in the scene -
+ * a death clone, a piece of wreckage - is a PASSIVE subject: it is drawn by its own file's rules,
+ * runs its own clips, and never answers a question about the model being previewed.
+ */
+export const ACTIVE_SUBJECT = "subject";

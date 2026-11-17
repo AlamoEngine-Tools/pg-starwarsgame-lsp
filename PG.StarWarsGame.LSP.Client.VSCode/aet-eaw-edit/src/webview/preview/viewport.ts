@@ -170,40 +170,12 @@ import {
     type LabelMode,
 } from "./skeleton";
 import { OverlayLayer } from "./overlayLayer";
-import { type LoadedPart } from "./loadedPart";
+import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
+import { type ParticleEntry } from "./particleEntry";
+
+export { ACTIVE_SUBJECT };
 import { TurretRig } from "./turretRig";
-
-/** Splits a `systemId#index` emitter key. The id may itself contain a `#`, so split from the right. */
-function splitEmitterKey(key: string): [string, number] {
-    const at = key.lastIndexOf("#");
-    return [key.slice(0, at), Number(key.slice(at + 1))];
-}
-
-/** What the viewport remembers about one running system, so it can be rebuilt on restart. */
-interface ParticleEntry {
-    /** Its key in {@link PreviewViewport.particleSystems}, so an entry alone can answer for itself. */
-    id: string;
-    system: AlamoParticleContent;
-    attachToPartId?: string;
-    attachBone?: string;
-    /** The bone's index, which is what tells two same-named bones apart. */
-    attachBoneIndex?: number;
-    /**
-     * What the game's own rules say: the opening rule and the damage state, together.
-     *
-     * Recomputed whenever a hardpoint blows up or is repaired, which is why the reader's own choice
-     * cannot live here - it would be overwritten every time anything else on the model changed.
-     */
-    gateVisible: boolean;
-    /** What the current ALT/LOD says, held apart again so a level change cannot clobber a toggle. */
-    levelVisible: boolean;
-    levels: LevelTagged;
-    /** The owning object's uniform render scale, so a rebuild keeps it. */
-    scaleFactor: number;
-    /** Whether the MODEL declares this system or the Gameplay lens asked for it. */
-    origin: ParticleOrigin;
-    instance: ParticleSystemInstance;
-}
+import { ParticleHost } from "./particleHost";
 
 /**
  * Where a system being loaded goes, and what it is.
@@ -289,15 +261,6 @@ const PRESETS: Record<PresetView, { azimuth: number; elevation: number }> = {
         elevation: DEFAULT_ELEVATION_DEGREES,
     },
 };
-
-/**
- * The subject that opened the scene: the one the tree, the stats and the row chain describe.
- *
- * Exactly one subject is ACTIVE at a time and it is always this one. Everything else in the scene -
- * a death clone, a piece of wreckage - is a PASSIVE subject: it is drawn by its own file's rules,
- * runs its own clips, and never answers a question about the model being previewed.
- */
-export const ACTIVE_SUBJECT = "subject";
 
 /** Anything about a loaded model beyond the bone it is attached to. */
 export interface AddPartOptions {
@@ -559,16 +522,8 @@ export class PreviewViewport {
     private ambient: THREE.AmbientLight | null = null;
     /** The rig as the reader has it. Held so a colour change can be applied without a reframe. */
     private rig: LightRig = DEFAULT_LIGHTS;
-    /** The wind as a vector in the space the particles are simulated in. */
-    private windVector: { x: number; y: number; z: number } = {
-        x: 0,
-        y: 0,
-        z: 0,
-    };
-    /** The same wind in the terms the foliage shaders read it: a heading and a speed. */
-    private wind: Wind = DEFAULT_VIEWER_SETTINGS.wind;
-    /** The weather phase's intensity, the energy every weather system is drawn at. */
-    private weatherIntensity = DEFAULT_VIEWER_SETTINGS.weatherIntensity;
+    /** The particle systems: what is attached where, what is fading out, and the step that runs them. See `ParticleHost`. */
+    private readonly particles: ParticleHost;
     /** The starfield and the sky dome, built on first use and then just shown or hidden. */
     private stars: THREE.Points | null = null;
     private sky: THREE.Mesh | null = null;
@@ -751,21 +706,6 @@ export class PreviewViewport {
     private readonly overlay: OverlayLayer;
     /** The firing arcs, the turret handles, the sweeps and the hand-set aims. See `TurretRig`. */
     private readonly turret: TurretRig;
-    private readonly particleSystems = new Map<string, ParticleEntry>();
-    /**
-     * Systems that have been killed but whose particles are still finishing.
-     *
-     * `leaveParticles` on the SYSTEM decides this, and it is what the engine does:
-     * `Engine::KillParticleSystem` calls `StopSpawning()` for one that says so and lets the air
-     * clear, and `Kill()` for one that does not. It defaults TRUE, and the ones that say false are
-     * the ENGINE GLOWS - a glow cuts with the engine, a fire trails off. Nothing read the flag, so
-     * a wreck's fire vanished mid-flame the instant its debris expired.
-     *
-     * Held OUT of {@link particleSystems} rather than flagged inside it: they are no longer
-     * addressable, must not be re-gated by anything, and must not collide with a new system taking
-     * the same id.
-     */
-    private fadingParticles: ParticleSystemInstance[] = [];
     /**
      * What each tree row stands for, so the inspector can describe it.
      *
@@ -781,9 +721,6 @@ export class PreviewViewport {
             systemId?: string;
         }
     >();
-    private readonly particleTextures = new Map<string, THREE.Texture>();
-    private particlesVisible = true;
-    private particlesPaused = false;
     /**
      * Whether the last ALT change was downwards.
      *
@@ -843,23 +780,6 @@ export class PreviewViewport {
     private readonly attachRequests = new Map<string, AttachmentRequest>();
     /** Parts broken off by a destroyed hardpoint. */
     private readonly hiddenParts = new Set<string>();
-    /** One-shot systems - death explosions - removed once they burn out. */
-    private readonly transient = new Set<string>();
-    /**
-     * Emitters switched off, keyed `systemId#index`.
-     *
-     * Held by the viewport rather than only in the shell because restart rebuilds every instance from
-     * scratch; without this, a restart would silently switch them all back on. Keyed by index because
-     * emitter names repeat within one system.
-     */
-    private readonly hiddenEmitters = new Set<string>();
-    /**
-     * Playback rate for particles only.
-     *
-     * Separate from the animation mixer's: a smoke plume worth slowing down to inspect usually sits on
-     * a model whose animation you still want at speed.
-     */
-    private particleSpeed = 1;
     /**
      * The unit flying off and coming apart, for one that declares no death clone.
      *
@@ -1050,6 +970,55 @@ export class PreviewViewport {
                 viewport.fireBoneAttachment(partId, bone),
             modelSpan: () => viewport.modelSpan(),
         });
+        this.particles = new ParticleHost({
+            get alt() {
+                return viewport.alt;
+            },
+            get altDescending() {
+                return viewport.altDescending;
+            },
+            get lod() {
+                return viewport.lod;
+            },
+            get fitDistance() {
+                return viewport.fitDistance;
+            },
+            get cameraPosition() {
+                return viewport.cameraPosition;
+            },
+            get modelRoot() {
+                return viewport.modelRoot;
+            },
+            get parts() {
+                return viewport.parts;
+            },
+            get hiddenParts() {
+                return viewport.hiddenParts;
+            },
+            get missingTextures() {
+                return viewport.missingTextures;
+            },
+            get shaderStates() {
+                return viewport.shaderStates;
+            },
+            get translated() {
+                return viewport.translated;
+            },
+            get translatedShaders() {
+                return viewport.translatedShaders;
+            },
+            applyClipPlanes: (sphere, distance) =>
+                viewport.applyClipPlanes(sphere, distance),
+            attachmentFor: (partId, bone, boneIndex) =>
+                viewport.attachmentFor(partId, bone, boneIndex),
+            boundingSphere: (includeEffects) =>
+                viewport.boundingSphere(includeEffects),
+            markMissing: (name) => viewport.markMissing(name),
+            partRootOf: (partId) => viewport.partRootOf(partId),
+            refreshParticleVisibility: (entry) =>
+                viewport.refreshParticleVisibility(entry),
+            refreshRows: () => viewport.refreshRows(),
+        });
 
         // CAPTURE phase, so a grabbed turret knob is claimed before `OrbitControls` - registered on
         // this canvas above - can start an orbit. See `TurretRig.grabKnob`.
@@ -1084,13 +1053,7 @@ export class PreviewViewport {
         camera: Vector3Like;
         systems: { id: string; emitters: EmitterProbe[] }[];
     } {
-        return {
-            camera: this.cameraPosition,
-            systems: [...this.particleSystems.values()].map((entry) => ({
-                id: entry.id,
-                emitters: entry.instance.probe(),
-            })),
-        };
+        return this.particles.particleProbe();
     }
 
     /**
@@ -1246,14 +1209,7 @@ export class PreviewViewport {
      * drifts with five times it - see `stepParticle` and the weather step.
      */
     setWind(headingDegrees: number, speed: number): void {
-        this.wind = { heading: headingDegrees, speed };
-        const heading = (headingDegrees * Math.PI) / 180;
-
-        this.windVector = {
-            x: Math.cos(heading) * speed || 0,
-            y: 0,
-            z: -Math.sin(heading) * speed || 0,
-        };
+        this.particles.setWind(headingDegrees, speed);
     }
 
     /**
@@ -1263,22 +1219,12 @@ export class PreviewViewport {
      * systems that hold a weather field and no other effect, which stays at 1.0.
      */
     setWeatherIntensity(intensity: number): void {
-        this.weatherIntensity = intensity;
-        for (const entry of this.particleSystems.values()) {
-            if (entry.instance.hasWeather) {
-                entry.instance.setEnergy(intensity);
-            }
-        }
+        this.particles.setWeatherIntensity(intensity);
     }
 
     /** Whether the scene holds a weather field, for the control that only reaches one. */
     hasWeather(): boolean {
-        for (const entry of this.particleSystems.values()) {
-            if (entry.instance.hasWeather) {
-                return true;
-            }
-        }
-        return false;
+        return this.particles.hasWeather();
     }
 
     /**
@@ -1596,7 +1542,7 @@ export class PreviewViewport {
 
         // The particle systems' effects too: an emitter is drawn through the engine's own
         // `Prim*.fx` for its render mode, fetched and translated like any mesh effect.
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             for (const name of entry.instance.effectNames()) {
                 names.add(name);
             }
@@ -1612,7 +1558,7 @@ export class PreviewViewport {
      * system built before its effect came back has to pick it up the same as one built after.
      */
     private applyParticleEffects(): void {
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             entry.instance.applyEffects(
                 this.translated,
                 this.shaderStates,
@@ -1712,7 +1658,7 @@ export class PreviewViewport {
             }
         });
 
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             const coverage = entry.instance.effectCoverage();
             translated += coverage.translated;
             total += coverage.total;
@@ -1796,12 +1742,12 @@ export class PreviewViewport {
 
     /** Removes everything, so a new subject starts from an empty scene. */
     clear(): void {
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             entry.instance.dispose();
         }
-        this.particleSystems.clear();
+        this.particles.particleSystems.clear();
         // A new subject is one of the two things allowed to cut a fading system short.
-        this.clearFadingParticles();
+        this.particles.clearFadingParticles();
 
         // BEFORE the sweep below, not after: a wreck is one of those parts now, and taking it
         // apart a second time would dispose a tree that has already gone.
@@ -1843,7 +1789,7 @@ export class PreviewViewport {
         this.parts.clear();
         this.billboards = [];
         this.hiddenParts.clear();
-        this.transient.clear();
+        this.particles.transient.clear();
         this.knownDecals = new Set();
         this.shownDecals = new Set();
         this.collisionMeshes = new Set();
@@ -2194,7 +2140,7 @@ export class PreviewViewport {
             part.root.visible = !hidden;
         }
 
-        this.holdEffectsOf(partId);
+        this.particles.holdEffectsOf(partId);
     }
 
     /**
@@ -2214,7 +2160,7 @@ export class PreviewViewport {
         // They no longer live inside the part's subtree, so nothing else would ever take them:
         // before, disposing the part quietly freed their buffers underneath them, which left every
         // entry in `particleSystems` still being stepped against disposed geometry.
-        for (const [id, entry] of [...this.particleSystems]) {
+        for (const [id, entry] of [...this.particles.particleSystems]) {
             if (entry.attachToPartId === partId) {
                 this.removeParticleSystem(id);
             }
@@ -2253,16 +2199,14 @@ export class PreviewViewport {
         /** Where to put it when it hangs on no part. See {@link ParticlePlacement.at}. */
         at?: { x: number; y: number; z: number },
     ): void {
-        // Always the Gameplay lens's. A one-shot IS an event - a hardpoint blowing up - and an
-        // event is never something the model declares.
-        this.addParticleSystem(id, system, {
-            origin: "gameplay",
+        this.particles.playOnce(
+            id,
+            system,
             attachToPartId,
             attachBone,
             scaleFactor,
             at,
-        });
-        this.transient.add(id);
+        );
     }
 
     /**
@@ -2303,7 +2247,7 @@ export class PreviewViewport {
             }
         });
 
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             tagged.push(entry.levels);
         }
 
@@ -2460,7 +2404,7 @@ export class PreviewViewport {
         // The same question for the effects, before any row is claimed: a system whose proxy bone
         // carries its name IS that row. A bone with two of them keeps the first, exactly as it
         // keeps the first of two meshes.
-        for (const [systemId, entry] of this.particleSystems) {
+        for (const [systemId, entry] of this.particles.particleSystems) {
             if (!listedInModelTree(entry.origin)) {
                 continue;
             }
@@ -2571,7 +2515,7 @@ export class PreviewViewport {
         // the whole effect - a proxy is either playing on this hull or it is not - and the emitters
         // a system is built from are the particle editor's business, not this one's. Listing them
         // here put twenty dead rows under a Star Destroyer's damage bones.
-        for (const [systemId, entry] of this.particleSystems) {
+        for (const [systemId, entry] of this.particles.particleSystems) {
             // The Gameplay lens's own. A death explosion and a wreck's trailing fire are asked for
             // by NAME at the moment they are needed, so they are in no proxy list and hang off no
             // bone - `ownerOf` falls back to the root and filed them there, giving the reader a
@@ -2707,7 +2651,7 @@ export class PreviewViewport {
         }
 
         if (source.systemId !== undefined) {
-            const entry = this.particleSystems.get(source.systemId);
+            const entry = this.particles.particleSystems.get(source.systemId);
 
             if (entry !== undefined) {
                 found.push({
@@ -3171,7 +3115,7 @@ export class PreviewViewport {
 
         // Only the CLIP's hold: the clip has stopped having an opinion, which says nothing about a
         // part that is hidden or a system that has been released to finish.
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             entry.instance.hold("clip", false);
         }
     }
@@ -3330,67 +3274,7 @@ export class PreviewViewport {
         system: AlamoParticleContent,
         placement: ParticlePlacement,
     ): void {
-        const {
-            attachToPartId,
-            attachBone,
-            attachBoneIndex,
-            origin,
-            scaleFactor = 1,
-            at,
-            levels = { alt: null, lod: null, altDecreaseStayHidden: false },
-        } = placement;
-
-        // Immediate: the id is about to name something else, and a fading twin under it would be
-        // orphaned in the scene for good.
-        this.removeParticleSystem(id, true);
-
-        const entry: ParticleEntry = {
-            id,
-            system,
-            attachToPartId,
-            attachBone,
-            attachBoneIndex,
-            gateVisible: true,
-            levels,
-            levelVisible: proxyVisibleAt(
-                levels,
-                this.alt,
-                this.lod,
-                this.altDescending,
-            ),
-            scaleFactor,
-            origin,
-            instance: this.instantiate(
-                id,
-                system,
-                attachToPartId,
-                attachBone,
-                attachBoneIndex,
-                scaleFactor,
-                at,
-            ),
-        };
-
-        // Held from birth when it is attached to something already off screen: a death clone's effects
-        // attach while the clone is still hidden, and a one-shot that runs there is spent before
-        // anyone sees it.
-        if (
-            attachToPartId !== undefined &&
-            this.hiddenParts.has(attachToPartId)
-        ) {
-            entry.instance.hold("part", true);
-        }
-
-        this.particleSystems.set(id, entry);
-        if (entry.instance.hasWeather) {
-            entry.instance.setEnergy(this.weatherIntensity);
-        }
-        this.refreshParticleVisibility(entry);
-
-        // The depth range again, because the effects reach further than the model and they arrive
-        // AFTER the camera was fitted to it. Without this, Boba Fett's flamethrower - 206 units of
-        // throw on a seven-unit model - was culled at 156 and looked like a flame that stops.
-        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+        this.particles.addParticleSystem(id, system, placement);
     }
 
     // ── levels ────────────────────────────────────────────────────────────────
@@ -3399,40 +3283,11 @@ export class PreviewViewport {
      * Takes a system out of the scene.
      *
      * What it does with the particles ALREADY IN THE AIR is the file's word: see
-     * {@link fadingParticles}. `immediate` overrides it, and only two things may - replacing a
+     * the fading list in `ParticleHost`. `immediate` overrides it, and only two things may - replacing a
      * system under the same id, and a wholesale reset of the scene or the renderer.
      */
     removeParticleSystem(id: string, immediate = false): void {
-        const entry = this.particleSystems.get(id);
-
-        if (entry !== undefined) {
-            if (
-                !immediate &&
-                entry.system.leaveParticles &&
-                !entry.instance.empty
-            ) {
-                // Stop spawning and let the air clear. Nothing sweeps it after this, which is why
-                // it leaves `particleSystems` - a gate re-enabling it would refill it forever.
-                entry.instance.hold("released", true);
-
-                // And cut loose from the bone it was anchored on, which is usually about to be
-                // hidden or disposed. Nothing moves: the simulation already runs in the model's
-                // space with the bone cancelled out, so the particles stay exactly where they are -
-                // but a bone still being read after its part is gone would report its last stale
-                // matrix as this step's movement and fling every linked particle with it.
-                entry.instance.detach();
-
-                this.fadingParticles.push(entry.instance);
-            } else {
-                entry.instance.dispose();
-            }
-        }
-
-        this.particleSystems.delete(id);
-
-        // And back in again once the effect is gone, so a one-off explosion does not leave the
-        // depth range stretched for the rest of the session.
-        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+        this.particles.removeParticleSystem(id, immediate);
     }
 
     /** Whether a part's geometry has arrived, so something can be attached to its bones. */
@@ -3442,28 +3297,17 @@ export class PreviewViewport {
 
     /** Names of the running systems, for the emitter list in the dock. */
     particleSystemIds(): string[] {
-        return [...this.particleSystems.keys()].sort();
+        return this.particles.particleSystemIds();
     }
 
     /** Every texture the running systems want but may not have yet. */
     particleTextureNames(): string[] {
-        return [
-            ...new Set(
-                [...this.particleSystems.values()].flatMap((e) =>
-                    e.instance.textureNames(),
-                ),
-            ),
-        ].sort();
+        return this.particles.particleTextureNames();
     }
 
     /** Hands a fetched texture to whichever emitters named it, now and after a restart. */
     setParticleTexture(name: string, texture: THREE.Texture): void {
-        this.particleTextures.set(name.toLowerCase(), texture);
-        this.missingTextures.delete(name.toLowerCase());
-
-        for (const entry of this.particleSystems.values()) {
-            entry.instance.setTexture(name, texture);
-        }
+        this.particles.setParticleTexture(name, texture);
     }
 
     /**
@@ -3474,19 +3318,11 @@ export class PreviewViewport {
      * because it happened to be late.
      */
     setParticleTextureMissing(name: string): void {
-        this.missingTextures.add(name.toLowerCase());
-
-        void this.markMissing(name);
+        this.particles.setParticleTextureMissing(name);
     }
 
     setParticlesVisible(visible: boolean): void {
-        this.particlesVisible = visible;
-
-        // A system switched off individually, or by its level, stays off when the global toggle
-        // comes back on.
-        for (const entry of this.particleSystems.values()) {
-            this.refreshParticleVisibility(entry);
-        }
+        this.particles.setParticlesVisible(visible);
     }
 
     /**
@@ -3502,44 +3338,26 @@ export class PreviewViewport {
      * as one the model does not draw, so nothing here is claimed that is not true.
      */
     setParticleSystemVisible(id: string, visible: boolean): void {
-        const entry = this.particleSystems.get(id);
-        if (entry === undefined) {
-            return;
-        }
-
-        entry.gateVisible = visible;
-        this.refreshRows();
+        this.particles.setParticleSystemVisible(id, visible);
     }
 
     /** The emitters of one system, in file order. */
     emitterNames(systemId: string): string[] {
-        return (
-            this.particleSystems.get(systemId)?.instance.emitterNames() ?? []
-        );
+        return this.particles.emitterNames(systemId);
     }
 
     /** Shows or hides one emitter of one system, by its position in that system's file. */
     setEmitterVisible(systemId: string, index: number, visible: boolean): void {
-        const key = `${systemId}#${index}`;
-
-        if (visible) {
-            this.hiddenEmitters.delete(key);
-        } else {
-            this.hiddenEmitters.add(key);
-        }
-
-        this.particleSystems
-            .get(systemId)
-            ?.instance.setEmitterVisible(index, visible);
+        this.particles.setEmitterVisible(systemId, index, visible);
     }
 
     setParticlesPaused(paused: boolean): void {
-        this.particlesPaused = paused;
+        this.particles.setParticlesPaused(paused);
     }
 
     /** Multiplier on particle time. 1 is real time. */
     setParticleSpeed(speed: number): void {
-        this.particleSpeed = Math.max(0, speed);
+        this.particles.setParticleSpeed(speed);
     }
 
     /**
@@ -3549,22 +3367,7 @@ export class PreviewViewport {
      * is no way back to it from the middle of a run short of discarding the state.
      */
     restartParticles(): void {
-        // The other override: every system is being rebuilt from scratch, and a fading one has no
-        // rebuilt twin to belong to.
-        this.clearFadingParticles();
-
-        for (const [id, entry] of this.particleSystems) {
-            entry.instance.dispose();
-            entry.instance = this.instantiate(
-                id,
-                entry.system,
-                entry.attachToPartId,
-                entry.attachBone,
-                entry.attachBoneIndex,
-                entry.scaleFactor,
-            );
-            this.refreshParticleVisibility(entry);
-        }
+        this.particles.restartParticles();
     }
 
     /**
@@ -3769,7 +3572,7 @@ export class PreviewViewport {
             grid: this.grid.visible,
             floor: this.floor.visible,
             catcher: this.shadowCatcher.visible,
-            particles: this.particlesVisible,
+            particles: this.particles.particlesVisible,
             axes: this.axes.visible,
             joints: this.overlay.joints.visible,
             jointLines: this.overlay.jointLines.visible,
@@ -3837,12 +3640,12 @@ export class PreviewViewport {
             // A sprite is oriented against the VIEW matrix - a streak's length is a screen-space
             // measurement - so it has to be re-aimed for this camera. A zero step re-aims without
             // advancing the simulation: a capture must not move the effects on.
-            if (this.particlesVisible) {
-                for (const entry of this.particleSystems.values()) {
+            if (this.particles.particlesVisible) {
+                for (const entry of this.particles.particleSystems.values()) {
                     entry.instance.update(
                         0,
                         this.camera.matrixWorldInverse,
-                        this.windVector,
+                        this.particles.windVector,
                     );
                 }
             }
@@ -4715,7 +4518,7 @@ export class PreviewViewport {
             mesh instanceof THREE.SkinnedMesh ? this.skinPalette(mesh) : null;
 
         return {
-            wind: this.wind,
+            wind: this.particles.wind,
             matrices: {
                 world: world.elements,
                 worldInverse: worldInverse.elements,
@@ -5121,30 +4924,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Holds the effects attached to a part while that part is off screen.
-     *
-     * An emitter nobody is drawing must not spawn - the rule `EmitterRenderer` already follows one
-     * level down, and the reason its clock is held with it. It was never applied to a whole PART,
-     * and a death clone is exactly the case that needs it: the clone is fetched early and held
-     * hidden so its arrival is not a visible gap, which gave its effects a free run at a model
-     * nobody could see. Its explosions are ONE-SHOTS - `p_explosion_big00` fires a single burst of
-     * 50 sparks - so by the time the ship actually died they were spent, and the blast that covers
-     * the wreck breaking up drew two stray particles.
-     *
-     * Only ever HOLDS here. Releasing is the clip's business: `advancePassiveSubjects` gates a
-     * playing subject frame by frame, and a subject with no clip is released as it is shown.
-     */
-    private holdEffectsOf(partId: string): void {
-        const hidden = this.hiddenParts.has(partId);
-
-        for (const entry of this.particleSystems.values()) {
-            if (entry.attachToPartId === partId) {
-                entry.instance.hold("part", hidden);
-            }
-        }
-    }
-
-    /**
      * Gives up everything the scene registered for a subtree that is about to be disposed.
      *
      * The counterpart of what {@link addPart} records, and it did not exist while only the hull
@@ -5187,7 +4966,7 @@ export class PreviewViewport {
         // systems write the same thing: this one re-derived every mesh from the old override maps
         // and undid whatever the row chain had just settled, so a mesh hidden from the tree came
         // straight back on the next level or material refresh.
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             entry.levelVisible = proxyVisibleAt(
                 entry.levels,
                 this.alt,
@@ -5320,7 +5099,10 @@ export class PreviewViewport {
             }
 
             if (target.particleId !== undefined) {
-                this.setParticleSystemDrawn(target.particleId, visible);
+                this.particles.setParticleSystemDrawn(
+                    target.particleId,
+                    visible,
+                );
             }
         }
     }
@@ -5478,7 +5260,7 @@ export class PreviewViewport {
      * proxy the current ALT/LOD gates off was drawing too.
      */
     private effectFacts(facts: RowFacts, systemId: string): RowFacts {
-        const entry = this.particleSystems.get(systemId);
+        const entry = this.particles.particleSystems.get(systemId);
 
         return {
             // Which drops the ancestors the MODEL hides: an effect answers to its own bone, as the
@@ -5487,7 +5269,7 @@ export class PreviewViewport {
 
             // The one master anyone legitimately keeps switched off while watching a clip: effects
             // are what obstructs the view of the thing being checked.
-            masters: [{ id: "effects", on: this.particlesVisible }],
+            masters: [{ id: "effects", on: this.particles.particlesVisible }],
             inFile: entry?.gateVisible ?? true,
 
             // The cloak, in the same chain that swaps the meshes. A cloaked unit shows its stealth
@@ -5645,7 +5427,7 @@ export class PreviewViewport {
      * something, and flagging it would read as a broken effect rather than an honest limitation.
      */
     private effectRowName(systemId: string): string {
-        const entry = this.particleSystems.get(systemId);
+        const entry = this.particles.particleSystems.get(systemId);
         if (entry === undefined) {
             return "";
         }
@@ -5673,18 +5455,6 @@ export class PreviewViewport {
         this.rowTargets.set(rowId, target);
         this.rowParents.set(rowId, parentId);
         this.rowNames.set(rowId, name);
-    }
-
-    // ── skeleton ───────────────────────────────────────────────────────
-
-    /**
-     * Draws or holds one system, as the row chain decided.
-     *
-     * The chain has already weighed the effects master, the level gate and the reader, so this only
-     * carries the answer - it must not weigh any of them a second time.
-     */
-    private setParticleSystemDrawn(id: string, visible: boolean): void {
-        this.particleSystems.get(id)?.instance.setVisible(visible);
     }
 
     private refreshParticleVisibility(entry: ParticleEntry): void {
@@ -5729,7 +5499,7 @@ export class PreviewViewport {
             ? 0
             : Math.max(
                   0,
-                  ...[...this.particleSystems.values()].map((entry) =>
+                  ...[...this.particles.particleSystems.values()].map((entry) =>
                       entry.instance.extent(),
                   ),
               );
@@ -5906,7 +5676,7 @@ export class PreviewViewport {
             // The same gate the active subject gets, on this subject's own clip. Without it the
             // clip decides only what is SEEN: a burst switched off at this moment goes on burning,
             // and is spent long before the frame that was meant to set it off.
-            this.applyEmitterGating(subjectId, track, action);
+            this.particles.applyEmitterGating(subjectId, track, action);
 
             // Gone at the end of it. A death clone is what dying LOOKS like, not what is left
             // afterwards - the engine takes the object away when the clip is done.
@@ -5915,7 +5685,7 @@ export class PreviewViewport {
                 // `p_explosion_huge00` ignite at 59.7s of a 60.1s clip - the detonation the whole
                 // minute builds to - and hiding the part they are attached to cut them 0.4s in, so the
                 // end of a death was 719 particles alive and NONE of them on screen.
-                this.releaseSubjectEffects(subjectId);
+                this.particles.releaseSubjectEffects(subjectId);
 
                 for (const part of this.partsOf(subjectId)) {
                     this.setPartHidden(part.id, true);
@@ -5957,88 +5727,7 @@ export class PreviewViewport {
             this.applyLevels();
         }
 
-        this.applyEmitterGating(ACTIVE_SUBJECT, track, active.action);
-    }
-
-    /**
-     * Holds the emitters whose proxy bone ONE SUBJECT's animation has switched off.
-     *
-     * Hiding the bone NODE is not enough for a particle system: the system's mesh is parented to the
-     * bone, so it would stop being drawn, but it would go on emitting the whole time and burst into
-     * view fully populated the moment the bone came back. 2285 of the shipped visibility tracks are
-     * particle proxies, so this is the case the whole feature exists for - the rancor's death
-     * explosion must not already be a fireball when frame 26 arrives.
-     *
-     * SCOPED to one subject, which it was not. It swept every system in the scene and gated them all
-     * on the ACTIVE subject's clip - the last scene-wide map driven by the active subject that the
-     * multi-subject work had not reached. With no active clip running, `bits` is undefined for
-     * everything and this set `setEmitting(true)` on every system in the scene, every frame, which
-     * also overrode any answer a passive subject had reached for its own.
-     *
-     * What that cost: a death clone's `_die` clip is a CHOREOGRAPHY - the Mon Calamari Cruiser's
-     * times four debris bursts to 0.3-2.0s, ten big explosions across the minute, and three
-     * `p_explosion_huge00` to 59.7s as the hull's bones go dark at 59.9s. All 39 of its systems ran
-     * continuously from the moment it spawned instead, and the clip only alternated whether you
-     * could see them.
-     */
-    private applyEmitterGating(
-        subjectId: string,
-        track: VisibilityTrack | undefined,
-        action: THREE.AnimationAction | null,
-    ): void {
-        for (const entry of this.particleSystems.values()) {
-            if (
-                entry.attachBone === undefined ||
-                entry.attachBoneIndex === undefined
-            ) {
-                continue;
-            }
-
-            if (this.subjectOfSystem(entry) !== subjectId) {
-                continue;
-            }
-
-            const bits = track?.bones.get(
-                `${entry.attachBone}#${entry.attachBoneIndex}`,
-            );
-
-            // A clip that says nothing about this proxy lifts only the CLIP's hold. It is not a
-            // permission to spawn: the part this system is attached to may be hidden, and this runs
-            // every frame, so voting yes here re-armed a held emitter one frame after it was held.
-            entry.instance.hold(
-                "clip",
-                bits !== undefined &&
-                    action !== null &&
-                    hiddenAt(bits, track!.fps, action.time),
-            );
-        }
-    }
-
-    /**
-     * Hands one subject's effects over to finish on their own.
-     *
-     * Each goes through {@link removeParticleSystem}, so the file's `leaveParticles` still decides
-     * whether it drains or is cut - an engine glow goes out with the ship, an explosion does not.
-     */
-    private releaseSubjectEffects(subjectId: string): void {
-        for (const [id, entry] of [...this.particleSystems]) {
-            if (this.subjectOfSystem(entry) === subjectId) {
-                this.removeParticleSystem(id);
-            }
-        }
-    }
-
-    /**
-     * The subject a particle system belongs to: the subject of the part it is attached to.
-     *
-     * A system with no part named is the scene's own - a particle file opened directly - and that is
-     * the active subject by definition.
-     */
-    private subjectOfSystem(entry: ParticleEntry): string {
-        return entry.attachToPartId === undefined
-            ? ACTIVE_SUBJECT
-            : (this.parts.get(entry.attachToPartId)?.subjectId ??
-                  ACTIVE_SUBJECT);
+        this.particles.applyEmitterGating(ACTIVE_SUBJECT, track, active.action);
     }
 
     /**
@@ -6074,102 +5763,11 @@ export class PreviewViewport {
         return true;
     }
 
-    private instantiate(
-        id: string,
-        system: AlamoParticleContent,
-        attachToPartId?: string,
-        attachBone?: string,
-        attachBoneIndex?: number,
-        scaleFactor = 1,
-        at?: { x: number; y: number; z: number },
-    ): ParticleSystemInstance {
-        // A marker at `at` where one was asked for and nothing is being hung on: the wreck's own
-        // explosion has to go off where the wreck FINISHED, and a part-less system otherwise
-        // anchors at the model root. An empty node rather than moving the instance, so the anchor
-        // stays the one thing that decides where a system sits.
-        const anchor =
-            at === undefined || attachToPartId !== undefined
-                ? null
-                : new THREE.Object3D();
-
-        if (anchor !== null && at !== undefined) {
-            anchor.position.set(at.x, at.y, at.z);
-            this.modelRoot.add(anchor);
-        }
-
-        const attachment =
-            anchor ??
-            this.attachmentFor(attachToPartId, attachBone, attachBoneIndex);
-
-        // Read once, here, rather than per spawn: the walk up the graph and the transform into the
-        // attachment's space are the same answer every frame, and this runs thousands of times a
-        // second on a `EveryVertex` emitter. `restartParticles` re-reads it, which is what picks up
-        // a level switch that swapped the geometry underneath.
-        const source = emissionMeshFor(
-            attachment,
-            this.partRootOf(attachToPartId),
-        );
-
-        // The model root is the space the particles are simulated in, so an effect the file does
-        // not link to its emitter is genuinely left behind rather than dragged along by the bone
-        // it is anchored on.
-        const instance = new ParticleSystemInstance(
-            id,
-            system,
-            this.particleTextures,
-            1,
-            source,
-            this.modelRoot,
-            scaleFactor,
-        );
-        instance.attachTo(attachment);
-        instance.setVisible(this.particlesVisible);
-        // Built after its effects came back, as a hardpoint's blast is: it takes what is in hand.
-        instance.applyEffects(
-            this.translated,
-            this.shaderStates,
-            this.translatedShaders,
-        );
-
-        // A system built after the answers came back still has to show the marker: a hardpoint
-        // blowing up spawns one long after the textures were asked for.
-        for (const name of this.missingTextures) {
-            void this.markMissing(name);
-        }
-
-        for (const key of this.hiddenEmitters) {
-            const [systemId, index] = splitEmitterKey(key);
-            if (systemId === id) {
-                instance.setEmitterVisible(index, false);
-            }
-        }
-
-        // Attached to the SIMULATION SPACE rather than to the bone it is anchored on. A proxy bone
-        // is a child of the piece it belongs to - `p_explosion_big00#12` sits under `Busted_00#11`
-        // on the Nebulon-B - and the death clip hides that piece on the very frame the blast
-        // fires. three prunes a hidden subtree, so parenting the effect there cut it one frame in.
-        // Anchoring is what makes it follow the bone; see `ParticleSystemInstance.attachTo`.
-        //
-        // Flagged all the same, so the model-mesh walk prunes it wherever it is reached from.
-        instance.root.userData.aetParticleSystem = true;
-        this.modelRoot.add(instance.root);
-        return instance;
-    }
-
     /** Where the climb for an emission mesh has to stop: the model the system was attached to. */
     private partRootOf(partId?: string): THREE.Object3D | null {
         return partId === undefined
             ? this.modelRoot
             : (this.parts.get(partId)?.root ?? null);
-    }
-
-    /** Drops every fading system at once, for a reset that takes the whole scene with it. */
-    private clearFadingParticles(): void {
-        for (const instance of this.fadingParticles) {
-            instance.dispose();
-        }
-
-        this.fadingParticles = [];
     }
 
     private async markMissing(name: string): Promise<void> {
@@ -6181,7 +5779,7 @@ export class PreviewViewport {
             return;
         }
 
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             entry.instance.setMissingTexture(name, marker);
         }
     }
@@ -6391,43 +5989,7 @@ export class PreviewViewport {
         this.advancePassiveSubjects(dt);
         this.controls.update();
 
-        if (this.particlesVisible && !this.particlesPaused) {
-            for (const [id, entry] of [...this.particleSystems]) {
-                // The camera goes in because a streak's length is a screen-space measurement:
-                // a spark flying at the viewer has no tail to draw.
-                entry.instance.update(
-                    dt * this.particleSpeed,
-                    this.camera.matrixWorldInverse,
-                    this.windVector,
-                );
-
-                // A death explosion is over once it stops emitting and its last spark dies.
-                if (this.transient.has(id) && entry.instance.exhausted) {
-                    this.transient.delete(id);
-                    this.removeParticleSystem(id);
-                }
-            }
-
-            // The ones already killed, finishing. Stepped in the SAME gate as the live systems, so
-            // the global particle switch and the pause govern them identically - the reader turning
-            // effects off must not leave a wreck's fire burning on.
-            for (let at = this.fadingParticles.length - 1; at >= 0; at--) {
-                const instance = this.fadingParticles[at];
-
-                instance.update(
-                    dt * this.particleSpeed,
-                    this.camera.matrixWorldInverse,
-                    this.windVector,
-                );
-
-                // `empty`, not `exhausted`: it has been told to stop spawning, so "finished" will
-                // never come for a continuous emitter. What is left is the only question.
-                if (instance.empty) {
-                    instance.dispose();
-                    this.fadingParticles.splice(at, 1);
-                }
-            }
-        }
+        this.particles.step(dt, this.camera.matrixWorldInverse);
 
         this.overlay.beforeCamera(this.active.mixer !== null);
         this.prepareForCamera();
@@ -6617,24 +6179,13 @@ export class PreviewViewport {
         const planes = clipPlanes(
             sphere,
             distance,
-            this.effectReach(),
+            this.particles.effectReach(),
             this.drawDistance,
         );
 
         this.camera.near = planes.near;
         this.camera.far = planes.far;
         this.camera.updateProjectionMatrix();
-    }
-
-    /** How far the running effects get from the model's centre. */
-    private effectReach(): number {
-        let reach = 0;
-
-        for (const entry of this.particleSystems.values()) {
-            reach = Math.max(reach, entry.instance.extent());
-        }
-
-        return reach;
     }
 
     /** Whether any running system has a heat emitter on screen this frame. */
@@ -6645,11 +6196,11 @@ export class PreviewViewport {
             return true;
         }
 
-        if (!this.heatEnabled || !this.particlesVisible) {
+        if (!this.heatEnabled || !this.particles.particlesVisible) {
             return false;
         }
 
-        for (const entry of this.particleSystems.values()) {
+        for (const entry of this.particles.particleSystems.values()) {
             if (entry.instance.hasVisibleHeat) {
                 return true;
             }
