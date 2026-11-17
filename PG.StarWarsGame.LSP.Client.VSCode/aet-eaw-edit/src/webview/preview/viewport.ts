@@ -189,6 +189,7 @@ import { ModelRows } from "./modelRows";
 import { CameraRig } from "./cameraRig";
 import { disposeTree, PartAssembly } from "./partAssembly";
 import { DestructionRig } from "./destructionRig";
+import { AnimationRig } from "./animationRig";
 
 /**
  * Where a system being loaded goes, and what it is.
@@ -268,9 +269,6 @@ function vectorOf(at: THREE.Vector3): { x: number; y: number; z: number } {
 /** How close to a joint a click must land, in pixels, to count as selecting it. */
 const JOINT_PICK_RADIUS = 10;
 
-/** Scratch for the bone-palette maths, so a per-frame loop allocates nothing. */
-const SKIN_WORK = new THREE.Matrix4();
-
 const BILLBOARD_AT = new THREE.Vector3();
 const BILLBOARD_LIGHT = new THREE.Vector3();
 const BILLBOARD_BONE = new THREE.Quaternion();
@@ -345,26 +343,8 @@ export class PreviewViewport {
     private readonly rows: ModelRows;
     /** Seconds since the viewport opened, for the effects that read the clock. */
     private elapsed = 0;
-    /** Reused per frame so building the bone palette does not allocate on every draw. */
-    private skinScratch = new Float32Array(0);
-    /**
-     * Every subject's animation state, keyed by subject id.
-     *
-     * These five things used to be one scene-wide set of maps, and every one of them was
-     * "first wins" - which the hull always was. A death clone is the SAME MODEL as the ship it
-     * replaces, so every node name, every clip name and every track name collided with the hull's:
-     * a clone's `_die` played on the shared mixer drove the HULL's bones, and its visibility track
-     * registered under the shared map hid the HULL's meshes. That collision is the whole reason a
-     * second, parallel clip path existed. Per subject, the names are unique again and there is one
-     * path.
-     */
-    private readonly subjects = new Map<string, SubjectAnimation>();
-    // panel and then picking a different clip used to silently drop it.
-    private animationSpeed = 1;
-    private animationLoop = true;
-    private animationPaused = false;
-    /** Whether a clip is currently driving bone visibility, so the release happens exactly once. */
-    private overridingVisibility = false;
+    /** The clips: each subject's mixer, the clip playing, its speed and loop, and the visibility it drives. See `AnimationRig`. */
+    private readonly animation: AnimationRig;
     private frameHandle = 0;
     private disposed = false;
     /** Bone nodes whose geometry turns to face the camera, the light or the wind. */
@@ -498,7 +478,7 @@ export class PreviewViewport {
                 return viewport.scaledRoot;
             },
             get subjects() {
-                return viewport.subjects;
+                return viewport.animation.subjects;
             },
             applyLevels: () => viewport.applyLevels(),
             bindLoadedTextures: (root) => viewport.bindLoadedTextures(root),
@@ -508,7 +488,7 @@ export class PreviewViewport {
                 viewport.removeParticleSystem(id, immediate),
             setColorization: (colour) => viewport.setColorization(colour),
             subjectAnimation: (subjectId) =>
-                viewport.subjectAnimation(subjectId),
+                viewport.animation.subjectAnimation(subjectId),
         });
         this.destruction = new DestructionRig({
             get assembly() {
@@ -534,6 +514,21 @@ export class PreviewViewport {
             dropRegistrations: (subjectId, root) =>
                 viewport.dropRegistrations(subjectId, root),
             removePart: (partId) => viewport.removePart(partId),
+        });
+        this.animation = new AnimationRig({
+            get assembly() {
+                return viewport.assembly;
+            },
+            get particles() {
+                return viewport.particles;
+            },
+            get rows() {
+                return viewport.rows;
+            },
+            applyLevels: () => viewport.applyLevels(),
+            clearRowOverrides: () => viewport.clearRowOverrides(),
+            setPartHidden: (partId, hidden) =>
+                viewport.setPartHidden(partId, hidden),
         });
         // First: the environment places its key light against the framing sphere as it is built.
         this.cameraRig = new CameraRig({
@@ -594,11 +589,11 @@ export class PreviewViewport {
                 viewport.cameraRig.boundingSphere(includeEffects),
             forEachDrawnMesh: (visit) =>
                 viewport.assembly.forEachDrawnMesh(visit),
-            skinPalette: (mesh) => viewport.skinPalette(mesh),
+            skinPalette: (mesh) => viewport.animation.skinPalette(mesh),
         });
         this.rows = new ModelRows({
             get active() {
-                return viewport.active;
+                return viewport.animation.active;
             },
             get alt() {
                 return viewport.alt;
@@ -808,20 +803,7 @@ export class PreviewViewport {
     }
 
     get animationNames(): string[] {
-        return this.active.clips.map((c) => c.name);
-    }
-
-    // ── content ───────────────────────────────────────────────────────────────
-
-    /**
-     * The subject the panel speaks for.
-     *
-     * Every animation control - the picker, the speed, the scrub bar, the loop switch - describes
-     * the model that was opened, and only that one. A passive subject's clip is not something the
-     * reader chose; it is what dying looks like, and it runs on its own terms.
-     */
-    private get active(): SubjectAnimation {
-        return this.subjectAnimation(ACTIVE_SUBJECT);
+        return this.animation.animationNames;
     }
 
     /**
@@ -1061,8 +1043,7 @@ export class PreviewViewport {
         this.shieldRevealed = false;
         // Every subject's clips, mixer, tracks, rest pose and node names at once. They hold nodes
         // of a model nobody is looking at any more, and keeping them would leak the whole graph.
-        this.subjects.clear();
-        this.overridingVisibility = false;
+        this.animation.forgetSubjects();
     }
 
     /**
@@ -1660,29 +1641,7 @@ export class PreviewViewport {
      * already full of the hull's answers.
      */
     startDeathClip(subjectId: string): void {
-        const subject = this.subjects.get(subjectId);
-
-        if (
-            subject === undefined ||
-            subject.mixer === null ||
-            subject.action !== null
-        ) {
-            return;
-        }
-
-        const name = deathClip(subject.clips.map((c) => c.name));
-        const clip = subject.clips.find((c) => c.name === name);
-
-        if (clip === undefined) {
-            return;
-        }
-
-        subject.action = subject.mixer.clipAction(clip);
-        subject.action.setLoop(THREE.LoopOnce, 1);
-        // Without this the last pose is gone the frame it arrives.
-        subject.action.clampWhenFinished = true;
-        subject.action.reset();
-        subject.action.play();
+        this.animation.startDeathClip(subjectId);
     }
 
     /**
@@ -1706,49 +1665,13 @@ export class PreviewViewport {
      * a fault; reporting it lets the caller stop claiming otherwise.
      */
     play(name: string | null): boolean {
-        this.active.action?.stop();
-        this.active.action = null;
-        this.resetPose();
-
-        // The pose is not the only thing a clip resets. Watching an animation means asking whether
-        // the animation works, and that can only be answered against the model as its author left
-        // it - so every row goes back to what the model says. The master toggles are untouched:
-        // effects switched off because they obstruct the view are the one thing worth keeping off
-        // while a clip runs. See `clearedForPlayback`.
-        this.clearRowOverrides();
-
-        if (name === null || this.active.mixer === null) {
-            return false;
-        }
-
-        const clip = this.active.clips.find((c) => c.name === name);
-        if (clip === undefined) {
-            return false;
-        }
-
-        this.active.action = this.active.mixer.clipAction(clip);
-        this.active.action.setLoop(
-            this.animationLoop ? THREE.LoopRepeat : THREE.LoopOnce,
-            Infinity,
-        );
-        // Without this a non-looping action snaps back to frame 0 the instant it ends, so the last
-        // pose - often the whole point of a death or a deploy - is never on screen.
-        this.active.action.clampWhenFinished = true;
-        this.active.action.timeScale = this.animationSpeed;
-        this.active.action.paused = this.animationPaused;
-        this.active.action.play();
-
-        return true;
+        return this.animation.play(name);
     }
 
     // ── spinning away ─────────────────────────────────────────────────────────
 
     setPaused(paused: boolean): void {
-        this.animationPaused = paused;
-
-        if (this.active.action !== null) {
-            this.active.action.paused = paused;
-        }
+        this.animation.setPaused(paused);
     }
 
     /**
@@ -1764,47 +1687,16 @@ export class PreviewViewport {
      * the file's pose, by definition, and it cannot drift.
      */
     resetPose(): void {
-        for (const [node, rest] of this.active.restPose) {
-            node.position.copy(rest.position);
-            node.quaternion.copy(rest.quaternion);
-            node.scale.copy(rest.scale);
-        }
-
-        // Transforms are the part three.js would have restored on its own; visibility is not, and a
-        // bone left switched off by the clip that just stopped is the residue that actually shows.
-        // Asking the level and override rules again is what puts it back - they, not this, know
-        // what the model looked like before the clip took over.
-        if (this.overridingVisibility) {
-            this.overridingVisibility = false;
-            this.applyLevels();
-        }
-
-        // Only the CLIP's hold: the clip has stopped having an opinion, which says nothing about a
-        // part that is hidden or a system that has been released to finish.
-        for (const entry of this.particles.particleSystems.values()) {
-            entry.instance.hold("clip", false);
-        }
+        this.animation.resetPose();
     }
 
     /** How fast the clip runs, as a multiple of the rate its file declares. */
     setAnimationSpeed(speed: number): void {
-        this.animationSpeed = speed;
-
-        if (this.active.action !== null) {
-            this.active.action.timeScale = speed;
-        }
+        this.animation.setAnimationSpeed(speed);
     }
 
     setAnimationLoop(loop: boolean): void {
-        this.animationLoop = loop;
-
-        if (this.active.action !== null) {
-            this.active.action.setLoop(
-                loop ? THREE.LoopRepeat : THREE.LoopOnce,
-                Infinity,
-            );
-            this.active.action.clampWhenFinished = true;
-        }
+        this.animation.setAnimationLoop(loop);
     }
 
     /**
@@ -1814,31 +1706,12 @@ export class PreviewViewport {
      * dropped it, and scrubbing a held one should leave it held on the frame you chose.
      */
     seekAnimation(seconds: number): void {
-        if (this.active.action === null) {
-            return;
-        }
-
-        this.active.action.time = Math.max(
-            0,
-            Math.min(seconds, this.active.action.getClip().duration),
-        );
-        // One update with no time step, so the pose on screen matches the playhead immediately
-        // rather than at the next frame - which is what makes a scrubber feel attached to the model.
-        this.active.mixer?.update(0);
+        this.animation.seekAnimation(seconds);
     }
 
     /** Where the playhead is and how long the clip runs, for the scrubber. Zeroes when idle. */
     animationProgress(): { time: number; duration: number; running: boolean } {
-        if (this.active.action === null) {
-            return { time: 0, duration: 0, running: false };
-        }
-
-        return {
-            time: this.active.action.time,
-            duration: this.active.action.getClip().duration,
-            running:
-                this.active.action.isRunning() && !this.active.action.paused,
-        };
+        return this.animation.animationProgress();
     }
 
     stats(): ViewportStats {
@@ -1862,7 +1735,7 @@ export class PreviewViewport {
             // model with no skinned mesh - the loader only creates Bone objects for skin joints, so
             // the Star Destroyer's 71 bones read as none while the tree beside it listed all of them.
             bones: this.skeleton().length,
-            animations: this.animationNames,
+            animations: this.animation.animationNames,
         };
     }
 
@@ -2395,41 +2268,6 @@ export class PreviewViewport {
     }
 
     /**
-     * The bone palette for one skinned mesh, in the space the Alamo skinned shaders work in.
-     *
-     * WORLD space, not mesh-local. The skinned effects project with VIEWPROJECTION rather than
-     * WORLDVIEWPROJECTION - their own comment says "we are working in world space here" - so the
-     * skin matrix has to carry the whole way out. Conjugating only by the bind matrices, the way
-     * three's own skinning shader does, leaves the result mesh-local and the turret's barrel flew
-     * off; the extra `matrixWorld` is what the difference in projection matrix demands.
-     */
-    private skinPalette(mesh: THREE.SkinnedMesh): Float32Array {
-        mesh.skeleton.update();
-
-        // Null until the skeleton has been initialised, which `update` above has just done.
-        const source = mesh.skeleton.boneMatrices;
-        if (source === null || source === undefined) {
-            return this.skinScratch;
-        }
-
-        const bones = mesh.skeleton.bones.length;
-        const palette =
-            this.skinScratch.length === bones * 16
-                ? this.skinScratch
-                : (this.skinScratch = new Float32Array(bones * 16));
-
-        for (let i = 0; i < bones; i++) {
-            SKIN_WORK.fromArray(source, i * 16);
-            SKIN_WORK.multiply(mesh.bindMatrix);
-            SKIN_WORK.premultiply(mesh.bindMatrixInverse);
-            SKIN_WORK.premultiply(mesh.matrixWorld);
-            SKIN_WORK.toArray(palette, i * 16);
-        }
-
-        return palette;
-    }
-
-    /**
      * The node a fire bone names, looking on the HULL before the attached model.
      *
      * A hardpoint model is cut from the hull and keeps its whole skeleton, so a bone like
@@ -2464,7 +2302,7 @@ export class PreviewViewport {
      * unparents the counting meshes it owns - mutating the children of a node being traversed.
      */
     private dropRegistrations(subjectId: string, root: THREE.Object3D): void {
-        const subject = this.subjectAnimation(subjectId);
+        const subject = this.animation.subjectAnimation(subjectId);
         const inside: THREE.Object3D[] = [];
         root.traverse((node) => inside.push(node));
 
@@ -2560,106 +2398,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Advances every PASSIVE subject's clip and applies what it says about visibility.
-     *
-     * The active subject is not here: its mixer is ticked by the loop and its visibility goes
-     * through the ROW CHAIN, which is the thing that describes the model being previewed. A passive
-     * subject has no rows, so its track is applied to its own nodes directly - safe now that
-     * `nodeByName` is the subject's own rather than a scene-wide map the hull had filled.
-     *
-     * A mesh the FILE hides is never brought back by the clip: a shadow volume is not geometry that
-     * happens to be switched off this frame.
-     */
-    private advancePassiveSubjects(dt: number): void {
-        for (const [subjectId, subject] of this.subjects) {
-            if (
-                subjectId === ACTIVE_SUBJECT ||
-                subject.action === null ||
-                subject.mixer === null
-            ) {
-                continue;
-            }
-
-            subject.mixer.update(dt);
-
-            const action = subject.action;
-            const track = subject.visibility.get(action.getClip().name);
-
-            if (track !== undefined) {
-                // Every bone the track names, proxies included: a proxy carries only the marker
-                // mesh the file already hides, and no effect is attached to it to be taken with it.
-                // Emission is what the clip decides for a proxy (`applyEmitterGating`); what is
-                // already in the air keeps drawing, exactly as it does in the engine.
-                //
-                // Through the subject's own name map rather than a traversal of its whole root:
-                // this runs every frame, and a capital ship's wreck is a hundred nodes.
-                for (const [name, bits] of track.bones) {
-                    const node = subject.nodeByName.get(name);
-
-                    if (node !== undefined && !subject.fileHidden.has(node)) {
-                        node.visible = !hiddenAt(bits, track.fps, action.time);
-                    }
-                }
-            }
-
-            // The same gate the active subject gets, on this subject's own clip. Without it the
-            // clip decides only what is SEEN: a burst switched off at this moment goes on burning,
-            // and is spent long before the frame that was meant to set it off.
-            this.particles.applyEmitterGating(subjectId, track, action);
-
-            // Gone at the end of it. A death clone is what dying LOOKS like, not what is left
-            // afterwards - the engine takes the object away when the clip is done.
-            if (action.time >= action.getClip().duration) {
-                // Its effects are released FIRST, and they outlive it. The Calamari clone's three
-                // `p_explosion_huge00` ignite at 59.7s of a 60.1s clip - the detonation the whole
-                // minute builds to - and hiding the part they are attached to cut them 0.4s in, so the
-                // end of a death was 719 particles alive and NONE of them on screen.
-                this.particles.releaseSubjectEffects(subjectId);
-
-                for (const part of this.assembly.partsOf(subjectId)) {
-                    this.setPartHidden(part.id, true);
-                }
-            }
-        }
-    }
-
-    /**
-     * Switches bones on and off for the frame the playing clip is on.
-     *
-     * Only the nodes this pass hides are touched, and every one of them is released the moment the
-     * clip stops naming it - so a bone hidden by one clip cannot stay hidden into the next, and a
-     * bone the reader hid by hand in the tree is never quietly shown again by an animation ending.
-     */
-    private applyAnimatedVisibility(): void {
-        // Looked up ONCE: this runs on every frame of a playing clip, and so does the emitter
-        // gating below, which asks per particle system.
-        const active = this.active;
-        const track =
-            active.action === null
-                ? undefined
-                : active.visibility.get(active.action.getClip().name);
-
-        if (track !== undefined && active.action !== null) {
-            // Through the ROW CHAIN, which is the only thing that writes visibility - the clip is a
-            // link in it (`animated`), above the level gates and the file. This used to write
-            // `node.visible` here instead, straight past the chain, and the two disagreed about how
-            // a track is keyed: tracks by glTF NODE name, the chain by BONE name. Whichever of them
-            // matched was the one that worked, and re-keying the tracks silently swapped which.
-            //
-            // The symptom that gave it away: with the per-frame writer missing its lookup, the only
-            // resolve was the one `play` does at frame 0 - so a muzzle whose track began `1111` sat
-            // on for the whole clip and the one beginning `0000` never lit.
-            this.rows.resolveRows();
-            this.overridingVisibility = true;
-        } else if (this.overridingVisibility) {
-            this.overridingVisibility = false;
-            this.applyLevels();
-        }
-
-        this.particles.applyEmitterGating(ACTIVE_SUBJECT, track, active.action);
-    }
-
-    /**
      * Whether a mesh actually reaches the screen: its own flag AND every ancestor's.
      *
      * A mesh with no ALT or LOD tag is always drawn unless it is hidden itself or is attached to a hidden
@@ -2690,29 +2428,6 @@ export class PreviewViewport {
         }
 
         return true;
-    }
-
-    /** One subject's animation state, created the first time it is asked for. */
-    private subjectAnimation(subjectId: string): SubjectAnimation {
-        const held = this.subjects.get(subjectId);
-
-        if (held !== undefined) {
-            return held;
-        }
-
-        const made: SubjectAnimation = {
-            mixer: null,
-            clips: [],
-            visibility: new Map(),
-            nodeByName: new Map(),
-            restPose: new Map(),
-            action: null,
-            fileHidden: new Set(),
-        };
-
-        this.subjects.set(subjectId, made);
-
-        return made;
     }
 
     private onPointerDown = (event: PointerEvent): void => {
@@ -2769,8 +2484,8 @@ export class PreviewViewport {
 
         const dt = this.clock.getDelta();
         this.elapsed += dt;
-        this.active.mixer?.update(dt);
-        this.applyAnimatedVisibility();
+        this.animation.active.mixer?.update(dt);
+        this.animation.applyAnimatedVisibility();
         // After the mixer, so a clip that drives the same bone wins: an animation is the model's own
         // word about where the turret is, and the sweep is the reader asking a question about it.
         this.turret.advanceTurretSweep(dt);
@@ -2783,12 +2498,12 @@ export class PreviewViewport {
         // tracks can now be put back in the frames their angles are measured against.
         this.turret.placeTurretAnchors();
 
-        this.advancePassiveSubjects(dt);
+        this.animation.advancePassiveSubjects(dt);
         this.controls.update();
 
         this.particles.step(dt, this.camera.matrixWorldInverse);
 
-        this.overlay.beforeCamera(this.active.mixer !== null);
+        this.overlay.beforeCamera(this.animation.active.mixer !== null);
         this.cameraRig.prepareForCamera();
         // After the camera's matrix is updated, so the marks are projected through THIS frame's view.
         // See `OverlayLayer.afterCamera`.
