@@ -50,7 +50,7 @@ import { LocSearch } from "./loc/LocSearch";
 import { LocProblemsBar } from "./loc/LocProblemsBar";
 import { LocRow } from "./loc/locRow";
 import { rowSeverityClass, severityByRow } from "./loc/rowSeverity";
-import { FILTER_DEBOUNCE_MS, useDebounced } from "./loc/useDebounced";
+import { FILTER_DEBOUNCE_MS, useDebounced } from "./shared/useDebounced";
 import {
     LocPanelMessage,
     LocProblem,

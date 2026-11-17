@@ -353,11 +353,6 @@ export const Shell = styled.div`
     }
 
     ${dockHeaderCss}
-    /* A header of plain buttons; no dial to make room for. */
-    .dock-header {
-        min-height: 34px;
-    }
-
     .dock-content {
         flex: 1;
         min-height: 0;

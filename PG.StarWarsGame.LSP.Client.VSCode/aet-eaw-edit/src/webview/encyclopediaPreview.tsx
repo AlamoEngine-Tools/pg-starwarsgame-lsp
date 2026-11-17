@@ -150,10 +150,6 @@ const Shell = styled.div`
 
     /* ── Header: the severity tag ───────────────────────────────────────── */
 
-    .dock-header {
-        min-height: 34px;
-    }
-
     .header-title {
         font-weight: 600;
         text-align: center;

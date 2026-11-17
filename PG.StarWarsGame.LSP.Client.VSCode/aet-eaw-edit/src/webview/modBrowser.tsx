@@ -103,7 +103,7 @@ import {
 } from "./shared/tableColumns";
 import type { ColumnLayout } from "./shared/tableColumns";
 import type { SortState } from "./shared/tableSort";
-import { useEdgeResize } from "./useEdgeResize";
+import { useEdgeResize } from "./shared/useEdgeResize";
 import { createRequester } from "./shared/hostRequest";
 import { poster, transport, vscodeApi } from "./shared/vscodeApi";
 import type {

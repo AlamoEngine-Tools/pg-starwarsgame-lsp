@@ -98,7 +98,7 @@ import {
     readOnlyThreadIndex,
 } from "./storyGraph/dependencyEdit";
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from "./staging";
-import { GRAPH_FILTER_DEBOUNCE_MS, useDebounced } from "./loc/useDebounced";
+import { GRAPH_FILTER_DEBOUNCE_MS, useDebounced } from "./shared/useDebounced";
 import { worstSeverity } from "./loc/validateState";
 import { createRoot } from "react-dom/client";
 import { ClassicPreset, GetSchemes, NodeEditor } from "rete";
@@ -5654,11 +5654,6 @@ const Shell = styled.div`
 
     ${rightDockCss}
     ${dockHeaderCss}
-        /* Tall enough for the rotary mode dial, which is this editor's alone. */
-    .dock-header {
-        min-height: 78px;
-    }
-
     ${dockBodyCss}
     ${dockOverviewCss}
         /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
@@ -7785,6 +7780,7 @@ function App(): React.JSX.Element {
                     </div>
                     <RightDock
                         memoKey="storyGraph.dock"
+                        headerHoldsDial
                         initialWidth={300}
                         minWidth={210}
                         maxWidth={520}

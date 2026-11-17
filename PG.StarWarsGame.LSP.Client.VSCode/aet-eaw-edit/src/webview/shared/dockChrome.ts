@@ -1046,9 +1046,10 @@ export const rightDockCss = `
  * did not, one knew about `sev-info` and the other did not. The severity tag in particular has to
  * mean ONE thing across the extension, and it cannot if each editor tints it from its own rules.
  *
- * `min-height` is deliberately NOT here. It is the one part that legitimately differs - the story
- * graph's header holds a rotary dial and needs 78px, a header with a button or two needs 34 - so
- * each editor sets its own after interpolating this.
+ * `min-height` takes two values and both live here: 34px for a header of a button or two, and 78px
+ * for one that holds the rotary mode dial (`RightDock`'s `headerHoldsDial`), which is the dial's own
+ * measurement. Held from the first frame rather than grown when the dial arrives, or the top of the
+ * dock visibly draws itself in two steps.
  */
 export const dockHeaderCss = `
     /* Whatever is centred stays dead-centre; the edge controls float over the sides so they can
@@ -1061,7 +1062,9 @@ export const dockHeaderCss = `
         gap: var(--space-6);
         padding: var(--space-6) var(--space-8);
         border-bottom: var(--space-1) solid var(--colour-line);
+        min-height: 34px;
     }
+    .dock-header.with-dial { min-height: 78px; }
     .dock-header .header-left { position: absolute; left: 8px; }
     .dock-header .header-right { position: absolute; right: 8px; }
 

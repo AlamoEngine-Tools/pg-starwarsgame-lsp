@@ -193,6 +193,15 @@ function main() {
     const defined = definedTokens();
     const roles = hostRoles(fs.readFileSync(TOKENS, 'utf8'));
 
+    // A component may set a custom property of its own from JS - the credits crawl drives its
+    // animation from `style={{ '--crawl-from': ... }}` - so the declaration is outside the stylesheet
+    // that reads it, and often in another file: the model preview sets `--capture-ratio` in the
+    // component and reads it in preview/previewShell.ts. Collected over the whole tree.
+    // The key may be computed and cast - `['--crawl-from' as string]:` - so anything but a
+    // newline is allowed between the closing quote and the colon.
+    const alsoDeclared = new Set(sources(ROOT).flatMap(file =>
+        [...fs.readFileSync(file, 'utf8').matchAll(/['"](--[a-z0-9-]+)['"][^:\n]*:/g)].map(m => m[1])));
+
     for (const file of sources(ROOT)) {
         const text = fs.readFileSync(file, 'utf8');
         const where = path.relative(process.cwd(), file);
@@ -229,14 +238,6 @@ function main() {
         }
 
         const exempt = GAME_TRUTH.has(file);
-
-        // A component may set a custom property of its own from JS - the credits crawl drives its
-        // animation from `style={{ '--crawl-from': ... }}` - so the declaration is in the same file
-        // but outside the stylesheet that reads it.
-        // The key may be computed and cast - `['--crawl-from' as string]:` - so anything but a
-        // newline is allowed between the closing quote and the colon.
-        const alsoDeclared = new Set(
-            [...text.matchAll(/['"](--[a-z0-9-]+)['"][^:\n]*:/g)].map(m => m[1]));
 
         for (const [body, offset] of templates(text)) {
             for (const offence of tokenOffences(body, {

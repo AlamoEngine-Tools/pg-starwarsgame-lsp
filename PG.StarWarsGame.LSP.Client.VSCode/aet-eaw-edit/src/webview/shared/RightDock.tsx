@@ -16,12 +16,18 @@
 import * as l10n from "@vscode/l10n";
 import { ReactNode } from "react";
 
-import { useEdgeResize } from "../useEdgeResize";
+import { useEdgeResize } from "./useEdgeResize";
 import { readPanelSize, writePanelSize } from "../../shared/panelLayout";
 
 export interface RightDockProps {
     /** Pinned above the scrolling content - mode switches, save/validate, whatever the editor needs. */
     header?: ReactNode;
+    /**
+     * Whether the header carries the rotary mode dial, which needs a taller header. Held from the
+     * first frame, before the dial itself has arrived, so the dock does not draw itself in two
+     * steps.
+     */
+    headerHoldsDial?: boolean;
     /**
      * The dock body. Wrap groups in `.dock-section` with a `.dock-section-title`.
      *
@@ -50,6 +56,7 @@ export interface RightDockProps {
 
 export function RightDock({
     header,
+    headerHoldsDial = false,
     content,
     overview,
     memoKey,
@@ -82,7 +89,13 @@ export function RightDock({
                 {...handleProps}
             />
             {header !== undefined && (
-                <div className="dock-header">{header}</div>
+                <div
+                    className={
+                        "dock-header" + (headerHoldsDial ? " with-dial" : "")
+                    }
+                >
+                    {header}
+                </div>
             )}
             <div className="dock-content">{content}</div>
             {overview !== undefined && (

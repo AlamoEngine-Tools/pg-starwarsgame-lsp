@@ -17,7 +17,7 @@ import type {
 } from "../../protocol/panels/localisationEditor";
 import { loadDialogGeometry } from "../shared/dialogGeometryStore";
 import { LocRow } from "../loc/locRow";
-import { useDebounced, VALIDATE_DEBOUNCE_MS } from "./useDebounced";
+import { useDebounced, VALIDATE_DEBOUNCE_MS } from "../shared/useDebounced";
 import { worstSeverity } from "./validateState";
 
 import { initPanelLayout } from "../shared/panelLayoutBridge";
