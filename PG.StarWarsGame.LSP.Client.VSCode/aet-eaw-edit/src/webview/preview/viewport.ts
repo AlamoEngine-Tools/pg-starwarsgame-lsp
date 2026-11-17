@@ -196,6 +196,7 @@ import {
     type PresetView,
     type ViewportStats,
 } from "./viewportTypes";
+import { CaptureRig } from "./captureRig";
 
 export type {
     AddPartOptions,
@@ -288,6 +289,8 @@ export class PreviewViewport {
     private elapsed = 0;
     /** The clips: each subject's mixer, the clip playing, its speed and loop, and the visibility it drives. See `AnimationRig`. */
     private readonly animation: AnimationRig;
+    /** The still capture: one frame at a chosen size, with what it hides, then everything put back. See `CaptureRig`. */
+    private readonly capturer: CaptureRig;
     private frameHandle = 0;
     private disposed = false;
     /** Bone nodes whose geometry turns to face the camera, the light or the wind. */
@@ -472,6 +475,40 @@ export class PreviewViewport {
             clearRowOverrides: () => viewport.clearRowOverrides(),
             setPartHidden: (partId, hidden) =>
                 viewport.setPartHidden(partId, hidden),
+        });
+        this.capturer = new CaptureRig({
+            get camera() {
+                return viewport.camera;
+            },
+            get cameraRig() {
+                return viewport.cameraRig;
+            },
+            get canvas() {
+                return viewport.canvas;
+            },
+            get environment() {
+                return viewport.environment;
+            },
+            get overlay() {
+                return viewport.overlay;
+            },
+            get particles() {
+                return viewport.particles;
+            },
+            get renderer() {
+                return viewport.renderer;
+            },
+            get scene() {
+                return viewport.scene;
+            },
+            get turret() {
+                return viewport.turret;
+            },
+            resize: () => viewport.resize(),
+            setFireArcsVisible: (visible) =>
+                viewport.setFireArcsVisible(visible),
+            setParticlesVisible: (visible) =>
+                viewport.setParticlesVisible(visible),
         });
         // First: the environment places its key light against the framing sphere as it is built.
         this.cameraRig = new CameraRig({
@@ -1720,17 +1757,7 @@ export class PreviewViewport {
     }
 
     /**
-     * Renders one frame at a chosen size and hands back the PNG bytes.
-     *
-     * The renderer is resized, drawn and put back inside ONE synchronous block. Without
-     * `preserveDrawingBuffer` the drawing buffer is only guaranteed to hold its contents until the
-     * browser composites, which cannot happen while this is running - and asking for that flag
-     * instead would cost every ordinary frame for the sake of the rare capture.
-     *
-     * What it hides is passed in rather than read from the panel's own toggles: an icon usually
-     * wants no grid, no floor and no hardpoint markers even while the reader is working with all
-     * three switched on, and a capture that quietly changed what they were looking at would be
-     * worse than one that asked.
+     * Renders one frame at a chosen size and hands back the PNG bytes. See `CaptureRig.capture`.
      */
     capture(options: {
         width: number;
@@ -1742,118 +1769,7 @@ export class PreviewViewport {
         /** The axes, the skeleton and the firing arcs: diagnostics, not part of the subject. */
         annotations: boolean;
     }): string {
-        const before = {
-            width: this.canvas.width,
-            height: this.canvas.height,
-            aspect: this.camera.aspect,
-            pixelRatio: this.renderer.getPixelRatio(),
-            background: this.scene.background,
-            grid: this.environment.grid.visible,
-            floor: this.environment.floor.visible,
-            catcher: this.environment.shadowCatcher.visible,
-            particles: this.particles.particlesVisible,
-            axes: this.environment.axes.visible,
-            joints: this.overlay.joints.visible,
-            jointLines: this.overlay.jointLines.visible,
-            selection: this.overlay.selectionBoxes.visible,
-            arcs: this.turret.arcsShown,
-        };
-
-        try {
-            // One device pixel per requested pixel: a capture is measured in pixels, not in the
-            // reader's display scaling, or the same request would give a different file on a
-            // different monitor.
-            this.renderer.setPixelRatio(1);
-            this.renderer.setSize(options.width, options.height, false);
-            // The frame drawn over the viewport, exactly: the largest rectangle of the capture's
-            // shape that fits the viewport, centred (captureFrame). Rendered as a view offset on the
-            // viewport's own projection, so a capture wider than the viewport shows what the frame
-            // shows - not more to either side, which is what widening the aspect used to do.
-            const frame = captureFrame(
-                before.width,
-                before.height,
-                options.width,
-                options.height,
-            );
-            this.camera.setViewOffset(
-                before.width,
-                before.height,
-                frame.x,
-                frame.y,
-                frame.width,
-                frame.height,
-            );
-            this.camera.updateProjectionMatrix();
-
-            // Null is TRANSPARENT, which is what an icon wants: the alpha the renderer was created
-            // with is what makes it possible at all.
-            this.scene.background =
-                options.background === null
-                    ? null
-                    : new THREE.Color(options.background);
-
-            this.environment.grid.visible = options.grid;
-            this.environment.floor.visible = options.floor;
-            this.environment.shadowCatcher.visible =
-                options.floor && before.catcher;
-            this.setParticlesVisible(options.particles);
-
-            // The axes, the skeleton and the firing arcs are things drawn to help someone READ the
-            // model. They are not part of it, and an icon with a coloured cross through it is not
-            // an icon - which is exactly what the first capture came out as.
-            this.environment.axes.visible = options.annotations && before.axes;
-            this.overlay.joints.visible = options.annotations && before.joints;
-            this.overlay.jointLines.visible =
-                options.annotations && before.jointLines;
-
-            // A selection box is a thing drawn to help someone READ the model, exactly like the
-            // axes and the skeleton, and an icon with an amber cage around it is not an icon.
-            this.overlay.selectionBoxes.visible =
-                options.annotations && before.selection;
-
-            if (!options.annotations) {
-                this.setFireArcsVisible(false);
-            }
-
-            this.cameraRig.prepareForCamera();
-
-            // A sprite is oriented against the VIEW matrix - a streak's length is a screen-space
-            // measurement - so it has to be re-aimed for this camera. A zero step re-aims without
-            // advancing the simulation: a capture must not move the effects on.
-            if (this.particles.particlesVisible) {
-                for (const entry of this.particles.particleSystems.values()) {
-                    entry.instance.update(
-                        0,
-                        this.camera.matrixWorldInverse,
-                        this.particles.windVector,
-                    );
-                }
-            }
-
-            this.environment.renderFrame();
-
-            return this.canvas.toDataURL("image/png");
-        } finally {
-            // Always put the room back, including when the render throws: a failed capture must not
-            // leave the reader looking at a 64-pixel viewport with the grid switched off.
-            this.renderer.setPixelRatio(before.pixelRatio);
-            this.scene.background = before.background;
-            this.environment.grid.visible = before.grid;
-            this.environment.floor.visible = before.floor;
-            this.environment.shadowCatcher.visible = before.catcher;
-            this.setParticlesVisible(before.particles);
-            this.environment.axes.visible = before.axes;
-            this.overlay.joints.visible = before.joints;
-            this.overlay.jointLines.visible = before.jointLines;
-            this.overlay.selectionBoxes.visible = before.selection;
-            this.setFireArcsVisible(before.arcs);
-            this.camera.clearViewOffset();
-            this.camera.aspect = before.aspect;
-            this.camera.updateProjectionMatrix();
-            this.resize();
-            this.cameraRig.prepareForCamera();
-            this.environment.renderFrame();
-        }
+        return this.capturer.capture(options);
     }
 
     resize(): void {
