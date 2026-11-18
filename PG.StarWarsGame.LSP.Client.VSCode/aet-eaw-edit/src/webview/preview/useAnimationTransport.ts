@@ -31,12 +31,45 @@ export interface AnimationTransportInputs {
 
 export type AnimationTransport = ReturnType<typeof useAnimationTransport>;
 
+/** What pressing a card or a take does: see {@link cardPress}. */
+export type CardPress = "play" | "pause" | "resume" | "replay";
+
+/**
+ * What pressing a card - or one take, with `clips` holding just that take - does.
+ *
+ * A card whose clip is not the current one plays. The current clip pauses while it runs, resumes
+ * where it was paused, and plays again from the start once it has ended. A card used to play
+ * whenever it was pressed, so pressing the current one set the name already set: nothing re-ran,
+ * and a clip that plays once could only be started again from the scrubber (#440).
+ */
+export function cardPress(
+    clips: readonly string[],
+    current: string | null,
+    playhead: { running: boolean; atEnd: boolean },
+): CardPress {
+    if (current === null || !clips.includes(current)) {
+        return "play";
+    }
+
+    if (playhead.running) {
+        return "pause";
+    }
+
+    return playhead.atEnd ? "replay" : "resume";
+}
+
 export function useAnimationTransport({
     scene,
     stats,
     viewportRef,
 }: AnimationTransportInputs) {
     const [animation, setAnimation] = useState<string | null>(null);
+
+    /**
+     * Counts every start asked for by hand, so starting the clip that is already current starts it
+     * again: the name alone does not change, and the effect that plays the clip keys on both.
+     */
+    const [clipStart, setClipStart] = useState(0);
 
     /**
      * The transport.
@@ -142,6 +175,7 @@ export function useAnimationTransport({
         // just that clip, and saying "random" over it would be a claim about nothing.
         setRoulette(action.takes.length > 1 ? action : null);
         setAnimation(pickTake(action.takes, Math.random()).name);
+        setClipStart((count) => count + 1);
         setAnimationPaused(false);
     }, []);
 
@@ -149,6 +183,7 @@ export function useAnimationTransport({
     const pickClip = useCallback((clip: string): void => {
         setRoulette(null);
         setAnimation(clip);
+        setClipStart((count) => count + 1);
         setAnimationPaused(false);
     }, []);
 
@@ -217,6 +252,35 @@ export function useAnimationTransport({
         setAnimationPaused(false);
     };
 
+    /**
+     * A card or a take pressed: plays it, or pauses, resumes or replays the current clip - see
+     * {@link cardPress}.
+     *
+     * Resuming goes straight at the viewport as well, for the reason `togglePlay` gives.
+     */
+    const press = (clips: readonly string[], start: () => void): void => {
+        switch (cardPress(clips, animation, { running: playing, atEnd })) {
+            case "pause":
+                setAnimationPaused(true);
+                return;
+            case "resume":
+                viewportRef.current?.setPaused(false);
+                setAnimationPaused(false);
+                return;
+            default:
+                start();
+        }
+    };
+
+    const pressAction = (action: AnimationAction): void =>
+        press(
+            action.takes.map((take) => take.name),
+            () => playAction(action),
+        );
+
+    const pressTake = (clip: string): void =>
+        press([clip], () => pickClip(clip));
+
     const step = (by: number): void => {
         if (orderedClips.length === 0) {
             return;
@@ -240,6 +304,7 @@ export function useAnimationTransport({
     return {
         animation,
         setAnimation,
+        clipStart,
         animationPaused,
         animationSpeed,
         setAnimationSpeed,
@@ -255,6 +320,8 @@ export function useAnimationTransport({
         roulette,
         playAction,
         pickClip,
+        pressAction,
+        pressTake,
         foldedFamilies,
         toggleFamily,
         playing,

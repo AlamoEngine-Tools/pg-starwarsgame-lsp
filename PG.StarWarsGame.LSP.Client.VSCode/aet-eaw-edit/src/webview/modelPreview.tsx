@@ -269,6 +269,7 @@ function ModelPreview(): React.JSX.Element {
     const {
         animation,
         setAnimation,
+        clipStart,
         animationPaused,
         animationSpeed,
         animationLoop,
@@ -1020,10 +1021,10 @@ function ModelPreview(): React.JSX.Element {
         }
 
         setTreeItems(viewportRef.current?.treeItems() ?? []);
-        // `levels` is read but deliberately NOT a dependency: this fires when the CLIP changes, and
-        // adding it would reset the model every time the defined levels were recomputed - which
-        // happens on every load and every level change.
-    }, [animation]);
+        // `levels` is read but deliberately NOT a dependency: this fires when the CLIP changes, or is
+        // started again by hand (`clipStart`), and adding it would reset the model every time the
+        // defined levels were recomputed - which happens on every load and every level change.
+    }, [animation, clipStart]);
 
     const combat = useCombatLens({
         abilityProxyIds,

@@ -23,18 +23,25 @@ import { type AnimationAction } from "./animationNames";
 export function AnimationTile({
     action,
     playing,
-    onPlay,
-    onPick,
+    running,
+    onPress,
+    onPressTake,
 }: {
     action: AnimationAction;
     /** The clip playing right now, so the card that owns it reads as active. */
     playing: string | null;
-    /** Play this action - the caller draws the take. */
-    onPlay: (action: AnimationAction) => void;
-    /** Play one named take, chosen by hand. */
-    onPick: (clip: string) => void;
+    /**
+     * Whether that clip is advancing. A clip that has ended, or is paused, is still the current one,
+     * but the card no longer reads as playing.
+     */
+    running: boolean;
+    /** This card pressed - the caller plays, pauses, resumes or replays, and draws the take. */
+    onPress: (action: AnimationAction) => void;
+    /** One named take pressed, chosen by hand. */
+    onPressTake: (clip: string) => void;
 }): React.JSX.Element {
     const mine = action.takes.some((take) => take.name === playing);
+    const advancing = mine && running;
     const several = action.takes.length > 1;
 
     return (
@@ -42,7 +49,7 @@ export function AnimationTile({
             <button
                 type="button"
                 className="anim-play"
-                aria-pressed={mine}
+                aria-pressed={advancing}
                 aria-label={action.label}
                 title={
                     several
@@ -52,9 +59,9 @@ export function AnimationTile({
                           )
                         : l10n.t("Play {0}", action.label)
                 }
-                onClick={() => onPlay(action)}
+                onClick={() => onPress(action)}
             >
-                <Icon name={mine ? "pause" : "play"} size={16} />
+                <Icon name={advancing ? "pause" : "play"} size={16} />
             </button>
 
             <span className="anim-card-body">
@@ -74,7 +81,7 @@ export function AnimationTile({
                                     (playing === take.name ? " active" : "")
                                 }
                                 title={take.name}
-                                onClick={() => onPick(take.name)}
+                                onClick={() => onPressTake(take.name)}
                             >
                                 {take.label}
                             </button>

@@ -9,9 +9,12 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { PreviewScene } from "../../protocol/modelPreview";
+import { AnimationTile } from "./AnimationTile";
+import type { AnimationAction } from "./animationNames";
 import {
     type AnimationTransport,
     type AnimationTransportInputs,
+    cardPress,
     useAnimationTransport,
 } from "./useAnimationTransport";
 import type { ViewportStats } from "./viewport";
@@ -68,5 +71,72 @@ describe("useAnimationTransport", () => {
         for (const clip of clips) {
             assert.ok(player.actionOfClip.has(clip), clip);
         }
+    });
+});
+
+describe("cardPress", () => {
+    const takes = ["Probe_DIE_00", "Probe_DIE_01"];
+
+    it("plays a card whose clip is not the current one", () => {
+        assert.equal(
+            cardPress(takes, "Probe_IDLE_00", { running: true, atEnd: false }),
+            "play",
+        );
+        assert.equal(
+            cardPress(takes, null, { running: false, atEnd: false }),
+            "play",
+        );
+    });
+
+    it("pauses the current clip while it runs", () => {
+        assert.equal(
+            cardPress(takes, "Probe_DIE_01", { running: true, atEnd: false }),
+            "pause",
+        );
+    });
+
+    it("plays the current clip again once it has ended", () => {
+        assert.equal(
+            cardPress(takes, "Probe_DIE_00", { running: false, atEnd: true }),
+            "replay",
+        );
+    });
+
+    it("resumes the current clip where it was paused", () => {
+        assert.equal(
+            cardPress(takes, "Probe_DIE_00", { running: false, atEnd: false }),
+            "resume",
+        );
+    });
+});
+
+describe("AnimationTile", () => {
+    const action = {
+        label: "Die",
+        takes: [
+            { name: "Probe_DIE_00", label: "00" },
+            { name: "Probe_DIE_01", label: "01" },
+        ],
+    } as unknown as AnimationAction;
+
+    const tile = (running: boolean): string =>
+        renderToStaticMarkup(
+            <AnimationTile
+                action={action}
+                playing="Probe_DIE_00"
+                running={running}
+                onPress={() => undefined}
+                onPressTake={() => undefined}
+            />,
+        );
+
+    it("reads as playing only while its clip runs", () => {
+        assert.match(tile(true), /aria-pressed="true"/);
+        assert.match(tile(true), /player-pause/);
+
+        // Ended or paused: still the current clip, but nothing is playing.
+        assert.match(tile(false), /aria-pressed="false"/);
+        assert.match(tile(false), /player-play/);
+        assert.match(tile(false), /anim-card active/);
     });
 });

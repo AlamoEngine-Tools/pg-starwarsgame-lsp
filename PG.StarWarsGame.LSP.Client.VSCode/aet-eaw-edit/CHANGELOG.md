@@ -29,6 +29,12 @@
   back to where it was exported while its weapon row went on reading out the aim, and the rest angle the XML
   declares was lost with it. The rest angle and the aim are now turned on again on top of the file's pose
   ([#437](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/437))
+- **An animation card plays its clip again** - a card in the model preview's Animations section went on
+  reading as playing after a clip that plays once had ended, and pressing it again did nothing; only the
+  scrubber could start the clip again. A card now reads as playing only while its clip runs, pauses it when
+  pressed then, resumes it when pressed while paused, and plays it again from the start once it has ended; a
+  take pressed after it ended plays again too
+  ([#440](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/440))
 
 ## 0.5.2
 
