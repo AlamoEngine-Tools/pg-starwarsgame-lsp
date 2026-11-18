@@ -41,7 +41,7 @@ import {
 } from "./attacker";
 import { shieldRevealed, stealthed } from "./abilityRows";
 import { cloneForDamage, turretSweeps } from "./deathClone";
-import { handlesForShownArcs, type TurretAim } from "./turretHandles";
+import { everyTurretHandle, type TurretAim } from "./turretHandles";
 import { spinAwayEnd } from "./spinAway";
 import { appendShot, BY_HAND, type DamageLogEntry } from "./damageLog";
 import { breakoffAnchor, type BreakoffAnchor, breakoffFor } from "./breakoff";
@@ -1160,24 +1160,27 @@ export function useCombatLens({
     );
 
     /**
-     * The turrets the reader can drag, which is exactly the turrets whose arcs are shown.
-     *
-     * No new selection concept and no new control. The arc state already exists at three levels -
-     * the stage pill, a toggle per weapon row, a fire bone in the tree - and it is persistent by
-     * design, which hover is not: a manipulator lives on the turret in the viewport while the row
-     * lives in the dock, so the pointer has to travel between them and any hover that gated the
-     * handles would be gone before it arrived.
+     * The turrets the reader can drag: every one that declares a traverse, in every lens. Pointing at
+     * a turret draws its handles; see `TurretRig.setTurretHandles`.
      */
     // From the WEAPONS, in the arc toggle's own ids - not from `sweepable`, whose hardpoint turrets
     // are keyed by the bare hardpoint id and so never matched. See `handlesForShownArcs`.
     const draggableTurrets = useMemo(
+        () => everyTurretHandle(weapons),
+        [weapons],
+    );
+
+    /**
+     * The turrets whose handles stay drawn whatever the pointer does: exactly those whose arcs are
+     * shown. The arc state is persistent by design, at three levels - the stage pill, a toggle per
+     * weapon row, a fire bone in the tree - so a reader working down the rows in the dock keeps the
+     * manipulators on screen while the pointer is away from them.
+     */
+    const shownTurrets = useMemo(
         () =>
-            handlesForShownArcs(
-                weapons,
-                new Set(
-                    visibleArcs(weapons, fireArcs, hiddenWeapons).map(
-                        (arc) => arc.weaponId,
-                    ),
+            new Set(
+                visibleArcs(weapons, fireArcs, hiddenWeapons).map(
+                    (arc) => arc.weaponId,
                 ),
             ),
         [weapons, fireArcs, hiddenWeapons],
@@ -1257,6 +1260,7 @@ export function useCombatLens({
         weapons,
         sweepable,
         draggableTurrets,
+        shownTurrets,
         cards,
         looseWeapons,
     };

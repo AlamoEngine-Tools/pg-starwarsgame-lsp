@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The 3D preview panel: a canvas with the tool dock on the right, matching the layout the story
@@ -1066,6 +1066,7 @@ function ModelPreview(): React.JSX.Element {
         weapons,
         sweepable,
         draggableTurrets,
+        shownTurrets,
         cards,
         looseWeapons,
     } = combat;
@@ -1152,6 +1153,7 @@ function ModelPreview(): React.JSX.Element {
         customColour,
         destroyed,
         draggableTurrets,
+        shownTurrets,
         faction,
         fireArcs,
         hardpointHealth,

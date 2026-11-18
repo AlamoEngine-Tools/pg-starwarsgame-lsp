@@ -13,6 +13,7 @@ import {
     clampAim,
     clampAxis,
     dragToAim,
+    everyTurretHandle,
     handlesForShownArcs,
     restAim,
     turretEnvelopes,
@@ -259,6 +260,31 @@ describe("turretEnvelopes", () => {
 });
 
 describe("handlesForShownArcs", () => {
+    it("gives every turret that declares a traverse a handle, whatever its arc, and none to one that does not", () => {
+        const handles = everyTurretHandle([
+            {
+                id: "weapon:A",
+                partId: "hull",
+                turret: {
+                    rotateExtentDegrees: 90,
+                    elevateExtentDegrees: 20,
+                    turretBone: "Turret_00",
+                    barrelBone: "Barrel_00",
+                },
+            },
+            {
+                id: "weapon:B",
+                partId: "hull",
+                turret: null,
+            },
+        ]);
+
+        assert.deepEqual(
+            handles.map((one) => one.id),
+            ["weapon:A"],
+        );
+    });
+
     /**
      * The regression. A hardpoint turret is reached twice - once as a HARDPOINT, keyed
      * `HP_Gargantuan_Main_Turret_Front`, and once as the WEAPON on it, keyed

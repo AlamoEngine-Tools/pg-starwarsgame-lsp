@@ -18,6 +18,15 @@
 
 import * as THREE from "three";
 
+import { type MaterialExtras, resolveMaterial } from "./materials";
+
+/** A mesh the exporter marked as a shadow volume, rather than part of the model's own shape. */
+export function isShadowVolume(mesh: THREE.Mesh): boolean {
+    const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
+
+    return resolveMaterial(extras).archetype === "shadow-volume";
+}
+
 /**
  * A box around the drawn meshes under a root, in world space.
  *

@@ -17,8 +17,7 @@ import {
 } from "./framing";
 import { alamoNodeName } from "./skeleton";
 import { resolveBoneId } from "./boneIds";
-import { drawnBounds, isOverlay } from "./modelBounds";
-import { type MaterialExtras, resolveMaterial } from "./materials";
+import { drawnBounds, isOverlay, isShadowVolume } from "./modelBounds";
 import { type PresetView } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
 import {
@@ -36,13 +35,6 @@ const PRESETS: Record<PresetView, { azimuth: number; elevation: number }> = {
         elevation: DEFAULT_ELEVATION_DEGREES,
     },
 };
-
-/** A mesh the exporter marked as a shadow volume, rather than part of the model's own shape. */
-function isShadowVolume(mesh: THREE.Mesh): boolean {
-    const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-    return resolveMaterial(extras).archetype === "shadow-volume";
-}
 
 /** Reused per frame by the billboards, which run before every render. */
 const BILLBOARD_AT = new THREE.Vector3();

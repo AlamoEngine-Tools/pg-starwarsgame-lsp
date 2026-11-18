@@ -296,6 +296,7 @@ export class PreviewViewport {
             capture: true,
         });
         canvas.addEventListener("pointermove", this.turret.onPointerMove);
+        canvas.addEventListener("pointerleave", this.turret.onPointerLeave);
         // On the WINDOW, not the canvas: a drag that leaves the canvas must still end, and a
         // release outside it is the ordinary way a fast drag finishes.
         window.addEventListener("pointerup", this.turret.onPointerUp);
@@ -621,11 +622,14 @@ export class PreviewViewport {
     }
 
     /**
-     * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest. See
-     * `TurretRig.setTurretHandles`.
+     * Puts drag handles on every turret given, drawing the `shown` ones always and the rest on hover.
+     * See `TurretRig.setTurretHandles`.
      */
-    setTurretHandles(handles: readonly TurretHandle[]): void {
-        this.turret.setTurretHandles(handles);
+    setTurretHandles(
+        handles: readonly TurretHandle[],
+        shown?: ReadonlySet<string>,
+    ): void {
+        this.turret.setTurretHandles(handles, shown);
     }
 
     /** Where the reader has pointed each turret, for the shell to read back out. */
@@ -1093,6 +1097,10 @@ export class PreviewViewport {
         this.canvas.removeEventListener(
             "pointermove",
             this.turret.onPointerMove,
+        );
+        this.canvas.removeEventListener(
+            "pointerleave",
+            this.turret.onPointerLeave,
         );
         window.removeEventListener("pointerup", this.turret.onPointerUp);
         window.removeEventListener("pointercancel", this.turret.onPointerUp);

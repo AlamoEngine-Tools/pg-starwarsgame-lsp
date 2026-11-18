@@ -25,6 +25,8 @@ export interface SubjectSyncInputs {
     customColour: string | null;
     destroyed: ReadonlySet<string>;
     draggableTurrets: TurretHandle[];
+    /** The turrets whose handles stay drawn: those whose arcs are shown. */
+    shownTurrets: ReadonlySet<string>;
     faction: string;
     fireArcs: boolean;
     hardpointHealth: Record<string, number | null>;
@@ -49,6 +51,7 @@ export function useSubjectSync({
     customColour,
     destroyed,
     draggableTurrets,
+    shownTurrets,
     faction,
     fireArcs,
     hardpointHealth,
@@ -114,9 +117,13 @@ export function useSubjectSync({
             sweepable.filter((sweep) => sweeping.has(sweep.id)),
         );
 
-        // Gated on the lens for the same reason the arcs are: a manipulator is an annotation over
-        // the model, and Gameplay is the only lens that carries the pill that switches it off.
-        viewport.setTurretHandles(annotate ? draggableTurrets : []);
+        // Every turret in every lens, drawn while it is pointed at. Only the ones kept drawn are
+        // gated on the lens, for the reason the arcs are: Gameplay is the only lens that carries the
+        // pill that switches them off.
+        viewport.setTurretHandles(
+            draggableTurrets,
+            annotate ? shownTurrets : new Set(),
+        );
 
         // Every turret, from BOTH places one can be declared, at the rest the game steers it to -
         // a turret with nothing written rests where the model put it.
@@ -155,6 +162,7 @@ export function useSubjectSync({
         sweeping,
         sweepable,
         draggableTurrets,
+        shownTurrets,
     ]);
 
     /**

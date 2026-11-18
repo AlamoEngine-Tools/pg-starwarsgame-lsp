@@ -64,6 +64,108 @@ const handle: TurretHandle = {
 const overlaysUnder = (node: THREE.Object3D): number =>
     node.children.filter((child) => child.userData.aetOverlay === true).length;
 
+/** The handle anchors hanging under a node, which is where a handle's visibility is set. */
+const anchorsUnder = (node: THREE.Object3D): THREE.Object3D[] =>
+    node.children.filter((child) => child.userData.aetOverlay === true);
+
+/**
+ * Turrets in front of a real camera, for hover: each a bone under a mount with a 4-unit box mesh, at the
+ * position given. The camera stands 30 units out on +Z looking at the origin; the canvas is 100 px square.
+ */
+function hoverRig(turrets: { name: string; at: [number, number, number] }[]): {
+    rig: TurretRig;
+    mounts: Map<string, THREE.Object3D>;
+    handles: TurretHandle[];
+    camera: THREE.PerspectiveCamera;
+} {
+    const root = new THREE.Group();
+    const bones = new Map<string, THREE.Object3D>();
+    const mounts = new Map<string, THREE.Object3D>();
+    for (const turret of turrets) {
+        const mount = new THREE.Object3D();
+        mount.position.set(...turret.at);
+        const bone = new THREE.Object3D();
+        bone.name = turret.name;
+        bone.add(
+            new THREE.Mesh(
+                new THREE.BoxGeometry(4, 4, 4),
+                new THREE.MeshBasicMaterial(),
+            ),
+        );
+        mount.add(bone);
+        root.add(mount);
+        bones.set(turret.name.toLowerCase(), bone);
+        mounts.set(turret.name, mount);
+    }
+    root.updateMatrixWorld(true);
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+    camera.position.set(0, 0, 30);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    const context = standInContext({
+        camera,
+        canvas: {
+            getBoundingClientRect: () => ({
+                left: 0,
+                top: 0,
+                width: 100,
+                height: 100,
+            }),
+            setPointerCapture: () => undefined,
+            style: {},
+        },
+        modelRoot: root,
+        parts: new Map([
+            [
+                "p",
+                {
+                    id: "p",
+                    root,
+                    bones,
+                    bonesByIndex: new Map(),
+                    subjectId: "subject",
+                },
+            ],
+        ]),
+        cameraRig: { modelSpan: () => 10 },
+        levels: { drawn: () => true },
+        modelScale: 1,
+    });
+    const rig = new TurretRig(context, { onTurretAimed: null });
+    const handles = turrets.map((turret) => ({
+        ...handle,
+        id: `weapon:${turret.name}`,
+        turretBone: turret.name,
+    }));
+    return { rig, mounts, handles, camera };
+}
+
+/** A pointer at canvas pixel (x, y). */
+const pointerAt = (x: number, y: number): PointerEvent =>
+    ({
+        clientX: x,
+        clientY: y,
+        pointerId: 1,
+        preventDefault: () => undefined,
+        stopImmediatePropagation: () => undefined,
+    }) as unknown as PointerEvent;
+
+/** Where a handle's yaw knob is drawn on the 100 px canvas. */
+function knobPixel(
+    mount: THREE.Object3D,
+    camera: THREE.PerspectiveCamera,
+): { x: number; y: number } {
+    mount.updateMatrixWorld(true);
+    let knob: THREE.Object3D | undefined;
+    anchorsUnder(mount)[0].traverse((node) => {
+        if (node instanceof THREE.Mesh && knob === undefined) {
+            knob = node;
+        }
+    });
+    const at = knob!.getWorldPosition(new THREE.Vector3()).project(camera);
+    return { x: (at.x * 0.5 + 0.5) * 100, y: (-at.y * 0.5 + 0.5) * 100 };
+}
+
 describe("TurretRig", () => {
     it("aims a turret at rest until it is turned by hand", () => {
         const rig = rigWith(new Map());
@@ -154,5 +256,226 @@ describe("TurretRig", () => {
 
         const angle = 2 * Math.acos(Math.min(1, Math.abs(turret.quaternion.w)));
         assert.ok(Math.abs(angle - Math.PI / 2) < 1e-6, `turned by ${angle}`);
+    });
+
+    it("shows a turret's handles while the pointer is over its meshes, and hides them when it leaves", () => {
+        const { rig, mounts, handles } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles);
+        const anchors = anchorsUnder(mounts.get("Turret")!);
+        assert.equal(anchors.length, 2);
+        assert.deepEqual(
+            anchors.map((a) => a.visible),
+            [false, false],
+        );
+
+        rig.onPointerMove(pointerAt(50, 50));
+        assert.deepEqual(
+            anchors.map((a) => a.visible),
+            [true, true],
+        );
+
+        rig.onPointerMove(pointerAt(2, 2));
+        assert.deepEqual(
+            anchors.map((a) => a.visible),
+            [false, false],
+        );
+    });
+
+    it("keeps a shown turret's handles drawn wherever the pointer is", () => {
+        const { rig, mounts, handles } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles, new Set([handles[0].id]));
+        const anchors = anchorsUnder(mounts.get("Turret")!);
+
+        assert.deepEqual(
+            anchors.map((a) => a.visible),
+            [true, true],
+        );
+        rig.onPointerMove(pointerAt(2, 2));
+        assert.deepEqual(
+            anchors.map((a) => a.visible),
+            [true, true],
+        );
+    });
+
+    it("gives two turrets under the pointer to the one nearest the camera", () => {
+        const { rig, mounts, handles } = hoverRig([
+            { name: "Far", at: [0, 0, 0] },
+            { name: "Near", at: [0, 0, 8] },
+        ]);
+        rig.setTurretHandles(handles);
+
+        rig.onPointerMove(pointerAt(50, 50));
+
+        assert.equal(anchorsUnder(mounts.get("Near")!)[0].visible, true);
+        assert.equal(anchorsUnder(mounts.get("Far")!)[0].visible, false);
+    });
+
+    it("keeps a hovered turret's handles while the pointer moves from the turret onto them", () => {
+        const { rig, mounts, handles, camera } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles);
+        rig.onPointerMove(pointerAt(50, 50));
+        const knob = knobPixel(mounts.get("Turret")!, camera);
+        assert.ok(Math.abs(knob.x - 50) > 10, `knob at ${knob.x}`);
+
+        rig.onPointerMove(pointerAt(knob.x, knob.y));
+
+        assert.equal(anchorsUnder(mounts.get("Turret")!)[0].visible, true);
+    });
+
+    it("lets no knob be grabbed while its handles are not drawn", () => {
+        const { rig, mounts, handles, camera } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles);
+        rig.onPointerMove(pointerAt(50, 50));
+        const knob = knobPixel(mounts.get("Turret")!, camera);
+        rig.onPointerMove(pointerAt(2, 2));
+
+        assert.equal(rig.grabKnob(pointerAt(knob.x, knob.y)), false);
+    });
+
+    it("hides the handles from a shot without annotations, and puts them back", () => {
+        const { rig, mounts, handles } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles, new Set([handles[0].id]));
+        const anchors = anchorsUnder(mounts.get("Turret")!);
+
+        const restore = rig.stageForCapture({
+            width: 64,
+            height: 64,
+            background: null,
+            grid: false,
+            floor: false,
+            particles: false,
+            annotations: false,
+        });
+        assert.deepEqual(
+            anchors.map((a) => a.visible),
+            [false, false],
+        );
+
+        restore();
+        assert.deepEqual(
+            anchors.map((a) => a.visible),
+            [true, true],
+        );
+    });
+
+    it("forgets the hovered turret when the pointer leaves the canvas", () => {
+        const { rig, mounts, handles } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles);
+        rig.onPointerMove(pointerAt(50, 50));
+
+        rig.onPointerLeave();
+
+        assert.equal(anchorsUnder(mounts.get("Turret")!)[0].visible, false);
+    });
+
+    it("finds a skinned turret by the hull vertices its bone carries", () => {
+        // Four of five turreted land units measured carry no mesh under the turret bone: the turret is
+        // the part of a skinned hull weighted to it. Here a hull of two boxes - one weighted to the root
+        // bone on the left of the screen, one to the turret bone on the right.
+        const root = new THREE.Group();
+        const hullBone = new THREE.Bone();
+        const turretBone = new THREE.Bone();
+        turretBone.name = "Turret";
+        turretBone.position.set(6, 0, 0);
+        hullBone.add(turretBone);
+        root.add(hullBone);
+        const left = new THREE.BoxGeometry(4, 4, 4).translate(-6, 0, 0);
+        const right = new THREE.BoxGeometry(4, 4, 4).translate(6, 0, 0);
+        const positions = [
+            ...left.attributes.position.array,
+            ...right.attributes.position.array,
+        ];
+        const count = positions.length / 3;
+        const half = left.attributes.position.count;
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(positions, 3),
+        );
+        geometry.setAttribute(
+            "skinIndex",
+            new THREE.Uint16BufferAttribute(
+                Array.from({ length: count }, (_, i) => [
+                    i < half ? 0 : 1,
+                    0,
+                    0,
+                    0,
+                ]).flat(),
+                4,
+            ),
+        );
+        geometry.setAttribute(
+            "skinWeight",
+            new THREE.Float32BufferAttribute(
+                Array.from({ length: count }, () => [1, 0, 0, 0]).flat(),
+                4,
+            ),
+        );
+        const hull = new THREE.SkinnedMesh(
+            geometry,
+            new THREE.MeshBasicMaterial(),
+        );
+        root.add(hull);
+        root.updateMatrixWorld(true);
+        hull.bind(new THREE.Skeleton([hullBone, turretBone]));
+
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+        camera.position.set(0, 0, 30);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        const context = standInContext({
+            camera,
+            canvas: {
+                getBoundingClientRect: () => ({
+                    left: 0,
+                    top: 0,
+                    width: 100,
+                    height: 100,
+                }),
+                setPointerCapture: () => undefined,
+                style: {},
+            },
+            modelRoot: root,
+            parts: new Map([
+                [
+                    "p",
+                    {
+                        id: "p",
+                        root,
+                        bones: new Map<string, THREE.Object3D>([
+                            ["turret", turretBone],
+                        ]),
+                        bonesByIndex: new Map(),
+                        subjectId: "subject",
+                    },
+                ],
+            ]),
+            cameraRig: { modelSpan: () => 10 },
+            levels: { drawn: () => true },
+            modelScale: 1,
+        });
+        const rig = new TurretRig(context, { onTurretAimed: null });
+        rig.setTurretHandles([handle]);
+        const anchors = anchorsUnder(hullBone);
+        const turretOnScreen = new THREE.Vector3(6, 0, 0).project(camera);
+        const x = (turretOnScreen.x * 0.5 + 0.5) * 100;
+
+        rig.onPointerMove(pointerAt(x, 50));
+        assert.equal(anchors[0].visible, true, `at ${x}`);
+
+        rig.onPointerMove(pointerAt(100 - x, 50));
+        assert.equal(anchors[0].visible, false, "over the hull's own half");
     });
 });

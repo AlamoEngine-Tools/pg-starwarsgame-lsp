@@ -156,6 +156,22 @@ export function handlesForShownArcs(
     return turretHandles(turretSweeps([], weapons), shownWeaponIds);
 }
 
+/**
+ * A handle for every turret the weapons carry that declares a traverse, whatever its arc.
+ *
+ * Every one of them can be pointed at and turned, in every lens; which of them keep their handles
+ * drawn is the arc toggle's answer, `handlesForShownArcs`. Same gate and same de-duplication, so the
+ * two lists name a turret by the same id.
+ */
+export function everyTurretHandle(
+    weapons: readonly TurretWeapon[],
+): TurretHandle[] {
+    return handlesForShownArcs(
+        weapons,
+        new Set(weapons.map((weapon) => weapon.id)),
+    );
+}
+
 /** One angle brought inside its own stops. A free axis wraps instead, because it has no stops. */
 export function clampAxis(range: TurretAxisRange, degrees: number): number {
     if (range.free) {
