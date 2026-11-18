@@ -48,7 +48,7 @@ export { ACTIVE_SUBJECT, BREAKOFF_ATTACHMENT };
 import { VIEWPORT_BACKGROUND } from "./backdrop";
 export { VIEWPORT_BACKGROUND };
 import { TurretRig } from "./turretRig";
-import { ParticleHost } from "./particleHost";
+import { ParticleRig } from "./particleRig";
 import { MaterialBinder } from "./materialBinder";
 import { EnvironmentRig } from "./environmentRig";
 import { ModelRows } from "./modelRows";
@@ -106,8 +106,8 @@ export class PreviewViewport {
     private readonly clock = new THREE.Clock();
     /** The room and the light: lights, sky and stars, grid, floor and shadows, and the pass chain that draws a frame. See `EnvironmentRig`. */
     private readonly environment: EnvironmentRig;
-    /** The particle systems: what is attached where, what is fading out, and the step that runs them. See `ParticleHost`. */
-    private readonly particles: ParticleHost;
+    /** The particle systems: what is attached where, what is fading out, and the step that runs them. See `ParticleRig`. */
+    private readonly particles: ParticleRig;
     private readonly parts = new Map<string, LoadedPart>();
     private readonly modelRoot = new THREE.Group();
     /**
@@ -295,7 +295,7 @@ export class PreviewViewport {
             },
         });
         this.materials = new MaterialBinder(context);
-        this.particles = new ParticleHost(context);
+        this.particles = new ParticleRig(context);
 
         // CAPTURE phase, so a grabbed turret knob is claimed before `OrbitControls` - registered on
         // this canvas above - can start an orbit. See `TurretRig.grabKnob`.
@@ -319,7 +319,7 @@ export class PreviewViewport {
 
     /**
      * Every running particle system's emitters as their last frame left them, and where the camera
-     * stands. See `ParticleHost.particleProbe`.
+     * stands. See `ParticleRig.particleProbe`.
      */
     particleProbe(): {
         camera: Vector3Like;
@@ -366,12 +366,12 @@ export class PreviewViewport {
         this.environment.setBackground(kind);
     }
 
-    /** Sets the one wind the scene has. See `ParticleHost.setWind`. */
+    /** Sets the one wind the scene has. See `ParticleRig.setWind`. */
     setWind(headingDegrees: number, speed: number): void {
         this.particles.setWind(headingDegrees, speed);
     }
 
-    /** Sets the weather phase's intensity. See `ParticleHost.setWeatherIntensity`. */
+    /** Sets the weather phase's intensity. See `ParticleRig.setWeatherIntensity`. */
     setWeatherIntensity(intensity: number): void {
         this.particles.setWeatherIntensity(intensity);
     }
@@ -694,7 +694,7 @@ export class PreviewViewport {
         this.assembly.removePart(partId);
     }
 
-    /** Plays a system once and forgets it. See `ParticleHost.playOnce`. */
+    /** Plays a system once and forgets it. See `ParticleRig.playOnce`. */
     playOnce(
         id: string,
         system: AlamoParticleContent,
@@ -926,7 +926,7 @@ export class PreviewViewport {
 
     /**
      * Starts a particle system, optionally attached to a bone of a loaded part. See
-     * `ParticleHost.addParticleSystem`.
+     * `ParticleRig.addParticleSystem`.
      */
     addParticleSystem(
         id: string,
@@ -936,7 +936,7 @@ export class PreviewViewport {
         this.particles.addParticleSystem(id, system, placement);
     }
 
-    /** Takes a system out of the scene. See `ParticleHost.removeParticleSystem`. */
+    /** Takes a system out of the scene. See `ParticleRig.removeParticleSystem`. */
     removeParticleSystem(id: string, immediate = false): void {
         this.particles.removeParticleSystem(id, immediate);
     }
@@ -963,7 +963,7 @@ export class PreviewViewport {
 
     /**
      * Says a texture will never arrive, so every emitter naming it shows the marker. See
-     * `ParticleHost.setParticleTextureMissing`.
+     * `ParticleRig.setParticleTextureMissing`.
      */
     setParticleTextureMissing(name: string): void {
         this.particles.setParticleTextureMissing(name);
@@ -975,7 +975,7 @@ export class PreviewViewport {
 
     /**
      * What the game's rules say about a system: the opening rule and the current damage state. See
-     * `ParticleHost.setParticleSystemVisible`.
+     * `ParticleRig.setParticleSystemVisible`.
      */
     setParticleSystemVisible(id: string, visible: boolean): void {
         this.particles.setParticleSystemVisible(id, visible);
@@ -995,12 +995,12 @@ export class PreviewViewport {
         this.particles.setParticlesPaused(paused);
     }
 
-    /** Multiplier on particle time. See `ParticleHost.setParticleSpeed`. */
+    /** Multiplier on particle time. See `ParticleRig.setParticleSpeed`. */
     setParticleSpeed(speed: number): void {
         this.particles.setParticleSpeed(speed);
     }
 
-    /** Replays every system from nothing. See `ParticleHost.restartParticles`. */
+    /** Replays every system from nothing. See `ParticleRig.restartParticles`. */
     restartParticles(): void {
         this.particles.restartParticles();
     }

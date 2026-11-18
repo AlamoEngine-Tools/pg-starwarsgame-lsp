@@ -11,7 +11,7 @@ import type { ParticleSystemInstance } from "./particleRenderer";
 
 /** What the viewport remembers about one running system, so it can be rebuilt on restart. */
 export interface ParticleEntry {
-    /** Its key in `ParticleHost.particleSystems`, so an entry alone can answer for itself. */
+    /** Its key in `ParticleRig.particleSystems`, so an entry alone can answer for itself. */
     id: string;
     system: AlamoParticleContent;
     attachToPartId?: string;

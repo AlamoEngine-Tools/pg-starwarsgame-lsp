@@ -28,7 +28,7 @@ function splitEmitterKey(key: string): [string, number] {
     return [key.slice(0, at), Number(key.slice(at + 1))];
 }
 
-export class ParticleHost {
+export class ParticleRig {
     /** The wind as a vector in the space the particles are simulated in. */
     windVector: { x: number; y: number; z: number } = {
         x: 0,

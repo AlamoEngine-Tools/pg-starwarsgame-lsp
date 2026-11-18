@@ -7,14 +7,14 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { emitter, testSystem } from "./particleFixture";
-import { ParticleHost } from "./particleHost";
+import { ParticleRig } from "./particleRig";
 import { standInContext } from "./viewportContext.testing";
 
 /**
- * A host over a stand-in viewport: a model root to hang systems on, nothing translated, no part to
+ * A rig over a stand-in viewport: a model root to hang systems on, nothing translated, no part to
  * attach to. Every system lands on the model root, which is where an unattached one goes.
  */
-function hostWith(): { particles: ParticleHost; modelRoot: THREE.Group } {
+function rigWith(): { particles: ParticleRig; modelRoot: THREE.Group } {
     const modelRoot = new THREE.Group();
     const context = standInContext({
         levels: { alt: 0, altDescending: false, lod: 0 },
@@ -38,16 +38,16 @@ function hostWith(): { particles: ParticleHost; modelRoot: THREE.Group } {
         },
         rows: { refreshRows: () => undefined },
     });
-    return { particles: new ParticleHost(context), modelRoot };
+    return { particles: new ParticleRig(context), modelRoot };
 }
 
 const systemsUnder = (root: THREE.Object3D): number =>
     root.children.filter((child) => child.userData.aetParticleSystem === true)
         .length;
 
-describe("ParticleHost", () => {
+describe("ParticleRig", () => {
     it("puts a system on the model and lists it by id, with its emitters by name", () => {
-        const { particles, modelRoot } = hostWith();
+        const { particles, modelRoot } = rigWith();
 
         particles.addParticleSystem(
             "fx",
@@ -66,7 +66,7 @@ describe("ParticleHost", () => {
     });
 
     it("forgets a system it is told to remove", () => {
-        const { particles } = hostWith();
+        const { particles } = rigWith();
 
         particles.addParticleSystem("fx", testSystem([emitter()]), {
             origin: "model",
@@ -77,7 +77,7 @@ describe("ParticleHost", () => {
     });
 
     it("has no weather without a weather emitter", () => {
-        const { particles } = hostWith();
+        const { particles } = rigWith();
 
         particles.addParticleSystem("fx", testSystem([emitter()]), {
             origin: "model",
@@ -87,7 +87,7 @@ describe("ParticleHost", () => {
     });
 
     it("steps nothing while paused", () => {
-        const { particles } = hostWith();
+        const { particles } = rigWith();
 
         particles.addParticleSystem("fx", testSystem([emitter()]), {
             origin: "model",
@@ -109,7 +109,7 @@ describe("ParticleHost", () => {
             }
         };
         try {
-            const { particles } = hostWith();
+            const { particles } = rigWith();
 
             particles.setParticleTextureMissing("P_Spark.tga");
             particles.setParticleTexture("P_Spark.tga", new THREE.Texture());
@@ -121,7 +121,7 @@ describe("ParticleHost", () => {
     });
 
     it("shows a system only at the level its proxy is tagged for", () => {
-        const { particles } = hostWith();
+        const { particles } = rigWith();
         particles.addParticleSystem("fx", testSystem([emitter()]), {
             origin: "model",
             levels: { alt: 1, lod: null, altDecreaseStayHidden: false },
@@ -136,7 +136,7 @@ describe("ParticleHost", () => {
     });
 
     it("forgets every system, for a new scene", () => {
-        const { particles, modelRoot } = hostWith();
+        const { particles, modelRoot } = rigWith();
         particles.addParticleSystem("a", testSystem([emitter()]), {
             origin: "model",
         });

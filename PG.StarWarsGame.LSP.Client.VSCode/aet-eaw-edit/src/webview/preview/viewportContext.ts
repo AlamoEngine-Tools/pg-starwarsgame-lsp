@@ -21,7 +21,7 @@ import { type ModelQueries } from "./modelQueries";
 import { type ModelRows } from "./modelRows";
 import { type OverlayLayer } from "./overlayLayer";
 import { type PartAssembly } from "./partAssembly";
-import { type ParticleHost } from "./particleHost";
+import { type ParticleRig } from "./particleRig";
 import { type TurretRig } from "./turretRig";
 
 /**
@@ -71,7 +71,7 @@ export interface ViewportContext {
         MaterialBinder,
         "shaderStates" | "translated"
     >;
-    readonly particles: LayerView<ParticleHost, "particleSystems">;
+    readonly particles: LayerView<ParticleRig, "particleSystems">;
     readonly overlay: LayerView<OverlayLayer>;
     readonly turret: LayerView<TurretRig>;
 }
