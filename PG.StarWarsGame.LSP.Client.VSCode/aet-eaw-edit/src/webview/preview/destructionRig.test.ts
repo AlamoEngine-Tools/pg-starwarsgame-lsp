@@ -35,7 +35,7 @@ const PROP: PreviewBreakoffProp = {
  * hangs a fresh group under the model and records how it was asked for. What is removed and what expires
  * is recorded too.
  */
-function rigWith(): {
+function rigWith(modelScale = 1): {
     destruction: DestructionRig;
     hull: LoadedPart;
     added: { id: string; subjectId?: string; at?: THREE.Vector3 }[];
@@ -101,9 +101,9 @@ function rigWith(): {
             dropRegistrations: () => undefined,
         },
         parts,
+        modelScale,
     });
     const host = {
-        modelScale: 1,
         onBreakoffExpired: (key: string) => expired.push(key),
     } as unknown as DestructionHost;
     return {
@@ -182,6 +182,26 @@ describe("DestructionRig", () => {
 
         destruction.clearSpinAway();
         assert.deepEqual(hull.root.position.toArray(), [1, 2, 3]);
+    });
+
+    it("spins a dying ship away a world distance, whatever the subject's scale", () => {
+        const drift = (scale: number): number => {
+            const { destruction, hull } = rigWith(scale);
+            destruction.startSpinAway(
+                "hull",
+                { timeSeconds: 2, chance: 1, explosion: null, maxSpeed: 4.5 },
+                () => undefined,
+            );
+            destruction.advanceSpinAway(1);
+            return hull.root.position.length();
+        };
+
+        const unscaled = drift(1);
+        assert.ok(unscaled > 0, "the ship did not move");
+        assert.ok(
+            Math.abs(drift(2) - unscaled / 2) < 1e-9,
+            `${drift(2)} at scale 2`,
+        );
     });
 
     it("finishes at once for a part that is not there", () => {

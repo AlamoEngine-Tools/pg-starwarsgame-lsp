@@ -136,7 +136,7 @@ export class PreviewViewport {
      * bone-frame arcs and the turret handles, both of which counter-scale by `1 / scale`.
      */
     private readonly scaledRoot = new THREE.Group();
-    /** The subject's `Scale_Factor`, or 1. Read by everything that counter-scales. */
+    /** The subject's `Scale_Factor`, or 1. The layers read it through the context. */
     private modelScale = 1;
     /** The materials: what every mesh is drawn with, the textures and effects bound to them, and the team tint. See `MaterialBinder`. */
     private readonly materials: MaterialBinder;
@@ -218,6 +218,9 @@ export class PreviewViewport {
             scaledRoot: this.scaledRoot,
             parts: this.parts,
             labelLayer,
+            get modelScale() {
+                return viewport.modelScale;
+            },
             get levels() {
                 return viewport.levels;
             },
@@ -227,14 +230,8 @@ export class PreviewViewport {
             get assembly() {
                 return viewport.assembly;
             },
-            get destruction() {
-                return viewport.destruction;
-            },
             get animation() {
                 return viewport.animation;
-            },
-            get capturer() {
-                return viewport.capturer;
             },
             get cameraRig() {
                 return viewport.cameraRig;
@@ -262,9 +259,6 @@ export class PreviewViewport {
         this.queries = new ModelQueries(context);
         this.assembly = new PartAssembly(context);
         this.destruction = new DestructionRig(context, {
-            get modelScale() {
-                return viewport.modelScale;
-            },
             get onBreakoffExpired() {
                 return viewport.onBreakoffExpired;
             },
@@ -287,9 +281,6 @@ export class PreviewViewport {
             },
         });
         this.turret = new TurretRig(context, {
-            get modelScale() {
-                return viewport.modelScale;
-            },
             get onTurretAimed() {
                 return viewport.onTurretAimed;
             },

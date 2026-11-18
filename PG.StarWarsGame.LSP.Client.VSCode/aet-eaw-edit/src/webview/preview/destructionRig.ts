@@ -43,7 +43,6 @@ interface BreakoffInstance {
 
 /** What DestructionRig still asks of the viewport itself: what only the viewport has. */
 export interface DestructionHost {
-    readonly modelScale: number;
     readonly onBreakoffExpired:
         ((key: string, prop: PreviewBreakoffProp) => void) | null;
 }
@@ -310,7 +309,7 @@ export class DestructionRig {
             // root sits inside the scaled node. Without it the wreck and the explosion that marks
             // where it stopped part company on any subject that declares a scale: `spinAwayEnd`
             // hands that same offset to a particle anchored on the UNSCALED model root.
-            const travel = 1 / this.host.modelScale;
+            const travel = 1 / this.context.modelScale;
 
             part.root.position.set(
                 home.position.x + pose.offset.x * travel,

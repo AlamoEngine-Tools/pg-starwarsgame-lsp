@@ -44,9 +44,9 @@ function rigWith(parts: ReadonlyMap<string, LoadedPart>): TurretRig {
         parts,
         cameraRig: { modelSpan: () => 10 },
         assembly: { fireBoneAttachment: () => null },
+        modelScale: 1,
     });
     const host = {
-        modelScale: 1,
         onTurretAimed: null,
     } as unknown as TurretHost;
     return new TurretRig(context, host);

@@ -297,7 +297,6 @@ const ELEVATION_AXIS = new THREE.Vector3(0, 1, 0);
 
 /** What TurretRig still asks of the viewport itself: what only the viewport has. */
 export interface TurretHost {
-    readonly modelScale: number;
     readonly onTurretAimed: ((id: string, aim: TurretAim) => void) | null;
 }
 
@@ -467,8 +466,8 @@ export class TurretRig {
         }
 
         for (const nodes of this.turretHandleNodes.values()) {
-            nodes.yaw.track.scale.setScalar(1 / this.host.modelScale);
-            nodes.pitch.track.scale.setScalar(1 / this.host.modelScale);
+            nodes.yaw.track.scale.setScalar(1 / this.context.modelScale);
+            nodes.pitch.track.scale.setScalar(1 / this.context.modelScale);
         }
     }
 
@@ -803,7 +802,7 @@ export class TurretRig {
     private applyArcScale(arc: THREE.Mesh): void {
         const inside = arc.userData.aetArcFrame === "bone";
 
-        arc.scale.setScalar(inside ? 1 / this.host.modelScale : 1);
+        arc.scale.setScalar(inside ? 1 / this.context.modelScale : 1);
     }
 
     clearFireArcs(): void {
@@ -922,7 +921,7 @@ export class TurretRig {
         // The bone is inside the scaled geometry and the radius is a world length - it comes from
         // the subject's world span - so the handle undoes the scale exactly as a bone-frame arc
         // does. Without this a 0.5-scale ship's handles would be drawn at half their size.
-        track.scale.setScalar(1 / this.host.modelScale);
+        track.scale.setScalar(1 / this.context.modelScale);
 
         // On an ANCHOR beside the bone, not on the bone: the track shows the stops, and the stops do
         // not move when the turret does. A bone always has a parent inside a loaded model; the

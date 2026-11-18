@@ -12,8 +12,6 @@ import { type GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { type LoadedPart } from "./loadedPart";
 import { type AnimationRig } from "./animationRig";
 import { type CameraRig } from "./cameraRig";
-import { type CaptureRig } from "./captureRig";
-import { type DestructionRig } from "./destructionRig";
 import { type EnvironmentRig } from "./environmentRig";
 import { type LevelGates } from "./levelGates";
 import { type MaterialBinder } from "./materialBinder";
@@ -58,12 +56,12 @@ export interface ViewportContext {
     readonly parts: Map<string, LoadedPart>;
     /** Absolutely-positioned container the bone labels are written into. */
     readonly labelLayer: HTMLElement;
+    /** The subject's `Scale_Factor`, or 1: what everything parented under `scaledRoot` that must stay a world length divides by. */
+    readonly modelScale: number;
     readonly levels: LayerView<LevelGates>;
     readonly queries: LayerView<ModelQueries>;
     readonly assembly: LayerView<PartAssembly, "hiddenParts">;
-    readonly destruction: LayerView<DestructionRig>;
     readonly animation: LayerView<AnimationRig, "subjects">;
-    readonly capturer: LayerView<CaptureRig>;
     readonly cameraRig: LayerView<CameraRig, "billboards">;
     readonly environment: LayerView<EnvironmentRig>;
     readonly rows: LayerView<ModelRows, "rowParents" | "rowTargets">;
