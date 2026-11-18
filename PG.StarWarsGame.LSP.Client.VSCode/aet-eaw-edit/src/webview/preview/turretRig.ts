@@ -965,6 +965,18 @@ export class TurretRig {
         this.host.onTurretAimed?.(id, TURRET_AT_REST);
     }
 
+    /** Puts every turned turret back where the model authored it, as each row's own reset does. */
+    resetAllTurretAims(): void {
+        const turned = [...this.turretAims.keys()];
+
+        this.turretAims.clear();
+        this.applyTurretAims();
+
+        for (const id of turned) {
+            this.host.onTurretAimed?.(id, TURRET_AT_REST);
+        }
+    }
+
     /**
      * Undoes the geometry scale on an arc that lives inside it.
      *

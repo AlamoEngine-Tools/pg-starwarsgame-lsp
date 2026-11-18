@@ -532,4 +532,37 @@ describe("TurretRig", () => {
         rig.onPointerMove(pointerAt(2, 2));
         assert.equal(canvas.style.cursor, "");
     });
+
+    it("puts every turned turret back where the model authored it, and says so for each", () => {
+        const { rig, mounts, handles, camera } = hoverRig([
+            { name: "Left", at: [-6, 0, 0] },
+            { name: "Right", at: [6, 0, 0] },
+        ]);
+        const told: [string, { yaw: number; pitch: number }][] = [];
+        rig.setTurretHandles(handles, new Set(handles.map((one) => one.id)));
+        (
+            rig as unknown as { host: { onTurretAimed: unknown } }
+        ).host.onTurretAimed = (
+            id: string,
+            aim: { yaw: number; pitch: number },
+        ) => told.push([id, aim]);
+        for (const name of ["Left", "Right"]) {
+            const knob = knobPixel(mounts.get(name)!, camera);
+            rig.grabKnob(pointerAt(knob.x, knob.y));
+            rig.onPointerMove(pointerAt(knob.x + 20, knob.y));
+            rig.onPointerUp();
+        }
+        assert.notDeepEqual(rig.turretAim(handles[0].id), TURRET_AT_REST);
+        assert.notDeepEqual(rig.turretAim(handles[1].id), TURRET_AT_REST);
+        told.length = 0;
+
+        rig.resetAllTurretAims();
+
+        assert.deepEqual(rig.turretAim(handles[0].id), TURRET_AT_REST);
+        assert.deepEqual(rig.turretAim(handles[1].id), TURRET_AT_REST);
+        assert.deepEqual(
+            told.map(([id]) => id).sort(),
+            handles.map((one) => one.id).sort(),
+        );
+    });
 });

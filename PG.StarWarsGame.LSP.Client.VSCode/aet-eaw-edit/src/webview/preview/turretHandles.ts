@@ -172,6 +172,18 @@ export function everyTurretHandle(
     );
 }
 
+/** How many of these turrets the reader has turned off their rest, for the stage's reset of them all. */
+export function turnedTurretCount(
+    handles: readonly TurretHandle[],
+    aims: ReadonlyMap<string, TurretAim>,
+): number {
+    return handles.filter((handle) => {
+        const aim = aims.get(handle.id);
+
+        return aim !== undefined && (aim.yaw !== 0 || aim.pitch !== 0);
+    }).length;
+}
+
 /** One angle brought inside its own stops. A free axis wraps instead, because it has no stops. */
 export function clampAxis(range: TurretAxisRange, degrees: number): number {
     if (range.free) {

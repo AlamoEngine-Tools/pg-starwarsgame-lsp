@@ -123,6 +123,7 @@ import {
     IconSunLow,
     IconSwords,
     IconTag,
+    IconTank,
     IconTargetArrow,
     IconTexture,
     IconTimeline,
@@ -161,6 +162,10 @@ const ICONS = {
     // it was the same glyph the faction palette uses for "no team tint", where it is right. Seen
     // side by side on a rendered panel, the damage slider read as a disabled control.
     damage: IconHeartBroken,
+
+    // A tank, because its turret is the one shape that says turret: there is no glyph for a turret
+    // alone, and a crosshair is already the targeting mark.
+    turret: IconTank,
 
     // ── the room ──────────────────────────────────────────────────────────────
     // A globe, not an aperture: this opens the settings for the ROOM the model stands in, and an

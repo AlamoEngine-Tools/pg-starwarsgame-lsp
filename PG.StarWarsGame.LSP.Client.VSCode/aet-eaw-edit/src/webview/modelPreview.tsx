@@ -40,6 +40,7 @@ import { AbilityCommandBar } from "./preview/panels/AbilityCommandBar";
 import { AbilityInfoFlyout } from "./preview/panels/AbilityInfoFlyout";
 import { AttackControls } from "./preview/panels/AttackControls";
 import { SubjectStateControls } from "./preview/panels/SubjectStateControls";
+import { turnedTurretCount } from "./preview/turretHandles";
 import { CardInfoFlyout } from "./preview/panels/CardInfoFlyout";
 import { DamageLogFlyout } from "./preview/panels/DamageLogFlyout";
 import { StageTopEdge } from "./preview/panels/StageTopEdge";
@@ -1451,6 +1452,14 @@ function ModelPreview(): React.JSX.Element {
                                     scene={scene}
                                     setAlt={setAlt}
                                     setLod={setLod}
+                                    turretCount={combat.draggableTurrets.length}
+                                    turnedTurrets={turnedTurretCount(
+                                        combat.draggableTurrets,
+                                        combat.turretAims,
+                                    )}
+                                    onResetTurrets={() =>
+                                        viewportRef.current?.resetAllTurretAims()
+                                    }
                                 />
                             }
                             middle={

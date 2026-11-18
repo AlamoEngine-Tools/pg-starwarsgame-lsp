@@ -1,12 +1,14 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The damage state and detail level the subject is shown at, on the stage bottom edge.
+// The damage state and detail level the subject is shown at, and the reset of its turrets, on the stage
+// bottom edge.
 
 import type { Dispatch, SetStateAction, RefObject } from "react";
 import type { CombatLens } from "../useCombatLens";
 import * as l10n from "@vscode/l10n";
 import { type PreviewScene } from "../../../protocol/modelPreview";
+import { IconButton } from "../../shared/Button";
 import { Icon } from "../../shared/Icon";
 import {
     type DefinedLevels,
@@ -27,6 +29,11 @@ export interface SubjectStateControlsProps {
     scene: PreviewScene | null;
     setAlt: Dispatch<SetStateAction<number>>;
     setLod: Dispatch<SetStateAction<number>>;
+    /** How many turrets the subject has that turn. None leaves the field out. */
+    turretCount: number;
+    /** How many of them the reader has turned off their rest. */
+    turnedTurrets: number;
+    onResetTurrets: () => void;
 }
 
 export function SubjectStateControls({
@@ -41,6 +48,9 @@ export function SubjectStateControls({
     scene,
     setAlt,
     setLod,
+    turretCount,
+    turnedTurrets,
+    onResetTurrets,
 }: SubjectStateControlsProps): React.JSX.Element {
     return (
         <>
@@ -59,7 +69,9 @@ export function SubjectStateControls({
                             Re-authored compactly rather than moved as it stood - the dock's
                             `.field` is a label above a full-width control, which is a shape a 22px
                             stage plate does not have. */}
-            {(levels.alt.length > 1 || levels.lod.length > 1) && (
+            {(levels.alt.length > 1 ||
+                levels.lod.length > 1 ||
+                turretCount > 0) && (
                 <div
                     className="stage-chrome subject-state"
                     role="group"
@@ -131,6 +143,30 @@ export function SubjectStateControls({
                                 })}
                             </span>
                         </label>
+                    )}
+
+                    {/* Every turret back where the model authored it, in every lens. Here rather than
+                        beside the per-row resets in the Gameplay dock, because a turret's pose is the
+                        subject's own state - the same kind of fact as its damage state and detail level
+                        - and the handles that turn it are reachable in every lens. */}
+                    {turretCount > 0 && (
+                        <span className="stage-field turrets">
+                            <Icon name="turret" />
+                            <IconButton
+                                icon="reset"
+                                title={l10n.t(
+                                    "Return every turret to the pose the model authored",
+                                )}
+                                disabled={turnedTurrets === 0}
+                                disabledReason={l10n.t("No turret is turned")}
+                                badge={
+                                    turnedTurrets > 0
+                                        ? turnedTurrets
+                                        : undefined
+                                }
+                                onClick={onResetTurrets}
+                            />
+                        </span>
                     )}
                 </div>
             )}

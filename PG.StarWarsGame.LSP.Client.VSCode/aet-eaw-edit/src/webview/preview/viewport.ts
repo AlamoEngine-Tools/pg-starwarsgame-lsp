@@ -642,6 +642,11 @@ export class PreviewViewport {
         this.turret.resetTurretAim(id);
     }
 
+    /** Puts every turned turret back where the model authored it. See `TurretRig.resetAllTurretAims`. */
+    resetAllTurretAims(): void {
+        this.turret.resetAllTurretAims();
+    }
+
     /** Drops a piece of wreckage where a hardpoint used to be. See `DestructionRig.addBreakoff`. */
     async addBreakoff(
         key: string,

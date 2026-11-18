@@ -2,6 +2,14 @@
 
 ## 0.6.0
 
+### Features
+
+- **Reset all turrets** - the model preview's Model state group on the stage carries one button that puts
+  every turned turret back at the pose the model authored, in every lens, with the number of turned turrets
+  inside it; it is disabled while none is turned and left out for a subject with no turret that turns. The
+  two state sliders beside it are 16px shorter so all three fit one row
+  ([#438](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/438))
+
 ### Fixes
 
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
