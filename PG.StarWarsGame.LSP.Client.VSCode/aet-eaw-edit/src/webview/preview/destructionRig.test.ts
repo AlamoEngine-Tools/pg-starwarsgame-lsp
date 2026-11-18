@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { type PreviewBreakoffProp } from "../../protocol/modelPreview";
-import { type DestructionViewport, DestructionRig } from "./destructionRig";
+import { type DestructionHost, DestructionRig } from "./destructionRig";
 import {
     ACTIVE_SUBJECT,
     BREAKOFF_ATTACHMENT,
@@ -105,7 +105,7 @@ function rigWith(): {
     const host = {
         modelScale: 1,
         onBreakoffExpired: (key: string) => expired.push(key),
-    } as unknown as DestructionViewport;
+    } as unknown as DestructionHost;
     return {
         destruction: new DestructionRig(context, host),
         hull,

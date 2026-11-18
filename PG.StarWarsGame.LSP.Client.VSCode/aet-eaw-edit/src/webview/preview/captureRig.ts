@@ -11,14 +11,14 @@ import * as THREE from "three";
 import { type ViewportContext } from "./viewportContext";
 
 /** What CaptureRig still asks of the viewport itself: what only the viewport has. */
-export interface CaptureViewport {
+export interface CaptureHost {
     resize(): void;
 }
 
 export class CaptureRig {
     constructor(
         private readonly context: ViewportContext,
-        private readonly host: CaptureViewport,
+        private readonly host: CaptureHost,
     ) {}
 
     /**

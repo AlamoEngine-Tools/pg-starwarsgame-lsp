@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { VIEWPORT_BACKGROUND } from "./backdrop";
-import { type EnvironmentViewport, EnvironmentRig } from "./environmentRig";
+import { type EnvironmentHost, EnvironmentRig } from "./environmentRig";
 import { shadowCatcherOpacity } from "./materialState";
 import { type ViewportContext } from "./viewportContext";
 
@@ -36,7 +36,7 @@ function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
     } as unknown as ViewportContext;
     const host = {
         elapsed: 0,
-    } as unknown as EnvironmentViewport;
+    } as unknown as EnvironmentHost;
     return { environment: new EnvironmentRig(context, host), scene };
 }
 

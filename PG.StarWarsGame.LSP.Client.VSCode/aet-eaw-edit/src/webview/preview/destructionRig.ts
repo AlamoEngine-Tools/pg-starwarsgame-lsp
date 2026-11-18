@@ -42,7 +42,7 @@ interface BreakoffInstance {
 }
 
 /** What DestructionRig still asks of the viewport itself: what only the viewport has. */
-export interface DestructionViewport {
+export interface DestructionHost {
     readonly modelScale: number;
     readonly onBreakoffExpired:
         ((key: string, prop: PreviewBreakoffProp) => void) | null;
@@ -79,7 +79,7 @@ export class DestructionRig {
 
     constructor(
         private readonly context: ViewportContext,
-        private readonly host: DestructionViewport,
+        private readonly host: DestructionHost,
     ) {}
 
     /**

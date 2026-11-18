@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 
 import * as THREE from "three";
 
-import { type CaptureViewport, CaptureRig } from "./captureRig";
+import { type CaptureHost, CaptureRig } from "./captureRig";
 import { type ViewportContext } from "./viewportContext";
 
 /**
@@ -110,7 +110,7 @@ function rigWith(throwOnDraw = false): {
     } as unknown as ViewportContext;
     const host = {
         resize: () => undefined,
-    } as unknown as CaptureViewport;
+    } as unknown as CaptureHost;
     return {
         capturer: new CaptureRig(context, host),
         context,

@@ -67,7 +67,7 @@ const GROUND_TILES = 14;
 const FRAME_SIZE = new THREE.Vector2();
 
 /** What EnvironmentRig still asks of the viewport itself: what only the viewport has. */
-export interface EnvironmentViewport {
+export interface EnvironmentHost {
     readonly elapsed: number;
 }
 
@@ -182,7 +182,7 @@ export class EnvironmentRig {
 
     constructor(
         private readonly context: ViewportContext,
-        private readonly host: EnvironmentViewport,
+        private readonly host: EnvironmentHost,
     ) {
         this.addLighting();
 
