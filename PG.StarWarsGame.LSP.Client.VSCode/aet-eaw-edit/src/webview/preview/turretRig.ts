@@ -463,7 +463,8 @@ export class TurretRig {
     /** Scratch for {@link placeTurretAnchor}, which runs every frame and should not allocate. */
     private readonly twistScratch = new THREE.Quaternion();
     /**
-     * The pose the MODEL authored for each bone this class swings, captured before it first moves.
+     * The pose the MODEL authored for each bone this class turns - the file's pose, see
+     * {@link sweepRestOf} - kept for as long as the subject is.
      *
      * A sweep is an angle ON TOP of that, not an angle instead of it. The old code assigned
      * `bone.rotation.z` outright, which threw the authored orientation away and left the other two
@@ -480,6 +481,8 @@ export class TurretRig {
      * turreted land units key the turret bone. Empty when no clip is running. See {@link composeOnClip}.
      */
     private readonly clipBase = new Map<THREE.Object3D, THREE.Quaternion>();
+    /** The bones the sweep is swinging, so the ones it stops swinging can be put back. */
+    private readonly swept = new Set<THREE.Object3D>();
     /**
      * Shows the handles of the turret under the pointer and brightens the axis under it.
      *
@@ -878,9 +881,12 @@ export class TurretRig {
     ): void {
         this.turretSweeps = [...sweeps];
 
-        // Anything that has stopped sweeping goes back to the pose the model authored. Only bones
-        // this class actually moved are in the map, so a part that has not loaded yet is not
-        // "missing" here - it was never touched.
+        // Only the bones that WERE sweeping and have stopped go back, and only to the pose they turn
+        // from - and then take their rest angle and the reader's aim again. Putting back every bone
+        // this class had turned, and forgetting the pose it measured them from, was harmless until
+        // the turn composed on a clip's pose: run again while a clip played, as a clip start makes
+        // the subject sync do, it left the turn in the bone and the next frame took that as the
+        // authored pose - the turn doubled and the turret rested off its model until it was closed.
         const swinging = new Set<THREE.Object3D>();
 
         for (const sweep of sweeps) {
@@ -900,11 +906,21 @@ export class TurretRig {
             }
         }
 
-        for (const [bone, rest] of [...this.sweepRest]) {
+        let stopped = false;
+        for (const bone of [...this.swept]) {
             if (!swinging.has(bone)) {
-                bone.quaternion.copy(rest);
-                this.sweepRest.delete(bone);
+                bone.quaternion.copy(
+                    this.clipBase.get(bone) ?? this.sweepRestOf(bone),
+                );
+                this.swept.delete(bone);
+                stopped = true;
             }
+        }
+        for (const bone of swinging) {
+            this.swept.add(bone);
+        }
+        if (stopped) {
+            this.poseRests();
         }
 
         if (sweeps.length === 0) {
@@ -1113,6 +1129,10 @@ export class TurretRig {
         this.hoveredTurretAxis = null;
         this.hoveredTurret = null;
         this.turretDrag = null;
+        // The bones go with the subject; a new one's poses are read when it is first turned.
+        this.sweepRest.clear();
+        this.clipBase.clear();
+        this.swept.clear();
     }
 
     /**
@@ -1342,12 +1362,22 @@ export class TurretRig {
 
     // ── frame loop ────────────────────────────────────────────────────────────
 
-    /** Its authored pose, remembered the first time it is asked for. */
+    /**
+     * The pose a bone turns from: the FILE's pose, as the animation layer snapshotted it when the
+     * part loaded, remembered the first time it is asked for.
+     *
+     * Never read off the live bone where the snapshot has it: whatever already turned the bone - a
+     * clip, an aim, a rest angle - would be taken for the model's own pose and kept for good. A bone
+     * the snapshot does not hold falls back to its pose at the first ask.
+     */
     private sweepRestOf(bone: THREE.Object3D): THREE.Quaternion {
         let rest = this.sweepRest.get(bone);
 
         if (rest === undefined) {
-            rest = bone.quaternion.clone();
+            rest = (
+                this.context.animation.active.restPose.get(bone)?.quaternion ??
+                bone.quaternion
+            ).clone();
             this.sweepRest.set(bone, rest);
         }
 

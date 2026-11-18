@@ -35,8 +35,17 @@ function turretPart(): {
     };
 }
 
-/** A rig over a stand-in viewport holding the parts given. Nothing here projects or draws an arc. */
-function rigWith(parts: ReadonlyMap<string, LoadedPart>): TurretRig {
+/**
+ * A rig over a stand-in viewport holding the parts given, and the file's pose the animation layer
+ * snapshotted for them. Nothing here projects or draws an arc.
+ */
+function rigWith(
+    parts: ReadonlyMap<string, LoadedPart>,
+    filePose: ReadonlyMap<
+        THREE.Object3D,
+        { quaternion: THREE.Quaternion }
+    > = new Map(),
+): TurretRig {
     const context = standInContext({
         camera: new THREE.PerspectiveCamera(),
         canvas: null,
@@ -44,6 +53,7 @@ function rigWith(parts: ReadonlyMap<string, LoadedPart>): TurretRig {
         parts,
         cameraRig: { modelSpan: () => 10 },
         assembly: { fireBoneAttachment: () => null },
+        animation: { active: { restPose: filePose } },
         modelScale: 1,
     });
     const host = {
@@ -131,6 +141,7 @@ function hoverRig(turrets: { name: string; at: [number, number, number] }[]): {
         ]),
         cameraRig: { modelSpan: () => 10 },
         levels: { drawn: () => true },
+        animation: { active: { restPose: new Map() } },
         modelScale: 1,
     });
     const rig = new TurretRig(context, { onTurretAimed: null });
@@ -351,6 +362,62 @@ describe("TurretRig", () => {
         );
     });
 
+    it("keeps a turret's turn single when the subject is synced again while a clip runs", () => {
+        const { part, turret } = turretPart();
+        const filePose = new Map([
+            [turret, { quaternion: turret.quaternion.clone() }],
+        ]);
+        const rig = rigWith(new Map([["p", part]]), filePose);
+        const rests = [
+            {
+                partId: "p",
+                turretBone: "Turret",
+                barrelBone: null,
+                rest: { yaw: 90, pitch: 0 },
+            },
+        ];
+        rig.setTurretHandles([handle]);
+        rig.setTurretRestAngles(rests);
+        // A clip that does not key this turret.
+        rig.composeOnClip(() => undefined);
+
+        // What the preview's subject sync does when it runs again: a clip start resets the damage
+        // state, which runs it while the clip plays.
+        rig.setTurretSweep([]);
+        rig.setTurretHandles([handle]);
+        rig.setTurretRestAngles(rests);
+        rig.composeOnClip(() => undefined);
+        rig.composeOnClip(() => undefined);
+
+        const angle = 2 * Math.acos(Math.min(1, Math.abs(turret.quaternion.w)));
+        assert.ok(Math.abs(angle - Math.PI / 2) < 1e-6, `turned by ${angle}`);
+    });
+
+    it("turns a turret from the file's pose even when its bone is already turned", () => {
+        const { part, turret } = turretPart();
+        const filePose = new Map([
+            [turret, { quaternion: new THREE.Quaternion() }],
+        ]);
+        const rig = rigWith(new Map([["p", part]]), filePose);
+        // Left turned by something before the turret layer first poses it.
+        turret.quaternion.setFromAxisAngle(
+            new THREE.Vector3(0, 0, 1),
+            Math.PI / 4,
+        );
+
+        rig.setTurretRestAngles([
+            {
+                partId: "p",
+                turretBone: "Turret",
+                barrelBone: null,
+                rest: { yaw: 90, pitch: 0 },
+            },
+        ]);
+
+        const angle = 2 * Math.acos(Math.min(1, Math.abs(turret.quaternion.w)));
+        assert.ok(Math.abs(angle - Math.PI / 2) < 1e-6, `turned by ${angle}`);
+    });
+
     it("shows a turret's handles while the pointer is over its meshes, and hides them when it leaves", () => {
         const { rig, mounts, handles } = hoverRig([
             { name: "Turret", at: [0, 0, 0] },
@@ -557,6 +624,7 @@ describe("TurretRig", () => {
             ]),
             cameraRig: { modelSpan: () => 10 },
             levels: { drawn: () => true },
+            animation: { active: { restPose: new Map() } },
             modelScale: 1,
         });
         const rig = new TurretRig(context, { onTurretAimed: null });
