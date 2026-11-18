@@ -28,6 +28,7 @@ import {
     knobPoint,
 } from "./turretTrack";
 import { sweepAngles } from "./deathClone";
+import { isOverlay, isShadowVolume } from "./modelBounds";
 import { type ViewportContext } from "./viewportContext";
 import { type CaptureShot } from "./viewportTypes";
 
@@ -158,7 +159,10 @@ const TURRET_STOP_TICK_FRACTION = 0.18;
 /** How far a drag turns the turret. A degree every two pixels is a full sweep across a wide panel. */
 const TURRET_DEGREES_PER_PIXEL = 0.5;
 
-/** How near the pointer has to be to a knob to take it. The joints' own threshold. */
+/**
+ * How near the pointer has to be to a knob to take it, at the least. The joints' own threshold; a knob
+ * drawn larger than this - the camera close to it - is taken anywhere inside what is drawn.
+ */
 const TURRET_KNOB_PICK_RADIUS = 14;
 
 /** Over the arcs, which are already over the hull. A manipulator is the frontmost thing there is. */
@@ -166,6 +170,77 @@ const TURRET_HANDLE_RENDER_ORDER = 3;
 
 /** The two axes, in the order a reader meets them: traverse first, then elevation. */
 const TURRET_AXES: readonly TurretAxis[] = ["yaw", "pitch"];
+
+/** A rectangle on the canvas, in CSS pixels from its top-left corner. */
+interface ScreenRect {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+}
+
+/**
+ * Where a world-space box lands on the canvas: the rectangle around its corners in front of the camera.
+ * Null when the whole box is behind it - projection mirrors such a point to the front, so a corner there
+ * would claim a place on screen the box is not at.
+ */
+function screenRectOf(
+    box: THREE.Box3,
+    camera: THREE.Camera,
+    width: number,
+    height: number,
+): ScreenRect | null {
+    if (box.isEmpty()) {
+        return null;
+    }
+
+    const corner = new THREE.Vector3();
+    const rect: ScreenRect = {
+        minX: Infinity,
+        minY: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity,
+    };
+
+    for (let i = 0; i < 8; i++) {
+        corner
+            .set(
+                (i & 1) === 0 ? box.min.x : box.max.x,
+                (i & 2) === 0 ? box.min.y : box.max.y,
+                (i & 4) === 0 ? box.min.z : box.max.z,
+            )
+            .project(camera);
+
+        if (corner.z > 1) {
+            continue;
+        }
+
+        const x = (corner.x * 0.5 + 0.5) * width;
+        const y = (-corner.y * 0.5 + 0.5) * height;
+        rect.minX = Math.min(rect.minX, x);
+        rect.minY = Math.min(rect.minY, y);
+        rect.maxX = Math.max(rect.maxX, x);
+        rect.maxY = Math.max(rect.maxY, y);
+    }
+
+    return rect.minX === Infinity ? null : rect;
+}
+
+/** Whether a point lies in a rectangle grown by a margin on every side. */
+function inside(
+    rect: ScreenRect | null,
+    x: number,
+    y: number,
+    margin = 0,
+): boolean {
+    return (
+        rect !== null &&
+        x >= rect.minX - margin &&
+        x <= rect.maxX + margin &&
+        y >= rect.minY - margin &&
+        y <= rect.maxY + margin
+    );
+}
 
 /** One turret bone across the lists that name it: by its part and its name, case folded. */
 function restKey(partId: string, bone: string): string {
@@ -326,8 +401,34 @@ export class TurretRig {
      * swing from its rest vector.
      */
     private readonly turretRests = new Map<string, TurretAim>();
+    /** The rest poses as given, bones and all, so they can be put back after a clip resets the pose. */
+    private restPoses: readonly {
+        partId: string;
+        turretBone: string;
+        barrelBone: string | null;
+        rest: TurretAim;
+    }[] = [];
     /** The knob under the pointer, and the one being dragged. At most one of each. */
     private hoveredTurretAxis: { id: string; axis: TurretAxis } | null = null;
+    /**
+     * The turret under the pointer, whose handles are drawn while it stays there or on them.
+     *
+     * A turret is found by its own meshes rather than by its knob: a knob is drawn where the handle
+     * puts it, so finding it first meant knowing where it would appear. See {@link turretUnder}.
+     */
+    private hoveredTurret: string | null = null;
+    /** The turrets whose handles are drawn whatever the pointer does: those whose arcs are shown. */
+    private shownTurrets: ReadonlySet<string> = new Set();
+    /**
+     * What each handled turret is drawn as, in its traverse bone's own space: every piece, and the mesh
+     * that draws it so a piece on a level not shown is left out. See {@link shapeOf}.
+     */
+    private readonly turretShapes = new Map<
+        string,
+        { mesh: THREE.Mesh; box: THREE.Box3 }[]
+    >();
+    /** True while a still capture without annotations is being drawn. See {@link stageForCapture}. */
+    private handlesHiddenForCapture = false;
     private turretDrag: {
         id: string;
         axis: TurretAxis;
@@ -362,7 +463,8 @@ export class TurretRig {
     /** Scratch for {@link placeTurretAnchor}, which runs every frame and should not allocate. */
     private readonly twistScratch = new THREE.Quaternion();
     /**
-     * The pose the MODEL authored for each bone this class swings, captured before it first moves.
+     * The pose the MODEL authored for each bone this class turns - the file's pose, see
+     * {@link sweepRestOf} - kept for as long as the subject is.
      *
      * A sweep is an angle ON TOP of that, not an angle instead of it. The old code assigned
      * `bone.rotation.z` outright, which threw the authored orientation away and left the other two
@@ -372,11 +474,21 @@ export class TurretRig {
      */
     private readonly sweepRest = new Map<THREE.Object3D, THREE.Quaternion>();
     /**
-     * Brightens the axis under the pointer.
+     * The pose the running clip gave each bone this class turns, this frame.
      *
-     * Hover HIGHLIGHTS rather than decides. Which handles exist is the arc toggle's answer, because
-     * a manipulator the pointer has to travel to cannot be gated on where the pointer is now. What
-     * hover is genuinely for is telling twenty overlapping handles on a station apart.
+     * While a clip runs, a turret's turn is measured from here rather than from `sweepRest`: the mixer
+     * writes the clip's pose into every bone it keys on every frame, and all 110 clips measured on the
+     * turreted land units key the turret bone. Empty when no clip is running. See {@link composeOnClip}.
+     */
+    private readonly clipBase = new Map<THREE.Object3D, THREE.Quaternion>();
+    /** The bones the sweep is swinging, so the ones it stops swinging can be put back. */
+    private readonly swept = new Set<THREE.Object3D>();
+    /**
+     * Shows the handles of the turret under the pointer and brightens the axis under it.
+     *
+     * A hovered turret keeps its handles while the pointer travels from the turret onto them, so the
+     * manipulator does not vanish on the way to it. The brightened axis tells twenty overlapping
+     * handles on a station apart.
      */
     onPointerMove = (event: PointerEvent): void => {
         if (this.turretDrag !== null) {
@@ -385,10 +497,16 @@ export class TurretRig {
         }
 
         const rect = this.context.canvas.getBoundingClientRect();
-        const found = this.turretKnobAt(
-            event.clientX - rect.left,
-            event.clientY - rect.top,
-        );
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const hovered = this.turretUnder(x, y);
+
+        if (hovered !== this.hoveredTurret) {
+            this.hoveredTurret = hovered;
+            this.showTurretHandles();
+        }
+
+        const found = this.turretKnobAt(x, y);
 
         if (
             found?.id === this.hoveredTurretAxis?.id &&
@@ -399,6 +517,19 @@ export class TurretRig {
 
         this.hoveredTurretAxis = found;
         this.paintTurretHandles();
+        this.showCursor();
+    };
+    /** The pointer has left the canvas: no turret is under it any more, unless one is held. */
+    onPointerLeave = (): void => {
+        if (this.turretDrag !== null) {
+            return;
+        }
+
+        this.hoveredTurret = null;
+        this.hoveredTurretAxis = null;
+        this.showTurretHandles();
+        this.paintTurretHandles();
+        this.showCursor();
     };
     onPointerUp = (): void => {
         if (this.turretDrag === null) {
@@ -408,7 +539,9 @@ export class TurretRig {
         // The turret stays where it was put. Springing back to rest on release would make the
         // handle a momentary readout rather than a control.
         this.turretDrag = null;
+        this.showTurretHandles();
         this.paintTurretHandles();
+        this.showCursor();
     };
 
     constructor(
@@ -454,6 +587,7 @@ export class TurretRig {
             };
 
             this.paintTurretHandles();
+            this.showCursor();
             return true;
         }
 
@@ -604,15 +738,25 @@ export class TurretRig {
         }
     }
 
-    /** Hides the arcs from a still capture without annotations, and returns what puts them back. */
+    /**
+     * Hides the arcs and the turret handles from a still capture without annotations, and returns what
+     * puts them back. A handle is a thing drawn to help someone READ the model, as an arc is.
+     */
     stageForCapture(shot: CaptureShot): () => void {
         const before = this.arcsVisible;
+        const handlesBefore = this.handlesHiddenForCapture;
 
         if (!shot.annotations) {
             this.setFireArcsVisible(false);
+            this.handlesHiddenForCapture = true;
+            this.showTurretHandles();
         }
 
-        return () => this.setFireArcsVisible(before);
+        return () => {
+            this.setFireArcsVisible(before);
+            this.handlesHiddenForCapture = handlesBefore;
+            this.showTurretHandles();
+        };
     }
 
     /**
@@ -637,11 +781,70 @@ export class TurretRig {
         }[],
     ): void {
         this.turretRests.clear();
+        this.restPoses = [...poses];
         for (const pose of poses) {
             this.turretRests.set(
                 restKey(pose.partId, pose.turretBone),
                 pose.rest,
             );
+        }
+        this.poseRests();
+    }
+
+    /**
+     * Puts every turret back at its rest angle and the reader's aim, over whatever pose its bones hold.
+     *
+     * A clip starting or stopping writes the FILE's pose back into every bone it snapshotted at load,
+     * turret bones included (see `AnimationRig.resetPose`), which threw away the rest angle the XML
+     * declares and the aim the reader had dragged to - while the weapon row went on reading out that
+     * aim. The turn composes on the authored pose, so putting it back is the same composition again.
+     *
+     * The clip's pose no longer applies once the file's is back, so the turn is measured from the
+     * authored pose again.
+     */
+    reposeTurrets(): void {
+        this.clipBase.clear();
+        this.poseRests();
+    }
+
+    /**
+     * Runs one step of a clip and turns every turret on top of the pose it leaves.
+     *
+     * The game turns a turret on top of the bone it computed from the file and its animation (#389),
+     * so the rest angle, the sweep and the reader's aim all compose on the clip's pose rather than
+     * fighting it. Left to the mixer, the clip's pose won every frame and a dragged knob did nothing
+     * while a clip ran.
+     *
+     * Each bone is put back on its authored pose first, so a bone the clip does not key holds that
+     * pose rather than last frame's turn, and the turn is never applied twice.
+     */
+    composeOnClip(step: () => void): void {
+        for (const [bone, rest] of this.sweepRest) {
+            bone.quaternion.copy(rest);
+        }
+
+        step();
+
+        for (const bone of [...this.clipBase.keys()]) {
+            if (!this.sweepRest.has(bone)) {
+                this.clipBase.delete(bone);
+            }
+        }
+        for (const bone of this.sweepRest.keys()) {
+            const base = this.clipBase.get(bone);
+            if (base === undefined) {
+                this.clipBase.set(bone, bone.quaternion.clone());
+            } else {
+                base.copy(bone.quaternion);
+            }
+        }
+
+        this.poseRests();
+    }
+
+    /** Every turret at its rest angle and the reader's aim, measured from the pose it turns from. */
+    private poseRests(): void {
+        for (const pose of this.restPoses) {
             const part = this.context.parts.get(pose.partId);
             const turret = part?.bones.get(pose.turretBone.toLowerCase());
             if (turret === undefined) {
@@ -678,9 +881,12 @@ export class TurretRig {
     ): void {
         this.turretSweeps = [...sweeps];
 
-        // Anything that has stopped sweeping goes back to the pose the model authored. Only bones
-        // this class actually moved are in the map, so a part that has not loaded yet is not
-        // "missing" here - it was never touched.
+        // Only the bones that WERE sweeping and have stopped go back, and only to the pose they turn
+        // from - and then take their rest angle and the reader's aim again. Putting back every bone
+        // this class had turned, and forgetting the pose it measured them from, was harmless until
+        // the turn composed on a clip's pose: run again while a clip played, as a clip start makes
+        // the subject sync do, it left the turn in the bone and the next frame took that as the
+        // authored pose - the turn doubled and the turret rested off its model until it was closed.
         const swinging = new Set<THREE.Object3D>();
 
         for (const sweep of sweeps) {
@@ -700,11 +906,21 @@ export class TurretRig {
             }
         }
 
-        for (const [bone, rest] of [...this.sweepRest]) {
+        let stopped = false;
+        for (const bone of [...this.swept]) {
             if (!swinging.has(bone)) {
-                bone.quaternion.copy(rest);
-                this.sweepRest.delete(bone);
+                bone.quaternion.copy(
+                    this.clipBase.get(bone) ?? this.sweepRestOf(bone),
+                );
+                this.swept.delete(bone);
+                stopped = true;
             }
+        }
+        for (const bone of swinging) {
+            this.swept.add(bone);
+        }
+        if (stopped) {
+            this.poseRests();
         }
 
         if (sweeps.length === 0) {
@@ -713,17 +929,23 @@ export class TurretRig {
     }
 
     /**
-     * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest.
+     * Puts drag handles on every turret that declares a traverse, and draws the ones in `shown` always.
+     *
+     * The rest are drawn while the pointer is over the turret or its handles, in every lens: a turret
+     * the reader points at shows how it turns. `shown` is the turrets whose arcs are on in Gameplay,
+     * which keep their handles drawn as they always have.
      *
      * Two axes and no third: the engine has no roll on a turret -
      * the turret-angle calculation returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
      *
      * Each track spans only what the engine allows, so the stop is visible before it is reached.
-     * Which turrets these are is {@link turretHandles}' decision, off the arc toggle, and not this
-     * class's.
      */
-    setTurretHandles(handles: readonly TurretHandle[]): void {
+    setTurretHandles(
+        handles: readonly TurretHandle[],
+        shown: ReadonlySet<string> = new Set(),
+    ): void {
         this.turretHandles = [...handles];
+        this.shownTurrets = shown;
 
         const wanted = new Set(handles.map((handle) => handle.id));
 
@@ -732,6 +954,7 @@ export class TurretRig {
                 disposeTurretHandle(nodes.yaw);
                 disposeTurretHandle(nodes.pitch);
                 this.turretHandleNodes.delete(id);
+                this.turretShapes.delete(id);
             }
         }
 
@@ -742,6 +965,10 @@ export class TurretRig {
         if (handles.length === 0) {
             this.hoveredTurretAxis = null;
             this.turretDrag = null;
+        }
+
+        if (this.hoveredTurret !== null && !wanted.has(this.hoveredTurret)) {
+            this.hoveredTurret = null;
         }
 
         const radius = trackRadius(this.context.cameraRig.modelSpan());
@@ -780,9 +1007,11 @@ export class TurretRig {
                     pitchBone === yawBone,
                 ),
             });
+            this.turretShapes.set(handle.id, this.shapeOf(yawBone));
         }
 
         this.applyTurretAims();
+        this.showTurretHandles();
     }
 
     /** Where the reader has pointed each turret, for the shell to read back out. */
@@ -802,6 +1031,18 @@ export class TurretRig {
         this.turretAims.delete(id);
         this.applyTurretAims();
         this.host.onTurretAimed?.(id, TURRET_AT_REST);
+    }
+
+    /** Puts every turned turret back where the model authored it, as each row's own reset does. */
+    resetAllTurretAims(): void {
+        const turned = [...this.turretAims.keys()];
+
+        this.turretAims.clear();
+        this.applyTurretAims();
+
+        for (const id of turned) {
+            this.host.onTurretAimed?.(id, TURRET_AT_REST);
+        }
     }
 
     /**
@@ -881,10 +1122,17 @@ export class TurretRig {
         }
 
         this.turretHandleNodes.clear();
+        this.turretShapes.clear();
         this.turretHandles = [];
+        this.shownTurrets = new Set();
         this.turretAims.clear();
         this.hoveredTurretAxis = null;
+        this.hoveredTurret = null;
         this.turretDrag = null;
+        // The bones go with the subject; a new one's poses are read when it is first turned.
+        this.sweepRest.clear();
+        this.clipBase.clear();
+        this.swept.clear();
     }
 
     /**
@@ -978,8 +1226,8 @@ export class TurretRig {
      * One anchor, in the frame its axis is measured against.
      *
      * The bone's POSITION and scale, which clips may move, and its REST orientation - the pose
-     * `aimBone` measures every angle from - never its live one. That is what holds a yaw track
-     * still while the turret yaws.
+     * `aimBone` measures every angle from, the clip's pose of it while a clip runs - never its live
+     * one. That is what holds a yaw track still while the turret yaws.
      *
      * A pitch track needs one thing more when there is no barrel and the turret bone carries both
      * axes (2 of 19 models). Its rest frame is the same as the yaw track's, but elevation turns
@@ -995,7 +1243,10 @@ export class TurretRig {
      */
     private placeTurretAnchor(parts: TurretHandleParts): void {
         const { anchor, bone } = parts;
-        const rest = this.sweepRest.get(bone) ?? bone.quaternion;
+        const rest =
+            this.clipBase.get(bone) ??
+            this.sweepRest.get(bone) ??
+            bone.quaternion;
 
         anchor.position.copy(bone.position);
         anchor.scale.copy(bone.scale);
@@ -1111,12 +1362,22 @@ export class TurretRig {
 
     // ── frame loop ────────────────────────────────────────────────────────────
 
-    /** Its authored pose, remembered the first time it is asked for. */
+    /**
+     * The pose a bone turns from: the FILE's pose, as the animation layer snapshotted it when the
+     * part loaded, remembered the first time it is asked for.
+     *
+     * Never read off the live bone where the snapshot has it: whatever already turned the bone - a
+     * clip, an aim, a rest angle - would be taken for the model's own pose and kept for good. A bone
+     * the snapshot does not hold falls back to its pose at the first ask.
+     */
     private sweepRestOf(bone: THREE.Object3D): THREE.Quaternion {
         let rest = this.sweepRest.get(bone);
 
         if (rest === undefined) {
-            rest = bone.quaternion.clone();
+            rest = (
+                this.context.animation.active.restPose.get(bone)?.quaternion ??
+                bone.quaternion
+            ).clone();
             this.sweepRest.set(bone, rest);
         }
 
@@ -1198,7 +1459,8 @@ export class TurretRig {
     }
 
     /**
-     * Turns a bone by one or two angles, measured from the pose the model authored.
+     * Turns a bone by one or two angles, measured from the pose the model authored - or, while a clip
+     * runs, from the pose the clip gave it this frame.
      *
      * Degrees in, because that is what the XML declares and what the panel reads out.
      */
@@ -1223,7 +1485,9 @@ export class TurretRig {
             );
         }
 
-        bone.quaternion.copy(this.sweepRestOf(bone)).multiply(turn);
+        bone.quaternion
+            .copy(this.clipBase.get(bone) ?? this.sweepRestOf(bone))
+            .multiply(turn);
     }
 
     /**
@@ -1233,6 +1497,12 @@ export class TurretRig {
      * small sphere the reader aims at with a cursor, so screen distance is the honest metric and a
      * ray through a 12-segment sphere is not. It also lets a knob be grabbed through the hull,
      * which is the whole reason the handle draws with `depthTest: false`.
+     *
+     * Only a DRAWN handle's knobs: a knob nobody can see is not something to take hold of.
+     *
+     * Taken anywhere inside the knob as drawn, never less than {@link TURRET_KNOB_PICK_RADIUS}: a fixed
+     * radius was right for a small knob and missed most of a large one, so zoomed in, the edge of the
+     * sphere under the pointer did nothing.
      */
     private turretKnobAt(
         x: number,
@@ -1240,14 +1510,33 @@ export class TurretRig {
     ): { id: string; axis: TurretAxis } | null {
         const rect = this.context.canvas.getBoundingClientRect();
         const world = new THREE.Vector3();
+        const edge = new THREE.Vector3();
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(
+            this.context.camera.getWorldQuaternion(new THREE.Quaternion()),
+        );
         let best: { id: string; axis: TurretAxis; distance: number } | null =
             null;
 
         for (const [id, nodes] of this.turretHandleNodes) {
+            if (!nodes.yaw.anchor.visible) {
+                continue;
+            }
+
             for (const axis of TURRET_AXES) {
                 const knob = nodes[axis].knob;
 
                 knob.getWorldPosition(world);
+                if (knob.geometry.boundingSphere === null) {
+                    knob.geometry.computeBoundingSphere();
+                }
+                // The knob's edge, a radius up the screen from its centre, in the world.
+                edge.copy(up)
+                    .multiplyScalar(
+                        (knob.geometry.boundingSphere?.radius ?? 0) *
+                            knob.getWorldScale(new THREE.Vector3()).x,
+                    )
+                    .add(world)
+                    .project(this.context.camera);
                 const ndc = world.project(this.context.camera);
 
                 // Behind the camera. Projection mirrors such a point to the front, so without this
@@ -1260,16 +1549,242 @@ export class TurretRig {
                     (ndc.x * 0.5 + 0.5) * rect.width - x,
                     (-ndc.y * 0.5 + 0.5) * rect.height - y,
                 );
+                const reach = Math.max(
+                    TURRET_KNOB_PICK_RADIUS,
+                    Math.hypot(
+                        (edge.x - ndc.x) * 0.5 * rect.width,
+                        (edge.y - ndc.y) * 0.5 * rect.height,
+                    ),
+                );
 
-                if (best === null || distance < best.distance) {
+                if (
+                    distance <= reach &&
+                    (best === null || distance < best.distance)
+                ) {
                     best = { id, axis, distance };
                 }
             }
         }
 
-        return best !== null && best.distance <= TURRET_KNOB_PICK_RADIUS
-            ? { id: best.id, axis: best.axis }
-            : null;
+        return best !== null ? { id: best.id, axis: best.axis } : null;
+    }
+
+    /** `grab` over a knob, `grabbing` while one is dragged, and the canvas's own cursor elsewhere. */
+    private showCursor(): void {
+        this.context.canvas.style.cursor =
+            this.turretDrag !== null
+                ? "grabbing"
+                : this.hoveredTurretAxis !== null
+                  ? "grab"
+                  : "";
+    }
+
+    /**
+     * The turret the pointer is over, by what it is drawn as.
+     *
+     * Three answers, in order. A drawn knob under the pointer is its turret's. The turret already
+     * hovered keeps the pointer while it is on that turret's handles, so travelling from the turret
+     * to a knob outside it does not take the knob away. Otherwise the turret whose own meshes cover
+     * the point on screen, the one nearest the camera where several do - on a station, the turret in
+     * front is the one being pointed at.
+     *
+     * A turret's meshes are what is drawn under its traverse bone, the handles and the arcs left out
+     * (`isOverlay`) and shadow volumes too, which are larger than the turret they belong to.
+     */
+    private turretUnder(x: number, y: number): string | null {
+        const knob = this.turretKnobAt(x, y);
+
+        if (knob !== null) {
+            return knob.id;
+        }
+
+        const rect = this.context.canvas.getBoundingClientRect();
+        const camera = this.context.camera;
+
+        if (this.hoveredTurret !== null) {
+            const nodes = this.turretHandleNodes.get(this.hoveredTurret);
+
+            if (nodes !== undefined) {
+                const handle = new THREE.Box3()
+                    .setFromObject(nodes.yaw.anchor)
+                    .union(new THREE.Box3().setFromObject(nodes.pitch.anchor));
+
+                if (
+                    inside(
+                        screenRectOf(handle, camera, rect.width, rect.height),
+                        x,
+                        y,
+                        TURRET_KNOB_PICK_RADIUS,
+                    )
+                ) {
+                    return this.hoveredTurret;
+                }
+            }
+        }
+
+        let nearest: { id: string; distance: number } | null = null;
+        const centre = new THREE.Vector3();
+
+        for (const [id, nodes] of this.turretHandleNodes) {
+            const box = new THREE.Box3();
+
+            for (const piece of this.turretShapes.get(id) ?? []) {
+                if (this.context.levels.drawn(piece.mesh)) {
+                    box.union(piece.box);
+                }
+            }
+
+            // From the bone's space to the world as the bone stands now, so the box turns with it.
+            box.applyMatrix4(nodes.yaw.bone.matrixWorld);
+
+            if (
+                !inside(
+                    screenRectOf(box, camera, rect.width, rect.height),
+                    x,
+                    y,
+                )
+            ) {
+                continue;
+            }
+
+            const distance = box.getCenter(centre).distanceTo(camera.position);
+
+            if (nearest === null || distance < nearest.distance) {
+                nearest = { id, distance };
+            }
+        }
+
+        return nearest?.id ?? null;
+    }
+
+    /**
+     * What a turret is drawn as, measured once in its traverse bone's own space.
+     *
+     * Two kinds of geometry, and the corpus needs both. A rigid mesh under the bone - the T2B's
+     * `Turret_00` - and the part of a SKINNED hull weighted to the bone or a bone below it: four of
+     * five turreted land units measured carry no mesh under the turret bone at all, the AT-AT's head
+     * being 720 vertices of its two hull meshes. A vertex counts for the turret when its heaviest
+     * weight is on one of those bones, so a vertex blended across the neck goes to whichever side
+     * holds most of it.
+     *
+     * In the bone's space because the turret moves with the bone: the box turns when the turret does,
+     * with one transform per hover instead of a walk over the vertices. Overlays - the handles, the
+     * arcs - and shadow volumes are left out, the shadow being larger than the turret it belongs to.
+     */
+    private shapeOf(
+        bone: THREE.Object3D,
+    ): { mesh: THREE.Mesh; box: THREE.Box3 }[] {
+        this.context.modelRoot.updateMatrixWorld(true);
+
+        const toBone = bone.matrixWorld.clone().invert();
+        const carried = new Set<THREE.Object3D>();
+        const pieces: { mesh: THREE.Mesh; box: THREE.Box3 }[] = [];
+
+        bone.traverse((node) => carried.add(node));
+
+        const visit = (node: THREE.Object3D): void => {
+            if (isOverlay(node)) {
+                return;
+            }
+
+            if (
+                node instanceof THREE.Mesh &&
+                !(node instanceof THREE.SkinnedMesh) &&
+                !isShadowVolume(node)
+            ) {
+                if (node.geometry.boundingBox === null) {
+                    node.geometry.computeBoundingBox();
+                }
+
+                const local = node.geometry.boundingBox;
+
+                if (local !== null && !local.isEmpty()) {
+                    pieces.push({
+                        mesh: node,
+                        box: local
+                            .clone()
+                            .applyMatrix4(node.matrixWorld)
+                            .applyMatrix4(toBone),
+                    });
+                }
+            }
+
+            for (const child of node.children) {
+                visit(child);
+            }
+        };
+
+        visit(bone);
+
+        const vertex = new THREE.Vector3();
+
+        this.context.modelRoot.traverse((node) => {
+            if (!(node instanceof THREE.SkinnedMesh) || isShadowVolume(node)) {
+                return;
+            }
+
+            const joints = node.skeleton.bones.map((one) => carried.has(one));
+
+            if (!joints.includes(true)) {
+                return;
+            }
+
+            const position = node.geometry.getAttribute("position");
+            const index = node.geometry.getAttribute("skinIndex");
+            const weight = node.geometry.getAttribute("skinWeight");
+
+            if (index === undefined || weight === undefined) {
+                return;
+            }
+
+            const box = new THREE.Box3();
+
+            for (let i = 0; i < position.count; i++) {
+                let heaviest = 0;
+
+                for (let k = 1; k < 4; k++) {
+                    if (
+                        weight.getComponent(i, k) >
+                        weight.getComponent(i, heaviest)
+                    ) {
+                        heaviest = k;
+                    }
+                }
+
+                if (!joints[index.getComponent(i, heaviest)]) {
+                    continue;
+                }
+
+                vertex.fromBufferAttribute(position, i);
+                node.applyBoneTransform(i, vertex);
+                box.expandByPoint(
+                    vertex.applyMatrix4(node.matrixWorld).applyMatrix4(toBone),
+                );
+            }
+
+            if (!box.isEmpty()) {
+                pieces.push({ mesh: node, box });
+            }
+        });
+
+        return pieces;
+    }
+
+    /**
+     * Draws the handles that should be on screen and no others: a shown turret's, the hovered one's,
+     * and the one being dragged - none while a capture without annotations is drawn.
+     */
+    private showTurretHandles(): void {
+        for (const [id, nodes] of this.turretHandleNodes) {
+            const drawn =
+                !this.handlesHiddenForCapture &&
+                (this.shownTurrets.has(id) ||
+                    this.hoveredTurret === id ||
+                    this.turretDrag?.id === id);
+
+            nodes.yaw.anchor.visible = drawn;
+            nodes.pitch.anchor.visible = drawn;
+        }
     }
 
     /** The hovered or dragged axis in its bright materials, everything else in its quiet ones. */

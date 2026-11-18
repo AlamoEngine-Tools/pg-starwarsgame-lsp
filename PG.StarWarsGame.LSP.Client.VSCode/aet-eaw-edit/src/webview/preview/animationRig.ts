@@ -133,9 +133,29 @@ export class AnimationRig {
         this.subjects.delete(subjectId);
     }
 
-    /** Steps the active subject's clip on by `dt` seconds. */
+    /**
+     * Steps the active subject's clip on by `dt` seconds.
+     *
+     * Through the turret layer while a clip is loaded, so every turret turns on top of the pose the
+     * clip gives it. With no clip the mixer writes nothing, and there is nothing to compose on.
+     */
     advance(dt: number): void {
-        this.active.mixer?.update(dt);
+        this.stepMixer(dt);
+    }
+
+    private stepMixer(dt: number): void {
+        const mixer = this.active.mixer;
+
+        if (mixer === null) {
+            return;
+        }
+
+        if (this.active.action === null) {
+            mixer.update(dt);
+            return;
+        }
+
+        this.context.turret.composeOnClip(() => mixer.update(dt));
     }
 
     /** Drops every subject's animation and the visibility a clip was driving, for a new scene. */
@@ -288,6 +308,11 @@ export class AnimationRig {
             node.scale.copy(rest.scale);
         }
 
+        // The file's pose is not the whole of a turret's: its rest angle and the reader's aim turn on
+        // top of it, and they are the turret layer's to put back. Left out, starting any clip - an
+        // ability's deploy included - swung every turret back to where it was exported.
+        this.context.turret.reposeTurrets();
+
         // Transforms are the part three.js would have restored on its own; visibility is not, and a
         // bone left switched off by the clip that just stopped is the residue that actually shows.
         // Asking the level and override rules again is what puts it back - they, not this, know
@@ -342,7 +367,7 @@ export class AnimationRig {
         );
         // One update with no time step, so the pose on screen matches the playhead immediately
         // rather than at the next frame - which is what makes a scrubber feel attached to the model.
-        this.active.mixer?.update(0);
+        this.stepMixer(0);
     }
 
     /** Where the playhead is and how long the clip runs, for the scrubber. Zeroes when idle. */

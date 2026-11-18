@@ -113,8 +113,9 @@ export function AnimationsSection({
                                                 key={action.id}
                                                 action={action}
                                                 playing={player.animation}
-                                                onPlay={player.playAction}
-                                                onPick={player.pickClip}
+                                                running={player.playing}
+                                                onPress={player.pressAction}
+                                                onPressTake={player.pressTake}
                                             />
                                         ))}
                                     </div>

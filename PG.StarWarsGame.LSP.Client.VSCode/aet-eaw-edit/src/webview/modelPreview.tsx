@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The 3D preview panel: a canvas with the tool dock on the right, matching the layout the story
@@ -40,6 +40,7 @@ import { AbilityCommandBar } from "./preview/panels/AbilityCommandBar";
 import { AbilityInfoFlyout } from "./preview/panels/AbilityInfoFlyout";
 import { AttackControls } from "./preview/panels/AttackControls";
 import { SubjectStateControls } from "./preview/panels/SubjectStateControls";
+import { turnedTurretCount } from "./preview/turretHandles";
 import { CardInfoFlyout } from "./preview/panels/CardInfoFlyout";
 import { DamageLogFlyout } from "./preview/panels/DamageLogFlyout";
 import { StageTopEdge } from "./preview/panels/StageTopEdge";
@@ -268,6 +269,7 @@ function ModelPreview(): React.JSX.Element {
     const {
         animation,
         setAnimation,
+        clipStart,
         animationPaused,
         animationSpeed,
         animationLoop,
@@ -1019,10 +1021,10 @@ function ModelPreview(): React.JSX.Element {
         }
 
         setTreeItems(viewportRef.current?.treeItems() ?? []);
-        // `levels` is read but deliberately NOT a dependency: this fires when the CLIP changes, and
-        // adding it would reset the model every time the defined levels were recomputed - which
-        // happens on every load and every level change.
-    }, [animation]);
+        // `levels` is read but deliberately NOT a dependency: this fires when the CLIP changes, or is
+        // started again by hand (`clipStart`), and adding it would reset the model every time the
+        // defined levels were recomputed - which happens on every load and every level change.
+    }, [animation, clipStart]);
 
     const combat = useCombatLens({
         abilityProxyIds,
@@ -1066,6 +1068,7 @@ function ModelPreview(): React.JSX.Element {
         weapons,
         sweepable,
         draggableTurrets,
+        shownTurrets,
         cards,
         looseWeapons,
     } = combat;
@@ -1152,6 +1155,7 @@ function ModelPreview(): React.JSX.Element {
         customColour,
         destroyed,
         draggableTurrets,
+        shownTurrets,
         faction,
         fireArcs,
         hardpointHealth,
@@ -1449,6 +1453,14 @@ function ModelPreview(): React.JSX.Element {
                                     scene={scene}
                                     setAlt={setAlt}
                                     setLod={setLod}
+                                    turretCount={combat.draggableTurrets.length}
+                                    turnedTurrets={turnedTurretCount(
+                                        combat.draggableTurrets,
+                                        combat.turretAims,
+                                    )}
+                                    onResetTurrets={() =>
+                                        viewportRef.current?.resetAllTurretAims()
+                                    }
                                 />
                             }
                             middle={

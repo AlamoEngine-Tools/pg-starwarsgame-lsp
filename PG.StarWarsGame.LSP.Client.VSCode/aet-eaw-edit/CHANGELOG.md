@@ -2,6 +2,21 @@
 
 ## 0.6.0
 
+### Features
+
+- **Turret handles on hover, in every lens** - pointing at a turret in the model preview draws its yaw and pitch
+  handles in Model, Animation and Gameplay, a skinned turret included, and every turret that turns gets them,
+  one whose weapon declares no range too. A knob is taken anywhere inside it as drawn, never less than 14px,
+  and the cursor shows when a knob can be taken and while it is held. With the arcs on in Gameplay the handles
+  stay drawn as before. While a clip runs, the rest angle, the sweep and the aim turn on top of the pose the
+  clip gives the turret, so a knob works during every clip
+  ([#437](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/437))
+- **Reset all turrets** - the model preview's Model state group on the stage carries one button that puts
+  every turned turret back at the pose the model authored, in every lens, with the number of turned turrets
+  inside it; it is disabled while none is turned and left out for a subject with no turret that turns. The
+  two state sliders beside it are 16px shorter so all three fit one row
+  ([#438](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/438))
+
 ### Fixes
 
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
@@ -9,6 +24,17 @@
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the
   path. The names are kept as written and cut where they are looked up
   ([#292](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/292))
+- **A clip leaves the turrets where they were pointed** - starting or stopping a clip, an ability's deploy
+  included, wrote the model file's pose back into every bone, turret bones too: a turret turned by hand swung
+  back to where it was exported while its weapon row went on reading out the aim, and the rest angle the XML
+  declares was lost with it. The rest angle and the aim are now turned on again on top of the file's pose
+  ([#437](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/437))
+- **An animation card plays its clip again** - a card in the model preview's Animations section went on
+  reading as playing after a clip that plays once had ended, and pressing it again did nothing; only the
+  scrubber could start the clip again. A card now reads as playing only while its clip runs, pauses it when
+  pressed then, resumes it when pressed while paused, and plays it again from the start once it has ended; a
+  take pressed after it ended plays again too
+  ([#440](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/440))
 
 ## 0.5.2
 

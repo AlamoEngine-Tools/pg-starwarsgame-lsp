@@ -296,6 +296,7 @@ export class PreviewViewport {
             capture: true,
         });
         canvas.addEventListener("pointermove", this.turret.onPointerMove);
+        canvas.addEventListener("pointerleave", this.turret.onPointerLeave);
         // On the WINDOW, not the canvas: a drag that leaves the canvas must still end, and a
         // release outside it is the ordinary way a fast drag finishes.
         window.addEventListener("pointerup", this.turret.onPointerUp);
@@ -621,11 +622,14 @@ export class PreviewViewport {
     }
 
     /**
-     * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest. See
-     * `TurretRig.setTurretHandles`.
+     * Puts drag handles on every turret given, drawing the `shown` ones always and the rest on hover.
+     * See `TurretRig.setTurretHandles`.
      */
-    setTurretHandles(handles: readonly TurretHandle[]): void {
-        this.turret.setTurretHandles(handles);
+    setTurretHandles(
+        handles: readonly TurretHandle[],
+        shown?: ReadonlySet<string>,
+    ): void {
+        this.turret.setTurretHandles(handles, shown);
     }
 
     /** Where the reader has pointed each turret, for the shell to read back out. */
@@ -636,6 +640,11 @@ export class PreviewViewport {
     /** Puts one turret back where the model authored it. See `TurretRig.resetTurretAim`. */
     resetTurretAim(id: string): void {
         this.turret.resetTurretAim(id);
+    }
+
+    /** Puts every turned turret back where the model authored it. See `TurretRig.resetAllTurretAims`. */
+    resetAllTurretAims(): void {
+        this.turret.resetAllTurretAims();
     }
 
     /** Drops a piece of wreckage where a hardpoint used to be. See `DestructionRig.addBreakoff`. */
@@ -1094,6 +1103,10 @@ export class PreviewViewport {
             "pointermove",
             this.turret.onPointerMove,
         );
+        this.canvas.removeEventListener(
+            "pointerleave",
+            this.turret.onPointerLeave,
+        );
         window.removeEventListener("pointerup", this.turret.onPointerUp);
         window.removeEventListener("pointercancel", this.turret.onPointerUp);
         cancelAnimationFrame(this.frameHandle);
@@ -1129,8 +1142,8 @@ export class PreviewViewport {
         this.elapsed += dt;
         this.animation.advance(dt);
         this.animation.applyAnimatedVisibility();
-        // After the mixer, so a clip that drives the same bone wins: an animation is the model's own
-        // word about where the turret is, and the sweep is the reader asking a question about it.
+        // After the mixer, so the sweep turns on top of the pose the clip gave the bone this frame -
+        // the composition `TurretRig.composeOnClip` sets up for the rest angle and the aim too.
         this.turret.advanceTurretSweep(dt);
         this.destruction.advanceBreakoffs(dt);
         this.destruction.advanceSpinAway(dt);

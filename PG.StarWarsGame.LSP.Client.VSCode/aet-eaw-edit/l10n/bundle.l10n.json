@@ -1121,6 +1121,8 @@
   "Damage state follows the hull in Gameplay": "Damage state follows the hull in Gameplay",
   "Set damage state - 0 is undamaged": "Set damage state - 0 is undamaged",
   "Set LOD - 0 is lowest detail in EaW": "Set LOD - 0 is lowest detail in EaW",
+  "Return every turret to the pose the model authored": "Return every turret to the pose the model authored",
+  "No turret is turned": "No turret is turned",
   "Scene settings": "Scene settings",
   "No team colour": "No team colour",
   "Pick a custom colour": "Pick a custom colour",

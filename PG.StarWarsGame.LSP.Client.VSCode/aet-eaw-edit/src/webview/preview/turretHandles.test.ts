@@ -13,7 +13,9 @@ import {
     clampAim,
     clampAxis,
     dragToAim,
+    everyTurretHandle,
     handlesForShownArcs,
+    turnedTurretCount,
     restAim,
     turretEnvelopes,
     turretHandles,
@@ -259,6 +261,69 @@ describe("turretEnvelopes", () => {
 });
 
 describe("handlesForShownArcs", () => {
+    it("counts the turrets turned off their rest, and none that are back at it", () => {
+        const handles = everyTurretHandle([
+            {
+                id: "weapon:A",
+                partId: "hull",
+                turret: {
+                    rotateExtentDegrees: 90,
+                    elevateExtentDegrees: 20,
+                    turretBone: "Turret_00",
+                    barrelBone: null,
+                },
+            },
+            {
+                id: "weapon:B",
+                partId: "hull",
+                turret: {
+                    rotateExtentDegrees: 90,
+                    elevateExtentDegrees: 20,
+                    turretBone: "Turret_01",
+                    barrelBone: null,
+                },
+            },
+        ]);
+
+        assert.equal(turnedTurretCount(handles, new Map()), 0);
+        assert.equal(
+            turnedTurretCount(
+                handles,
+                new Map([
+                    ["weapon:A", { yaw: 12, pitch: 0 }],
+                    ["weapon:B", { yaw: 0, pitch: 0 }],
+                    ["weapon:gone", { yaw: 5, pitch: 5 }],
+                ]),
+            ),
+            1,
+        );
+    });
+
+    it("gives every turret that declares a traverse a handle, whatever its arc, and none to one that does not", () => {
+        const handles = everyTurretHandle([
+            {
+                id: "weapon:A",
+                partId: "hull",
+                turret: {
+                    rotateExtentDegrees: 90,
+                    elevateExtentDegrees: 20,
+                    turretBone: "Turret_00",
+                    barrelBone: "Barrel_00",
+                },
+            },
+            {
+                id: "weapon:B",
+                partId: "hull",
+                turret: null,
+            },
+        ]);
+
+        assert.deepEqual(
+            handles.map((one) => one.id),
+            ["weapon:A"],
+        );
+    });
+
     /**
      * The regression. A hardpoint turret is reached twice - once as a HARDPOINT, keyed
      * `HP_Gargantuan_Main_Turret_Front`, and once as the WEAPON on it, keyed
