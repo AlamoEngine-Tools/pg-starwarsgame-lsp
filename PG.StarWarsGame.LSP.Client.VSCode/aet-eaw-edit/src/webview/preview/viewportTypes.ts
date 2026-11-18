@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The viewport's own types: where a particle system goes, what a model part is loaded with, the stats
-// readout and the named camera angles. Their own module because the viewport and its layers both read
+// readout, the named camera angles and what a still capture shows. Their own module because the viewport and its layers both read
 // them; `viewport.ts` re-exports them.
 
 import type * as THREE from "three";
@@ -54,6 +54,21 @@ export interface ViewportStats {
     triangles: number;
     bones: number;
     animations: string[];
+}
+
+/**
+ * A still capture: its size in pixels, the backdrop behind it - null for a transparent one - and what of
+ * the room and the reading aids it shows. Each layer stages its own part of it; see `CaptureRig.capture`.
+ */
+export interface CaptureShot {
+    width: number;
+    height: number;
+    background: string | null;
+    grid: boolean;
+    floor: boolean;
+    particles: boolean;
+    /** The axes, the skeleton, the selection and the firing arcs: diagnostics, not part of the subject. */
+    annotations: boolean;
 }
 
 /** A named camera angle the toolbar can jump to. */

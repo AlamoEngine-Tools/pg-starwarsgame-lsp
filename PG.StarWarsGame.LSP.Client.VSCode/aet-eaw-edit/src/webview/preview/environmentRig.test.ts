@@ -153,4 +153,57 @@ describe("EnvironmentRig", () => {
         assert.ok(stars, "no starfield on the camera");
         assert.equal(stars.scale.x, 2000);
     });
+
+    it("sets the room as a shot asks and puts it back as it was", () => {
+        const { environment, scene } = rigWith();
+        environment.setBackground("starfield");
+        environment.setFloorVisible(true);
+
+        const restore = environment.stageForCapture({
+            width: 64,
+            height: 64,
+            background: null,
+            grid: false,
+            floor: true,
+            particles: false,
+            annotations: false,
+        });
+
+        assert.equal(
+            scene.background === null,
+            true,
+            "the shot is not transparent",
+        );
+        assert.equal(environment.grid.visible, false);
+        assert.equal(environment.axes.visible, false);
+        assert.equal(environment.floor.visible, true);
+        assert.equal(environment.shadowCatcher.visible, true);
+
+        restore();
+
+        assert.equal((scene.background as THREE.Color).getHex(), 0x05070c);
+        assert.equal(environment.grid.visible, true);
+        assert.equal(environment.axes.visible, true);
+        assert.equal(environment.floor.visible, true);
+        assert.equal(environment.shadowCatcher.visible, true);
+    });
+
+    it("draws a shot over the backdrop it names", () => {
+        const { environment, scene } = rigWith();
+
+        environment.stageForCapture({
+            ...{
+                width: 64,
+                height: 64,
+                background: null,
+                grid: false,
+                floor: true,
+                particles: false,
+                annotations: false,
+            },
+            background: "#ff0000",
+        });
+
+        assert.equal((scene.background as THREE.Color).getHex(), 0xff0000);
+    });
 });

@@ -29,6 +29,7 @@ import {
 } from "./turretTrack";
 import { sweepAngles } from "./deathClone";
 import { type ViewportContext } from "./viewportContext";
+import { type CaptureShot } from "./viewportTypes";
 
 // The firing-arc gizmo's look: unlit and never writing depth, because it is an annotation drawn over a
 // model rather than a thing in the scene.
@@ -471,7 +472,7 @@ export class TurretRig {
         }
     }
 
-    /** Whether the arcs are drawn, so a capture can put them back as it found them. */
+    /** Whether the arcs are drawn. */
     get arcsShown(): boolean {
         return this.arcsVisible;
     }
@@ -601,6 +602,17 @@ export class TurretRig {
         for (const arc of this.arcs) {
             arc.visible = visible;
         }
+    }
+
+    /** Hides the arcs from a still capture without annotations, and returns what puts them back. */
+    stageForCapture(shot: CaptureShot): () => void {
+        const before = this.arcsVisible;
+
+        if (!shot.annotations) {
+            this.setFireArcsVisible(false);
+        }
+
+        return () => this.setFireArcsVisible(before);
     }
 
     /**

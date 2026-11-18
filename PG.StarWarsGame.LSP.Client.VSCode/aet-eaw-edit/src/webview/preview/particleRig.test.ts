@@ -149,4 +149,22 @@ describe("ParticleRig", () => {
         assert.deepEqual(particles.particleSystemIds(), []);
         void modelRoot;
     });
+
+    it("hides the effects from a shot without particles, and puts them back", () => {
+        const { particles } = rigWith();
+
+        const restore = particles.stageForCapture({
+            width: 64,
+            height: 64,
+            background: null,
+            grid: false,
+            floor: true,
+            particles: false,
+            annotations: false,
+        });
+        assert.equal(particles.particlesVisible, false);
+
+        restore();
+        assert.equal(particles.particlesVisible, true);
+    });
 });

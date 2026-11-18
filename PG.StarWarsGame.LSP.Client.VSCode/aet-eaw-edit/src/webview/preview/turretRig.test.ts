@@ -116,4 +116,23 @@ describe("TurretRig", () => {
         rig.setFireArcsVisible(false);
         assert.equal(rig.arcsShown, false);
     });
+
+    it("hides the arcs from a shot without annotations, and puts them back", () => {
+        const rig = rigWith(new Map());
+        rig.setFireArcsVisible(true);
+
+        const restore = rig.stageForCapture({
+            width: 64,
+            height: 64,
+            background: null,
+            grid: false,
+            floor: true,
+            particles: false,
+            annotations: false,
+        });
+        assert.equal(rig.arcsShown, false);
+
+        restore();
+        assert.equal(rig.arcsShown, true);
+    });
 });

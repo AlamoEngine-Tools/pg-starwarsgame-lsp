@@ -58,6 +58,7 @@ import { DestructionRig } from "./destructionRig";
 import { AnimationRig } from "./animationRig";
 import {
     type AddPartOptions,
+    type CaptureShot,
     type ParticlePlacement,
     type PresetView,
     type ViewportStats,
@@ -69,6 +70,7 @@ import { type ViewportContext } from "./viewportContext";
 
 export type {
     AddPartOptions,
+    CaptureShot,
     ParticlePlacement,
     PresetView,
     ViewportStats,
@@ -1050,17 +1052,8 @@ export class PreviewViewport {
     /**
      * Renders one frame at a chosen size and hands back the PNG bytes. See `CaptureRig.capture`.
      */
-    capture(options: {
-        width: number;
-        height: number;
-        background: string | null;
-        grid: boolean;
-        floor: boolean;
-        particles: boolean;
-        /** The axes, the skeleton and the firing arcs: diagnostics, not part of the subject. */
-        annotations: boolean;
-    }): string {
-        return this.capturer.capture(options);
+    capture(shot: CaptureShot): string {
+        return this.capturer.capture(shot);
     }
 
     resize(): void {

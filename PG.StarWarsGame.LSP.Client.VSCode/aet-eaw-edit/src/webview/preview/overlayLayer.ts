@@ -15,6 +15,7 @@ import {
 import { type ReticleMark, reticleSizePx, healthColour } from "./reticles";
 import { boxTargetFor, boxRoots, rowsInBox } from "./selectionBox";
 import { type ViewportContext } from "./viewportContext";
+import { type CaptureShot } from "./viewportTypes";
 
 /** Smallest gap between two bone labels, in pixels, before the further one is dropped. */
 const LABEL_SPACING = 26;
@@ -245,6 +246,29 @@ export class OverlayLayer {
         if (!visible) {
             this.clearLabels();
         }
+    }
+
+    /**
+     * Hides the skeleton and the selection from a still capture without annotations, and returns what
+     * puts them back. Both are drawn to help someone READ the model; an icon with an amber cage around
+     * it is not an icon.
+     */
+    stageForCapture(shot: CaptureShot): () => void {
+        const before = {
+            joints: this.joints.visible,
+            jointLines: this.jointLines.visible,
+            selection: this.selectionBoxes.visible,
+        };
+
+        this.joints.visible = shot.annotations && before.joints;
+        this.jointLines.visible = shot.annotations && before.jointLines;
+        this.selectionBoxes.visible = shot.annotations && before.selection;
+
+        return () => {
+            this.joints.visible = before.joints;
+            this.jointLines.visible = before.jointLines;
+            this.selectionBoxes.visible = before.selection;
+        };
     }
 
     setLabelMode(mode: LabelMode): void {

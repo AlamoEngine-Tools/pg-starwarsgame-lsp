@@ -19,7 +19,7 @@ import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import { emissionMeshFor } from "./emissionSource";
 import { missingTexture } from "./missingTexture";
-import { type ParticlePlacement } from "./viewportTypes";
+import { type CaptureShot, type ParticlePlacement } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
 
 /** Splits a `systemId#index` emitter key. The id may itself contain a `#`, so split from the right. */
@@ -400,6 +400,36 @@ export class ParticleRig {
         // the old per-system loop did once per system to the same end.
         if (this.particleSystems.size > 0) {
             this.refreshParticleVisibility();
+        }
+    }
+
+    /** Shows or hides the effects as a still capture asks, and returns what puts them back. */
+    stageForCapture(shot: CaptureShot): () => void {
+        const before = this.particlesVisible;
+
+        this.setParticlesVisible(shot.particles);
+
+        return () => this.setParticlesVisible(before);
+    }
+
+    /**
+     * Re-aims every shown sprite at the camera as it now stands, without moving the effects on.
+     *
+     * A sprite is oriented against the VIEW matrix - a streak's length is a screen-space measurement -
+     * so a camera moved outside the frame step leaves it aimed at the old one. A zero step re-aims
+     * without advancing the simulation.
+     */
+    reaimAtCamera(): void {
+        if (!this.particlesVisible) {
+            return;
+        }
+
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.update(
+                0,
+                this.context.camera.matrixWorldInverse,
+                this.windVector,
+            );
         }
     }
 

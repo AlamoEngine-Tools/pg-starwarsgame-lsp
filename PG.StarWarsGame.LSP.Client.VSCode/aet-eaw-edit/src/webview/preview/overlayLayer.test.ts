@@ -155,4 +155,51 @@ describe("OverlayLayer", () => {
         assert.equal(layer.jointAt(at(52, 49)), 4);
         assert.equal(layer.jointAt(at(5, 5)), null);
     });
+
+    it("hides the skeleton and the selection from a shot without annotations, and puts them back", () => {
+        const { layer } = layerWith();
+        layer.joints.visible = true;
+        layer.jointLines.visible = true;
+        layer.selectionBoxes.visible = true;
+
+        const restore = layer.stageForCapture({
+            width: 64,
+            height: 64,
+            background: null,
+            grid: false,
+            floor: true,
+            particles: false,
+            annotations: false,
+        });
+
+        assert.equal(layer.joints.visible, false);
+        assert.equal(layer.jointLines.visible, false);
+        assert.equal(layer.selectionBoxes.visible, false);
+
+        restore();
+
+        assert.equal(layer.joints.visible, true);
+        assert.equal(layer.jointLines.visible, true);
+        assert.equal(layer.selectionBoxes.visible, true);
+    });
+
+    it("shows no annotation in a shot that was not shown before it", () => {
+        const { layer } = layerWith();
+
+        layer.stageForCapture({
+            ...{
+                width: 64,
+                height: 64,
+                background: null,
+                grid: false,
+                floor: true,
+                particles: false,
+                annotations: false,
+            },
+            annotations: true,
+        });
+
+        assert.equal(layer.joints.visible, false);
+        assert.equal(layer.selectionBoxes.visible, false);
+    });
 });

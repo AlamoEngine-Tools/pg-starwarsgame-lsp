@@ -39,6 +39,7 @@ import {
 } from "./materials";
 import { HEAT_LAYER } from "./particleRenderer";
 import { type ViewportContext } from "./viewportContext";
+import { type CaptureShot } from "./viewportTypes";
 
 /** Fixed, so the sky is the same one every session and a screenshot can be compared to another. */
 const STAR_SEED = 20260817;
@@ -388,6 +389,40 @@ export class EnvironmentRig {
     setGridVisible(visible: boolean): void {
         this.grid.visible = visible;
         this.axes.visible = visible;
+    }
+
+    /**
+     * Sets the room as a still capture asks - its backdrop, grid, floor and axes - and returns what puts
+     * them back as they were. The axes are a reading aid, so they go with the shot's annotations.
+     */
+    stageForCapture(shot: CaptureShot): () => void {
+        const before = {
+            background: this.context.scene.background,
+            grid: this.grid.visible,
+            floor: this.floor.visible,
+            catcher: this.shadowCatcher.visible,
+            axes: this.axes.visible,
+        };
+
+        // Null is TRANSPARENT, which is what an icon wants: the alpha the renderer was created
+        // with is what makes it possible at all.
+        this.context.scene.background =
+            shot.background === null ? null : new THREE.Color(shot.background);
+        this.grid.visible = shot.grid;
+        this.floor.visible = shot.floor;
+        this.shadowCatcher.visible = shot.floor && before.catcher;
+        // The axes are drawn to help someone READ the model. They are not part of it, and an icon
+        // with a coloured cross through it is not an icon - which is exactly what the first capture
+        // came out as.
+        this.axes.visible = shot.annotations && before.axes;
+
+        return () => {
+            this.context.scene.background = before.background;
+            this.grid.visible = before.grid;
+            this.floor.visible = before.floor;
+            this.shadowCatcher.visible = before.catcher;
+            this.axes.visible = before.axes;
+        };
     }
 
     /** Shows or hides the ground plane. Independent of the grid: either is useful without it. */
