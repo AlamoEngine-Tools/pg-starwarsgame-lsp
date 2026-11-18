@@ -159,7 +159,10 @@ const TURRET_STOP_TICK_FRACTION = 0.18;
 /** How far a drag turns the turret. A degree every two pixels is a full sweep across a wide panel. */
 const TURRET_DEGREES_PER_PIXEL = 0.5;
 
-/** How near the pointer has to be to a knob to take it. The joints' own threshold. */
+/**
+ * How near the pointer has to be to a knob to take it, at the least. The joints' own threshold; a knob
+ * drawn larger than this - the camera close to it - is taken anywhere inside what is drawn.
+ */
 const TURRET_KNOB_PICK_RADIUS = 14;
 
 /** Over the arcs, which are already over the hull. A manipulator is the frontmost thing there is. */
@@ -503,6 +506,7 @@ export class TurretRig {
 
         this.hoveredTurretAxis = found;
         this.paintTurretHandles();
+        this.showCursor();
     };
     /** The pointer has left the canvas: no turret is under it any more, unless one is held. */
     onPointerLeave = (): void => {
@@ -514,6 +518,7 @@ export class TurretRig {
         this.hoveredTurretAxis = null;
         this.showTurretHandles();
         this.paintTurretHandles();
+        this.showCursor();
     };
     onPointerUp = (): void => {
         if (this.turretDrag === null) {
@@ -525,6 +530,7 @@ export class TurretRig {
         this.turretDrag = null;
         this.showTurretHandles();
         this.paintTurretHandles();
+        this.showCursor();
     };
 
     constructor(
@@ -570,6 +576,7 @@ export class TurretRig {
             };
 
             this.paintTurretHandles();
+            this.showCursor();
             return true;
         }
 
@@ -1392,6 +1399,10 @@ export class TurretRig {
      * which is the whole reason the handle draws with `depthTest: false`.
      *
      * Only a DRAWN handle's knobs: a knob nobody can see is not something to take hold of.
+     *
+     * Taken anywhere inside the knob as drawn, never less than {@link TURRET_KNOB_PICK_RADIUS}: a fixed
+     * radius was right for a small knob and missed most of a large one, so zoomed in, the edge of the
+     * sphere under the pointer did nothing.
      */
     private turretKnobAt(
         x: number,
@@ -1399,6 +1410,10 @@ export class TurretRig {
     ): { id: string; axis: TurretAxis } | null {
         const rect = this.context.canvas.getBoundingClientRect();
         const world = new THREE.Vector3();
+        const edge = new THREE.Vector3();
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(
+            this.context.camera.getWorldQuaternion(new THREE.Quaternion()),
+        );
         let best: { id: string; axis: TurretAxis; distance: number } | null =
             null;
 
@@ -1411,6 +1426,17 @@ export class TurretRig {
                 const knob = nodes[axis].knob;
 
                 knob.getWorldPosition(world);
+                if (knob.geometry.boundingSphere === null) {
+                    knob.geometry.computeBoundingSphere();
+                }
+                // The knob's edge, a radius up the screen from its centre, in the world.
+                edge.copy(up)
+                    .multiplyScalar(
+                        (knob.geometry.boundingSphere?.radius ?? 0) *
+                            knob.getWorldScale(new THREE.Vector3()).x,
+                    )
+                    .add(world)
+                    .project(this.context.camera);
                 const ndc = world.project(this.context.camera);
 
                 // Behind the camera. Projection mirrors such a point to the front, so without this
@@ -1423,16 +1449,34 @@ export class TurretRig {
                     (ndc.x * 0.5 + 0.5) * rect.width - x,
                     (-ndc.y * 0.5 + 0.5) * rect.height - y,
                 );
+                const reach = Math.max(
+                    TURRET_KNOB_PICK_RADIUS,
+                    Math.hypot(
+                        (edge.x - ndc.x) * 0.5 * rect.width,
+                        (edge.y - ndc.y) * 0.5 * rect.height,
+                    ),
+                );
 
-                if (best === null || distance < best.distance) {
+                if (
+                    distance <= reach &&
+                    (best === null || distance < best.distance)
+                ) {
                     best = { id, axis, distance };
                 }
             }
         }
 
-        return best !== null && best.distance <= TURRET_KNOB_PICK_RADIUS
-            ? { id: best.id, axis: best.axis }
-            : null;
+        return best !== null ? { id: best.id, axis: best.axis } : null;
+    }
+
+    /** `grab` over a knob, `grabbing` while one is dragged, and the canvas's own cursor elsewhere. */
+    private showCursor(): void {
+        this.context.canvas.style.cursor =
+            this.turretDrag !== null
+                ? "grabbing"
+                : this.hoveredTurretAxis !== null
+                  ? "grab"
+                  : "";
     }
 
     /**

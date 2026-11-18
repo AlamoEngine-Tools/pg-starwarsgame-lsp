@@ -77,6 +77,7 @@ function hoverRig(turrets: { name: string; at: [number, number, number] }[]): {
     mounts: Map<string, THREE.Object3D>;
     handles: TurretHandle[];
     camera: THREE.PerspectiveCamera;
+    canvas: { style: { cursor: string } };
 } {
     const root = new THREE.Group();
     const bones = new Map<string, THREE.Object3D>();
@@ -102,18 +103,19 @@ function hoverRig(turrets: { name: string; at: [number, number, number] }[]): {
     camera.position.set(0, 0, 30);
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld(true);
+    const canvas = {
+        getBoundingClientRect: () => ({
+            left: 0,
+            top: 0,
+            width: 100,
+            height: 100,
+        }),
+        setPointerCapture: () => undefined,
+        style: { cursor: "" },
+    };
     const context = standInContext({
         camera,
-        canvas: {
-            getBoundingClientRect: () => ({
-                left: 0,
-                top: 0,
-                width: 100,
-                height: 100,
-            }),
-            setPointerCapture: () => undefined,
-            style: {},
-        },
+        canvas,
         modelRoot: root,
         parts: new Map([
             [
@@ -137,7 +139,7 @@ function hoverRig(turrets: { name: string; at: [number, number, number] }[]): {
         id: `weapon:${turret.name}`,
         turretBone: turret.name,
     }));
-    return { rig, mounts, handles, camera };
+    return { rig, mounts, handles, camera, canvas };
 }
 
 /** A pointer at canvas pixel (x, y). */
@@ -477,5 +479,57 @@ describe("TurretRig", () => {
 
         rig.onPointerMove(pointerAt(100 - x, 50));
         assert.equal(anchors[0].visible, false, "over the hull's own half");
+    });
+
+    it("takes a knob anywhere inside its drawn size when the camera is close", () => {
+        const { rig, mounts, handles, camera } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles, new Set([handles[0].id]));
+        // Up close to the yaw knob, so it is drawn far larger than the 14 px floor.
+        let knob: THREE.Object3D | undefined;
+        anchorsUnder(mounts.get("Turret")!)[0].traverse((node) => {
+            if (node instanceof THREE.Mesh && knob === undefined) {
+                knob = node;
+            }
+        });
+        const at = knob!.getWorldPosition(new THREE.Vector3());
+        camera.position.set(at.x, at.y, at.z + 1.5);
+        camera.lookAt(at);
+        camera.updateMatrixWorld(true);
+
+        assert.equal(rig.grabKnob(pointerAt(50 + 25, 50)), true);
+    });
+
+    it("still takes a small knob from 14 px away", () => {
+        const { rig, mounts, handles, camera } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles, new Set([handles[0].id]));
+        const knob = knobPixel(mounts.get("Turret")!, camera);
+
+        assert.equal(rig.grabKnob(pointerAt(knob.x + 13, knob.y)), true);
+        rig.onPointerUp();
+        assert.equal(rig.grabKnob(pointerAt(knob.x + 30, knob.y)), false);
+    });
+
+    it("shows a grab cursor over a knob, grabbing while it is dragged, and none elsewhere", () => {
+        const { rig, mounts, handles, camera, canvas } = hoverRig([
+            { name: "Turret", at: [0, 0, 0] },
+        ]);
+        rig.setTurretHandles(handles, new Set([handles[0].id]));
+        const knob = knobPixel(mounts.get("Turret")!, camera);
+
+        rig.onPointerMove(pointerAt(knob.x, knob.y));
+        assert.equal(canvas.style.cursor, "grab");
+
+        rig.grabKnob(pointerAt(knob.x, knob.y));
+        assert.equal(canvas.style.cursor, "grabbing");
+
+        rig.onPointerUp();
+        assert.equal(canvas.style.cursor, "grab");
+
+        rig.onPointerMove(pointerAt(2, 2));
+        assert.equal(canvas.style.cursor, "");
     });
 });
