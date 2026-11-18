@@ -125,13 +125,6 @@ export function useParticleEffects({
     );
 
     /**
-     * Whether a particle system plays right now.
-     *
-     * Damage smoke starts off: the hardpoint is intact, and a ship that smokes from every hardpoint the
-     * moment you open it tells the author nothing. Chunk 14's destroy switches it on.
-     */
-
-    /**
      * Whether one effect should be drawing right now.
      *
      * THE one answer, because there are two callers - the pass below and `attachPending`, which

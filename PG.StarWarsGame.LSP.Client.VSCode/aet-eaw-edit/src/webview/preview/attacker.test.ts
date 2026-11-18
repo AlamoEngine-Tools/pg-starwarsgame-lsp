@@ -927,11 +927,6 @@ describe("poolRows, as bars", () => {
     });
 
     /**
-     * Energy is behind a feature toggle, off by default. The user: the mechanic is in the engine and
-     * works, but it is disabled and has no UI, so a mod maker turns it on deliberately after reading
-     * what it means. Every energy element goes with it, this row included.
-     */
-    /**
      * Shot-off generators empty the bar, whatever the pool holds.
      *
      * The user's rule, and it is a SWITCH rather than a drain - so the row has to read 0 even when
@@ -959,6 +954,11 @@ describe("poolRows, as bars", () => {
         assert.equal(rows.find((r) => r.id === "shield")!.fraction, 0.5);
     });
 
+    /**
+     * Energy is behind a feature toggle, off by default. The user: the mechanic is in the engine and
+     * works, but it is disabled and has no UI, so a mod maker turns it on deliberately after reading
+     * what it means. Every energy element goes with it, this row included.
+     */
     it("leaves energy out entirely unless it has been turned on", () => {
         const off = poolRows(SHIELDED, pools, null, { energy: false });
 

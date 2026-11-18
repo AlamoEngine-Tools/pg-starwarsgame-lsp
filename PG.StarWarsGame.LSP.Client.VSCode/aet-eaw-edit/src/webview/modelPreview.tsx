@@ -512,13 +512,6 @@ function ModelPreview(): React.JSX.Element {
     const lodSteps = useMemo(() => levelSteps(levels.lod), [levels.lod]);
 
     /**
-     * What each detail level costs, for the LOD slider's own label.
-     *
-     * Depends on `stats` for the reason the arcs and the reticles do - it is this component's
-     * signal that geometry has arrived - and on `alt`, because a mesh tagged for another damage
-     * stage is not part of what the level draws.
-     */
-    /**
      * Where the shadow colour can be seen, which decides whether its control is live.
      *
      * Depends on `translatedOn` because the stencil pass follows the renderer, and on `stats`
@@ -534,6 +527,13 @@ function ModelPreview(): React.JSX.Element {
         [floor, translatedOn, stats],
     );
 
+    /**
+     * What each detail level costs, for the LOD slider's own label.
+     *
+     * Depends on `stats` for the reason the arcs and the reticles do - it is this component's
+     * signal that geometry has arrived - and on `alt`, because a mesh tagged for another damage
+     * stage is not part of what the level draws.
+     */
     const lodCost = useMemo(
         () =>
             viewportRef.current?.costByLod(levels.lod) ??
@@ -541,12 +541,6 @@ function ModelPreview(): React.JSX.Element {
         [levels.lod, alt, stats],
     );
 
-    /**
-     * Read inside the message handler, which is not re-created when `destroyed` changes.
-     *
-     * Geometry and effects arrive asynchronously, so a part or system landing after a hardpoint was
-     * destroyed has to see the current state rather than the one captured when the handler was made.
-     */
     /**
      * Wreckage waiting on its model to arrive.
      *
@@ -564,6 +558,10 @@ function ModelPreview(): React.JSX.Element {
     /**
      * The hardpoints destroyed now, for the effect callbacks and the message handler, which run outside
      * a render.
+     *
+     * Geometry and effects arrive asynchronously, so a part or system landing after a hardpoint
+     * was destroyed has to see the current state rather than the one captured when the handler
+     * was made.
      *
      * Made here rather than in the combat lens that owns `destroyed` and writes it, because those
      * callbacks are made before the lens and the lens is handed them.
@@ -840,13 +838,6 @@ function ModelPreview(): React.JSX.Element {
     }, []);
 
     /**
-     * Points at a bone from somewhere that is not the tree.
-     *
-     * Sets exactly what a tree click sets - the row selection that draws the box, and the bone the
-     * labels highlight - so a muzzle picked off a weapon row and the same bone picked in the tree
-     * are one state rather than two that can disagree.
-     */
-    /**
      * Asks the host for everything the geometry now loaded needs in order to be DRAWN.
      *
      * Textures are asked for only once the geometry that samples them exists, so nothing is fetched
@@ -910,6 +901,13 @@ function ModelPreview(): React.JSX.Element {
         });
     }, []);
 
+    /**
+     * Points at a bone from somewhere that is not the tree.
+     *
+     * Sets exactly what a tree click sets - the row selection that draws the box, and the bone the
+     * labels highlight - so a muzzle picked off a weapon row and the same bone picked in the tree
+     * are one state rather than two that can disagree.
+     */
     const selectBoneRow = useCallback((rowId: string | undefined): void => {
         if (rowId === undefined) {
             return;

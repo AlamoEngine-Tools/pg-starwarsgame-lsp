@@ -23,7 +23,6 @@ import { PREVIEW_WEAPON_SOURCE } from "../../protocol/modelPreview";
 import type { TreeItem } from "./previewTree";
 import { axisRange, turretEnvelopes } from "./turretHandles";
 
-/** One cone the viewport draws, tagged with the weapon it belongs to. */
 /**
  * Which frame an arc is measured in, because the two firing paths genuinely disagree.
  *
@@ -50,6 +49,7 @@ export type WeaponArcFrame = "bone" | "hull";
  */
 export type WeaponArcKind = "fire" | "rotation";
 
+/** One cone the viewport draws, tagged with the weapon it belongs to. */
 export interface WeaponArc {
     /** The `PreviewWeapon.id` this came from, so a weapon can be switched without a rebuild. */
     weaponId: string;

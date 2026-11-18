@@ -8089,12 +8089,6 @@ function App(): React.JSX.Element {
 }
 
 /**
- * Pointer-capture drag resizing for one panel edge. `axis` maps pointer movement to growth:
- * 'e' = dragging right grows (a left panel's right edge), 'w' = dragging left grows (a right dock's
- * left edge), 'n' = dragging up grows (a bottom bar's top edge). Plain pointer capture on the handle
- * - no window listeners to leak.
- */
-/**
  * The campaign's validation problems. A row whose diagnostic lives on a graph node is clickable
  * as a whole (jumps to the node); the ↗ button opens the XML at the diagnostic's line either way.
  *
@@ -8570,14 +8564,6 @@ function TacticalCreateBar(props: {
 }
 
 /**
- * Drag source for node creation. Order matters: "New event" sits on top (set off by a divider),
- * then the Structure (AND/OR) group, then the long, collapsible Event-types and Rewards lists —
- * so the common actions aren't buried under 100+ type entries. Dropping New event / an Event type
- * on the canvas creates the node directly; dropping a Reward attaches it to the event node under
- * the cursor (see `onCanvasDrop`). Rewards default collapsed - you usually attach them onto a node
- * rather than pick one to create.
- */
-/**
  * A CX-inspired colour family for a palette step, keyed heuristically off the type name (we have no
  * per-type art). The point is at-a-glance grouping - flags amber, event-control blue, combat red,
  * media purple, timing yellow - not an exact taxonomy.
@@ -8616,6 +8602,14 @@ function fadedBg(color: string): string {
     return `color-mix(in srgb, ${color} 20%, var(--colour-panel))`;
 }
 
+/**
+ * Drag source for node creation. Order matters: "New event" sits on top (set off by a divider),
+ * then the Structure (AND/OR) group, then the long, collapsible Event-types and Rewards lists -
+ * so the common actions aren't buried under 100+ type entries. Dropping New event / an Event type
+ * on the canvas creates the node directly; dropping a Reward attaches it to the event node under
+ * the cursor (see `onCanvasDrop`). Rewards default collapsed - you usually attach them onto a node
+ * rather than pick one to create.
+ */
 function NodePalette(props: {
     eventTypes: string[];
     rewardTypes: string[];

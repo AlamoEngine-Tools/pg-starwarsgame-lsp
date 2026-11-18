@@ -74,7 +74,6 @@ export interface Particle {
     childDebt: number;
     /** Randomised multiplier applied on top of the scale track. */
     scaleJitter: number;
-    /** Fixed at birth, for emitters whose colour varies per particle. */
     /**
      * The per-particle colour ADDITION, fixed at birth. `randomColors`, and it brightens.
      *
@@ -468,11 +467,6 @@ function saturate(value: number): number {
 }
 
 /**
- * Advances one particle.
- *
- * Returns false when it has died, so the caller can retire it.
- */
-/**
  * The acceleration an emitter applies, in the space the simulation runs in.
  *
  * The file's vector is in ALAMO axes, where Z is up; the simulation runs in the model's glTF space,
@@ -490,6 +484,11 @@ export function accelerationIn(properties: AlamoEmitter["properties"]): Vec3 {
     };
 }
 
+/**
+ * Advances one particle.
+ *
+ * Returns false when it has died, so the caller can retire it.
+ */
 export function stepParticle(
     particle: Particle,
     emitter: AlamoEmitter,

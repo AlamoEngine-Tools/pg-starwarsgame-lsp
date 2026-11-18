@@ -347,7 +347,16 @@ interface ProjectClient {
     phase?: LoadingPhase;
     /** The line the bar shows in place of the phase for a moment, when a phase drew one. */
     gag?: string;
-    /** This server's watchers over directories outside the workspace folders. */
+    /**
+     * This server's watchers over directories outside the workspace folders.
+     *
+     * A bare glob only ever watches the folders the window is open on, so a project reached
+     * through `projectReferences` was invisible: editing a dependency's XML, scripts, localisation
+     * or its own `.pgproj` produced no `didChangeWatchedFiles` at all, and nothing re-indexed
+     * until the server was restarted. These carry an absolute `RelativePattern` instead, and
+     * their events are forwarded by hand because `synchronize.fileEvents` is fixed when the
+     * client is constructed, long before the server has resolved which projects exist.
+     */
     dependencyWatchers: vscode.Disposable[];
     /** Disposed with the client: a project's own trace channel, when it has one. */
     owned: vscode.Disposable[];
@@ -420,6 +429,12 @@ function routedProject(): ProjectClient | undefined {
 }
 
 /**
+ * Fired whenever the set of running servers changes. Every routed gateway is built on it, so none
+ * can be left waiting for a route that is already back (#318).
+ */
+const routeChanges = new RouteChanges();
+
+/**
  * Every request to the server goes through here.
  *
  * Resolves the client per call rather than holding it: clients are replaced on every restart and
@@ -427,12 +442,6 @@ function routedProject(): ProjectClient | undefined {
  * process. Built once at module scope because the panels and navigators are handed it at
  * construction and outlive any single client.
  */
-/**
- * Fired whenever the set of running servers changes. Every routed gateway is built on it, so none
- * can be left waiting for a route that is already back (#318).
- */
-const routeChanges = new RouteChanges();
-
 const lsp = new RoutedLspGateway(
     () => routedProject()?.gateway,
     vscodeMessageSink,
@@ -614,16 +623,6 @@ const WATCHED_GLOBS = [
     "**/*.lc",
 ];
 
-/**
- * Watchers over project directories that lie OUTSIDE the open workspace folders.
- *
- * A bare glob only ever watches the folders the window is open on, so a project reached through
- * `projectReferences` was invisible: editing a dependency's XML, scripts, localisation or its own
- * `.pgproj` produced no `didChangeWatchedFiles` at all, and nothing re-indexed until the server was
- * restarted. These carry an absolute `RelativePattern` instead, and their events are forwarded by
- * hand because `synchronize.fileEvents` is fixed when the client is constructed, long before the
- * server has resolved which projects exist.
- */
 /**
  * One OS watcher per directory and glob, shared by every server that asked for it: two projects
  * referencing one dependency both need its changes.
