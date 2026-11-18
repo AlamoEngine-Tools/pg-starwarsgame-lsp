@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { type BoundingSphere } from "./framing";
-import { type CameraViewport, CameraRig } from "./cameraRig";
+import { CameraRig } from "./cameraRig";
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
 import { type ViewportContext } from "./viewportContext";
 
@@ -46,11 +46,8 @@ function rigWith(): {
         particles: { particleSystems: new Map(), effectReach: () => 0 },
         renderer: null,
     } as unknown as ViewportContext;
-    const host = {
-        updateBillboards: () => undefined,
-    } as unknown as CameraViewport;
     return {
-        cameraRig: new CameraRig(context, host),
+        cameraRig: new CameraRig(context),
         camera,
         target,
         modelRoot,
@@ -136,5 +133,18 @@ describe("CameraRig", () => {
 
         cameraRig.forgetSpan();
         assert.ok(cameraRig.modelSpan() > first);
+    });
+
+    it("stops turning the billboards of a subtree being disposed, and keeps the rest", () => {
+        const { cameraRig } = rigWith();
+        const kept = new THREE.Object3D();
+        const gone = new THREE.Object3D();
+        cameraRig.billboards.push(kept, gone);
+
+        cameraRig.dropBillboards(new Set([gone]));
+        assert.deepEqual(cameraRig.billboards, [kept]);
+
+        cameraRig.forgetBillboards();
+        assert.deepEqual(cameraRig.billboards, []);
     });
 });

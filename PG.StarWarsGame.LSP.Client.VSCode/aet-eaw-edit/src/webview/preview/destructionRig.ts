@@ -44,7 +44,6 @@ interface BreakoffInstance {
 /** What DestructionRig reads from the viewport it belongs to. */
 /** What DestructionRig still asks of the viewport itself: what only the viewport has. */
 export interface DestructionViewport {
-    dropRegistrations(subjectId: string, root: THREE.Object3D): void;
     readonly modelScale: number;
     readonly onBreakoffExpired:
         ((key: string, prop: PreviewBreakoffProp) => void) | null;
@@ -254,7 +253,7 @@ export class DestructionRig {
                     debris.partId;
 
                 for (const child of [...debris.root.children]) {
-                    this.host.dropRegistrations(subjectId, child);
+                    this.context.assembly.dropRegistrations(subjectId, child);
                     child.removeFromParent();
                     disposeTree(child);
                 }

@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
-import { type AssemblyViewport, PartAssembly } from "./partAssembly";
+import { PartAssembly } from "./partAssembly";
 import { type ViewportContext } from "./viewportContext";
 
 /**
@@ -22,6 +22,7 @@ function assemblyWith(): {
     wreck: LoadedPart;
     held: string[];
     dropped: string[];
+    billboards: THREE.Object3D[];
 } {
     const modelRoot = new THREE.Group();
     const turret = new THREE.Bone();
@@ -47,6 +48,7 @@ function assemblyWith(): {
     };
     const held: string[] = [];
     const dropped: string[] = [];
+    const billboards: THREE.Object3D[] = [];
     const context = {
         levels: { alt: 0, lod: 0 },
         modelRoot,
@@ -55,24 +57,40 @@ function assemblyWith(): {
             ["hull", hull],
             ["wreck:1", wreck],
         ]),
-        animation: { subjects: new Map() },
+        animation: {
+            subjects: new Map(),
+            subjectAnimation: (subjectId: string) => {
+                dropped.push(subjectId);
+                return {
+                    restPose: new Map(),
+                    fileHidden: new Set(),
+                    nodeByName: new Map(),
+                };
+            },
+        },
+        environment: { shadowVolumes: { remove: () => undefined } },
+        cameraRig: {
+            billboards,
+            dropBillboards: (nodes: ReadonlySet<THREE.Object3D>) => {
+                const kept = billboards.filter((node) => !nodes.has(node));
+                billboards.length = 0;
+                billboards.push(...kept);
+            },
+        },
         particles: {
             holdEffectsOf: (id: string) => held.push(id),
             particleSystems: new Map(),
             removeParticleSystem: () => undefined,
         },
     } as unknown as ViewportContext;
-    const host = {
-        billboards: [],
-        dropRegistrations: (subjectId: string) => dropped.push(subjectId),
-    } as unknown as AssemblyViewport;
     return {
-        assembly: new PartAssembly(context, host),
+        assembly: new PartAssembly(context),
         modelRoot,
         hull,
         wreck,
         held,
         dropped,
+        billboards,
     };
 }
 
@@ -133,5 +151,26 @@ describe("PartAssembly", () => {
         assert.equal(assembly.hasPart("wreck:1"), false);
         assert.equal(modelRoot.children.includes(wreck.root), false);
         assert.ok(dropped.includes("wreck:1"));
+    });
+
+    it("stops turning a removed part's billboards", () => {
+        const { assembly, wreck, billboards } = assemblyWith();
+        const card = new THREE.Object3D();
+        wreck.root.add(card);
+        billboards.push(card);
+
+        assembly.removePart("wreck:1");
+
+        assert.deepEqual(billboards, []);
+    });
+
+    it("finds a fire bone on the hull before the attached model, and on the model when the hull has none", () => {
+        const { assembly, hull, wreck } = assemblyWith();
+        const turret = hull.bones.get("turret")!;
+
+        assert.equal(assembly.fireBoneAttachment("wreck:1", "Turret"), turret);
+        assert.ok(
+            under(assembly.fireBoneAttachment("wreck:1", "Muzzle"), wreck.root),
+        );
     });
 });

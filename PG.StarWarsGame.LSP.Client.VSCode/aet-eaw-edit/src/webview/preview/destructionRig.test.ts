@@ -98,13 +98,13 @@ function rigWith(): {
                 return last;
             },
             removePart: (partId: string) => removed.push(partId),
+            dropRegistrations: () => undefined,
         },
         parts,
     } as unknown as ViewportContext;
     const host = {
         modelScale: 1,
         onBreakoffExpired: (key: string) => expired.push(key),
-        dropRegistrations: () => undefined,
     } as unknown as DestructionViewport;
     return {
         destruction: new DestructionRig(context, host),

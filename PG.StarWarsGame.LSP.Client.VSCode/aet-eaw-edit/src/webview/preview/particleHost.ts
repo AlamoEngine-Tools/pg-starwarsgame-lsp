@@ -28,11 +28,6 @@ function splitEmitterKey(key: string): [string, number] {
     return [key.slice(0, at), Number(key.slice(at + 1))];
 }
 
-/** What ParticleHost still asks of the viewport itself: what only the viewport has. */
-export interface ParticleViewport {
-    refreshParticleVisibility(entry: ParticleEntry): void;
-}
-
 export class ParticleHost {
     /** The wind as a vector in the space the particles are simulated in. */
     windVector: { x: number; y: number; z: number } = {
@@ -82,10 +77,7 @@ export class ParticleHost {
      */
     private particleSpeed = 1;
 
-    constructor(
-        private readonly context: ViewportContext,
-        private readonly host: ParticleViewport,
-    ) {}
+    constructor(private readonly context: ViewportContext) {}
 
     /**
      * Runs every system one frame on, and finishes the ones fading out - nothing while effects are
@@ -282,7 +274,7 @@ export class ParticleHost {
         if (entry.instance.hasWeather) {
             entry.instance.setEnergy(this.weatherIntensity);
         }
-        this.host.refreshParticleVisibility(entry);
+        this.refreshParticleVisibility();
 
         // The depth range again, because the effects reach further than the model and they arrive
         // AFTER the camera was fitted to it. Without this, Boba Fett's flamethrower - 206 units of
@@ -381,9 +373,10 @@ export class ParticleHost {
         this.particlesVisible = visible;
 
         // A system switched off individually, or by its level, stays off when the global toggle
-        // comes back on.
-        for (const entry of this.particleSystems.values()) {
-            this.host.refreshParticleVisibility(entry);
+        // comes back on. One refresh answers for every system: it re-runs the whole row chain, which
+        // the old per-system loop did once per system to the same end.
+        if (this.particleSystems.size > 0) {
+            this.refreshParticleVisibility();
         }
     }
 
@@ -461,7 +454,7 @@ export class ParticleHost {
                 entry.attachBoneIndex,
                 entry.scaleFactor,
             );
-            this.host.refreshParticleVisibility(entry);
+            this.refreshParticleVisibility();
         }
     }
 
@@ -700,5 +693,12 @@ export class ParticleHost {
         for (const entry of this.particleSystems.values()) {
             entry.instance.setMissingTexture(name, marker);
         }
+    }
+
+    private refreshParticleVisibility(): void {
+        // Deliberately does not decide anything itself. A system's row is in the chain like every
+        // other row - the effects master vetoes it, its level gates it, the reader overrides it -
+        // and a second opinion here would silently undo the first.
+        this.context.rows.refreshRows();
     }
 }

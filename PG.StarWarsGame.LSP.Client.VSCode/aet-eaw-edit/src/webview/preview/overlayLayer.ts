@@ -77,6 +77,9 @@ export interface OverlayHost {
     readonly onReticleClicked: ((hardpointId: string) => void) | null;
 }
 
+/** How close to a joint a click must land, in pixels, to count as selecting it. */
+const JOINT_PICK_RADIUS = 10;
+
 export class OverlayLayer {
     /** Joints and the lines between them, rebuilt each frame because animation moves bones. */
     readonly joints: THREE.Points;
@@ -879,5 +882,49 @@ export class OverlayLayer {
         for (const element of this.labelPool) {
             element.style.display = "none";
         }
+    }
+
+    /**
+     * The hull's joint under the pointer, measured on screen, or null when none is near enough.
+     *
+     * Screen distance rather than a ray, as the turret knobs are picked: a joint is a dot the reader
+     * aims a cursor at.
+     */
+    jointAt(event: PointerEvent): number | null {
+        const hull = this.context.assembly.hull();
+        if (hull === null) {
+            return null;
+        }
+
+        const rect = this.context.canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        let best: { index: number; distance: number } | null = null;
+        const world = new THREE.Vector3();
+
+        for (const [index, node] of hull.bonesByIndex) {
+            node.getWorldPosition(world);
+            const ndc = world.project(this.context.camera);
+            if (ndc.z > 1) {
+                continue;
+            }
+
+            const distance = Math.hypot(
+                (ndc.x * 0.5 + 0.5) * rect.width - x,
+                (-ndc.y * 0.5 + 0.5) * rect.height - y,
+            );
+
+            if (best === null || distance < best.distance) {
+                best = { index, distance };
+            }
+        }
+
+        // Only a deliberate click on a joint counts. Without a threshold, every drag of the camera
+        // would also reselect whichever bone happened to be nearest the cursor.
+
+        return best !== null && best.distance <= JOINT_PICK_RADIUS
+            ? best.index
+            : null;
     }
 }

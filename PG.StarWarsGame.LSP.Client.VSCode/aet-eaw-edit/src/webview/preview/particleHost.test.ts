@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { emitter, testSystem } from "./particleFixture";
-import { type ParticleViewport, ParticleHost } from "./particleHost";
+import { ParticleHost } from "./particleHost";
 import { type ViewportContext } from "./viewportContext";
 
 /**
@@ -38,10 +38,7 @@ function hostWith(): { particles: ParticleHost; modelRoot: THREE.Group } {
         },
         rows: { refreshRows: () => undefined },
     } as unknown as ViewportContext;
-    const host = {
-        refreshParticleVisibility: () => undefined,
-    } as unknown as ParticleViewport;
-    return { particles: new ParticleHost(context, host), modelRoot };
+    return { particles: new ParticleHost(context), modelRoot };
 }
 
 const systemsUnder = (root: THREE.Object3D): number =>

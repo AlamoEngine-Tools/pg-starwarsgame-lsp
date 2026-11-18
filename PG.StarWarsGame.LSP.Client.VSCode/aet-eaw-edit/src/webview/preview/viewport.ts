@@ -23,17 +23,12 @@ import type { FxMaterialState } from "./fx/renderState";
 import { type DefinedLevels, type LevelCost } from "./levels";
 import type { TranslatedEffect } from "./fx/effect";
 import { type MaterialExtras } from "./materials";
-import { lightDirection, type Vector3 as Vector3Like } from "./lighting";
+import { type Vector3 as Vector3Like } from "./lighting";
 import { type TreeItem } from "./previewTree";
 import { type ReticleMark } from "./reticles";
 import { type BreakoffAnchor } from "./breakoff";
 import { type TurretAim, type TurretHandle } from "./turretHandles";
 import { type Inspection } from "./inspector";
-import {
-    billboardLocalRotation,
-    billboardRotation,
-    billboardTypeOf,
-} from "./billboards";
 import { type AbilityOwnership } from "./abilityRows";
 import { type OverrideChange, type RowOverride } from "./visibility";
 import {
@@ -41,19 +36,13 @@ import {
     type LightRig,
 } from "../../shared/viewerSettings";
 import { type EmitterProbe } from "./particleRenderer";
-import {
-    alamoNodeName,
-    type BoneAttachment,
-    type FlatBone,
-    type LabelMode,
-} from "./skeleton";
+import { type BoneAttachment, type FlatBone, type LabelMode } from "./skeleton";
 import { OverlayLayer } from "./overlayLayer";
 import {
     ACTIVE_SUBJECT,
     BREAKOFF_ATTACHMENT,
     type LoadedPart,
 } from "./loadedPart";
-import { type ParticleEntry } from "./particleEntry";
 
 export { ACTIVE_SUBJECT, BREAKOFF_ATTACHMENT };
 import { VIEWPORT_BACKGROUND } from "./backdrop";
@@ -84,13 +73,6 @@ export type {
     PresetView,
     ViewportStats,
 } from "./viewportTypes";
-
-/** How close to a joint a click must land, in pixels, to count as selecting it. */
-const JOINT_PICK_RADIUS = 10;
-
-const BILLBOARD_AT = new THREE.Vector3();
-const BILLBOARD_LIGHT = new THREE.Vector3();
-const BILLBOARD_BONE = new THREE.Quaternion();
 
 export class PreviewViewport {
     /** Raised when a targeting mark is clicked, so the dock can follow the viewport. */
@@ -168,8 +150,6 @@ export class PreviewViewport {
     private readonly capturer: CaptureRig;
     private frameHandle = 0;
     private disposed = false;
-    /** Bone nodes whose geometry turns to face the camera, the light or the wind. */
-    private billboards: THREE.Object3D[] = [];
     /** The framing: how far the camera sits, what it is fitted to, the model's own cameras and the clip planes. See `CameraRig`. */
     private readonly cameraRig: CameraRig;
     /** The detail and damage level, and the gates on what is drawn at it. See `LevelGates`. */
@@ -280,13 +260,7 @@ export class PreviewViewport {
         };
         this.levels = new LevelGates(context);
         this.queries = new ModelQueries(context);
-        this.assembly = new PartAssembly(context, {
-            get billboards() {
-                return viewport.billboards;
-            },
-            dropRegistrations: (subjectId, root) =>
-                viewport.dropRegistrations(subjectId, root),
-        });
+        this.assembly = new PartAssembly(context);
         this.destruction = new DestructionRig(context, {
             get modelScale() {
                 return viewport.modelScale;
@@ -294,17 +268,13 @@ export class PreviewViewport {
             get onBreakoffExpired() {
                 return viewport.onBreakoffExpired;
             },
-            dropRegistrations: (subjectId, root) =>
-                viewport.dropRegistrations(subjectId, root),
         });
         this.animation = new AnimationRig(context);
         this.capturer = new CaptureRig(context, {
             resize: () => viewport.resize(),
         });
         // Before the environment, which places its key light against the framing sphere as it is built.
-        this.cameraRig = new CameraRig(context, {
-            updateBillboards: () => viewport.updateBillboards(),
-        });
+        this.cameraRig = new CameraRig(context);
         this.environment = new EnvironmentRig(context, {
             get elapsed() {
                 return viewport.elapsed;
@@ -323,14 +293,9 @@ export class PreviewViewport {
             get onTurretAimed() {
                 return viewport.onTurretAimed;
             },
-            fireBoneAttachment: (partId, bone) =>
-                viewport.fireBoneAttachment(partId, bone),
         });
         this.materials = new MaterialBinder(context);
-        this.particles = new ParticleHost(context, {
-            refreshParticleVisibility: (entry) =>
-                viewport.refreshParticleVisibility(entry),
-        });
+        this.particles = new ParticleHost(context);
 
         // CAPTURE phase, so a grabbed turret knob is claimed before `OrbitControls` - registered on
         // this canvas above - can start an orbit. See `TurretRig.grabKnob`.
@@ -526,8 +491,9 @@ export class PreviewViewport {
         // and those sources are inside the trees about to go - so letting them be disposed first
         // leaves the map keyed by objects nobody else can reach.
         //
-        // Nothing else takes them: `removePart` unregisters through `dropRegistrations`, but this
-        // sweep does not go through `removePart`, so every subject switch left its volumes behind.
+        // Nothing else takes them: `removePart` unregisters through
+        // `PartAssembly.dropRegistrations`, but this sweep does not go through `removePart`, so every
+        // subject switch left its volumes behind.
         // Measured: the palace alone registers 4 sources and 8 counting meshes; opened after the
         // Executor it reported 8 and 16, half of them belonging to a model no longer in the scene.
         // The stencil pass then counts geometry that is not there, which is why a handful of models
@@ -556,7 +522,7 @@ export class PreviewViewport {
         // over the next model's geometry at whatever the last one's bounds happened to be.
         this.overlay.dropReticles();
         this.parts.clear();
-        this.billboards = [];
+        this.cameraRig.forgetBillboards();
         this.assembly.hiddenParts.clear();
         this.particles.transient.clear();
         this.levels.forgetModel();
@@ -1192,73 +1158,6 @@ export class PreviewViewport {
         this.renderer.dispose();
     }
 
-    /**
-     * The node a fire bone names, looking on the HULL before the attached model.
-     *
-     * A hardpoint model is cut from the hull and keeps its whole skeleton, so a bone like
-     * `FP_F-L_00` exists on BOTH - and the copy inside the attached model still sits at its
-     * HULL-space position. Resolving it there placed it twice over, because the attached model is
-     * itself attached at the hardpoint's bone. Measured on `Calamari_Cruiser`: the hull's
-     * `FP_F-L_00` is at (28, 3, 275), a few units ahead of its hardpoint at (30, 2, 249) - and the
-     * attached model's copy is at (59, 6, 523), almost exactly double. Every one of its six weapons
-     * had its cone out in open space instead of at the muzzle.
-     *
-     * The fallback still matters: a hardpoint that carries a muzzle bone the hull does not have is
-     * resolved on the hardpoint, which is the only place it exists.
-     */
-    private fireBoneAttachment(partId: string, bone: string): THREE.Object3D {
-        return (
-            this.parts.get("hull")?.bones.get(bone.toLowerCase()) ??
-            this.assembly.attachmentFor(partId, bone)
-        );
-    }
-
-    /**
-     * Gives up everything the scene registered for a subtree that is about to be disposed.
-     *
-     * The counterpart of what {@link addPart} records, and it did not exist while only the hull
-     * and its hardpoints came through there - a scene part lives as long as the subject does. Now that
-     * a death clone and a piece of wreckage take the same route, geometry comes and goes inside a
-     * standing scene, and every one of those registrations outlived it: the stencil pass went on
-     * counting a repaired ship's death clone, and its `bySource` map held the whole disposed
-     * subtree alive through the mesh it was keyed by.
-     *
-     * The nodes are collected before anything is dropped, because `ShadowVolumePass.remove`
-     * unparents the counting meshes it owns - mutating the children of a node being traversed.
-     */
-    private dropRegistrations(subjectId: string, root: THREE.Object3D): void {
-        const subject = this.animation.subjectAnimation(subjectId);
-        const inside: THREE.Object3D[] = [];
-        root.traverse((node) => inside.push(node));
-
-        for (const node of inside) {
-            if (node instanceof THREE.Mesh) {
-                this.environment.shadowVolumes.remove(node);
-            }
-
-            subject.restPose.delete(node);
-            subject.fileHidden.delete(node);
-
-            // Only where THIS node is the one holding the name. `nodeByName` is first-wins, so one
-            // part of a subject must not take another part's entry with it.
-            const name = alamoNodeName(node);
-            if (name !== "" && subject.nodeByName.get(name) === node) {
-                subject.nodeByName.delete(name);
-            }
-        }
-
-        const held = new Set(inside);
-        this.billboards = this.billboards.filter((node) => !held.has(node));
-    }
-
-    private refreshParticleVisibility(entry: ParticleEntry): void {
-        // Deliberately does not decide anything itself. A system's row is in the chain like every
-        // other row - the effects master vetoes it, its level gates it, the reader overrides it -
-        // and a second opinion here would silently undo the first.
-        void entry;
-        this.rows.refreshRows();
-    }
-
     private onPointerDown = (event: PointerEvent): void => {
         if (this.turret.grabKnob(event)) {
             return;
@@ -1268,39 +1167,9 @@ export class PreviewViewport {
             return;
         }
 
-        const hull = this.assembly.hull();
-        if (hull === null) {
-            return;
-        }
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
-        let best: { index: number; distance: number } | null = null;
-        const world = new THREE.Vector3();
-
-        for (const [index, node] of hull.bonesByIndex) {
-            node.getWorldPosition(world);
-            const ndc = world.project(this.camera);
-            if (ndc.z > 1) {
-                continue;
-            }
-
-            const distance = Math.hypot(
-                (ndc.x * 0.5 + 0.5) * rect.width - x,
-                (-ndc.y * 0.5 + 0.5) * rect.height - y,
-            );
-
-            if (best === null || distance < best.distance) {
-                best = { index, distance };
-            }
-        }
-
-        // Only a deliberate click on a joint counts. Without a threshold, every drag of the camera
-        // would also reselect whichever bone happened to be nearest the cursor.
-        if (best !== null && best.distance <= JOINT_PICK_RADIUS) {
-            this.onBoneSelected(best.index);
+        const index = this.overlay.jointAt(event);
+        if (index !== null) {
+            this.onBoneSelected(index);
         }
     };
 
@@ -1340,58 +1209,4 @@ export class PreviewViewport {
 
         this.environment.renderFrame();
     };
-
-    /**
-     * Turns each billboarded bone's geometry to face whatever it is meant to face.
-     *
-     * On the MESH rather than on the bone, which is what the engine does: `DoBillboard` composes the
-     * rotation onto the sub-mesh's world matrix as it draws, so the bone still supplies the position
-     * and its child bones are left exactly where the file put them. Rotating the bone itself would
-     * swing a whole limb round with the card.
-     */
-    private updateBillboards(): void {
-        if (this.billboards.length === 0) {
-            return;
-        }
-
-        // The direction the light TRAVELS, which is the reverse of where it stands.
-        const light = BILLBOARD_LIGHT.copy(
-            lightDirection(
-                this.environment.lightAzimuth,
-                this.environment.lightElevation,
-            ),
-        ).negate();
-
-        for (const node of this.billboards) {
-            const type = billboardTypeOf(node);
-            if (type === null) {
-                continue;
-            }
-
-            node.updateWorldMatrix(true, false);
-            node.getWorldPosition(BILLBOARD_AT);
-            node.getWorldQuaternion(BILLBOARD_BONE);
-
-            const world = billboardRotation(
-                type,
-                this.camera,
-                light,
-                BILLBOARD_AT,
-            );
-
-            for (const child of node.children) {
-                if (child instanceof THREE.Mesh) {
-                    // The billboard turns what the node ALREADY had, the way
-                    // `ObjectTemplate::DoBillboard` does - it must not replace the world rotation,
-                    // because that throws away the exporter's Z-up-to-Y-up root correction and lays
-                    // every tree's shadow card flat. See `billboardLocalRotation`.
-                    billboardLocalRotation(
-                        BILLBOARD_BONE,
-                        world,
-                        child.quaternion,
-                    );
-                }
-            }
-        }
-    }
 }

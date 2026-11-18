@@ -5,7 +5,7 @@
 // distance, the clip planes that follow it, a pose or a model camera applied, and the per-frame step that
 // readies the scene for the camera. It reads the camera, the controls and the drawn meshes; nothing else.
 
-import { type Vector3 as Vector3Like } from "./lighting";
+import { lightDirection, type Vector3 as Vector3Like } from "./lighting";
 import * as THREE from "three";
 import {
     frameSphere,
@@ -21,6 +21,11 @@ import { drawnBounds, isOverlay } from "./modelBounds";
 import { type MaterialExtras, resolveMaterial } from "./materials";
 import { type PresetView } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
+import {
+    billboardLocalRotation,
+    billboardRotation,
+    billboardTypeOf,
+} from "./billboards";
 
 const PRESETS: Record<PresetView, { azimuth: number; elevation: number }> = {
     front: { azimuth: 0, elevation: 0 },
@@ -40,10 +45,9 @@ function isShadowVolume(mesh: THREE.Mesh): boolean {
 }
 
 /** What CameraRig reads from the viewport it belongs to. */
-/** What CameraRig still asks of the viewport itself: what only the viewport has. */
-export interface CameraViewport {
-    updateBillboards(): void;
-}
+const BILLBOARD_AT = new THREE.Vector3();
+const BILLBOARD_LIGHT = new THREE.Vector3();
+const BILLBOARD_BONE = new THREE.Quaternion();
 
 export class CameraRig {
     /** How far the camera stands off, kept so the depth range can be redone without reframing. */
@@ -52,11 +56,22 @@ export class CameraRig {
     private drawDistance = 1;
     /** See {@link modelSpan}. Cleared with the scene. */
     private cachedSpan: number | null = null;
+    /** Bone nodes whose geometry turns to face the camera, the light or the wind. */
+    readonly billboards: THREE.Object3D[] = [];
 
-    constructor(
-        private readonly context: ViewportContext,
-        private readonly host: CameraViewport,
-    ) {}
+    constructor(private readonly context: ViewportContext) {}
+
+    /** Stops turning these billboards: their subtree is being disposed. */
+    dropBillboards(nodes: ReadonlySet<THREE.Object3D>): void {
+        const kept = this.billboards.filter((node) => !nodes.has(node));
+        this.billboards.length = 0;
+        this.billboards.push(...kept);
+    }
+
+    /** Forgets every billboard, for a new scene. */
+    forgetBillboards(): void {
+        this.billboards.length = 0;
+    }
 
     /** Drops the remembered span, for when the model it measured has changed. */
     forgetSpan(): void {
@@ -355,7 +370,7 @@ export class CameraRig {
         // The engine's per-frame contract, including the matrices. Last, not first, so it sees the
         // bone transforms the animation and skeleton work above have already settled.
         this.context.materials.updateAlamoUniforms();
-        this.host.updateBillboards();
+        this.updateBillboards();
 
         // The sky dome travels with the camera and keeps its own orientation, so the horizon stays
         // level and infinitely far however the camera is turned.
@@ -410,5 +425,59 @@ export class CameraRig {
         this.context.camera.near = planes.near;
         this.context.camera.far = planes.far;
         this.context.camera.updateProjectionMatrix();
+    }
+
+    /**
+     * Turns each billboarded bone's geometry to face whatever it is meant to face.
+     *
+     * On the MESH rather than on the bone, which is what the engine does: `DoBillboard` composes the
+     * rotation onto the sub-mesh's world matrix as it draws, so the bone still supplies the position
+     * and its child bones are left exactly where the file put them. Rotating the bone itself would
+     * swing a whole limb round with the card.
+     */
+    private updateBillboards(): void {
+        if (this.billboards.length === 0) {
+            return;
+        }
+
+        // The direction the light TRAVELS, which is the reverse of where it stands.
+        const light = BILLBOARD_LIGHT.copy(
+            lightDirection(
+                this.context.environment.lightAzimuth,
+                this.context.environment.lightElevation,
+            ),
+        ).negate();
+
+        for (const node of this.billboards) {
+            const type = billboardTypeOf(node);
+            if (type === null) {
+                continue;
+            }
+
+            node.updateWorldMatrix(true, false);
+            node.getWorldPosition(BILLBOARD_AT);
+            node.getWorldQuaternion(BILLBOARD_BONE);
+
+            const world = billboardRotation(
+                type,
+                this.context.camera,
+                light,
+                BILLBOARD_AT,
+            );
+
+            for (const child of node.children) {
+                if (child instanceof THREE.Mesh) {
+                    // The billboard turns what the node ALREADY had, the way
+                    // `ObjectTemplate::DoBillboard` does - it must not replace the world rotation,
+                    // because that throws away the exporter's Z-up-to-Y-up root correction and lays
+                    // every tree's shadow card flat. See `billboardLocalRotation`.
+                    billboardLocalRotation(
+                        BILLBOARD_BONE,
+                        world,
+                        child.quaternion,
+                    );
+                }
+            }
+        }
     }
 }

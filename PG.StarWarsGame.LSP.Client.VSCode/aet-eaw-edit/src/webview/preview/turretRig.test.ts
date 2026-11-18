@@ -43,11 +43,11 @@ function rigWith(parts: ReadonlyMap<string, LoadedPart>): TurretRig {
         modelRoot: new THREE.Group(),
         parts,
         cameraRig: { modelSpan: () => 10 },
+        assembly: { fireBoneAttachment: () => null },
     } as unknown as ViewportContext;
     const host = {
         modelScale: 1,
         onTurretAimed: null,
-        fireBoneAttachment: () => null,
     } as unknown as TurretHost;
     return new TurretRig(context, host);
 }

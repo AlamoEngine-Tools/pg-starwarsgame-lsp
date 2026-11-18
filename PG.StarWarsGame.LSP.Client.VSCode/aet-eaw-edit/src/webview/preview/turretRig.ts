@@ -300,7 +300,6 @@ const ELEVATION_AXIS = new THREE.Vector3(0, 1, 0);
 
 /** What TurretRig still asks of the viewport itself: what only the viewport has. */
 export interface TurretHost {
-    fireBoneAttachment(partId: string, bone: string): THREE.Object3D;
     readonly modelScale: number;
     readonly onTurretAimed: ((id: string, aim: TurretAim) => void) | null;
 }
@@ -505,7 +504,10 @@ export class TurretRig {
         const modelSize = this.context.cameraRig.modelSpan();
 
         for (const arc of arcs) {
-            const boneNode = this.host.fireBoneAttachment(arc.partId, arc.bone);
+            const boneNode = this.context.assembly.fireBoneAttachment(
+                arc.partId,
+                arc.bone,
+            );
             const drawn = {
                 ...arc,
                 range: drawnConeRange(
@@ -1010,8 +1012,8 @@ export class TurretRig {
     /**
      * The bone an axis turns about, looking on the hull before the attached model.
      *
-     * Same rule as {@link fireBoneAttachment} and for the same measured reason: a hardpoint's model
-     * carries a copy of the hull's skeleton, and resolving a bone there applies the attachment
+     * Same rule as `PartAssembly.fireBoneAttachment` and for the same measured reason: a hardpoint's
+     * model carries a copy of the hull's skeleton, and resolving a bone there applies the attachment
      * offset twice.
      */
     private turretBoneNode(

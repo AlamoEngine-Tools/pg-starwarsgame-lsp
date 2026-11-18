@@ -106,4 +106,53 @@ describe("OverlayLayer", () => {
         layer.setSelectedBones(new Set([3]));
         assert.ok(scene.children.every((overlay) => !overlay.visible));
     });
+
+    it("picks the hull's joint under the pointer, and none when the pointer is away from every joint", () => {
+        // One joint at the origin, a camera ten units back looking at it, a 100 x 100 canvas: the joint
+        // sits in the middle of the canvas.
+        const bone = new THREE.Bone();
+        bone.updateMatrixWorld(true);
+        const hull: LoadedPart = {
+            id: "hull",
+            root: bone,
+            bones: new Map(),
+            bonesByIndex: new Map([[4, bone]]),
+            subjectId: "subject",
+        };
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+        camera.position.set(0, 0, 10);
+        camera.updateMatrixWorld(true);
+        const context = {
+            scene: new THREE.Scene(),
+            camera,
+            canvas: {
+                getBoundingClientRect: () => ({
+                    left: 0,
+                    top: 0,
+                    width: 100,
+                    height: 100,
+                }),
+            },
+            labelLayer: null,
+            parts: new Map(),
+            rows: { rowParents: new Map(), rowTargets: new Map() },
+            assembly: { hull: () => hull },
+            queries: { skeleton: () => [], bonePosition: () => null },
+            cameraRig: {
+                modelSpan: () => 1,
+                boundingSphere: () => ({
+                    center: { x: 0, y: 0, z: 0 },
+                    radius: 1,
+                }),
+            },
+        } as unknown as ViewportContext;
+        const layer = new OverlayLayer(context, {
+            onReticleClicked: null,
+        } as unknown as OverlayHost);
+        const at = (clientX: number, clientY: number) =>
+            ({ clientX, clientY }) as PointerEvent;
+
+        assert.equal(layer.jointAt(at(52, 49)), 4);
+        assert.equal(layer.jointAt(at(5, 5)), null);
+    });
 });

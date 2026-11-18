@@ -71,22 +71,13 @@ export function disposeTree(root: THREE.Object3D): void {
     });
 }
 
-/** What PartAssembly still asks of the viewport itself: what only the viewport has. */
-export interface AssemblyViewport {
-    readonly billboards: THREE.Object3D[];
-    dropRegistrations(subjectId: string, root: THREE.Object3D): void;
-}
-
 export class PartAssembly {
     /** Every named attachment a caller has asked for, so {@link unresolvedAttachments} can check. */
     readonly attachRequests = new Map<string, AttachmentRequest>();
     /** Parts broken off by a destroyed hardpoint. */
     readonly hiddenParts = new Set<string>();
 
-    constructor(
-        private readonly context: ViewportContext,
-        private readonly host: AssemblyViewport,
-    ) {}
+    constructor(private readonly context: ViewportContext) {}
 
     /**
      * Adds a model, attached to a bone of an already-loaded part when asked.
@@ -292,7 +283,7 @@ export class PartAssembly {
         // at all, so a per-frame traversal would be almost entirely wasted.
         root.traverse((node) => {
             if (billboardTypeOf(node) !== null) {
-                this.host.billboards.push(node);
+                this.context.cameraRig.billboards.push(node);
             }
         });
 
@@ -422,7 +413,7 @@ export class PartAssembly {
             }
         }
 
-        this.host.dropRegistrations(part.subjectId, part.root);
+        this.dropRegistrations(part.subjectId, part.root);
         part.root.removeFromParent();
         disposeTree(part.root);
         this.context.parts.delete(partId);
@@ -720,5 +711,64 @@ export class PartAssembly {
                     ),
             );
         });
+    }
+
+    /**
+     * Gives up everything the scene registered for a subtree that is about to be disposed.
+     *
+     * The counterpart of what {@link addPart} records, and it did not exist while only the hull
+     * and its hardpoints came through there - a scene part lives as long as the subject does. Now that
+     * a death clone and a piece of wreckage take the same route, geometry comes and goes inside a
+     * standing scene, and every one of those registrations outlived it: the stencil pass went on
+     * counting a repaired ship's death clone, and its `bySource` map held the whole disposed
+     * subtree alive through the mesh it was keyed by.
+     *
+     * The nodes are collected before anything is dropped, because `ShadowVolumePass.remove`
+     * unparents the counting meshes it owns - mutating the children of a node being traversed.
+     */
+    dropRegistrations(subjectId: string, root: THREE.Object3D): void {
+        const subject = this.context.animation.subjectAnimation(subjectId);
+        const inside: THREE.Object3D[] = [];
+        root.traverse((node) => inside.push(node));
+
+        for (const node of inside) {
+            if (node instanceof THREE.Mesh) {
+                this.context.environment.shadowVolumes.remove(node);
+            }
+
+            subject.restPose.delete(node);
+            subject.fileHidden.delete(node);
+
+            // Only where THIS node is the one holding the name. `nodeByName` is first-wins, so one
+            // part of a subject must not take another part's entry with it.
+            const name = alamoNodeName(node);
+            if (name !== "" && subject.nodeByName.get(name) === node) {
+                subject.nodeByName.delete(name);
+            }
+        }
+
+        const held = new Set(inside);
+        this.context.cameraRig.dropBillboards(held);
+    }
+
+    /**
+     * The node a fire bone names, looking on the HULL before the attached model.
+     *
+     * A hardpoint model is cut from the hull and keeps its whole skeleton, so a bone like
+     * `FP_F-L_00` exists on BOTH - and the copy inside the attached model still sits at its
+     * HULL-space position. Resolving it there placed it twice over, because the attached model is
+     * itself attached at the hardpoint's bone. Measured on `Calamari_Cruiser`: the hull's
+     * `FP_F-L_00` is at (28, 3, 275), a few units ahead of its hardpoint at (30, 2, 249) - and the
+     * attached model's copy is at (59, 6, 523), almost exactly double. Every one of its six weapons
+     * had its cone out in open space instead of at the muzzle.
+     *
+     * The fallback still matters: a hardpoint that carries a muzzle bone the hull does not have is
+     * resolved on the hardpoint, which is the only place it exists.
+     */
+    fireBoneAttachment(partId: string, bone: string): THREE.Object3D {
+        return (
+            this.context.parts.get("hull")?.bones.get(bone.toLowerCase()) ??
+            this.attachmentFor(partId, bone)
+        );
     }
 }
