@@ -8,6 +8,7 @@ import * as THREE from "three";
 
 import { type CaptureHost, CaptureRig } from "./captureRig";
 import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * A rig over a stand-in viewport: a real scene and camera, a renderer that records its size, and the
@@ -55,7 +56,7 @@ function rigWith(throwOnDraw = false): {
     };
     const turret = { arcsShown: true };
     const shots: Record<string, boolean | number | null>[] = [];
-    const context = {
+    const context = standInContext({
         scene,
         camera,
         canvas: {
@@ -107,7 +108,7 @@ function rigWith(throwOnDraw = false): {
             },
         }),
         cameraRig: { prepareForCamera: () => undefined },
-    } as unknown as ViewportContext;
+    });
     const host = {
         resize: () => undefined,
     } as unknown as CaptureHost;

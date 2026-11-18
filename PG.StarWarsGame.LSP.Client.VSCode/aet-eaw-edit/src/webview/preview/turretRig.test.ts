@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { type LoadedPart } from "./loadedPart";
 import { axisRange, TURRET_AT_REST, type TurretHandle } from "./turretHandles";
 import { type TurretHost, TurretRig } from "./turretRig";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /** A part whose one turret bone hangs under a mount, the way a hull carries one. */
 function turretPart(): {
@@ -37,14 +37,14 @@ function turretPart(): {
 
 /** A rig over a stand-in viewport holding the parts given. Nothing here projects or draws an arc. */
 function rigWith(parts: ReadonlyMap<string, LoadedPart>): TurretRig {
-    const context = {
+    const context = standInContext({
         camera: new THREE.PerspectiveCamera(),
         canvas: null,
         modelRoot: new THREE.Group(),
         parts,
         cameraRig: { modelSpan: () => 10 },
         assembly: { fireBoneAttachment: () => null },
-    } as unknown as ViewportContext;
+    });
     const host = {
         modelScale: 1,
         onTurretAimed: null,

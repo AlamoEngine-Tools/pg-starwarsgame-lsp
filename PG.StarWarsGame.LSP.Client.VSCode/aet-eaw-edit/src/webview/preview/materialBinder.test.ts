@@ -8,7 +8,7 @@ import * as THREE from "three";
 
 import { type MaterialExtras } from "./materials";
 import { MaterialBinder } from "./materialBinder";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * A binder over a stand-in viewport: a model root whose meshes are all drawn, no stencil shadows, no
@@ -22,7 +22,7 @@ function binderWith(): { materials: MaterialBinder; modelRoot: THREE.Group } {
                 visit(node);
             }
         });
-    const context = {
+    const context = standInContext({
         camera: new THREE.PerspectiveCamera(),
         modelRoot,
         particles: { particleSystems: new Map() },
@@ -34,7 +34,7 @@ function binderWith(): { materials: MaterialBinder; modelRoot: THREE.Group } {
         },
         levels: { applyMeshVisibility: () => undefined },
         assembly: { forEachDrawnMesh: eachMesh, forEachPartMesh: eachMesh },
-    } as unknown as ViewportContext;
+    });
     return { materials: new MaterialBinder(context), modelRoot };
 }
 

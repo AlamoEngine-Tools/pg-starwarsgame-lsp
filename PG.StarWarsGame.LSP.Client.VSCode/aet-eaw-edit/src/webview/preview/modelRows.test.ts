@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
 import { meshDrawn } from "./meshVisibility";
 import { ModelRows } from "./modelRows";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * Rows over a stand-in viewport: a hull with a root bone and one child bone carrying a mesh of its own
@@ -53,7 +53,7 @@ function rowsWith(): { rows: ModelRows; mesh: THREE.Mesh; extra: THREE.Mesh } {
         ]),
         subjectId: ACTIVE_SUBJECT,
     };
-    const context = {
+    const context = standInContext({
         animation: {
             active: {
                 mixer: null,
@@ -92,7 +92,7 @@ function rowsWith(): { rows: ModelRows; mesh: THREE.Mesh; extra: THREE.Mesh } {
                 { index: 1, name: "Turret", parent: 0, visible: true },
             ],
         },
-    } as unknown as ViewportContext;
+    });
     return { rows: new ModelRows(context), mesh, extra };
 }
 

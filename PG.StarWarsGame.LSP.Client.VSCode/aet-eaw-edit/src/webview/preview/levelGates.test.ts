@@ -8,7 +8,7 @@ import * as THREE from "three";
 
 import { LevelGates } from "./levelGates";
 import { setMeshDrawn } from "./meshVisibility";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * Gates over a stand-in viewport: one shadow-volume mesh, no parts. What the particles, the rows and the
@@ -34,7 +34,7 @@ function gatesWith(): {
     const gated: [number, number, boolean][] = [];
     const counting: boolean[] = [];
     let refreshes = 0;
-    const context = {
+    const context = standInContext({
         modelRoot,
         parts: new Map(),
         particles: {
@@ -57,7 +57,7 @@ function gatesWith(): {
                 refreshes++;
             },
         },
-    } as unknown as ViewportContext;
+    });
     return {
         levels: new LevelGates(context),
         modelRoot,

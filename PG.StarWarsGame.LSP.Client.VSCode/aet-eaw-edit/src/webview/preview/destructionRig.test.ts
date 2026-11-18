@@ -13,7 +13,7 @@ import {
     BREAKOFF_ATTACHMENT,
     type LoadedPart,
 } from "./loadedPart";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 const PROP: PreviewBreakoffProp = {
     id: "Hardpoint_Breakoff_Test",
@@ -62,7 +62,7 @@ function rigWith(): {
     const removed: string[] = [];
     const expired: string[] = [];
     let last = new THREE.Group();
-    const context = {
+    const context = standInContext({
         assembly: {
             attachmentFor: () => bone,
             addPart: async (
@@ -101,7 +101,7 @@ function rigWith(): {
             dropRegistrations: () => undefined,
         },
         parts,
-    } as unknown as ViewportContext;
+    });
     const host = {
         modelScale: 1,
         onBreakoffExpired: (key: string) => expired.push(key),

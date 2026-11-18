@@ -8,7 +8,7 @@ import * as THREE from "three";
 
 import { AnimationRig } from "./animationRig";
 import { ACTIVE_SUBJECT } from "./loadedPart";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * A rig over a stand-in viewport whose active subject has a mixer on a root with one bone, its rest pose
@@ -21,7 +21,7 @@ function rigWith(): {
     cleared: () => number;
 } {
     let clears = 0;
-    const context = {
+    const context = standInContext({
         assembly: { setPartHidden: () => undefined },
         rows: {
             clearRowOverrides: () => {
@@ -30,7 +30,7 @@ function rigWith(): {
         },
         particles: { particleSystems: new Map() },
         levels: { applyLevels: () => undefined },
-    } as unknown as ViewportContext;
+    });
     const animation = new AnimationRig(context);
 
     const root = new THREE.Group();

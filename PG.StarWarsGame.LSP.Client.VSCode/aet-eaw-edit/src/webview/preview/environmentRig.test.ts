@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { VIEWPORT_BACKGROUND } from "./backdrop";
 import { type EnvironmentHost, EnvironmentRig } from "./environmentRig";
 import { shadowCatcherOpacity } from "./materialState";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * A rig over a stand-in viewport: an empty scene, a camera, a unit model at the origin and no particle
@@ -17,7 +17,7 @@ import { type ViewportContext } from "./viewportContext";
  */
 function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
     const scene = new THREE.Scene();
-    const context = {
+    const context = standInContext({
         levels: { alt: 0, lod: 0, stealthed: false },
         camera: new THREE.PerspectiveCamera(45, 1, 0.1, 10000),
         canvas: { clientWidth: 100, clientHeight: 100 },
@@ -33,7 +33,7 @@ function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
         },
         assembly: { forEachDrawnMesh: () => undefined },
         animation: { skinPalette: () => new Float32Array(0) },
-    } as unknown as ViewportContext;
+    });
     const host = {
         elapsed: 0,
     } as unknown as EnvironmentHost;

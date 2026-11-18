@@ -8,7 +8,7 @@ import * as THREE from "three";
 
 import { type OverlayHost, OverlayLayer } from "./overlayLayer";
 import { type LoadedPart } from "./loadedPart";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /** A part holding one 2-unit cube. */
 function cubePart(id: string): LoadedPart {
@@ -32,7 +32,7 @@ function layerWith(parts: ReadonlyMap<string, LoadedPart> = new Map()): {
     scene: THREE.Scene;
 } {
     const scene = new THREE.Scene();
-    const context = {
+    const context = standInContext({
         scene,
         camera: new THREE.PerspectiveCamera(),
         canvas: null,
@@ -45,7 +45,7 @@ function layerWith(parts: ReadonlyMap<string, LoadedPart> = new Map()): {
             modelSpan: () => 1,
             boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
         },
-    } as unknown as ViewportContext;
+    });
     const host = {
         onReticleClicked: null,
     } as unknown as OverlayHost;
@@ -122,7 +122,7 @@ describe("OverlayLayer", () => {
         const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
         camera.position.set(0, 0, 10);
         camera.updateMatrixWorld(true);
-        const context = {
+        const context = standInContext({
             scene: new THREE.Scene(),
             camera,
             canvas: {
@@ -145,7 +145,7 @@ describe("OverlayLayer", () => {
                     radius: 1,
                 }),
             },
-        } as unknown as ViewportContext;
+        });
         const layer = new OverlayLayer(context, {
             onReticleClicked: null,
         } as unknown as OverlayHost);

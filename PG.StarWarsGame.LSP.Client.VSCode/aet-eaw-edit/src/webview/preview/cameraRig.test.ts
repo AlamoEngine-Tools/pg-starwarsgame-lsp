@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { type BoundingSphere } from "./framing";
 import { CameraRig } from "./cameraRig";
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * A rig over a stand-in viewport: a model root, the hull as one part rooted on it, every mesh drawn, no
@@ -33,7 +33,7 @@ function rigWith(): {
         bonesByIndex: new Map(),
         subjectId: ACTIVE_SUBJECT,
     };
-    const context = {
+    const context = standInContext({
         camera,
         controls: { target, update: () => undefined },
         levels: { drawn: () => true },
@@ -45,7 +45,7 @@ function rigWith(): {
         modelRoot,
         particles: { particleSystems: new Map(), effectReach: () => 0 },
         renderer: null,
-    } as unknown as ViewportContext;
+    });
     return {
         cameraRig: new CameraRig(context),
         camera,

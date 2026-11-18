@@ -8,7 +8,7 @@ import * as THREE from "three";
 
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
 import { ModelQueries } from "./modelQueries";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * Queries over a stand-in viewport whose hull has a root bone and a turret bone under it, 5 units up,
@@ -47,7 +47,7 @@ function queriesWith(): { queries: ModelQueries; noted: string[] } {
         subjectId: ACTIVE_SUBJECT,
     };
     const noted: string[] = [];
-    const context = {
+    const context = standInContext({
         modelRoot,
         parts: new Map([["hull", hull]]),
         particles: { particleSystems: new Map() },
@@ -59,7 +59,7 @@ function queriesWith(): { queries: ModelQueries; noted: string[] } {
             noteAttachment: (partId: string, bone?: string) =>
                 noted.push(`${partId}/${bone}`),
         },
-    } as unknown as ViewportContext;
+    });
     return { queries: new ModelQueries(context), noted };
 }
 

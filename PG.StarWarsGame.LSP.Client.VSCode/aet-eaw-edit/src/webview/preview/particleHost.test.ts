@@ -8,7 +8,7 @@ import * as THREE from "three";
 
 import { emitter, testSystem } from "./particleFixture";
 import { ParticleHost } from "./particleHost";
-import { type ViewportContext } from "./viewportContext";
+import { standInContext } from "./viewportContext.testing";
 
 /**
  * A host over a stand-in viewport: a model root to hang systems on, nothing translated, no part to
@@ -16,7 +16,7 @@ import { type ViewportContext } from "./viewportContext";
  */
 function hostWith(): { particles: ParticleHost; modelRoot: THREE.Group } {
     const modelRoot = new THREE.Group();
-    const context = {
+    const context = standInContext({
         levels: { alt: 0, altDescending: false, lod: 0 },
         cameraRig: {
             fitDistance: 1,
@@ -37,7 +37,7 @@ function hostWith(): { particles: ParticleHost; modelRoot: THREE.Group } {
             translatedShaders: false,
         },
         rows: { refreshRows: () => undefined },
-    } as unknown as ViewportContext;
+    });
     return { particles: new ParticleHost(context), modelRoot };
 }
 
