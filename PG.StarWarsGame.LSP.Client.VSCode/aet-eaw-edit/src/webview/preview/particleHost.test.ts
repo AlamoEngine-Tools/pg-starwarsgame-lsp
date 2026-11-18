@@ -119,4 +119,34 @@ describe("ParticleHost", () => {
             image.Image = saved;
         }
     });
+
+    it("shows a system only at the level its proxy is tagged for", () => {
+        const { particles } = hostWith();
+        particles.addParticleSystem("fx", testSystem([emitter()]), {
+            origin: "model",
+            levels: { alt: 1, lod: null, altDecreaseStayHidden: false },
+        });
+        const entry = particles.particleSystems.get("fx")!;
+
+        particles.gateByLevel(0, 0, false);
+        assert.equal(entry.levelVisible, false);
+
+        particles.gateByLevel(1, 0, false);
+        assert.equal(entry.levelVisible, true);
+    });
+
+    it("forgets every system, for a new scene", () => {
+        const { particles, modelRoot } = hostWith();
+        particles.addParticleSystem("a", testSystem([emitter()]), {
+            origin: "model",
+        });
+        particles.addParticleSystem("b", testSystem([emitter()]), {
+            origin: "model",
+        });
+
+        particles.forgetSystems();
+
+        assert.deepEqual(particles.particleSystemIds(), []);
+        void modelRoot;
+    });
 });

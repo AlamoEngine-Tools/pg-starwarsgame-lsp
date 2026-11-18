@@ -21,29 +21,10 @@ import {
     stampTreeKeys,
     outermostRoots,
 } from "./boneNodes";
-import { billboardTypeOf } from "./billboards";
-import { visibilityTracks } from "./boneVisibility";
 import { isOverlay } from "./modelBounds";
 import { setMeshDrawn } from "./meshVisibility";
 import { type AddPartOptions } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
-
-/** Every mesh a model's own materials say is not drawn - collision hulls, shadow volumes. */
-function hiddenMeshes(root: THREE.Object3D): Set<THREE.Object3D> {
-    const hidden = new Set<THREE.Object3D>();
-
-    root.traverse((node) => {
-        if (
-            node instanceof THREE.Mesh &&
-            resolveMaterial((node.userData.alamo ?? {}) as MaterialExtras)
-                .hidden
-        ) {
-            hidden.add(node);
-        }
-    });
-
-    return hidden;
-}
 
 function decodeBase64(value: string): ArrayBuffer {
     const binary = atob(value);
@@ -72,11 +53,28 @@ export function disposeTree(root: THREE.Object3D): void {
 
 export class PartAssembly {
     /** Every named attachment a caller has asked for, so {@link unresolvedAttachments} can check. */
-    readonly attachRequests = new Map<string, AttachmentRequest>();
+    private readonly attachRequests = new Map<string, AttachmentRequest>();
     /** Parts broken off by a destroyed hardpoint. */
     readonly hiddenParts = new Set<string>();
 
     constructor(private readonly context: ViewportContext) {}
+
+    /** Takes every part out of the scene and releases its GPU memory. The map still names them. */
+    disposeParts(): void {
+        for (const part of this.context.parts.values()) {
+            part.root.removeFromParent();
+            disposeTree(part.root);
+        }
+    }
+
+    /** Forgets every part, the hidden ones and the attachments asked for, for a new subject. */
+    forgetParts(): void {
+        this.context.parts.clear();
+        this.hiddenParts.clear();
+        // A new subject asks for its own bones. Keeping the old subject's requests would report a
+        // Star Destroyer's missing hardpoint against a Mon Calamari Cruiser for the rest of the session.
+        this.attachRequests.clear();
+    }
 
     /**
      * Adds a model, attached to a bone of an already-loaded part when asked.
@@ -266,25 +264,13 @@ export class PartAssembly {
         // there, so a part arriving after its shader had was drawn with every triangle facing away
         // and rendered NOTHING. That is what made a death clone invisible with shaders switched on
         // and perfect with them off. `addBreakoff` has always done this; `addPart` never did.
-        for (const [shader, state] of this.context.materials.shaderStates) {
-            this.context.materials.applyStoredShaderState(shader, state);
-        }
-
-        if (this.context.materials.colorization !== null) {
-            this.context.materials.setColorization(
-                this.context.materials.colorization,
-            );
-        }
+        this.context.materials.applyStoredState();
         this.context.environment.collectShadowVolumes(root);
 
         // The handful of bones that turn to face something. Collected once per part rather than
         // searched for each frame: across the shipped models 268 bones out of 22866 declare a mode
         // at all, so a per-frame traversal would be almost entirely wasted.
-        root.traverse((node) => {
-            if (billboardTypeOf(node) !== null) {
-                this.context.cameraRig.billboards.push(node);
-            }
-        });
+        this.context.cameraRig.collectBillboards(root);
 
         // Geometry can arrive after its hardpoint was destroyed; a part loading late must not
         // reappear intact.
@@ -293,48 +279,7 @@ export class PartAssembly {
         // Everything the animation needs goes to THIS PART'S SUBJECT, never to the scene. One path
         // for the hull, an attached turret, a death clone and a piece of wreckage alike - what used
         // to differ between them was only which of these maps they were allowed into.
-        const subject = this.context.animation.subjectAnimation(subjectId);
-
-        // Before any clip can touch it. Recorded for the whole part, not only for the bones this
-        // GLB's own clips drive - a later part of the same subject can reach in here too.
-        root.traverse((node) => {
-            if (!subject.restPose.has(node)) {
-                subject.restPose.set(node, {
-                    position: node.position.clone(),
-                    quaternion: node.quaternion.clone(),
-                    scale: node.scale.clone(),
-                });
-            }
-
-            // First wins. A visibility track names a bone, and a bone name is unique within one
-            // model because the exporter suffixes it with the bone index. Keyed by the name the
-            // exporter wrote, which is the one a track names - three's sanitised copy is not.
-            const name = alamoNodeName(node);
-            if (name !== "" && !subject.nodeByName.has(name)) {
-                subject.nodeByName.set(name, node);
-            }
-        });
-
-        // What its own file says is not drawn - a collision hull, a shadow volume. Held so a clip
-        // can never bring one back: a shadow volume is not geometry that happens to be switched off
-        // this frame.
-        for (const mesh of hiddenMeshes(root)) {
-            subject.fileHidden.add(mesh);
-        }
-
-        if (gltf.animations.length > 0) {
-            // Rooted at the first of this subject's parts to bring clips. A clip binds to nodes BY
-            // NAME from the root it was given, so a mixer rooted anywhere else drives the wrong
-            // model - which is exactly what a clone's `_die` did on the scene-wide mixer.
-            subject.mixer ??= new THREE.AnimationMixer(root);
-            subject.clips = [...subject.clips, ...gltf.animations];
-
-            // Off the raw glTF JSON: three's loader builds AnimationClips and does not carry an
-            // animation's extras onto them, so the parser's own document is the only source.
-            for (const [name, track] of visibilityTracks(gltf.parser.json)) {
-                subject.visibility.set(name, track);
-            }
-        }
+        this.context.animation.registerPart(subjectId, root, gltf);
 
         this.context.levels.applyLevels();
 
@@ -425,7 +370,7 @@ export class PartAssembly {
             part.subjectId !== ACTIVE_SUBJECT &&
             this.rootPartOf(part.subjectId) === null
         ) {
-            this.context.animation.subjects.delete(part.subjectId);
+            this.context.animation.forgetSubject(part.subjectId);
         }
     }
 
@@ -726,28 +671,12 @@ export class PartAssembly {
      * unparents the counting meshes it owns - mutating the children of a node being traversed.
      */
     dropRegistrations(subjectId: string, root: THREE.Object3D): void {
-        const subject = this.context.animation.subjectAnimation(subjectId);
         const inside: THREE.Object3D[] = [];
         root.traverse((node) => inside.push(node));
 
-        for (const node of inside) {
-            if (node instanceof THREE.Mesh) {
-                this.context.environment.shadowVolumes.remove(node);
-            }
-
-            subject.restPose.delete(node);
-            subject.fileHidden.delete(node);
-
-            // Only where THIS node is the one holding the name. `nodeByName` is first-wins, so one
-            // part of a subject must not take another part's entry with it.
-            const name = alamoNodeName(node);
-            if (name !== "" && subject.nodeByName.get(name) === node) {
-                subject.nodeByName.delete(name);
-            }
-        }
-
-        const held = new Set(inside);
-        this.context.cameraRig.dropBillboards(held);
+        this.context.environment.dropShadowVolumes(inside);
+        this.context.animation.unregisterPart(subjectId, inside);
+        this.context.cameraRig.dropBillboards(new Set(inside));
     }
 
     /**

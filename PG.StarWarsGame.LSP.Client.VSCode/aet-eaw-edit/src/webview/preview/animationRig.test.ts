@@ -116,4 +116,55 @@ describe("AnimationRig", () => {
         assert.equal(bone.position.x, 0);
         assert.equal(animation.active.action, null);
     });
+
+    it("takes in what a part brings to its subject, and lets it go again", () => {
+        const { animation } = rigWith();
+        const root = new THREE.Group();
+        const bone = new THREE.Object3D();
+        bone.name = "Hatch#2";
+        root.add(bone);
+        const hull = new THREE.Mesh(
+            new THREE.BufferGeometry(),
+            new THREE.MeshBasicMaterial(),
+        );
+        hull.userData.alamo = {
+            alamoShader: "MeshCollision.fx",
+            alamoMesh: "Collision",
+            alamoHidden: true,
+        };
+        root.add(hull);
+        const clip = new THREE.AnimationClip("Open", 1, []);
+        const gltf = {
+            animations: [clip],
+            parser: { json: {} },
+        } as unknown as Parameters<typeof animation.registerPart>[2];
+
+        animation.registerPart("wreck:1", root, gltf);
+        const subject = animation.subjectAnimation("wreck:1");
+        assert.ok(subject.restPose.has(bone));
+        assert.equal(subject.nodeByName.get("Hatch#2"), bone);
+        assert.ok(subject.fileHidden.has(hull));
+        assert.deepEqual(subject.clips, [clip]);
+        assert.notEqual(subject.mixer, null);
+
+        animation.unregisterPart("wreck:1", [bone, hull]);
+        assert.equal(subject.restPose.has(bone), false);
+        assert.equal(subject.nodeByName.has("Hatch#2"), false);
+        assert.equal(subject.fileHidden.has(hull), false);
+
+        animation.forgetSubject("wreck:1");
+        assert.notEqual(animation.subjectAnimation("wreck:1"), subject);
+    });
+
+    it("steps the playing clip on", () => {
+        const { animation, bone } = rigWith();
+        animation.play("Move");
+
+        animation.advance(0.5);
+
+        assert.ok(
+            Math.abs(bone.position.x - 0.5) < 1e-6,
+            `x ${bone.position.x}`,
+        );
+    });
 });

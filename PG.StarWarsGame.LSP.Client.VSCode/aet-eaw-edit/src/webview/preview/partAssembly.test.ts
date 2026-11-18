@@ -22,7 +22,7 @@ function assemblyWith(): {
     wreck: LoadedPart;
     held: string[];
     dropped: string[];
-    billboards: THREE.Object3D[];
+    billboards: THREE.Object3D[][];
 } {
     const modelRoot = new THREE.Group();
     const turret = new THREE.Bone();
@@ -48,7 +48,7 @@ function assemblyWith(): {
     };
     const held: string[] = [];
     const dropped: string[] = [];
-    const billboards: THREE.Object3D[] = [];
+    const billboards: THREE.Object3D[][] = [];
     const context = {
         levels: { alt: 0, lod: 0 },
         modelRoot,
@@ -58,24 +58,14 @@ function assemblyWith(): {
             ["wreck:1", wreck],
         ]),
         animation: {
-            subjects: new Map(),
-            subjectAnimation: (subjectId: string) => {
-                dropped.push(subjectId);
-                return {
-                    restPose: new Map(),
-                    fileHidden: new Set(),
-                    nodeByName: new Map(),
-                };
-            },
+            unregisterPart: (subjectId: string) => dropped.push(subjectId),
+            forgetSubject: (subjectId: string) =>
+                dropped.push(`forget ${subjectId}`),
         },
-        environment: { shadowVolumes: { remove: () => undefined } },
+        environment: { dropShadowVolumes: () => undefined },
         cameraRig: {
-            billboards,
-            dropBillboards: (nodes: ReadonlySet<THREE.Object3D>) => {
-                const kept = billboards.filter((node) => !nodes.has(node));
-                billboards.length = 0;
-                billboards.push(...kept);
-            },
+            dropBillboards: (nodes: ReadonlySet<THREE.Object3D>) =>
+                billboards.push([...nodes]),
         },
         particles: {
             holdEffectsOf: (id: string) => held.push(id),
@@ -150,18 +140,18 @@ describe("PartAssembly", () => {
 
         assert.equal(assembly.hasPart("wreck:1"), false);
         assert.equal(modelRoot.children.includes(wreck.root), false);
-        assert.ok(dropped.includes("wreck:1"));
+        assert.deepEqual(dropped, ["wreck:1", "forget wreck:1"]);
     });
 
     it("stops turning a removed part's billboards", () => {
         const { assembly, wreck, billboards } = assemblyWith();
         const card = new THREE.Object3D();
         wreck.root.add(card);
-        billboards.push(card);
 
         assembly.removePart("wreck:1");
 
-        assert.deepEqual(billboards, []);
+        assert.equal(billboards.length, 1);
+        assert.ok(billboards[0].includes(card));
     });
 
     it("finds a fire bone on the hull before the attached model, and on the model when the hull has none", () => {
@@ -172,5 +162,20 @@ describe("PartAssembly", () => {
         assert.ok(
             under(assembly.fireBoneAttachment("wreck:1", "Muzzle"), wreck.root),
         );
+    });
+
+    it("takes every part out of the scene, then forgets them, the hidden ones and the attachments asked for", () => {
+        const { assembly, modelRoot, wreck } = assemblyWith();
+        assembly.setPartHidden("wreck:1", true);
+        assembly.attachmentFor("hull", "Missing_Bone");
+
+        assembly.disposeParts();
+        assert.equal(modelRoot.children.includes(wreck.root), false);
+        assert.equal(assembly.hasPart("wreck:1"), true);
+
+        assembly.forgetParts();
+        assert.equal(assembly.hasPart("wreck:1"), false);
+        assert.equal(assembly.hiddenParts.size, 0);
+        assert.deepEqual(assembly.unresolvedAttachments(), []);
     });
 });

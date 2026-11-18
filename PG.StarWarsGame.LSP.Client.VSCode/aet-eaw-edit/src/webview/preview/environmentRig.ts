@@ -109,8 +109,8 @@ export class EnvironmentRig {
     /** The rig as the reader has it. Held so a colour change can be applied without a reframe. */
     private rig: LightRig = DEFAULT_LIGHTS;
     /** The starfield and the sky dome, built on first use and then just shown or hidden. */
-    stars: THREE.Points | null = null;
-    sky: THREE.Mesh | null = null;
+    private stars: THREE.Points | null = null;
+    private sky: THREE.Mesh | null = null;
     lightAzimuth = DEFAULT_LIGHT_AZIMUTH_DEGREES;
     lightElevation = DEFAULT_LIGHT_ELEVATION_DEGREES;
     readonly axes: THREE.AxesHelper;
@@ -137,7 +137,7 @@ export class EnvironmentRig {
         DEFAULT_LIGHTS.ambient.colour,
     );
     /** Built the first time a heat sprite is on screen, and not before - it costs two buffers. */
-    heat: HeatPass | null = null;
+    private heat: HeatPass | null = null;
     /**
      * The engine's own shadows: stencil volumes cast by the authored shadow mesh.
      *
@@ -158,7 +158,7 @@ export class EnvironmentRig {
     /** Whether heat sprites bend the frame at all. */
     private heatEnabled = true;
     /** Built the first time bloom is switched on, like the heat buffers - it is not free either. */
-    bloom: BloomPass | null = null;
+    private bloom: BloomPass | null = null;
     private bloomEnabled = false;
     /**
      * Where the frame goes when something comes after it.
@@ -166,7 +166,7 @@ export class EnvironmentRig {
      * Only allocated while bloom is on. With bloom off the chain is one step long and draws
      * straight to the canvas, exactly as it did before any of this existed.
      */
-    frameCopy: THREE.FramebufferTexture | null = null;
+    private frameCopy: THREE.FramebufferTexture | null = null;
     /** Draw the heat BUFFER rather than the bent picture. */
     private heatDebug = false;
     /**
@@ -255,6 +255,57 @@ export class EnvironmentRig {
             this.shadowCatcher,
         );
         this.context.scene.add(this.shadowVolumes.darken);
+    }
+
+    /** Forgets every shadow volume, BEFORE the parts whose meshes they are keyed by are disposed. */
+    forgetShadowVolumes(): void {
+        this.shadowVolumes.clear();
+    }
+
+    /** Stops counting the shadow volumes among these nodes, before their subtree is disposed. */
+    dropShadowVolumes(nodes: readonly THREE.Object3D[]): void {
+        for (const node of nodes) {
+            if (node instanceof THREE.Mesh) {
+                this.shadowVolumes.remove(node);
+            }
+        }
+    }
+
+    /** Keeps the sky and the stars with the camera, after it has moved and its planes are set. */
+    followCamera(): void {
+        // The sky dome travels with the camera and keeps its own orientation, so the horizon stays
+        // level and infinitely far however the camera is turned.
+        if (this.sky !== null && this.sky.visible) {
+            this.sky.position.copy(this.context.camera.position);
+            this.sky.scale.setScalar(
+                Math.max(
+                    this.context.camera.near * 4,
+                    this.context.camera.far * 0.4,
+                ),
+            );
+        }
+
+        // The stars need the same treatment, and for a reason that took a regression to notice:
+        // parenting them to the CAMERA exempts them from frustum CULLING but not from the far
+        // plane, which clips their vertices like anything else's. The far plane is fitted to the
+        // model, so the moment the hardpoint rotation was corrected and the bounds shrank, the
+        // whole sky fell outside it and the stars simply went out.
+        if (this.stars !== null && this.stars.visible) {
+            this.stars.scale.setScalar(
+                Math.max(
+                    this.context.camera.near * 4,
+                    this.context.camera.far * 0.4,
+                ),
+            );
+        }
+    }
+
+    /** Releases the passes' GPU memory. */
+    dispose(): void {
+        this.heat?.dispose();
+        this.bloom?.dispose();
+        this.shadowVolumes.dispose();
+        this.frameCopy?.dispose();
     }
 
     /**

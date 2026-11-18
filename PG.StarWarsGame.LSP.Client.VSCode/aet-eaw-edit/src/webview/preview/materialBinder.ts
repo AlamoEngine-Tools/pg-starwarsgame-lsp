@@ -65,6 +65,17 @@ export class MaterialBinder {
 
     constructor(private readonly context: ViewportContext) {}
 
+    /** Puts every declared render state and the team tint onto the materials built since they were set. */
+    applyStoredState(): void {
+        for (const [shader, state] of this.shaderStates) {
+            this.applyStoredShaderState(shader, state);
+        }
+
+        if (this.colorization !== null) {
+            this.setColorization(this.colorization);
+        }
+    }
+
     /**
      * Applies a shader's declared render state to every material using it.
      *

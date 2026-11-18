@@ -147,4 +147,16 @@ describe("CameraRig", () => {
         cameraRig.forgetBillboards();
         assert.deepEqual(cameraRig.billboards, []);
     });
+
+    it("collects the billboarded bones of a part that has just arrived", () => {
+        const { cameraRig } = rigWith();
+        const root = new THREE.Group();
+        const card = new THREE.Object3D();
+        card.userData.alamoBillboard = "Face";
+        root.add(card, new THREE.Object3D());
+
+        cameraRig.collectBillboards(root);
+
+        assert.deepEqual(cameraRig.billboards, [card]);
+    });
 });

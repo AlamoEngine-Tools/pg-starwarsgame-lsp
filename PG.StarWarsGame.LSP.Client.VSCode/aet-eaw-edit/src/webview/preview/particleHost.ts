@@ -60,7 +60,7 @@ export class ParticleHost {
     particlesVisible = true;
     private particlesPaused = false;
     /** One-shot systems - death explosions - removed once they burn out. */
-    readonly transient = new Set<string>();
+    private readonly transient = new Set<string>();
     /**
      * Emitters switched off, keyed `systemId#index`.
      *
@@ -78,6 +78,29 @@ export class ParticleHost {
     private particleSpeed = 1;
 
     constructor(private readonly context: ViewportContext) {}
+
+    /** Shows or hides each system by whether its proxy is tagged for the level the model is shown at. */
+    gateByLevel(alt: number, lod: number, altDescending: boolean): void {
+        for (const entry of this.particleSystems.values()) {
+            entry.levelVisible = proxyVisibleAt(
+                entry.levels,
+                alt,
+                lod,
+                altDescending,
+            );
+        }
+    }
+
+    /** Disposes every system and forgets them all, the fading ones and the one-shots too, for a new scene. */
+    forgetSystems(): void {
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.dispose();
+        }
+        this.particleSystems.clear();
+        // A new subject is one of the two things allowed to cut a fading system short.
+        this.clearFadingParticles();
+        this.transient.clear();
+    }
 
     /**
      * Runs every system one frame on, and finishes the ones fading out - nothing while effects are

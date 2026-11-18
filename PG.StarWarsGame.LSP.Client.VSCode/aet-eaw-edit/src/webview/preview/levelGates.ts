@@ -5,7 +5,6 @@
 // decals a destroyed hardpoint opens, the collision meshes, the revealed shield and stealth, and the one
 // answer per mesh of whether it is drawn at all. It owns those values; every other layer reads them here.
 
-import { proxyVisibleAt } from "./levels";
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import * as THREE from "three";
 import { type MaterialExtras, resolveMaterial, isVisibleAt } from "./materials";
@@ -148,14 +147,11 @@ export class LevelGates {
         // systems write the same thing: this one re-derived every mesh from the old override maps
         // and undid whatever the row chain had just settled, so a mesh hidden from the tree came
         // straight back on the next level or material refresh.
-        for (const entry of this.context.particles.particleSystems.values()) {
-            entry.levelVisible = proxyVisibleAt(
-                entry.levels,
-                this.alt,
-                this.lod,
-                this.altDescending,
-            );
-        }
+        this.context.particles.gateByLevel(
+            this.alt,
+            this.lod,
+            this.altDescending,
+        );
 
         // And what the stencil pass counts, which follows the level and the cloak rather than the
         // reader. It was set at LOAD and by the pass's own setup and nowhere else, so a cloak

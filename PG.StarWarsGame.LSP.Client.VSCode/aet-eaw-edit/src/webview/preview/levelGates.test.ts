@@ -11,13 +11,13 @@ import { setMeshDrawn } from "./meshVisibility";
 import { type ViewportContext } from "./viewportContext";
 
 /**
- * Gates over a stand-in viewport: one tagged particle system, one shadow-volume mesh, no parts. What the
- * rows and the shadow pass are told is recorded.
+ * Gates over a stand-in viewport: one shadow-volume mesh, no parts. What the particles, the rows and the
+ * shadow pass are told is recorded.
  */
 function gatesWith(): {
     levels: LevelGates;
     modelRoot: THREE.Group;
-    system: { levels: unknown; levelVisible: boolean };
+    gated: [number, number, boolean][];
     counting: boolean[];
     refreshed: () => number;
 } {
@@ -31,17 +31,16 @@ function gatesWith(): {
         alamoMesh: "Shadow",
     };
     modelRoot.add(volume);
-    // Drawn only at ALT 1: a damage-level effect.
-    const system = {
-        levels: { alt: 1, lod: null, altDecreaseStayHidden: false },
-        levelVisible: true,
-    };
+    const gated: [number, number, boolean][] = [];
     const counting: boolean[] = [];
     let refreshes = 0;
     const context = {
         modelRoot,
         parts: new Map(),
-        particles: { particleSystems: new Map([["fx", system]]) },
+        particles: {
+            gateByLevel: (alt: number, lod: number, descending: boolean) =>
+                gated.push([alt, lod, descending]),
+        },
         assembly: {
             forEachPartMesh: (visit: (mesh: THREE.Mesh) => void) =>
                 visit(volume),
@@ -62,21 +61,23 @@ function gatesWith(): {
     return {
         levels: new LevelGates(context),
         modelRoot,
-        system,
+        gated,
         counting,
         refreshed: () => refreshes,
     };
 }
 
 describe("LevelGates", () => {
-    it("moves to a level, gates the effects tagged for it, and refreshes the rows", () => {
-        const { levels, system, refreshed } = gatesWith();
+    it("moves to a level, hands it to the effects, and refreshes the rows", () => {
+        const { levels, gated, refreshed } = gatesWith();
 
-        levels.setLevels(0, 0);
-        assert.equal(system.levelVisible, false);
+        levels.setLevels(2, 1);
+        levels.setLevels(1, 1);
 
-        levels.setLevels(1, 0);
-        assert.equal(system.levelVisible, true);
+        assert.deepEqual(gated, [
+            [2, 1, false],
+            [1, 1, true],
+        ]);
         assert.equal(refreshed(), 2);
     });
 

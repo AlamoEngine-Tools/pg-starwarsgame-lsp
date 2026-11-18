@@ -131,4 +131,26 @@ describe("EnvironmentRig", () => {
             shadowCatcherOpacity(0x404040),
         );
     });
+
+    it("keeps the stars inside the far plane the camera is fitted to", () => {
+        const { environment } = rigWith();
+        environment.setBackground("starfield");
+        const camera = (
+            environment as unknown as {
+                context: { camera: THREE.PerspectiveCamera };
+            }
+        ).context.camera;
+        camera.far = 5000;
+
+        environment.followCamera();
+
+        let stars: THREE.Points | undefined;
+        camera.traverse((node) => {
+            if (node instanceof THREE.Points) {
+                stars = node;
+            }
+        });
+        assert.ok(stars, "no starfield on the camera");
+        assert.equal(stars.scale.x, 2000);
+    });
 });

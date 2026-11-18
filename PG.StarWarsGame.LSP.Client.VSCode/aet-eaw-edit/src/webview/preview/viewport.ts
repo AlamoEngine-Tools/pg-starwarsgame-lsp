@@ -53,7 +53,7 @@ import { MaterialBinder } from "./materialBinder";
 import { EnvironmentRig } from "./environmentRig";
 import { ModelRows } from "./modelRows";
 import { CameraRig } from "./cameraRig";
-import { disposeTree, PartAssembly } from "./partAssembly";
+import { PartAssembly } from "./partAssembly";
 import { DestructionRig } from "./destructionRig";
 import { AnimationRig } from "./animationRig";
 import {
@@ -476,12 +476,7 @@ export class PreviewViewport {
 
     /** Removes everything, so a new subject starts from an empty scene. */
     clear(): void {
-        for (const entry of this.particles.particleSystems.values()) {
-            entry.instance.dispose();
-        }
-        this.particles.particleSystems.clear();
-        // A new subject is one of the two things allowed to cut a fading system short.
-        this.particles.clearFadingParticles();
+        this.particles.forgetSystems();
 
         // BEFORE the sweep below, not after: a wreck is one of those parts now, and taking it
         // apart a second time would dispose a tree that has already gone.
@@ -498,12 +493,9 @@ export class PreviewViewport {
         // Executor it reported 8 and 16, half of them belonging to a model no longer in the scene.
         // The stencil pass then counts geometry that is not there, which is why a handful of models
         // rendered differently depending on what had been looked at before them.
-        this.environment.shadowVolumes.clear();
+        this.environment.forgetShadowVolumes();
 
-        for (const part of this.parts.values()) {
-            part.root.removeFromParent();
-            disposeTree(part.root);
-        }
+        this.assembly.disposeParts();
 
         this.turret.clearFireArcs();
         this.turret.clearTurretHandles();
@@ -514,17 +506,12 @@ export class PreviewViewport {
         this.modelScale = 1;
         this.scaledRoot.scale.setScalar(1);
 
-        // A new subject asks for its own bones. Keeping the old subject's requests would report a
-        // Star Destroyer's missing hardpoint against a Mon Calamari Cruiser for the rest of the session.
-        this.assembly.attachRequests.clear();
         this.cameraRig.forgetSpan();
         // The marks name parts that are about to stop existing; leaving them would draw a reticle
         // over the next model's geometry at whatever the last one's bounds happened to be.
         this.overlay.dropReticles();
-        this.parts.clear();
+        this.assembly.forgetParts();
         this.cameraRig.forgetBillboards();
-        this.assembly.hiddenParts.clear();
-        this.particles.transient.clear();
         this.levels.forgetModel();
         // Every subject's clips, mixer, tracks, rest pose and node names at once. They hold nodes
         // of a model nobody is looking at any more, and keeping them would leak the whole graph.
@@ -1128,10 +1115,7 @@ export class PreviewViewport {
         cancelAnimationFrame(this.frameHandle);
         this.clear();
         this.controls.dispose();
-        this.environment.heat?.dispose();
-        this.environment.bloom?.dispose();
-        this.environment.shadowVolumes.dispose();
-        this.environment.frameCopy?.dispose();
+        this.environment.dispose();
         this.renderer.dispose();
     }
 
@@ -1159,7 +1143,7 @@ export class PreviewViewport {
 
         const dt = this.clock.getDelta();
         this.elapsed += dt;
-        this.animation.active.mixer?.update(dt);
+        this.animation.advance(dt);
         this.animation.applyAnimatedVisibility();
         // After the mixer, so a clip that drives the same bone wins: an animation is the model's own
         // word about where the turret is, and the sweep is the reader asking a question about it.

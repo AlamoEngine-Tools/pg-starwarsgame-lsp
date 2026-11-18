@@ -61,6 +61,15 @@ export class CameraRig {
 
     constructor(private readonly context: ViewportContext) {}
 
+    /** Starts turning every billboarded bone under a part that has just arrived. */
+    collectBillboards(root: THREE.Object3D): void {
+        root.traverse((node) => {
+            if (billboardTypeOf(node) !== null) {
+                this.billboards.push(node);
+            }
+        });
+    }
+
     /** Stops turning these billboards: their subtree is being disposed. */
     dropBillboards(nodes: ReadonlySet<THREE.Object3D>): void {
         const kept = this.billboards.filter((node) => !nodes.has(node));
@@ -371,40 +380,7 @@ export class CameraRig {
         // bone transforms the animation and skeleton work above have already settled.
         this.context.materials.updateAlamoUniforms();
         this.updateBillboards();
-
-        // The sky dome travels with the camera and keeps its own orientation, so the horizon stays
-        // level and infinitely far however the camera is turned.
-        if (
-            this.context.environment.sky !== null &&
-            this.context.environment.sky.visible
-        ) {
-            this.context.environment.sky.position.copy(
-                this.context.camera.position,
-            );
-            this.context.environment.sky.scale.setScalar(
-                Math.max(
-                    this.context.camera.near * 4,
-                    this.context.camera.far * 0.4,
-                ),
-            );
-        }
-
-        // The stars need the same treatment, and for a reason that took a regression to notice:
-        // parenting them to the CAMERA exempts them from frustum CULLING but not from the far
-        // plane, which clips their vertices like anything else's. The far plane is fitted to the
-        // model, so the moment the hardpoint rotation was corrected and the bounds shrank, the
-        // whole sky fell outside it and the stars simply went out.
-        if (
-            this.context.environment.stars !== null &&
-            this.context.environment.stars.visible
-        ) {
-            this.context.environment.stars.scale.setScalar(
-                Math.max(
-                    this.context.camera.near * 4,
-                    this.context.camera.far * 0.4,
-                ),
-            );
-        }
+        this.context.environment.followCamera();
     }
 
     /**

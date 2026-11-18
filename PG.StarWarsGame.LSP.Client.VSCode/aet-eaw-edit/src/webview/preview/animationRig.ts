@@ -10,11 +10,31 @@ import { type SubjectAnimation } from "./subjectAnimation";
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import { deathClip } from "./visibility";
 import * as THREE from "three";
-import { hiddenAt } from "./boneVisibility";
+import { hiddenAt, visibilityTracks } from "./boneVisibility";
+import { type MaterialExtras, resolveMaterial } from "./materials";
+import { alamoNodeName } from "./skeleton";
+import { type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { type ViewportContext } from "./viewportContext";
 
 /** Scratch for the bone-palette maths, so a per-frame loop allocates nothing. */
 const SKIN_WORK = new THREE.Matrix4();
+
+/** Every mesh a model's own materials say is not drawn - collision hulls, shadow volumes. */
+function hiddenMeshes(root: THREE.Object3D): Set<THREE.Object3D> {
+    const hidden = new Set<THREE.Object3D>();
+
+    root.traverse((node) => {
+        if (
+            node instanceof THREE.Mesh &&
+            resolveMaterial((node.userData.alamo ?? {}) as MaterialExtras)
+                .hidden
+        ) {
+            hidden.add(node);
+        }
+    });
+
+    return hidden;
+}
 
 export class AnimationRig {
     /** Reused per frame so building the bone palette does not allocate on every draw. */
@@ -41,6 +61,82 @@ export class AnimationRig {
     private overridingVisibility = false;
 
     constructor(private readonly context: ViewportContext) {}
+
+    /**
+     * Takes in what one part brings to its subject's animation: the rest pose of every node, the
+     * nodes by name, the meshes its file hides, and its clips with their visibility tracks.
+     */
+    registerPart(subjectId: string, root: THREE.Object3D, gltf: GLTF): void {
+        const subject = this.subjectAnimation(subjectId);
+
+        // Before any clip can touch it. Recorded for the whole part, not only for the bones this
+        // GLB's own clips drive - a later part of the same subject can reach in here too.
+        root.traverse((node) => {
+            if (!subject.restPose.has(node)) {
+                subject.restPose.set(node, {
+                    position: node.position.clone(),
+                    quaternion: node.quaternion.clone(),
+                    scale: node.scale.clone(),
+                });
+            }
+
+            // First wins. A visibility track names a bone, and a bone name is unique within one
+            // model because the exporter suffixes it with the bone index. Keyed by the name the
+            // exporter wrote, which is the one a track names - three's sanitised copy is not.
+            const name = alamoNodeName(node);
+            if (name !== "" && !subject.nodeByName.has(name)) {
+                subject.nodeByName.set(name, node);
+            }
+        });
+
+        // What its own file says is not drawn - a collision hull, a shadow volume. Held so a clip
+        // can never bring one back: a shadow volume is not geometry that happens to be switched off
+        // this frame.
+        for (const mesh of hiddenMeshes(root)) {
+            subject.fileHidden.add(mesh);
+        }
+
+        if (gltf.animations.length > 0) {
+            // Rooted at the first of this subject's parts to bring clips. A clip binds to nodes BY
+            // NAME from the root it was given, so a mixer rooted anywhere else drives the wrong
+            // model - which is exactly what a clone's `_die` did on the scene-wide mixer.
+            subject.mixer ??= new THREE.AnimationMixer(root);
+            subject.clips = [...subject.clips, ...gltf.animations];
+
+            // Off the raw glTF JSON: three's loader builds AnimationClips and does not carry an
+            // animation's extras onto them, so the parser's own document is the only source.
+            for (const [name, track] of visibilityTracks(gltf.parser.json)) {
+                subject.visibility.set(name, track);
+            }
+        }
+    }
+
+    /** Lets go of everything a subtree registered with its subject, before the subtree is disposed. */
+    unregisterPart(subjectId: string, nodes: readonly THREE.Object3D[]): void {
+        const subject = this.subjectAnimation(subjectId);
+
+        for (const node of nodes) {
+            subject.restPose.delete(node);
+            subject.fileHidden.delete(node);
+
+            // Only where THIS node is the one holding the name. `nodeByName` is first-wins, so one
+            // part of a subject must not take another part's entry with it.
+            const name = alamoNodeName(node);
+            if (name !== "" && subject.nodeByName.get(name) === node) {
+                subject.nodeByName.delete(name);
+            }
+        }
+    }
+
+    /** Forgets a passive subject whose last part has gone. */
+    forgetSubject(subjectId: string): void {
+        this.subjects.delete(subjectId);
+    }
+
+    /** Steps the active subject's clip on by `dt` seconds. */
+    advance(dt: number): void {
+        this.active.mixer?.update(dt);
+    }
 
     /** Drops every subject's animation and the visibility a clip was driving, for a new scene. */
     forgetSubjects(): void {

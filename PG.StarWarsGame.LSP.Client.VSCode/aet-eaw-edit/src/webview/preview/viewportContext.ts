@@ -24,6 +24,24 @@ import { type PartAssembly } from "./partAssembly";
 import { type ParticleHost } from "./particleHost";
 import { type TurretRig } from "./turretRig";
 
+/**
+ * A layer as the other layers see it: every field read-only, and the collections they read too.
+ *
+ * Only the layer itself writes its state; everyone else asks it to. Typing the context this way makes
+ * a write from another layer a compile error rather than a convention. Methods are unaffected.
+ */
+export type LayerView<T, Collections extends keyof T = never> = Readonly<
+    Omit<T, Collections>
+> & {
+    readonly [K in Collections]: T[K] extends Map<infer A, infer B>
+        ? ReadonlyMap<A, B>
+        : T[K] extends Set<infer A>
+          ? ReadonlySet<A>
+          : T[K] extends (infer A)[]
+            ? readonly A[]
+            : Readonly<T[K]>;
+};
+
 /** The scene objects and the layers, as the viewport hands them to every layer it builds. */
 export interface ViewportContext {
     readonly scene: THREE.Scene;
@@ -40,17 +58,20 @@ export interface ViewportContext {
     readonly parts: Map<string, LoadedPart>;
     /** Absolutely-positioned container the bone labels are written into. */
     readonly labelLayer: HTMLElement;
-    readonly levels: LevelGates;
-    readonly queries: ModelQueries;
-    readonly assembly: PartAssembly;
-    readonly destruction: DestructionRig;
-    readonly animation: AnimationRig;
-    readonly capturer: CaptureRig;
-    readonly cameraRig: CameraRig;
-    readonly environment: EnvironmentRig;
-    readonly rows: ModelRows;
-    readonly materials: MaterialBinder;
-    readonly particles: ParticleHost;
-    readonly overlay: OverlayLayer;
-    readonly turret: TurretRig;
+    readonly levels: LayerView<LevelGates>;
+    readonly queries: LayerView<ModelQueries>;
+    readonly assembly: LayerView<PartAssembly, "hiddenParts">;
+    readonly destruction: LayerView<DestructionRig>;
+    readonly animation: LayerView<AnimationRig, "subjects">;
+    readonly capturer: LayerView<CaptureRig>;
+    readonly cameraRig: LayerView<CameraRig, "billboards">;
+    readonly environment: LayerView<EnvironmentRig>;
+    readonly rows: LayerView<ModelRows, "rowParents" | "rowTargets">;
+    readonly materials: LayerView<
+        MaterialBinder,
+        "shaderStates" | "translated"
+    >;
+    readonly particles: LayerView<ParticleHost, "particleSystems">;
+    readonly overlay: LayerView<OverlayLayer>;
+    readonly turret: LayerView<TurretRig>;
 }
