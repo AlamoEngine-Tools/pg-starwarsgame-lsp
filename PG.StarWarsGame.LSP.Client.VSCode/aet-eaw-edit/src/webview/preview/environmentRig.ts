@@ -43,7 +43,6 @@ import { type ViewportContext } from "./viewportContext";
 /** Fixed, so the sky is the same one every session and a screenshot can be compared to another. */
 const STAR_SEED = 20260817;
 
-/** Reused per frame by the billboards, which run before every render. */
 /**
  * The engine's light intensities are stored as the engine means them; this converts to three's.
  *
@@ -67,7 +66,6 @@ const GROUND_TILES = 14;
 /** Reused so measuring the canvas each frame allocates nothing. */
 const FRAME_SIZE = new THREE.Vector2();
 
-/** What EnvironmentRig reads from the viewport it belongs to. */
 /** What EnvironmentRig still asks of the viewport itself: what only the viewport has. */
 export interface EnvironmentViewport {
     readonly elapsed: number;
@@ -374,12 +372,12 @@ export class EnvironmentRig {
         return this.stencilShadowing;
     }
 
-    /** Whether the engine's stencil shadows are drawn at all. */
     /** Draws the extruded volumes themselves, for diagnosing what the stencil is counting. */
     setShadowVolumeDebug(on: boolean): void {
         this.shadowVolumes.setDebug(on);
     }
 
+    /** Whether the engine's stencil shadows are drawn at all. */
     setShadowVolumes(on: boolean): void {
         this.shadowVolumesEnabled = on;
         this.shadowVolumes.setEnabled(on);

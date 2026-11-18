@@ -16,7 +16,6 @@ import { type ViewportContext } from "./viewportContext";
 /** Scratch for the bone-palette maths, so a per-frame loop allocates nothing. */
 const SKIN_WORK = new THREE.Matrix4();
 
-/** What AnimationRig reads from the viewport it belongs to. */
 export class AnimationRig {
     /** Reused per frame so building the bone palette does not allocate on every draw. */
     private skinScratch = new Float32Array(0);
@@ -119,9 +118,8 @@ export class AnimationRig {
      *
      * The rest pose is restored before anything starts, so a clip never plays on top of the pose
      * another one left behind.
-     */
-    /**
-     * Starts a clip by name, answering whether one actually started.
+     *
+     * Answers whether a clip actually started.
      *
      * The answer matters and used to be thrown away. A name no loaded clip carries returned here in
      * silence while the panel went on showing that clip as the one playing - which is exactly what

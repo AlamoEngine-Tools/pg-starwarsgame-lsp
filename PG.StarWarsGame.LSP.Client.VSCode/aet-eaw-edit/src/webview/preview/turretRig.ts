@@ -30,12 +30,9 @@ import {
 import { sweepAngles } from "./deathClone";
 import { type ViewportContext } from "./viewportContext";
 
-/**
- * The firing-arc gizmo's look.
- *
- * Unlit and never writing depth, because it is an annotation drawn over a model rather than a thing
- * in the scene.
- */
+// The firing-arc gizmo's look: unlit and never writing depth, because it is an annotation drawn over a
+// model rather than a thing in the scene.
+
 /**
  * The fill of a firing cone.
  *
@@ -1218,7 +1215,6 @@ export class TurretRig {
         bone.quaternion.copy(this.sweepRestOf(bone)).multiply(turn);
     }
 
-    /** Picks the nearest joint to the pointer, so clicking a bone selects it. */
     /**
      * The knob nearest the pointer, if one is near enough to mean it.
      *

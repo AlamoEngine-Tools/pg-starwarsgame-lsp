@@ -64,7 +64,7 @@ export class ParticleHost {
     /**
      * Emitters switched off, keyed `systemId#index`.
      *
-     * Held by the viewport rather than only in the shell because restart rebuilds every instance from
+     * Held here rather than only in the shell because restart rebuilds every instance from
      * scratch; without this, a restart would silently switch them all back on. Keyed by index because
      * emitter names repeat within one system.
      */

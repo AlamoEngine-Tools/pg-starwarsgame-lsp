@@ -56,7 +56,6 @@ function anchorNodeOf(entry: ParticleEntry): THREE.Object3D {
     return entry.instance.anchorNode ?? entry.instance.root;
 }
 
-/** What ModelRows reads from the viewport it belongs to. */
 export class ModelRows {
     /**
      * What one tree row controls.
@@ -109,6 +108,13 @@ export class ModelRows {
 
     constructor(private readonly context: ViewportContext) {}
 
+    /**
+     * Everything the model is made of, as flat items for ONE tree: bones, the meshes attached to
+     * them, and the particle emitters attached to them.
+     *
+     * A mesh's origin IS a bone and an emitter is attached to one, so the skeleton is already the
+     * structure all three live in. Ids are prefixed by kind so they cannot collide.
+     */
     treeItems(): TreeItem[] {
         const items: TreeItem[] = [];
 
@@ -915,12 +921,6 @@ export class ModelRows {
     }
 
     /**
-     * What a playing clip says about a bone on this frame, or undefined when it says nothing.
-     *
-     * Undefined is NOT false: a clip that never mentions a bone is not asking for it to be hidden,
-     * and treating silence as a hide is how an animation came to blink meshes out.
-     */
-    /**
      * What the model's idle clip says about a bone when NOTHING is playing.
      *
      * Read at frame zero: this is a resting pose, not a performance. A model with no idle clip, or
@@ -951,6 +951,12 @@ export class ModelRows {
         return this.restingClipCached;
     }
 
+    /**
+     * What a playing clip says about a bone on this frame, or undefined when it says nothing.
+     *
+     * Undefined is NOT false: a clip that never mentions a bone is not asking for it to be hidden,
+     * and treating silence as a hide is how an animation came to blink meshes out.
+     */
     private animatedVisibilityOf(id: BoneId | undefined): boolean | undefined {
         return this.context.animation.active.action === null
             ? undefined

@@ -41,7 +41,6 @@ interface BreakoffInstance {
     expired: boolean;
 }
 
-/** What DestructionRig reads from the viewport it belongs to. */
 /** What DestructionRig still asks of the viewport itself: what only the viewport has. */
 export interface DestructionViewport {
     readonly modelScale: number;

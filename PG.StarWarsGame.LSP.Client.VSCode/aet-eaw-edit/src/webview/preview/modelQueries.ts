@@ -30,7 +30,6 @@ function vectorOf(at: THREE.Vector3): { x: number; y: number; z: number } {
     return { x: at.x, y: at.y, z: at.z };
 }
 
-/** What ModelQueries reads from the viewport it belongs to. */
 export class ModelQueries {
     constructor(private readonly context: ViewportContext) {}
 
@@ -65,8 +64,7 @@ export class ModelQueries {
      *
      * Every mesh the model holds rather than only the ones on screen: the question is what a level
      * COSTS, which is a property of the file and not of where the slider happens to sit. The rule
-     * that decides which meshes belong to a level is `costByLevel`'s, which is the viewport's own
-     * gate.
+     * that decides which meshes belong to a level is `costByLevel`'s, in `levels.ts`.
      */
     costByLod(levels: readonly number[]): Map<number, LevelCost> {
         const meshes: { extras: MaterialExtras; triangles: number }[] = [];

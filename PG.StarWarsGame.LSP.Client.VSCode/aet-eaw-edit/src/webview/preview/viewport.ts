@@ -114,9 +114,9 @@ export class PreviewViewport {
      * The subject's GEOMETRY, carrying the object's `Scale_Factor`.
      *
      * Between `modelRoot` and the parts rather than on `modelRoot` itself, and the split is the
-     * engine's own. the engine's transform update puts no scale in the object's world matrix
-     * and then calls `Model->the model-scale setter`, so the scale belongs to the MODEL: geometry and bones are
-     * model units and reach the world multiplied by it, while positions - and every range the XML
+     * engine's own: its transform update puts no scale in the object's world matrix and applies the
+     * scale to the model instead. So the scale belongs to the MODEL: geometry and bones are model
+     * units and reach the world multiplied by it, while positions - and every range the XML
      * declares - are already world units.
      *
      * What that buys is that the things which must NOT scale stay on `modelRoot` and need no
@@ -653,8 +653,6 @@ export class PreviewViewport {
         return this.turret.turretAim(id);
     }
 
-    // ── damage ────────────────────────────────────────────────────────────────
-
     /** Puts one turret back where the model authored it. See `TurretRig.resetTurretAim`. */
     resetTurretAim(id: string): void {
         this.turret.resetTurretAim(id);
@@ -751,19 +749,13 @@ export class PreviewViewport {
         return this.queries.costByLod(levels);
     }
 
-    /**
-     * Everything the model is made of, as flat items for ONE tree: bones, the meshes attached to
-     * them, and the particle emitters attached to them.
-     *
-     * A mesh's origin IS a bone and an emitter is attached to one, so the skeleton is already the
-     * structure all three live in. Ids are prefixed by kind so they cannot collide.
-     */
     /** For the harness: drives controls that have no UI yet. Costs nothing when unused. */
     expose(): void {
         (globalThis as unknown as { __aetViewport?: unknown }).__aetViewport =
             this;
     }
 
+    /** Everything the model is made of, as flat items for ONE tree. See `ModelRows.treeItems`. */
     treeItems(): TreeItem[] {
         return this.rows.treeItems();
     }
@@ -821,7 +813,6 @@ export class PreviewViewport {
         this.rows.releaseAbilityRows(ownership);
     }
 
-    /** Frames whatever is currently loaded. */
     /**
      * Puts the camera where the model's own authored camera stands, looking where it looks. See
      * `CameraRig.applyModelCamera`.
@@ -835,6 +826,7 @@ export class PreviewViewport {
         this.cameraRig.applyCameraPose(position, target);
     }
 
+    /** Frames whatever is currently loaded. See `CameraRig.frameAll`. */
     frameAll(preset: PresetView = "threeQuarter"): void {
         this.cameraRig.frameAll(preset);
     }
@@ -869,12 +861,12 @@ export class PreviewViewport {
         return this.environment.castsStencilShadows();
     }
 
-    /** Whether the engine's stencil shadows are drawn at all. */
     /** Draws the extruded volumes themselves, for diagnosing what the stencil is counting. */
     setShadowVolumeDebug(on: boolean): void {
         this.environment.setShadowVolumeDebug(on);
     }
 
+    /** Whether the engine's stencil shadows are drawn at all. See `EnvironmentRig.setShadowVolumes`. */
     setShadowVolumes(on: boolean): void {
         this.environment.setShadowVolumes(on);
     }
@@ -889,23 +881,10 @@ export class PreviewViewport {
         this.animation.startDeathClip(subjectId);
     }
 
-    /**
-     * Plays a clip by name, or stops playback when given null.
-     *
-     * Timing comes from the file. The exporter writes each keyframe at `frame / fps` using the rate
-     * the `.ala` itself declares - 30 fps for 1270 of the 1363 shipped animations, but 1, 5, 10 or
-     * 15 for the other 93 - so 1.0x means "this clip's own declared rate", whatever that is: a
-     * 15 fps clip plays at 15 frames a second. There is no rate for the panel to impose.
-     *
-     * The rest pose is restored before anything starts, so a clip never plays on top of the pose
-     * another one left behind.
-     */
     /** Starts a clip by name, answering whether one actually started. See `AnimationRig.play`. */
     play(name: string | null): boolean {
         return this.animation.play(name);
     }
-
-    // ── spinning away ─────────────────────────────────────────────────────────
 
     setPaused(paused: boolean): void {
         this.animation.setPaused(paused);
@@ -969,8 +948,6 @@ export class PreviewViewport {
     ): void {
         this.particles.addParticleSystem(id, system, placement);
     }
-
-    // ── levels ────────────────────────────────────────────────────────────────
 
     /** Takes a system out of the scene. See `ParticleHost.removeParticleSystem`. */
     removeParticleSystem(id: string, immediate = false): void {

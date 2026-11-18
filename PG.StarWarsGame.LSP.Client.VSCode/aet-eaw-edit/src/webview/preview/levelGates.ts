@@ -12,7 +12,6 @@ import { type MaterialExtras, resolveMaterial, isVisibleAt } from "./materials";
 import { meshDrawn } from "./meshVisibility";
 import { type ViewportContext } from "./viewportContext";
 
-/** What LevelGates reads from the viewport it belongs to. */
 export class LevelGates {
     alt = 0;
     lod = 0;
@@ -138,6 +137,12 @@ export class LevelGates {
         this.applyLevels();
     }
 
+    /**
+     * Everything that can hide a mesh, decided together.
+     *
+     * Separate passes would fight each other: a level change would re-show a decal whose hardpoint
+     * is intact, and re-hide one whose hardpoint had just been blown off.
+     */
     applyLevels(): void {
         // What the LEVEL knows, and nothing else. Deciding visibility here as well is what let two
         // systems write the same thing: this one re-derived every mesh from the old override maps
@@ -174,12 +179,6 @@ export class LevelGates {
         this.context.rows.refreshRows();
     }
 
-    /**
-     * Everything that can hide a mesh, decided together.
-     *
-     * Separate passes would fight each other: a level change would re-show a decal whose hardpoint
-     * is intact, and re-hide one whose hardpoint had just been blown off.
-     */
     /**
      * Applies BOTH halves of a sub-mesh's visibility: whether it is drawn, and - for a shadow
      * volume - whether it is counted.

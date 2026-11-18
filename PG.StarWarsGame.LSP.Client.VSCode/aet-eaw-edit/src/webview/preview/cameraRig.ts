@@ -44,7 +44,7 @@ function isShadowVolume(mesh: THREE.Mesh): boolean {
     return resolveMaterial(extras).archetype === "shadow-volume";
 }
 
-/** What CameraRig reads from the viewport it belongs to. */
+/** Reused per frame by the billboards, which run before every render. */
 const BILLBOARD_AT = new THREE.Vector3();
 const BILLBOARD_LIGHT = new THREE.Vector3();
 const BILLBOARD_BONE = new THREE.Quaternion();
@@ -138,7 +138,6 @@ export class CameraRig {
         return this.boundingSphere();
     }
 
-    /** Frames whatever is currently loaded. */
     /**
      * Puts the camera where the model's own authored camera stands, looking where it looks.
      *
@@ -190,6 +189,7 @@ export class CameraRig {
         this.context.controls.update();
     }
 
+    /** Frames whatever is currently loaded. */
     frameAll(preset: PresetView = "threeQuarter"): void {
         const sphere = this.boundingSphere();
         const { azimuth, elevation } = PRESETS[preset];

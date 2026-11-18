@@ -54,7 +54,6 @@ function decodeBase64(value: string): ArrayBuffer {
     return bytes.buffer;
 }
 
-/** What PartAssembly reads from the viewport it belongs to. */
 /** Releases GPU memory for a subtree; the renderer does not do it on removal. */
 export function disposeTree(root: THREE.Object3D): void {
     root.traverse((node) => {
@@ -256,7 +255,7 @@ export class PartAssembly {
             this.context.materials.bindLoadedTextures(root);
         }
 
-        // AFTER the part is registered, never before: `applyWireframe` sweeps `this.parts`, so
+        // AFTER the part is registered, never before: `applyWireframe` sweeps the parts, so
         // running it a few lines earlier - where the materials are built - swept everything except
         // the part that had just been given them, and a turret arriving late came in solid while
         // the hull beside it was edges.

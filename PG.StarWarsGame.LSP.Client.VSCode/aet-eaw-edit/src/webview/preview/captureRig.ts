@@ -10,7 +10,6 @@ import { captureFrame } from "./capture";
 import * as THREE from "three";
 import { type ViewportContext } from "./viewportContext";
 
-/** What CaptureRig reads from the viewport it belongs to. */
 /** What CaptureRig still asks of the viewport itself: what only the viewport has. */
 export interface CaptureViewport {
     resize(): void;

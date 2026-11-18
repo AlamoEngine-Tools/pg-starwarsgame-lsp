@@ -814,7 +814,7 @@ export class OverlayLayer {
         }
 
         // Through `bonePosition`, which answers null for anything it cannot actually find.
-        // Comparing against `this.modelRoot` caught only HALF of it: that is the fallback for a
+        // Comparing against the model root caught only HALF of it: that is the fallback for a
         // missing PART, and a missing BONE falls back to the owning part's root instead - so a
         // mark whose bone was absent was drawn at that model's origin rather than dropped, and
         // every such mark piled up in the same place.
