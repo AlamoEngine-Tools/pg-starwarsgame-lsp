@@ -20,13 +20,19 @@ function rigWith(): {
     bone: THREE.Object3D;
     cleared: () => number;
     reposed: () => number;
+    composed: () => number;
 } {
     let clears = 0;
     let reposes = 0;
+    let composes = 0;
     const context = standInContext({
         turret: {
             reposeTurrets: () => {
                 reposes++;
+            },
+            composeOnClip: (step: () => void) => {
+                composes++;
+                step();
             },
         },
         assembly: { setPartHidden: () => undefined },
@@ -65,6 +71,7 @@ function rigWith(): {
         bone,
         cleared: () => clears,
         reposed: () => reposes,
+        composed: () => composes,
     };
 }
 
@@ -188,5 +195,23 @@ describe("AnimationRig", () => {
 
         animation.play(null);
         assert.equal(reposed(), 2);
+    });
+
+    it("steps a playing clip through the turret layer, and an idle mixer without it", () => {
+        const { animation, bone, composed } = rigWith();
+
+        animation.advance(0.5);
+        assert.equal(composed(), 0);
+
+        animation.play("Move");
+        animation.advance(0.5);
+        assert.equal(composed(), 1);
+        assert.ok(
+            Math.abs(bone.position.x - 0.5) < 1e-6,
+            `x ${bone.position.x}`,
+        );
+
+        animation.seekAnimation(1);
+        assert.equal(composed(), 2);
     });
 });

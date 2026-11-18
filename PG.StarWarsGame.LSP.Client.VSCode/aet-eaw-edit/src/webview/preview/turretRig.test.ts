@@ -260,6 +260,97 @@ describe("TurretRig", () => {
         assert.ok(Math.abs(angle - Math.PI / 2) < 1e-6, `turned by ${angle}`);
     });
 
+    it("turns a turret on top of the pose a clip gives its bone, every frame, without piling up", () => {
+        const { part, mount, turret } = turretPart();
+        const rig = rigWith(new Map([["p", part]]));
+        rig.setTurretHandles([handle]);
+        rig.setTurretRestAngles([
+            {
+                partId: "p",
+                turretBone: "Turret",
+                barrelBone: null,
+                rest: { yaw: 90, pitch: 0 },
+            },
+        ]);
+        const clipPose = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0),
+            Math.PI / 6,
+        );
+        const turn = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 0, 1),
+            Math.PI / 2,
+        );
+        const expected = clipPose.clone().multiply(turn);
+
+        // What the mixer does to a keyed bone: writes the clip's pose outright, every frame.
+        for (let frame = 0; frame < 3; frame++) {
+            rig.composeOnClip(() => turret.quaternion.copy(clipPose));
+            assert.ok(
+                turret.quaternion.angleTo(expected) < 1e-6,
+                `frame ${frame} off by ${turret.quaternion.angleTo(expected)}`,
+            );
+        }
+
+        // The tracks are measured from the clip's pose of the bone, so they move with it.
+        rig.placeTurretAnchors();
+        const yawTrack = anchorsUnder(mount)[0];
+        assert.ok(
+            yawTrack.quaternion.angleTo(clipPose) < 1e-6,
+            `track off by ${yawTrack.quaternion.angleTo(clipPose)}`,
+        );
+    });
+
+    it("keeps a turret's turn on a bone the clip does not key, without piling it up", () => {
+        const { part, turret } = turretPart();
+        const rig = rigWith(new Map([["p", part]]));
+        rig.setTurretRestAngles([
+            {
+                partId: "p",
+                turretBone: "Turret",
+                barrelBone: null,
+                rest: { yaw: 90, pitch: 0 },
+            },
+        ]);
+
+        rig.composeOnClip(() => undefined);
+        rig.composeOnClip(() => undefined);
+
+        const angle = 2 * Math.acos(Math.min(1, Math.abs(turret.quaternion.w)));
+        assert.ok(Math.abs(angle - Math.PI / 2) < 1e-6, `turned by ${angle}`);
+    });
+
+    it("measures from the authored pose again once the clip has stopped", () => {
+        const { part, turret } = turretPart();
+        const rig = rigWith(new Map([["p", part]]));
+        rig.setTurretRestAngles([
+            {
+                partId: "p",
+                turretBone: "Turret",
+                barrelBone: null,
+                rest: { yaw: 90, pitch: 0 },
+            },
+        ]);
+        rig.composeOnClip(() =>
+            turret.quaternion.setFromAxisAngle(
+                new THREE.Vector3(1, 0, 0),
+                Math.PI / 6,
+            ),
+        );
+
+        // What `AnimationRig.resetPose` does when the clip stops.
+        turret.quaternion.identity();
+        rig.reposeTurrets();
+
+        const expected = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 0, 1),
+            Math.PI / 2,
+        );
+        assert.ok(
+            turret.quaternion.angleTo(expected) < 1e-6,
+            `off by ${turret.quaternion.angleTo(expected)}`,
+        );
+    });
+
     it("shows a turret's handles while the pointer is over its meshes, and hides them when it leaves", () => {
         const { rig, mounts, handles } = hoverRig([
             { name: "Turret", at: [0, 0, 0] },

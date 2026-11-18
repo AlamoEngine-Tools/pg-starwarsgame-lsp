@@ -473,6 +473,14 @@ export class TurretRig {
      */
     private readonly sweepRest = new Map<THREE.Object3D, THREE.Quaternion>();
     /**
+     * The pose the running clip gave each bone this class turns, this frame.
+     *
+     * While a clip runs, a turret's turn is measured from here rather than from `sweepRest`: the mixer
+     * writes the clip's pose into every bone it keys on every frame, and all 110 clips measured on the
+     * turreted land units key the turret bone. Empty when no clip is running. See {@link composeOnClip}.
+     */
+    private readonly clipBase = new Map<THREE.Object3D, THREE.Quaternion>();
+    /**
      * Shows the handles of the turret under the pointer and brightens the axis under it.
      *
      * A hovered turret keeps its handles while the pointer travels from the turret onto them, so the
@@ -777,7 +785,7 @@ export class TurretRig {
                 pose.rest,
             );
         }
-        this.reposeTurrets();
+        this.poseRests();
     }
 
     /**
@@ -787,8 +795,52 @@ export class TurretRig {
      * turret bones included (see `AnimationRig.resetPose`), which threw away the rest angle the XML
      * declares and the aim the reader had dragged to - while the weapon row went on reading out that
      * aim. The turn composes on the authored pose, so putting it back is the same composition again.
+     *
+     * The clip's pose no longer applies once the file's is back, so the turn is measured from the
+     * authored pose again.
      */
     reposeTurrets(): void {
+        this.clipBase.clear();
+        this.poseRests();
+    }
+
+    /**
+     * Runs one step of a clip and turns every turret on top of the pose it leaves.
+     *
+     * The game turns a turret on top of the bone it computed from the file and its animation (#389),
+     * so the rest angle, the sweep and the reader's aim all compose on the clip's pose rather than
+     * fighting it. Left to the mixer, the clip's pose won every frame and a dragged knob did nothing
+     * while a clip ran.
+     *
+     * Each bone is put back on its authored pose first, so a bone the clip does not key holds that
+     * pose rather than last frame's turn, and the turn is never applied twice.
+     */
+    composeOnClip(step: () => void): void {
+        for (const [bone, rest] of this.sweepRest) {
+            bone.quaternion.copy(rest);
+        }
+
+        step();
+
+        for (const bone of [...this.clipBase.keys()]) {
+            if (!this.sweepRest.has(bone)) {
+                this.clipBase.delete(bone);
+            }
+        }
+        for (const bone of this.sweepRest.keys()) {
+            const base = this.clipBase.get(bone);
+            if (base === undefined) {
+                this.clipBase.set(bone, bone.quaternion.clone());
+            } else {
+                base.copy(bone.quaternion);
+            }
+        }
+
+        this.poseRests();
+    }
+
+    /** Every turret at its rest angle and the reader's aim, measured from the pose it turns from. */
+    private poseRests(): void {
         for (const pose of this.restPoses) {
             const part = this.context.parts.get(pose.partId);
             const turret = part?.bones.get(pose.turretBone.toLowerCase());
@@ -1154,8 +1206,8 @@ export class TurretRig {
      * One anchor, in the frame its axis is measured against.
      *
      * The bone's POSITION and scale, which clips may move, and its REST orientation - the pose
-     * `aimBone` measures every angle from - never its live one. That is what holds a yaw track
-     * still while the turret yaws.
+     * `aimBone` measures every angle from, the clip's pose of it while a clip runs - never its live
+     * one. That is what holds a yaw track still while the turret yaws.
      *
      * A pitch track needs one thing more when there is no barrel and the turret bone carries both
      * axes (2 of 19 models). Its rest frame is the same as the yaw track's, but elevation turns
@@ -1171,7 +1223,10 @@ export class TurretRig {
      */
     private placeTurretAnchor(parts: TurretHandleParts): void {
         const { anchor, bone } = parts;
-        const rest = this.sweepRest.get(bone) ?? bone.quaternion;
+        const rest =
+            this.clipBase.get(bone) ??
+            this.sweepRest.get(bone) ??
+            bone.quaternion;
 
         anchor.position.copy(bone.position);
         anchor.scale.copy(bone.scale);
@@ -1374,7 +1429,8 @@ export class TurretRig {
     }
 
     /**
-     * Turns a bone by one or two angles, measured from the pose the model authored.
+     * Turns a bone by one or two angles, measured from the pose the model authored - or, while a clip
+     * runs, from the pose the clip gave it this frame.
      *
      * Degrees in, because that is what the XML declares and what the panel reads out.
      */
@@ -1399,7 +1455,9 @@ export class TurretRig {
             );
         }
 
-        bone.quaternion.copy(this.sweepRestOf(bone)).multiply(turn);
+        bone.quaternion
+            .copy(this.clipBase.get(bone) ?? this.sweepRestOf(bone))
+            .multiply(turn);
     }
 
     /**

@@ -1142,8 +1142,8 @@ export class PreviewViewport {
         this.elapsed += dt;
         this.animation.advance(dt);
         this.animation.applyAnimatedVisibility();
-        // After the mixer, so a clip that drives the same bone wins: an animation is the model's own
-        // word about where the turret is, and the sweep is the reader asking a question about it.
+        // After the mixer, so the sweep turns on top of the pose the clip gave the bone this frame -
+        // the composition `TurretRig.composeOnClip` sets up for the rest angle and the aim too.
         this.turret.advanceTurretSweep(dt);
         this.destruction.advanceBreakoffs(dt);
         this.destruction.advanceSpinAway(dt);

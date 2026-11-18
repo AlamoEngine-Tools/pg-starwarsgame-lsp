@@ -4,6 +4,13 @@
 
 ### Features
 
+- **Turret handles on hover, in every lens** - pointing at a turret in the model preview draws its yaw and pitch
+  handles in Model, Animation and Gameplay, a skinned turret included, and every turret that turns gets them,
+  one whose weapon declares no range too. A knob is taken anywhere inside it as drawn, never less than 14px,
+  and the cursor shows when a knob can be taken and while it is held. With the arcs on in Gameplay the handles
+  stay drawn as before. While a clip runs, the rest angle, the sweep and the aim turn on top of the pose the
+  clip gives the turret, so a knob works during every clip
+  ([#437](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/437))
 - **Reset all turrets** - the model preview's Model state group on the stage carries one button that puts
   every turned turret back at the pose the model authored, in every lens, with the number of turned turrets
   inside it; it is disabled while none is turned and left out for a subject with no turret that turns. The
