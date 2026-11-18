@@ -40,7 +40,7 @@ async function bend(): Promise<Bent> {
 
         v.setHeat(true);
         v.setHeatDebug(true);
-        v.renderFrame();
+        v.environment.renderFrame();
         const field = new Uint8Array(4);
         gl.readPixels(4, 4, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, field);
         v.setHeatDebug(false);
@@ -50,10 +50,10 @@ async function bend(): Promise<Bent> {
         const plain = new Uint8Array(width * height * 4);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, plain);
 
-        v.heat.render(v.renderer, v.scene, v.camera, false);
+        v.environment.heat.render(v.renderer, v.scene, v.camera, false);
         const bent = new Uint8Array(width * height * 4);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, bent);
-        v.renderFrame();
+        v.environment.renderFrame();
 
         let differing = 0;
         for (let i = 0; i < plain.length; i += 4) {

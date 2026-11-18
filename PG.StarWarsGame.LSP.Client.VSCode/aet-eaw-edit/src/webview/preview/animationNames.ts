@@ -308,16 +308,6 @@ export interface AnimationGroup {
     actions: AnimationAction[];
 }
 
-/**
- * The clips of one model, gathered into families and then into actions.
- *
- * Families come out in `FAMILIES` order rather than in the order the model happens to use them, so
- * Death is always in the same place whatever was opened. Empty families are left out entirely - a
- * heading over nothing is a claim that the model should have had one.
- *
- * Within a family the actions keep the order their first take appears in, which is the order the
- * index handed them over.
- */
 /** Just enough of a scene to say which model its clips are named after. */
 interface ClipNamingScene {
     animationSource?: string | null;
@@ -346,6 +336,16 @@ export function clipNamingModel(
     return named.replace(/\.[^.]*$/, "");
 }
 
+/**
+ * The clips of one model, gathered into families and then into actions.
+ *
+ * Families come out in `FAMILIES` order rather than in the order the model happens to use them, so
+ * Death is always in the same place whatever was opened. Empty families are left out entirely - a
+ * heading over nothing is a claim that the model should have had one.
+ *
+ * Within a family the actions keep the order their first take appears in, which is the order the
+ * index handed them over.
+ */
 export function groupAnimations(
     model: string,
     files: readonly string[],

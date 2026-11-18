@@ -122,11 +122,6 @@ describe("frameSphere", () => {
 
 describe("clipPlanes", () => {
     /**
-     * The corpus spans orders of magnitude - infantry are a couple of units across, a command centre
-     * is thousands. One fixed near plane either clips the small models away or z-fights the large
-     * ones into stripes, so both planes scale with the model.
-     */
-    /**
      * The depth buffer's precision is set almost entirely by the NEAR plane, and a coplanar overlay
      * is what pays for a bad one.
      *
@@ -160,6 +155,11 @@ describe("clipPlanes", () => {
         assert.ok(planes.near <= 67 / 100, `near is ${planes.near}`);
     });
 
+    /**
+     * The corpus spans orders of magnitude - infantry are a couple of units across, a command centre
+     * is thousands. One fixed near plane either clips the small models away or z-fights the large
+     * ones into stripes, so both planes scale with the model.
+     */
     it("scales both planes with the model", () => {
         const small = clipPlanes(
             { center: { x: 0, y: 0, z: 0 }, radius: 1 },

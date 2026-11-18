@@ -44,13 +44,6 @@ export function parseHex(text: string): PreviewRgba | null {
 }
 
 /**
- * A faction colour as the renderer takes it.
- *
- * Alpha is forced opaque, matching `RenderObject::SetColorization`, which comments the same rule:
- * "always force alpha channel to 100%". Vanilla factions do ship colours with other alphas, and
- * honouring them would make those units translucent in a way the game never shows.
- */
-/**
  * The colour to feed the shader's `Colorization`, which is the ONE colourisation parameter the
  * effects declare.
  *
@@ -107,6 +100,13 @@ export function affiliationColour(
     );
 }
 
+/**
+ * A faction colour as the renderer takes it.
+ *
+ * Alpha is forced opaque, matching `RenderObject::SetColorization`, which comments the same rule:
+ * "always force alpha channel to 100%". Vanilla factions do ship colours with other alphas, and
+ * honouring them would make those units translucent in a way the game never shows.
+ */
 export function teamColour(colour: PreviewRgba): NormalisedColour {
     return {
         r: clampChannel(colour.r) / 255,

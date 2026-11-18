@@ -20,16 +20,20 @@ type Particle = { position: { x: number; y: number; z: number } };
 type Inner = {
     camera: THREE.PerspectiveCamera;
     loop: () => void;
-    renderFrame: () => void;
+    /** The pass chain, on the viewport's environment layer. */
+    environment: { renderFrame: () => void };
     renderer: THREE.WebGLRenderer;
     controls: { target: THREE.Vector3; update: () => void; enableDamping: boolean };
-    particleSystems: Map<string, {
-        instance: {
-            emitters: unknown[];
-            emitterMesh: (i: number) => THREE.Mesh | null;
-            emitterParticles: (i: number) => Particle[]
-        }
-    }>;
+    /** The running systems, on the viewport's particle layer. */
+    particles: {
+        particleSystems: Map<string, {
+            instance: {
+                emitters: unknown[];
+                emitterMesh: (i: number) => THREE.Mesh | null;
+                emitterParticles: (i: number) => Particle[]
+            }
+        }>;
+    };
 };
 
 const lines: string[] = [];
@@ -76,7 +80,7 @@ function frames(inner: Inner, n: number): Promise<void> {
 
 /** Renders one frame, counts the pixels that differ from the corner, keeps the frame as a PNG. */
 function readback(inner: Inner): string {
-    inner.renderFrame();
+    inner.environment.renderFrame();
     const gl = inner.renderer.getContext() as WebGL2RenderingContext;
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
@@ -116,7 +120,7 @@ function decodeDds(data: string): { texture: THREE.Texture; summary: string } {
 }
 
 function describeMesh(inner: Inner, label: string): void {
-    const entry = inner.particleSystems.get("probe");
+    const entry = inner.particles.particleSystems.get("probe");
     const mesh = entry?.instance.emitterMesh(0) ?? null;
     if (mesh === null) {
         log(`${label}: no mesh`);
@@ -218,7 +222,7 @@ async function main(): Promise<void> {
     await frames(inner, 2);
 
     // A close-up on the first particle: both paths, one pose.
-    const entry = inner.particleSystems.get("probe")!;
+    const entry = inner.particles.particleSystems.get("probe")!;
     const first = entry.instance.emitterParticles(0)[0]?.position ?? {x: 0, y: 0, z: 0};
     const target = new THREE.Vector3(first.x, first.y, first.z);
     const pose = (): void => {

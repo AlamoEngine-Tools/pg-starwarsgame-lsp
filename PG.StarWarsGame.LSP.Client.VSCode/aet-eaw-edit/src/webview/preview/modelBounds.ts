@@ -96,3 +96,34 @@ export function drawnBounds(
 
     return box;
 }
+
+/**
+ * How many triangles one geometry draws.
+ *
+ * An indexed geometry draws its INDEX buffer, not its vertices - reading the vertex count would
+ * under-report every shipped mesh, all of which are indexed.
+ */
+export function triangleCount(geometry: THREE.BufferGeometry): number {
+    const vertices = geometry.getAttribute("position")?.count ?? 0;
+
+    return Math.floor((geometry.getIndex()?.count ?? vertices) / 3);
+}
+
+/**
+ * The root of something this viewport DRAWS OVER the model - a firing arc, a turret handle - rather
+ * than part of it.
+ *
+ * One flag for every overlay, checked everywhere the model is walked or measured: the mesh walk the
+ * tree, the stats, the shader rebuild, the wireframe and the tint go through, plus the framing sphere
+ * and the subject span. Both kinds of overlay hang INSIDE the model on bones, and both are meshes, so
+ * neither a type test nor scoping to the part roots keeps them out - the same trap the particle
+ * systems fell into first.
+ *
+ * Measured on the Gargantuan with both showing, before this: 24 overlay meshes walked as geometry,
+ * 24 phantom tree rows, shader coverage counting 35 meshes where the model has 11, the knob handed a
+ * model material on a shader rebuild and swept by the wireframe, the span five times the hull's and
+ * the camera framing five times too far.
+ */
+export function isOverlay(node: THREE.Object3D): boolean {
+    return node.userData.aetOverlay === true;
+}

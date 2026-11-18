@@ -231,10 +231,6 @@ describe("IconButton", () => {
     });
 
     /**
-     * The count belongs INSIDE the button, not beside it: pressing the number has to do what
-     * pressing the glyph does, and a count that is a sibling is a hit area the reader can miss.
-     */
-    /**
      * A sentence is the right tooltip and the wrong accessible name: heard before every other
      * control on the row, "Choose which language columns to show" is what a screen-reader user
      * skips past. The two are allowed to differ, and default to the same string when they do not.
@@ -253,6 +249,10 @@ describe("IconButton", () => {
         assert.match(html, /aria-label="Columns"/);
     });
 
+    /**
+     * The count belongs INSIDE the button, not beside it: pressing the number has to do what
+     * pressing the glyph does, and a count that is a sibling is a hit area the reader can miss.
+     */
     it("carries a count beside its glyph, inside the same hit area", () => {
         const html = render(
             <IconButton

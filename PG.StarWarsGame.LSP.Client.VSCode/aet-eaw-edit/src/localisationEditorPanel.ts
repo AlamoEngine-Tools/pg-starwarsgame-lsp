@@ -86,7 +86,6 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
 
     private constructor(
         private readonly _filePaths: string[],
-        /** Which language's column to show alone at first, when opened on one file of a set. */
         /**
          * Which language's column to show alone, when opened on one file of a set.
          *

@@ -325,17 +325,6 @@ function localDeclarations(structs: StructTable): RegExp {
 }
 
 /**
- * Rewrites a translation unit so no assignment relies on implicit truncation.
- *
- * Function by function, each with its OWN scope. A single flat scope looked sufficient and was not:
- * both entry points name their parameter `In`, so the vertex shader's `VS_INPUT_MESH In` overwrote
- * the pixel shader's `VS_OUTPUT In`, every `In.Spec` became untypeable, and every truncation on one
- * was silently skipped. Same name, different struct, in the same file.
- *
- * Anything whose type cannot be worked out is left exactly as it was - a wrong swizzle changes what
- * the shader computes, which is worse than a shader that does not translate.
- */
-/**
  * Makes a scalar conversion explicit.
  *
  * HLSL converts freely between float and int; GLSL converts neither way on its own. Every skinning
@@ -393,6 +382,17 @@ function scopeFor(
     return scope;
 }
 
+/**
+ * Rewrites a translation unit so no assignment relies on implicit truncation.
+ *
+ * Function by function, each with its OWN scope. A single flat scope looked sufficient and was not:
+ * both entry points name their parameter `In`, so the vertex shader's `VS_INPUT_MESH In` overwrote
+ * the pixel shader's `VS_OUTPUT In`, every `In.Spec` became untypeable, and every truncation on one
+ * was silently skipped. Same name, different struct, in the same file.
+ *
+ * Anything whose type cannot be worked out is left exactly as it was - a wrong swizzle changes what
+ * the shader computes, which is worse than a shader that does not translate.
+ */
 export function fixVectorTruncation(source: string): string {
     const structs = collectStructs(source);
     const globals = collectGlobals(source);

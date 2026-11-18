@@ -389,22 +389,6 @@ export function becauseText(because: string): string {
 }
 
 /**
- * The same row, asked only about the things that apply to everything BENEATH it.
- *
- * A merged bone/mesh row writes two different things: whether that mesh is drawn, and whether the
- * bone is visible - which prunes its entire subtree. Deciding both from one answer is wrong in one
- * direction: what the FILE says about a mesh, and what the current level says about it, are
- * statements about that mesh alone. Everything else - the reader's own tick, a master switch, a
- * hidden ancestor, a clip hiding the bone - is a statement about the bone and takes the subtree
- * with it, which is what a tree means.
- *
- * The AT-AT is the case that proved it. Its particle proxies are bones named after the effect they
- * carry, each with a marker mesh of the same name that the file marks hidden. Merged into one row,
- * the mesh's flag pruned the bone's subtree, and the effect attached to that bone was vetoed by an
- * ancestor it could not see - so every fire, smoke and explosion proxy on the model was dark and no
- * amount of ticking brought one back.
- */
-/**
  * The same row, asked about the EFFECT it carries rather than the geometry.
  *
  * One difference, and it is the engine's: **Alamo does not inherit visibility.**
@@ -455,6 +439,22 @@ export function damageMeshFacts(facts: RowFacts, shown: boolean): RowFacts {
     return { ...facts, inFile: shown };
 }
 
+/**
+ * The same row, asked only about the things that apply to everything BENEATH it.
+ *
+ * A merged bone/mesh row writes two different things: whether that mesh is drawn, and whether the
+ * bone is visible - which prunes its entire subtree. Deciding both from one answer is wrong in one
+ * direction: what the FILE says about a mesh, and what the current level says about it, are
+ * statements about that mesh alone. Everything else - the reader's own tick, a master switch, a
+ * hidden ancestor, a clip hiding the bone - is a statement about the bone and takes the subtree
+ * with it, which is what a tree means.
+ *
+ * The AT-AT is the case that proved it. Its particle proxies are bones named after the effect they
+ * carry, each with a marker mesh of the same name that the file marks hidden. Merged into one row,
+ * the mesh's flag pruned the bone's subtree, and the effect attached to that bone was vetoed by an
+ * ancestor it could not see - so every fire, smoke and explosion proxy on the model was dark and no
+ * amount of ticking brought one back.
+ */
 export function subtreeFacts(facts: RowFacts): RowFacts {
     // `resting` stays: it comes from a clip's track, which names a BONE, so it is a statement about
     // the whole subtree in the same way a playing clip's is.

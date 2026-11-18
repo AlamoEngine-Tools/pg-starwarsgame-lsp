@@ -323,12 +323,6 @@ const RANGES: Record<string, { min: number; max: number }> = {
 };
 
 /**
- * Reads settings back out of storage, falling back field by field.
- *
- * Field by field rather than all-or-nothing: one unreadable value should cost its own control, not
- * every preference the reader has set.
- */
-/**
  * The saved shots that are still readable.
  *
  * Entry by entry, and a bad one is DROPPED rather than repaired or thrown on. This store outlives
@@ -416,6 +410,12 @@ function bindingsFrom(stored: unknown): CameraBinding[] {
     return bindings;
 }
 
+/**
+ * Reads settings back out of storage, falling back field by field.
+ *
+ * Field by field rather than all-or-nothing: one unreadable value should cost its own control, not
+ * every preference the reader has set.
+ */
 export function viewerSettingsFrom(stored: unknown): ViewerSettings {
     const raw = asRecord(stored);
 

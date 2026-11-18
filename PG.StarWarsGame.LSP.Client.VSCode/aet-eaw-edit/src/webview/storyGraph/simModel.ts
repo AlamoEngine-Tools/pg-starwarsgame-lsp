@@ -21,7 +21,6 @@ import {
 
 // ── Decisions ────────────────────────────────────────────────────────────────
 
-/** What kind of answer a decision takes: a world change, a battle outcome, a Lua notification, or an assumption. */
 /**
  * The decision the story hangs on, to open beside the dock by itself: a pending or starting battle
  * (the galaxy is frozen for it), else the decision armed last - the next step of the chain that
@@ -112,6 +111,7 @@ export function portalPickAction(
     return mode === "simulate" ? "select" : mode === "view" ? "open" : "none";
 }
 
+/** What kind of answer a decision takes: a world change, a battle outcome, a Lua notification, or an assumption. */
 export type DecisionKind = "world" | "tactical" | "lua" | "assume";
 
 export interface DecisionGroup {
@@ -441,7 +441,6 @@ export function describeChange(change: StorySimWorldChangeDto): string {
 
 // ── Pace ─────────────────────────────────────────────────────────────────────
 
-/** How the author advances ticks: a 1 s pulse, one tick per press, or a custom rate. */
 /**
  * Whether play should pick itself up again after the author answered something.
  *

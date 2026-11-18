@@ -60,12 +60,12 @@ export function shaderLicenceNote(): string {
     );
 }
 
-/** The managed directory, or undefined when the user has not supplied one. */
 /** The download prompt's buttons, one wrapped text each, so the choice compares against it. */
 const DOWNLOAD_NOW = (): string => vscode.l10n.t("Download now");
 const OPEN_DOWNLOAD_PAGE = (): string => vscode.l10n.t("Open download page");
 const CHOOSE_FOLDER = (): string => vscode.l10n.t("Choose folder");
 
+/** The managed directory, or undefined when the user has not supplied one. */
 export function shaderDirectory(): string | undefined {
     const configured = vscode.workspace
         .getConfiguration()

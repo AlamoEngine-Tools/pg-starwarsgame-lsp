@@ -9,7 +9,6 @@
 
 import type { FxPass } from "./fxParser";
 
-/** How a pass composites. */
 /**
  * The blend a pass declares.
  *

@@ -152,10 +152,6 @@ describe("hardpointPool", () => {
 });
 
 describe("hullPool", () => {
-    // 188 objects over the two trees carry their weapons as WEAPON behaviour and no hardpoints at
-    // all, against 68 with hardpoints - so this is the COMMON unit, not an edge case.
-    const NO_HARDPOINTS: PreviewHardpoint[] = [];
-
     it("reports what the unit has left, not what it started with", () => {
         // The bug. `hullPool` answered `tacticalHealth` for both ends of the bar, so the reader
         // could empty the pool with the attacker panel and watch a full hull bar the whole time -
@@ -237,6 +233,8 @@ describe("a unit with no hardpoints dying", () => {
     // Reported: it could not die at all. `unitDestroyed` required a destructible hardpoint, and
     // its own doc said such a unit "dies by its own health pool" - which nothing implemented. Every
     // fighter, every infantry squad and most ground vehicles were unkillable.
+    // 188 objects over the two trees carry their weapons as WEAPON behaviour and no hardpoints at
+    // all, against 68 with hardpoints - so this is the COMMON unit, not an edge case.
     const NO_HARDPOINTS: PreviewHardpoint[] = [];
 
     it("dies when its hull pool is emptied", () => {

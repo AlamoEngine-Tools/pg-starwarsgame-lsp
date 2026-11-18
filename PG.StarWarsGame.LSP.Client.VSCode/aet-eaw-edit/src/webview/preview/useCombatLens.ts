@@ -629,21 +629,15 @@ export function useCombatLens({
     const livePools = useMemo(() => poolsFor(scene, pools), [scene, pools]);
 
     /**
-     * The unit's hull bar.
-     *
-     * Derived rather than stored: it is a VIEW of the hardpoint healths, and a second copy would
-     * drift from them the first time anything else changed a hardpoint.
-     *
-     * Declared ABOVE the death watch because the watch reads it - a unit with no hardpoints dies
-     * when this empties, and there is nothing else that could tell it so.
-     */
-    /**
      * The two pools, corrected against each other exactly as a service tick would.
      *
      * They are SEPARATE - the hull is the unit's own Tactical_Health, the hardpoints are their own
      * sum - and neither may run more than Hull_Vs_Hard_Points_Health_Constraint ahead of the other.
      * The panel used to draw the hardpoint sum as the hull, so the pool that actually kills the unit
      * was never on screen and the leash was not modelled at all.
+     *
+     * Declared ABOVE the death watch because the watch reads it - a unit with no hardpoints dies
+     * when the hull empties, and there is nothing else that could tell it so.
      */
     const healthNow = useMemo(() => {
         // `livePools.hull` is the LIVE number the attacker panel depletes. Without it the bar drew

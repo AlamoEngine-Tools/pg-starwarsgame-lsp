@@ -70,11 +70,7 @@ import { useAbilities } from "./preview/useAbilities";
 import { useAnimationTransport } from "./preview/useAnimationTransport";
 import { useCombatLens } from "./preview/useCombatLens";
 import { WRECK_EFFECT } from "./preview/partIds";
-import {
-    ancestorsOf,
-    type BoneAttachment,
-    type FlatBone,
-} from "./preview/skeleton";
+import { ancestorsOf } from "./preview/skeleton";
 import {
     boneIndexOfRow,
     toggleSelected,
@@ -280,11 +276,6 @@ function ModelPreview(): React.JSX.Element {
         scrubbingRef,
     } = player;
 
-    const [bones, setBones] = useState<FlatBone[]>([]);
-    const [attachments, setAttachments] = useState<
-        Map<number, BoneAttachment[]>
-    >(new Map());
-
     /**
      * Drops the selection, and with it the box drawn round it in the viewport.
      *
@@ -444,7 +435,8 @@ function ModelPreview(): React.JSX.Element {
         hardpointSearchPressed,
     } = flyouts;
 
-    const [particlesPaused, setParticlesPaused] = useState(false);
+    // Nothing sets this yet: #289 adds the particle transport that pauses them.
+    const [particlesPaused] = useState(false);
     /** Emitter names in file order. Names repeat, so the index is the identity, not the name. */
     const [emitters, setEmitters] = useState<string[]>([]);
     const [hiddenEmitters, setHiddenEmitters] = useState<ReadonlySet<number>>(
@@ -520,13 +512,6 @@ function ModelPreview(): React.JSX.Element {
     const lodSteps = useMemo(() => levelSteps(levels.lod), [levels.lod]);
 
     /**
-     * What each detail level costs, for the LOD slider's own label.
-     *
-     * Depends on `stats` for the reason the arcs and the reticles do - it is this component's
-     * signal that geometry has arrived - and on `alt`, because a mesh tagged for another damage
-     * stage is not part of what the level draws.
-     */
-    /**
      * Where the shadow colour can be seen, which decides whether its control is live.
      *
      * Depends on `translatedOn` because the stencil pass follows the renderer, and on `stats`
@@ -542,6 +527,13 @@ function ModelPreview(): React.JSX.Element {
         [floor, translatedOn, stats],
     );
 
+    /**
+     * What each detail level costs, for the LOD slider's own label.
+     *
+     * Depends on `stats` for the reason the arcs and the reticles do - it is this component's
+     * signal that geometry has arrived - and on `alt`, because a mesh tagged for another damage
+     * stage is not part of what the level draws.
+     */
     const lodCost = useMemo(
         () =>
             viewportRef.current?.costByLod(levels.lod) ??
@@ -549,12 +541,6 @@ function ModelPreview(): React.JSX.Element {
         [levels.lod, alt, stats],
     );
 
-    /**
-     * Read inside the message handler, which is not re-created when `destroyed` changes.
-     *
-     * Geometry and effects arrive asynchronously, so a part or system landing after a hardpoint was
-     * destroyed has to see the current state rather than the one captured when the handler was made.
-     */
     /**
      * Wreckage waiting on its model to arrive.
      *
@@ -572,6 +558,10 @@ function ModelPreview(): React.JSX.Element {
     /**
      * The hardpoints destroyed now, for the effect callbacks and the message handler, which run outside
      * a render.
+     *
+     * Geometry and effects arrive asynchronously, so a part or system landing after a hardpoint
+     * was destroyed has to see the current state rather than the one captured when the handler
+     * was made.
      *
      * Made here rather than in the combat lens that owns `destroyed` and writes it, because those
      * callbacks are made before the lens and the lens is handed them.
@@ -734,9 +724,7 @@ function ModelPreview(): React.JSX.Element {
         const viewport = viewportRef.current;
         setStats(viewport?.stats() ?? null);
         setHasWeather(viewport?.hasWeather() ?? false);
-        setBones(viewport?.skeleton() ?? []);
         setTreeItems(viewport?.treeItems() ?? []);
-        setAttachments(viewport?.attachmentsByBone() ?? new Map());
         // The geometry's own tags, WIDENED by what the object declares. A damage stage may touch
         // no geometry at all - see `withDeclaredStages` - so the model alone under-reports it.
         const defined = withDeclaredStages(
@@ -850,13 +838,6 @@ function ModelPreview(): React.JSX.Element {
     }, []);
 
     /**
-     * Points at a bone from somewhere that is not the tree.
-     *
-     * Sets exactly what a tree click sets - the row selection that draws the box, and the bone the
-     * labels highlight - so a muzzle picked off a weapon row and the same bone picked in the tree
-     * are one state rather than two that can disagree.
-     */
-    /**
      * Asks the host for everything the geometry now loaded needs in order to be DRAWN.
      *
      * Textures are asked for only once the geometry that samples them exists, so nothing is fetched
@@ -920,6 +901,13 @@ function ModelPreview(): React.JSX.Element {
         });
     }, []);
 
+    /**
+     * Points at a bone from somewhere that is not the tree.
+     *
+     * Sets exactly what a tree click sets - the row selection that draws the box, and the bone the
+     * labels highlight - so a muzzle picked off a weapon row and the same bone picked in the tree
+     * are one state rather than two that can disagree.
+     */
     const selectBoneRow = useCallback((rowId: string | undefined): void => {
         if (rowId === undefined) {
             return;
@@ -1249,7 +1237,6 @@ function ModelPreview(): React.JSX.Element {
         {
             levelsApplied: (viewport) => {
                 setStats(viewport.stats());
-                setAttachments(viewport.attachmentsByBone());
                 setTreeItems(viewport.treeItems());
             },
             translatedApplied: (viewport) =>

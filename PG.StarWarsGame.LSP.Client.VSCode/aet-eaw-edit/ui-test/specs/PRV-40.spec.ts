@@ -6,7 +6,6 @@ import { serverReady } from "../protocol.js";
 import { inNewestWebview } from "./storyGraph.js";
 import {
     openOutline,
-    rail,
     railChildren,
     railClick,
     railExpand,

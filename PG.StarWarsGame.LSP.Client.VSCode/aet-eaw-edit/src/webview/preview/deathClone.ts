@@ -106,6 +106,14 @@ export interface SweepPose {
 }
 
 /**
+ * The extent at which a traverse stops having end stops.
+ *
+ * The engine's own threshold: the turret-angle calculation skips its clamp entirely once the
+ * extent reaches this, since plus or minus 180 is already the whole circle.
+ */
+const CONTINUOUS_TURN_DEGREES = 180;
+
+/**
  * Where a turret points at `phase` through a sweep, with `phase` running 0 to 1.
  *
  * The extents are PLUS-OR-MINUS bounds, so a 90-degree extent swings 90 EITHER SIDE of rest - a
@@ -125,14 +133,6 @@ export interface SweepPose {
  * clamp is skipped once the extent reaches 180 (`FLD 180.0; FCOMIP; JBE`), because plus or minus 180
  * already covers the circle and there are no end stops left to swing between.
  */
-/**
- * The extent at which a traverse stops having end stops.
- *
- * The engine's own threshold: the turret-angle calculation skips its clamp entirely once the
- * extent reaches this, since plus or minus 180 is already the whole circle.
- */
-const CONTINUOUS_TURN_DEGREES = 180;
-
 export function sweepAngles(turret: PreviewTurret, phase: number): SweepPose {
     const rest = turret.restAngle ?? 0;
     const restPitch = turret.restPitch ?? 0;

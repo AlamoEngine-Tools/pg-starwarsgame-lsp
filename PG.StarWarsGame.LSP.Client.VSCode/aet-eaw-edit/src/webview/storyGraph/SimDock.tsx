@@ -31,7 +31,6 @@ import { IntegerField } from "../shared/IntegerField";
 import { parseInteger } from "../shared/integerValue";
 import { Modal } from "../shared/Modal";
 import { DockSection } from "../shared/DockSection";
-import { Field } from "../shared/Field";
 import { Icon, type IconName } from "../shared/Icon";
 import { ProblemsPanel } from "../shared/ProblemsPanel";
 import { TransportBar } from "../shared/TransportBar";

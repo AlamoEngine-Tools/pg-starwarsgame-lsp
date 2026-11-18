@@ -496,6 +496,12 @@ export interface PreviewHardpoint {
     turret?: PreviewTurret | null;
 }
 
+/** One band of the damage table: the health fraction it tops out at, and the stage inside it. */
+export interface PreviewDamageBand {
+    threshold: number;
+    stage: number;
+}
+
 /**
  * A faction's colours.
  *
@@ -505,12 +511,6 @@ export interface PreviewHardpoint {
  * declare exactly one colourisation uniform. An OBJECT may override it with its own - see
  * {@link PreviewScene.noColorizationColor}, which is what the preview reads.
  */
-/** One band of the damage table: the health fraction it tops out at, and the stage inside it. */
-export interface PreviewDamageBand {
-    threshold: number;
-    stage: number;
-}
-
 export interface PreviewFaction {
     name: string;
     color?: PreviewRgba | null;
@@ -518,7 +518,6 @@ export interface PreviewFaction {
     displayFontColor?: PreviewRgba | null;
 }
 
-/** Something the author should see about this scene. */
 /**
  * A camera a model carries in its own skeleton, in MODEL space.
  *
@@ -534,6 +533,7 @@ export interface PreviewCamera {
     target: number[];
 }
 
+/** Something the author should see about this scene. */
 export interface PreviewProblem {
     /** `error`, `warning` or `info`. */
     severity: string;
@@ -562,12 +562,6 @@ export interface PreviewAssetTiers {
     archiveCount: number;
 }
 
-/**
- * Everything needed to draw a preview, with no binary payload.
- *
- * Walk it, fetch each distinct model once, and drive every stateful behaviour - ALT/LOD, hardpoint
- * destruction, faction tint, particle toggles - locally. Nothing round-trips when a slider moves.
- */
 /**
  * One particle system attached to a bone of a loaded part.
  *
@@ -673,6 +667,12 @@ export interface PreviewSourceFile {
     packed: boolean;
 }
 
+/**
+ * Everything needed to draw a preview, with no binary payload.
+ *
+ * Walk it, fetch each distinct model once, and drive every stateful behaviour - ALT/LOD, hardpoint
+ * destruction, faction tint, particle toggles - locally. Nothing round-trips when a slider moves.
+ */
 export interface PreviewScene {
     /** See {@link PREVIEW_SCENE_KIND}. */
     kind: string;
