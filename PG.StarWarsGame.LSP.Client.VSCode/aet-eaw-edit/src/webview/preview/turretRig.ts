@@ -326,6 +326,13 @@ export class TurretRig {
      * swing from its rest vector.
      */
     private readonly turretRests = new Map<string, TurretAim>();
+    /** The rest poses as given, bones and all, so they can be put back after a clip resets the pose. */
+    private restPoses: readonly {
+        partId: string;
+        turretBone: string;
+        barrelBone: string | null;
+        rest: TurretAim;
+    }[] = [];
     /** The knob under the pointer, and the one being dragged. At most one of each. */
     private hoveredTurretAxis: { id: string; axis: TurretAxis } | null = null;
     private turretDrag: {
@@ -637,11 +644,26 @@ export class TurretRig {
         }[],
     ): void {
         this.turretRests.clear();
+        this.restPoses = [...poses];
         for (const pose of poses) {
             this.turretRests.set(
                 restKey(pose.partId, pose.turretBone),
                 pose.rest,
             );
+        }
+        this.reposeTurrets();
+    }
+
+    /**
+     * Puts every turret back at its rest angle and the reader's aim, over whatever pose its bones hold.
+     *
+     * A clip starting or stopping writes the FILE's pose back into every bone it snapshotted at load,
+     * turret bones included (see `AnimationRig.resetPose`), which threw away the rest angle the XML
+     * declares and the aim the reader had dragged to - while the weapon row went on reading out that
+     * aim. The turn composes on the authored pose, so putting it back is the same composition again.
+     */
+    reposeTurrets(): void {
+        for (const pose of this.restPoses) {
             const part = this.context.parts.get(pose.partId);
             const turret = part?.bones.get(pose.turretBone.toLowerCase());
             if (turret === undefined) {

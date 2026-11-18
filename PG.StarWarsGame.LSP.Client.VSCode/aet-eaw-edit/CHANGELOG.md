@@ -9,6 +9,11 @@
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the
   path. The names are kept as written and cut where they are looked up
   ([#292](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/292))
+- **A clip leaves the turrets where they were pointed** - starting or stopping a clip, an ability's deploy
+  included, wrote the model file's pose back into every bone, turret bones too: a turret turned by hand swung
+  back to where it was exported while its weapon row went on reading out the aim, and the rest angle the XML
+  declares was lost with it. The rest angle and the aim are now turned on again on top of the file's pose
+  ([#437](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/437))
 
 ## 0.5.2
 

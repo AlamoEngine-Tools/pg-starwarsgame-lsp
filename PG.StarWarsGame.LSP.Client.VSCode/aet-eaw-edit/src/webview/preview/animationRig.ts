@@ -288,6 +288,11 @@ export class AnimationRig {
             node.scale.copy(rest.scale);
         }
 
+        // The file's pose is not the whole of a turret's: its rest angle and the reader's aim turn on
+        // top of it, and they are the turret layer's to put back. Left out, starting any clip - an
+        // ability's deploy included - swung every turret back to where it was exported.
+        this.context.turret.reposeTurrets();
+
         // Transforms are the part three.js would have restored on its own; visibility is not, and a
         // bone left switched off by the clip that just stopped is the residue that actually shows.
         // Asking the level and override rules again is what puts it back - they, not this, know

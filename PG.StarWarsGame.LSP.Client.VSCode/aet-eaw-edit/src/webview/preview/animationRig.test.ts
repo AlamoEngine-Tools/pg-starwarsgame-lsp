@@ -19,9 +19,16 @@ function rigWith(): {
     animation: AnimationRig;
     bone: THREE.Object3D;
     cleared: () => number;
+    reposed: () => number;
 } {
     let clears = 0;
+    let reposes = 0;
     const context = standInContext({
+        turret: {
+            reposeTurrets: () => {
+                reposes++;
+            },
+        },
         assembly: { setPartHidden: () => undefined },
         rows: {
             clearRowOverrides: () => {
@@ -53,7 +60,12 @@ function rigWith(): {
         quaternion: bone.quaternion.clone(),
         scale: bone.scale.clone(),
     });
-    return { animation, bone, cleared: () => clears };
+    return {
+        animation,
+        bone,
+        cleared: () => clears,
+        reposed: () => reposes,
+    };
 }
 
 describe("AnimationRig", () => {
@@ -166,5 +178,15 @@ describe("AnimationRig", () => {
             Math.abs(bone.position.x - 0.5) < 1e-6,
             `x ${bone.position.x}`,
         );
+    });
+
+    it("hands the turrets back their pose whenever it puts the file's pose back", () => {
+        const { animation, reposed } = rigWith();
+
+        animation.play("Move");
+        assert.equal(reposed(), 1);
+
+        animation.play(null);
+        assert.equal(reposed(), 2);
     });
 });

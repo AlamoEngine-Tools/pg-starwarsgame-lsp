@@ -135,4 +135,24 @@ describe("TurretRig", () => {
         restore();
         assert.equal(rig.arcsShown, true);
     });
+
+    it("turns a turret back to its rest angle after a clip put the file's pose back", () => {
+        const { part, turret } = turretPart();
+        const rig = rigWith(new Map([["p", part]]));
+        rig.setTurretRestAngles([
+            {
+                partId: "p",
+                turretBone: "Turret",
+                barrelBone: null,
+                rest: { yaw: 90, pitch: 0 },
+            },
+        ]);
+
+        // What `AnimationRig.resetPose` does to every bone it snapshotted at load.
+        turret.quaternion.identity();
+        rig.reposeTurrets();
+
+        const angle = 2 * Math.acos(Math.min(1, Math.abs(turret.quaternion.w)));
+        assert.ok(Math.abs(angle - Math.PI / 2) < 1e-6, `turned by ${angle}`);
+    });
 });
