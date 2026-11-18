@@ -5,7 +5,6 @@ import {
     command,
     copyBugReport,
     eaw,
-    extensionLog,
     recordStatus,
     statusHistory,
     viewItems,

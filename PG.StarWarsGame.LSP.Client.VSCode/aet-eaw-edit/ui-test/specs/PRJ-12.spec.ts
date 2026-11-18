@@ -1,7 +1,7 @@
 // PRJ-12: a dependency's localisation file is read-only - saving and exporting are refused and nothing is
 // written.
 import fs from "node:fs";
-import { browser, expect } from "@wdio/globals";
+import { expect } from "@wdio/globals";
 import { notification, projectsReady } from "../protocol.js";
 import { inNewestWebview } from "./storyGraph.js";
 import { confirmDialog, editCell, openTextFile, pressTile, save, saveTitle, treeRows } from "./locGrid.js";

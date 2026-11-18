@@ -6,6 +6,7 @@
     "types": ["node", "@wdio/globals/types", "@wdio/mocha-framework", "wdio-vscode-service"],
     "strict": true,
     "skipLibCheck": true,
+    "noUnusedLocals": true,
     "noEmit": true
   },
   "include": ["./**/*.ts"]

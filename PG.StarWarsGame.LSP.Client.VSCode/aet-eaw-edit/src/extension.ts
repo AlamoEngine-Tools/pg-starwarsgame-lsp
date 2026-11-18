@@ -532,15 +532,6 @@ async function pickProject(): Promise<ProjectClient | undefined> {
 }
 
 /**
- * The gateway of the project a command acts on: the document in front's, else the one last picked
- * in this window, else the one picked now. Undefined when the picker was dismissed.
- */
-async function commandGateway(): Promise<LspGateway | undefined> {
-    const key = await commandProjectKey();
-    return key === null ? undefined : gatewayFor(key);
-}
-
-/**
  * The key of the project a command acts on, "" with none running, null when the picker was
  * dismissed. Panels are filed under it, so two projects' panels of one name stay apart - and under
  * the real key with one project too, so a panel keeps its project when a second one starts.
