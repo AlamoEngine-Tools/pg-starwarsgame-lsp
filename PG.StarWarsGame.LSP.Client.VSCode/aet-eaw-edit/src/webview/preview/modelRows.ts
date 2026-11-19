@@ -59,8 +59,9 @@ function anchorNodeOf(entry: ParticleEntry): THREE.Object3D {
 /**
  * What one tree row controls.
  *
- * `boneIndex` means the row IS that bone; `ownerBone` is the bone a mesh row that is not merged with
- * its bone rides, whose track is that mesh's animation switch.
+ * `boneIndex` means the row IS that bone; `ownerBone` is the hull bone a row that is not merged with
+ * its bone is on: the bone a mesh rides, whose track is that mesh's animation switch, or the bone an
+ * effect is anchored on. The rules that name a bone read either.
  */
 interface RowTarget {
     boneIndex?: number;
@@ -369,7 +370,7 @@ export class ModelRows {
                 `particle:${systemId}`,
                 entry.system.name,
                 boneId(owner),
-                { particleId: systemId },
+                { particleId: systemId, ownerBone: owner },
             );
 
             items.push({
@@ -679,7 +680,7 @@ export class ModelRows {
             const answer = resolveRow(
                 target.particleId === undefined
                     ? facts
-                    : this.effectFacts(facts, target.particleId),
+                    : this.effectFacts(facts, target),
             );
 
             resolutions.set(rowId, answer);
@@ -758,10 +759,11 @@ export class ModelRows {
 
             // The state switch: the file writes it from its hidden flag, and in a unit preview the
             // game's rules write over it - the shield, the stealth shell, the collision hulls, the
-            // damage decals. See `UnitRules.meshState`.
+            // damage decals, a hardpoint's Damage_Particles bone. See `UnitRules.meshState`.
             facts.state = this.context.rules.meshState(
                 fileState(extras.alamoHidden !== true),
                 extras,
+                target.boneIndex ?? target.ownerBone,
             );
 
             // A SKINNED mesh rides no bone, so every track below missed it - see `skinVisibility`.
@@ -846,8 +848,11 @@ export class ModelRows {
      * lights when a hardpoint is destroyed was drawing from the moment the model opened, and a
      * proxy the current ALT/LOD gates off was drawing too.
      */
-    private effectFacts(facts: RowFacts, systemId: string): RowFacts {
-        const entry = this.context.particles.particleSystems.get(systemId);
+    private effectFacts(facts: RowFacts, target: RowTarget): RowFacts {
+        const entry =
+            target.particleId === undefined
+                ? undefined
+                : this.context.particles.particleSystems.get(target.particleId);
 
         return {
             ...facts,
@@ -858,11 +863,13 @@ export class ModelRows {
                 { id: "effects", on: this.context.particles.particlesVisible },
             ],
 
-            // The cloak is written in the rules layer, in the same chain that swaps the meshes - see
-            // `UnitRules.effectState`. Not in the caller's effect decider: that put the flag in two
-            // places, and the two disagreed the moment anything drove one without the other.
+            // The cloak and the Damage_Particles bone are written in the rules layer, in the same
+            // chain that writes the meshes - see `UnitRules.effectState`. Not in the caller's effect
+            // decider: that put a flag in two places, and the two disagreed the moment anything drove
+            // one without the other.
             state: this.context.rules.effectState(
                 entry?.state ?? fileState(true),
+                target.boneIndex ?? target.ownerBone,
             ),
             alt: entry?.altVisible ?? true,
             lod: entry?.lodVisible ?? true,

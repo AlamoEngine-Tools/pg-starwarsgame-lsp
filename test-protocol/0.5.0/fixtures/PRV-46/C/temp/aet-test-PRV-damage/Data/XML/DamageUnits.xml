@@ -1,0 +1,9 @@
+﻿<?xml version="1.0"?>
+<DamageUnits>
+<SpaceUnit Name="Prv_Damage_Unit">
+<Text_ID>TEXT_NONE</Text_ID>
+<Space_Model_Name>Prv_damage.alo</Space_Model_Name>
+<Scale_Factor>1.0</Scale_Factor>
+<HardPoints>HP_Prv_Damage_Subtree, HP_Prv_Damage_FileHidden</HardPoints>
+</SpaceUnit>
+</DamageUnits>

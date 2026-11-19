@@ -99,8 +99,17 @@ function rowsWith(options: RowsOptions = {}): {
         ]),
         subjectId: ACTIVE_SUBJECT,
     };
+    const skeleton = [
+        { index: 0, name: "Root", parent: -1, visible: true },
+        { index: 1, name: "Turret", parent: 0, visible: true },
+        { index: 2, name: "Gun", parent: 1, visible: true },
+    ];
     const unit = new UnitRules(
-        standInContext({ levels: { applyLevels: () => undefined } }),
+        standInContext({
+            levels: { applyLevels: () => undefined },
+            queries: { skeleton: () => skeleton },
+            assembly: { hull: () => hull },
+        }),
     );
     unit.setRules(options.rules ?? "game");
     const context = standInContext({
@@ -327,5 +336,21 @@ describe("ModelRows", () => {
             rows.treeItems().find((item) => item.name === "Gun")?.because,
             "ancestor:Turret",
         );
+    });
+
+    it("hides every mesh on a living hardpoint's Damage_Particles bone and below it, and nothing else", () => {
+        const { rows, mesh, extra, gun, unit } = rowsWith();
+        unit.setDamageParticles(new Map([["turret", false]]));
+
+        rows.treeItems();
+
+        assert.equal(meshDrawn(mesh), false, "the bone's own mesh is drawn");
+        assert.equal(meshDrawn(extra), false, "its second mesh is drawn");
+        assert.equal(meshDrawn(gun), false, "the mesh below it is drawn");
+
+        unit.setDamageParticles(new Map([["turret", true]]));
+        rows.resolveRows();
+
+        assert.equal(meshDrawn(gun), true, "destroying it did not show them");
     });
 });

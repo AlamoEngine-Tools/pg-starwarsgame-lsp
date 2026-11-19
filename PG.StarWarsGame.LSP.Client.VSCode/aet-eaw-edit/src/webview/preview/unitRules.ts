@@ -58,6 +58,11 @@ export class UnitRules {
      */
     collisionMeshes: ReadonlySet<string> = new Set();
     /**
+     * Each hardpoint's `Damage_Particles` bone, lowercased, and whether a hardpoint naming it is
+     * destroyed. See {@link setDamageParticles}.
+     */
+    damageParticles: ReadonlyMap<string, boolean> = new Map();
+    /**
      * Whether an active ability is holding the SHIELD MESH visible.
      *
      * The mesh ships hidden - `MeshShield.fx` carries `alamoHidden: true` - so this is the unit being
@@ -71,6 +76,17 @@ export class UnitRules {
      * that is not cloaked has it hidden by this layer, and a cloaked one has everything else hidden.
      */
     stealthed = false;
+
+    /**
+     * What the `Damage_Particles` rule writes per hull bone, worked out once per hull and set of
+     * bones: true for shown, false for hidden, absent for a bone no such bone is at or above. This is
+     * asked once per row on every frame of a playing clip, and the answer only changes with those two.
+     */
+    private damageWrites: {
+        hull: unknown;
+        bones: ReadonlyMap<string, boolean>;
+        writes: ReadonlyMap<number, boolean>;
+    } | null = null;
 
     constructor(private readonly context: ViewportContext) {}
 
@@ -92,11 +108,13 @@ export class UnitRules {
         return this.rules === "game";
     }
 
-    /** Drops the decals, collision meshes and shield state of a model that is no longer shown. */
+    /** Drops the hardpoint and shield state of a model that is no longer shown. */
     forgetModel(): void {
         this.knownDecals = new Set();
         this.shownDecals = new Set();
         this.collisionMeshes = new Set();
+        this.damageParticles = new Map();
+        this.damageWrites = null;
         this.shieldRevealed = false;
     }
 
@@ -116,6 +134,20 @@ export class UnitRules {
     /** Which meshes the hardpoints claim as collision hulls. */
     setCollisionMeshes(names: ReadonlySet<string>): void {
         this.collisionMeshes = names;
+        this.context.levels.applyLevels();
+    }
+
+    /**
+     * Each hardpoint's `Damage_Particles` bone, lowercased, and whether a hardpoint naming it is
+     * destroyed - see `damageParticleBones`.
+     *
+     * Measured in the game: when a hardpoint is created, every part on its `Damage_Particles` bone or
+     * at any depth below it - meshes, effects, attached models - has its state written hidden; when the
+     * hardpoint is destroyed they are all written shown, whatever the model file says about them, and
+     * nothing hides them again. A bone, not a name: `Damage_Decal` is the rule for one named part.
+     */
+    setDamageParticles(bones: ReadonlyMap<string, boolean>): void {
+        this.damageParticles = bones;
         this.context.levels.applyLevels();
     }
 
@@ -144,8 +176,14 @@ export class UnitRules {
     /**
      * A mesh's state switch with the game's rules written over the file's write, in the order the
      * preview applies them; the last write is what the mesh has.
+     *
+     * @param bone The hull bone the mesh is on, for the rules that name a bone.
      */
-    meshState(state: StateSwitch, extras: MaterialExtras): StateSwitch {
+    meshState(
+        state: StateSwitch,
+        extras: MaterialExtras,
+        bone?: number,
+    ): StateSwitch {
         if (!this.appliesGameRules()) {
             return state;
         }
@@ -172,6 +210,10 @@ export class UnitRules {
             written = ruleState(this.shownDecals.has(name));
         }
 
+        // After the decal: a hardpoint is created after its type loaded, and both rules show on
+        // destruction anyway.
+        written = this.damageParticlesWrite(written, bone);
+
         if (this.collisionMeshes.has(name)) {
             written = ruleState(false);
         }
@@ -191,9 +233,81 @@ export class UnitRules {
      * smoke, not the proxies of the ability doing the cloaking. Written here, over the effect's own
      * state, rather than into it: the effect keeps what the effect rules last decided, so uncloaking
      * restores exactly what was playing.
+     *
+     * @param bone The hull bone the effect is anchored on, for the rules that name a bone.
      */
-    effectState(state: StateSwitch): StateSwitch {
-        return this.isStealthed() ? ruleState(false) : state;
+    effectState(state: StateSwitch, bone?: number): StateSwitch {
+        if (!this.appliesGameRules()) {
+            return state;
+        }
+
+        return this.stealthed
+            ? ruleState(false)
+            : this.damageParticlesWrite(state, bone);
+    }
+
+    /** The `Damage_Particles` rule's write over a part on `bone`, or `state` when it writes nothing. */
+    private damageParticlesWrite(
+        state: StateSwitch,
+        bone: number | undefined,
+    ): StateSwitch {
+        if (bone === undefined || this.damageParticles.size === 0) {
+            return state;
+        }
+
+        const write = this.damageWritesByBone().get(bone);
+
+        return write === undefined ? state : ruleState(write);
+    }
+
+    /**
+     * Per hull bone, what the `Damage_Particles` rule writes: shown when any such bone at or above it
+     * belongs to a destroyed hardpoint, hidden when every one does to a living hardpoint.
+     *
+     * Shown wins because only a destruction writes after creation, and it writes shown. The bone is
+     * matched by name, without case, as the hardpoint's tag names it.
+     */
+    private damageWritesByBone(): ReadonlyMap<number, boolean> {
+        const hull = this.context.assembly.hull();
+
+        if (
+            this.damageWrites !== null &&
+            this.damageWrites.hull === hull &&
+            this.damageWrites.bones === this.damageParticles
+        ) {
+            return this.damageWrites.writes;
+        }
+
+        const skeleton = this.context.queries.skeleton();
+        const byIndex = new Map(skeleton.map((bone) => [bone.index, bone]));
+        const writes = new Map<number, boolean>();
+
+        for (const bone of skeleton) {
+            let write: boolean | undefined;
+            // Bounded by the skeleton's size: a file-controlled parent chain that loops must not hang
+            // the preview.
+            let steps = skeleton.length;
+
+            for (
+                let at = byIndex.get(bone.index);
+                at !== undefined && steps-- > 0;
+                at = at.parent < 0 ? undefined : byIndex.get(at.parent)
+            ) {
+                const named = this.damageParticles.get(at.name.toLowerCase());
+
+                if (named !== undefined) {
+                    write = (write ?? false) || named;
+                }
+            }
+
+            if (write !== undefined) {
+                writes.set(bone.index, write);
+            }
+        }
+
+        this.damageWrites = { hull, bones: this.damageParticles, writes };
+
+        return writes;
     }
 
     /**

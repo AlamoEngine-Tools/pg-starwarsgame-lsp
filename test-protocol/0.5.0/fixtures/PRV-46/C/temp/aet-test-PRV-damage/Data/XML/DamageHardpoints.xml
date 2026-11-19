@@ -1,0 +1,19 @@
+﻿<?xml version="1.0"?>
+<HardPoints>
+<!-- Damage_Particles names a bone with a mesh and a bone of effects below it, and no decal names that mesh. -->
+<HardPoint Name="HP_Prv_Damage_Subtree">
+<Type>HARD_POINT_WEAPON_LASER</Type>
+<Is_Targetable>Yes</Is_Targetable>
+<Is_Destroyable>Yes</Is_Destroyable>
+<Health>100.0</Health>
+<Damage_Particles>HP_F-L_Bone</Damage_Particles>
+</HardPoint>
+<!-- Damage_Particles names the bone of an effect the model file marks hidden. -->
+<HardPoint Name="HP_Prv_Damage_FileHidden">
+<Type>HARD_POINT_WEAPON_LASER</Type>
+<Is_Targetable>Yes</Is_Targetable>
+<Is_Destroyable>Yes</Is_Destroyable>
+<Health>100.0</Health>
+<Damage_Particles>pi_damage_elec_SD00</Damage_Particles>
+</HardPoint>
+</HardPoints>

@@ -32,6 +32,12 @@
   level - and draws it only when all four show it; the preview now does the same, and a part's tooltip names
   the one that hides it
   ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
+- **A hardpoint's damage bone hides everything below it** - a hardpoint's `Damage_Particles` bone hid only the
+  effects one level below it, so a mesh on that bone or deeper stayed drawn on an undamaged unit, and an effect
+  further down never appeared when the hardpoint was destroyed. In the unit preview every part on that bone or
+  at any depth below it - meshes, lights, attached models and effects - is now hidden while the hardpoint
+  stands and shown once it is destroyed, whatever the model file says
+  ([#444](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/444))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

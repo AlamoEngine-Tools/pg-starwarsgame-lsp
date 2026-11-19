@@ -11,6 +11,7 @@ import type {
 import { PREVIEW_PARTICLE_GATE } from "../../protocol/modelPreview";
 import {
     collisionMeshNames,
+    damageParticleBones,
     decalNames,
     destroyable,
     effectPlays,
@@ -79,13 +80,15 @@ describe("partHidden", () => {
 });
 
 describe("effectPlays", () => {
-    it("lights the damage smoke only once its hardpoint is gone", () => {
+    it("leaves damage smoke to the Damage_Particles rule, which is a state writer of the unit", () => {
+        // The rule reaches every part below the bone, meshes too, so it lives with the unit's other
+        // state writers - see `UnitRules.setDamageParticles`. The gate only names the owner here.
         const smoke = particle({
             gate: "HardpointDestroyed",
             hardpointId: "HP_Weapon",
         });
 
-        assert.equal(effectPlays(smoke, new Set()), false);
+        assert.equal(effectPlays(smoke, new Set()), true);
         assert.equal(effectPlays(smoke, new Set(["HP_Weapon"])), true);
     });
 
@@ -105,20 +108,44 @@ describe("effectPlays", () => {
     });
 
     it("keeps an effect the model ships switched off switched off", () => {
-        // pi_damage_elec_SD00 is present but invisible in the file; destroying something must not
-        // suddenly reveal an effect the model never plays.
+        // pi_damage_elec_SD00 is present but invisible in the file. Only a Damage_Particles bone
+        // above it shows it on destruction, and that is the unit's rule, not this one.
         const idle = particle({ startsVisible: false });
 
         assert.equal(effectPlays(idle, new Set(["HP_Weapon"])), false);
     });
+});
 
-    it("does not light smoke whose hardpoint is not the one destroyed", () => {
-        const smoke = particle({
-            gate: "HardpointDestroyed",
-            hardpointId: "HP_Left",
-        });
+describe("damageParticleBones", () => {
+    it("names each hardpoint's Damage_Particles bone, lowercased, and whether it is destroyed", () => {
+        const bones = damageParticleBones(
+            [
+                hardpoint(),
+                hardpoint({
+                    id: "HP_Other",
+                    damageParticlesBone: "HP_M-C_Bone",
+                }),
+                hardpoint({ id: "HP_None", damageParticlesBone: null }),
+            ],
+            new Set(["HP_Other"]),
+        );
 
-        assert.equal(effectPlays(smoke, new Set(["HP_Right"])), false);
+        assert.deepEqual(
+            [...bones],
+            [
+                ["hp_f-l_emitdamage", false],
+                ["hp_m-c_bone", true],
+            ],
+        );
+    });
+
+    it("shows a bone two hardpoints name once either of them is destroyed", () => {
+        const bones = damageParticleBones(
+            [hardpoint(), hardpoint({ id: "HP_Twin" })],
+            new Set(["HP_Twin"]),
+        );
+
+        assert.equal(bones.get("hp_f-l_emitdamage"), true);
     });
 });
 
@@ -233,7 +260,7 @@ describe("playsOnOpen", () => {
         );
     });
 
-    it("keeps damage smoke off however it is named", () => {
+    it("leaves damage smoke to the Damage_Particles rule however it is named", () => {
         assert.equal(
             playsOnOpen(
                 gate({
@@ -241,7 +268,7 @@ describe("playsOnOpen", () => {
                     systemRef: "p_engine_fire",
                 }),
             ),
-            false,
+            true,
         );
     });
 });
@@ -328,15 +355,15 @@ describe("hardpointGateAllows", () => {
         );
     });
 
-    it("still refuses an effect whose hardpoint is the wrong side of its gate", () => {
-        // The damage question is a different one from the default question, and it still applies:
-        // smoke that belongs to a destroyed hardpoint must not appear because an ability is on.
+    it("leaves damage smoke to the Damage_Particles rule", () => {
+        // Smoke below a living hardpoint's Damage_Particles bone still does not appear because an
+        // ability is on: the unit's state writer hides it after the effect rules have spoken.
         const onDeath = gated({
             gate: PREVIEW_PARTICLE_GATE.hardpointDestroyed,
             hardpointId: "HP_Gun",
         });
 
-        assert.equal(hardpointGateAllows(onDeath, new Set()), false);
+        assert.equal(hardpointGateAllows(onDeath, new Set()), true);
         assert.equal(hardpointGateAllows(onDeath, new Set(["HP_Gun"])), true);
     });
 

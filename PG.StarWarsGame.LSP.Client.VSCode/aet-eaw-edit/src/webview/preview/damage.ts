@@ -9,10 +9,13 @@
 //
 //   destroyed
 //     |- hide  Model_To_Attach            the turret breaks off
-//     |- show  the proxies under Damage_Particles
+//     |- show  every part on the Damage_Particles bone or below it
 //     |- show  the Damage_Decal mesh      the scorch mark
 //     |- once  Death_Explosion_Particles
 //     '- if Engine_Death_Hide_Engine_Particles: put the engine glow out
+//
+// The Damage_Particles rule is a write of each part's state switch, so it lives with the unit's other
+// state writers in `UnitRules`; this module only names the bones - see `damageParticleBones`.
 
 import {
     PREVIEW_PARTICLE_GATE,
@@ -48,10 +51,12 @@ export interface EffectGate {
 }
 
 /**
- * Whether a particle system is playing.
+ * Whether the effect rules have a particle system playing.
  *
- * `startsVisible` always has the final say: an effect the model itself ships switched off - like
- * `pi_damage_elec_SD00` - must not appear just because something was destroyed.
+ * `startsVisible` has the final say HERE: an effect the model itself ships switched off - like
+ * `pi_damage_elec_SD00` - does not appear just because something was destroyed. The one rule that
+ * shows it is the Damage_Particles rule, for an effect on or below a destroyed hardpoint's bone, and
+ * that writes over this answer in the unit's rules - see `UnitRules.setDamageParticles`.
  */
 export function effectPlays(
     particle: EffectGate,
@@ -83,15 +88,41 @@ export function hardpointGateAllows(
 ): boolean {
     const owner = particle.hardpointId ?? null;
 
-    if (particle.gate === PREVIEW_PARTICLE_GATE.hardpointDestroyed) {
-        return owner !== null && destroyed.has(owner);
-    }
-
+    // A `HardpointDestroyed` gate only names the effect's owner. Hiding it while that hardpoint lives
+    // and showing it once it is destroyed is the Damage_Particles rule, which reaches every part
+    // below the bone and is written by the unit's rules - see `UnitRules.setDamageParticles`.
     if (particle.gate === PREVIEW_PARTICLE_GATE.hardpointAlive) {
         return owner === null || !destroyed.has(owner);
     }
 
     return true;
+}
+
+/**
+ * Each hardpoint's `Damage_Particles` bone, lowercased, and whether a hardpoint naming it is destroyed.
+ *
+ * Every part on that bone or at any depth below it is hidden while the hardpoint lives and shown once
+ * it is destroyed - see `UnitRules.setDamageParticles`. Two hardpoints naming one bone show it once
+ * either is destroyed: a destruction only ever writes shown.
+ */
+export function damageParticleBones(
+    hardpoints: readonly PreviewHardpoint[],
+    destroyed: Destroyed,
+): ReadonlyMap<string, boolean> {
+    const bones = new Map<string, boolean>();
+
+    for (const hardpoint of hardpoints) {
+        const bone = (hardpoint.damageParticlesBone ?? "").trim().toLowerCase();
+
+        if (bone !== "") {
+            bones.set(
+                bone,
+                (bones.get(bone) ?? false) || destroyed.has(hardpoint.id),
+            );
+        }
+    }
+
+    return bones;
 }
 
 /**
@@ -204,13 +235,13 @@ export function playsOnOpen(effect: OpeningEffect): boolean {
     }
 
     // The engine gate, assigned by the server wherever a hardpoint's `Engine_Particles` names the
-    // bone. Anything gated on DESTRUCTION is off by definition - the model opens undamaged.
-    if (effect.gate === PREVIEW_PARTICLE_GATE.hardpointAlive) {
+    // bone. An effect gated on DESTRUCTION is left to the Damage_Particles rule, which hides it while
+    // the unit is undamaged - see `UnitRules.setDamageParticles`.
+    if (
+        effect.gate === PREVIEW_PARTICLE_GATE.hardpointAlive ||
+        effect.gate === PREVIEW_PARTICLE_GATE.hardpointDestroyed
+    ) {
         return true;
-    }
-
-    if (effect.gate === PREVIEW_PARTICLE_GATE.hardpointDestroyed) {
-        return false;
     }
 
     // A LEVEL-tagged proxy answers to the ALT/LOD gate and to nothing here. It is already hidden at
@@ -233,7 +264,7 @@ export function playsOnOpen(effect: OpeningEffect): boolean {
  *
  * An ungated effect is the interesting case. It plays only if it would play on open, so a hull's
  * fires and dust stay off until they are asked for, while its engines run. A gated one is left to
- * {@link effectPlays}: damage smoke lights when its hardpoint dies, however it is named.
+ * {@link effectPlays}, and damage smoke to the Damage_Particles rule, however it is named.
  */
 export function effectPlaysNow(
     effect: OpeningEffect,

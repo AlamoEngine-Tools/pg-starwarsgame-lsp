@@ -9,12 +9,25 @@ import { fileState, ruleState } from "./visibility";
 import { type PreviewRules, UnitRules, rulesFor } from "./unitRules";
 import { standInContext } from "./viewportContext.testing";
 
+/**
+ * The hull's skeleton the rules see: Root, then HP_Bone under it, EmitDamage under that and an effect
+ * bone under that, and a Hull_Other bone beside HP_Bone.
+ */
+const SKELETON = [
+    { index: 0, name: "Root", parent: -1, visible: true },
+    { index: 1, name: "HP_Bone", parent: 0, visible: true },
+    { index: 2, name: "EmitDamage", parent: 1, visible: true },
+    { index: 3, name: "p_smoke", parent: 2, visible: true },
+    { index: 4, name: "Hull_Other", parent: 0, visible: true },
+];
+
 /** The rules over a stand-in viewport, counting how often the level pass was asked to run. */
 function rulesWith(rules?: PreviewRules): {
     unit: UnitRules;
     applied: () => number;
 } {
     let applied = 0;
+    const hull = {};
     const unit = new UnitRules(
         standInContext({
             levels: {
@@ -22,6 +35,8 @@ function rulesWith(rules?: PreviewRules): {
                     applied++;
                 },
             },
+            queries: { skeleton: () => SKELETON },
+            assembly: { hull: () => hull },
         }),
     );
 
@@ -151,5 +166,75 @@ describe("UnitRules", () => {
         assert.equal(unit.shownDecals.size, 0);
         assert.equal(unit.collisionMeshes.size, 0);
         assert.equal(unit.shieldRevealed, false);
+        assert.equal(unit.damageParticles.size, 0);
+    });
+});
+
+describe("UnitRules, a hardpoint's Damage_Particles bone", () => {
+    const mesh = { alamoMesh: "Plate" };
+
+    it("hides every part on the bone or at any depth below it while the hardpoint lives", () => {
+        const { unit } = rulesWith("game");
+        unit.setDamageParticles(new Map([["hp_bone", false]]));
+
+        for (const bone of [1, 2, 3]) {
+            assert.deepEqual(
+                unit.meshState(drawnInFile, mesh, bone),
+                ruleState(false),
+                `mesh on bone ${bone}`,
+            );
+            assert.deepEqual(
+                unit.effectState(drawnInFile, bone),
+                ruleState(false),
+                `effect on bone ${bone}`,
+            );
+        }
+    });
+
+    it("leaves every part outside that subtree as it was", () => {
+        const { unit } = rulesWith("game");
+        unit.setDamageParticles(new Map([["hp_bone", false]]));
+
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 0), drawnInFile);
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 4), drawnInFile);
+        assert.deepEqual(unit.effectState(drawnInFile, 4), drawnInFile);
+    });
+
+    it("shows them all once it is destroyed, whatever the file says, and the bone is matched by name", () => {
+        const { unit } = rulesWith("game");
+        unit.setDamageParticles(new Map([["hp_bone", true]]));
+
+        assert.deepEqual(
+            unit.meshState(fileState(false), mesh, 2),
+            ruleState(true),
+        );
+        assert.deepEqual(
+            unit.effectState(fileState(false), 3),
+            ruleState(true),
+        );
+    });
+
+    it("comes after the decal rule, and the cloak still comes after it", () => {
+        const { unit } = rulesWith("game");
+        unit.setDecals(new Set(["plate"]), new Set());
+        unit.setDamageParticles(new Map([["hp_bone", true]]));
+
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), ruleState(true));
+
+        unit.setStealthed(true);
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, mesh, 2),
+            ruleState(false),
+        );
+        assert.deepEqual(unit.effectState(drawnInFile, 2), ruleState(false));
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setDamageParticles(new Map([["hp_bone", false]]));
+
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), drawnInFile);
+        assert.deepEqual(unit.effectState(drawnInFile, 3), drawnInFile);
     });
 });

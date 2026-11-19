@@ -26,7 +26,12 @@ import { post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART } from "./partIds";
 import { type TreeItem } from "./previewTree";
 import { type PreviewViewport } from "./viewport";
-import { collisionMeshNames, decalNames, partHidden } from "./damage";
+import {
+    collisionMeshNames,
+    damageParticleBones,
+    decalNames,
+    partHidden,
+} from "./damage";
 import { stageForHull } from "./levels";
 import { hardpointCards, unitWeapons } from "./hardpointCards";
 import { type PreviewMode } from "./previewMode";
@@ -482,6 +487,12 @@ export function useCombatLens({
         // Never shown in either damage state, so this takes no `destroyed` and does not change with
         // it - it is set here because this is the pass that owns hardpoint-driven visibility.
         viewport.setCollisionMeshes(collisionMeshNames(scene.hardpoints));
+
+        // Every part on or below each hardpoint's Damage_Particles bone: hidden while it lives,
+        // shown once it is destroyed - meshes and effects alike.
+        viewport.setDamageParticles(
+            damageParticleBones(scene.hardpoints, destroyed),
+        );
 
         // The ordinary effect rules AND the ability decider. Through the same call as every other
         // effect deliberately: a held proxy then rides the emission gate, so its burst does not

@@ -562,6 +562,14 @@ export class PreviewViewport {
     }
 
     /**
+     * Each hardpoint's Damage_Particles bone and whether it is destroyed. See
+     * `UnitRules.setDamageParticles`.
+     */
+    setDamageParticles(bones: ReadonlyMap<string, boolean>): void {
+        this.rules.setDamageParticles(bones);
+    }
+
+    /**
      * Shield meshes the model names but does not draw with a shield shader. See
      * `MaterialBinder.shieldMeshesOffShader`.
      */
