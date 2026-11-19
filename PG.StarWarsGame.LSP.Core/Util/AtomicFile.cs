@@ -27,6 +27,15 @@ public static class AtomicFile
 {
     public static void WriteAllBytes(IFileSystem fs, string path, byte[] bytes)
     {
+        Write(fs, path, stream => stream.Write(bytes));
+    }
+
+    /// <summary>
+    ///     The same, for content written in parts: <paramref name="write" /> fills the temp file's
+    ///     stream, so a large file made of several pieces is never joined in memory first.
+    /// </summary>
+    public static void Write(IFileSystem fs, string path, Action<Stream> write)
+    {
         var directory = fs.Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory))
             fs.Directory.CreateDirectory(directory);
@@ -34,7 +43,11 @@ public static class AtomicFile
         var tempPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            fs.File.WriteAllBytes(tempPath, bytes);
+            using (var stream = fs.File.Create(tempPath))
+            {
+                write(stream);
+            }
+
             fs.File.Move(tempPath, path, true);
         }
         finally

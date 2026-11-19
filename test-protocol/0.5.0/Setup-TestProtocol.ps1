@@ -16,8 +16,9 @@
     packs the win32-x64 VSIX to C:\temp\aet-vscode\LUA-34-vsix - minutes, so not part of a full set-up).
 
     Also done here: PRJ-17 and PRJ-18 copy the archives they read, LUA-25 copies the schema and edits its
-    Find_Player annotation, PRV-36 generates its two particle files, and PRJ-24, PRJ-25, XML-29 and
-    XML-30 copy the repository's e2e-workspace-load-order to C:\temp\aet-test-load-order, which they edit.
+    Find_Player annotation, PRV-36 generates its two particle files, PRV-45 copies a model, its twin and
+    their textures from the local game workspace, and PRJ-24, PRJ-25, XML-29 and XML-30 copy the
+    repository's e2e-workspace-load-order to C:\temp\aet-test-load-order, which they edit.
 
 .PARAMETER Test
     One test id, e.g. XML-14. Omit to set up every test.
@@ -40,7 +41,7 @@ $repo = (Resolve-Path (Join-Path $here '..\..')).Path
 $fixtures = Join-Path $here 'fixtures'
 $onDemand = @('XML-14', 'XML-15', 'PRJ-15', 'LUA-26', 'LUA-27', 'LUA-28', 'LUA-34')
 $loadOrderTests = @('PRJ-24', 'PRJ-25', 'XML-29', 'XML-30')
-$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36') + $loadOrderTests
+$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRV-45') + $loadOrderTests
 
 function Get-RootOf([string] $root) {
     switch ($root) {
@@ -167,6 +168,31 @@ function Invoke-Extra([string] $testId) {
                     "<Game_Object_Files>`r`n`t<File>PrvModUnits.xml</File>`r`n`t<File>PrvBaseUnits.xml</File>"
                 [System.IO.File]::WriteAllText($dest, $list)
             } else { Write-Warning "PRV-35: $source not found; $dest is missing and no object file loads." }
+        }
+        'PRV-45' {
+            # A model, its byte-identical twin and the textures it names, as loose files; and beside the
+            # project's folders, where nothing indexes them, another model and another texture for the
+            # test to write over them. Copied from the local game workspace, so no game file is part of
+            # the fixture.
+            $art = Join-Path $repo 'eaw\Data\Art'
+            $dest = 'C:\temp\aet-test-PRV-load'
+            $copies = @(
+                @('Models\Ev_tiefighter.alo', 'Data\Art\Models\Prv_load.alo'),
+                @('Models\Ev_tiefighter.alo', 'Data\Art\Models\Prv_load_twin.alo'),
+                @('Textures\Ev_tie01.dds', 'Data\Art\Textures\Ev_tie01.dds'),
+                @('Textures\Ev_tie01_gloss.dds', 'Data\Art\Textures\Ev_tie01_gloss.dds'),
+                @('Textures\W_laser_small.dds', 'Data\Art\Textures\W_laser_small.dds'),
+                @('Models\Rv_xwing.alo', 'swap\Prv_other.alo'),
+                @('Textures\Rv_xwing.dds', 'swap\Other.dds'),
+                # What the test puts back: it writes over the model and one texture, and a fixture
+                # left that way draws the wrong texture for whoever opens it next.
+                @('Models\Ev_tiefighter.alo', 'swap\Prv_load.orig.alo'),
+                @('Textures\Ev_tie01.dds', 'swap\Ev_tie01.orig.dds'))
+            foreach ($pair in $copies) {
+                $source = Join-Path $art $pair[0]
+                if (Test-Path $source) { Copy-Item $source (Join-Path $dest $pair[1]) -Force }
+                else { Write-Warning "PRV-45: $source not found; $(Join-Path $dest $pair[1]) is missing." }
+            }
         }
     }
 }

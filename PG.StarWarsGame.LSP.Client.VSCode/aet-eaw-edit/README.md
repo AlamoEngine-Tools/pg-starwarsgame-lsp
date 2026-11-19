@@ -730,6 +730,7 @@ Command Palette (`Ctrl+Shift+P`).
 | EaWEdit: Show Effective Object (Variant Inheritance)   | Merged XML of a variant object                                   |
 | EaWEdit: Preview Model                                 | Opens a model by file name, without XML                          |
 | EaWEdit: Preview Assembled Unit                        | Opens the GameObject under the cursor, assembled from the XML    |
+| EaWEdit: Clear Preview Cache                           | Empties the project's `.aetswg/preview/` of converted models     |
 | EaWEdit: Set Up Base Shader Sources                    | Fetches the shader sources into `aet-eaw-edit.shaders.directory` |
 | EaWEdit: Preview Encyclopedia Popup                    | The encyclopedia card of the GameObject under the cursor         |
 | EaWEdit: Open Mod Browser                              | Lists what the project indexes, by type                          |

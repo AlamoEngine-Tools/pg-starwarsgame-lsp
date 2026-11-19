@@ -722,6 +722,17 @@ function ModelPreview(): React.JSX.Element {
         tally.expectedParts,
     ]);
 
+    /**
+     * The scene has finished loading: the textures it did not ask for are let go. Until here they
+     * were kept, because a refresh asks for most of them again and gets "still yours" - after it,
+     * what is on the GPU is what is drawn, not everything this panel has shown.
+     */
+    useEffect(() => {
+        if (!loading.covered) {
+            assets.releaseUnused();
+        }
+    }, [assets, loading.covered]);
+
     const refreshStats = useCallback(() => {
         const viewport = viewportRef.current;
         setStats(viewport?.stats() ?? null);

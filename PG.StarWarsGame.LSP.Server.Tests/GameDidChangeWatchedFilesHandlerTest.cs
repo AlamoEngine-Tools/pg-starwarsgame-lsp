@@ -20,6 +20,7 @@ using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Indexing;
 using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
@@ -65,7 +66,10 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         FakeReloadService? reload = null,
         ISchemaProvider? schema = null,
         ILocalisationWriteLedger? writeLedger = null,
-        IRegistryWalkStore? walks = null)
+        IRegistryWalkStore? walks = null,
+        IPreviewAssetFingerprints? previewAssets = null,
+        IPreviewCacheBuilder? previewCache = null,
+        IMegArchiveSet? archives = null)
     {
         var fileSystem = fs ?? new MockFileSystem();
         var fileHelper = new FileHelper(fileSystem);
@@ -98,7 +102,195 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             writeLedger ?? new LocalisationWriteLedger(fileHelper),
             walkStore,
             new OpenStartupGate(),
+            previewAssets ?? new ForgottenAssets(),
+            previewCache ?? new ToldBuilder(),
+            archives ?? EmptyArchives.Instance,
             NullLogger<GameDidChangeWatchedFilesHandler>.Instance);
+    }
+
+    /// <summary>The background build as a record of the files the handler said had changed.</summary>
+    private sealed class ToldBuilder : IPreviewCacheBuilder
+    {
+        public List<IReadOnlyCollection<string>> Calls { get; } = [];
+
+        public void StartUnlessBuilt()
+        {
+        }
+
+        public void Prioritise(IReadOnlyList<PreviewBuildItem> items)
+        {
+        }
+
+        public void FilesChanged(IReadOnlyCollection<string> paths)
+        {
+            Calls.Add(paths);
+        }
+
+        public void Cancel()
+        {
+        }
+    }
+
+    private sealed class CountedArchives : IMegArchiveSet
+    {
+        public int Invalidations { get; private set; }
+
+        public int ArchiveCount => 0;
+
+        public byte[]? TryRead(string normalizedPath)
+        {
+            return null;
+        }
+
+        public void Invalidate()
+        {
+            Invalidations++;
+        }
+    }
+
+    /// <summary>The preview's fingerprints as a record of what the handler told them to forget.</summary>
+    private sealed class ForgottenAssets : IPreviewAssetFingerprints
+    {
+        public List<IReadOnlyCollection<string>> Calls { get; } = [];
+
+#pragma warning disable CS0067 // Raised by the real one; nothing here listens.
+        public event Action? Changed;
+#pragma warning restore CS0067
+
+        public PreviewAssetIdentity? Identify(string gameRelativePath)
+        {
+            return null;
+        }
+
+        public PreviewAssetIdentity? Identify(GameAssetLocation location)
+        {
+            return null;
+        }
+
+        public void Forget(IReadOnlyCollection<string> paths)
+        {
+            Calls.Add(paths);
+        }
+    }
+
+    /// <summary>
+    ///     Every watched-file event on an asset - changed, created or deleted - has the preview
+    ///     forget that file BY PATH, once per notification (#436). The preview's stamps cannot be
+    ///     trusted to have moved: a copy over a file keeps the source's write time.
+    /// </summary>
+    [Fact]
+    public async Task Handle_AssetChanges_HaveThePreviewForgetEachFileOncePerNotification()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\data\art\textures\a.dds"] = new(""),
+            [@"c:\data\art\models\c.alo"] = new(""),
+            [@"c:\data\xml\units.xml"] = new("<Units/>")
+        });
+        var forgotten = new ForgottenAssets();
+        var told = new ToldBuilder();
+
+        var handler = BuildHandler(fs: fs, previewAssets: forgotten, previewCache: told);
+        await handler.Handle(new DidChangeWatchedFilesParams
+        {
+            Changes = new Container<FileEvent>(
+                new FileEvent
+                    { Uri = DocumentUri.From("file:///c:/data/art/textures/a.dds"), Type = FileChangeType.Changed },
+                new FileEvent
+                    { Uri = DocumentUri.From("file:///c:/data/art/models/c.alo"), Type = FileChangeType.Created },
+                new FileEvent
+                    { Uri = DocumentUri.From("file:///c:/data/art/models/gone.ala"), Type = FileChangeType.Deleted },
+                new FileEvent
+                    { Uri = DocumentUri.From("file:///c:/data/xml/units.xml"), Type = FileChangeType.Changed })
+        }, CancellationToken.None);
+
+        var call = Assert.Single(forgotten.Calls);
+        Assert.Equal(
+            ["c:/data/art/models/c.alo", "c:/data/art/models/gone.ala", "c:/data/art/textures/a.dds"],
+            call.Select(p => p.Replace('\\', '/').ToLowerInvariant()).Order());
+
+        // And the background build is told the same files, to convert their models again (FR-12).
+        Assert.Same(call, Assert.Single(told.Calls));
+    }
+
+    /// <summary>
+    ///     A changed archive is a change to its models (FR-12): the archives are read again, the
+    ///     preview is told, and the archive is never read as a document.
+    /// </summary>
+    [Fact]
+    public async Task Handle_AChangedArchive_HasTheArchivesReadAgain_AndCountsAsAChangeToThePreview()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mod\data\Models.meg"] = new(new byte[] { 0xff, 0xfe, 0x00, 0x01 })
+        });
+        var index = new FakeGameIndexService();
+        var forgotten = new ForgottenAssets();
+        var told = new ToldBuilder();
+        var archives = new CountedArchives();
+
+        var handler = BuildHandler(index, fs: fs, previewAssets: forgotten, previewCache: told, archives: archives);
+        await handler.Handle(Changed("file:///c:/mod/data/Models.meg"), CancellationToken.None);
+
+        Assert.Equal(1, archives.Invalidations);
+        Assert.Equal(["c:/mod/data/models.meg"],
+            Assert.Single(forgotten.Calls).Select(p => p.Replace('\\', '/').ToLowerInvariant()));
+        Assert.Single(told.Calls);
+        Assert.Empty(index.Current.Documents);
+    }
+
+    [Fact]
+    public async Task Handle_WithNoAssetAmongTheChanges_TellsThePreviewNothing()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\data\xml\units.xml"] = new("<Units/>")
+        });
+        var forgotten = new ForgottenAssets();
+
+        var handler = BuildHandler(fs: fs, previewAssets: forgotten);
+        await handler.Handle(Changed("file:///c:/data/xml/units.xml"), CancellationToken.None);
+
+        Assert.Empty(forgotten.Calls);
+    }
+
+    /// <summary>
+    ///     The asset catalog lists scripts, sounds and maps as well, and the preview draws none of
+    ///     them. A change to one is no change to any preview: nothing is forgotten, so no open
+    ///     preview is told to ask for its assets again, and the background build hears nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("file:///c:/data/scripts/story.lua")]
+    [InlineData("file:///c:/data/scripts/story.lc")]
+    [InlineData("file:///c:/data/audio/sfx/blast.wav")]
+    [InlineData("file:///c:/data/audio/music/theme.mp3")]
+    [InlineData("file:///c:/data/art/maps/_land_planet_hoth_00.ted")]
+    public async Task Handle_AnAssetThePreviewDoesNotDraw_TellsThePreviewNothing(string uri)
+    {
+        var forgotten = new ForgottenAssets();
+        var told = new ToldBuilder();
+
+        var handler = BuildHandler(previewAssets: forgotten, previewCache: told);
+        await handler.Handle(Changed(uri), CancellationToken.None);
+
+        Assert.Empty(forgotten.Calls);
+        Assert.Empty(told.Calls);
+    }
+
+    /// <summary>What the preview draws: models, clips and textures.</summary>
+    [Theory]
+    [InlineData("file:///c:/data/art/models/hull.alo")]
+    [InlineData("file:///c:/data/art/models/hull_idle_00.ala")]
+    [InlineData("file:///c:/data/art/textures/hull.dds")]
+    [InlineData("file:///c:/data/art/textures/hull.tga")]
+    public async Task Handle_AnAssetThePreviewDraws_HasThePreviewForgetIt(string uri)
+    {
+        var forgotten = new ForgottenAssets();
+
+        var handler = BuildHandler(previewAssets: forgotten);
+        await handler.Handle(Changed(uri), CancellationToken.None);
+
+        Assert.Single(Assert.Single(forgotten.Calls));
     }
 
     // ── registry and load order changes ──────────────────────────────────────
@@ -402,6 +594,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [InlineData("**/*.wav")]
     [InlineData("**/*.mp3")]
     [InlineData("**/*.ted")]
+    [InlineData("**/*.meg")]
     public void WatchedGlobs_CoversEveryFileKindTheServerReactsTo(string glob)
     {
         Assert.Contains(glob, GameDidChangeWatchedFilesHandler.WatchedGlobs);

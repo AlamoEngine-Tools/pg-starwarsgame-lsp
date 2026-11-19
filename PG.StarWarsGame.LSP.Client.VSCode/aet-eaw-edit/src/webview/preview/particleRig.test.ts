@@ -6,9 +6,10 @@ import { describe, it } from "node:test";
 
 import * as THREE from "three";
 
-import { emitter, testSystem } from "./particleFixture";
+import { emitter, properties, testSystem } from "./particleFixture";
 import { ParticleRig } from "./particleRig";
 import { standInContext } from "./viewportContext.testing";
+import { TextureStore } from "./textureStore";
 
 /**
  * A rig over a stand-in viewport: a model root to hang systems on, nothing translated, no part to
@@ -26,6 +27,7 @@ function rigWith(): { particles: ParticleRig; modelRoot: THREE.Group } {
         },
         modelRoot,
         parts: new Map(),
+        textures: new TextureStore(),
         assembly: {
             hiddenParts: new Set(),
             attachmentFor: () => modelRoot,
@@ -45,7 +47,74 @@ const systemsUnder = (root: THREE.Object3D): number =>
     root.children.filter((child) => child.userData.aetParticleSystem === true)
         .length;
 
+/** Hangs a triangle on `root` and counts how often its vertices are read. */
+function countedGeometryOn(root: THREE.Object3D): { reads: () => number } {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(
+            new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+            3,
+        ),
+    );
+    let reads = 0;
+    const read = geometry.getAttribute.bind(geometry);
+    geometry.getAttribute = ((name: string) => {
+        reads++;
+        return read(name);
+    }) as typeof geometry.getAttribute;
+    root.add(new THREE.Mesh(geometry));
+    return { reads: () => reads };
+}
+
 describe("ParticleRig", () => {
+    it("prepares systems that differ only in the stored system name once", () => {
+        const { particles } = rigWith();
+
+        particles.addParticleSystem(
+            "a",
+            testSystem([emitter({ name: "Glow" })], "P_engine_a"),
+            { origin: "model" },
+        );
+        particles.addParticleSystem(
+            "b",
+            testSystem([emitter({ name: "Glow" })], "P_engine_b"),
+            { origin: "model" },
+        );
+        particles.addParticleSystem(
+            "c",
+            testSystem([emitter({ name: "Smoke" })], "P_smoke"),
+            { origin: "model" },
+        );
+
+        assert.equal(particles.preparations.prepared, 2);
+        assert.deepEqual(particles.particleSystemIds(), ["a", "b", "c"]);
+
+        particles.forgetSystems();
+        assert.equal(particles.preparations.prepared, 0);
+    });
+
+    it("reads the attached geometry only for a system with an emitter born on a mesh", () => {
+        const { particles, modelRoot } = rigWith();
+        const geometry = countedGeometryOn(modelRoot);
+
+        particles.addParticleSystem("plain", testSystem([emitter()]), {
+            origin: "model",
+        });
+        assert.equal(geometry.reads(), 0);
+
+        particles.addParticleSystem(
+            "wash",
+            testSystem([
+                emitter({
+                    properties: properties({ emitFromMesh: "EveryVertex" }),
+                }),
+            ]),
+            { origin: "model" },
+        );
+        assert.ok(geometry.reads() > 0);
+    });
+
     it("puts a system on the model and lists it by id, with its emitters by name", () => {
         const { particles, modelRoot } = rigWith();
 

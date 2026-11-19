@@ -4,130 +4,96 @@
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
-using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Messages;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Preview;
-using PG.StarWarsGame.LSP.Server.Assets;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
-/// <summary>Serves one model as a glTF binary.</summary>
+/// <summary>
+///     Serves one model as a glTF binary: resolves it, takes it from the preview cache or converts
+///     it, and offers the bytes on the transfer channel. The reply names the transfer; it carries
+///     no payload.
+/// </summary>
 public sealed class GetModelGlbHandler(
     IGameAssetResolver assets,
+    IPreviewModelCache cache,
+    IModelGlbConverter converter,
+    IPreviewTransferChannel transfers,
     IMessageCatalog messages,
     ILogger<GetModelGlbHandler> logger)
     : IJsonRpcRequestHandler<GetModelGlbParams, GetModelGlbResult>
 {
-    public Task<GetModelGlbResult> Handle(GetModelGlbParams request, CancellationToken cancellationToken)
+    public async Task<GetModelGlbResult> Handle(GetModelGlbParams request, CancellationToken cancellationToken)
     {
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
-            return Task.FromResult(new GetModelGlbResult(null, [],
-                messages.Format("PreviewHandlers_NoModelWasNamed")));
-
-        var bytes = assets.Read(PreviewModelReference.ModelPath(reference));
-        if (bytes is null)
-            return Task.FromResult(new GetModelGlbResult(null, [],
-                messages.Format("PreviewHandlers_ModelWasNotFound", reference,
-                    assets.Tiers.Explain(messages))));
+            return new GetModelGlbResult(null, [], messages.Format("PreviewHandlers_NoModelWasNamed"));
 
         try
         {
-            var model = AloModelReader.Read(bytes);
-            var clips = LoadAnimations(model, bytes, reference, request.Animations);
+            // Not on the thread the request arrived on. A miss converts, which takes seconds on a
+            // large model, and a model the background build has in hand is waited for; the cache
+            // sees to it that the build's thread does not make that wait a slow one.
+            var converted = await Task.Run(() => cache.GetOrConvert(
+                PreviewModelReference.ModelPath(reference),
+                [.. request.Animations.Select(name => (name, PreviewModelReference.ModelPath(name)))],
+                converter.Convert, converter.Judge, request.Have), CancellationToken.None);
 
-            var glb = ModelGlbExporter.Export(model, clips);
-            return Task.FromResult(new GetModelGlbResult(
-                Convert.ToBase64String(glb), [.. clips.Select(c => c.Name)]));
+            if (converted is null)
+                return new GetModelGlbResult(null, [],
+                    messages.Format("PreviewHandlers_ModelWasNotFound", reference,
+                        assets.Tiers.Explain(messages)));
+
+            // Said on every request, a cache hit included: the notes are kept beside the entry.
+            Say(reference, converted.Notes);
+
+            // The client's copy stands: nothing is offered, so nothing is read or sent.
+            if (request.Have is { Length: > 0 } have && have == converted.Key)
+                return new GetModelGlbResult(null, converted.Animations, null, converted.Key);
+
+            return new GetModelGlbResult(
+                transfers.Offer("glb", converted.Length, converted.OpenPayload), converted.Animations, null,
+                converted.Key);
         }
         catch (AloFormatException e)
         {
             // The reader is strict on purpose; a refusal names the chunk that did not add up, which is
             // far more use to the author than a half-drawn model would be.
-            return Task.FromResult(new GetModelGlbResult(null, [],
-                messages.Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
+            return new GetModelGlbResult(null, [],
+                messages.Format("PreviewHandlers_CouldNotBeRead", reference, e.Message));
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "Unexpected failure exporting {Model}", reference);
-            return Task.FromResult(new GetModelGlbResult(null, [],
+            return new GetModelGlbResult(null, [],
                 messages.Format("PreviewHandlers_CouldNotBeExported", reference,
-                    e.Message)));
+                    e.Message));
         }
     }
 
-    /// <summary>
-    ///     Reads the requested clips, dropping any that do not belong to this skeleton.
-    /// </summary>
-    /// <remarks>
-    ///     Dropping rather than failing: 50 shipped animations sit beside a model they were not
-    ///     authored against, so a mismatch is ordinary data, not an error. The result reports which
-    ///     clips actually made it.
-    /// </remarks>
-    private List<(string Name, AlamoAnimationContent Animation)> LoadAnimations(
-        AlamoModelContent model, byte[] aloBytes, string reference,
-        IReadOnlyList<string> requested)
+    /// <summary>Writes what the conversion said about the clips to the log, against this model's name.</summary>
+    private void Say(string reference, IReadOnlyList<PreviewClipNote> notes)
     {
-        var clips = new List<(string, AlamoAnimationContent)>();
-        if (requested.Count == 0)
-            return clips;
-
-        // Bones UNIONED WITH MESH NAMES, which is the engine's own bone space: it assumes a bone at
-        // the origin of every mesh, so a clip may legitimately drive one of those at an index past
-        // the end of the skeleton, and matching against the skeleton alone rejects it.
-        //
-        // Measured over the whole FOC tree: of 2826 model/clip pairs whose names pair them, two are
-        // recovered by the union and none are lost. Both are Underworld turrets -
-        // `Ub_turretmst50_idle00` and `Ub_turretptl05_idle00` - and both drive a last bone called
-        // `collision` that the model carries only as a MESH. Two is a small number and the rule is
-        // still right: the alternative is a clip silently dropped for being what the engine calls
-        // valid.
-        //
-        // Through `ModelNameCatalog` rather than rebuilt here, so the union stays defined once -
-        // it is the same call `BoneNameExtractor` makes to populate `index.ModelBones`.
-        var boneNames = ModelNameCatalog.ReadBoneReferenceTargets(
-            aloBytes, _ => model.Bones.Select(b => b.Name).ToList());
-
-        foreach (var name in requested)
-        {
-            var bytes = assets.Read(PreviewModelReference.ModelPath(name));
-            if (bytes is null)
-                continue;
-
-            try
+        foreach (var note in notes)
+            switch (note.Kind)
             {
-                var animation = AlaAnimationReader.Read(bytes);
-
-                // FITS, not MATCHES. Requiring an identical skeleton dropped clips the base game
-                // plays: a unit that borrows another model's animation set does so across skeletons
-                // that differ, and the engine binds by index regardless. What cannot be recovered is
-                // a track reaching past the end of the bone list - there is no node to drive.
-                if (animation.FitsSkeleton(boneNames))
-                {
-                    clips.Add((Path.GetFileNameWithoutExtension(name), animation));
-
+                case PreviewClipNoteKind.DiffersButPlays:
                     // Still worth saying: the clip will play, and the bones it moves may not be the
                     // ones it was authored to move.
-                    if (animation.WhyNotModel(boneNames) is { } disagreement)
-                        logger.LogInformation(
-                            "Animation {Animation} plays on {Model} across a differing skeleton: "
-                            + "{Reason}", name, reference, disagreement);
-                }
-                else
-                {
                     logger.LogInformation(
-                        "Animation {Animation} cannot be played on {Model}: {Reason}",
-                        name, reference, animation.WhyNotModel(boneNames));
-                }
+                        "Animation {Animation} plays on {Model} across a differing skeleton: {Reason}",
+                        note.Clip, reference, note.Reason);
+                    break;
+                case PreviewClipNoteKind.CannotPlay:
+                    logger.LogInformation("Animation {Animation} cannot be played on {Model}: {Reason}",
+                        note.Clip, reference, note.Reason);
+                    break;
+                default:
+                    logger.LogInformation("Skipping animation {Animation}: {Reason}", note.Clip, note.Reason);
+                    break;
             }
-            catch (AloFormatException e)
-            {
-                logger.LogInformation("Skipping animation {Animation}: {Reason}", name, e.Message);
-            }
-        }
-
-        return clips;
     }
 }
 
@@ -235,10 +201,17 @@ public sealed class GetSubMeshGeometryHandler(
     }
 }
 
-/// <summary>Serves one texture's bytes, undecoded.</summary>
+/// <summary>
+///     Serves one texture's bytes, undecoded: resolves the name once and offers the file on the
+///     transfer channel. The reply names the transfer and the format found; it carries no payload.
+/// </summary>
 public sealed class GetModelTextureHandler(
     IGameAssetResolver assets,
-    IMessageCatalog messages)
+    IPreviewAssetFingerprints fingerprints,
+    IFileHelper fileHelper,
+    IPreviewTransferChannel transfers,
+    IMessageCatalog messages,
+    ILogger<GetModelTextureHandler> logger)
     : IJsonRpcRequestHandler<GetModelTextureParams, GetModelTextureResult>
 {
     /// <summary>
@@ -256,20 +229,76 @@ public sealed class GetModelTextureHandler(
             return Task.FromResult(new GetModelTextureResult(null, null,
                 messages.Format("PreviewHandlers_NoTextureWasNamed")));
 
-        // Locate before reading so the ACTUAL extension is reported: a .tga reference routinely
-        // resolves to a .dds, and the client picks its decoder from what it is given.
+        // Resolved ONCE. The location says the ACTUAL extension - a .tga reference routinely
+        // resolves to a .dds, and the client picks its decoder from what it is given - and the same
+        // location is what is read, where this used to resolve the name a second time to read it.
         var location = assets.Locate(TextureDirectory + name);
         if (location is null)
             return Task.FromResult(new GetModelTextureResult(null, null,
                 messages.Format("PreviewHandlers_TextureWasNotFound", name,
                     assets.Tiers.Explain(messages))));
 
-        var bytes = assets.Read(TextureDirectory + name);
-        if (bytes is null)
+        var format = Path.GetExtension(location.ResolvedPath).TrimStart('.').ToLowerInvariant();
+
+        // The version is the hash of the file's bytes. A loose file is read for it ONCE: after
+        // that its stamp answers, until the stamp moves or the watcher reports the file - a file
+        // written over with the same length and write time has the stamp of the one it replaced.
+        // An archive entry has no stamp and is read every time.
+        var identity = fingerprints.Identify(location);
+        if (identity is null)
             return Task.FromResult(new GetModelTextureResult(null, null,
                 messages.Format("PreviewHandlers_TextureResolvedButCouldNot", name)));
 
-        var format = Path.GetExtension(location.ResolvedPath).TrimStart('.').ToLowerInvariant();
-        return Task.FromResult(new GetModelTextureResult(format, Convert.ToBase64String(bytes)));
+        // The client's copy stands: nothing is offered, so nothing is held or sent.
+        if (identity.Hash == request.Have)
+            return Task.FromResult(new GetModelTextureResult(format, null, null, identity.Hash));
+
+        try
+        {
+            // A loose file is streamed from disk when the client collects it, so its bytes are not
+            // held here in between. It is the modder's own file and stays theirs while it is read:
+            // opened so that it can be written, replaced or deleted under the reader. What the
+            // client gets of a file changed mid-read is replaced by the refresh that change causes.
+            if (LooseFile(location) is { } file)
+                return Task.FromResult(new GetModelTextureResult(format,
+                    transfers.Offer(format, file.Length, () => fileHelper.FileSystem.File.Open(file.Path,
+                        FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)),
+                    null, identity.Hash));
+
+            // An archive entry has no file to stream, so its bytes are held until they are collected.
+            var bytes = identity.Bytes();
+            if (bytes is null)
+                return Task.FromResult(new GetModelTextureResult(null, null,
+                    messages.Format("PreviewHandlers_TextureResolvedButCouldNot", name)));
+
+            return Task.FromResult(new GetModelTextureResult(format,
+                transfers.Offer(format, bytes.LongLength, () => new MemoryStream(bytes, false)), null,
+                identity.Hash));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // The transfer channel could not be opened, so there is nowhere to collect it from.
+            logger.LogWarning(e, "Texture {Texture} could not be offered on the transfer channel", name);
+            return Task.FromResult(new GetModelTextureResult(null, null,
+                messages.Format("PreviewHandlers_TextureResolvedButCouldNot", name)));
+        }
+    }
+
+    /// <summary>The file a location names and its length, or null for an archive entry or a file that is not there.</summary>
+    private (string Path, long Length)? LooseFile(GameAssetLocation location)
+    {
+        if (location.Tier == GameAssetTier.Archive)
+            return null;
+
+        try
+        {
+            var info = fileHelper.FileSystem.FileInfo.New(location.ResolvedPath);
+            return info.Exists ? (location.ResolvedPath, info.Length) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException
+                                      or NotSupportedException)
+        {
+            return null;
+        }
     }
 }

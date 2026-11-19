@@ -15,7 +15,7 @@ import {
 
 /** What the loader did to the viewport and told the panel, in order. */
 interface Recorded {
-    posted: { type: string; name: string }[];
+    posted: { type: string; name: string; have?: string; request?: number }[];
     calls: string[];
     problems: { severity: string; message: string }[];
     ledgerChanges: number;
@@ -29,7 +29,7 @@ function harness(options?: {
         source: string,
         read: (name: string) => string | null,
     ) => TranslationResult;
-    decode?: () => THREE.Texture | null;
+    decode?: (bytes: Uint8Array, format: string) => THREE.Texture | null;
 }): { loader: PreviewAssetLoader; seen: Recorded } {
     const seen: Recorded = {
         posted: [],
@@ -51,6 +51,7 @@ function harness(options?: {
             seen.calls.push(`particle texture ${name}`),
         setParticleTextureMissing: (name) =>
             seen.calls.push(`particle texture missing ${name}`),
+        releaseTexturesExcept: () => seen.calls.push("release"),
     };
 
     const events: AssetLoaderEvents = {
@@ -84,17 +85,65 @@ describe("PreviewAssetLoader", () => {
             loader.requestTexture("hull.dds");
 
             assert.deepEqual(seen.posted, [
-                { type: "requestTexture", name: "hull.dds" },
+                { type: "requestTexture", name: "hull.dds", request: 1 },
             ]);
             assert.equal(loader.requested, 1);
             assert.equal(loader.settled, 0);
+        });
+
+        // Two refreshes close together ask for the same texture twice, and the replies can land
+        // in either order. Only the reply to the latest request is the texture: an older one is
+        // older bytes, and it must not settle the wait of the scene that asked again.
+        it("takes only the reply to the latest request for a name", () => {
+            const { loader, seen } = harness();
+            loader.requestTexture("hull.dds");
+            loader.clearLedgers();
+            loader.requestTexture("hull.dds");
+            const [first, second] = seen.posted.map((p) => p.request);
+
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([1]),
+                version: "v1",
+                request: first,
+            });
+
+            assert.notEqual(first, second);
+            assert.equal(loader.settled, 0);
+            assert.deepEqual(seen.calls, []);
+
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([2]),
+                version: "v2",
+                request: second,
+            });
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([1]),
+                version: "v1",
+                request: first,
+            });
+
+            assert.equal(loader.settled, 1);
+            assert.deepEqual(seen.calls, [
+                "texture hull.dds",
+                "particle texture hull.dds",
+            ]);
+
+            loader.clearLedgers();
+            loader.requestTexture("hull.dds");
+            assert.equal(seen.posted[2].have, "v2");
         });
 
         it("settles on the reply and hands the texture to meshes and particles alike", () => {
             const { loader, seen } = harness();
             loader.requestTexture("hull.dds");
 
-            loader.receiveTexture("hull.dds", { format: "dds", data: "AAAA" });
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([1, 2, 3]),
+            });
 
             assert.equal(loader.settled, 1);
             assert.deepEqual(seen.calls, [
@@ -102,6 +151,128 @@ describe("PreviewAssetLoader", () => {
                 "particle texture hull.dds",
             ]);
             assert.deepEqual(seen.problems, []);
+        });
+
+        // The file's bytes reach the decoder as they came, with the format the server found:
+        // nothing in between turns them into text and back.
+        it("hands the decoder the bytes as they arrived and the format found", () => {
+            const decoded: { bytes: Uint8Array; format: string }[] = [];
+            const { loader } = harness({
+                decode: (bytes, format) => {
+                    decoded.push({ bytes, format });
+                    return {} as THREE.Texture;
+                },
+            });
+            const data = new Uint8Array([68, 68, 83, 32]);
+
+            loader.receiveTexture("hull.tga", { format: "dds", data });
+
+            assert.equal(decoded.length, 1);
+            assert.equal(decoded[0].bytes, data);
+            assert.equal(decoded[0].format, "dds");
+        });
+
+        // A texture that did not arrive carries the host's reason, and that is what is said.
+        // A refresh asks with the version held, and "still yours" binds the texture kept - no
+        // decode, no new texture object, nothing missing.
+        it("asks again with the version it holds and rebinds the texture kept", () => {
+            let decodes = 0;
+            const { loader, seen } = harness({
+                decode: () => {
+                    decodes++;
+                    return {} as THREE.Texture;
+                },
+            });
+            loader.requestTexture("hull.dds");
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([1]),
+                version: "v1",
+            });
+
+            loader.clearLedgers();
+            seen.calls.length = 0;
+            loader.requestTexture("HULL.dds");
+            loader.receiveTexture("HULL.dds", {
+                version: "v1",
+                unchanged: true,
+            });
+
+            assert.deepEqual(seen.posted, [
+                { type: "requestTexture", name: "hull.dds", request: 1 },
+                {
+                    type: "requestTexture",
+                    name: "HULL.dds",
+                    have: "v1",
+                    request: 2,
+                },
+            ]);
+            assert.equal(decodes, 1);
+            assert.deepEqual(seen.calls, [
+                "texture HULL.dds",
+                "particle texture HULL.dds",
+            ]);
+            assert.deepEqual(seen.problems, []);
+            assert.equal(loader.settled, 1);
+        });
+
+        it("decodes a changed texture again and asks with its new version afterwards", () => {
+            let decodes = 0;
+            const { loader, seen } = harness({
+                decode: () => {
+                    decodes++;
+                    return {} as THREE.Texture;
+                },
+            });
+            loader.requestTexture("hull.dds");
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([1]),
+                version: "v1",
+            });
+            loader.clearLedgers();
+            loader.requestTexture("hull.dds");
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([2]),
+                version: "v2",
+            });
+            loader.clearLedgers();
+            loader.requestTexture("hull.dds");
+
+            assert.equal(decodes, 2);
+            assert.equal(seen.posted[2].have, "v2");
+        });
+
+        // A texture that was there and is gone is no longer held: the next scene asks for it fresh.
+        it("forgets a texture that stopped resolving", () => {
+            const { loader, seen } = harness();
+            loader.requestTexture("hull.dds");
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([1]),
+                version: "v1",
+            });
+            loader.clearLedgers();
+            loader.requestTexture("hull.dds");
+            loader.receiveTexture("hull.dds", { data: null });
+            loader.clearLedgers();
+            loader.requestTexture("hull.dds");
+
+            assert.equal(seen.posted[2].have, undefined);
+        });
+
+        it("says the host's reason for a texture that did not arrive", () => {
+            const { loader, seen } = harness();
+
+            loader.receiveTexture("hull.tga", {
+                data: null,
+                error: "The data channel closed.",
+            });
+
+            assert.deepEqual(seen.problems, [
+                { severity: "warning", message: "The data channel closed." },
+            ]);
         });
 
         // A texture that did not resolve is an answer too: the cover stops waiting, the emitters

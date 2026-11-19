@@ -23,8 +23,9 @@ import {
 } from "../../protocol/modelPreview";
 import { type ModelPreviewToWebview } from "../../protocol/panels/modelPreview";
 import { isSubjectSystem, type LoadTally } from "./loadProgress";
+import { modelRequestsOf } from "./modelStore";
 import { particleNotices } from "./particleNotices";
-import { post } from "./previewPost";
+import { heldModels, post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
 import { dispatchHostMessage } from "./hostMessages";
 import { type PendingEffect } from "./useParticleEffects";
@@ -245,6 +246,11 @@ export function useHostMessages({
                     requestedSystemsRef.current.clear();
                     assets.clearLedgers();
 
+                    // The scene on screen is what is kept: a model this scene has no part for is let
+                    // go here. An XML edit can drop a hardpoint and the model it attached. Its
+                    // wrecks and death clones are part of the scene too, held with their own clips.
+                    heldModels.retain(modelRequestsOf(message.scene));
+
                     // Cover the viewport again for the new subject. The expected count is the parts
                     // that RESOLVED, because those are the only ones a GLB is asked for - counting the
                     // rest would leave the cover waiting on geometry nobody requested.
@@ -293,9 +299,17 @@ export function useHostMessages({
                         message.scene.parts.find((part) => part.resolved) ??
                         null;
                     detailWantedRef.current = hull?.modelRef ?? null;
-                    setModelDetail(null);
 
-                    if (hull !== null) {
+                    // Kept from the scene before when the hull's file did not change: the detail is
+                    // read off the model's file, and reading a 149 MB one again took 0.1 to 0.6 s of
+                    // every refresh. Asked for again below if the hull's bytes turn out to be new.
+                    const keptDetail =
+                        hull === null
+                            ? null
+                            : heldModels.detailOf(hull.modelRef);
+                    setModelDetail(keptDetail);
+
+                    if (hull !== null && keptDetail === null) {
                         post({
                             type: "requestModelDetail",
                             modelReference: hull.modelRef,
@@ -319,10 +333,20 @@ export function useHostMessages({
                     }
                 },
                 glb: async (message) => {
-                    const glb = message.result.glb ?? null;
+                    // A reply to a request that a later one for the same part overtook, or that
+                    // was on its way when the scene changed. Not this scene's: not shown, not
+                    // counted, and no reason to say a part failed.
+                    if (!heldModels.awaits(message)) {
+                        return;
+                    }
+
+                    // The bytes this reply stands for: the ones it carries, or the ones kept from
+                    // the scene before when the server says the model did not change.
+                    const taken = heldModels.take(message);
+                    const glb = taken?.bytes ?? null;
 
                     if (glb === null) {
-                        const error = message.result.error ?? null;
+                        const error = message.error ?? null;
                         if (error !== null) {
                             setProblems((current) => [
                                 ...current,
@@ -457,6 +481,17 @@ export function useHostMessages({
                         message.attachBone ?? undefined,
                     );
 
+                    // The hull's file changed under a detail kept from before: read it again.
+                    if (
+                        taken?.replaced === true &&
+                        taken.modelReference === detailWantedRef.current
+                    ) {
+                        post({
+                            type: "requestModelDetail",
+                            modelReference: taken.modelReference,
+                        });
+                    }
+
                     // Counted here rather than at every `glb`: a wreck, a death clone and a breakoff
                     // prop all arrive down this same message and have already returned above. Only a
                     // scene part is one of the parts the cover is waiting for.
@@ -505,6 +540,10 @@ export function useHostMessages({
                     // reference (`EV_StarDestroyer.ALO` comes back as `Ev_stardestroyer`), so comparing
                     // against what was asked for would never match and the panel would stay empty.
                     const arrived = message.result.detail ?? null;
+
+                    if (arrived !== null) {
+                        heldModels.keepDetail(message.modelReference, arrived);
+                    }
 
                     if (
                         arrived !== null &&
@@ -721,7 +760,7 @@ export function useHostMessages({
                     );
                 },
                 texture: (message) => {
-                    assets.receiveTexture(message.name, message.result);
+                    assets.receiveTexture(message.name, message);
                 },
             });
         };

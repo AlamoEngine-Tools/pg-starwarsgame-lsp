@@ -50,8 +50,6 @@ export class MaterialBinder {
     readonly translated = new Map<string, TranslatedEffect>();
     /** Declared render state per shader, so a material rebuilt later is not left on the defaults. */
     readonly shaderStates = new Map<string, FxMaterialState>();
-    /** Every decoded texture, kept so a material rebuilt later can be handed them again. */
-    private readonly textures = new Map<string, THREE.Texture>();
     /** Draw with a translated shader wherever one is available. */
     translatedShaders = true;
     private wireframe = false;
@@ -287,7 +285,8 @@ export class MaterialBinder {
 
     /** Applies a decoded texture wherever a material asked for it by name. */
     setTexture(name: string, texture: THREE.Texture): void {
-        this.textures.set(name, texture);
+        // The store disposes the texture this one replaces, if it replaces one.
+        this.context.textures.set(name, texture);
         this.bindTextureIn(this.context.modelRoot, name, texture);
     }
 
@@ -295,13 +294,13 @@ export class MaterialBinder {
      * Binds every texture already decoded into a subtree that has only just been added.
      *
      * `setTexture` binds at the moment the texture ARRIVES, so geometry added afterwards gets
-     * nothing - and asking the host again does not help, because it remembers what it has already
-     * sent and answers a repeat request with silence. Wreckage is the case that exposed this: a
+     * nothing - and asking again does not help, because a name is asked for once per scene and a
+     * repeat is never posted. Wreckage is the case that exposed this: a
      * breakoff prop is usually a piece of the hull it fell off, so its textures are always ones
      * already in hand, and it dropped as a black shape every time.
      */
     bindLoadedTextures(root: THREE.Object3D): void {
-        for (const [name, texture] of this.textures) {
+        for (const [name, texture] of this.context.textures.entries()) {
             this.bindTextureIn(root, name, texture);
         }
     }
@@ -753,7 +752,7 @@ export class MaterialBinder {
         }
 
         // Materials are new objects, so everything already decoded has to be handed over again.
-        for (const [name, texture] of this.textures) {
+        for (const [name, texture] of this.context.textures.entries()) {
             this.setTexture(name, texture);
         }
         this.applyParticleEffects();

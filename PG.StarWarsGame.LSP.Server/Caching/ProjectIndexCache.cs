@@ -25,7 +25,7 @@ public sealed class ProjectIndexCache : IProjectIndexCache
 
     // Every generated directory under .aetswg. Listed rather than a bare "*" so a project can
     // still keep something of its own in here.
-    private static readonly string[] GitignoreEntries = ["indices/", "bones/"];
+    private static readonly string[] GitignoreEntries = ["indices/", "bones/", "preview/"];
 
     private static readonly string GitignoreHeader =
         "# Remove a line below to share that cache with your team via version control\n";

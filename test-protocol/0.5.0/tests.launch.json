@@ -556,6 +556,9 @@
   "PRV-44": {
     "open": "{repo}\\foc"
   },
+  "PRV-45": {
+    "open": "C:\\temp\\aet-test-PRV-load"
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   }

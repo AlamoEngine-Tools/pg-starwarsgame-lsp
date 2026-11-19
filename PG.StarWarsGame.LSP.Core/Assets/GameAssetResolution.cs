@@ -79,6 +79,14 @@ public interface IMegArchiveSet
 
     /// <summary>The bytes of <paramref name="normalizedPath" />, or null when no archive holds it.</summary>
     byte[]? TryRead(string normalizedPath);
+
+    /// <summary>
+    ///     Has the archives read again before the next answer: one of them changed on disk, was
+    ///     added or was removed.
+    /// </summary>
+    void Invalidate()
+    {
+    }
 }
 
 /// <summary>The archive tier for a workspace with no game directory configured.</summary>
@@ -105,4 +113,13 @@ public interface IGameAssetResolver
 
     /// <summary>The bytes of <paramref name="gameRelativePath" />, or null when it resolves nowhere.</summary>
     byte[]? Read(string gameRelativePath);
+
+    /// <summary>
+    ///     The bytes at a location <see cref="Locate" /> returned, without resolving the path a second
+    ///     time. Null when it can no longer be read.
+    /// </summary>
+    byte[]? Read(GameAssetLocation location)
+    {
+        return Read(location.RequestedPath);
+    }
 }

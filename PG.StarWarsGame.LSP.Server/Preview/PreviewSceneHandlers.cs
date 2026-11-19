@@ -96,10 +96,51 @@ public sealed class GetPreviewSceneHandler(
     PreviewSceneBuilder builder,
     IGameAssetResolver assets,
     IMessageCatalog messages,
-    IWorkspaceIconCatalog icons)
+    IWorkspaceIconCatalog icons,
+    IPreviewCacheBuilder previewCache)
     : IJsonRpcRequestHandler<GetPreviewSceneParams, GetPreviewSceneResult>
 {
     public async Task<GetPreviewSceneResult> Handle(
+        GetPreviewSceneParams request, CancellationToken cancellationToken)
+    {
+        var result = await BuildAsync(request, cancellationToken);
+
+        // The reader has just opened this subject, or changed it. While the background build of
+        // the preview cache is still under way, everything the subject loads goes to the front of
+        // its queue - the preview is never held back for the build, the build is reordered for the
+        // preview.
+        previewCache.Prioritise(ModelsOf(result.Scene));
+        return result;
+    }
+
+    /// <summary>
+    ///     Every model the client will ask for on this scene's behalf, each with the clips it will
+    ///     offer: a part with the scene's, a death clone or a piece of wreckage with its own when it
+    ///     has any. That is the rule the client's request follows, so an entry converted ahead is
+    ///     the entry the request finds.
+    /// </summary>
+    private static List<PreviewBuildItem> ModelsOf(PreviewScene scene)
+    {
+        var items = new List<PreviewBuildItem>();
+
+        foreach (var part in scene.Parts)
+            if (part.Resolved)
+                items.Add(new PreviewBuildItem(part.ModelRef, scene.Animations));
+
+        foreach (var clone in scene.DeathClones)
+            if (!string.IsNullOrEmpty(clone.ModelFile))
+                items.Add(new PreviewBuildItem(clone.ModelFile,
+                    clone.Animations.Count > 0 ? clone.Animations : scene.Animations));
+
+        foreach (var prop in scene.BreakoffProps)
+            if (prop.Resolved && !string.IsNullOrEmpty(prop.ModelRef))
+                items.Add(new PreviewBuildItem(prop.ModelRef,
+                    prop.Animations.Count > 0 ? prop.Animations : scene.Animations));
+
+        return items;
+    }
+
+    private async Task<GetPreviewSceneResult> BuildAsync(
         GetPreviewSceneParams request, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(request.ObjectId))
