@@ -765,6 +765,8 @@
       "ModelFile": "RB_station_02_break.alo",
       "PlaysIdle": false,
       "ScaleFactor": 1,
+      "PersistenceSeconds": 34,
+      "FadeSeconds": null,
       "Animations": [
         "rb_station_02_break_die_00.ala"
       ],
@@ -1301,7 +1303,8 @@
           "AltDecreaseStayHidden": false,
           "ClaimsAbility": null
         }
-      ]
+      ],
+      "EndExplosions": []
     }
   ],
   "ProjectileCatalog": [

@@ -646,6 +646,8 @@
       "ModelFile": "RV_nebulonb_D.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 0.76,
+      "PersistenceSeconds": null,
+      "FadeSeconds": null,
       "Animations": [
         "rv_nebulonb_d_death_00.ala",
         "rv_nebulonb_d_die_00.ala"
@@ -875,7 +877,8 @@
           "AltDecreaseStayHidden": false,
           "ClaimsAbility": null
         }
-      ]
+      ],
+      "EndExplosions": []
     }
   ],
   "ProjectileCatalog": [

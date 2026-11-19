@@ -314,31 +314,12 @@ describe("AnimationRig", () => {
         near(bone.position.x, 2, "x");
     });
 
-    /** A death clone plays once, ends on the same frame, and is taken away there. */
-    it("ends a death clone's clip on its second-to-last frame, and takes the clone away there", () => {
-        const hidden: string[] = [];
-        const context = standInContext({
-            assembly: {
-                partsOf: () => [{ id: "clone:1/part" }],
-                applyOwnFileVisibility: () => undefined,
-                setPartHidden: (id: string) => {
-                    hidden.push(id);
-                },
-            },
-            particles: {
-                particleSystems: new Map(),
-                applyEmitterGating: () => undefined,
-                releaseSubjectEffects: () => undefined,
-            },
-        });
-        const animation = new AnimationRig(context);
-        const root = new THREE.Group();
-        const bone = new THREE.Object3D();
-        bone.name = "Turret";
-        root.add(bone);
-        const clone = animation.subjectAnimation("clone:1");
-        clone.mixer = new THREE.AnimationMixer(root);
-        clone.clips.push(walk("Hull_die_00"));
+    /**
+     * A death clone plays once and ends on the same frame. With nothing declared about how it
+     * ends, it is gone there.
+     */
+    it("ends a death clone's clip on its second-to-last frame", () => {
+        const { animation, clone, bone, hidden } = dyingClone(true);
 
         animation.startDeathClip("clone:1");
         animation.advancePassiveSubjects(2.5);
@@ -347,4 +328,133 @@ describe("AnimationRig", () => {
         near(bone.position.x, 2, "x");
         assert.deepEqual(hidden, ["clone:1/part"]);
     });
+
+    // ── how a death clone ends ────────────────────────────────────────────────
+    //
+    // Measured in the game: a dying object with a death clip STAYS. Once its clip is done its fade
+    // starts Death_Persistence_Duration later; then it fades out over Death_Fade_Time and is gone at
+    // 0.025 or below - or, naming Death_Explosions_End, is destroyed at the fade start. The clock
+    // here is the time the rig is stepped by.
+
+    it("keeps a death clone on its held frame for its persistence, then fades it out", () => {
+        const { animation, clone, bone, hidden, released, ended } =
+            dyingClone(true);
+
+        animation.startDeathClip(
+            "clone:1",
+            { persistenceSeconds: 5, fadeSeconds: 1, endsInExplosions: false },
+            ended.push,
+        );
+        animation.advancePassiveSubjects(2);
+        animation.advancePassiveSubjects(4.9);
+
+        assert.deepEqual(hidden, [], "still there before its fade start");
+        near(bone.position.x, 2, "x");
+
+        animation.advancePassiveSubjects(0.6);
+        near(clone.death?.alpha ?? -1, 0.5, "alpha half way through the fade");
+        assert.deepEqual(hidden, []);
+
+        animation.advancePassiveSubjects(0.5);
+        assert.deepEqual(hidden, ["clone:1/part"]);
+        assert.equal(
+            released.length,
+            1,
+            "its effects released when it goes, not before",
+        );
+        assert.equal(ended.length, 1);
+    });
+
+    it("destroys a death clone that names end explosions at its fade start, without a fade", () => {
+        const { animation, hidden, ended } = dyingClone(true);
+
+        animation.startDeathClip(
+            "clone:1",
+            { persistenceSeconds: 3, fadeSeconds: 1, endsInExplosions: true },
+            ended.push,
+        );
+        animation.advancePassiveSubjects(2);
+        animation.advancePassiveSubjects(2.9);
+        assert.deepEqual(hidden, []);
+
+        animation.advancePassiveSubjects(0.2);
+        assert.deepEqual(hidden, ["clone:1/part"]);
+        assert.equal(ended.length, 1);
+    });
+
+    it("starts the persistence at once for a death clone with no death clip", () => {
+        const { animation, hidden } = dyingClone(false);
+
+        animation.startDeathClip("clone:1", {
+            persistenceSeconds: 1,
+            fadeSeconds: 0,
+            endsInExplosions: false,
+        });
+        animation.advancePassiveSubjects(0.5);
+        assert.deepEqual(hidden, []);
+
+        animation.advancePassiveSubjects(0.6);
+        assert.deepEqual(hidden, ["clone:1/part"]);
+    });
 });
+
+/**
+ * A rig with one passive subject, `clone:1`, carrying {@link walk} as `Hull_die_00` when asked for a
+ * clip - and no mixer at all when not. What it hides, the effect releases and the end callbacks are
+ * recorded.
+ */
+function dyingClone(withClip: boolean): {
+    animation: AnimationRig;
+    clone: ReturnType<AnimationRig["subjectAnimation"]>;
+    bone: THREE.Object3D;
+    hidden: string[];
+    released: string[];
+    ended: { push: () => void; length: number };
+} {
+    const hidden: string[] = [];
+    const released: string[] = [];
+    let ends = 0;
+    const context = standInContext({
+        assembly: {
+            partsOf: () => [{ id: "clone:1/part" }],
+            applyOwnFileVisibility: () => undefined,
+            setPartHidden: (id: string) => {
+                hidden.push(id);
+            },
+        },
+        particles: {
+            particleSystems: new Map(),
+            applyEmitterGating: () => undefined,
+            releaseSubjectEffects: (id: string) => {
+                released.push(id);
+            },
+        },
+    });
+    const animation = new AnimationRig(context);
+    const root = new THREE.Group();
+    const bone = new THREE.Object3D();
+    bone.name = "Turret";
+    root.add(bone);
+    const clone = animation.subjectAnimation("clone:1");
+
+    if (withClip) {
+        clone.mixer = new THREE.AnimationMixer(root);
+        clone.clips.push(walk("Hull_die_00"));
+    }
+
+    return {
+        animation,
+        clone,
+        bone,
+        hidden,
+        released,
+        ended: {
+            push: () => {
+                ends++;
+            },
+            get length() {
+                return ends;
+            },
+        },
+    };
+}

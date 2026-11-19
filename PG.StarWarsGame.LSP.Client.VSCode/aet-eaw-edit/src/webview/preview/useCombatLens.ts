@@ -47,7 +47,7 @@ import {
 } from "./attacker";
 import { shieldRevealed, stealthed } from "./abilityRows";
 import { effectState } from "./visibility";
-import { cloneForDamage, turretSweeps } from "./deathClone";
+import { cloneDeath, cloneForDamage, turretSweeps } from "./deathClone";
 import { everyTurretHandle, type TurretAim } from "./turretHandles";
 import { spinAwayEnd } from "./spinAway";
 import { appendShot, BY_HAND, type DamageLogEntry } from "./damageLog";
@@ -808,7 +808,9 @@ export function useCombatLens({
         const partId = `${DEATH_CLONE_PART}${clone.objectId}`;
 
         viewportRef.current?.setPartHidden(partId, false);
-        viewportRef.current?.startDeathClip(partId);
+        // It stays once its clip is done, and ends as its own type says - see `deathEnding.ts`.
+        const { ending, onEnd } = cloneDeath(clone, playEffect);
+        viewportRef.current?.startDeathClip(partId, ending, onEnd);
     }, [
         scene,
         destroyed,

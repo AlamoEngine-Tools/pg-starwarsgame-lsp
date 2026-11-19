@@ -7,6 +7,7 @@
 import type * as THREE from "three";
 
 import { type VisibilityTrack } from "./boneVisibility";
+import { type DeathState } from "./deathEnding";
 
 /**
  * One subject's animation, kept entirely apart from every other subject's.
@@ -58,4 +59,6 @@ export interface SubjectAnimation {
     >;
     /** The clip running on this subject right now. */
     action: THREE.AnimationAction | null;
+    /** How far this subject has got towards its end, once it has started dying; null until then. */
+    death: DeathState | null;
 }

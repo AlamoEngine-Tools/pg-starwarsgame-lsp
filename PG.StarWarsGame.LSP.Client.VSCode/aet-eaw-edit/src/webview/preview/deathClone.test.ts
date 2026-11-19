@@ -10,11 +10,14 @@ import type {
 } from "../../protocol/modelPreview";
 
 import {
+    cloneDeath,
     cloneForDamage,
+    deathEndingOf,
     deathCloneRows,
     sweepAngles,
     turretSweeps,
 } from "./deathClone";
+import { ENDS_WITH_ITS_CLIP } from "./deathEnding";
 
 const CLONES: PreviewDeathClone[] = [
     {
@@ -364,5 +367,48 @@ describe("turretSweeps, keyed back to what declared them", () => {
 
         assert.equal(sweeps.length, 1);
         assert.equal(sweeps[0].id, "HP_Turret");
+    });
+});
+
+describe("deathEndingOf", () => {
+    it("reads how the clone ends off its descriptor", () => {
+        assert.deepEqual(
+            deathEndingOf({
+                ...CLONES[0],
+                persistenceSeconds: 20,
+                fadeSeconds: 0.25,
+                endExplosions: ["Large_Explosion_Land"],
+            }),
+            {
+                persistenceSeconds: 20,
+                fadeSeconds: 0.25,
+                endsInExplosions: true,
+            },
+        );
+    });
+
+    it("ends with the clip where the clone declares nothing, or is not there", () => {
+        assert.deepEqual(deathEndingOf(CLONES[0]), ENDS_WITH_ITS_CLIP);
+        assert.deepEqual(deathEndingOf(undefined), ENDS_WITH_ITS_CLIP);
+    });
+});
+
+describe("cloneDeath", () => {
+    it("sets off every end explosion, once each, when the clone ends", () => {
+        const played: { name: string; once: boolean }[] = [];
+        const { onEnd } = cloneDeath(
+            {
+                ...CLONES[0],
+                endExplosions: ["Large_Explosion_Land", "Small_Explosion_Land"],
+            },
+            (_id, name, _partId, _bone, once) => played.push({ name, once }),
+        );
+
+        onEnd();
+
+        assert.deepEqual(played, [
+            { name: "Large_Explosion_Land", once: true },
+            { name: "Small_Explosion_Land", once: true },
+        ]);
     });
 });

@@ -66,6 +66,10 @@
   its scrubber and its "Last frame" button now do the same, death clones included. A looping clip still wraps
   at its last frame
   ([#447](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/447))
+- **A death clone stays for its persistence** - a death clone disappeared the moment its clip ended. It now
+  holds its last frame for `Death_Persistence_Duration`, then goes with its `Death_Explosions_End`, or after
+  `Death_Fade_Time` when it names none
+  ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

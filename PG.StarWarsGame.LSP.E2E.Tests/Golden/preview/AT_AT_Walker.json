@@ -419,6 +419,8 @@
       "ModelFile": "EV_AT-AT.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 1.75,
+      "PersistenceSeconds": 15,
+      "FadeSeconds": null,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -774,6 +776,9 @@
           "AltDecreaseStayHidden": true,
           "ClaimsAbility": null
         }
+      ],
+      "EndExplosions": [
+        "Huge_Explosion_Land"
       ]
     },
     {
@@ -782,6 +787,8 @@
       "ModelFile": "EV_AT-AT.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 1.75,
+      "PersistenceSeconds": 15,
+      "FadeSeconds": null,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -1137,6 +1144,9 @@
           "AltDecreaseStayHidden": true,
           "ClaimsAbility": null
         }
+      ],
+      "EndExplosions": [
+        "Huge_Explosion_Land"
       ]
     },
     {
@@ -1145,6 +1155,8 @@
       "ModelFile": "EV_AT-AT.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 1.75,
+      "PersistenceSeconds": 15,
+      "FadeSeconds": null,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -1500,6 +1512,9 @@
           "AltDecreaseStayHidden": true,
           "ClaimsAbility": null
         }
+      ],
+      "EndExplosions": [
+        "Huge_Explosion_Land"
       ]
     },
     {
@@ -1508,6 +1523,8 @@
       "ModelFile": "EV_AT-AT.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 1.75,
+      "PersistenceSeconds": 15,
+      "FadeSeconds": null,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -1863,6 +1880,9 @@
           "AltDecreaseStayHidden": true,
           "ClaimsAbility": null
         }
+      ],
+      "EndExplosions": [
+        "Huge_Explosion_Land"
       ]
     }
   ],

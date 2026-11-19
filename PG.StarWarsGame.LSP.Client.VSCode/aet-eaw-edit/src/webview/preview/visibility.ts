@@ -379,10 +379,12 @@ export function restingClip(clips: readonly string[]): string | undefined {
 export function deathClip(clips: readonly string[]): string | undefined {
     const sorted = [...clips].sort();
 
-    return (
-        sorted.find((clip) => /(^|[^a-z])die([^a-z]|$)/i.test(clip)) ??
-        sorted[0]
-    );
+    return sorted.find(isDeathClipName) ?? sorted[0];
+}
+
+/** Whether a clip's name says it is a death: `die` standing on its own between separators. */
+export function isDeathClipName(clip: string): boolean {
+    return /(^|[^a-z])die([^a-z]|$)/i.test(clip);
 }
 
 /** One row's override changing, where null means "give it back to the model". */

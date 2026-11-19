@@ -27,6 +27,7 @@ import { modelRequestsOf } from "./modelStore";
 import { particleNotices } from "./particleNotices";
 import { heldModels, post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
+import { cloneDeath } from "./deathClone";
 import { dispatchHostMessage } from "./hostMessages";
 import { type PendingEffect } from "./useParticleEffects";
 import { BREAKOFF_ATTACHMENT, type PreviewViewport } from "./viewport";
@@ -471,7 +472,19 @@ export function useHostMessages({
                         // visible gap between the ship going and the wreck arriving - a capital ship's
                         // clone is three megabytes. Shown and started by the death watch.
                         if (deadRef.current) {
-                            viewport.startDeathClip(message.partId);
+                            const { ending, onEnd } = cloneDeath(
+                                sceneRef.current?.deathClones?.find(
+                                    (c) =>
+                                        `${DEATH_CLONE_PART}${c.objectId}` ===
+                                        message.partId,
+                                ),
+                                playEffect,
+                            );
+                            viewport.startDeathClip(
+                                message.partId,
+                                ending,
+                                onEnd,
+                            );
                         } else {
                             viewport.setPartHidden(message.partId, true);
                         }

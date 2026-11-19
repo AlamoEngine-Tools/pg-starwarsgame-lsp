@@ -93,6 +93,50 @@ public sealed class PreviewDeathCloneTest
         Assert.Equal(1f, Assert.Single(scene.DeathClones).ScaleFactor);
     }
 
+    /// <summary>
+    ///     How the clone ENDS, off the clone's own type: it stays after its death clip, for
+    ///     <c>Death_Persistence_Duration</c>, then fades over <c>Death_Fade_Time</c> - or, with
+    ///     <c>Death_Explosions_End</c>, is destroyed in those explosions instead.
+    /// </summary>
+    [Fact]
+    public void DeathClones_CarryHowTheCloneEnds()
+    {
+        var scene = Scene(
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
+            tags => tags.With("Wreck",
+                Tag("Land_Model_Name", "wreck.alo"),
+                Tag("Death_Persistence_Duration", "20"),
+                Tag("Death_Fade_Time", "0.25"),
+                Tag("Death_Explosions_End", "Large_Explosion_Land, Small_Explosion_Land")),
+            Tag("Land_Model_Name", "hull.alo"),
+            Tag("Death_Clone", "Damage_Normal, Wreck"));
+
+        var clone = Assert.Single(scene.DeathClones);
+        Assert.Equal(20f, clone.PersistenceSeconds);
+        Assert.Equal(0.25f, clone.FadeSeconds);
+        Assert.Equal(["Large_Explosion_Land", "Small_Explosion_Land"], clone.EndExplosions);
+    }
+
+    /// <summary>
+    ///     Null, not zero, for a tag the clone does not declare: 35 of eaw's 126 clone types declare
+    ///     neither the persistence nor the fade, and saying nothing is not saying zero.
+    /// </summary>
+    [Fact]
+    public void DeathClones_SayNothingAboutAnEndingTheCloneDoesNotDeclare()
+    {
+        var scene = Scene(
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
+            tags => tags.With("Wreck", Tag("Land_Model_Name", "wreck.alo")),
+            Tag("Land_Model_Name", "hull.alo"),
+            Tag("Death_Persistence_Duration", "34"),
+            Tag("Death_Clone", "Damage_Normal, Wreck"));
+
+        var clone = Assert.Single(scene.DeathClones);
+        Assert.Null(clone.PersistenceSeconds);
+        Assert.Null(clone.FadeSeconds);
+        Assert.Empty(clone.EndExplosions);
+    }
+
     [Fact]
     public void DeathClones_ReportACloneThatIsNotDefined()
     {

@@ -61,6 +61,7 @@ import { CameraRig } from "./cameraRig";
 import { PartAssembly } from "./partAssembly";
 import { DestructionRig } from "./destructionRig";
 import { AnimationRig } from "./animationRig";
+import { type DeathEnding } from "./deathEnding";
 import {
     type AddPartOptions,
     type CaptureShot,
@@ -906,9 +907,13 @@ export class PreviewViewport {
         this.environment.setShadowColour(colour);
     }
 
-    /** Starts a passive subject's own death clip, once. See `AnimationRig.startDeathClip`. */
-    startDeathClip(subjectId: string): void {
-        this.animation.startDeathClip(subjectId);
+    /** Starts a passive subject dying, once. See `AnimationRig.startDeathClip`. */
+    startDeathClip(
+        subjectId: string,
+        ending?: DeathEnding,
+        onEnd?: () => void,
+    ): void {
+        this.animation.startDeathClip(subjectId, ending, onEnd);
     }
 
     /** Starts a clip by name, answering whether one actually started. See `AnimationRig.play`. */

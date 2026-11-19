@@ -280,6 +280,15 @@ export interface PreviewDeathClone {
      * rewrites the ids when it puts one in the scene.
      */
     particles: PreviewParticle[];
+    /**
+     * How the clone ENDS, off the clone's own type. Once its death clip is done it stays for
+     * `Death_Persistence_Duration`, then is destroyed in its `Death_Explosions_End` when it names
+     * any, and otherwise fades out over `Death_Fade_Time`. Absent where the clone does not declare
+     * the tag.
+     */
+    persistenceSeconds?: number | null;
+    fadeSeconds?: number | null;
+    endExplosions?: string[];
 }
 
 /**

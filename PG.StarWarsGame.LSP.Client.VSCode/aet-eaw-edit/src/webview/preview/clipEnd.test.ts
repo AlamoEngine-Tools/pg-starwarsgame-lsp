@@ -92,6 +92,7 @@ describe("clipDone and runningClips", () => {
             nodeByName: new Map(),
             restPose: new Map(),
             action,
+            death: null,
         };
     }
 

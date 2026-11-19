@@ -13,6 +13,7 @@ import type {
     PreviewDeathClone,
     PreviewTurret,
 } from "../../protocol/modelPreview";
+import { type DeathEnding, ENDS_WITH_ITS_CLIP } from "./deathEnding";
 
 /**
  * One card in the Gameplay dock's Death clone section.
@@ -97,6 +98,58 @@ export function deathCloneRows(
             chosen.objectId === clone.objectId &&
             (chosen.damageType ?? null) === (clone.damageType ?? null),
     }));
+}
+
+/**
+ * How a clone ends, off its descriptor - see `deathEnding.ts`. A number the clone does not declare
+ * is {@link ENDS_WITH_ITS_CLIP}'s.
+ */
+export function deathEndingOf(
+    clone: PreviewDeathClone | undefined,
+): DeathEnding {
+    return {
+        persistenceSeconds:
+            clone?.persistenceSeconds ?? ENDS_WITH_ITS_CLIP.persistenceSeconds,
+        fadeSeconds: clone?.fadeSeconds ?? ENDS_WITH_ITS_CLIP.fadeSeconds,
+        endsInExplosions: (clone?.endExplosions ?? []).length > 0,
+    };
+}
+
+/** Plays a named effect once where it hangs on no part - the shape of `playEffect`. */
+export type PlayEffect = (
+    id: string,
+    name: string,
+    partId: string | undefined,
+    bone: string | undefined,
+    once: boolean,
+) => void;
+
+/**
+ * How a clone ends, and what happens the moment it does: its `Death_Explosions_End` go off.
+ *
+ * Where the clone is, which is where the ship was - so at the model root, like the ship's own
+ * death blast.
+ */
+export function cloneDeath(
+    clone: PreviewDeathClone | undefined,
+    playEffect: PlayEffect,
+): { ending: DeathEnding; onEnd: () => void } {
+    return {
+        ending: deathEndingOf(clone),
+        onEnd: () => {
+            const at = Date.now();
+
+            (clone?.endExplosions ?? []).forEach((name, index) => {
+                playEffect(
+                    `deathend:${clone!.objectId}:${index}:${at}`,
+                    name,
+                    undefined,
+                    undefined,
+                    true,
+                );
+            });
+        },
+    };
 }
 
 /** How far a turret is turned at one point in a sweep. Degrees, relative to the model. */

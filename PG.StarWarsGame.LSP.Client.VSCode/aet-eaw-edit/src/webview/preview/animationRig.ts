@@ -8,7 +8,13 @@
 
 import { type SubjectAnimation } from "./subjectAnimation";
 import { ACTIVE_SUBJECT } from "./loadedPart";
-import { deathClip } from "./visibility";
+import { deathClip, isDeathClipName } from "./visibility";
+import {
+    type DeathEnding,
+    deathState,
+    ENDS_WITH_ITS_CLIP,
+    stepDeath,
+} from "./deathEnding";
 import * as THREE from "three";
 import { visibilityTracks } from "./boneVisibility";
 import { clipDone, playedLooping, playedOnce } from "./clipEnd";
@@ -42,6 +48,8 @@ export class AnimationRig {
     private animationPaused = false;
     /** Whether a clip is currently driving bone visibility, so the release happens exactly once. */
     private overridingVisibility = false;
+    /** What to do when each dying subject is destroyed, by subject id - see {@link startDeathClip}. */
+    private readonly deathEnds = new Map<string, () => void>();
 
     constructor(private readonly context: ViewportContext) {}
 
@@ -106,6 +114,7 @@ export class AnimationRig {
     /** Forgets a passive subject whose last part has gone. */
     forgetSubject(subjectId: string): void {
         this.subjects.delete(subjectId);
+        this.deathEnds.delete(subjectId);
     }
 
     /**
@@ -136,6 +145,7 @@ export class AnimationRig {
     /** Drops every subject's animation and the visibility a clip was driving, for a new scene. */
     forgetSubjects(): void {
         this.subjects.clear();
+        this.deathEnds.clear();
         this.overridingVisibility = false;
     }
 
@@ -157,15 +167,19 @@ export class AnimationRig {
     }
 
     /**
-     * Starts a passive subject's own death clip, once.
+     * Starts a passive subject dying: its own death clip, once, and the clock towards its end.
      *
      * ONCE, and clamped: the user's word is that a death clone is spawned at the exact position of
      * the model it replaces and plays through a single time. There is no picker for it and no loop
      * - it is not something the reader chose, it is what dying looks like.
      *
+     * It then STAYS, on the clip's held frame, and ends as `ending` says - see `deathEnding.ts`.
+     * `onEnd` runs once, the moment it is destroyed: that is when `Death_Explosions_End` go off.
+     * A subject with no clip to play starts its persistence at once.
+     *
      * Separate from LOADING it so the geometry can be fetched early and held: asking for a capital
      * ship's three-megabyte clone at the moment of death left a visible gap between the ship going
-     * and the wreck arriving. Idempotent - a second call does not restart a clip already running,
+     * and the wreck arriving. Idempotent - a second call does not restart a subject already dying,
      * because it is the same wreck.
      *
      * This is `play` for a subject nobody is driving. It is the same machinery: the subject's own
@@ -173,21 +187,31 @@ export class AnimationRig {
      * implementation of all three, because the scene-wide maps it would have had to use were
      * already full of the hull's answers.
      */
-    startDeathClip(subjectId: string): void {
+    startDeathClip(
+        subjectId: string,
+        ending: DeathEnding = ENDS_WITH_ITS_CLIP,
+        onEnd?: () => void,
+    ): void {
         const subject = this.subjects.get(subjectId);
 
-        if (
-            subject === undefined ||
-            subject.mixer === null ||
-            subject.action !== null
-        ) {
+        if (subject === undefined || subject.death !== null) {
             return;
+        }
+
+        if (onEnd !== undefined) {
+            this.deathEnds.set(subjectId, onEnd);
         }
 
         const name = deathClip(subject.clips.map((c) => c.name));
         const clip = subject.clips.find((c) => c.name === name);
 
-        if (clip === undefined) {
+        // With no clip to play, the clip is over from the start, and so is the wait for it.
+        subject.death = deathState(
+            ending,
+            subject.mixer === null || clip === undefined,
+        );
+
+        if (subject.mixer === null || clip === undefined) {
             return;
         }
 
@@ -446,33 +470,48 @@ export class AnimationRig {
      */
     advancePassiveSubjects(dt: number): void {
         for (const [subjectId, subject] of this.subjects) {
+            const death = subject.death;
+
             if (
                 subjectId === ACTIVE_SUBJECT ||
-                subject.action === null ||
-                subject.mixer === null
+                death === null ||
+                death.destroyed
             ) {
                 continue;
             }
 
-            subject.mixer.update(dt);
-
             const action = subject.action;
-            const track = subject.visibility.get(action.getClip().name);
 
-            // Emission is what the clip decides for a proxy (`applyEmitterGating`, below); what is
-            // already in the air keeps drawing, exactly as it does in the engine.
-            for (const part of this.context.assembly.partsOf(subjectId)) {
-                this.context.assembly.applyOwnFileVisibility(part);
+            if (action !== null && subject.mixer !== null) {
+                subject.mixer.update(dt);
+
+                const track = subject.visibility.get(action.getClip().name);
+
+                // Emission is what the clip decides for a proxy (`applyEmitterGating`, below); what
+                // is already in the air keeps drawing, exactly as it does in the engine.
+                for (const part of this.context.assembly.partsOf(subjectId)) {
+                    this.context.assembly.applyOwnFileVisibility(part);
+                }
+
+                // The same gate the active subject gets, on this subject's own clip. Without it the
+                // clip decides only what is SEEN: a burst switched off at this moment goes on
+                // burning, and is spent long before the frame that was meant to set it off.
+                this.context.particles.applyEmitterGating(
+                    subjectId,
+                    track,
+                    action,
+                );
             }
 
-            // The same gate the active subject gets, on this subject's own clip. Without it the
-            // clip decides only what is SEEN: a burst switched off at this moment goes on burning,
-            // and is spent long before the frame that was meant to set it off.
-            this.context.particles.applyEmitterGating(subjectId, track, action);
+            // A dying object STAYS once its clip is done, on the held frame, until its ending says
+            // it is gone - see `deathEnding.ts`. The clip is over when there is none, or it is not
+            // a death clip, or it has finished.
+            const clipOver =
+                action === null ||
+                !isDeathClipName(action.getClip().name) ||
+                clipDone(action);
 
-            // Gone at the end of it. A death clone is what dying LOOKS like, not what is left
-            // afterwards - the engine takes the object away when the clip is done.
-            if (clipDone(action)) {
+            if (stepDeath(death, dt, clipOver)) {
                 // Its effects are released FIRST, and they outlive it. The Calamari clone's three
                 // `p_explosion_huge00` ignite at 59.7s of a 60.1s clip - the detonation the whole
                 // minute builds to - and hiding the part they are attached to cut them 0.4s in, so the
@@ -482,6 +521,8 @@ export class AnimationRig {
                 for (const part of this.context.assembly.partsOf(subjectId)) {
                     this.context.assembly.setPartHidden(part.id, true);
                 }
+
+                this.deathEnds.get(subjectId)?.();
             }
         }
     }
@@ -541,6 +582,7 @@ export class AnimationRig {
             nodeByName: new Map(),
             restPose: new Map(),
             action: null,
+            death: null,
         };
 
         this.subjects.set(subjectId, made);

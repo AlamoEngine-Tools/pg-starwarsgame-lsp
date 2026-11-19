@@ -7,6 +7,7 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Preview;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -261,7 +262,11 @@ public sealed class DamageSectionBuilder(
                 model is null ? [] : _parts.ProxiesOf(model, row[1], [], problems),
                 // The clone's OWN scale, read off the resolved clone - variants included - through
                 // the same reader the subject's scale uses.
-                EngineScaleFactor.Of(clone.ValueOf("Scale_Factor"))));
+                EngineScaleFactor.Of(clone.ValueOf("Scale_Factor")),
+                // How it ends, off the clone too: it is the clone that stays and fades.
+                clone.FloatOf("Death_Persistence_Duration"),
+                clone.FloatOf("Death_Fade_Time"),
+                clone.ValueOf("Death_Explosions_End") is { } end ? XmlUtility.SplitList(end) : []));
         }
 
         return clones;
