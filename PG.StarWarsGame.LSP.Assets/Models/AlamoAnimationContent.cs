@@ -22,11 +22,12 @@ public readonly record struct AlamoAnimationFrame(
 ///     Every frame of one animated bone.
 /// </summary>
 /// <param name="BoneIndex">
-///     Index into the <em>model's</em> bone list. An animation only describes the bones it moves, so
-///     these are sparse; a consumer fills the gaps from the model's own rest pose.
+///     The bone index as stored. Not what binds the track: the game matches tracks to bones by
+///     position (see <see cref="AlamoAnimationContent.BoneDrivenBy" />), so nothing reads this to
+///     decide which bone moves.
 /// </param>
 /// <param name="Name">
-///     The bone name as stored. Matching it against the model's bone of the same index is what
+///     The bone name as stored. Matching it against the model's bone at the same position is what
 ///     confirms an animation belongs to a given model - the check that makes it possible to work out
 ///     which of 1363 <c>.ala</c> files pair with which <c>.alo</c>.
 /// </param>
@@ -47,8 +48,8 @@ public sealed record AlamoAnimationBone(
 ///         means the reader needs no model, keeping it a pure description of one file.
 ///     </para>
 ///     <para>
-///         Only the bones the animation actually drives appear. Everything else holds its rest pose,
-///         which lives in the model, not here.
+///         Tracks bind to bones by POSITION: track i drives bone i + 1, and the root has no track.
+///         A bone past the last track holds its rest pose, which lives in the model, not here.
 ///     </para>
 /// </remarks>
 /// <param name="FrameCount">
@@ -73,11 +74,25 @@ public sealed record AlamoAnimationContent(
     public float Duration => Fps > 0 ? Math.Max(0, FrameCount - 1) / Fps : 0f;
 
     /// <summary>
+    ///     The model bone that track <paramref name="track" /> drives: the one after it, because the
+    ///     root has no track.
+    /// </summary>
+    /// <remarks>
+    ///     By position, as the game matches them - never by the name or the index the track stores.
+    ///     Every shipped clip stores index = position + 1, so the two only part ways in a file built
+    ///     otherwise, and there the bone that moves is the one at the position.
+    /// </remarks>
+    public static int BoneDrivenBy(int track)
+    {
+        return track + 1;
+    }
+
+    /// <summary>
     ///     Whether this animation's bones line up with <paramref name="modelBoneNames" />.
     /// </summary>
     /// <remarks>
-    ///     The pairing test the viewer uses: every driven bone must exist at the index it claims and
-    ///     carry the name it claims. Filename prefixes get the candidate list down to a handful -
+    ///     The pairing test the viewer uses: every track must land on a bone and carry that bone's
+    ///     name. Filename prefixes get the candidate list down to a handful -
     ///     1342 of 1363 shipped animations match their model that way - and this settles it.
     ///     Case-insensitive, because the engine uppercases bone names and the files do not.
     /// </remarks>
@@ -97,9 +112,9 @@ public sealed record AlamoAnimationContent(
     ///         is not what the engine requires, and enforcing it dropped clips the game plays.
     ///     </para>
     ///     <para>
-    ///         An index past the end of the bone list is different in kind: there is no node to drive,
-    ///         so the track cannot be written whatever anyone decides about names. That is a hard
-    ///         limit rather than a strictness setting, and it stays.
+    ///         A track whose position lands past the end of the bone list is different in kind: there
+    ///         is no node to drive, so the track cannot be written whatever anyone decides about
+    ///         names. That is a hard limit rather than a strictness setting, and it stays.
     ///     </para>
     ///     <para>
     ///         Use <see cref="MatchesModel" /> where the job is to CHOOSE which model a loose clip
@@ -110,7 +125,7 @@ public sealed record AlamoAnimationContent(
     {
         ArgumentNullException.ThrowIfNull(modelBoneNames);
 
-        return Bones.All(bone => bone.BoneIndex >= 0 && bone.BoneIndex < modelBoneNames.Count);
+        return Bones.Count == 0 || BoneDrivenBy(Bones.Count - 1) < modelBoneNames.Count;
     }
 
     /// <summary>
@@ -127,16 +142,16 @@ public sealed record AlamoAnimationContent(
     {
         ArgumentNullException.ThrowIfNull(modelBoneNames);
 
-        foreach (var bone in Bones)
+        for (var track = 0; track < Bones.Count; track++)
         {
-            if (bone.BoneIndex < 0 || bone.BoneIndex >= modelBoneNames.Count)
-                return $"it drives bone {bone.BoneIndex} ('{bone.Name}') and the model has " +
-                       $"{modelBoneNames.Count}";
+            var bone = BoneDrivenBy(track);
+            var name = Bones[track].Name;
 
-            if (!string.Equals(modelBoneNames[bone.BoneIndex], bone.Name,
-                    StringComparison.OrdinalIgnoreCase))
-                return $"bone {bone.BoneIndex} is '{bone.Name}' here and " +
-                       $"'{modelBoneNames[bone.BoneIndex]}' on the model";
+            if (bone >= modelBoneNames.Count)
+                return $"it drives bone {bone} ('{name}') and the model has {modelBoneNames.Count}";
+
+            if (!string.Equals(modelBoneNames[bone], name, StringComparison.OrdinalIgnoreCase))
+                return $"bone {bone} is '{name}' here and '{modelBoneNames[bone]}' on the model";
         }
 
         return null;

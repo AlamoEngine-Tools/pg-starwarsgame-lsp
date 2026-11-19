@@ -49,6 +49,11 @@
   the root in its skin list, a shadow volume casts only while its own bone shows it, and a bone with no track in
   the clip is shown whatever its parent does
   ([#445](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/445))
+- **A clip's tracks drive the bones at their position** - the preview bound each track of a clip to the bone
+  index the clip stores. The game binds them by position, the first track to the first bone after the root,
+  whatever the clip names or stores; the preview now does the same. Every shipped clip stores the position, so
+  nothing changes for them; a clip written with other indices now moves and hides the bones it does in the game
+  ([#445](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/445))
 - **A bone the model file hides counts while no clip runs** - the preview ignored a bone's own visible flag, so
   a model opened on its own drew parts the game keeps hidden in its base pose, an X-wing's second engine glow
   among them. With no clip running, the parts on such a bone are now hidden; a running clip, the idle a unit

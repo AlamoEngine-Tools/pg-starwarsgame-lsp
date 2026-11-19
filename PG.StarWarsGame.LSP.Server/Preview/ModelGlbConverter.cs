@@ -126,8 +126,8 @@ public sealed class ModelGlbConverter : IModelGlbConverter
 
             // FITS, not MATCHES. Requiring an identical skeleton dropped clips the base game
             // plays: a unit that borrows another model's animation set does so across skeletons
-            // that differ, and the engine binds by index regardless. What cannot be recovered is
-            // a track reaching past the end of the bone list - there is no node to drive.
+            // that differ, and the game binds tracks by position regardless. What cannot be
+            // recovered is a track reaching past the end of the bone list - there is no node.
             if (!animation.FitsSkeleton(boneNames))
                 return (null, new PreviewClipNote(name, PreviewClipNoteKind.CannotPlay,
                     animation.WhyNotModel(boneNames) ?? string.Empty));

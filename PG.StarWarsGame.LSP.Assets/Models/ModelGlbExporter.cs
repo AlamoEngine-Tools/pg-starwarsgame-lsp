@@ -228,11 +228,14 @@ public static class ModelGlbExporter
 
             var bones = new JsonObject();
 
-            foreach (var bone in animation.Bones)
+            for (var track = 0; track < animation.Bones.Count; track++)
             {
-                if (bone.BoneIndex < 0 || bone.BoneIndex >= model.Bones.Count)
+                // By position, like the motion tracks - see AddAnimation.
+                var target = AlamoAnimationContent.BoneDrivenBy(track);
+                if (target >= model.Bones.Count)
                     continue;
 
+                var bone = animation.Bones[track];
                 if (bone.Frames.All(frame => frame.Visible))
                     continue;
 
@@ -240,7 +243,7 @@ public static class ModelGlbExporter
                 // NODE names, and the nodes are named after the skeleton being exported - so where a
                 // borrowed clip disagrees about what bone 12 is called, the clip's spelling would
                 // name no node at all and the track would be silently unreadable.
-                bones[$"{model.Bones[bone.BoneIndex].Name}#{bone.BoneIndex}"] =
+                bones[$"{model.Bones[target].Name}#{target}"] =
                     string.Concat(bone.Frames.Select(frame => frame.Visible ? '1' : '0'));
             }
 
@@ -300,19 +303,19 @@ public static class ModelGlbExporter
         if (animation.FrameCount <= 0 || animation.Fps <= 0)
             return;
 
-        foreach (var bone in animation.Bones)
+        for (var track = 0; track < animation.Bones.Count; track++)
         {
-            // The index is a hard limit - there is no node to drive past the end of the array - but
-            // the NAME is not. A track whose name disagrees with the model's bone used to be skipped
-            // here, on the reasoning that it belongs to a different skeleton. The user reported that
-            // the units doing this animate perfectly well in the base game, so the engine plainly
-            // binds by index and the strict rule was costing real clips their motion. It binds by
-            // index here too now; a disagreement is reported against the OBJECT, where a reader can
-            // act on it, rather than silently freezing the bone.
-            if (bone.BoneIndex < 0 || bone.BoneIndex >= nodes.Length)
+            // By POSITION, as the game matches a clip's tracks: neither the name nor the index the
+            // track stores decides which bone moves. A track whose name disagrees with the model's
+            // bone used to be skipped here; the units doing this animate perfectly well in the base
+            // game, so a disagreement is reported against the OBJECT, where a reader can act on it,
+            // rather than silently freezing the bone. Past the end of the skeleton there is no node.
+            var target = AlamoAnimationContent.BoneDrivenBy(track);
+            if (target >= nodes.Length)
                 continue;
 
-            var node = nodes[bone.BoneIndex];
+            var bone = animation.Bones[track];
+            var node = nodes[target];
             var translation = node.UseTranslation(name);
             var rotation = node.UseRotation(name);
             var scale = node.UseScale(name);
