@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Pipes;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -380,6 +381,179 @@ public sealed class PreviewTransferPipeTest
     {
         Assert.Same(task, await Task.WhenAny(task,
             Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)));
+    }
+
+    /// <summary>
+    ///     The limit is on one write waiting, not on the transfer. A stall timer that fires just as
+    ///     its write completes belongs to that write alone: the rest of the response, and the next
+    ///     exchange on the connection, go through.
+    /// </summary>
+    [Fact]
+    public async Task AStallTimerFiringAsItsWriteCompletes_LeavesTheNextExchangeWorking()
+    {
+        var clock = new FakeTimeProvider();
+        var client = new ScriptedClient();
+        var opened = 0;
+        using var pipe = new PreviewTransferPipe(NullLogger<PreviewTransferPipe>.Instance, clock,
+            _ => Interlocked.Increment(ref opened) == 1 ? client : new IdleListener());
+        var first = Offer(pipe, [1, 2, 3]);
+
+        // The payload's write is taken whole - and its time runs out before it returns.
+        client.OnWrite = (index, _) =>
+        {
+            if (index == 1)
+                clock.Advance(PreviewTransferPipe.WriteStall);
+            return Task.CompletedTask;
+        };
+
+        client.Ask(first.Id);
+        var one = await client.TakeAsync(PreviewTransferFraming.ResponseHeaderLength + 3);
+
+        // Offered now: the clock has moved on by as long as an unclaimed offer is kept.
+        var second = Offer(pipe, [4, 5]);
+        client.Ask(second.Id);
+        var two = await client.TakeAsync(PreviewTransferFraming.ResponseHeaderLength + 2);
+
+        Assert.Equal([1, 2, 3], one[PreviewTransferFraming.ResponseHeaderLength..]);
+        Assert.Equal(PreviewTransferFraming.Ok, two[0]);
+        Assert.Equal([4, 5], two[PreviewTransferFraming.ResponseHeaderLength..]);
+    }
+
+    /// <summary>
+    ///     A large payload to a client that reads slowly, but reads, is not cut off: every write
+    ///     here takes twenty seconds and the transfer far longer than the limit on one of them.
+    /// </summary>
+    [Fact]
+    public async Task AClientThatReadsSlowly_GetsTheWholePayload()
+    {
+        var clock = new FakeTimeProvider();
+        var client = new ScriptedClient();
+        var opened = 0;
+        using var pipe = new PreviewTransferPipe(NullLogger<PreviewTransferPipe>.Instance, clock,
+            _ => Interlocked.Increment(ref opened) == 1 ? client : new IdleListener());
+        var bytes = Enumerable.Range(0, 600_000).Select(i => (byte)(i * 7)).ToArray();
+        var transfer = Offer(pipe, bytes);
+        var waiting = Channel.CreateUnbounded<TaskCompletionSource>();
+        client.OnWrite = async (_, stop) =>
+        {
+            var taken = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await waiting.Writer.WriteAsync(taken, stop);
+            await taken.Task.WaitAsync(stop);
+        };
+
+        client.Ask(transfer.Id);
+        var received = client.TakeAsync(PreviewTransferFraming.ResponseHeaderLength + bytes.Length);
+        var writes = 0;
+        while (!received.IsCompleted)
+        {
+            var next = waiting.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask();
+            if (await Task.WhenAny(next, received) == received)
+                break;
+
+            clock.Advance(TimeSpan.FromSeconds(20));
+            (await next).SetResult();
+            writes++;
+        }
+
+        Assert.True(writes * 20 > PreviewTransferPipe.WriteStall.TotalSeconds * 2);
+        Assert.Equal(bytes, (await received)[PreviewTransferFraming.ResponseHeaderLength..]);
+    }
+
+    /// <summary>
+    ///     A connected client the test drives: it sends the ids it is told to, and takes each write
+    ///     through <see cref="OnWrite" /> - which may hold it, or move the clock - before keeping it.
+    /// </summary>
+    private sealed class ScriptedClient : Stream, IPreviewPipeListener
+    {
+        private readonly Channel<byte[]> _requests = Channel.CreateUnbounded<byte[]>();
+        private readonly Channel<byte[]> _written = Channel.CreateUnbounded<byte[]>();
+        private readonly List<byte> _taken = [];
+        private int _writes;
+
+        /// <summary>Called with each write's index, from zero, before the write is kept.</summary>
+        public Func<int, CancellationToken, Task> OnWrite { get; set; } = (_, _) => Task.CompletedTask;
+
+        public Stream Connection => this;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public Task WaitForConnectionAsync(CancellationToken stop)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void Ask(string id)
+        {
+            _requests.Writer.TryWrite(Convert.FromHexString(id));
+        }
+
+        /// <summary>The next <paramref name="count" /> bytes the server wrote.</summary>
+        public async Task<byte[]> TakeAsync(int count)
+        {
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            limit.CancelAfter(TimeSpan.FromSeconds(20));
+            while (_taken.Count < count)
+                _taken.AddRange(await _written.Reader.ReadAsync(limit.Token));
+
+            var bytes = _taken.Take(count).ToArray();
+            _taken.RemoveRange(0, count);
+            return bytes;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            var id = await _requests.Reader.ReadAsync(cancellationToken);
+            id.CopyTo(buffer);
+            return id.Length;
+        }
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var kept = buffer.ToArray();
+            await OnWrite(Interlocked.Increment(ref _writes) - 1, cancellationToken);
+            _written.Writer.TryWrite(kept);
+        }
+
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     /// <summary>An instance of the pipe that fails as soon as it is waited on.</summary>

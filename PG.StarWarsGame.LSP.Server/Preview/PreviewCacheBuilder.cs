@@ -4,7 +4,6 @@
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Preview;
@@ -121,6 +120,15 @@ public sealed class PreviewCacheBuilder(
     private readonly CancellationTokenSource _stop = new();
     private int _done;
     private bool _fullBuild;
+
+    /// <summary>
+    ///     True from a worker deciding that another must take the queue up until that other is
+    ///     started: no run stands to be cancelled then, so a cancel is noted in
+    ///     <see cref="_cancelledBetweenRuns" /> and honoured where the next would start.
+    /// </summary>
+    private bool _betweenRuns;
+
+    private bool _cancelledBetweenRuns;
     private CancellationTokenSource? _run;
     private int _total;
     private Thread? _worker;
@@ -276,7 +284,10 @@ public sealed class PreviewCacheBuilder(
     {
         lock (_gate)
         {
-            _run?.Cancel();
+            if (_run is not null)
+                _run.Cancel();
+            else if (_betweenRuns)
+                _cancelledBetweenRuns = true;
         }
     }
 
@@ -335,7 +346,8 @@ public sealed class PreviewCacheBuilder(
     /// <summary>Starts the worker if none is running. Called under the gate.</summary>
     private void EnsureWorker()
     {
-        if (_worker is not null || _queue.Count == 0)
+        // None once the server is stopping: there is nobody left to convert for.
+        if (_worker is not null || _queue.Count == 0 || _stop.IsCancellationRequested)
             return;
 
         _idle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -436,6 +448,7 @@ public sealed class PreviewCacheBuilder(
                         _queued.Add(waiting.Key);
                     _done = 0;
                     _total = _queue.Count;
+                    _betweenRuns = true;
                 }
                 else
                 {
@@ -465,10 +478,27 @@ public sealed class PreviewCacheBuilder(
                 if (again)
                     lock (_gate)
                     {
-                        StartWorker();
+                        _betweenRuns = false;
+                        if (_cancelledBetweenRuns || _stop.IsCancellationRequested)
+                        {
+                            // Cancelled in between, which is a cancel of the run that was about to
+                            // start: what it would have converted is not this session's any more.
+                            _cancelledBetweenRuns = false;
+                            _fullBuild = false;
+                            _queue.Clear();
+                            _queued.Clear();
+                            _done = 0;
+                            _total = 0;
+                            _worker = null;
+                            idle = _idle;
+                        }
+                        else
+                        {
+                            StartWorker();
+                        }
                     }
-                else
-                    idle?.TrySetResult();
+
+                idle?.TrySetResult();
             }
         }
     }

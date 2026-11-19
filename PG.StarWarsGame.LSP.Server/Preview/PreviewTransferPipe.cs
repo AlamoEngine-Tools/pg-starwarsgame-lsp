@@ -318,11 +318,6 @@ public sealed class PreviewTransferPipe(
         var request = new byte[PreviewTransferFraming.RequestLength];
         var header = new byte[PreviewTransferFraming.ResponseHeaderLength];
 
-        // Set again before every write and unset once a response is out: what is bounded is one
-        // write waiting on the client, never the transfer as a whole or the wait for a request.
-        using var stalled = new CancellationTokenSource(Timeout.InfiniteTimeSpan, _time);
-        using var writing = CancellationTokenSource.CreateLinkedTokenSource(stop, stalled.Token);
-
         try
         {
             await using (client)
@@ -336,19 +331,17 @@ public sealed class PreviewTransferPipe(
                     await using (payload)
                     {
                         PreviewTransferFraming.WriteResponseHeader(header, status, length);
-                        stalled.CancelAfter(WriteStall);
-                        await connection.WriteAsync(header, writing.Token);
+                        await WriteAsync(connection, header, stop);
 
                         if (payload is not null)
-                            await CopyExactlyAsync(payload, connection, length, stalled, writing.Token);
+                            await CopyExactlyAsync(payload, connection, length, stop);
 
-                        await connection.FlushAsync(writing.Token);
-                        stalled.CancelAfter(Timeout.InfiniteTimeSpan);
+                        await connection.FlushAsync(stop);
                     }
                 }
             }
         }
-        catch (OperationCanceledException) when (stalled.IsCancellationRequested)
+        catch (StalledWriteException)
         {
             // The client stopped reading. Its connection and the payload are closed by now.
             if (logger.IsEnabled(LogLevel.Debug))
@@ -420,10 +413,9 @@ public sealed class PreviewTransferPipe(
     ///     Sends exactly the bytes the header announced. A source that ends early - a file that
     ///     shrank between the offer and the collection - cannot fill the frame, so the connection is
     ///     given up: the client sees it close mid-payload, which it reports, instead of reading the
-    ///     next frame out of step. <paramref name="stalled" /> is set again before each write.
+    ///     next frame out of step.
     /// </summary>
-    private static async Task CopyExactlyAsync(Stream source, Stream target, long length,
-        CancellationTokenSource stalled, CancellationToken stop)
+    private async Task CopyExactlyAsync(Stream source, Stream target, long length, CancellationToken stop)
     {
         var buffer = new byte[128 * 1024];
         var left = length;
@@ -436,11 +428,37 @@ public sealed class PreviewTransferPipe(
                 throw new EndOfStreamException("A preview transfer's payload ended before its announced length.");
             }
 
-            stalled.CancelAfter(WriteStall);
-            await target.WriteAsync(buffer.AsMemory(0, read), stop);
+            await WriteAsync(target, buffer.AsMemory(0, read), stop);
             left -= read;
         }
     }
+
+    /// <summary>
+    ///     One write, given up when the client takes none of it for <see cref="WriteStall" />.
+    /// </summary>
+    /// <remarks>
+    ///     The limit is on NO PROGRESS, not on the transfer: every write starts its own, so a large
+    ///     payload to a client that reads slowly is sent for as long as it keeps reading. And each
+    ///     write has a timer and a token of its own, gone when the write returns - a timer that
+    ///     fires just as its write completes has nothing later to cancel, neither the rest of the
+    ///     response nor the next exchange on the connection.
+    /// </remarks>
+    private async ValueTask WriteAsync(Stream target, ReadOnlyMemory<byte> bytes, CancellationToken stop)
+    {
+        using var stalled = new CancellationTokenSource(WriteStall, _time);
+        using var writing = CancellationTokenSource.CreateLinkedTokenSource(stop, stalled.Token);
+        try
+        {
+            await target.WriteAsync(bytes, writing.Token);
+        }
+        catch (OperationCanceledException) when (stalled.IsCancellationRequested && !stop.IsCancellationRequested)
+        {
+            throw new StalledWriteException();
+        }
+    }
+
+    /// <summary>A write the client took nothing of for <see cref="WriteStall" />.</summary>
+    private sealed class StalledWriteException() : IOException("The client stopped reading a preview transfer.");
 
     private sealed record Offered(long Length, Func<Stream> Open, DateTimeOffset At);
 

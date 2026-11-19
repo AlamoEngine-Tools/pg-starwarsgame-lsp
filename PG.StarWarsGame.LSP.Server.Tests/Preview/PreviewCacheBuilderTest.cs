@@ -36,6 +36,9 @@ public sealed class PreviewCacheBuilderTest
         public bool Project { get; set; } = true;
         public Dictionary<string, string[]> Archives { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>Runs once, the next time the builder asks where the cache is.</summary>
+        public Action? OnNextDirectoryRead { get; set; }
+
         public Rig With(params string[] files)
         {
             foreach (var file in files)
@@ -67,9 +70,17 @@ public sealed class PreviewCacheBuilderTest
                 : null;
 
             return new PreviewCacheBuilder(new FakeGameIndexService(index), new StubProjects(config), Cache,
-                Converter, new FixedLocation(() => Directory), new FileHelper(Files), new ArchiveEntries(Archives),
+                Converter, new FixedLocation(ReadDirectory), new FileHelper(Files), new ArchiveEntries(Archives),
                 Progress,
                 NullLogger<PreviewCacheBuilder>.Instance);
+        }
+
+        private string? ReadDirectory()
+        {
+            var read = OnNextDirectoryRead;
+            OnNextDirectoryRead = null;
+            read?.Invoke();
+            return Directory;
         }
     }
 
@@ -392,6 +403,49 @@ public sealed class PreviewCacheBuilderTest
         // The build of every model did run to its end, and the late one is no build to show.
         Assert.True(rig.Files.File.Exists(Marker));
         Assert.Equal(1, rig.Progress.Begins);
+    }
+
+    /// <summary>
+    ///     A cancel that lands after one worker has left and before the next has taken up what was
+    ///     queued behind it stops that next one all the same: nothing it would have converted is
+    ///     converted. The moment is held open by what the leaving worker does in it - writing the
+    ///     marker of the build it finished, for which it asks where the cache is.
+    /// </summary>
+    [Fact]
+    public async Task Cancel_BetweenAWorkerLeavingAndTheNextStarting_StopsTheNext()
+    {
+        var rig = new Rig().With("A.alo");
+        var builder = rig.Build();
+        rig.Progress.OnEnded = () =>
+        {
+            builder.Requeue([new PreviewBuildItem("Late.alo", [])]);
+            rig.OnNextDirectoryRead = builder.Cancel;
+        };
+
+        builder.StartUnlessBuilt();
+        await Finished(builder);
+
+        Assert.Equal(["Data/Art/Models/A.alo <- "], rig.Cache.Calls);
+        Assert.True(rig.Files.File.Exists(Marker));
+
+        // And the builder is not left thinking a worker runs: the next save is converted.
+        builder.Requeue([new PreviewBuildItem("Next.alo", [])]);
+        await Finished(builder);
+        Assert.Equal(["Data/Art/Models/A.alo <- ", "Data/Art/Models/Next.alo <- "], rig.Cache.Calls);
+    }
+
+    /// <summary>A save reported while the server is shutting down starts no worker.</summary>
+    [Fact]
+    public async Task Requeue_AfterTheBuilderWasDisposed_StartsNothing()
+    {
+        var rig = new Rig().With("A.alo");
+        var builder = rig.Build();
+        builder.Dispose();
+
+        builder.Requeue([new PreviewBuildItem("A.alo", [])]);
+        await Finished(builder);
+
+        Assert.Empty(rig.Cache.Calls);
     }
 
     [Fact]

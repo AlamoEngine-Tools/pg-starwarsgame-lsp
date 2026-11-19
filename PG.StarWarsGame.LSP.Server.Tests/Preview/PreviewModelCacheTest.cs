@@ -661,6 +661,73 @@ public sealed class PreviewModelCacheTest
     }
 
     /// <summary>
+    ///     What is remembered of conversions with no project is bounded: a session that previews
+    ///     model after model does not grow a line for each. Past the limit the oldest is forgotten,
+    ///     and a caller that still holds it has it converted once more.
+    /// </summary>
+    [Fact]
+    public void GetOrConvert_WithNoProject_RemembersNoMoreThanItsLimit()
+    {
+        var assets = new DiskAssets().With(Model, [1, 2, 3]);
+        for (var i = 0; i < PreviewModelCache.UnkeptLimit; i++)
+            assets.With($"Data/Art/Models/Other{i}.alo", [9, (byte)(i >> 8), (byte)i]);
+        var converter = new CountingConverter();
+        var cache = Build(assets, false);
+        var first = cache.GetOrConvert(Model, NoClips, converter.Convert);
+        PreviewCachedModel? last = null;
+        for (var i = 0; i < PreviewModelCache.UnkeptLimit; i++)
+            last = cache.GetOrConvert($"Data/Art/Models/Other{i}.alo", NoClips, converter.Convert);
+        var converted = converter.Calls;
+
+        cache.GetOrConvert($"Data/Art/Models/Other{PreviewModelCache.UnkeptLimit - 1}.alo", NoClips,
+            converter.Convert, last!.Key);
+        Assert.Equal(converted, converter.Calls);
+
+        cache.GetOrConvert(Model, NoClips, converter.Convert, first!.Key);
+        Assert.Equal(converted + 1, converter.Calls);
+    }
+
+    /// <summary>
+    ///     An entry is streamed from its file while the client collects it. Meanwhile the file must
+    ///     not be pinned: the clear command removes it, and the model converted again afterwards is
+    ///     kept under the same name - not held in memory for want of a file to write.
+    /// </summary>
+    [Fact]
+    public void AnEntryBeingStreamed_CanStillBeCleared_AndConvertedAgainIntoItsPlace()
+    {
+        var folder = Directory.CreateTempSubdirectory("aet-preview-cache-");
+        try
+        {
+            var disk = new FileHelper(new System.IO.Abstractions.FileSystem());
+            var assets = new DiskAssets().With(Model, [1, 2, 3]);
+            var cache = new PreviewModelCache(
+                new PreviewAssetFingerprints(assets, new FileHelper(assets.Files)), disk,
+                new FixedLocation(folder.FullName.Replace('\\', '/')), NullLogger<PreviewModelCache>.Instance);
+            var entry = cache.GetOrConvert(Model, NoClips, new CountingConverter().Convert);
+            Assert.NotNull(entry!.File);
+
+            using (var streamed = entry.OpenPayload())
+            {
+                Assert.Equal(1, cache.Clear());
+                Assert.False(File.Exists(entry.File));
+
+                var again = cache.GetOrConvert(Model, NoClips, new CountingConverter().Convert);
+                Assert.Equal(entry.File, again!.File);
+                Assert.True(File.Exists(entry.File));
+
+                // And the reader that was under way still has the entry it opened, whole.
+                var bytes = new byte[entry.Length];
+                streamed.ReadExactly(bytes);
+                Assert.Equal(again.ReadBytes(), bytes);
+            }
+        }
+        finally
+        {
+            folder.Delete(true);
+        }
+    }
+
+    /// <summary>
     ///     A request that finds its model being converted by the background build waits for that
     ///     conversion - and the build's thread runs below normal priority, so the request would wait
     ///     behind everything else the machine is doing. The waiter lends the converting thread its

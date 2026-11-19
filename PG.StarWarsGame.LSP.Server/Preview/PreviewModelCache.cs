@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
-using System.IO.Hashing;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -239,6 +237,9 @@ public sealed class PreviewModelCache(
     /// <summary>The cache directory's name under <c>.aetswg/</c>.</summary>
     public const string DirectoryName = "preview";
 
+    /// <summary>How many conversions with no project to keep them in are remembered at once.</summary>
+    public const int UnkeptLimit = 256;
+
     private static readonly JsonSerializerOptions MetadataJson = new(JsonSerializerDefaults.Web);
 
     /// <summary>Conversions under way, so two requests for one key wait for the same one.</summary>
@@ -249,8 +250,15 @@ public sealed class PreviewModelCache(
     ///     and the length, never the GLB. Enough to tell a caller that its copy still stands without
     ///     converting the model again to say so. Small - one line per model served this session.
     /// </summary>
-    private readonly ConcurrentDictionary<string, (IReadOnlyList<string> Animations,
+    /// <remarks>
+    ///     At most <see cref="UnkeptLimit" /> of them, the oldest forgotten first. A caller that
+    ///     still holds a forgotten one has it converted once more, which remembers it again.
+    /// </remarks>
+    private readonly Dictionary<string, (IReadOnlyList<string> Animations,
         IReadOnlyList<PreviewClipNote> Notes, long Length)> _unkept = new(StringComparer.Ordinal);
+
+    /// <summary>The keys of <see cref="_unkept" />, oldest first. Both are read and written under its lock.</summary>
+    private readonly Queue<string> _unkeptOrder = new();
 
     /// <summary>
     ///     What the judge said of each model and clip, by the hashes of their bytes: whether the
@@ -289,12 +297,33 @@ public sealed class PreviewModelCache(
         // made; one asked for after all is converted at that moment.
         if (directory is null)
         {
-            if (have == key && _unkept.TryGetValue(key, out var known))
-                return new PreviewCachedModel(key, known.Animations, known.Notes, known.Length, null,
-                    () => new MemoryStream(Convert(model, offered, convert).Glb, false)).With(dropped);
+            if (have == key)
+            {
+                (IReadOnlyList<string> Animations, IReadOnlyList<PreviewClipNote> Notes, long Length) known;
+                bool remembered;
+                lock (_unkept)
+                {
+                    remembered = _unkept.TryGetValue(key, out known);
+                }
+
+                if (remembered)
+                    return new PreviewCachedModel(key, known.Animations, known.Notes, known.Length, null,
+                        () => new MemoryStream(Convert(model, offered, convert).Glb, false)).With(dropped);
+            }
 
             var conversion = Convert(model, offered, convert);
-            _unkept[key] = (conversion.Animations, conversion.Notes, conversion.Glb.LongLength);
+            lock (_unkept)
+            {
+                if (!_unkept.ContainsKey(key))
+                {
+                    _unkeptOrder.Enqueue(key);
+                    while (_unkeptOrder.Count > UnkeptLimit)
+                        _unkept.Remove(_unkeptOrder.Dequeue());
+                }
+
+                _unkept[key] = (conversion.Animations, conversion.Notes, conversion.Glb.LongLength);
+            }
+
             return InMemory(key, conversion).With(dropped);
         }
 
@@ -398,7 +427,7 @@ public sealed class PreviewModelCache(
 
         try
         {
-            using var file = fs.File.OpenRead(path);
+            using var file = OpenEntry(path);
             var layout = PreviewCacheEntryFormat.TryReadLayout(file, file.Length);
             if (layout?.Section(PreviewCacheEntryFormat.MetadataSection) is not { } metadataAt
                 || layout.Section(PreviewCacheEntryFormat.PayloadSection) is not { } payloadAt)
@@ -413,7 +442,7 @@ public sealed class PreviewModelCache(
                 return null;
 
             return new PreviewCachedModel(key, metadata.Animations, metadata.Notes, payloadAt.Length, path,
-                () => new SectionStream(fs.File.OpenRead(path), payloadAt.Offset, payloadAt.Length));
+                () => new SectionStream(OpenEntry(path), payloadAt.Offset, payloadAt.Length));
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -502,6 +531,23 @@ public sealed class PreviewModelCache(
             // Tried again in the next session; the entry is written either way.
             logger.LogWarning(e, "Could not list the preview cache in the ignore file beside '{Path}'", directory);
         }
+    }
+
+    /// <summary>
+    ///     Opens an entry to read without pinning it: while its payload is streamed to a client the
+    ///     clear command still removes it, and the model converted again afterwards is written
+    ///     under the same name. The reader keeps the entry it opened, whole.
+    /// </summary>
+    /// <remarks>
+    ///     MEASURED on Windows: moving a file OVER an entry that is open is refused even so, with
+    ///     access denied. Only a second process converting the same model at the same moment does that;
+    ///     its conversion is then served from memory, which <see cref="ConvertAndKeep" /> already
+    ///     does for an entry it cannot write.
+    /// </remarks>
+    private Stream OpenEntry(string path)
+    {
+        return fileHelper.FileSystem.File.Open(path, FileMode.Open, FileAccess.Read,
+            FileShare.Read | FileShare.Delete);
     }
 
     private static string EntryPath(string directory, string key)
