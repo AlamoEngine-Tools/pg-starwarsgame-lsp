@@ -261,11 +261,11 @@ export function shieldRevealed(active: ReadonlySet<string>): boolean {
 /**
  * The rows one ability speaks for.
  *
- * Every channel an ability drives enters the visibility chain at the BOTTOM of it, as the model's
- * own word: a proxy's `gateVisible` and the shield and shell meshes' `inFile` are all read by the
- * `file` link. The reader sits four links above that. So a single tick on one of these rows outranks
- * the ability permanently - the switch still fires, the chain still ignores it, and there is no way
- * back short of resetting the whole model. That is the defect this exists to fix.
+ * Every channel an ability drives is a write of the part's STATE switch: a proxy's state and the
+ * shield and shell meshes' state. The reader's own word sits above every switch. So a single tick on
+ * one of these rows outranks the ability permanently - the switch still fires, the chain still
+ * ignores it, and there is no way back short of resetting the whole model. That is the defect this
+ * exists to fix.
  *
  * The answer is the same one a clip already gets: switching an ability TAKES ITS OWN ROWS BACK, the
  * way starting a clip takes the whole model back (`clearedForPlayback`). A clip may be global

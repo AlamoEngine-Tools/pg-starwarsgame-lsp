@@ -129,8 +129,8 @@ export function useAbilities({
             // Before the state changes, so the chain re-runs once with both the override gone and the
             // new gate in place.
             //
-            // Every channel an ability drives - its proxies' gate, the shield mesh, the stealth shell -
-            // enters the visibility chain at the `file` link, four below the reader. So one tick on such
+            // Every channel an ability drives - its proxies, the shield mesh, the stealth shell - is a
+            // write of the state switch, which the reader's word sits above. So one tick on such
             // a row in Model mode outranked this switch for good: it fired, the chain ignored it, and
             // only a whole-model Reset could undo it. Switching the ability takes ITS OWN rows back,
             // which is the rule a starting clip already follows - scoped, because a mesh hidden for an

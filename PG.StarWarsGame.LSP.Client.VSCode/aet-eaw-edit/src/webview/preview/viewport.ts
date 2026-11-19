@@ -30,7 +30,11 @@ import { type BreakoffAnchor } from "./breakoff";
 import { type TurretAim, type TurretHandle } from "./turretHandles";
 import { type Inspection } from "./inspector";
 import { type AbilityOwnership } from "./abilityRows";
-import { type OverrideChange, type RowOverride } from "./visibility";
+import {
+    type OverrideChange,
+    type RowOverride,
+    type StateSwitch,
+} from "./visibility";
 import {
     type BackgroundKind,
     type LightRig,
@@ -1009,11 +1013,11 @@ export class PreviewViewport {
     }
 
     /**
-     * What the game's rules say about a system: the opening rule and the current damage state. See
+     * Writes a system's state switch: its proxy's flag, or what the effect rules say over it. See
      * `ParticleRig.setParticleSystemVisible`.
      */
-    setParticleSystemVisible(id: string, visible: boolean): void {
-        this.particles.setParticleSystemVisible(id, visible);
+    setParticleSystemVisible(id: string, state: StateSwitch): void {
+        this.particles.setParticleSystemVisible(id, state);
     }
 
     /** The emitters of one system, in file order. */

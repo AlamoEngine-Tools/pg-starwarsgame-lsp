@@ -24,16 +24,21 @@ interface RowsOptions {
     barrel?: MaterialExtras;
     /** The clips' visibility tracks, by clip name. */
     visibility?: Map<string, VisibilityTrack>;
+    /** The clip playing, by name, at this many seconds; nothing plays when absent. */
+    playing?: { clip: string; time: number };
 }
 
 /**
- * Rows over a stand-in viewport: a hull with a root bone and one child bone carrying a mesh of its own
- * name, no particle systems, nothing animated, every level and gate open.
+ * Rows over a stand-in viewport: a hull with a root bone, a child bone carrying a mesh of its own name
+ * and a second mesh, and a bone below that carrying a mesh of its own name; no particle systems,
+ * nothing animated unless asked, every level and gate open.
  */
 function rowsWith(options: RowsOptions = {}): {
     rows: ModelRows;
     mesh: THREE.Mesh;
     extra: THREE.Mesh;
+    gun: THREE.Mesh;
+    turretBone: THREE.Bone;
     unit: UnitRules;
 } {
     const root = new THREE.Group();
@@ -43,6 +48,9 @@ function rowsWith(options: RowsOptions = {}): {
     turretBone.name = "Turret#1";
     rootBone.add(turretBone);
     root.add(rootBone);
+    const gunBone = new THREE.Bone();
+    gunBone.name = "Gun#2";
+    turretBone.add(gunBone);
 
     // A mesh of the bone's own name shares its row; a second one on the same bone is a child row.
     const mesh = new THREE.Mesh(
@@ -67,6 +75,14 @@ function rowsWith(options: RowsOptions = {}): {
         alamoShader: "MeshGloss.fx",
     };
     turretBone.add(extra);
+    const gun = new THREE.Mesh(
+        new THREE.BufferGeometry(),
+        new THREE.MeshStandardMaterial(),
+    );
+    gun.name = "Gun";
+    gun.userData.aetTreeKey = "gun";
+    gun.userData.alamo = { alamoMesh: "Gun", alamoShader: "MeshGloss.fx" };
+    gunBone.add(gun);
 
     const hull: LoadedPart = {
         id: "hull",
@@ -74,10 +90,12 @@ function rowsWith(options: RowsOptions = {}): {
         bones: new Map([
             ["root", rootBone],
             ["turret", turretBone],
+            ["gun", gunBone],
         ]),
         bonesByIndex: new Map([
             [0, rootBone],
             [1, turretBone],
+            [2, gunBone],
         ]),
         subjectId: ACTIVE_SUBJECT,
     };
@@ -93,7 +111,13 @@ function rowsWith(options: RowsOptions = {}): {
                 visibility: options.visibility ?? new Map(),
                 nodeByName: new Map(),
                 restPose: new Map(),
-                action: null,
+                action:
+                    options.playing === undefined
+                        ? null
+                        : {
+                              getClip: () => ({ name: options.playing!.clip }),
+                              time: options.playing.time,
+                          },
                 fileHidden: new Set(),
             },
         },
@@ -111,6 +135,7 @@ function rowsWith(options: RowsOptions = {}): {
             forEachPartMesh: (visit: (mesh: THREE.Mesh) => void) => {
                 visit(mesh);
                 visit(extra);
+                visit(gun);
             },
             hull: () => hull,
         },
@@ -118,10 +143,11 @@ function rowsWith(options: RowsOptions = {}): {
             skeleton: () => [
                 { index: 0, name: "Root", parent: -1, visible: true },
                 { index: 1, name: "Turret", parent: 0, visible: true },
+                { index: 2, name: "Gun", parent: 1, visible: true },
             ],
         },
     });
-    return { rows: new ModelRows(context), mesh, extra, unit };
+    return { rows: new ModelRows(context), mesh, extra, gun, turretBone, unit };
 }
 
 describe("ModelRows", () => {
@@ -229,5 +255,77 @@ describe("ModelRows", () => {
             "the model stood in its idle",
         );
         assert.equal(meshDrawn(unit.mesh), false, "the unit ignored its idle");
+    });
+
+    it("hides only the parts on a bone a clip hides, never the parts below it", () => {
+        const visibility = new Map<string, VisibilityTrack>([
+            ["Model_DIE_00", { fps: 15, bones: new Map([["Turret#1", "0"]]) }],
+        ]);
+        const { rows, mesh, extra, gun, turretBone } = rowsWith({
+            visibility,
+            playing: { clip: "Model_DIE_00", time: 0 },
+        });
+
+        rows.treeItems();
+
+        assert.equal(meshDrawn(mesh), false, "the bone's own mesh is drawn");
+        assert.equal(meshDrawn(extra), false, "its second mesh is drawn");
+        assert.equal(
+            meshDrawn(gun),
+            true,
+            "the mesh on the bone below is hidden",
+        );
+        assert.equal(
+            turretBone.visible,
+            true,
+            "the bone prunes what is below it",
+        );
+    });
+
+    it("never lets a playing clip show a mesh the file hides", () => {
+        const visibility = new Map<string, VisibilityTrack>([
+            ["Model_IDLE_00", { fps: 15, bones: new Map([["Turret#1", "1"]]) }],
+        ]);
+        const { rows, mesh } = rowsWith({
+            visibility,
+            playing: { clip: "Model_IDLE_00", time: 0 },
+            turret: {
+                alamoMesh: "Turret",
+                alamoShader: "MeshGloss.fx",
+                alamoHidden: true,
+            },
+        });
+
+        rows.treeItems();
+
+        assert.equal(meshDrawn(mesh), false);
+    });
+
+    it("says the file hides a mesh the file hides, not the level", () => {
+        const { rows } = rowsWith({
+            barrel: {
+                alamoMesh: "Barrel",
+                alamoShader: "MeshGloss.fx",
+                alamoHidden: true,
+            },
+        });
+
+        const barrel = rows.treeItems().find((item) => item.name === "Barrel");
+
+        assert.equal(barrel?.visible, false);
+        assert.equal(barrel?.because, "file");
+    });
+
+    it("still takes the rows below a bone the reader switches off", () => {
+        const { rows, turretBone } = rowsWith();
+        rows.treeItems();
+
+        rows.setItemsVisible(["bone:1"], false);
+
+        assert.equal(turretBone.visible, false);
+        assert.equal(
+            rows.treeItems().find((item) => item.name === "Gun")?.because,
+            "ancestor:Turret",
+        );
     });
 });

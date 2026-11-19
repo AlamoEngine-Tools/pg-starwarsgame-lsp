@@ -10,12 +10,18 @@
 // over it: the hardpoint rules, the abilities, the XML gates and the state a unit is created in.
 //
 // One implementation, never two. `ModelRows` works out the file's answer for every row; this layer
-// takes that answer and returns the unit's, and in a model preview it returns it untouched. Which of
-// the two a preview is, is decided once, by what was opened, and does not change for its life.
+// only WRITES the state switch over it, the way the game's rules do - last write wins - and in a
+// model preview it writes nothing. It never touches the AND of the four switches in `visibility.ts`;
+// a rule added later is one more writer here. Which of the two a preview is, is decided once, by
+// what was opened, and does not change for its life.
 
 import { PREVIEW_SCENE_KIND } from "../../protocol/modelPreview";
 import { type MaterialExtras, isShieldMesh, isStealthMesh } from "./materials";
-import { type RowFacts, damageMeshFacts } from "./visibility";
+import {
+    type AnimationSwitch,
+    type StateSwitch,
+    ruleState,
+} from "./visibility";
 import { type ViewportContext } from "./viewportContext";
 
 /** Whose rules decide what a preview draws: the model file's alone, or the game's on top of it. */
@@ -55,7 +61,7 @@ export class UnitRules {
      * Whether an active ability is holding the SHIELD MESH visible.
      *
      * The mesh ships hidden - `MeshShield.fx` carries `alamoHidden: true` - so this is the unit being
-     * told it does draw it after all, which is why it writes `inFile` rather than adding a gate.
+     * told it does draw it after all, which is why it writes the state switch.
      */
     shieldRevealed = false;
     /**
@@ -136,65 +142,62 @@ export class UnitRules {
     }
 
     /**
-     * A mesh row's facts with the game's rules written over the file's answer.
-     *
-     * @param levelGated What the damage and detail levels alone say, without the file's own hidden
-     *     flag. The shield is the one mesh an ability can talk into being drawn, so the flag it ships
-     *     with must not veto it a second time from the level link.
+     * A mesh's state switch with the game's rules written over the file's write, in the order the
+     * preview applies them; the last write is what the mesh has.
      */
-    meshFacts(
-        facts: RowFacts,
-        extras: MaterialExtras,
-        levelGated: boolean,
-    ): RowFacts {
+    meshState(state: StateSwitch, extras: MaterialExtras): StateSwitch {
         if (!this.appliesGameRules()) {
-            return facts;
+            return state;
         }
 
         const name = (extras.alamoMesh ?? "").toLowerCase();
+        let written = state;
 
         // By the MESH, not the archetype: the shield shader is the engine glow's too on some
         // models, and archetype alone lit the engines with the ability.
-        const shield = isShieldMesh(extras);
+        if (isShieldMesh(extras)) {
+            written = ruleState(this.shieldRevealed);
+        }
 
-        // The level gate is left alone for the shell, unlike the shield's - `Ui_tyber` and
-        // `Ui_urai_fen` ship `Stealth_LOD0/1/2`, and a shell exempted from LOD would draw all three.
+        // The shell ships VISIBLE, so the cloak says everything about it. Its LOD variants -
+        // `Ui_tyber` and `Ui_urai_fen` ship `Stealth_LOD0/1/2` - are still gated by the detail level.
         const stealth = isStealthMesh(extras);
+        if (stealth) {
+            written = ruleState(this.stealthed);
+        }
 
-        const unit: RowFacts = {
-            ...facts,
-            inFile: shield
-                ? this.shieldRevealed
-                : stealth
-                  ? this.stealthed
-                  : facts.inFile,
-            gated:
-                (shield ? levelGated : facts.gated) ||
-                this.collisionMeshes.has(name) ||
-                (this.stealthed && !stealth),
-        };
+        // A damage decal is off while its hardpoint is whole and on once it is destroyed, whatever
+        // the file says - the shipped art marks none of them hidden.
+        if (this.knownDecals.has(name)) {
+            written = ruleState(this.shownDecals.has(name));
+        }
 
-        // A damage decal's bottom of the chain is the DAMAGE RULE, not the file - see
-        // `damageMeshFacts`.
-        return this.knownDecals.has(name)
-            ? damageMeshFacts(unit, this.shownDecals.has(name))
-            : unit;
+        if (this.collisionMeshes.has(name)) {
+            written = ruleState(false);
+        }
+
+        // Last, because a cloaked unit draws its shell and nothing else.
+        if (this.stealthed && !stealth) {
+            written = ruleState(false);
+        }
+
+        return written;
     }
 
     /**
-     * An effect row's facts with the game's rules written over the file's answer.
+     * An effect's state switch with the game's rules written over it.
      *
      * A cloaked unit shows its stealth shell and nothing else - not its engines, not its damage
-     * smoke, not the proxies of the ability doing the cloaking. `gated` and not `inFile` because it
-     * is a state, and it leaves the effect's own gate holding what the effect rules last decided, so
-     * uncloaking restores exactly what was playing.
+     * smoke, not the proxies of the ability doing the cloaking. Written here, over the effect's own
+     * state, rather than into it: the effect keeps what the effect rules last decided, so uncloaking
+     * restores exactly what was playing.
      */
-    effectFacts(facts: RowFacts): RowFacts {
-        return this.isStealthed() ? { ...facts, gated: true } : facts;
+    effectState(state: StateSwitch): StateSwitch {
+        return this.isStealthed() ? ruleState(false) : state;
     }
 
     /**
-     * A row's facts with the unit standing in its idle clip.
+     * The animation switch of a unit standing in its idle clip.
      *
      * A unit that is not doing anything plays its idle, and the preview reads that clip's first
      * frame while nothing else plays. A model file opened on its own plays nothing it is not asked
@@ -203,7 +206,9 @@ export class UnitRules {
      * @param idle What the idle clip's first frame says about the row, or undefined when the model
      *     ships no idle, the idle says nothing about it, or another clip is playing.
      */
-    idleFacts(facts: RowFacts, idle: boolean | undefined): RowFacts {
-        return this.appliesGameRules() ? { ...facts, resting: idle } : facts;
+    idle(idle: boolean | undefined): AnimationSwitch | undefined {
+        return this.appliesGameRules() && idle !== undefined
+            ? { shown: idle, source: "idle" }
+            : undefined;
     }
 }

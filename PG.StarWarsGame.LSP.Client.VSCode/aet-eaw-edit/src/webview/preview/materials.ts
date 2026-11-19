@@ -453,24 +453,26 @@ export function shieldMeshOffShader(extras: MaterialExtras): boolean {
 /**
  * The LEVEL question alone: is this mesh part of the current damage and detail state?
  *
- * Without `alamoHidden`, which is a different question - "does the model draw this at all" - and
- * one the row chain already asks through its own `inFile` link. Bundled together they made one flag
- * gate a mesh TWICE, so an ability that talked the model into drawing its shield was still vetoed
- * by the level link reading the same flag, and overriding one did nothing at all.
+ * Without `alamoHidden`, which is a different switch - the part's state, which the game's rules can
+ * write over. Bundled together they made one flag gate a mesh TWICE, so an ability that talked the
+ * model into drawing its shield was still vetoed by the level reading the same flag.
  */
 export function isVisibleAtLevel(
     extras: MaterialExtras,
     alt: number,
     lod: number,
 ): boolean {
-    if (extras.alamoAlt !== undefined && extras.alamoAlt !== alt) {
-        return false;
-    }
-    if (extras.alamoLod !== undefined && extras.alamoLod !== lod) {
-        return false;
-    }
+    return isVisibleAtAlt(extras, alt) && isVisibleAtLod(extras, lod);
+}
 
-    return true;
+/** The damage-level switch alone: an untagged mesh belongs to every ALT. */
+export function isVisibleAtAlt(extras: MaterialExtras, alt: number): boolean {
+    return extras.alamoAlt === undefined || extras.alamoAlt === alt;
+}
+
+/** The detail-level switch alone: an untagged mesh belongs to every LOD. */
+export function isVisibleAtLod(extras: MaterialExtras, lod: number): boolean {
+    return extras.alamoLod === undefined || extras.alamoLod === lod;
 }
 
 /**

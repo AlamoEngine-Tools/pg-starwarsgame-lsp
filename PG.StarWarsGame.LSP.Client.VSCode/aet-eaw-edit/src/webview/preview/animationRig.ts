@@ -500,8 +500,8 @@ export class AnimationRig {
                 : active.visibility.get(active.action.getClip().name);
 
         if (track !== undefined && active.action !== null) {
-            // Through the ROW CHAIN, which is the only thing that writes visibility - the clip is a
-            // link in it (`animated`), above the level gates and the file. This used to write
+            // Through the ROW CHAIN, which is the only thing that writes visibility - the clip is
+            // one of a part's four switches there (`animation`). This used to write
             // `node.visible` here instead, straight past the chain, and the two disagreed about how
             // a track is keyed: tracks by glTF NODE name, the chain by BONE name. Whichever of them
             // matched was the one that worked, and re-keying the tracks silently swapped which.

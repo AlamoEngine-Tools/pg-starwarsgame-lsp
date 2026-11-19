@@ -198,10 +198,11 @@ describe("ParticleRig", () => {
         const entry = particles.particleSystems.get("fx")!;
 
         particles.gateByLevel(0, 0, false);
-        assert.equal(entry.levelVisible, false);
+        assert.equal(entry.altVisible, false);
+        assert.equal(entry.lodVisible, true);
 
         particles.gateByLevel(1, 0, false);
-        assert.equal(entry.levelVisible, true);
+        assert.equal(entry.altVisible, true);
     });
 
     it("forgets every system, for a new scene", () => {

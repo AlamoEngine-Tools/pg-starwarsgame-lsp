@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { PREVIEW_SCENE_KIND } from "../../protocol/modelPreview";
-import { type RowFacts } from "./visibility";
+import { fileState, ruleState } from "./visibility";
 import { type PreviewRules, UnitRules, rulesFor } from "./unitRules";
 import { standInContext } from "./viewportContext.testing";
 
@@ -32,10 +32,8 @@ function rulesWith(rules?: PreviewRules): {
     return { unit, applied: () => applied };
 }
 
-/** A row the file draws, at a level that includes it. */
-function drawnInFile(): RowFacts {
-    return { inFile: true, gated: false, masters: [] };
-}
+/** The state switch of a part the file draws. */
+const drawnInFile = fileState(true);
 
 describe("rulesFor", () => {
     it("takes the game's rules for a game object and the file's for anything opened as a file", () => {
@@ -66,22 +64,15 @@ describe("UnitRules", () => {
         unit.setCollisionMeshes(new Set(["collision"]));
         unit.setDecals(new Set(["hp_blast"]), new Set());
         unit.setStealthed(true);
-        const facts = drawnInFile();
 
-        assert.deepEqual(
-            unit.meshFacts(facts, { alamoMesh: "Collision" }, false),
-            facts,
-        );
-        assert.deepEqual(
-            unit.meshFacts(facts, { alamoMesh: "HP_Blast" }, false),
-            facts,
-        );
-        assert.deepEqual(
-            unit.meshFacts(facts, { alamoMesh: "stealth" }, false),
-            facts,
-        );
-        assert.deepEqual(unit.effectFacts(facts), facts);
-        assert.deepEqual(unit.idleFacts(facts, false), facts);
+        for (const alamoMesh of ["Collision", "HP_Blast", "stealth", "Hull"]) {
+            assert.deepEqual(
+                unit.meshState(drawnInFile, { alamoMesh }),
+                drawnInFile,
+            );
+        }
+        assert.deepEqual(unit.effectState(drawnInFile), drawnInFile);
+        assert.equal(unit.idle(false), undefined);
         assert.equal(unit.isStealthed(), false);
     });
 
@@ -90,29 +81,32 @@ describe("UnitRules", () => {
         const shell = { alamoMesh: "stealth" };
         const hull = { alamoMesh: "Hull" };
 
-        assert.equal(unit.meshFacts(drawnInFile(), shell, false).inFile, false);
-        assert.equal(unit.meshFacts(drawnInFile(), hull, false).gated, false);
+        assert.deepEqual(unit.meshState(drawnInFile, shell), ruleState(false));
+        assert.deepEqual(unit.meshState(drawnInFile, hull), drawnInFile);
 
         unit.setStealthed(true);
 
         assert.equal(unit.isStealthed(), true);
-        assert.equal(unit.meshFacts(drawnInFile(), shell, false).inFile, true);
-        assert.equal(unit.meshFacts(drawnInFile(), hull, false).gated, true);
-        assert.equal(unit.effectFacts(drawnInFile()).gated, true);
+        assert.deepEqual(unit.meshState(drawnInFile, shell), ruleState(true));
+        assert.deepEqual(unit.meshState(drawnInFile, hull), ruleState(false));
+        assert.deepEqual(unit.effectState(drawnInFile), ruleState(false));
     });
 
     it("shows a unit's shield mesh only while an ability holds it up", () => {
         const { unit } = rulesWith("game");
         const shield = { alamoMesh: "shield", alamoHidden: true };
-        const inFile: RowFacts = { inFile: false, gated: true, masters: [] };
 
-        assert.equal(unit.meshFacts(inFile, shield, false).inFile, false);
+        assert.deepEqual(
+            unit.meshState(fileState(false), shield),
+            ruleState(false),
+        );
 
         unit.setShieldRevealed(true);
-        const revealed = unit.meshFacts(inFile, shield, false);
 
-        assert.equal(revealed.inFile, true);
-        assert.equal(revealed.gated, false);
+        assert.deepEqual(
+            unit.meshState(fileState(false), shield),
+            ruleState(true),
+        );
     });
 
     it("hides a unit's collision mesh and its damage decals until the hardpoint is destroyed", () => {
@@ -120,34 +114,29 @@ describe("UnitRules", () => {
         unit.setCollisionMeshes(new Set(["collision"]));
         unit.setDecals(new Set(["hp_blast"]), new Set());
 
-        assert.equal(
-            unit.meshFacts(drawnInFile(), { alamoMesh: "Collision" }, false)
-                .gated,
-            true,
+        assert.deepEqual(
+            unit.meshState(drawnInFile, { alamoMesh: "Collision" }),
+            ruleState(false),
         );
-        assert.equal(
-            unit.meshFacts(drawnInFile(), { alamoMesh: "HP_Blast" }, false)
-                .inFile,
-            false,
+        assert.deepEqual(
+            unit.meshState(drawnInFile, { alamoMesh: "HP_Blast" }),
+            ruleState(false),
         );
 
         unit.setDecals(new Set(["hp_blast"]), new Set(["hp_blast"]));
 
-        assert.equal(
-            unit.meshFacts(drawnInFile(), { alamoMesh: "HP_Blast" }, false)
-                .inFile,
-            true,
+        assert.deepEqual(
+            unit.meshState(fileState(false), { alamoMesh: "HP_Blast" }),
+            ruleState(true),
+            "a destroyed hardpoint's decal is not shown over the file",
         );
     });
 
     it("stands a unit in its idle clip", () => {
         const { unit } = rulesWith("game");
 
-        assert.equal(unit.idleFacts(drawnInFile(), false).resting, false);
-        assert.equal(
-            unit.idleFacts(drawnInFile(), undefined).resting,
-            undefined,
-        );
+        assert.deepEqual(unit.idle(false), { shown: false, source: "idle" });
+        assert.equal(unit.idle(undefined), undefined);
     });
 
     it("forgets a model's decals, collision meshes and shield", () => {

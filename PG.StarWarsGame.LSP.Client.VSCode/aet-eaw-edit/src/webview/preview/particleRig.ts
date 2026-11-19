@@ -15,7 +15,8 @@ import { ParticleSystemInstance, type EmitterProbe } from "./particleRenderer";
 import * as THREE from "three";
 import { type Vector3 as Vector3Like } from "./lighting";
 import { type AlamoParticleContent } from "../../protocol/modelPreview";
-import { proxyVisibleAt } from "./levels";
+import { proxyAltVisibleAt, proxyLodVisibleAt } from "./levels";
+import { type StateSwitch, fileState } from "./visibility";
 import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import { emissionMeshFor } from "./emissionSource";
@@ -87,12 +88,12 @@ export class ParticleRig {
     /** Shows or hides each system by whether its proxy is tagged for the level the model is shown at. */
     gateByLevel(alt: number, lod: number, altDescending: boolean): void {
         for (const entry of this.particleSystems.values()) {
-            entry.levelVisible = proxyVisibleAt(
+            entry.altVisible = proxyAltVisibleAt(
                 entry.levels,
                 alt,
-                lod,
                 altDescending,
             );
+            entry.lodVisible = proxyLodVisibleAt(entry.levels, lod);
         }
     }
 
@@ -268,14 +269,14 @@ export class ParticleRig {
             attachToPartId,
             attachBone,
             attachBoneIndex,
-            gateVisible: true,
+            state: fileState(true),
             levels,
-            levelVisible: proxyVisibleAt(
+            altVisible: proxyAltVisibleAt(
                 levels,
                 this.context.levels.alt,
-                this.context.levels.lod,
                 this.context.levels.altDescending,
             ),
+            lodVisible: proxyLodVisibleAt(levels, this.context.levels.lod),
             scaleFactor,
             origin,
             instance: this.instantiate(
@@ -442,24 +443,25 @@ export class ParticleRig {
     }
 
     /**
-     * What the game's rules say about a system: the opening rule and the current damage state.
+     * Writes a system's state switch: its proxy's own flag, or what the effect rules say over it -
+     * the opening rule and the current damage state.
      *
      * The RULES path, called on attach and again whenever a hardpoint is destroyed or repaired -
      * never in response to a click. A hand-set override survives this, so switching one effect on
      * does not get undone by an unrelated hardpoint blowing up.
      *
-     * What the rules say is `inFile` for this row - the model's own word - and the chain weighs it
-     * against everything else. It does NOT clear a hand-set override: the reader's word is taken
-     * back only by the reader or by a clip starting, and a row standing against the rules is marked
-     * as one the model does not draw, so nothing here is claimed that is not true.
+     * It is the row's state switch, and the chain ANDs it with the others. It does NOT clear a
+     * hand-set override: the reader's word is taken back only by the reader or by a clip starting,
+     * and a row standing against the rules is marked as one the model does not draw, so nothing here
+     * is claimed that is not true.
      */
-    setParticleSystemVisible(id: string, visible: boolean): void {
+    setParticleSystemVisible(id: string, state: StateSwitch): void {
         const entry = this.particleSystems.get(id);
         if (entry === undefined) {
             return;
         }
 
-        entry.gateVisible = visible;
+        entry.state = state;
         this.context.rows.refreshRows();
     }
 

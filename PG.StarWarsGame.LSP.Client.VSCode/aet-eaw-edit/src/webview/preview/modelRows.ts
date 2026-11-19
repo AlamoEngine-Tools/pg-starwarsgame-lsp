@@ -13,9 +13,9 @@ import {
     type Resolution,
     type OverrideChange,
     resolveRow,
-    subtreeFacts,
     type RowFacts,
-    effectFacts as effectRowFacts,
+    fileState,
+    subtreeHiddenByReader,
     restingClip,
 } from "./visibility";
 import {
@@ -24,14 +24,15 @@ import {
     meshPlacement,
     effectPlacement,
 } from "./previewTree";
-import { alamoBoneName, alamoNodeName, type FlatBone } from "./skeleton";
+import { alamoBoneName, alamoNodeName } from "./skeleton";
 import {
     type MaterialExtras,
     resolveMaterial,
     isVisibleAt,
     isShieldMesh,
     isStealthMesh,
-    isVisibleAtLevel,
+    isVisibleAtAlt,
+    isVisibleAtLod,
 } from "./materials";
 import { listedInModelTree } from "./particleScene";
 import { meshDrawn, setMeshDrawn } from "./meshVisibility";
@@ -55,6 +56,19 @@ function anchorNodeOf(entry: ParticleEntry): THREE.Object3D {
     return entry.instance.anchorNode ?? entry.instance.root;
 }
 
+/**
+ * What one tree row controls.
+ *
+ * `boneIndex` means the row IS that bone; `ownerBone` is the bone a mesh row that is not merged with
+ * its bone rides, whose track is that mesh's animation switch.
+ */
+interface RowTarget {
+    boneIndex?: number;
+    ownerBone?: number;
+    mesh?: THREE.Mesh;
+    particleId?: string;
+}
+
 export class ModelRows {
     /**
      * What one tree row controls.
@@ -63,14 +77,7 @@ export class ModelRows {
      * anchored on its BONE's id while standing for a mesh as well. Reading the mesh's state and
      * writing the bone's is what made a hidden mesh impossible to show again.
      */
-    readonly rowTargets = new Map<
-        string,
-        {
-            boneIndex?: number;
-            mesh?: THREE.Mesh;
-            particleId?: string;
-        }
-    >();
+    readonly rowTargets = new Map<string, RowTarget>();
     /**
      * Every bone a skinned mesh is weighted to, worked out once.
      *
@@ -322,7 +329,7 @@ export class ModelRows {
                 `mesh:${treeKeyOf(mesh)}`,
                 details.name,
                 boneId(owner),
-                { mesh },
+                { mesh, ownerBone: owner },
             );
 
             items.push({
@@ -370,8 +377,9 @@ export class ModelRows {
                 kind: "particle",
                 name: this.effectRowName(systemId),
                 parentId: boneId(owner),
-                visible: entry.gateVisible && entry.levelVisible,
-                gatedOff: !entry.levelVisible,
+                visible:
+                    entry.state.shown && entry.altVisible && entry.lodVisible,
+                gatedOff: !(entry.altVisible && entry.lodVisible),
                 systemId,
             });
         }
@@ -495,7 +503,9 @@ export class ModelRows {
                         this.rowResolutions.get(
                             this.rowForSystem(source.systemId),
                         )?.visible ??
-                        (entry.gateVisible && entry.levelVisible),
+                        (entry.state.shown &&
+                            entry.altVisible &&
+                            entry.lodVisible),
                 });
             }
         }
@@ -588,9 +598,9 @@ export class ModelRows {
     /**
      * Hands the rows ONE ability speaks for back to the model.
      *
-     * Every channel an ability drives - a proxy's `gateVisible`, the shield mesh's and the shell's
-     * `inFile` - enters the chain at the `file` link, four below the reader. So one tick on such a
-     * row outranked the ability for good: the switch fired, the chain ignored it, and nothing but a
+     * Every channel an ability drives - a proxy's state, the shield mesh's and the shell's - is a
+     * write of the state switch, which the reader's word sits above. So one tick on such a row
+     * outranked the ability for good: the switch fired, the chain ignored it, and nothing but a
      * whole-model Reset could undo it. Switching the ability now takes its own rows back, which is
      * the same rule a starting clip already follows.
      *
@@ -655,17 +665,9 @@ export class ModelRows {
     resolveRows(): void {
         const resolutions = new Map<string, Resolution>();
 
-        // Once, not once per row. This now runs on every frame of a playing clip, and `skeleton()`
-        // rebuilds its list by walking the whole hull - which was affordable when this only ran on
-        // a change and is not at sixty frames a second.
-        const bones = new Map(
-            this.context.queries.skeleton().map((bone) => [bone.index, bone]),
-        );
-
-        // The SUBTREE answer, which a merged row needs as well as its own - see `subtreeFacts`.
-        // Kept beside the row answer so a child asking about its ancestor gets the one that
-        // actually applies to it.
-        const subtree = new Map<string, Resolution>();
+        // Whether the READER has switched each row's subtree off - the only thing that reaches the
+        // rows below one. No switch of the model is inherited; see `subtreeHiddenByReader`.
+        const readerHidden = new Map<string, boolean>();
 
         // What the MESH half of a row does, which is a different question once an effect is merged
         // in: the marker mesh of a particle proxy is hidden in the file, and showing the effect
@@ -673,7 +675,7 @@ export class ModelRows {
         const meshAnswers = new Map<string, Resolution>();
 
         for (const [rowId, target] of this.rowTargets) {
-            const facts = this.factsFor(rowId, target, subtree, bones);
+            const facts = this.factsFor(rowId, target, readerHidden);
             const answer = resolveRow(
                 target.particleId === undefined
                     ? facts
@@ -682,7 +684,7 @@ export class ModelRows {
 
             resolutions.set(rowId, answer);
             meshAnswers.set(rowId, resolveRow(facts));
-            subtree.set(rowId, resolveRow(subtreeFacts(facts)));
+            readerHidden.set(rowId, subtreeHiddenByReader(facts));
         }
 
         this.rowResolutions = resolutions;
@@ -702,11 +704,11 @@ export class ModelRows {
                     .hull()
                     ?.bonesByIndex.get(target.boneIndex);
 
-                // `visible` on a bone PRUNES ITS SUBTREE, so it takes the subtree answer, not the
-                // row's. On a merged row the two differ: the file marking a proxy's marker mesh
-                // hidden says nothing about the effect attached to that same bone.
+                // `visible` on a bone PRUNES ITS SUBTREE, so it follows the reader alone. What the
+                // model says about a bone is said to the parts on it, each through its own
+                // switches, and never to the parts below it.
                 if (node !== undefined) {
-                    node.visible = subtree.get(rowId)?.visible ?? visible;
+                    node.visible = readerHidden.get(rowId) !== true;
                 }
             }
 
@@ -722,72 +724,51 @@ export class ModelRows {
     /** Everything the chain needs to know about one row. */
     private factsFor(
         rowId: string,
-        target: { boneIndex?: number; mesh?: THREE.Mesh; particleId?: string },
-        subtree: ReadonlyMap<string, Resolution>,
-        bones: ReadonlyMap<number, FlatBone>,
+        target: RowTarget,
+        readerHidden: ReadonlyMap<string, boolean>,
     ): RowFacts {
         const parent = this.rowParents.get(rowId) ?? null;
 
-        // The parent's SUBTREE answer, which is the one that reaches down here. Its own row answer
-        // is about its mesh and stops there.
-        const parentResolution =
-            parent === null ? undefined : subtree.get(parent);
-
         const facts: RowFacts = {
-            inFile: true,
-            gated: false,
+            state: fileState(true),
+            alt: true,
+            lod: true,
             // No masters here. The effects master belongs to the EFFECT half of a row and is added
-            // by `effectFacts` - put on the base facts it would reach the marker mesh and, through
-            // the subtree answer, the proxy bone, so switching effects off would prune geometry.
+            // by `effectFacts` - put on the base facts it would reach the marker mesh, so switching
+            // effects off would hide geometry.
             masters: [],
             override: this.rowOverrides.get(rowId),
+            // Only a row the READER switched off above this one. A bone the model hides says
+            // nothing about the parts below it.
             ancestorHidden:
-                parentResolution?.visible === false
-                    ? (this.rowNames.get(parent ?? "") ?? "")
-                    : undefined,
-
-            // The ancestor as the MODEL leaves it, which is a different question: a bone the reader
-            // unticked hides its subtree, but the model still draws every row in it. Without this
-            // the whole subtree claimed the model did not draw it and went italic on one tick.
-            ancestorHiddenAuthored:
-                parentResolution?.authored === false
-                    ? (this.rowNames.get(parent ?? "") ?? "")
+                parent !== null && readerHidden.get(parent) === true
+                    ? (this.rowNames.get(parent) ?? "")
                     : undefined,
         };
 
-        // What the idle clip a unit stands in says about this row - see `UnitRules.idleFacts`.
+        // What the idle clip a unit stands in says about this row - see `UnitRules.idle`.
         let idle: boolean | undefined;
 
         if (target.mesh !== undefined) {
             const extras = (target.mesh.userData.alamo ?? {}) as MaterialExtras;
 
-            // What the damage and detail levels alone say, without the file's own hidden flag.
-            const levelGated =
-                resolveMaterial(extras).hidden ||
-                !isVisibleAtLevel(
-                    extras,
-                    this.context.levels.alt,
-                    this.context.levels.lod,
-                );
+            facts.nonVisual = resolveMaterial(extras).hidden;
+            facts.alt = isVisibleAtAlt(extras, this.context.levels.alt);
+            facts.lod = isVisibleAtLod(extras, this.context.levels.lod);
 
-            // The model file's answer. Its hidden flag is read at the level link as well as at the
-            // file link, which keeps the idle a unit stands in - between the two - from showing a
-            // mesh the file hides.
-            facts.inFile = extras.alamoHidden !== true;
-            facts.gated = levelGated || extras.alamoHidden === true;
-
-            // And the game's rules over it, in a unit preview only: the shield, the stealth shell,
-            // the collision hulls and the damage decals. See `UnitRules.meshFacts`.
-            Object.assign(
-                facts,
-                this.context.rules.meshFacts(facts, extras, levelGated),
+            // The state switch: the file writes it from its hidden flag, and in a unit preview the
+            // game's rules write over it - the shield, the stealth shell, the collision hulls, the
+            // damage decals. See `UnitRules.meshState`.
+            facts.state = this.context.rules.meshState(
+                fileState(extras.alamoHidden !== true),
+                extras,
             );
 
             // A SKINNED mesh rides no bone, so every track below missed it - see `skinVisibility`.
             // Only ever a hide, and only ever ONE of the two questions.
             //
             // Asking both cost Yoda his blade during every attack. The rule is a hide-or-silence,
-            // so a clip that SHOWS the bones leaves `animated` undefined - and the idle's answer,
+            // so a clip that SHOWS the bones leaves `animation` undefined - and the idle's answer,
             // computed beside it, then hid the mesh from below. `attack_00` shows the saber bones
             // and `idle_00` hides them, so the resting pose was overruling the clip on screen.
             //
@@ -806,7 +787,7 @@ export class ModelRows {
 
                 if (asked === true) {
                     if (playing) {
-                        facts.animated = false;
+                        facts.animation = { shown: false, source: "clip" };
                     } else {
                         idle = false;
                     }
@@ -814,18 +795,28 @@ export class ModelRows {
             }
         }
 
-        if (target.boneIndex !== undefined) {
-            // Deliberately NOT the bone's `visible`: that reads the scene node this chain WRITES, so a
-            // bone hidden once resolved as hidden-in-the-file ever after and clearing the override
-            // could never bring it back. A bone is always in the file - a bone row is a subtree
-            // switch, and what the model says about it is said by the clip, below.
+        // The bone whose track is this row's animation switch: the row's own bone, or the bone a
+        // rigid mesh rides. A skinned mesh rides none and was answered above.
+        const bone =
+            target.boneIndex ??
+            (target.mesh !== undefined &&
+            this.skinBonesOf(target.mesh).length === 0
+                ? target.ownerBone
+                : undefined);
+
+        if (bone !== undefined) {
+            // Deliberately NOT the bone's `visible`: that reads the scene node this chain WRITES.
             // The canonical id off the NODE, never the display name the tree shows. Two bones can
             // share a name; only the id separates them - see `boneIds.ts`.
             const id = this.context.assembly
                 .hull()
-                ?.bonesByIndex.get(target.boneIndex)?.name;
+                ?.bonesByIndex.get(bone)?.name;
 
-            facts.animated = this.animatedVisibilityOf(id);
+            const clip = this.animatedVisibilityOf(id);
+            facts.animation =
+                clip === undefined
+                    ? undefined
+                    : { shown: clip, source: "clip" };
 
             // Only when nothing is playing, which is what a resting pose MEANS and what the method
             // above it has always claimed. Computed unconditionally, the idle's opinion reached the
@@ -838,7 +829,9 @@ export class ModelRows {
                     : undefined;
         }
 
-        return this.context.rules.idleFacts(facts, idle);
+        facts.animation ??= this.context.rules.idle(idle);
+
+        return facts;
     }
 
     /**
@@ -846,8 +839,8 @@ export class ModelRows {
      *
      * A proxy row is a bone, a marker mesh and a system at once, and the three do not answer alike:
      * the file hides the marker plate, while what the file says about the EFFECT is whether the
-     * game's own rules have it running. So the effect takes the row's ancestors, the reader's word
-     * and the clip from the base facts, and supplies its own bottom of the chain.
+     * proxy is on. So the effect takes the row's ancestors, the reader's word and the clip from the
+     * base facts, and supplies its own state and levels.
      *
      * The rules and the levels are the two the rewrite dropped once already: a plume that only
      * lights when a hardpoint is destroyed was drawing from the moment the model opened, and a
@@ -856,23 +849,27 @@ export class ModelRows {
     private effectFacts(facts: RowFacts, systemId: string): RowFacts {
         const entry = this.context.particles.particleSystems.get(systemId);
 
-        return this.context.rules.effectFacts({
-            // Which drops the ancestors the MODEL hides: an effect answers to its own bone, as the
-            // engine does. See `visibility.effectFacts`.
-            ...effectRowFacts(facts),
+        return {
+            ...facts,
 
             // The one master anyone legitimately keeps switched off while watching a clip: effects
             // are what obstructs the view of the thing being checked.
             masters: [
                 { id: "effects", on: this.context.particles.particlesVisible },
             ],
-            inFile: entry?.gateVisible ?? true,
-            gated: entry !== undefined && !entry.levelVisible,
 
-            // The cloak goes on in the rules layer, in the same chain that swaps the meshes - see
-            // `UnitRules.effectFacts`. Not in the caller's effect decider: that put the flag in two
+            // The cloak is written in the rules layer, in the same chain that swaps the meshes - see
+            // `UnitRules.effectState`. Not in the caller's effect decider: that put the flag in two
             // places, and the two disagreed the moment anything drove one without the other.
-        });
+            state: this.context.rules.effectState(
+                entry?.state ?? fileState(true),
+            ),
+            alt: entry?.altVisible ?? true,
+            lod: entry?.lodVisible ?? true,
+
+            // The marker mesh's material says nothing about the effect.
+            nonVisual: undefined,
+        };
     }
 
     /**
@@ -1009,7 +1006,7 @@ export class ModelRows {
         rowId: string,
         name: string,
         parentId: string | null,
-        target: { boneIndex?: number; mesh?: THREE.Mesh; particleId?: string },
+        target: RowTarget,
     ): void {
         this.rowTargets.set(rowId, target);
         this.rowParents.set(rowId, parentId);

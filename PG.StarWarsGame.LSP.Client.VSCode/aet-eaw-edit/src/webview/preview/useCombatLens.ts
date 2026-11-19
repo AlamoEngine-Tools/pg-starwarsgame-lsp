@@ -40,6 +40,7 @@ import {
     resolveHitWithWorkings,
 } from "./attacker";
 import { shieldRevealed, stealthed } from "./abilityRows";
+import { effectState } from "./visibility";
 import { cloneForDamage, turretSweeps } from "./deathClone";
 import { everyTurretHandle, type TurretAim } from "./turretHandles";
 import { spinAwayEnd } from "./spinAway";
@@ -496,7 +497,7 @@ export function useCombatLens({
         for (const particle of scene.particles ?? []) {
             viewport.setParticleSystemVisible(
                 particle.id,
-                effectDrawsNow(particle),
+                effectState(particle.startsVisible, effectDrawsNow(particle)),
             );
         }
 

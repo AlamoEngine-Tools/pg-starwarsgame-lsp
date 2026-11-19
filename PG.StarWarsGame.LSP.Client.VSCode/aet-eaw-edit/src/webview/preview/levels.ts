@@ -20,10 +20,7 @@ export interface LevelTagged {
 /**
  * Whether a proxy is drawn at the given levels.
  *
- * `altDescending` is a property of the last CHANGE, not a state: the engine computes it as
- * `alt < m_alt` inside `SetALT` and passes `false` for every LOD change. A proxy that sets
- * `altDecreaseStayHidden` is held back on a decreasing step, which is what stops a repaired
- * hardpoint's fire flickering back on as the damage state winds down.
+ * Both level switches together - see {@link proxyAltVisibleAt} and {@link proxyLodVisibleAt}.
  */
 export function proxyVisibleAt(
     proxy: LevelTagged,
@@ -31,13 +28,27 @@ export function proxyVisibleAt(
     lod: number,
     altDescending: boolean,
 ): boolean {
-    // Untagged proxies are never touched by a level change.
+    return (
+        proxyAltVisibleAt(proxy, alt, altDescending) &&
+        proxyLodVisibleAt(proxy, lod)
+    );
+}
+
+/**
+ * The damage-level switch of a proxy.
+ *
+ * `altDescending` is a property of the last CHANGE, not a state: it is true only for a step down in
+ * damage level, never for a LOD change. A proxy that sets `altDecreaseStayHidden` is held back on a
+ * decreasing step, which is what stops a repaired hardpoint's fire flickering back on as the damage
+ * state winds down. Untagged proxies are never touched by a level change.
+ */
+export function proxyAltVisibleAt(
+    proxy: LevelTagged,
+    alt: number,
+    altDescending: boolean,
+): boolean {
     if (proxy.alt === null && proxy.lod === null) {
         return true;
-    }
-
-    if (proxy.lod !== null && proxy.lod !== lod) {
-        return false;
     }
 
     if (proxy.alt !== null && proxy.alt !== alt) {
@@ -45,6 +56,11 @@ export function proxyVisibleAt(
     }
 
     return !(proxy.altDecreaseStayHidden && altDescending);
+}
+
+/** The detail-level switch of a proxy: an untagged one belongs to every LOD. */
+export function proxyLodVisibleAt(proxy: LevelTagged, lod: number): boolean {
+    return proxy.lod === null || proxy.lod === lod;
 }
 
 /** The ALT and LOD levels a model actually defines, ascending, always including zero. */

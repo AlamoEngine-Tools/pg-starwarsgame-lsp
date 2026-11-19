@@ -8,6 +8,7 @@ import type { AlamoParticleContent } from "../../protocol/modelPreview";
 import type { LevelTagged } from "./levels";
 import type { ParticleOrigin } from "./particleScene";
 import type { ParticleSystemInstance } from "./particleRenderer";
+import type { StateSwitch } from "./visibility";
 
 /** What the viewport remembers about one running system, so it can be rebuilt on restart. */
 export interface ParticleEntry {
@@ -19,14 +20,17 @@ export interface ParticleEntry {
     /** The bone's index, which is what tells two same-named bones apart. */
     attachBoneIndex?: number;
     /**
-     * What the game's own rules say: the opening rule and the damage state, together.
+     * The effect's state switch, as its last writer left it: the proxy's own flag, or what the
+     * effect rules wrote over it in a unit preview - the opening rule and the damage state.
      *
      * Recomputed whenever a hardpoint blows up or is repaired, which is why the reader's own choice
      * cannot live here - it would be overwritten every time anything else on the model changed.
      */
-    gateVisible: boolean;
-    /** What the current ALT/LOD says, held apart again so a level change cannot clobber a toggle. */
-    levelVisible: boolean;
+    state: StateSwitch;
+    /** The damage-level switch, held apart so a level change cannot clobber the state. */
+    altVisible: boolean;
+    /** The detail-level switch, the same way. */
+    lodVisible: boolean;
     levels: LevelTagged;
     /** The owning object's uniform render scale, so a rebuild keeps it. */
     scaleFactor: number;

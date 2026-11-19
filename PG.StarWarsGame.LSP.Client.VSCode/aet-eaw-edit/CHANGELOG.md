@@ -25,6 +25,13 @@
 
 ### Fixes
 
+- **A part is drawn only when everything that decides it shows it** - the preview took the first rule with an
+  opinion on a part, so a playing clip showed a mesh the model file hides, marker plates included, and a part
+  of another damage or detail level, and a clip that hid a bone took every part below it along. The game asks
+  four things of every part - its own bone's track in the clip, its state, the damage level and the detail
+  level - and draws it only when all four show it; the preview now does the same, and a part's tooltip names
+  the one that hides it
+  ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

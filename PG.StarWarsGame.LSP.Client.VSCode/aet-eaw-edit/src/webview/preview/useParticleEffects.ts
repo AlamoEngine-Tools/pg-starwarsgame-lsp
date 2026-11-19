@@ -22,6 +22,7 @@ import { type PreviewAssetLoader } from "./previewAssetLoader";
 import { effectPlaysNow, hardpointGateAllows } from "./damage";
 import { passiveEffectPlaysNow, passiveEffects } from "./passiveSubject";
 import { abilityAllows, abilityClaims } from "./abilityRows";
+import { effectState } from "./visibility";
 
 /** An effect asked for before its system arrived, and where it goes when the system lands. */
 export interface PendingEffect {
@@ -293,7 +294,7 @@ export function useParticleEffects({
 
             viewport.setParticleSystemVisible(
                 particle.id,
-                effectDrawsNow(particle),
+                effectState(particle.startsVisible, effectDrawsNow(particle)),
             );
         }
 
