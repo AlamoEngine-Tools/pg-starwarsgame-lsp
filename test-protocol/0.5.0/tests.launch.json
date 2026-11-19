@@ -568,6 +568,9 @@
   "PRV-48": {
     "open": "{repo}\\eaw"
   },
+  "PRV-49": {
+    "open": "{repo}\\foc"
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   }

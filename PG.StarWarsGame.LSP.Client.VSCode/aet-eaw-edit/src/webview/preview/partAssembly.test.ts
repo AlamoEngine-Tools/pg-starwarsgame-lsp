@@ -95,7 +95,129 @@ const under = (node: THREE.Object3D, ancestor: THREE.Object3D): boolean => {
     return false;
 };
 
+/**
+ * An assembly that LOADS parts, over a stand-in viewport whose layers do nothing: each "GLB" names a
+ * scene the stand-in loader hands back. `hull` is a root with a `Turret` bone at index 1, `turret` a
+ * model of its own.
+ */
+function loaderWith(): {
+    assembly: PartAssembly;
+    modelRoot: THREE.Group;
+    parts: Map<string, LoadedPart>;
+    scene: (name: "hull" | "turret") => Uint8Array;
+} {
+    const modelRoot = new THREE.Group();
+    const scaledRoot = new THREE.Group();
+    modelRoot.add(scaledRoot);
+    const parts = new Map<string, LoadedPart>();
+    const scenes: THREE.Group[] = [];
+    const make = (name: "hull" | "turret"): THREE.Group => {
+        const root = new THREE.Group();
+        if (name === "hull") {
+            const bone = new THREE.Bone();
+            bone.name = "Turret#1";
+            bone.position.set(0, 0, 5);
+            root.add(bone);
+        } else {
+            const bone = new THREE.Bone();
+            bone.name = "Barrel#1";
+            root.add(bone);
+        }
+        return root;
+    };
+    const idle = () => undefined;
+    const assembly = new PartAssembly(
+        standInContext({
+            modelRoot,
+            scaledRoot,
+            parts,
+            levels: { alt: 0, lod: 0, applyLevels: idle },
+            loader: {
+                parseAsync: async (bytes: ArrayBuffer) => ({
+                    scene: scenes[new Uint8Array(bytes)[0]],
+                    animations: [],
+                    parser: { json: {} },
+                }),
+            },
+            materials: {
+                applyMaterial: idle,
+                applyWireframe: idle,
+                applyStoredState: idle,
+                bindLoadedTextures: idle,
+            },
+            environment: {
+                collectShadowVolumes: idle,
+                dropShadowVolumes: idle,
+            },
+            cameraRig: { collectBillboards: idle, dropBillboards: idle },
+            animation: {
+                registerPart: idle,
+                unregisterPart: idle,
+                forgetSubject: idle,
+            },
+            particles: {
+                particleSystems: new Map(),
+                removeParticleSystem: idle,
+                holdEffectsOf: idle,
+            },
+        }),
+    );
+    return {
+        assembly,
+        modelRoot,
+        parts,
+        scene: (name) => {
+            scenes.push(make(name));
+            return new Uint8Array([scenes.length - 1]);
+        },
+    };
+}
+
 describe("PartAssembly", () => {
+    it("hangs an attached model on its bone when the model it hangs on arrives after it", async () => {
+        const { assembly, modelRoot, parts, scene } = loaderWith();
+
+        await assembly.addPart("hp:Gun", scene("turret"), "hull", "Turret");
+        const turret = parts.get("hp:Gun")!;
+        assert.equal(
+            under(turret.root, modelRoot),
+            false,
+            "a turret whose hull has not arrived is in the scene",
+        );
+
+        await assembly.addPart("hull", scene("hull"));
+        const bone = parts.get("hull")!.bones.get("turret")!;
+
+        assert.equal(turret.root.parent, bone, "the turret is not on its bone");
+        assert.ok(
+            turret.root
+                .getWorldPosition(new THREE.Vector3())
+                .distanceTo(bone.getWorldPosition(new THREE.Vector3())) < 1e-6,
+        );
+    });
+
+    it("drops a model still waiting for its hull with the scene, or when it is removed", async () => {
+        const { assembly, parts, scene } = loaderWith();
+
+        await assembly.addPart("hp:Gun", scene("turret"), "hull", "Turret");
+        await assembly.addPart("hp:Other", scene("turret"), "hull", "Turret");
+        const other = parts.get("hp:Other")!;
+        assembly.removePart("hp:Other");
+
+        assembly.forgetParts();
+        const gun = parts.get("hp:Gun");
+        assert.equal(gun, undefined);
+
+        await assembly.addPart("hull", scene("hull"));
+        const bone = parts.get("hull")!.bones.get("turret")!;
+        assert.equal(
+            bone.children.length,
+            0,
+            "a forgotten or removed turret was hung on the new hull",
+        );
+        assert.equal(other.root.parent, null);
+    });
+
     it("knows the hull and each subject's parts", () => {
         const { assembly, hull, wreck } = assemblyWith();
 

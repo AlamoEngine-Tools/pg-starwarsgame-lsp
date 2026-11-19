@@ -82,6 +82,19 @@ export class PartAssembly {
     private readonly attachRequests = new Map<string, AttachmentRequest>();
     /** Parts broken off by a destroyed hardpoint. */
     readonly hiddenParts = new Set<string>();
+    /**
+     * Parts that hang on a part not loaded yet, by the part they hang on: the bone each wants, kept
+     * out of the scene until that part arrives.
+     *
+     * Models arrive as bytes in whatever order the server answers, and a small turret model routinely
+     * lands before the hull it hangs on. Put at the model root instead, it sat inside the hull at the
+     * origin - with the hull's axis correction already taken off, so rotated down - and nothing moved
+     * it once the hull came. Out of the scene it draws nothing until it can be drawn where it belongs.
+     */
+    private readonly waiting = new Map<
+        string,
+        { id: string; bone: string | undefined }[]
+    >();
 
     constructor(private readonly context: ViewportContext) {}
 
@@ -97,6 +110,7 @@ export class PartAssembly {
     forgetParts(): void {
         this.context.parts.clear();
         this.hiddenParts.clear();
+        this.waiting.clear();
         // A new subject asks for its own bones. Keeping the old subject's requests would report a
         // Star Destroyer's missing hardpoint against a Mon Calamari Cruiser for the rest of the session.
         this.attachRequests.clear();
@@ -216,6 +230,12 @@ export class PartAssembly {
         // An unattached PASSIVE part - a death clone - is neither. It is spawned as its own object,
         // so it goes beside the scaled geometry and carries its OWN scale. It used to fall through
         // to the hull's branch and take the SHIP's, which is wrong for 59 of 265 shipped pairs.
+        //
+        // An attached part whose host has not arrived hangs nowhere yet - see `waiting`.
+        const waitsForHost =
+            options.pose === undefined &&
+            attachToPartId !== undefined &&
+            !this.context.parts.has(attachToPartId);
         const parent =
             options.pose !== undefined
                 ? this.context.modelRoot
@@ -245,7 +265,15 @@ export class PartAssembly {
             cancelRootCorrection(root);
         }
 
-        parent.add(root);
+        if (waitsForHost) {
+            const host = attachToPartId ?? "";
+            this.waiting.set(host, [
+                ...(this.waiting.get(host) ?? []),
+                { id, bone: attachBone },
+            ]);
+        } else {
+            parent.add(root);
+        }
 
         if (options.pose !== undefined) {
             root.position.copy(options.pose.position);
@@ -266,6 +294,9 @@ export class PartAssembly {
                 attachToPartId !== undefined || options.pose !== undefined,
         };
         this.context.parts.set(id, part);
+
+        // Whatever was waiting for THIS part can hang on its bones now.
+        this.mountWaitingOn(id);
 
         // Its own file's word, because the row chain will never speak for it - see
         // `LoadedPart.subjectId`. Debris needs exactly this too: outside the chain, nothing else
@@ -389,6 +420,14 @@ export class PartAssembly {
         this.context.parts.delete(partId);
         this.hiddenParts.delete(partId);
 
+        // Nor is it hung on its host later, if it was still waiting for one.
+        for (const [host, waiting] of this.waiting) {
+            this.waiting.set(
+                host,
+                waiting.filter((w) => w.id !== partId),
+            );
+        }
+
         // The subject goes with its last part. A repair removes the wreck, and a mixer left behind
         // would keep ticking a clip whose nodes have been disposed. The ACTIVE subject stays
         // whatever happens - it is the scene, and only `clear` ends it.
@@ -403,6 +442,24 @@ export class PartAssembly {
     /** Whether a part's geometry has arrived, so something can be attached to its bones. */
     hasPart(partId: string): boolean {
         return this.context.parts.has(partId);
+    }
+
+    /** Hangs every part that was waiting for `hostId` on the bone it asked for - see `waiting`. */
+    private mountWaitingOn(hostId: string): void {
+        const waiting = this.waiting.get(hostId);
+        if (waiting === undefined) {
+            return;
+        }
+
+        this.waiting.delete(hostId);
+
+        for (const { id, bone } of waiting) {
+            const part = this.context.parts.get(id);
+
+            if (part !== undefined) {
+                this.attachmentFor(hostId, bone).add(part.root);
+            }
+        }
     }
 
     /** The object a part is attached to: a named bone of another part, or the scene root. */
