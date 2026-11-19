@@ -15,7 +15,7 @@ import * as THREE from "three";
 import { DDSLoader } from "three/examples/jsm/loaders/DDSLoader.js";
 import { TGALoader } from "three/examples/jsm/loaders/TGALoader.js";
 
-import type { GetModelTextureResult } from "../../protocol/modelPreview";
+import type { ModelPreviewTexture } from "../../protocol/panels/modelPreview";
 import {
     type TranslatedEffect,
     translateEffect,
@@ -24,7 +24,17 @@ import {
 import { parseFxManifest, selectTechnique } from "./fx/fxParser";
 import { type FxMaterialState, materialStateFrom } from "./fx/renderState";
 import { AssetLedger } from "./loadProgress";
+import { bufferOf } from "./payloadBytes";
 import { addressingFor } from "./textures";
+
+/**
+ * A texture as the host delivers it: the file's bytes and the format found, the word that the copy
+ * already held still stands, or why there is neither.
+ */
+export type TexturePayload = Pick<
+    ModelPreviewTexture,
+    "format" | "data" | "error" | "version" | "unchanged"
+>;
 
 /** The part of the viewport the loader drives. */
 export interface AssetViewport {
@@ -35,6 +45,8 @@ export interface AssetViewport {
     setTexture(name: string, texture: THREE.Texture): void;
     setParticleTexture(name: string, texture: THREE.Texture): void;
     setParticleTextureMissing(name: string): void;
+    /** Disposes every texture whose lower-cased name is not among `keep`. */
+    releaseTexturesExcept(keep: ReadonlySet<string>): void;
 }
 
 /** What the loader tells the panel. */
@@ -42,6 +54,8 @@ export interface AssetLoaderEvents {
     post(message: {
         type: "requestTexture" | "requestShader";
         name: string;
+        /** For a texture: the version already held, when one is. */
+        have?: string;
     }): void;
     /** A request was made or answered: the loading tally reads `requested` and `settled`. */
     ledgersChanged(): void;
@@ -59,7 +73,7 @@ export interface AssetLoaderOptions {
         source: string,
         read: (name: string) => string | null,
     ) => TranslationResult;
-    decode?: (result: GetModelTextureResult) => THREE.Texture | null;
+    decode?: (bytes: Uint8Array, format: string) => THREE.Texture | null;
 }
 
 export class PreviewAssetLoader {
@@ -83,6 +97,18 @@ export class PreviewAssetLoader {
 
     /** Effects already handed to the viewport, so a retry does not rebuild materials for nothing. */
     private readonly translatedNames = new Set<string>();
+
+    /**
+     * Every texture decoded and the version it came with, by lower-cased name.
+     *
+     * A scene refresh asks for each texture again with the version held here. For one whose file
+     * did not change the host answers "still yours" and sends no bytes; the texture kept here is
+     * bound to the scene's new materials, with no decode and no upload.
+     */
+    private readonly held = new Map<
+        string,
+        { version: string; texture: THREE.Texture }
+    >();
 
     private readonly translate: NonNullable<AssetLoaderOptions["translate"]>;
     private readonly decode: NonNullable<AssetLoaderOptions["decode"]>;
@@ -118,7 +144,12 @@ export class PreviewAssetLoader {
             return;
         }
 
-        this.events.post({ type: "requestTexture", name });
+        const have = this.held.get(name.toLowerCase())?.version;
+        this.events.post(
+            have === undefined
+                ? { type: "requestTexture", name }
+                : { type: "requestTexture", name, have },
+        );
         this.events.ledgersChanged();
     }
 
@@ -131,6 +162,23 @@ export class PreviewAssetLoader {
         this.events.post({ type: "requestShader", name });
         this.events.shaderRequested();
         this.events.ledgersChanged();
+    }
+
+    /**
+     * Lets go of every texture the scene on screen did not ask for. Called when the scene has
+     * finished loading: what stays on the GPU is what is drawn, not everything this panel ever
+     * showed. A texture asked for and still on its way counts as asked for.
+     */
+    releaseUnused(): void {
+        const keep = this.textures.requestedNames;
+
+        for (const name of [...this.held.keys()]) {
+            if (!keep.has(name)) {
+                this.held.delete(name);
+            }
+        }
+
+        this.viewport()?.releaseTexturesExcept(keep);
     }
 
     /**
@@ -177,7 +225,7 @@ export class PreviewAssetLoader {
     }
 
     /** A texture has come back, or come back empty. */
-    receiveTexture(name: string, result: GetModelTextureResult): void {
+    receiveTexture(name: string, result: TexturePayload): void {
         // Before the decode, and regardless of how it goes: a texture that did not resolve is an
         // ANSWER. The problems bar is what tells the reader it is missing; the cover only needs to
         // know it is no longer waiting.
@@ -189,16 +237,38 @@ export class PreviewAssetLoader {
             return;
         }
 
+        // The copy already held still stands: it is handed to the viewport again, because a refresh
+        // rebuilt the materials it was bound to.
+        const kept =
+            result.unchanged === true
+                ? this.held.get(name.toLowerCase())
+                : undefined;
+        if (kept !== undefined) {
+            viewport.setTexture(name, kept.texture);
+            viewport.setParticleTexture(name, kept.texture);
+            return;
+        }
+
+        const bytes = result.data ?? null;
         const texture =
-            (result.data ?? null) === null ? null : this.decode(result);
+            bytes === null ? null : this.decode(bytes, result.format ?? "");
 
         if (texture !== null) {
+            const version = result.version ?? null;
+            if (version === null) {
+                this.held.delete(name.toLowerCase());
+            } else {
+                this.held.set(name.toLowerCase(), { version, texture });
+            }
+
             // Offered to both: a name resolves to one texture whichever kind of thing samples it,
             // and the loader does not track which asked.
             viewport.setTexture(name, texture);
             viewport.setParticleTexture(name, texture);
             return;
         }
+
+        this.held.delete(name.toLowerCase());
 
         // The reply IS the answer - the server sends no data when the name did not resolve.
         // Dropping it silently left every emitter naming that texture drawing a plain tinted quad,
@@ -299,21 +369,25 @@ function applyAddressing(
 }
 
 /**
- * Turns raw texture bytes into a three.js texture.
+ * Turns a texture file's bytes into a three.js texture.
  *
- * The server sends the file undecoded, so the format picks the decoder. DDS keeps its compressed
- * blocks all the way to the GPU - decoding it would inflate a 2048x2048 texture several times over
- * for no gain - while TGA has to be unpacked, because no GPU samples it directly.
+ * The ONE place a texture's bytes become a texture: everything before it - the server, the pipe,
+ * the host - moves bytes and decides nothing about them. Today `format`, the extension the server
+ * found, picks the decoder; choosing by what the bytes ARE instead changes this function and
+ * nothing around it.
+ *
+ * DDS keeps its compressed blocks all the way to the GPU - decoding it would inflate a 2048x2048
+ * texture several times over for no gain - while TGA has to be unpacked, because no GPU samples it
+ * directly.
  */
 export function decodeTexture(
-    result: GetModelTextureResult,
+    bytes: Uint8Array,
+    format: string,
 ): THREE.Texture | null {
-    const bytes = Uint8Array.from(atob(result.data ?? ""), (c) =>
-        c.charCodeAt(0),
-    );
+    const buffer = bufferOf(bytes);
 
-    if (result.format === "dds") {
-        const parsed = new DDSLoader().parse(bytes.buffer as ArrayBuffer, true);
+    if (format === "dds") {
+        const parsed = new DDSLoader().parse(buffer, true);
 
         // Not every .dds is compressed - the loader hands back a plain pixel format for the
         // uncompressed ones, and a CompressedTexture cannot carry those.
@@ -342,8 +416,8 @@ export function decodeTexture(
         return applyAddressing(texture, parsed.width, parsed.height);
     }
 
-    if (result.format === "tga") {
-        const parsed = new TGALoader().parse(bytes.buffer as ArrayBuffer);
+    if (format === "tga") {
+        const parsed = new TGALoader().parse(buffer);
 
         const texture = new THREE.DataTexture(
             parsed.data,

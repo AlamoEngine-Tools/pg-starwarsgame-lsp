@@ -154,6 +154,11 @@ export class AssetLedger {
         return this.answered.size;
     }
 
+    /** The names asked for, lower-cased. */
+    get requestedNames(): ReadonlySet<string> {
+        return this.asked;
+    }
+
     /**
      * Records a request.
      *

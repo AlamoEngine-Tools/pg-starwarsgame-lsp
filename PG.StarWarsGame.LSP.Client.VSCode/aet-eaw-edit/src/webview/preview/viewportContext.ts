@@ -21,6 +21,7 @@ import { type OverlayLayer } from "./overlayLayer";
 import { type PartAssembly } from "./partAssembly";
 import { type ParticleRig } from "./particleRig";
 import { type TurretRig } from "./turretRig";
+import { type TextureStore } from "./textureStore";
 
 /**
  * A layer as the other layers see it: every field read-only, and the collections they read too.
@@ -54,6 +55,8 @@ export interface ViewportContext {
     readonly scaledRoot: THREE.Group;
     /** Every loaded part by id. The assembly is the only writer. */
     readonly parts: Map<string, LoadedPart>;
+    /** Every decoded texture by name, for the materials and the particle systems alike. */
+    readonly textures: TextureStore;
     /** Absolutely-positioned container the bone labels are written into. */
     readonly labelLayer: HTMLElement;
     /** The subject's `Scale_Factor`, or 1: what everything parented under `scaledRoot` that must stay a world length divides by. */

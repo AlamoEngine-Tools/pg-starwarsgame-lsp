@@ -55,6 +55,40 @@ public sealed record PreviewModelEntry(string Name, bool BaseGame);
 /// <summary>Result of <c>aet/listModels</c>, sorted by name. Empty when the preview is turned off.</summary>
 public sealed record ListModelsResult(IReadOnlyList<PreviewModelEntry> Models);
 
+/// <summary>
+///     Asks the server to stop the background build of the preview cache. Sent when the reader
+///     cancels the progress the client shows for it.
+/// </summary>
+[Method("aet/cancelPreviewCacheBuild", Direction.ClientToServer)]
+public sealed record CancelPreviewCacheBuildParams : IRequest<CancelPreviewCacheBuildResult>;
+
+/// <summary>Result of <c>aet/cancelPreviewCacheBuild</c>. Empty: the build's own notification says it stopped.</summary>
+public sealed record CancelPreviewCacheBuildResult;
+
+/// <summary>
+///     Asks the server to empty the project's preview cache: every converted model under
+///     <c>.aetswg/preview/</c>. Sent by the client's Clear Preview Cache command.
+/// </summary>
+[Method("aet/clearPreviewCache", Direction.ClientToServer)]
+public sealed record ClearPreviewCacheParams : IRequest<ClearPreviewCacheResult>;
+
+/// <summary>Result of <c>aet/clearPreviewCache</c>.</summary>
+/// <param name="Removed">How many converted models were removed.</param>
+public sealed record ClearPreviewCacheResult(int Removed);
+
+/// <summary>
+///     What the server tells the client about the background build of the preview cache, as the
+///     <c>aet/previewCacheBuild</c> notification: the client shows it as a progress the reader can
+///     cancel.
+/// </summary>
+/// <param name="State">
+///     <c>running</c> while models are being converted, <c>ended</c> when the build has stopped -
+///     finished or cancelled.
+/// </param>
+/// <param name="Done">Models converted so far.</param>
+/// <param name="Total">Models the build set out to convert, which grows when a subject is opened.</param>
+public sealed record PreviewCacheBuildProgress(string State, int Done, int Total);
+
 /// <summary>Request for one model's geometry as a glTF binary.</summary>
 [Method("aet/getModelGlb", Direction.ClientToServer)]
 public sealed record GetModelGlbParams : IRequest<GetModelGlbResult>
@@ -71,24 +105,46 @@ public sealed record GetModelGlbParams : IRequest<GetModelGlbResult>
     ///     the format exists to avoid.
     /// </remarks>
     public IReadOnlyList<string> Animations { get; init; } = [];
+
+    /// <summary>
+    ///     The <see cref="GetModelGlbResult.Version" /> of the GLB the client already holds for this
+    ///     model and these clips, if it holds one. When it is still the version, the reply offers
+    ///     no transfer.
+    /// </summary>
+    public string? Have { get; init; }
 }
 
 /// <summary>
 ///     Result of <c>aet/getModelGlb</c>.
 /// </summary>
-/// <param name="Glb">
-///     Base64 GLB, or null when the model did not resolve or would not parse. Base64 rather than raw
-///     bytes because the payload crosses a JSON-RPC boundary either way.
+/// <param name="Transfer">
+///     Where the client collects the GLB, or null when the model did not resolve or would not
+///     parse. The bytes do not cross JSON-RPC: MEASURED, an 81 MB model took 1.1 s as base64 in the
+///     reply and 0.26 s over the transfer pipe.
 /// </param>
 /// <param name="Animations">
 ///     Clips actually baked in. Shorter than the request when one did not match the skeleton, which
 ///     is common enough to report rather than treat as an error.
 /// </param>
 /// <param name="Error">Why nothing came back, in words the panel can show verbatim.</param>
+/// <param name="Version">
+///     What the GLB was converted from, as one token: the same for the same model bytes, clips and
+///     converter. A reply with a version, no transfer and no error says the client's copy stands.
+/// </param>
 public sealed record GetModelGlbResult(
-    string? Glb,
+    PreviewTransfer? Transfer,
     IReadOnlyList<string> Animations,
-    string? Error = null);
+    string? Error = null,
+    string? Version = null);
+
+/// <summary>
+///     A payload waiting on the server's transfer pipe (<see cref="PreviewTransferPipe" />).
+/// </summary>
+/// <param name="Pipe">What the client connects to.</param>
+/// <param name="Id">The transfer's id, 32 hex digits; collected once.</param>
+/// <param name="Length">The payload's length in bytes.</param>
+/// <param name="Format">What the bytes are: <c>glb</c>.</param>
+public sealed record PreviewTransfer(string Pipe, string Id, long Length, string Format);
 
 /// <summary>Request for what is inside one model, for the inspector.</summary>
 [Method("aet/getModelDetail", Direction.ClientToServer)]
@@ -246,20 +302,35 @@ public sealed record GetModelTextureParams : IRequest<GetModelTextureResult>
 {
     /// <summary>The texture name as a sub-mesh's shader parameter writes it.</summary>
     public string Name { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     The <see cref="GetModelTextureResult.Version" /> of the copy the client already holds, if
+    ///     it holds one. When it is still the version, the reply offers no transfer.
+    /// </summary>
+    public string? Have { get; init; }
 }
 
 /// <summary>
 ///     Result of <c>aet/getModelTexture</c>.
 /// </summary>
 /// <remarks>
-///     The bytes are sent <strong>undecoded</strong>, in whatever format the file is. The browser can
+///     The bytes are offered <strong>undecoded</strong>, in whatever format the file is. The browser can
 ///     hand DXT data straight to the GPU, so decoding here and re-encoding as PNG would cost a
 ///     round trip through an image codec and inflate a compressed 2048x2048 texture several times
 ///     over, for nothing.
 /// </remarks>
 /// <param name="Format">The file extension without the dot - <c>dds</c> or <c>tga</c>.</param>
-/// <param name="Data">Base64 file bytes, or null when the texture did not resolve.</param>
+/// <param name="Transfer">
+///     Where the client collects the file's bytes, or null when the texture did not resolve. As for
+///     a model, the bytes do not cross JSON-RPC.
+/// </param>
+/// <param name="Version">
+///     The hash of the file's bytes: the same token while the content stands, whatever the file's
+///     name or timestamps. A reply with a version, no transfer and no error says the client's copy
+///     stands.
+/// </param>
 public sealed record GetModelTextureResult(
     string? Format,
-    string? Data,
-    string? Error = null);
+    PreviewTransfer? Transfer,
+    string? Error = null,
+    string? Version = null);

@@ -14,6 +14,7 @@
   "command.lsp.openStoryFile.title": "Open File",
   "command.lsp.openStoryFileUnavailable.title": "Open File - no document in the project",
   "command.lsp.openStoryGraph.title": "EaWEdit: Open Story Graph",
+  "command.lsp.clearPreviewCache.title": "EaWEdit: Clear Preview Cache",
   "command.lsp.previewAssembledUnit.title": "EaWEdit: Preview Assembled Unit",
   "command.lsp.previewCreditsCrawl.title": "EaWEdit: Open Credits Preview to the Side",
   "command.lsp.previewCreditsCrawlFullScreen.title": "EaWEdit: Play Credits Crawl Full Screen",

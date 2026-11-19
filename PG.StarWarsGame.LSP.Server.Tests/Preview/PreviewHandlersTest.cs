@@ -2,11 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Preview;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -37,7 +39,8 @@ public sealed class PreviewHandlersTest
     {
         var assets = new StubAssets();
         var handler =
-            new GetPreviewSceneHandler(Builder(assets), assets, TestCatalogues.English, new NoWorkspaceIcons());
+            new GetPreviewSceneHandler(Builder(assets), assets, TestCatalogues.English, new NoWorkspaceIcons(),
+                new PrioritisedModels());
 
         var result = await handler.Handle(new GetPreviewSceneParams(), CancellationToken.None);
 
@@ -49,8 +52,10 @@ public sealed class PreviewHandlersTest
     {
         // The custom editor sends a file:/// URI; the XML sends a bare name. Both mean one model.
         var assets = new StubAssets().With("Data/Art/Models/Ev_stardestroyer.alo", [1, 2, 3]);
+        var prioritised = new PrioritisedModels();
         var handler =
-            new GetPreviewSceneHandler(Builder(assets), assets, TestCatalogues.English, new NoWorkspaceIcons());
+            new GetPreviewSceneHandler(Builder(assets), assets, TestCatalogues.English, new NoWorkspaceIcons(),
+                prioritised);
 
         var result = await handler.Handle(
             new GetPreviewSceneParams
@@ -62,6 +67,34 @@ public sealed class PreviewHandlersTest
         var part = Assert.Single(result.Scene.Parts);
         Assert.Equal("Ev_stardestroyer.alo", part.ModelRef);
         Assert.True(part.Resolved);
+
+        // Opening a subject puts its models at the front of the background build's queue (#436).
+        var first = Assert.Single(Assert.Single(prioritised.Calls));
+        Assert.Equal("Ev_stardestroyer.alo", first.ModelReference);
+        Assert.Equal(result.Scene.Animations, first.Animations);
+    }
+
+    /// <summary>The background build as a record of what a scene asked it to do first.</summary>
+    private sealed class PrioritisedModels : IPreviewCacheBuilder
+    {
+        public List<IReadOnlyList<PreviewBuildItem>> Calls { get; } = [];
+
+        public void StartUnlessBuilt()
+        {
+        }
+
+        public void Prioritise(IReadOnlyList<PreviewBuildItem> items)
+        {
+            Calls.Add(items);
+        }
+
+        public void FilesChanged(IReadOnlyCollection<string> paths)
+        {
+        }
+
+        public void Cancel()
+        {
+        }
     }
 
     // ── the model list ────────────────────────────────────────────────────────
@@ -117,16 +150,105 @@ public sealed class PreviewHandlersTest
 
     // ── the GLB endpoint ──────────────────────────────────────────────────────
 
+    /// <summary>
+    ///     The GLB handler over a preview cache with no project to keep anything in, so each test
+    ///     converts for itself. <c>PreviewModelCacheTest</c> covers what is kept.
+    /// </summary>
+    private static GetModelGlbHandler GlbHandler(StubAssets assets, ILogger<GetModelGlbHandler>? logger = null,
+        OfferedTransfers? transfers = null, IPreviewCacheLocation? location = null)
+    {
+        var disk = new FileHelper(new MockFileSystem());
+        var cache = new PreviewModelCache(new PreviewAssetFingerprints(assets, disk), disk,
+            location ?? new NoProject(), NullLogger<PreviewModelCache>.Instance);
+        return new GetModelGlbHandler(assets, cache, transfers ?? new OfferedTransfers(), TestCatalogues.English,
+            logger ?? NullLogger<GetModelGlbHandler>.Instance);
+    }
+
+    /// <summary>
+    ///     The transfer channel as a list of what was offered, with no pipe behind it. A payload is
+    ///     opened when a test asks for its bytes, as the pipe opens it when the client asks.
+    /// </summary>
+    private sealed class OfferedTransfers : IPreviewTransferChannel
+    {
+        private readonly Dictionary<string, Func<Stream>> _payloads = [];
+
+        public PreviewTransfer Offer(string format, long length, Func<Stream> open)
+        {
+            var id = Guid.NewGuid().ToString("N");
+            _payloads[id] = open;
+            return new PreviewTransfer("test-pipe", id, length, format);
+        }
+
+        public byte[] BytesOf(PreviewTransfer transfer)
+        {
+            using var payload = _payloads[transfer.Id]();
+            using var bytes = new MemoryStream();
+            payload.CopyTo(bytes);
+            return bytes.ToArray();
+        }
+    }
+
+    private sealed class NoProject : IPreviewCacheLocation
+    {
+        public string? Directory => null;
+
+        public void EnsureIgnored()
+        {
+        }
+    }
+
+    private sealed class ProjectAt(string directory) : IPreviewCacheLocation
+    {
+        public string? Directory => directory;
+
+        public void EnsureIgnored()
+        {
+        }
+    }
+
+    /// <summary>
+    ///     The second request is answered from the cache, and still says what the conversion said:
+    ///     the notes are kept beside the entry, so a hit is not quieter than a miss.
+    /// </summary>
+    [Fact]
+    public async Task GetModelGlb_AnsweredFromTheCache_SaysAgainWhatTheConversionSaid()
+    {
+        var model = FindModel("Ev_stardestroyer.alo");
+        var animation = FindModel("Ai_rancor_idle_00.ala");
+        if (model is null || animation is null)
+            Assert.Skip("No extracted game tree found.");
+
+        var assets = new StubAssets()
+            .With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model))
+            .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
+        var logger = new ListLogger<GetModelGlbHandler>();
+        var transfers = new OfferedTransfers();
+        var handler = GlbHandler(assets, logger, transfers, new ProjectAt("/mod/.aetswg/preview"));
+        var request = new GetModelGlbParams
+        {
+            ModelReference = "Ev_stardestroyer.alo",
+            Animations = ["Ai_rancor_idle_00.ala"]
+        };
+
+        var first = await handler.Handle(request, CancellationToken.None);
+        var second = await handler.Handle(request, CancellationToken.None);
+
+        Assert.Equal(2, logger.Messages.Count(m => m.Contains("Ai_rancor_idle_00.ala")));
+        Assert.Equal(logger.Messages[0], logger.Messages[1]);
+        Assert.Equal(transfers.BytesOf(first.Transfer!), transfers.BytesOf(second.Transfer!));
+        Assert.Equal(first.Animations, second.Animations);
+    }
+
     [Fact]
     public async Task GetModelGlb_ForAMissingModel_ExplainsWhyRatherThanReturningNothing()
     {
         var assets = new StubAssets();
-        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
+        var handler = GlbHandler(assets);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "nope.alo" }, CancellationToken.None);
 
-        Assert.Null(result.Glb);
+        Assert.Null(result.Transfer);
         Assert.Contains("baseGameDirectory", result.Error);
     }
 
@@ -136,33 +258,36 @@ public sealed class PreviewHandlersTest
         // The reader is strict by design; its message names the chunk that did not add up, which is
         // far more use than a bare failure.
         var assets = new StubAssets().With("Data/Art/Models/junk.alo", [9, 9, 9, 9, 9, 9, 9, 9]);
-        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
+        var handler = GlbHandler(assets);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "junk.alo" }, CancellationToken.None);
 
-        Assert.Null(result.Glb);
+        Assert.Null(result.Transfer);
         Assert.Contains("could not be read", result.Error);
     }
 
     [Fact]
-    public async Task GetModelGlb_ForARealModel_ReturnsBase64Glb()
+    public async Task GetModelGlb_ForARealModel_OffersTheGlbAsATransferAndSendsNoBytesInTheReply()
     {
         var model = FindModel("Ev_stardestroyer.alo");
         if (model is null)
             Assert.Skip("No extracted game tree found.");
 
         var assets = new StubAssets().With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model));
-        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
+        var transfers = new OfferedTransfers();
+        var handler = GlbHandler(assets, transfers: transfers);
 
         var result = await handler.Handle(
             new GetModelGlbParams { ModelReference = "Ev_stardestroyer.alo" }, CancellationToken.None);
 
         Assert.Null(result.Error);
-        Assert.NotNull(result.Glb);
+        Assert.NotNull(result.Transfer);
+        Assert.Equal("glb", result.Transfer.Format);
 
-        // "glTF" in ASCII is the GLB magic; decoding proves this is a real container, not a blob.
-        var bytes = Convert.FromBase64String(result.Glb);
+        // "glTF" in ASCII is the GLB magic: what was offered is a real container, not a blob.
+        var bytes = transfers.BytesOf(result.Transfer);
+        Assert.Equal(bytes.Length, result.Transfer.Length);
         Assert.Equal([0x67, 0x6C, 0x54, 0x46], bytes[..4]);
     }
 
@@ -193,7 +318,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
+        var handler = GlbHandler(assets);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -203,7 +328,7 @@ public sealed class PreviewHandlersTest
             },
             CancellationToken.None);
 
-        Assert.NotNull(result.Glb);
+        Assert.NotNull(result.Transfer);
         Assert.Single(result.Animations);
     }
 
@@ -226,7 +351,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Nb_basepad.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
+        var handler = GlbHandler(assets);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -236,7 +361,7 @@ public sealed class PreviewHandlersTest
             },
             CancellationToken.None);
 
-        Assert.NotNull(result.Glb);
+        Assert.NotNull(result.Transfer);
         Assert.Empty(result.Animations);
     }
 
@@ -261,7 +386,7 @@ public sealed class PreviewHandlersTest
             .With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
         var logger = new ListLogger<GetModelGlbHandler>();
-        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, logger);
+        var handler = GlbHandler(assets, logger);
 
         await handler.Handle(
             new GetModelGlbParams
@@ -302,7 +427,7 @@ public sealed class PreviewHandlersTest
         var assets = new StubAssets()
             .With("Data/Art/Models/Ub_turretmst50.alo", File.ReadAllBytes(model))
             .With("Data/Art/Models/Ub_turretmst50_idle00.ala", File.ReadAllBytes(animation));
-        var handler = new GetModelGlbHandler(assets, TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
+        var handler = GlbHandler(assets);
 
         var result = await handler.Handle(
             new GetModelGlbParams
@@ -318,6 +443,170 @@ public sealed class PreviewHandlersTest
 
     // ── the texture endpoint ──────────────────────────────────────────────────
 
+    private static GetModelTextureHandler TextureHandler(StubAssets assets, OfferedTransfers transfers,
+        MockFileSystem? disk = null, IPreviewAssetFingerprints? fingerprints = null)
+    {
+        var files = new FileHelper(disk ?? new MockFileSystem());
+        return new GetModelTextureHandler(assets, fingerprints ?? new PreviewAssetFingerprints(assets, files),
+            files, transfers, TestCatalogues.English);
+    }
+
+    /// <summary>
+    ///     A refresh asks for every texture again and says which version it holds. For one that did
+    ///     not change the reply offers nothing - no bytes are read, held or sent (#436, FR-4).
+    /// </summary>
+    [Fact]
+    public async Task GetModelTexture_WhenTheClientHoldsThatVersion_OffersNothing()
+    {
+        var disk = new MockFileSystem();
+        disk.AddFile("/mod/Data/Art/Textures/Hull.dds", new MockFileData([5, 6, 7]));
+        var assets = new StubAssets { Disk = disk }
+            .With("Data/Art/Textures/Hull.dds", [0], "/mod/Data/Art/Textures/Hull.dds");
+        var handler = TextureHandler(assets, new OfferedTransfers(), disk);
+        var first = await handler.Handle(new GetModelTextureParams { Name = "Hull.tga" }, CancellationToken.None);
+
+        var again = await handler.Handle(
+            new GetModelTextureParams { Name = "Hull.tga", Have = first.Version }, CancellationToken.None);
+
+        Assert.NotNull(first.Version);
+        Assert.NotNull(first.Transfer);
+        Assert.Equal(first.Version, again.Version);
+        Assert.Null(again.Transfer);
+        Assert.Null(again.Error);
+        Assert.Equal("dds", again.Format);
+    }
+
+    /// <summary>
+    ///     Every 2048x2048 DXT5 texture has the same length, and a copy keeps the source's write
+    ///     time: a texture copied over another can have the stamp of the one it replaced. The
+    ///     watcher's report is what makes it another version, and so sends it again.
+    /// </summary>
+    [Fact]
+    public async Task GetModelTexture_WrittenOverWithTheSameLengthAndWriteTime_IsSentAgainOnceTheWatcherReportsIt()
+    {
+        var disk = new MockFileSystem();
+        var written = new DateTime(2026, 5, 25, 13, 33, 0, DateTimeKind.Utc);
+        disk.AddFile("/mod/Data/Art/Textures/Hull.dds", new MockFileData([5, 6, 7]) { LastWriteTime = written });
+        var assets = new StubAssets { Disk = disk }
+            .With("Data/Art/Textures/Hull.dds", [0], "/mod/Data/Art/Textures/Hull.dds");
+        var transfers = new OfferedTransfers();
+        var fingerprints = new PreviewAssetFingerprints(assets, new FileHelper(disk));
+        var handler = TextureHandler(assets, transfers, disk, fingerprints);
+        var first = await handler.Handle(new GetModelTextureParams { Name = "Hull.tga" }, CancellationToken.None);
+
+        disk.File.WriteAllBytes("/mod/Data/Art/Textures/Hull.dds", [9, 9, 9]);
+        disk.File.SetLastWriteTimeUtc("/mod/Data/Art/Textures/Hull.dds", written);
+        var unreported = await handler.Handle(
+            new GetModelTextureParams { Name = "Hull.tga", Have = first.Version }, CancellationToken.None);
+
+        fingerprints.Forget([@"\mod\Data\Art\Textures\Hull.dds"]);
+        var reported = await handler.Handle(
+            new GetModelTextureParams { Name = "Hull.tga", Have = first.Version }, CancellationToken.None);
+
+        // The stamp alone cannot tell: until the watcher speaks, the client's copy is taken to stand.
+        Assert.Null(unreported.Transfer);
+        Assert.NotEqual(first.Version, reported.Version);
+        Assert.Equal([9, 9, 9], transfers.BytesOf(reported.Transfer!));
+
+        // One write is often reported two or three times over. The second report finds the same
+        // bytes, so the version the client now holds still stands and nothing is sent again.
+        fingerprints.Forget([@"\mod\Data\Art\Textures\Hull.dds"]);
+        var reportedAgain = await handler.Handle(
+            new GetModelTextureParams { Name = "Hull.tga", Have = reported.Version }, CancellationToken.None);
+
+        Assert.Null(reportedAgain.Transfer);
+        Assert.Equal(reported.Version, reportedAgain.Version);
+    }
+
+    /// <summary>An archive entry has no stamp; its version is its bytes' hash.</summary>
+    [Fact]
+    public async Task GetModelTexture_ForAnEntryWithNoFile_VersionsItByItsBytes()
+    {
+        var assets = new StubAssets()
+            .With("Data/Art/Textures/Packed.dds", [1, 2], "Data/Art/Textures/Packed.dds");
+        var handler = TextureHandler(assets, new OfferedTransfers());
+        var first = await handler.Handle(new GetModelTextureParams { Name = "Packed.dds" }, CancellationToken.None);
+
+        var same = await handler.Handle(
+            new GetModelTextureParams { Name = "Packed.dds", Have = first.Version }, CancellationToken.None);
+        assets.With("Data/Art/Textures/Packed.dds", [3, 4], "Data/Art/Textures/Packed.dds");
+        var changed = await handler.Handle(
+            new GetModelTextureParams { Name = "Packed.dds", Have = first.Version }, CancellationToken.None);
+
+        Assert.Null(same.Transfer);
+        Assert.NotNull(changed.Transfer);
+        Assert.NotEqual(first.Version, changed.Version);
+    }
+
+    /// <summary>
+    ///     The model's version is its cache key. A client that holds it is offered nothing, and is
+    ///     still told which clips are baked in.
+    /// </summary>
+    [Fact]
+    public async Task GetModelGlb_WhenTheClientHoldsThatVersion_OffersNothing()
+    {
+        var model = FindModel("Ev_stardestroyer.alo");
+        if (model is null)
+            Assert.Skip("No extracted game tree found.");
+
+        var assets = new StubAssets().With("Data/Art/Models/Ev_stardestroyer.alo", File.ReadAllBytes(model));
+        var handler = GlbHandler(assets, location: new ProjectAt("/mod/.aetswg/preview"));
+        var first = await handler.Handle(
+            new GetModelGlbParams { ModelReference = "Ev_stardestroyer.alo" }, CancellationToken.None);
+
+        var again = await handler.Handle(
+            new GetModelGlbParams { ModelReference = "Ev_stardestroyer.alo", Have = first.Version },
+            CancellationToken.None);
+        var other = await handler.Handle(
+            new GetModelGlbParams { ModelReference = "Ev_stardestroyer.alo", Have = "another-version" },
+            CancellationToken.None);
+
+        Assert.NotNull(first.Version);
+        Assert.NotNull(first.Transfer);
+        Assert.Null(again.Transfer);
+        Assert.Null(again.Error);
+        Assert.Equal(first.Version, again.Version);
+        Assert.NotNull(other.Transfer);
+    }
+
+    /// <summary>
+    ///     A hardpoint's model is asked for with the UNIT's clips, and the background build
+    ///     converts it with its own (#436). A clip that reaches past the model's bones is not baked,
+    ///     so both mean the same GLB: the same version, and the request still says why the clip is
+    ///     not there. On the shipped files - a turret of 15 bone targets, and a creature's idle.
+    /// </summary>
+    [Fact]
+    public async Task GetModelGlb_ForAPartOfferedAClipThatCannotPlayOnIt_IsTheVersionConvertedWithoutIt()
+    {
+        var model = FindModel("Ub_turretmst50.alo");
+        var animation = FindModel("Ai_rancor_idle_00.ala");
+        if (model is null || animation is null)
+            Assert.Skip("No extracted game tree found.");
+
+        var assets = new StubAssets()
+            .With("Data/Art/Models/Ub_turretmst50.alo", File.ReadAllBytes(model))
+            .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
+        var logger = new ListLogger<GetModelGlbHandler>();
+        var transfers = new OfferedTransfers();
+        var handler = GlbHandler(assets, logger, transfers, new ProjectAt("/mod/.aetswg/preview"));
+
+        var alone = await handler.Handle(
+            new GetModelGlbParams { ModelReference = "Ub_turretmst50.alo" }, CancellationToken.None);
+        var asPart = await handler.Handle(
+            new GetModelGlbParams
+            {
+                ModelReference = "Ub_turretmst50.alo",
+                Animations = ["Ai_rancor_idle_00.ala"]
+            },
+            CancellationToken.None);
+
+        Assert.Empty(asPart.Animations);
+        Assert.Equal(alone.Version, asPart.Version);
+        Assert.Equal(transfers.BytesOf(alone.Transfer!), transfers.BytesOf(asPart.Transfer!));
+        Assert.Contains(logger.Messages,
+            m => m.Contains("Ai_rancor_idle_00.ala") && m.Contains("cannot be played"));
+    }
+
     [Fact]
     public async Task GetModelTexture_ReportsTheFormatActuallyFoundNotTheOneAsked()
     {
@@ -325,24 +614,68 @@ public sealed class PreviewHandlersTest
         // client picks its decoder from the reported format, so reporting the request would be wrong.
         var assets = new StubAssets()
             .With("Data/Art/Textures/Ai_rancor.dds", [1, 2, 3, 4], "Data/Art/Textures/Ai_rancor.dds");
-        var handler = new GetModelTextureHandler(assets, TestCatalogues.English);
+        var transfers = new OfferedTransfers();
+        var handler = TextureHandler(assets, transfers);
 
         var result = await handler.Handle(
             new GetModelTextureParams { Name = "Ai_rancor.tga" }, CancellationToken.None);
 
         Assert.Equal("dds", result.Format);
-        Assert.Equal(Convert.ToBase64String([1, 2, 3, 4]), result.Data);
+        Assert.NotNull(result.Transfer);
+        Assert.Equal("dds", result.Transfer.Format);
+        Assert.Equal(4, result.Transfer.Length);
+        Assert.Equal([1, 2, 3, 4], transfers.BytesOf(result.Transfer));
+    }
+
+    /// <summary>
+    ///     A loose file is read once, for its version, and never again while its stamp stands; it is
+    ///     offered by its length and streamed from disk when the client collects it. MEASURED
+    ///     before: every texture was read whole and base64-encoded inside every request - 16 ms for
+    ///     a 16.8 MB sprite map; the read and hash take 5 ms, once.
+    /// </summary>
+    [Fact]
+    public async Task GetModelTexture_ForALooseFile_ReadsItOnceForItsVersionAndStreamsItFromDisk()
+    {
+        var disk = new MockFileSystem();
+        disk.AddFile("/mod/Data/Art/Textures/Hull.dds", new MockFileData([5, 6, 7]));
+        var assets = new StubAssets { Disk = disk }
+            .With("Data/Art/Textures/Hull.dds", [0], "/mod/Data/Art/Textures/Hull.dds");
+        var transfers = new OfferedTransfers();
+        var handler = TextureHandler(assets, transfers, disk);
+
+        var result = await handler.Handle(
+            new GetModelTextureParams { Name = "Hull.tga" }, CancellationToken.None);
+        await handler.Handle(new GetModelTextureParams { Name = "Hull.tga" }, CancellationToken.None);
+
+        Assert.Equal(1, assets.Reads);
+        Assert.Equal(3, result.Transfer!.Length);
+        // What is collected is what the disk holds then, not what a resolver read earlier.
+        Assert.Equal([5, 6, 7], transfers.BytesOf(result.Transfer));
+    }
+
+    /// <summary>The name is resolved once: the location found is the location read.</summary>
+    [Fact]
+    public async Task GetModelTexture_ResolvesTheNameOnce()
+    {
+        var assets = new StubAssets()
+            .With("Data/Art/Textures/Packed.dds", [1, 2], "Data/Art/Textures/Packed.dds");
+        var handler = TextureHandler(assets, new OfferedTransfers());
+
+        await handler.Handle(new GetModelTextureParams { Name = "Packed.dds" }, CancellationToken.None);
+
+        Assert.Equal(1, assets.Locates);
+        Assert.Equal(1, assets.Reads);
     }
 
     [Fact]
     public async Task GetModelTexture_ForAMissingTexture_ExplainsWhy()
     {
-        var handler = new GetModelTextureHandler(new StubAssets(), TestCatalogues.English);
+        var handler = TextureHandler(new StubAssets(), new OfferedTransfers());
 
         var result = await handler.Handle(
             new GetModelTextureParams { Name = "nope.tga" }, CancellationToken.None);
 
-        Assert.Null(result.Data);
+        Assert.Null(result.Transfer);
         Assert.Contains("not found", result.Error);
     }
 
@@ -643,6 +976,7 @@ public sealed class PreviewHandlersTest
 
         public GameAssetLocation? Locate(string gameRelativePath)
         {
+            Locates++;
             return _files.TryGetValue(gameRelativePath, out var file)
                 ? new GameAssetLocation(gameRelativePath, file.Resolved, GameAssetTier.Workspace)
                 : null;
@@ -650,8 +984,26 @@ public sealed class PreviewHandlersTest
 
         public byte[]? Read(string gameRelativePath)
         {
+            Reads++;
             return _files.TryGetValue(gameRelativePath, out var file) ? file.Bytes : null;
         }
+
+        /// <summary>The disk a located file is read from, when a test puts its files on one.</summary>
+        public MockFileSystem? Disk { get; init; }
+
+        public byte[]? Read(GameAssetLocation location)
+        {
+            if (Disk is null || !Disk.File.Exists(location.ResolvedPath))
+                return Read(location.RequestedPath);
+
+            Reads++;
+            return Disk.File.ReadAllBytes(location.ResolvedPath);
+        }
+
+        /// <summary>How often a path was resolved, and how often bytes were read.</summary>
+        public int Locates { get; private set; }
+
+        public int Reads { get; private set; }
 
         /// <param name="path">The asset's game-relative path.</param>
         /// <param name="bytes">The asset's bytes.</param>

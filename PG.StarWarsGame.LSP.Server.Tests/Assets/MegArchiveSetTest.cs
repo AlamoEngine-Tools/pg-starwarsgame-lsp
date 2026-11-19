@@ -142,6 +142,32 @@ public sealed class MegArchiveSetTest
     }
 
     /// <summary>
+    ///     An archive written again while the server runs (#436). The set keeps what it read of an
+    ///     archive's entry table, so until it is told, a new entry is not found - and an old one is
+    ///     read at the place it used to be. The file watcher's report has it read the archives again.
+    /// </summary>
+    [Fact]
+    public void Invalidate_AfterAnArchiveWasWrittenAgain_ReadsItsNewEntries()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile($@"{Project}\Data\MegaFiles.xml", new MockFileData(MegaFiles(@"Data\ModTextures.meg")));
+        WriteMeg(fs, $@"{Project}\Data\ModTextures.meg", (@"DATA\ART\TEXTURES\PACKED.DDS", [4, 2]));
+        var archives = Build(fs, null, Project);
+        Assert.Equal([4, 2], archives.TryRead("data/art/textures/packed.dds")!);
+
+        fs.File.Delete($@"{Project}\Data\ModTextures.meg");
+        WriteMeg(fs, $@"{Project}\Data\ModTextures.meg",
+            (@"DATA\ART\TEXTURES\ADDED.DDS", [7, 7, 7]), (@"DATA\ART\TEXTURES\PACKED.DDS", [5]));
+
+        Assert.Null(archives.TryRead("data/art/textures/added.dds"));
+
+        archives.Invalidate();
+
+        Assert.Equal([7, 7, 7], archives.TryRead("data/art/textures/added.dds")!);
+        Assert.Equal([5], archives.TryRead("data/art/textures/packed.dds")!);
+    }
+
+    /// <summary>
     ///     A sound archive's flat entries are read by the path the catalog gives them, under
     ///     <c>data/audio/sfx/</c>, or a catalogued sound would never resolve.
     /// </summary>

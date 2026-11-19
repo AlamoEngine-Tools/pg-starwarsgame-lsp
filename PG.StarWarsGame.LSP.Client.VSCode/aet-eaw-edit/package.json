@@ -497,6 +497,10 @@
         "title": "%command.lsp.previewAssembledUnit.title%"
       },
       {
+        "command": "aet-eaw-edit.lsp.clearPreviewCache",
+        "title": "%command.lsp.clearPreviewCache.title%"
+      },
+      {
         "command": "aet-eaw-edit.shaders.obtain",
         "title": "%command.shaders.obtain.title%"
       }

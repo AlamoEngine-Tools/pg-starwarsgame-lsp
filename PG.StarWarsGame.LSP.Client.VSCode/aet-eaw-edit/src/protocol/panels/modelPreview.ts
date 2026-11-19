@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The model preview's messages (#208): ModelPreviewPanel and modelPreview.tsx.
@@ -12,8 +12,6 @@ import type { SubjectState } from "../../shared/subjectState";
 import type { ViewerSettings } from "../../shared/viewerSettings";
 import type {
     GetModelDetailResult,
-    GetModelGlbResult,
-    GetModelTextureResult,
     GetParticleSystemResult,
     GetProjectileResult,
     GetShaderSourceResult,
@@ -62,6 +60,8 @@ export interface ModelPreviewRequestGlb {
     attachBone?: string;
     /** The part's own clips; empty or absent bakes the clips the scene reported. */
     animations?: string[];
+    /** The version of this model the webview already holds, if it holds one. */
+    have?: string;
 }
 
 /** A model's detail for the tree and the inspector, answered with {@link ModelPreviewModelDetail}. */
@@ -70,10 +70,14 @@ export interface ModelPreviewRequestModelDetail {
     modelReference: string;
 }
 
-/** A texture by name, answered with {@link ModelPreviewTexture}; asked for once per scene. */
+/**
+ * A texture by name, answered with {@link ModelPreviewTexture}; asked for once per scene, with the
+ * version the webview already holds, if it holds one.
+ */
 export interface ModelPreviewRequestTexture {
     type: "requestTexture";
     name: string;
+    have?: string;
 }
 
 /** A particle system by name, answered with {@link ModelPreviewParticleSystem}. */
@@ -157,18 +161,45 @@ export interface ModelPreviewScene {
     refresh?: boolean;
 }
 
+/**
+ * One model's geometry, as bytes.
+ *
+ * `data` is the GLB itself: the host collected it from the server's transfer pipe and posts it as a
+ * typed array, so nothing on the way to the webview is base64 text. Absent when the model did not
+ * resolve, would not parse, or did not arrive - `error` then says which, in words to show.
+ */
 export interface ModelPreviewGlb {
     type: "glb";
     partId: string;
     attachToPartId?: string | null;
     attachBone?: string | null;
-    result: GetModelGlbResult;
+    /** The clips baked into the GLB. */
+    animations: string[];
+    data?: Uint8Array | null;
+    error?: string | null;
+    /** The version of the model, to ask with next time. */
+    version?: string | null;
+    /** The server says the copy the webview asked with still stands; no `data` is sent. */
+    unchanged?: boolean;
 }
 
+/**
+ * One texture's file, as bytes and undecoded.
+ *
+ * `format` is the extension the server FOUND - `dds` or `tga` - which is frequently not the one the
+ * model named. `data` is absent when the texture did not resolve or did not arrive; `error` then
+ * says which.
+ */
 export interface ModelPreviewTexture {
     type: "texture";
     name: string;
-    result: GetModelTextureResult;
+    format?: string | null;
+    data?: Uint8Array | null;
+    error?: string | null;
+    /** The version of the texture, to ask with next time. */
+    version?: string | null;
+    /** The server says the copy the webview asked with still stands; no `data` is sent. */
+    unchanged?: boolean;
 }
 
 export interface ModelPreviewModelDetail {

@@ -12,6 +12,7 @@ import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
+    State,
     StaticFeature,
 } from "vscode-languageclient/node";
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
@@ -148,6 +149,11 @@ import {
     PgprojMigrationProposal,
     proposalMessage,
 } from "./pgprojMigrationPrompt";
+import {
+    PreviewCacheBuildProgress,
+    PreviewCacheBuildView,
+    ShownProgress,
+} from "./previewCacheBuildView";
 
 // vscode-languageclient reads `<id>.trace.server` itself: when it sends initialize and on every
 // change. Named so that is aet-eaw-edit.lsp.debug.trace.server, the handshake is traced at the level
@@ -604,6 +610,7 @@ const WATCHED_GLOBS = [
     "**/*.csv",
     "**/*.properties",
     "**/*.dat",
+    "**/*.meg",
     "**/*.tga",
     "**/*.dds",
     "**/*.alo",
@@ -689,6 +696,67 @@ function forwardFileChange(
 /** A log line's prefix naming the project, when the window runs more than one. */
 function projectLabel(project: ProjectClient): string {
     return project.spec.roots === undefined ? "" : `[${project.spec.name}] `;
+}
+
+/**
+ * A cancellable progress notification that stays until `end` is called.
+ *
+ * `withProgress` hands its reporter over asynchronously, so what is reported before then is kept
+ * and shown when it arrives.
+ */
+function showCancellableProgress(
+    title: string,
+    onCancel: () => void,
+): ShownProgress {
+    let reporter: vscode.Progress<{
+        message?: string;
+        increment?: number;
+    }> | null = null;
+    let finish: (() => void) | null = null;
+    let ended = false;
+    let latest: { message: string; fraction: number } | null = null;
+    let reported = 0;
+
+    const apply = (): void => {
+        if (reporter === null || latest === null) {
+            return;
+        }
+        reporter.report({
+            message: latest.message,
+            increment: (latest.fraction - reported) * 100,
+        });
+        reported = latest.fraction;
+    };
+
+    void vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title,
+            cancellable: true,
+        },
+        (progress, token) => {
+            token.onCancellationRequested(onCancel);
+            reporter = progress;
+            apply();
+            return new Promise<void>((resolve) => {
+                finish = resolve;
+                if (ended) {
+                    resolve();
+                }
+            });
+        },
+    );
+
+    return {
+        report(message, fraction) {
+            latest = { message, fraction };
+            apply();
+        },
+        end() {
+            ended = true;
+            finish?.();
+        },
+    };
 }
 
 let traceChannel: vscode.LogOutputChannel | undefined;
@@ -1246,6 +1314,39 @@ function startProjectClient(
         // variant chain, its hardpoints, their models and their weapons, and none of that is
         // tracked back to the files it came from.
         ModelPreviewPanel.refreshAll(project.spec.key);
+    });
+
+    lspClient.onNotification("aet/previewAssetsChanged", () => {
+        // A model, a clip or a texture changed on disk. The scene may read exactly as before, so
+        // the previews are told to ask for their assets again; each says which version it holds
+        // and is sent only what changed.
+        ModelPreviewPanel.refreshAll(project.spec.key, true);
+    });
+
+    // The background build of this project's preview cache: one progress with a Cancel button for
+    // as long as the server says it is running. A notification rather than the status bar, because
+    // only there can a progress be cancelled.
+    const cacheBuild = new PreviewCacheBuildView(
+        (onCancel) =>
+            showCancellableProgress(
+                projectLabel(project) +
+                    vscode.l10n.t("Converting models for the preview"),
+                onCancel,
+            ),
+        () => {
+            void project.gateway.request("aet/cancelPreviewCacheBuild", {});
+        },
+        (done, total) => vscode.l10n.t("{0} of {1} models", done, total),
+    );
+    lspClient.onNotification(
+        "aet/previewCacheBuild",
+        (progress: PreviewCacheBuildProgress) => cacheBuild.update(progress),
+    );
+    lspClient.onDidChangeState((event) => {
+        // A server that stopped will send no "ended".
+        if (event.newState === State.Stopped) {
+            cacheBuild.end();
+        }
     });
 
     lspClient.onNotification("aet/modBrowserChanged", () => {
@@ -3390,6 +3491,35 @@ export async function activate(
             "aet-eaw-edit.shaders.obtain",
             async () => {
                 await offerShaderSources(context);
+            },
+        ),
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "aet-eaw-edit.lsp.clearPreviewCache",
+            async () => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                // The cache is the server's: it knows the project's folder and stops a build that
+                // would fill it again.
+                const result = await gatewayFor(projectKey).requestOrReport<{
+                    removed: number;
+                }>(
+                    "aet/clearPreviewCache",
+                    {},
+                    vscode.l10n.t("Could not clear the preview cache"),
+                );
+                if (result) {
+                    void vscode.window.showInformationMessage(
+                        vscode.l10n.t(
+                            "Preview cache cleared - {0} converted models removed",
+                            result.removed,
+                        ),
+                    );
+                }
             },
         ),
     );

@@ -44,6 +44,14 @@ public sealed class MegArchiveSet(
 
     public int ArchiveCount => EnsureIndexed().ArchiveCount;
 
+    public void Invalidate()
+    {
+        lock (_gate)
+        {
+            _index = null;
+        }
+    }
+
     public byte[]? TryRead(string normalizedPath)
     {
         if (!EnsureIndexed().Entries.TryGetValue(normalizedPath, out var location))

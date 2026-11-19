@@ -8,6 +8,11 @@
 
 import * as THREE from "three";
 
+import {
+    type PreparedParticleSystem,
+    emitterIndexOf,
+    prepareParticleSystem,
+} from "./particlePreparation";
 import type {
     AlamoEmitter,
     AlamoParticleContent,
@@ -1823,9 +1828,9 @@ export class ParticleSystemInstance {
     private readonly holds = new Set<EmissionHold>();
 
     /** Emitters another emitter spawns, which must not also run a clock of their own. */
-    private readonly dependent = new Set<number>();
+    private readonly dependent: ReadonlySet<number>;
     /** File indices in update and draw order: ascending priority ticket, file order on ties. */
-    private readonly order: number[];
+    private readonly order: readonly number[];
 
     private readonly frame: EmitterFrame = stillFrame();
 
@@ -1875,6 +1880,12 @@ export class ParticleSystemInstance {
          * explosions. Nothing read it, so all six drew at a fraction of their size.
          */
         scaleFactor = 1,
+        /**
+         * What the system's emitters decide, when the caller has it already - the rig prepares
+         * each distinct system once and hands every placement the same answer. Worked out here
+         * otherwise.
+         */
+        prepared: PreparedParticleSystem = prepareParticleSystem(system),
     ) {
         system.emitters.forEach((emitter, index) => {
             // A distinct stream per emitter, seeded from the index: two emitters of one system must
@@ -1891,36 +1902,13 @@ export class ParticleSystemInstance {
             this.root.add(renderer.mesh);
         });
 
-        // Measured in the game: after loading, the emitters are sorted by priority ticket,
-        // ascending, and that is their update and draw order from then on. The file order is kept
-        // for everything that names an emitter by index; this is the order they run in.
-        const ticketed = this.emitters.some(
-            (e) => e.description.properties.priorityTicket !== undefined,
-        );
-        this.order = this.emitters
-            .map((e, index) => ({
-                index,
-                ticket: ticketed
-                    ? (e.description.properties.priorityTicket ?? 0)
-                    : index,
-            }))
-            .sort((a, b) => a.ticket - b.ticket || a.index - b.index)
-            .map((e) => e.index);
+        // The order the emitters update and draw in, and the ones another emitter spawns: the
+        // same for every placement of this system, so prepared once. See `particlePreparation.ts`.
+        this.order = prepared.order;
+        this.dependent = prepared.dependent;
         this.order.forEach((index, rank) => {
             this.emitters[index].mesh.renderOrder = rank;
         });
-
-        for (const emitter of system.emitters) {
-            for (const link of [
-                emitter.spawnOnDeath,
-                emitter.spawnDuringLife,
-            ]) {
-                const child = this.childIndexOf(link);
-                if (child >= 0) {
-                    this.dependent.add(child);
-                }
-            }
-        }
 
         this.root.name = `particles:${name}`;
     }
@@ -2294,29 +2282,11 @@ export class ParticleSystemInstance {
         return index >= 0 ? this.emitters[index] : null;
     }
 
-    /**
-     * The index of the emitter a spawn link names, or -1.
-     *
-     * Measured in the game: after loading, a link is resolved by finding the emitter whose
-     * PRIORITY TICKET equals the stored value - not the emitter at that position. Every shipped
-     * and workshop system numbers its tickets in file order, so both readings agree there; a
-     * reordered file is where they part. A system with no tickets at all (an older server, a
-     * fixture) still reads the link as a position.
-     */
+    /** The index of the emitter a spawn link names, or -1. See {@link emitterIndexOf}. */
     private childIndexOf(link: number): number {
-        if (link < 0) {
-            return -1;
-        }
-
-        const ticketed = this.emitters.some(
-            (e) => e.description.properties.priorityTicket !== undefined,
-        );
-        if (!ticketed) {
-            return link < this.emitters.length ? link : -1;
-        }
-
-        return this.emitters.findIndex(
-            (e) => e.description.properties.priorityTicket === link,
+        return emitterIndexOf(
+            this.emitters.map((e) => e.description),
+            link,
         );
     }
 

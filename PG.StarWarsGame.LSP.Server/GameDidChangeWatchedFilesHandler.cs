@@ -7,12 +7,14 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.LSP.Assets.Projection;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Server.Indexing;
+using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using LspFileSystemWatcher = OmniSharp.Extensions.LanguageServer.Protocol.Models.FileSystemWatcher;
@@ -41,10 +43,14 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     ///         and for a long time that branch only ever ran for a script, because no asset
     ///         extension was watched: a file dropped into the workspace was unknown until a reload.
     ///     </para>
+    ///     <para>
+    ///         An archive is watched for what it packs: a project's <c>.meg</c> written again is
+    ///         catalogued and opened again, and the preview converts its models again (#436).
+    ///     </para>
     /// </remarks>
     public static readonly string[] WatchedGlobs =
     [
-        "**/*.xml", "**/*.lua", "**/*.pgproj", "**/*.csv", "**/*.properties", "**/*.dat",
+        "**/*.xml", "**/*.lua", "**/*.pgproj", "**/*.csv", "**/*.properties", "**/*.dat", "**/*.meg",
         .. MegAssetCatalogBuilder.KnownAssetExtensions
             .Select(extension => $"**/*{extension}")
             .Where(glob => glob != "**/*.lua")
@@ -52,9 +58,12 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     ];
 
     private readonly IFileHelper _fileHelper;
+    private readonly IMegArchiveSet _archives;
     private readonly IGameIndexService _indexService;
     private readonly IWorkspaceIndexer _indexer;
     private readonly ILogger<GameDidChangeWatchedFilesHandler> _logger;
+    private readonly IPreviewAssetFingerprints _previewAssets;
+    private readonly IPreviewCacheBuilder _previewCache;
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
     private readonly IStartupGate _startupGate;
@@ -72,9 +81,15 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         ILocalisationWriteLedger writeLedger,
         IRegistryWalkStore walks,
         IStartupGate startupGate,
+        IPreviewAssetFingerprints previewAssets,
+        IPreviewCacheBuilder previewCache,
+        IMegArchiveSet archives,
         ILogger<GameDidChangeWatchedFilesHandler> logger)
     {
         _startupGate = startupGate;
+        _previewAssets = previewAssets;
+        _previewCache = previewCache;
+        _archives = archives;
         _writeLedger = writeLedger;
         _walks = walks;
         _indexService = indexService;
@@ -104,9 +119,15 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         // Per-document updates/removals stay per-change inside one bulk scope.
         var projectChanged = false;
         var assetsChanged = false;
+        var archivesChanged = false;
         var dynamicEnumsChanged = false;
         var localisationTextChanged = false;
         HashSet<string>? listedKeys = null;
+
+        // Every asset file and archive reported, whatever happened to it. The preview forgets what
+        // it knew of each BY PATH: a file copied over another keeps the source's write time, so its
+        // stamp alone cannot be trusted to have moved.
+        List<string>? changedAssets = null;
 
         // Built on first use so the schema's enum list is walked once per notification, not once
         // per changed file.
@@ -126,6 +147,16 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 }
 
                 var path = _fileHelper.FileUriToPath(uri);
+
+                // An archive is no document and holds assets: what it packs is catalogued again, the
+                // next read opens it again, and the preview treats it as a change to every model in it.
+                if (path is not null && path.EndsWith(".meg", StringComparison.OrdinalIgnoreCase))
+                {
+                    archivesChanged = true;
+                    assetsChanged = true;
+                    (changedAssets ??= []).Add(path);
+                    continue;
+                }
 
                 // The change still goes on to be indexed or removed below; the reload runs once after.
                 if (path is not null && ChangesTheLoadOrder(path, change.Type, ref listedKeys))
@@ -153,6 +184,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 if (path is not null && AssetCatalogBuilder.IsAssetFile(path))
                 {
                     assetsChanged = true;
+                    (changedAssets ??= []).Add(path);
                     if (DocumentLanguages.LanguageIdOf(path) != DocumentLanguages.Lua)
                         continue;
                 }
@@ -193,6 +225,14 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             }
         }
 
+        // Before anything below asks the preview's caches again. An archive entry carries no stamp
+        // and is told apart by its bytes on every request, so a changed archive needs only to be
+        // opened again.
+        if (archivesChanged)
+            _archives.Invalidate();
+        if (changedAssets is not null)
+            _previewAssets.Forget(changedAssets);
+
         // Run after the bulk scope has closed so the reload's own indexing (and its project-cache
         // snapshots, which read Current after their inner scope) see the merged index rather than
         // still-deferred operations.
@@ -202,6 +242,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             // dynamic enums, model bones, localisation) - the scoped reloads below would be
             // redundant work against the outdated configuration.
             await _reloadService.ReloadAsync(ct);
+            ConvertChangedModels(changedAssets);
             return;
         }
 
@@ -213,6 +254,18 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
 
         if (localisationTextChanged)
             await _reloadService.ReloadLocalisationAsync(ct);
+
+        ConvertChangedModels(changedAssets);
+    }
+
+    /// <summary>
+    ///     Has the changed models, and the models of the changed clips, converted again in the
+    ///     background. After the asset catalog was applied: which clips a model has is read from it.
+    /// </summary>
+    private void ConvertChangedModels(List<string>? changedAssets)
+    {
+        if (changedAssets is not null)
+            _previewCache.FilesChanged(changedAssets);
     }
 
     // Matches by filename only, same as DynamicEnumCatalogBuilder.Apply's file search —

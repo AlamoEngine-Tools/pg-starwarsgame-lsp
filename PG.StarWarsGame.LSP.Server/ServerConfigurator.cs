@@ -199,6 +199,8 @@ public static class ServerConfigurator
             .WithHandler<GetSymbolPreviewHandler>()
             .WithHandler<GetServerStatusHandler>()
             .WithHandler<GetModelGlbHandler>()
+            .WithHandler<CancelPreviewCacheBuildHandler>()
+            .WithHandler<ClearPreviewCacheHandler>()
             .WithHandler<GetModelDetailHandler>()
             .WithHandler<GetSubMeshGeometryHandler>()
             .WithHandler<GetModelTextureHandler>()
@@ -526,6 +528,54 @@ public static class ServerConfigurator
                 services.AddSingleton<MegArchiveLoadOrder>();
                 services.AddSingleton<IGameAssetResolver, GameAssetResolver>();
 
+                // What the preview knows of the files it has served (#436). A watched-file event
+                // forgets a file here, and every open preview is then told to ask for its assets
+                // again: the ones that did not change come back as "still yours", without bytes.
+                services.AddSingleton<IPreviewAssetFingerprints>(sp =>
+                {
+                    var fingerprints = new PreviewAssetFingerprints(
+                        sp.GetRequiredService<IGameAssetResolver>(),
+                        sp.GetRequiredService<IFileHelper>());
+                    fingerprints.Changed += () =>
+                    {
+                        try
+                        {
+                            sp.GetRequiredService<ILanguageServerFacade>()
+                                .SendNotification(PreviewAssetFingerprints.ChangedNotification);
+                        }
+                        catch (Exception e)
+                        {
+                            // A client that has gone away must not fail the watcher event.
+                            sp.GetRequiredService<ILogger<PreviewAssetFingerprints>>().LogWarning(e,
+                                "Failed to send {Method} (non-fatal).",
+                                PreviewAssetFingerprints.ChangedNotification);
+                        }
+                    };
+                    return fingerprints;
+                });
+
+                // Converted models, under the root project's .aetswg/preview/ (#436). A factory
+                // rather than a type: the converter version is a constructor default the container
+                // has no business choosing.
+                services.AddSingleton<IPreviewModelCache>(sp => new PreviewModelCache(
+                    sp.GetRequiredService<IPreviewAssetFingerprints>(),
+                    sp.GetRequiredService<IFileHelper>(),
+                    sp.GetRequiredService<IPreviewCacheLocation>(),
+                    sp.GetRequiredService<ILogger<PreviewModelCache>>()));
+
+                // The pipe the preview's large payloads leave by (#436). Opened on the first offer.
+                services.AddSingleton<IPreviewTransferChannel, PreviewTransferPipe>();
+
+                // Fills the preview cache once a project's first index is live (#436).
+                services.AddSingleton<IPreviewBuildProgress>(sp => new NotifiedPreviewBuildProgress(
+                    progress => sp.GetRequiredService<ILanguageServerFacade>()
+                        .SendNotification(NotifiedPreviewBuildProgress.Notification, progress),
+                    sp.GetRequiredService<ILogger<NotifiedPreviewBuildProgress>>()));
+                services.AddSingleton<IPreviewCacheLocation>(sp => new ProjectPreviewCacheLocation(
+                    sp.GetRequiredService<IModProjectReloadService>(),
+                    sp.GetRequiredService<IProjectIndexCache>()));
+                services.AddSingleton<IPreviewCacheBuilder, PreviewCacheBuilder>();
+
                 // The textures a model names inside itself, for the XML diagnostics. Registered
                 // behind the Core-side contract as well, the same way the icon catalog is: that is
                 // how the Xml project consumes it without ever referencing the asset layer it
@@ -691,7 +741,17 @@ public static class ServerConfigurator
                 // question, which therefore sat inside the indexing stage and held the gate shut
                 // until the user answered it.
                 var pipeline = server.Services.GetRequiredService<StartupPipeline>();
-                _ = Task.Run(() => pipeline.RunAsync(scanRoots, CancellationToken.None),
+                var previewCache = server.Services.GetRequiredService<IPreviewCacheBuilder>();
+                _ = Task.Run(async () =>
+                    {
+                        await pipeline.RunAsync(scanRoots, CancellationToken.None);
+
+                        // Only now: the index is live and the gate is open, so the editor is usable
+                        // and nothing the pipeline does is waiting behind this. The build converts
+                        // the project's models on a thread of its own, below normal priority, and
+                        // does nothing at all for a project it has already built.
+                        previewCache.StartUnlessBuilt();
+                    },
                     CancellationToken.None);
 
                 await Task.CompletedTask;

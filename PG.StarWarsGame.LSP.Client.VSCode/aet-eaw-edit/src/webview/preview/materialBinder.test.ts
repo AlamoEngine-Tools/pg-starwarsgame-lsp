@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { type MaterialExtras } from "./materials";
 import { MaterialBinder } from "./materialBinder";
 import { standInContext } from "./viewportContext.testing";
+import { TextureStore } from "./textureStore";
 
 /**
  * A binder over a stand-in viewport: a model root whose meshes are all drawn, no stencil shadows, no
@@ -25,6 +26,7 @@ function binderWith(): { materials: MaterialBinder; modelRoot: THREE.Group } {
     const context = standInContext({
         camera: new THREE.PerspectiveCamera(),
         modelRoot,
+        textures: new TextureStore(),
         particles: { particleSystems: new Map() },
         environment: {
             stencilShadowing: false,

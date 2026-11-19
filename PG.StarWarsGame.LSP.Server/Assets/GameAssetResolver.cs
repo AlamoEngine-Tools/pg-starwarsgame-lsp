@@ -99,9 +99,11 @@ public sealed class GameAssetResolver(
     public byte[]? Read(string gameRelativePath)
     {
         var location = Locate(gameRelativePath);
-        if (location is null)
-            return null;
+        return location is null ? null : Read(location);
+    }
 
+    public byte[]? Read(GameAssetLocation location)
+    {
         if (location.Tier == GameAssetTier.Archive)
             return archives.TryRead(location.ResolvedPath);
 
@@ -114,7 +116,7 @@ public sealed class GameAssetResolver(
             // Located but unreadable - a lock, a permission, a file deleted between the two calls.
             // Worth a log rather than a throw: one unreadable asset must not abort a whole scene.
             logger.LogWarning(e, "Could not read asset {Path} at {Resolved}",
-                gameRelativePath, location.ResolvedPath);
+                location.RequestedPath, location.ResolvedPath);
             return null;
         }
     }

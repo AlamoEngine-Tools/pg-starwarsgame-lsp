@@ -10,6 +10,7 @@ import {
     DEFAULT_VIEWER_SETTINGS,
 } from "../../shared/viewerSettings";
 import { type ParticleEntry } from "./particleEntry";
+import { ParticlePreparations } from "./particlePreparation";
 import { ParticleSystemInstance, type EmitterProbe } from "./particleRenderer";
 import * as THREE from "three";
 import { type Vector3 as Vector3Like } from "./lighting";
@@ -41,6 +42,11 @@ export class ParticleRig {
     private weatherIntensity = DEFAULT_VIEWER_SETTINGS.weatherIntensity;
     readonly particleSystems = new Map<string, ParticleEntry>();
     /**
+     * What each distinct system of this scene was found to need, worked out once however many
+     * names it is filed under and however often it is placed (#436).
+     */
+    readonly preparations = new ParticlePreparations();
+    /**
      * Systems that have been killed but whose particles are still finishing.
      *
      * `leaveParticles` on the SYSTEM decides this, and it is what the engine does:
@@ -54,7 +60,6 @@ export class ParticleRig {
      * the same id.
      */
     private fadingParticles: ParticleSystemInstance[] = [];
-    private readonly particleTextures = new Map<string, THREE.Texture>();
     /** Textures the server has told us do not resolve. */
     private readonly missingTextures = new Set<string>();
     particlesVisible = true;
@@ -100,6 +105,7 @@ export class ParticleRig {
         // A new subject is one of the two things allowed to cut a fading system short.
         this.clearFadingParticles();
         this.transient.clear();
+        this.preparations.clear();
     }
 
     /**
@@ -371,7 +377,9 @@ export class ParticleRig {
 
     /** Hands a fetched texture to whichever emitters named it, now and after a restart. */
     setParticleTexture(name: string, texture: THREE.Texture): void {
-        this.particleTextures.set(name.toLowerCase(), texture);
+        // The same store the materials read: a name is one texture whichever kind of thing
+        // samples it, and the store is what lets it go.
+        this.context.textures.set(name, texture);
         this.missingTextures.delete(name.toLowerCase());
 
         for (const entry of this.particleSystems.values()) {
@@ -659,14 +667,22 @@ export class ParticleRig {
                 attachBoneIndex,
             );
 
+        const prepared = this.preparations.of(system);
+
         // Read once, here, rather than per spawn: the walk up the graph and the transform into the
         // attachment's space are the same answer every frame, and this runs thousands of times a
         // second on a `EveryVertex` emitter. `restartParticles` re-reads it, which is what picks up
         // a level switch that swapped the geometry underneath.
-        const source = emissionMeshFor(
-            attachment,
-            this.context.assembly.partRootOf(attachToPartId),
-        );
+        //
+        // And only for a system that is born on a mesh at all. The read copies every vertex of the
+        // geometry the bone belongs to, which on a capital ship is the hull, and an emitter that
+        // is not born on a mesh never looks at it.
+        const source = prepared.emitsFromMesh
+            ? emissionMeshFor(
+                  attachment,
+                  this.context.assembly.partRootOf(attachToPartId),
+              )
+            : null;
 
         // The model root is the space the particles are simulated in, so an effect the file does
         // not link to its emitter is genuinely left behind rather than dragged along by the bone
@@ -674,11 +690,12 @@ export class ParticleRig {
         const instance = new ParticleSystemInstance(
             id,
             system,
-            this.particleTextures,
+            this.context.textures.byName,
             1,
             source,
             this.context.modelRoot,
             scaleFactor,
+            prepared,
         );
         instance.attachTo(attachment);
         instance.setVisible(this.particlesVisible);

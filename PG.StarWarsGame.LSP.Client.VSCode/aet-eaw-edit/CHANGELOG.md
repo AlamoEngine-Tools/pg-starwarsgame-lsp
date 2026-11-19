@@ -35,6 +35,18 @@
   pressed then, resumes it when pressed while paused, and plays it again from the start once it has ended; a
   take pressed after it ended plays again too
   ([#440](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/440))
+- **A large model opens in the preview without the wait, and an edit no longer loads it again** - a model
+  and its textures reached the preview as base64 text inside a JSON reply, and the model was converted from
+  the game's format on every open and on every edit that changed the scene: on a mod's model above 100 MB
+  that was 8 to 11 seconds for a first open and 5 to 7 for each such edit. They now travel as bytes, a
+  converted model is kept in the project's `.aetswg/preview/` folder across sessions - git-ignored, and
+  models that are byte-for-byte copies of one another share one entry - and a refresh sends only what
+  changed on disk. The project's models are converted in the background once its first index is complete,
+  shown as a notification that can be cancelled; a subject opened meanwhile goes to the front of the
+  queue, and a model, a clip or a `.meg` archive written to disk is converted again. A subject no longer
+  shown releases its textures, and a particle system saved under several names is prepared once.
+  `EaWEdit: Clear Preview Cache` empties the folder
+  ([#436](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/436))
 
 ## 0.5.2
 

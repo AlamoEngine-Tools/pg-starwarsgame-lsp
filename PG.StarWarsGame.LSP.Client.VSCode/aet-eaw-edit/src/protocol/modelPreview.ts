@@ -846,17 +846,39 @@ export interface GetModelGlbParams {
      * to the skeleton it drives, and splitting them would mean rebuilding that association here.
      */
     animations?: string[];
+    /** The version of the GLB already held for this model and these clips, if one is held. */
+    have?: string;
 }
 
 export interface GetModelGlbResult {
-    /** Base64 GLB, or absent when the model did not resolve or would not parse. */
-    glb?: string | null;
+    /**
+     * Where the GLB is collected, or absent when the model did not resolve or would not parse. The
+     * bytes do not ride in this reply: the host collects them from the server's transfer pipe.
+     */
+    transfer?: PreviewTransfer | null;
     /**
      * The clips actually baked in - shorter than requested when one did not match the skeleton,
      * which is ordinary: 50 shipped animations sit beside a model they were not authored against.
      */
     animations: string[];
     error?: string | null;
+    /**
+     * What the GLB was converted from, as one token. A reply with a version, no transfer and no
+     * error says the copy asked with still stands.
+     */
+    version?: string | null;
+}
+
+/** A payload waiting on the server's transfer pipe. See `previewTransfer.ts` for the frames. */
+export interface PreviewTransfer {
+    /** What to connect to: a named pipe on Windows, a socket path elsewhere. */
+    pipe: string;
+    /** The transfer's id, 32 hex digits. Collected once. */
+    id: string;
+    /** The payload's length in bytes. */
+    length: number;
+    /** What the bytes are: `glb`. */
+    format: string;
 }
 
 // ── aet/getModelDetail ───────────────────────────────────────────────────────
@@ -1259,6 +1281,8 @@ export interface GetShaderSourceResult {
 
 export interface GetModelTextureParams {
     name: string;
+    /** The version of the copy already held, if one is held. */
+    have?: string;
 }
 
 /**
@@ -1271,7 +1295,15 @@ export interface GetModelTextureParams {
 export interface GetModelTextureResult {
     /** `dds` or `tga`, without the dot. */
     format?: string | null;
-    /** Base64 file bytes, or absent when the texture did not resolve. */
-    data?: string | null;
+    /**
+     * Where the file's bytes are collected, or absent when the texture did not resolve. As for a
+     * model, they do not ride in this reply.
+     */
+    transfer?: PreviewTransfer | null;
     error?: string | null;
+    /**
+     * A token that changes whenever the file may have. A reply with a version, no transfer and no
+     * error says the copy asked with still stands.
+     */
+    version?: string | null;
 }

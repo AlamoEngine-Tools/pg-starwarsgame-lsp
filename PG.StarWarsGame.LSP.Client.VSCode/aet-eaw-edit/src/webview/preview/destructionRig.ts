@@ -95,7 +95,7 @@ export class DestructionRig {
      */
     async addBreakoff(
         key: string,
-        glbBase64: string,
+        glb: Uint8Array,
         at: BreakoffAnchor,
         prop: PreviewBreakoffProp,
     ): Promise<void> {
@@ -117,7 +117,7 @@ export class DestructionRig {
 
         const root = await this.context.assembly.addPart(
             wreckId,
-            glbBase64,
+            glb,
             undefined,
             undefined,
             {

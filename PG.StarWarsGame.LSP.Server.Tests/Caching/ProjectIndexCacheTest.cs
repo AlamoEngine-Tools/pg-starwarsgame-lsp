@@ -251,6 +251,21 @@ public sealed class ProjectIndexCacheTest
         Assert.True(fs.File.Exists(AetswgDir + "/.gitattributes"));
     }
 
+    /// <summary>The preview cache (#436) is generated like the index caches, and ignored like them.</summary>
+    [Fact]
+    public void EnsureGitHygiene_IgnoresThePreviewCache_InANewAndInAnExistingGitignore()
+    {
+        var fresh = new MockFileSystem();
+        Build(fresh).EnsureGitHygiene(PgprojPath);
+
+        var existing = new MockFileSystem(new Dictionary<string, MockFileData>
+            { [AetswgDir + "/.gitignore"] = new("# custom\nindices/\nbones/\n") });
+        Build(existing).EnsureGitHygiene(PgprojPath);
+
+        Assert.Single(fresh.File.ReadAllText(AetswgDir + "/.gitignore").Split('\n'), l => l.Trim() == "preview/");
+        Assert.Single(existing.File.ReadAllText(AetswgDir + "/.gitignore").Split('\n'), l => l.Trim() == "preview/");
+    }
+
     [Fact]
     public void EnsureGitHygiene_GitignoreExcludes_IndicesDirectory()
     {
@@ -266,7 +281,7 @@ public sealed class ProjectIndexCacheTest
     [Fact]
     public void EnsureGitHygiene_EverythingAlreadyListed_ChangesNothing()
     {
-        var existing = "# custom\nindices/\nbones/\n";
+        var existing = "# custom\nindices/\nbones/\npreview/\n";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
             { [AetswgDir + "/.gitignore"] = new(existing) });
         var cache = Build(fs);

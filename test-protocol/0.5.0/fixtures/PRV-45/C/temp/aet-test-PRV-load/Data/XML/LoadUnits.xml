@@ -1,0 +1,13 @@
+﻿<?xml version="1.0"?>
+<LoadUnits>
+<SpaceUnit Name="Load_Unit">
+<Text_ID>TEXT_NONE</Text_ID>
+<Space_Model_Name>Prv_load.alo</Space_Model_Name>
+<Scale_Factor>1.0</Scale_Factor>
+</SpaceUnit>
+<SpaceUnit Name="Load_Twin">
+<Text_ID>TEXT_NONE</Text_ID>
+<Space_Model_Name>Prv_load_twin.alo</Space_Model_Name>
+<Scale_Factor>2.0</Scale_Factor>
+</SpaceUnit>
+</LoadUnits>

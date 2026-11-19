@@ -17,6 +17,7 @@ import {
     GetModelDetailResult,
     GetModelGlbResult,
     GetModelTextureResult,
+    PreviewTransfer,
     GetParticleSystemResult,
     GetPreviewSceneResult,
     GetProjectileResult,
@@ -30,6 +31,11 @@ import type {
     ModelPreviewToWebview,
 } from "./protocol/panels/modelPreview";
 import { handoffFile, launchDetached } from "./externalTool";
+import {
+    collectTransfer,
+    PreviewTransferError,
+    standsUnchanged,
+} from "./previewTransfer";
 import { revealDefinition } from "./revealDefinition";
 import { type SubjectState, subjectStateFrom } from "./shared/subjectState";
 import {
@@ -111,13 +117,6 @@ export class ModelPreviewPanel extends WebviewPanelHost<
      */
     private static readonly subjectStates = new Map<string, SubjectState>();
     private subject: PreviewSubject;
-    /**
-     * Textures already asked for.
-     *
-     * Every part that loads reports the whole scene's texture list, so without this a ten-part unit
-     * would request its shared hull texture ten times.
-     */
-    private readonly requestedTextures = new Set<string>();
     /**
      * The scene as last sent, serialised.
      *
@@ -236,11 +235,15 @@ export class ModelPreviewPanel extends WebviewPanelHost<
      *
      * Called on <c>aet/previewSceneChanged</c>, which the server pushes once the new index is live -
      * so this reads the edit rather than racing it. Only the notifying project's previews re-read.
+     *
+     * @param assetsChanged The server saw an asset file change on disk (`aet/previewAssetsChanged`).
+     *     The scene is then sent even when it is the one already shown: the webview asks for every
+     *     model and texture again with the version it holds, and is sent the ones that changed.
      */
-    static refreshAll(projectKey: string): void {
+    static refreshAll(projectKey: string, assetsChanged = false): void {
         for (const panel of ModelPreviewPanel.live) {
             if (panel.project.key === projectKey) {
-                void panel.sendScene(true);
+                void panel.sendScene(true, assetsChanged);
             }
         }
     }
@@ -315,7 +318,7 @@ export class ModelPreviewPanel extends WebviewPanelHost<
                 return;
 
             case "requestTexture":
-                await this.sendTexture(message.name);
+                await this.sendTexture(message.name, message.have);
                 return;
 
             case "requestParticleSystem":
@@ -450,9 +453,10 @@ export class ModelPreviewPanel extends WebviewPanelHost<
         }
     }
 
-    private async sendScene(refresh = false): Promise<void> {
-        this.requestedTextures.clear();
-
+    private async sendScene(
+        refresh = false,
+        assetsChanged = false,
+    ): Promise<void> {
         const result =
             await this.project.gateway.request<GetPreviewSceneResult>(
                 "aet/getPreviewScene",
@@ -478,8 +482,9 @@ export class ModelPreviewPanel extends WebviewPanelHost<
 
         // Nothing about THIS subject moved, so nothing is sent. The notification cannot say which
         // previews an edit touches, so every open one asks - and without this, editing any file in
-        // the workspace would throw away every part's geometry and fetch it all again.
-        if (refresh && serialised === this.lastScene) {
+        // the workspace would throw away every part's geometry and build it all again. An asset
+        // changed on disk is the exception: the scene reads the same and what it draws does not.
+        if (refresh && !assetsChanged && serialised === this.lastScene) {
             return;
         }
 
@@ -535,6 +540,8 @@ export class ModelPreviewPanel extends WebviewPanelHost<
                     this.subject.kind === "animation"
                         ? [this.subject.animationReference]
                         : (own ?? this.sceneAnimations),
+                // The version the webview holds: for the same one the server offers no bytes.
+                have: message.have,
             },
         );
 
@@ -543,10 +550,56 @@ export class ModelPreviewPanel extends WebviewPanelHost<
             partId: message.partId,
             attachToPartId: message.attachToPartId,
             attachBone: message.attachBone,
-            result: result.ok
-                ? result.value
-                : { glb: null, animations: [], error: result.message },
+            animations: result.ok ? result.value.animations : [],
+            ...(await this.payloadOf(
+                message.have,
+                result.ok ? result.value : { error: result.message },
+            )),
         });
+    }
+
+    /**
+     * What a model or texture reply comes to for the webview: the bytes, the word that its copy
+     * still stands, or why there is neither.
+     *
+     * The reply names a transfer; the bytes come over the server's pipe, never off the disk here.
+     * A pipe that drops is said in the preview like any other asset that did not load.
+     */
+    private async payloadOf(
+        have: string | undefined,
+        reply: {
+            transfer?: PreviewTransfer | null;
+            version?: string | null;
+            error?: string | null;
+        },
+    ): Promise<{
+        data: Uint8Array | null;
+        error: string | null;
+        version: string | null;
+        unchanged: boolean;
+    }> {
+        const version = reply.version ?? null;
+        let error = reply.error ?? null;
+
+        // The server says the copy stands: nothing is collected.
+        if (standsUnchanged(have, reply)) {
+            return { data: null, error: null, version, unchanged: true };
+        }
+
+        let data: Uint8Array | null = null;
+        const transfer = reply.transfer ?? null;
+        if (transfer !== null) {
+            try {
+                data = await collectTransfer(transfer);
+            } catch (failure) {
+                error =
+                    failure instanceof PreviewTransferError
+                        ? failure.message
+                        : String(failure);
+            }
+        }
+
+        return { data, error, version, unchanged: false };
     }
 
     /**
@@ -627,25 +680,31 @@ export class ModelPreviewPanel extends WebviewPanelHost<
         });
     }
 
-    private async sendTexture(name: string): Promise<void> {
-        if (name === "" || this.requestedTextures.has(name.toLowerCase())) {
+    /**
+     * One texture, or the word that the webview's copy still stands.
+     *
+     * Not deduplicated here: the webview asks for a name once per scene and says which version it
+     * holds, and the server answers a version that still stands without reading the file.
+     */
+    private async sendTexture(name: string, have?: string): Promise<void> {
+        if (name === "") {
             return;
         }
-
-        this.requestedTextures.add(name.toLowerCase());
 
         const result =
             await this.project.gateway.request<GetModelTextureResult>(
                 "aet/getModelTexture",
-                { name },
+                { name, have },
             );
 
         this.post({
             type: "texture",
             name,
-            result: result.ok
-                ? result.value
-                : { format: null, data: null, error: result.message },
+            format: result.ok ? (result.value.format ?? null) : null,
+            ...(await this.payloadOf(
+                have,
+                result.ok ? result.value : { error: result.message },
+            )),
         });
     }
 

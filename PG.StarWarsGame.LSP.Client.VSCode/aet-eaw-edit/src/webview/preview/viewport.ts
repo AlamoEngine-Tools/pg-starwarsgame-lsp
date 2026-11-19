@@ -67,6 +67,7 @@ import { CaptureRig } from "./captureRig";
 import { LevelGates } from "./levelGates";
 import { ModelQueries } from "./modelQueries";
 import { type ViewportContext } from "./viewportContext";
+import { TextureStore } from "./textureStore";
 
 export type {
     AddPartOptions,
@@ -105,6 +106,8 @@ export class PreviewViewport {
     private readonly camera: THREE.PerspectiveCamera;
     private readonly controls: OrbitControls;
     private readonly loader = new GLTFLoader();
+    /** Every decoded texture; the one place a texture is disposed. See `TextureStore`. */
+    private readonly textures = new TextureStore();
     private readonly clock = new THREE.Clock();
     /** The room and the light: lights, sky and stars, grid, floor and shadows, and the pass chain that draws a frame. See `EnvironmentRig`. */
     private readonly environment: EnvironmentRig;
@@ -219,6 +222,7 @@ export class PreviewViewport {
             modelRoot: this.modelRoot,
             scaledRoot: this.scaledRoot,
             parts: this.parts,
+            textures: this.textures,
             labelLayer,
             get modelScale() {
                 return viewport.modelScale;
@@ -381,14 +385,14 @@ export class PreviewViewport {
      */
     async addPart(
         id: string,
-        glbBase64: string,
+        glb: Uint8Array,
         attachToPartId?: string,
         attachBone?: string,
         options: AddPartOptions = {},
     ): Promise<THREE.Object3D> {
         return this.assembly.addPart(
             id,
-            glbBase64,
+            glb,
             attachToPartId,
             attachBone,
             options,
@@ -458,6 +462,15 @@ export class PreviewViewport {
     /** Applies a decoded texture wherever a material asked for it by name. */
     setTexture(name: string, texture: THREE.Texture): void {
         this.materials.setTexture(name, texture);
+    }
+
+    /**
+     * Disposes every texture the scene on screen did not ask for. See `TextureStore.retain`.
+     *
+     * @param keep Lower-cased names of the textures to keep.
+     */
+    releaseTexturesExcept(keep: ReadonlySet<string>): void {
+        this.textures.retain(keep);
     }
 
     /**
@@ -650,11 +663,11 @@ export class PreviewViewport {
     /** Drops a piece of wreckage where a hardpoint used to be. See `DestructionRig.addBreakoff`. */
     async addBreakoff(
         key: string,
-        glbBase64: string,
+        glb: Uint8Array,
         at: BreakoffAnchor,
         prop: PreviewBreakoffProp,
     ): Promise<void> {
-        return this.destruction.addBreakoff(key, glbBase64, at, prop);
+        return this.destruction.addBreakoff(key, glb, at, prop);
     }
 
     /** Clears the wreckage ONE hardpoint shed. See `DestructionRig.clearBreakoff`. */
@@ -1111,6 +1124,7 @@ export class PreviewViewport {
         window.removeEventListener("pointercancel", this.turret.onPointerUp);
         cancelAnimationFrame(this.frameHandle);
         this.clear();
+        this.textures.clear();
         this.controls.dispose();
         this.environment.dispose();
         this.renderer.dispose();

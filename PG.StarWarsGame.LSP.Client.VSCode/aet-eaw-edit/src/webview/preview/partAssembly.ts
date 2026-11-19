@@ -25,15 +25,7 @@ import { isOverlay } from "./modelBounds";
 import { setMeshDrawn } from "./meshVisibility";
 import { type AddPartOptions } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
-
-function decodeBase64(value: string): ArrayBuffer {
-    const binary = atob(value);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
+import { bufferOf } from "./payloadBytes";
 
 /** Releases GPU memory for a subtree; the renderer does not do it on removal. */
 export function disposeTree(root: THREE.Object3D): void {
@@ -94,7 +86,7 @@ export class PartAssembly {
      */
     async addPart(
         id: string,
-        glbBase64: string,
+        glb: Uint8Array,
         attachToPartId?: string,
         attachBone?: string,
         options: AddPartOptions = {},
@@ -105,10 +97,7 @@ export class PartAssembly {
         // active subject and will never speak for this one.
         const passive = subjectId !== ACTIVE_SUBJECT;
 
-        const gltf = await this.context.loader.parseAsync(
-            decodeBase64(glbBase64),
-            "",
-        );
+        const gltf = await this.context.loader.parseAsync(bufferOf(glb), "");
         const root = gltf.scene;
 
         const bones = new Map<string, THREE.Object3D>();
