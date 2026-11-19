@@ -31,6 +31,12 @@ interface RowsOptions {
      * the turret bone when absent.
      */
     skinnedTo?: number[];
+    /** The bones, by index, the model file marks invisible. */
+    boneHidden?: number[];
+    /** A model effect anchored on this bone, by index, under a name of its own. */
+    effectOn?: number;
+    /** The clips the model ships, by name, whether or not they carry a visibility track. */
+    clips?: string[];
 }
 
 /**
@@ -46,6 +52,7 @@ function rowsWith(options: RowsOptions = {}): {
     turretBone: THREE.Bone;
     unit: UnitRules;
     counting: Map<THREE.Mesh, boolean>;
+    effectDrawn: () => boolean | undefined;
 } {
     const root = new THREE.Group();
     const rootBone = new THREE.Bone();
@@ -71,6 +78,9 @@ function rowsWith(options: RowsOptions = {}): {
     };
     turretBone.add(mesh);
     const byIndex = [rootBone, turretBone, gunBone];
+    for (const index of options.boneHidden ?? []) {
+        byIndex[index].userData.alamoBoneHidden = true;
+    }
     const extra =
         options.skinnedTo === undefined
             ? new THREE.Mesh(
@@ -134,11 +144,29 @@ function rowsWith(options: RowsOptions = {}): {
     );
     unit.setRules(options.rules ?? "game");
     const counting = new Map<THREE.Mesh, boolean>();
+    let effectDrawn: boolean | undefined;
+    const particleSystems = new Map<string, unknown>();
+    if (options.effectOn !== undefined) {
+        particleSystems.set("hull#0", {
+            id: "hull#0",
+            system: { name: "pe_glow", emitters: [] },
+            origin: "model",
+            state: { shown: true, writer: "file" },
+            altVisible: true,
+            lodVisible: true,
+            attachBoneIndex: options.effectOn,
+            instance: {
+                anchorNode: byIndex[options.effectOn],
+                root: new THREE.Group(),
+                emitterIsHeat: () => [],
+            },
+        });
+    }
     const context = standInContext({
         animation: {
             active: {
                 mixer: null,
-                clips: [],
+                clips: (options.clips ?? []).map((name) => ({ name })),
                 visibility: options.visibility ?? new Map(),
                 nodeByName: new Map(),
                 restPose: new Map(),
@@ -164,9 +192,11 @@ function rowsWith(options: RowsOptions = {}): {
             },
         },
         particles: {
-            particleSystems: new Map(),
+            particleSystems,
             particlesVisible: true,
-            setParticleSystemDrawn: () => undefined,
+            setParticleSystemDrawn: (_id: string, drawn: boolean) => {
+                effectDrawn = drawn;
+            },
         },
         assembly: {
             forEachPartMesh: (visit: (mesh: THREE.Mesh) => void) => {
@@ -192,6 +222,7 @@ function rowsWith(options: RowsOptions = {}): {
         turretBone,
         unit,
         counting,
+        effectDrawn: () => effectDrawn,
     };
 }
 
@@ -288,8 +319,9 @@ describe("ModelRows", () => {
                 { fps: 15, bones: new Map([["Turret#1", "00"]]) },
             ],
         ]);
-        const model = rowsWith({ rules: "file", visibility });
-        const unit = rowsWith({ rules: "game", visibility });
+        const clips = ["Model_IDLE_00"];
+        const model = rowsWith({ rules: "file", visibility, clips });
+        const unit = rowsWith({ rules: "game", visibility, clips });
 
         model.rows.treeItems();
         unit.rows.treeItems();
@@ -522,5 +554,100 @@ describe("ModelRows", () => {
         unit.setStealthed(false);
         rows.resolveRows();
         assert.equal(counting.get(extra), true);
+    });
+
+    it("hides the parts on a bone the file hides while no clip runs, and nothing below it", () => {
+        const { rows, mesh, extra, gun, turretBone } = rowsWith({
+            rules: "file",
+            boneHidden: [1],
+        });
+
+        const items = rows.treeItems();
+
+        assert.equal(meshDrawn(mesh), false, "the bone's own mesh is drawn");
+        assert.equal(meshDrawn(extra), false, "its second mesh is drawn");
+        assert.equal(
+            meshDrawn(gun),
+            true,
+            "the mesh on the bone below is hidden",
+        );
+        assert.equal(
+            turretBone.visible,
+            true,
+            "the hidden bone prunes its subtree",
+        );
+        assert.equal(
+            items.find((item) => item.name === "Barrel")?.because,
+            "pose",
+        );
+    });
+
+    it("lets a running clip decide instead, a bone it has no track for showing its parts", () => {
+        const visibility = new Map<string, VisibilityTrack>([
+            ["Model_ATTACK_00", { fps: 15, bones: new Map() }],
+        ]);
+        const { rows, mesh } = rowsWith({
+            rules: "file",
+            boneHidden: [1],
+            visibility,
+            playing: { clip: "Model_ATTACK_00", time: 0 },
+        });
+
+        rows.treeItems();
+
+        assert.equal(meshDrawn(mesh), true);
+    });
+
+    it("applies the bone flag to a unit with no idle clip, and not to one standing in its idle", () => {
+        const without = rowsWith({ rules: "game", boneHidden: [1] });
+        without.rows.treeItems();
+        assert.equal(
+            meshDrawn(without.mesh),
+            false,
+            "a unit with no idle ignored the file",
+        );
+
+        const standing = rowsWith({
+            rules: "game",
+            boneHidden: [1],
+            visibility: new Map<string, VisibilityTrack>([
+                ["Model_IDLE_00", { fps: 15, bones: new Map() }],
+            ]),
+            clips: ["Model_IDLE_00"],
+        });
+        standing.rows.treeItems();
+        assert.equal(
+            meshDrawn(standing.mesh),
+            true,
+            "the idle a unit stands in did not decide",
+        );
+    });
+
+    it("holds back an effect on a bone the file hides while no clip runs", () => {
+        const hidden = rowsWith({
+            rules: "file",
+            boneHidden: [2],
+            effectOn: 2,
+        });
+        hidden.rows.treeItems();
+        assert.equal(hidden.effectDrawn(), false, "the effect runs");
+
+        const shown = rowsWith({ rules: "file", effectOn: 2 });
+        shown.rows.treeItems();
+        assert.equal(shown.effectDrawn(), true);
+    });
+
+    it("stands a unit in an idle clip that hides nothing, rather than in its base pose", () => {
+        // A clip that hides no bone carries no visibility track at all, so the model's clips are
+        // what say whether it has an idle - not its tracks.
+        const { rows, mesh } = rowsWith({
+            rules: "game",
+            boneHidden: [1],
+            clips: ["Model_IDLE_00"],
+        });
+
+        rows.treeItems();
+
+        assert.equal(meshDrawn(mesh), true, "the base pose decided");
     });
 });

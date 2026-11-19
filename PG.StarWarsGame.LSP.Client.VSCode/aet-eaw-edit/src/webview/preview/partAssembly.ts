@@ -15,7 +15,7 @@ import {
 } from "./loadedPart";
 import { alamoBoneName, alamoNodeName } from "./skeleton";
 import { type MaterialExtras, resolveMaterial } from "./materials";
-import { clipsSay } from "./boneVisibility";
+import { clipsSay, poseSays } from "./boneVisibility";
 import { skinVisibilityBone } from "./skinBone";
 import {
     type RowFacts,
@@ -36,22 +36,21 @@ import { type ViewportContext } from "./viewportContext";
 import { bufferOf } from "./payloadBytes";
 
 /**
- * The canonical id of the bone whose track speaks for a mesh: for a skinned mesh the bone of
- * `skinVisibilityBone`, else the nearest of the part's bone nodes above it. Undefined for a mesh on
- * no bone of the part.
+ * The bone whose track speaks for a mesh: for a skinned mesh the bone of `skinVisibilityBone`, else
+ * the nearest of the part's bone nodes above it. Undefined for a mesh on no bone of the part.
  */
 function ownBoneOf(
     mesh: THREE.Mesh,
     part: LoadedPart,
     boneNodes: ReadonlySet<THREE.Object3D>,
-): string | undefined {
+): THREE.Object3D | undefined {
     if ((mesh as THREE.SkinnedMesh).isSkinnedMesh === true) {
         return skinVisibilityBone(mesh, part.root, part.bonesByIndex.get(0));
     }
 
     for (let at = mesh.parent; at !== null; at = at.parent) {
         if (boneNodes.has(at)) {
-            return alamoNodeName(at);
+            return at;
         }
 
         if (at === part.root) {
@@ -687,7 +686,11 @@ export class PartAssembly {
             }
 
             const extras = (node.userData.alamo ?? {}) as MaterialExtras;
-            const said = clipsSay(running, ownBoneOf(node, part, boneNodes));
+            const bone = ownBoneOf(node, part, boneNodes);
+            const said =
+                bone === undefined
+                    ? undefined
+                    : clipsSay(running, alamoNodeName(bone));
             const facts: RowFacts = {
                 ...meshSwitches(
                     extras,
@@ -695,10 +698,13 @@ export class PartAssembly {
                     this.context.levels.lod,
                 ),
                 masters: [],
+                // A running clip decides; with none, the base pose, where the file's bone flag does.
                 animation:
-                    said === undefined
-                        ? undefined
-                        : { shown: said, source: "clip" },
+                    action === null
+                        ? poseSays(bone)
+                        : said === undefined
+                          ? undefined
+                          : { shown: said, source: "clip" },
             };
 
             if (resolveMaterial(extras).archetype === "shadow-volume") {

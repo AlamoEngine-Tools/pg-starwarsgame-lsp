@@ -232,7 +232,7 @@ public sealed class PreviewModelCache(
     ///     Part of every key. Raised whenever the same input would convert to a different GLB: a
     ///     change to the model or animation readers, to the exporter, or to which clips are kept.
     /// </summary>
-    public const int ConverterVersion = 1;
+    public const int ConverterVersion = 2;
 
     /// <summary>The cache directory's name under <c>.aetswg/</c>.</summary>
     public const string DirectoryName = "preview";

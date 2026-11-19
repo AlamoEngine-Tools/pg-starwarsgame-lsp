@@ -17,10 +17,10 @@ import { type MaterialExtras } from "./materials";
 import { alamoBoneName, alamoNodeName } from "./skeleton";
 
 /** What a skinned mesh follows, worked out once: its skeleton is fixed when the model loads. */
-const answered = new WeakMap<THREE.Object3D, string | undefined>();
+const answered = new WeakMap<THREE.Object3D, THREE.Object3D | undefined>();
 
 /**
- * The canonical id of the bone a skinned mesh's visibility follows, or undefined for a rigid mesh.
+ * The bone a skinned mesh's visibility follows, or undefined for a rigid mesh.
  *
  * @param partRoot The root of the part the mesh belongs to, where its sibling sub-meshes are.
  * @param rootBone The part's bone 0, for the fallback.
@@ -29,7 +29,7 @@ export function skinVisibilityBone(
     mesh: THREE.Mesh,
     partRoot: THREE.Object3D,
     rootBone: THREE.Object3D | undefined,
-): string | undefined {
+): THREE.Object3D | undefined {
     if (!(mesh as THREE.SkinnedMesh).isSkinnedMesh) {
         return undefined;
     }
@@ -47,17 +47,11 @@ export function skinVisibilityBone(
 
     // A list with no bone but the root is a case the engine reading does not record: unmeasured, so
     // it falls back to the root itself.
-    const fallback = rootBone ?? bones?.[0];
-    const id =
-        named !== undefined
-            ? alamoNodeName(named)
-            : fallback === undefined
-              ? undefined
-              : alamoNodeName(fallback);
+    const bone = named ?? rootBone ?? bones?.[0];
 
-    answered.set(mesh, id);
+    answered.set(mesh, bone);
 
-    return id;
+    return bone;
 }
 
 /**

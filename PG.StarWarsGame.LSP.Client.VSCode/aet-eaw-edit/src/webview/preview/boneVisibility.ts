@@ -18,6 +18,8 @@
 // repeated bone name unique.
 
 import { type BoneId, resolveBoneId } from "./boneIds";
+import type * as THREE from "three";
+import { type AnimationSwitch } from "./visibility";
 
 /** One clip's tracks. */
 export interface VisibilityTrack {
@@ -156,6 +158,21 @@ export function clipsSay(
     }
 
     return over ?? under;
+}
+
+/**
+ * The animation switch while NO clip runs: the model stands in its base pose, where the model file's
+ * own visible flag on the part's bone decides. Hidden for a bone the file hides; silent, which is
+ * shown, for every other one - and for every bone once a clip runs, which is the clip's to decide.
+ *
+ * Not the state switch: a file-hidden bone never stops a clip from showing its parts.
+ */
+export function poseSays(
+    bone: THREE.Object3D | undefined,
+): AnimationSwitch | undefined {
+    return bone?.userData.alamoBoneHidden === true
+        ? { shown: false, source: "pose" }
+        : undefined;
 }
 
 function record(value: unknown): Record<string, unknown> {

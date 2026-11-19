@@ -7,6 +7,15 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { skinVisibilityBone } from "./skinBone";
+import { alamoNodeName } from "./skeleton";
+
+/** The canonical id of the bone a mesh's visibility follows. */
+const followed = (
+    ...args: Parameters<typeof skinVisibilityBone>
+): string | undefined => {
+    const bone = skinVisibilityBone(...args);
+    return bone === undefined ? undefined : alamoNodeName(bone);
+};
 
 /** A bone node as the exporter names it: `<name>#<model bone index>`. */
 function bone(name: string, index: number): THREE.Bone {
@@ -46,7 +55,7 @@ describe("skinVisibilityBone", () => {
         const part = new THREE.Group();
         const first = subMesh(part, 4, 0, [root, saber, blade]);
 
-        assert.equal(skinVisibilityBone(first, part, root), "saber#1");
+        assert.equal(followed(first, part, root), "saber#1");
     });
 
     it("is the same for every sub-mesh of the mesh, whatever its own list says", () => {
@@ -54,7 +63,7 @@ describe("skinVisibilityBone", () => {
         subMesh(part, 4, 0, [root, blade, saber]);
         const second = subMesh(part, 4, 1, [hand, saber]);
 
-        assert.equal(skinVisibilityBone(second, part, root), "B_saber#2");
+        assert.equal(followed(second, part, root), "B_saber#2");
     });
 
     it("keeps to the mesh's own sub-meshes, not another mesh's", () => {
@@ -62,13 +71,13 @@ describe("skinVisibilityBone", () => {
         subMesh(part, 2, 0, [root, hand]);
         const other = subMesh(part, 4, 0, [root, saber]);
 
-        assert.equal(skinVisibilityBone(other, part, root), "saber#1");
+        assert.equal(followed(other, part, root), "saber#1");
     });
 
     it("falls back to the root when the first sub-mesh lists no other bone", () => {
         const part = new THREE.Group();
         const only = subMesh(part, 4, 0, [root]);
 
-        assert.equal(skinVisibilityBone(only, part, root), "Root#0");
+        assert.equal(followed(only, part, root), "Root#0");
     });
 });

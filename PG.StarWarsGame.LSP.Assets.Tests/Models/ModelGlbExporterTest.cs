@@ -431,6 +431,34 @@ public sealed class ModelGlbExporterTest
     }
 
     [Fact]
+    public void Export_MarksABoneTheFileHidesInItsNodeExtras()
+    {
+        // The bone's visible flag decides the parts on it while no clip runs, and glTF has no notion
+        // of a hidden node that the client could read instead.
+        var alo = Concat(
+            Skeleton(
+                Bone("ROOT", -1, true, Translation(0, 0, 0)),
+                Bone("HIDDEN", 0, false, Translation(0, 0, 0)),
+                Bone("CARD", 0, false, Translation(0, 0, 0), (int)AlamoBillboardType.ZAxisView),
+                Bone("SHOWN", 0, true, Translation(0, 0, 0))),
+            Mesh("HIDDEN", [TriangleSubMesh()]),
+            Connections([Connection(0, 1)]));
+
+        var gltf = Roundtrip(alo);
+
+        Assert.True(gltf.LogicalNodes.Single(n => n.Name == "HIDDEN#1")
+            .Extras!["alamoBoneHidden"]!.GetValue<bool>());
+
+        // Beside the billboard mode on a bone that has both, not instead of it.
+        var card = gltf.LogicalNodes.Single(n => n.Name == "CARD#2").Extras!;
+        Assert.True(card["alamoBoneHidden"]!.GetValue<bool>());
+        Assert.Equal("ZAxisView", card["alamoBillboard"]!.GetValue<string>());
+
+        // Nothing on a bone the file shows.
+        Assert.Null(gltf.LogicalNodes.Single(n => n.Name == "SHOWN#3").Extras);
+    }
+
+    [Fact]
     public void Export_CarriesTheShaderNameAndParametersInMaterialExtras()
     {
         // glTF has no equivalent of an Alamo shader binding, so the client reconstructs the material

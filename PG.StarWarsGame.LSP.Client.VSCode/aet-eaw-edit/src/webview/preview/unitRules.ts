@@ -338,4 +338,13 @@ export class UnitRules {
             ? { shown: idle, source: "idle" }
             : undefined;
     }
+
+    /**
+     * Whether the unit stands in an idle clip while nothing else plays - which is a clip RUNNING, so
+     * the file's bone flags do not apply. A unit whose model ships no idle stands in its base pose,
+     * and a model preview always opens in it.
+     */
+    standsInIdle(modelHasIdle: boolean): boolean {
+        return this.appliesGameRules() && modelHasIdle;
+    }
 }

@@ -79,7 +79,7 @@ public static class ModelGlbExporter
 
         var gltf = scene.ToGltf2();
         RestoreDroppedFaces(gltf, faces);
-        AddBillboardExtras(gltf, model);
+        AddBoneExtras(gltf, model);
         AddVisibilityExtras(gltf, model, animations ?? []);
 
         using var buffer = new MemoryStream();
@@ -139,19 +139,24 @@ public static class ModelGlbExporter
     }
 
     /// <summary>
-    ///     Records each billboarded bone's mode on its glTF node.
+    ///     Records on each bone's glTF node what glTF has no field for: its billboard mode, and that
+    ///     the file hides it.
     /// </summary>
     /// <remarks>
     ///     After <c>ToGltf2</c> rather than during the build, because <c>NodeBuilder</c> has no
     ///     extras of its own. Matching by name is exact - the <c>#index</c> suffix is what makes
     ///     these unique in the first place.
     ///     <para>
-    ///         Only the bones that actually billboard are written. Across the shipped models 22598
-    ///         of 22866 bones are <see cref="AlamoBillboardType.Disable" />, so writing the default
-    ///         would put an extras object on nearly every node of every file to say nothing.
+    ///         Only what differs from the default is written. Across the shipped models 22598 of 22866
+    ///         bones are <see cref="AlamoBillboardType.Disable" />, so writing the default would put an
+    ///         extras object on nearly every node of every file to say nothing.
+    ///     </para>
+    ///     <para>
+    ///         <c>alamoBoneHidden</c> is the bone's visible flag, false in the file: it decides the
+    ///         parts on that bone while no clip runs.
     ///     </para>
     /// </remarks>
-    private static void AddBillboardExtras(ModelRoot gltf, AlamoModelContent model)
+    private static void AddBoneExtras(ModelRoot gltf, AlamoModelContent model)
     {
         var byName = gltf.LogicalNodes
             .Where(node => !string.IsNullOrEmpty(node.Name))
@@ -161,14 +166,21 @@ public static class ModelGlbExporter
         for (var i = 0; i < model.Bones.Count; i++)
         {
             var bone = model.Bones[i];
-            if (bone.Billboard == AlamoBillboardType.Disable)
+            if (bone.Billboard == AlamoBillboardType.Disable && bone.Visible)
                 continue;
 
-            if (byName.TryGetValue($"{bone.Name}#{i}", out var node))
-                node.Extras = new JsonObject
-                {
-                    ["alamoBillboard"] = bone.Billboard.ToString()
-                };
+            if (!byName.TryGetValue($"{bone.Name}#{i}", out var node))
+                continue;
+
+            var extras = new JsonObject();
+
+            if (bone.Billboard != AlamoBillboardType.Disable)
+                extras["alamoBillboard"] = bone.Billboard.ToString();
+
+            if (!bone.Visible)
+                extras["alamoBoneHidden"] = true;
+
+            node.Extras = extras;
         }
     }
 

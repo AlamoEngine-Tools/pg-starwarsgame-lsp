@@ -49,6 +49,12 @@
   the root in its skin list, a shadow volume casts only while its own bone shows it, and a bone with no track in
   the clip is shown whatever its parent does
   ([#445](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/445))
+- **A bone the model file hides counts while no clip runs** - the preview ignored a bone's own visible flag, so
+  a model opened on its own drew parts the game keeps hidden in its base pose, an X-wing's second engine glow
+  among them. With no clip running, the parts on such a bone are now hidden; a running clip, the idle a unit
+  stands in included, decides instead. A unit whose idle clip hides nothing now stands in that idle rather
+  than in its base pose
+  ([#446](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/446))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

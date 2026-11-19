@@ -297,4 +297,71 @@ describe("PartAssembly", () => {
             "the hidden bone prunes its subtree",
         );
     });
+
+    it("hides a wreck's parts on a bone its file hides until its clip runs", () => {
+        const root = new THREE.Group();
+        const hatchBone = new THREE.Bone();
+        hatchBone.name = "Hatch#1";
+        hatchBone.userData.alamoBoneHidden = true;
+        const innerBone = new THREE.Bone();
+        innerBone.name = "Inner#2";
+        hatchBone.add(innerBone);
+        root.add(hatchBone);
+        const mesh = (name: string) => {
+            const made = new THREE.Mesh(
+                new THREE.BufferGeometry(),
+                new THREE.MeshBasicMaterial(),
+            );
+            made.userData.alamo = { alamoMesh: name };
+            return made;
+        };
+        const hatch = mesh("Hatch");
+        hatchBone.add(hatch);
+        const inner = mesh("Inner");
+        innerBone.add(inner);
+        const wreck: LoadedPart = {
+            id: "wreck:2",
+            root,
+            bones: new Map(),
+            bonesByIndex: new Map([
+                [1, hatchBone],
+                [2, innerBone],
+            ]),
+            subjectId: "wreck:2",
+        };
+        let action: unknown = null;
+        const assembly = new PartAssembly(
+            standInContext({
+                levels: { alt: 0, lod: 0 },
+                parts: new Map([["wreck:2", wreck]]),
+                animation: {
+                    subjectAnimation: () => ({
+                        action,
+                        visibility: new Map([
+                            ["x_die_00", { fps: 30, bones: new Map() }],
+                        ]),
+                    }),
+                },
+                environment: {
+                    shadowVolumes: { setCounting: () => undefined },
+                },
+            }),
+        );
+
+        assembly.applyOwnFileVisibility(wreck);
+        assert.equal(
+            meshDrawn(hatch),
+            false,
+            "the file-hidden bone's mesh is drawn",
+        );
+        assert.equal(meshDrawn(inner), true, "the mesh below it is hidden");
+
+        action = { getClip: () => ({ name: "x_die_00" }), time: 0 };
+        assembly.applyOwnFileVisibility(wreck);
+        assert.equal(
+            meshDrawn(hatch),
+            true,
+            "a clip with no track for it hid it",
+        );
+    });
 });

@@ -118,7 +118,9 @@ export type AnimationSource =
     /** The clip being played. */
     | "clip"
     /** The idle a unit stands in while nothing else plays - see `UnitRules.idle`. */
-    | "idle";
+    | "idle"
+    /** The model file's bone flag, while no clip runs - see `poseSays`. */
+    | "pose";
 
 /** The animation switch, when something speaks for the part's own bone. */
 export interface AnimationSwitch {
@@ -171,8 +173,8 @@ export interface RowFacts {
  *
  * The typed half of `because`. `master` and `ancestor` speak for something ABOVE the row, which the
  * tree's eye cannot change; `you` is the reader; the rest name the switch: `archetype` for geometry
- * that is no surface, `file` and `rules` for the state switch by its last writer, `animation` and
- * `idle` for the animation switch by its source, `alt` and `lod` for the two levels.
+ * that is no surface, `file` and `rules` for the state switch by its last writer, `animation`,
+ * `idle` and `pose` for the animation switch by its source, `alt` and `lod` for the two levels.
  */
 export type VisibilityLink =
     | "master"
@@ -183,6 +185,7 @@ export type VisibilityLink =
     | "rules"
     | "animation"
     | "idle"
+    | "pose"
     | "alt"
     | "lod";
 
@@ -301,7 +304,7 @@ function hidingSwitch(facts: RowFacts): VisibilityLink | undefined {
 }
 
 function animationLink(animation: AnimationSwitch): VisibilityLink {
-    return animation.source === "clip" ? "animation" : "idle";
+    return animation.source === "clip" ? "animation" : animation.source;
 }
 
 /**
@@ -508,6 +511,8 @@ export function becauseText(because: string): string {
             return l10n.t("Set by the idle animation");
         case "animation":
             return l10n.t("Set by the animation playing");
+        case "pose":
+            return l10n.t("Bone hidden in the model file");
         case "alt":
             return l10n.t("Not in this damage level");
         case "lod":

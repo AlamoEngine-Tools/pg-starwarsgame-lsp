@@ -7,7 +7,7 @@
 
 import * as THREE from "three";
 import { type BoneId } from "./boneIds";
-import { type VisibilityTrack, clipsSay, trackSays } from "./boneVisibility";
+import { clipsSay, poseSays, trackSays } from "./boneVisibility";
 import {
     type RowOverride,
     type Resolution,
@@ -93,10 +93,10 @@ export class ModelRows {
      */
     private readonly skinSpeakers = new WeakMap<
         THREE.Mesh,
-        BoneId | undefined
+        THREE.Object3D | undefined
     >();
     /** The clip map {@link restingClipName} last answered for, and its answer. */
-    private restingClipFor: Map<string, VisibilityTrack> | null = null;
+    private restingClipFor: readonly THREE.AnimationClip[] | null = null;
     private restingClipCached: string | undefined;
     /** Each row's parent, so a hidden ancestor can veto without walking the scene graph. */
     readonly rowParents = new Map<string, string | null>();
@@ -771,9 +771,6 @@ export class ModelRows {
                     : undefined,
         };
 
-        // What the idle clip a unit stands in says about this row - see `UnitRules.idle`.
-        let idle: boolean | undefined;
-
         if (target.mesh !== undefined) {
             const extras = (target.mesh.userData.alamo ?? {}) as MaterialExtras;
             const switches = meshSwitches(
@@ -798,44 +795,61 @@ export class ModelRows {
         }
 
         // The bone whose track is this row's animation switch - see `speakingBone`.
-        const id = this.speakingBone(target);
+        const node = this.speakingBone(target);
+        const id = node === undefined ? undefined : alamoNodeName(node);
 
-        if (id !== undefined) {
+        if (this.context.animation.active.action !== null) {
+            // A clip runs, and it alone decides: a bone it has no track for is visible, whatever
+            // the file says about that bone.
             const clip = this.animatedVisibilityOf(id);
             facts.animation =
                 clip === undefined
                     ? undefined
                     : { shown: clip, source: "clip" };
-
-            // Only when nothing is playing, which is what a resting pose MEANS and what the method
-            // above it has always claimed. Computed unconditionally, the idle's opinion reached the
-            // chain from below whenever the playing clip happened to be silent about a bone - so a
-            // clip that shows a part the idle hides lost to the idle. Yoda's hilt is that: his
-            // `attack_00` shows `b_hilt` and his `idle_00` hides it, and the hilt stayed away.
-            idle =
-                this.context.animation.active.action === null
-                    ? this.restingVisibilityOf(id)
-                    : undefined;
+        } else if (
+            this.context.rules.standsInIdle(
+                this.restingClipName() !== undefined,
+            )
+        ) {
+            // A unit with an idle clip stands in it, so that clip is running - read at its first
+            // frame. Only when nothing else plays: a clip that shows a part the idle hides must not
+            // lose to the idle. Yoda's hilt is that: his `attack_00` shows `b_hilt` and his
+            // `idle_00` hides it.
+            facts.animation = this.context.rules.idle(
+                this.restingVisibilityOf(id),
+            );
+        } else {
+            // Nothing runs: the model stands in its base pose, where the file's own bone flag decides
+            // the parts on that bone. A model file opened on its own always opens here.
+            //
+            // An effect row not merged with its bone takes the bone it is anchored on here. While a
+            // clip runs, that effect's emission follows the clip's track in the particle layer.
+            facts.animation = poseSays(
+                node ??
+                    (target.particleId === undefined ||
+                    target.ownerBone === undefined
+                        ? undefined
+                        : this.context.assembly
+                              .hull()
+                              ?.bonesByIndex.get(target.ownerBone)),
+            );
         }
-
-        facts.animation ??= this.context.rules.idle(idle);
 
         return facts;
     }
 
     /**
-     * The canonical id of the bone whose track is a row's animation switch.
+     * The bone whose track is a row's animation switch.
      *
-     * The row's own bone; for a rigid mesh the bone it rides; for a SKINNED mesh the first bone it is
-     * skinned to, which is what the game measures - not the bones further down its skin, and not the
-     * bone the tree files it under. An effect row that is not merged with its bone has none here: its
-     * emission follows its own bone's track in the particle layer.
+     * The row's own bone; for a rigid mesh the bone it rides; for a SKINNED mesh the bone of
+     * `skinVisibilityBone`, not the bone the tree files it under. An effect row that is not merged
+     * with its bone has none here: its emission follows its own bone's track in the particle layer.
      *
-     * Deliberately NOT a bone's `visible`: that reads the scene node this chain WRITES. The canonical
-     * id off the NODE, never the display name the tree shows - two bones can share a name; only the
-     * id separates them, see `boneIds.ts`.
+     * Deliberately NOT a bone's `visible`: that is what this chain WRITES. Tracks are keyed by the
+     * canonical id off the NODE, never the display name the tree shows - two bones can share a name;
+     * only the id separates them, see `boneIds.ts`.
      */
-    private speakingBone(target: RowTarget): BoneId | undefined {
+    private speakingBone(target: RowTarget): THREE.Object3D | undefined {
         const skin =
             target.mesh === undefined ? [] : this.skinBonesOf(target.mesh);
         const bone =
@@ -845,7 +859,7 @@ export class ModelRows {
                 : undefined);
 
         if (bone !== undefined) {
-            return this.context.assembly.hull()?.bonesByIndex.get(bone)?.name;
+            return this.context.assembly.hull()?.bonesByIndex.get(bone);
         }
 
         if (target.mesh === undefined || skin.length === 0) {
@@ -859,7 +873,7 @@ export class ModelRows {
         // The part the mesh belongs to: its sub-meshes are siblings there, and a mesh index means
         // nothing across two model files.
         const part = this.partOf(target.mesh);
-        const id =
+        const node =
             part === undefined
                 ? undefined
                 : skinVisibilityBone(
@@ -868,9 +882,9 @@ export class ModelRows {
                       part.bonesByIndex.get(0),
                   );
 
-        this.skinSpeakers.set(target.mesh, id);
+        this.skinSpeakers.set(target.mesh, node);
 
-        return id;
+        return node;
     }
 
     /** The loaded part whose root is nearest above `node`. */
@@ -949,9 +963,8 @@ export class ModelRows {
     /**
      * What the model's idle clip says about a bone when NOTHING is playing.
      *
-     * Read at frame zero: this is a resting pose, not a performance. A model with no idle clip, or
-     * an idle that says nothing about this bone, gets undefined and falls back to the file - the
-     * rule the user set.
+     * Read at frame zero: this is a resting pose, not a performance. Undefined for a model with no
+     * idle clip, or an idle with no track for this bone - which, the idle running, is visible.
      */
     private restingVisibilityOf(id: BoneId | undefined): boolean | undefined {
         const clip = this.restingClipName();
@@ -970,14 +983,19 @@ export class ModelRows {
      *
      * It was copied, sorted and searched on every call - and this is asked once per bone row
      * per frame, now once per skin bone of every skinned mesh as well. The answer cannot
-     * change while the subject's clips do not, so it is memoised against the map it reads.
+     * change while the subject's clips do not, so it is memoised against the list it reads.
+     *
+     * From the CLIPS, not the visibility tracks: a clip that hides no bone carries no track at all,
+     * and an idle like that is still the clip a unit stands in.
      */
     private restingClipName(): string | undefined {
-        const clips = this.context.animation.active.visibility;
+        const clips = this.context.animation.active.clips;
 
         if (this.restingClipFor !== clips) {
             this.restingClipFor = clips;
-            this.restingClipCached = restingClip([...clips.keys()]);
+            this.restingClipCached = restingClip(
+                clips.map((clip) => clip.name),
+            );
         }
 
         return this.restingClipCached;
