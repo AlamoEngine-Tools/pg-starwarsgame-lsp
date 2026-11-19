@@ -37,6 +37,13 @@
 
 import * as l10n from "@vscode/l10n";
 
+import {
+    type MaterialExtras,
+    isVisibleAtAlt,
+    isVisibleAtLod,
+    resolveMaterial,
+} from "./materials";
+
 /** The reader's word on one row. Absent means they have not said anything about it. */
 export type RowOverride = "shown" | "hidden";
 
@@ -69,6 +76,26 @@ export function fileState(shown: boolean): StateSwitch {
 /** A rule of the game writing the state switch, over whatever was written before. */
 export function ruleState(shown: boolean): StateSwitch {
     return { shown, writer: "rules" };
+}
+
+/**
+ * A mesh's own switches as its model file sets them: the state its hidden flag writes, the damage
+ * and detail level it is tagged for, and whether it is a surface at all.
+ *
+ * One answer for every mesh the preview draws - the rows of the subject and the parts of a death
+ * clone or a wreck alike - so the two cannot read the file differently.
+ */
+export function meshSwitches(
+    extras: MaterialExtras,
+    alt: number,
+    lod: number,
+): Pick<RowFacts, "state" | "alt" | "lod" | "nonVisual"> {
+    return {
+        state: fileState(extras.alamoHidden !== true),
+        alt: isVisibleAtAlt(extras, alt),
+        lod: isVisibleAtLod(extras, lod),
+        nonVisual: resolveMaterial(extras).hidden,
+    };
 }
 
 /**
@@ -287,6 +314,23 @@ function animationLink(animation: AnimationSwitch): VisibilityLink {
  */
 export function subtreeHiddenByReader(facts: RowFacts): boolean {
     return facts.ancestorHidden !== undefined || facts.override === "hidden";
+}
+
+/**
+ * Whether a shadow volume casts: its own switches as the model leaves them.
+ *
+ * A volume is never drawn as a surface, so the archetype that keeps it off screen says nothing
+ * about whether it casts; the reader's tick on its row puts it on screen to look at, and says nothing
+ * either. What casts is the part the game would draw: a volume whose bone a clip hides, or whose
+ * level or state is off, casts nothing.
+ */
+export function castsShadow(facts: RowFacts): boolean {
+    return resolveRow({
+        ...facts,
+        nonVisual: false,
+        override: undefined,
+        ancestorHidden: undefined,
+    }).visible;
 }
 
 /**

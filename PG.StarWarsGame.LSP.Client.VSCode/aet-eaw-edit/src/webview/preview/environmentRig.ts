@@ -34,7 +34,6 @@ import { type BoundingSphere } from "./framing";
 import {
     type MaterialExtras,
     resolveMaterial,
-    isVisibleAt,
     castsShadowMap,
 } from "./materials";
 import { HEAT_LAYER } from "./particleRenderer";
@@ -910,22 +909,9 @@ export class EnvironmentRig {
         this.shadowVolumes.setEnabled(this.shadowVolumesEnabled);
         this.placeKeyLight();
 
-        // Which ALT's volume is the live one, before anything is counted.
-        for (const mesh of found) {
-            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-            // The cloak as well as the level, so a model that finds its volumes while already
-            // stealthed does not start out casting. Same pair as `applyMeshVisibility`.
-            this.shadowVolumes.setCounting(
-                mesh,
-                !this.context.rules.isStealthed() &&
-                    isVisibleAt(
-                        extras,
-                        this.context.levels.alt,
-                        this.context.levels.lod,
-                    ),
-            );
-        }
+        // Which volumes count is not decided here: each casts by its own switches, written by the
+        // rows of the subject and by a passive subject's own sweep - see `castsShadow`. The part
+        // that brought these runs both before it is drawn.
 
         // The model can only be known to have a volume AFTER one is found, and the materials were
         // built before that - so the casting decision has to be taken again over everything.

@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
+import { meshDrawn } from "./meshVisibility";
 import { PartAssembly } from "./partAssembly";
 import { standInContext } from "./viewportContext.testing";
 
@@ -207,5 +208,93 @@ describe("PartAssembly", () => {
         assert.equal(assembly.hasPart("wreck:1"), false);
         assert.equal(assembly.hiddenParts.size, 0);
         assert.deepEqual(assembly.unresolvedAttachments(), []);
+    });
+
+    it("draws a death clone's parts by their own switches, never hiding what is below a hidden bone", () => {
+        // A clone of two bones, Hatch and Inner below it: Hatch carries a mesh, Inner carries a mesh
+        // and a plate the file hides. The clip hides Hatch and shows Inner.
+        const root = new THREE.Group();
+        const hatchBone = new THREE.Bone();
+        hatchBone.name = "Hatch#1";
+        const innerBone = new THREE.Bone();
+        innerBone.name = "Inner#2";
+        hatchBone.add(innerBone);
+        root.add(hatchBone);
+        const mesh = (name: string, extras: Record<string, unknown>) => {
+            const made = new THREE.Mesh(
+                new THREE.BufferGeometry(),
+                new THREE.MeshBasicMaterial(),
+            );
+            made.name = name;
+            made.userData.alamo = { alamoMesh: name, ...extras };
+            return made;
+        };
+        const hatch = mesh("Hatch", {});
+        hatchBone.add(hatch);
+        const inner = mesh("Inner", {});
+        innerBone.add(inner);
+        const plate = mesh("Plate", { alamoHidden: true });
+        innerBone.add(plate);
+        const clone: LoadedPart = {
+            id: "deathclone:X",
+            root,
+            bones: new Map([
+                ["hatch", hatchBone],
+                ["inner", innerBone],
+            ]),
+            bonesByIndex: new Map([
+                [1, hatchBone],
+                [2, innerBone],
+            ]),
+            subjectId: "deathclone:X",
+        };
+        const assembly = new PartAssembly(
+            standInContext({
+                levels: { alt: 0, lod: 0 },
+                parts: new Map([["deathclone:X", clone]]),
+                animation: {
+                    subjectAnimation: () => ({
+                        action: {
+                            getClip: () => ({ name: "x_die_00" }),
+                            time: 0,
+                        },
+                        visibility: new Map([
+                            [
+                                "x_die_00",
+                                {
+                                    fps: 30,
+                                    bones: new Map([
+                                        ["Hatch#1", "0"],
+                                        ["Inner#2", "1"],
+                                    ]),
+                                },
+                            ],
+                        ]),
+                    }),
+                },
+                environment: {
+                    shadowVolumes: { setCounting: () => undefined },
+                },
+            }),
+        );
+
+        assembly.applyOwnFileVisibility(clone);
+
+        assert.equal(
+            meshDrawn(hatch),
+            false,
+            "the hidden bone's mesh is drawn",
+        );
+        assert.equal(meshDrawn(inner), true, "the mesh below it is hidden");
+        assert.equal(
+            meshDrawn(plate),
+            false,
+            "the clip showed a file-hidden plate",
+        );
+        assert.equal(
+            hatchBone.visible,
+            true,
+            "the hidden bone prunes its subtree",
+        );
     });
 });

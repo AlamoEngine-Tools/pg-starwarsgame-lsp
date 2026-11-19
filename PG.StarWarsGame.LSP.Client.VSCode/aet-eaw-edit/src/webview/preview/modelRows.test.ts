@@ -26,6 +26,11 @@ interface RowsOptions {
     visibility?: Map<string, VisibilityTrack>;
     /** The clip playing, by name, at this many seconds; nothing plays when absent. */
     playing?: { clip: string; time: number };
+    /**
+     * The bones the second mesh is skinned to, by index, in the order of its skin; it is rigid on
+     * the turret bone when absent.
+     */
+    skinnedTo?: number[];
 }
 
 /**
@@ -40,6 +45,7 @@ function rowsWith(options: RowsOptions = {}): {
     gun: THREE.Mesh;
     turretBone: THREE.Bone;
     unit: UnitRules;
+    counting: Map<THREE.Mesh, boolean>;
 } {
     const root = new THREE.Group();
     const rootBone = new THREE.Bone();
@@ -64,17 +70,32 @@ function rowsWith(options: RowsOptions = {}): {
         alamoShader: "MeshGloss.fx",
     };
     turretBone.add(mesh);
-    const extra = new THREE.Mesh(
-        new THREE.BufferGeometry(),
-        new THREE.MeshStandardMaterial(),
-    );
+    const byIndex = [rootBone, turretBone, gunBone];
+    const extra =
+        options.skinnedTo === undefined
+            ? new THREE.Mesh(
+                  new THREE.BufferGeometry(),
+                  new THREE.MeshStandardMaterial(),
+              )
+            : new THREE.SkinnedMesh(
+                  new THREE.BufferGeometry(),
+                  new THREE.MeshStandardMaterial(),
+              );
     extra.name = "Barrel";
     extra.userData.aetTreeKey = "barrel";
     extra.userData.alamo = options.barrel ?? {
         alamoMesh: "Barrel",
         alamoShader: "MeshGloss.fx",
     };
-    turretBone.add(extra);
+    if (extra instanceof THREE.SkinnedMesh) {
+        // A skinned mesh hangs at the part root, not under a bone.
+        extra.skeleton = new THREE.Skeleton(
+            (options.skinnedTo ?? []).map((index) => byIndex[index]),
+        );
+        root.add(extra);
+    } else {
+        turretBone.add(extra);
+    }
     const gun = new THREE.Mesh(
         new THREE.BufferGeometry(),
         new THREE.MeshStandardMaterial(),
@@ -112,6 +133,7 @@ function rowsWith(options: RowsOptions = {}): {
         }),
     );
     unit.setRules(options.rules ?? "game");
+    const counting = new Map<THREE.Mesh, boolean>();
     const context = standInContext({
         animation: {
             active: {
@@ -127,7 +149,6 @@ function rowsWith(options: RowsOptions = {}): {
                               getClip: () => ({ name: options.playing!.clip }),
                               time: options.playing.time,
                           },
-                fileHidden: new Set(),
             },
         },
         levels: {
@@ -135,6 +156,13 @@ function rowsWith(options: RowsOptions = {}): {
             lod: 0,
         },
         rules: unit,
+        parts: new Map([["hull", hull]]),
+        environment: {
+            shadowVolumes: {
+                setCounting: (source: THREE.Mesh, on: boolean) =>
+                    counting.set(source, on),
+            },
+        },
         particles: {
             particleSystems: new Map(),
             particlesVisible: true,
@@ -156,7 +184,15 @@ function rowsWith(options: RowsOptions = {}): {
             ],
         },
     });
-    return { rows: new ModelRows(context), mesh, extra, gun, turretBone, unit };
+    return {
+        rows: new ModelRows(context),
+        mesh,
+        extra,
+        gun,
+        turretBone,
+        unit,
+        counting,
+    };
 }
 
 describe("ModelRows", () => {
@@ -365,5 +401,114 @@ describe("ModelRows", () => {
         assert.equal(meshDrawn(mesh), false, "the bone's own mesh is drawn");
         assert.equal(meshDrawn(extra), false, "its second mesh is drawn");
         assert.equal(meshDrawn(gun), false, "the mesh below it is drawn");
+    });
+
+    it("lets a skinned mesh follow the first bone it is skinned to, and only that one", () => {
+        const track = (bits: Record<string, string>) =>
+            new Map<string, VisibilityTrack>([
+                [
+                    "Model_DIE_00",
+                    { fps: 15, bones: new Map(Object.entries(bits)) },
+                ],
+            ]);
+        const playing = { clip: "Model_DIE_00", time: 0 };
+
+        const first = rowsWith({
+            skinnedTo: [1, 2],
+            visibility: track({ "Turret#1": "0" }),
+            playing,
+        });
+        first.rows.treeItems();
+        assert.equal(
+            meshDrawn(first.extra),
+            false,
+            "its first bone hid nothing",
+        );
+
+        const second = rowsWith({
+            skinnedTo: [2, 1],
+            visibility: track({ "Turret#1": "0" }),
+            playing,
+        });
+        second.rows.treeItems();
+        assert.equal(meshDrawn(second.extra), true, "a later bone hid it");
+    });
+
+    it("skips the root at the head of a skin list, so a skinned mesh follows the next bone", () => {
+        const track = (bits: Record<string, string>) =>
+            new Map<string, VisibilityTrack>([
+                [
+                    "Model_DIE_00",
+                    { fps: 15, bones: new Map(Object.entries(bits)) },
+                ],
+            ]);
+        const playing = { clip: "Model_DIE_00", time: 0 };
+
+        const next = rowsWith({
+            skinnedTo: [0, 1],
+            visibility: track({ "Turret#1": "0" }),
+            playing,
+        });
+        next.rows.treeItems();
+        assert.equal(
+            meshDrawn(next.extra),
+            false,
+            "hiding the next bone hid nothing",
+        );
+
+        const root = rowsWith({
+            skinnedTo: [0, 1],
+            visibility: track({ "Root#0": "0" }),
+            playing,
+        });
+        root.rows.treeItems();
+        assert.equal(meshDrawn(root.extra), true, "hiding the root hid it");
+    });
+
+    it("counts a shadow volume only while its own switches show it", () => {
+        const visibility = new Map<string, VisibilityTrack>([
+            ["Model_DIE_00", { fps: 15, bones: new Map([["Turret#1", "01"]]) }],
+        ]);
+        const { rows, extra, counting } = rowsWith({
+            barrel: {
+                alamoMesh: "Barrel_Shadow",
+                alamoShader: "MeshShadowVolume.fx",
+            },
+            visibility,
+            playing: { clip: "Model_DIE_00", time: 0 },
+        });
+
+        rows.treeItems();
+
+        assert.equal(
+            meshDrawn(extra),
+            false,
+            "a shadow volume is drawn as a mesh",
+        );
+        assert.equal(
+            counting.get(extra),
+            false,
+            "a hidden bone's volume casts",
+        );
+    });
+
+    it("stops a shadow volume counting while the unit is cloaked, and counts it again after", () => {
+        const { rows, extra, counting, unit } = rowsWith({
+            barrel: {
+                alamoMesh: "Barrel_Shadow",
+                alamoShader: "MeshShadowVolume.fx",
+            },
+        });
+
+        rows.treeItems();
+        assert.equal(counting.get(extra), true);
+
+        unit.setStealthed(true);
+        rows.resolveRows();
+        assert.equal(counting.get(extra), false);
+
+        unit.setStealthed(false);
+        rows.resolveRows();
+        assert.equal(counting.get(extra), true);
     });
 });

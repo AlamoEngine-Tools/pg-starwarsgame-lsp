@@ -10,31 +10,13 @@ import { type SubjectAnimation } from "./subjectAnimation";
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import { deathClip } from "./visibility";
 import * as THREE from "three";
-import { hiddenAt, visibilityTracks } from "./boneVisibility";
-import { type MaterialExtras, resolveMaterial } from "./materials";
+import { visibilityTracks } from "./boneVisibility";
 import { alamoNodeName } from "./skeleton";
 import { type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { type ViewportContext } from "./viewportContext";
 
 /** Scratch for the bone-palette maths, so a per-frame loop allocates nothing. */
 const SKIN_WORK = new THREE.Matrix4();
-
-/** Every mesh a model's own materials say is not drawn - collision hulls, shadow volumes. */
-function hiddenMeshes(root: THREE.Object3D): Set<THREE.Object3D> {
-    const hidden = new Set<THREE.Object3D>();
-
-    root.traverse((node) => {
-        if (
-            node instanceof THREE.Mesh &&
-            resolveMaterial((node.userData.alamo ?? {}) as MaterialExtras)
-                .hidden
-        ) {
-            hidden.add(node);
-        }
-    });
-
-    return hidden;
-}
 
 export class AnimationRig {
     /** Reused per frame so building the bone palette does not allocate on every draw. */
@@ -89,13 +71,6 @@ export class AnimationRig {
             }
         });
 
-        // What its own file says is not drawn - a collision hull, a shadow volume. Held so a clip
-        // can never bring one back: a shadow volume is not geometry that happens to be switched off
-        // this frame.
-        for (const mesh of hiddenMeshes(root)) {
-            subject.fileHidden.add(mesh);
-        }
-
         if (gltf.animations.length > 0) {
             // Rooted at the first of this subject's parts to bring clips. A clip binds to nodes BY
             // NAME from the root it was given, so a mixer rooted anywhere else drives the wrong
@@ -117,7 +92,6 @@ export class AnimationRig {
 
         for (const node of nodes) {
             subject.restPose.delete(node);
-            subject.fileHidden.delete(node);
 
             // Only where THIS node is the one holding the name. `nodeByName` is first-wins, so one
             // part of a subject must not take another part's entry with it.
@@ -424,11 +398,9 @@ export class AnimationRig {
      *
      * The active subject is not here: its mixer is ticked by the loop and its visibility goes
      * through the ROW CHAIN, which is the thing that describes the model being previewed. A passive
-     * subject has no rows, so its track is applied to its own nodes directly - safe now that
-     * `nodeByName` is the subject's own rather than a scene-wide map the hull had filled.
-     *
-     * A mesh the FILE hides is never brought back by the clip: a shadow volume is not geometry that
-     * happens to be switched off this frame.
+     * subject has no rows, so each of its meshes is drawn by its own switches on every frame - see
+     * `PartAssembly.applyOwnFileVisibility`. No bone node is hidden, so a bone the clip hides takes
+     * nothing below it with it, and a mesh the file hides is never brought back by the clip.
      */
     advancePassiveSubjects(dt: number): void {
         for (const [subjectId, subject] of this.subjects) {
@@ -445,21 +417,10 @@ export class AnimationRig {
             const action = subject.action;
             const track = subject.visibility.get(action.getClip().name);
 
-            if (track !== undefined) {
-                // Every bone the track names, proxies included: a proxy carries only the marker
-                // mesh the file already hides, and no effect is attached to it to be taken with it.
-                // Emission is what the clip decides for a proxy (`applyEmitterGating`); what is
-                // already in the air keeps drawing, exactly as it does in the engine.
-                //
-                // Through the subject's own name map rather than a traversal of its whole root:
-                // this runs every frame, and a capital ship's wreck is a hundred nodes.
-                for (const [name, bits] of track.bones) {
-                    const node = subject.nodeByName.get(name);
-
-                    if (node !== undefined && !subject.fileHidden.has(node)) {
-                        node.visible = !hiddenAt(bits, track.fps, action.time);
-                    }
-                }
+            // Emission is what the clip decides for a proxy (`applyEmitterGating`, below); what is
+            // already in the air keeps drawing, exactly as it does in the engine.
+            for (const part of this.context.assembly.partsOf(subjectId)) {
+                this.context.assembly.applyOwnFileVisibility(part);
             }
 
             // The same gate the active subject gets, on this subject's own clip. Without it the
@@ -538,7 +499,6 @@ export class AnimationRig {
             nodeByName: new Map(),
             restPose: new Map(),
             action: null,
-            fileHidden: new Set(),
         };
 
         this.subjects.set(subjectId, made);

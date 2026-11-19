@@ -381,13 +381,10 @@ export class MaterialBinder {
 
         mesh.userData.alamo = extras;
 
-        // `meshVisible`, not `!spec.hidden`: that is the single authority, and it also weighs the
-        // current ALT/LOD and whether a damage decal has been blown open. Setting visibility from
-        // the material spec alone was harmless while this only ran at load time, and became a real
-        // bug once the shader toggle started rebuilding materials - it re-showed every mesh the
-        // level gating had hidden, including the collision and shadow hulls, and nothing put them
-        // back because toggling again simply re-ran the same wrong assignment.
-        this.context.levels.applyMeshVisibility(mesh);
+        // Nothing about WHETHER the mesh is drawn, or whether a shadow volume casts: both belong to
+        // the row chain and a passive subject's own sweep. Setting visibility from the material spec
+        // here re-showed every mesh the levels had hidden each time the shader toggle rebuilt the
+        // materials, collision and shadow hulls included.
 
         // Only SOLID geometry casts. A collision hull and a shadow volume are overlays and would
         // throw a second silhouette over the model; an additive glow or an alpha-blended girder has

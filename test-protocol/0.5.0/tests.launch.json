@@ -562,6 +562,9 @@
   "PRV-46": {
     "open": "C:\\temp\\aet-test-PRV-damage"
   },
+  "PRV-47": {
+    "open": "{repo}\\eaw"
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   }

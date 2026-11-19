@@ -14,7 +14,15 @@ import {
     type LoadedPart,
 } from "./loadedPart";
 import { alamoBoneName, alamoNodeName } from "./skeleton";
-import { type MaterialExtras, resolveMaterial, isVisibleAt } from "./materials";
+import { type MaterialExtras, resolveMaterial } from "./materials";
+import { clipsSay } from "./boneVisibility";
+import { skinVisibilityBone } from "./skinBone";
+import {
+    type RowFacts,
+    castsShadow,
+    meshSwitches,
+    resolveRow,
+} from "./visibility";
 import {
     splitGeometryFromBone,
     cancelRootCorrection,
@@ -26,6 +34,33 @@ import { setMeshDrawn } from "./meshVisibility";
 import { type AddPartOptions } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
 import { bufferOf } from "./payloadBytes";
+
+/**
+ * The canonical id of the bone whose track speaks for a mesh: for a skinned mesh the bone of
+ * `skinVisibilityBone`, else the nearest of the part's bone nodes above it. Undefined for a mesh on
+ * no bone of the part.
+ */
+function ownBoneOf(
+    mesh: THREE.Mesh,
+    part: LoadedPart,
+    boneNodes: ReadonlySet<THREE.Object3D>,
+): string | undefined {
+    if ((mesh as THREE.SkinnedMesh).isSkinnedMesh === true) {
+        return skinVisibilityBone(mesh, part.root, part.bonesByIndex.get(0));
+    }
+
+    for (let at = mesh.parent; at !== null; at = at.parent) {
+        if (boneNodes.has(at)) {
+            return alamoNodeName(at);
+        }
+
+        if (at === part.root) {
+            break;
+        }
+    }
+
+    return undefined;
+}
 
 /** Releases GPU memory for a subtree; the renderer does not do it on removal. */
 export function disposeTree(root: THREE.Object3D): void {
@@ -222,7 +257,7 @@ export class PartAssembly {
         // replaces did not - see `stampTreeKeys`.
         stampTreeKeys(root, bonesByIndex, id);
 
-        this.context.parts.set(id, {
+        const part: LoadedPart = {
             id,
             root,
             bones,
@@ -230,14 +265,15 @@ export class PartAssembly {
             subjectId,
             attached:
                 attachToPartId !== undefined || options.pose !== undefined,
-        });
+        };
+        this.context.parts.set(id, part);
 
         // Its own file's word, because the row chain will never speak for it - see
         // `LoadedPart.subjectId`. Debris needs exactly this too: outside the chain, nothing else
         // hides its collision hull and its shadow volume, and it dropped showing both. Applied
         // again on every level change, from `applyLevels`.
         if (passive) {
-            this.applyOwnFileVisibility(subjectId, root);
+            this.applyOwnFileVisibility(part);
 
             // The host answers a texture name ONCE, and a wreck is the same ship - so every map it
             // needs was already sent for the hull and its own request comes back silent.
@@ -609,32 +645,40 @@ export class PartAssembly {
     }
 
     /**
-     * Draws a passive subject's geometry by its OWN file's rules, at the current levels.
+     * Draws a passive subject's geometry by its OWN file's rules, at the current levels and frame.
      *
      * The row chain speaks only for the ACTIVE subject, so this is the whole of what decides
      * whether a wreck's mesh is on screen. It runs when the geometry loads AND whenever the levels
-     * change: applied once and never again, a death clone kept whatever detail level happened to be
-     * set at the moment it arrived, and moving the control afterwards left it behind. Measured over
-     * the shipped tree that is one ship - the Broadside Class Cruiser, whose clone carries a `_LOD1`
-     * mesh and whose hull declares the levels that make the control live - but the engine plainly
-     * supports it and a mod authoring an ALT-tagged wreck is exactly who would be confused.
+     * change, and on every frame of the subject's own clip: applied once and never again, a death
+     * clone kept whatever detail level happened to be set at the moment it arrived, and moving the
+     * control afterwards left it behind. Measured over the shipped tree that is one ship - the
+     * Broadside Class Cruiser, whose clone carries a `_LOD1` mesh and whose hull declares the levels
+     * that make the control live - but the engine plainly supports it and a mod authoring an
+     * ALT-tagged wreck is exactly who would be confused.
+     *
+     * Each mesh by the same four switches as the subject's rows - `meshSwitches` and `resolveRow` -
+     * with its animation switch from the track of its OWN bone in the running clip, or of the first
+     * bone it is skinned to. No bone node is hidden, so nothing below a bone the clip hides goes with
+     * it; and a mesh the file hides is never shown by a clip.
      *
      * Through {@link setMeshDrawn}, never `visible`: a mesh node is very often a bone node too, and
      * `visible` prunes the whole subtree under it. See `meshVisibility.ts`.
-     *
-     * A node the RUNNING CLIP names is left alone. The clip is the model's own word about this
-     * frame and it sits above the level gate, which is the same precedence `resolveRow` gives the
-     * active subject.
      */
-    applyOwnFileVisibility(subjectId: string, root: THREE.Object3D): void {
-        const subject = this.context.animation.subjectAnimation(subjectId);
+    applyOwnFileVisibility(part: LoadedPart): void {
+        const subject = this.context.animation.subjectAnimation(part.subjectId);
         const action = subject.action;
-        const track =
+        const running =
             action === null
-                ? undefined
-                : subject.visibility.get(action.getClip().name);
+                ? []
+                : [
+                      {
+                          track: subject.visibility.get(action.getClip().name),
+                          seconds: action.time,
+                      },
+                  ];
+        const boneNodes = new Set<THREE.Object3D>(part.bonesByIndex.values());
 
-        root.traverse((node) => {
+        part.root.traverse((node) => {
             if (
                 !(node instanceof THREE.Mesh) ||
                 node.userData.aetShadowVolume === true
@@ -642,21 +686,29 @@ export class PartAssembly {
                 return;
             }
 
-            if (track?.bones.has(alamoNodeName(node)) === true) {
-                return;
+            const extras = (node.userData.alamo ?? {}) as MaterialExtras;
+            const said = clipsSay(running, ownBoneOf(node, part, boneNodes));
+            const facts: RowFacts = {
+                ...meshSwitches(
+                    extras,
+                    this.context.levels.alt,
+                    this.context.levels.lod,
+                ),
+                masters: [],
+                animation:
+                    said === undefined
+                        ? undefined
+                        : { shown: said, source: "clip" },
+            };
+
+            if (resolveMaterial(extras).archetype === "shadow-volume") {
+                this.context.environment.shadowVolumes.setCounting(
+                    node,
+                    castsShadow(facts),
+                );
             }
 
-            const extras = (node.userData.alamo ?? {}) as MaterialExtras;
-
-            setMeshDrawn(
-                node,
-                !resolveMaterial(extras).hidden &&
-                    isVisibleAt(
-                        extras,
-                        this.context.levels.alt,
-                        this.context.levels.lod,
-                    ),
-            );
+            setMeshDrawn(node, resolveRow(facts).visible);
         });
     }
 

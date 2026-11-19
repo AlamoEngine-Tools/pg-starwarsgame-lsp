@@ -34,7 +34,6 @@ function binderWith(): { materials: MaterialBinder; modelRoot: THREE.Group } {
                 throw new Error("no frame is drawn here");
             },
         },
-        levels: { applyMeshVisibility: () => undefined },
         assembly: { forEachDrawnMesh: eachMesh, forEachPartMesh: eachMesh },
     });
     return { materials: new MaterialBinder(context), modelRoot };

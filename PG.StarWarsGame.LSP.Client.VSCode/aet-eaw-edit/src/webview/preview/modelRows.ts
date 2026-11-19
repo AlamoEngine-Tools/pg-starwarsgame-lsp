@@ -6,15 +6,17 @@
 // the reader's show and hide overrides. It reads the parts, the skeleton and the particle systems; nothing else.
 
 import * as THREE from "three";
-import { type BoneId, resolveBoneId } from "./boneIds";
-import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
+import { type BoneId } from "./boneIds";
+import { type VisibilityTrack, clipsSay, trackSays } from "./boneVisibility";
 import {
     type RowOverride,
     type Resolution,
     type OverrideChange,
     resolveRow,
     type RowFacts,
+    castsShadow,
     fileState,
+    meshSwitches,
     subtreeHiddenByReader,
     restingClip,
 } from "./visibility";
@@ -31,8 +33,6 @@ import {
     isVisibleAt,
     isShieldMesh,
     isStealthMesh,
-    isVisibleAtAlt,
-    isVisibleAtLod,
 } from "./materials";
 import { listedInModelTree } from "./particleScene";
 import { meshDrawn, setMeshDrawn } from "./meshVisibility";
@@ -40,8 +40,9 @@ import { treeKeyOf } from "./boneNodes";
 import { type Inspection } from "./inspector";
 import { billboardTypeOf } from "./billboards";
 import { type AbilityOwnership } from "./abilityRows";
-import { skinHiddenByClip } from "./skinVisibility";
 import { type ParticleEntry } from "./particleEntry";
+import { type LoadedPart } from "./loadedPart";
+import { skinVisibilityBone } from "./skinBone";
 import { triangleCount } from "./modelBounds";
 import { type ViewportContext } from "./viewportContext";
 
@@ -86,6 +87,14 @@ export class ModelRows {
      * cleared by hand and must not be the thing that keeps a discarded model alive.
      */
     private readonly skinBoneIds = new WeakMap<THREE.Mesh, readonly BoneId[]>();
+    /**
+     * The bone each skinned mesh's visibility follows - see `skinVisibilityBone`. Weak and worked
+     * out once, like {@link skinBoneIds}: asked on every frame of a playing clip, fixed at load.
+     */
+    private readonly skinSpeakers = new WeakMap<
+        THREE.Mesh,
+        BoneId | undefined
+    >();
     /** The clip map {@link restingClipName} last answered for, and its answer. */
     private restingClipFor: Map<string, VisibilityTrack> | null = null;
     private restingClipCached: string | undefined;
@@ -686,6 +695,21 @@ export class ModelRows {
             resolutions.set(rowId, answer);
             meshAnswers.set(rowId, resolveRow(facts));
             readerHidden.set(rowId, subtreeHiddenByReader(facts));
+
+            // A shadow volume is never drawn, but it casts by the same switches as any part - see
+            // `castsShadow`. The rows are the one writer of that for the subject; a passive
+            // subject's volumes are its own file's - see `PartAssembly.applyOwnFileVisibility`.
+            if (
+                target.mesh !== undefined &&
+                resolveMaterial(
+                    (target.mesh.userData.alamo ?? {}) as MaterialExtras,
+                ).archetype === "shadow-volume"
+            ) {
+                this.context.environment.shadowVolumes.setCounting(
+                    target.mesh,
+                    castsShadow(facts),
+                );
+            }
         }
 
         this.rowResolutions = resolutions;
@@ -752,68 +776,31 @@ export class ModelRows {
 
         if (target.mesh !== undefined) {
             const extras = (target.mesh.userData.alamo ?? {}) as MaterialExtras;
+            const switches = meshSwitches(
+                extras,
+                this.context.levels.alt,
+                this.context.levels.lod,
+            );
 
-            facts.nonVisual = resolveMaterial(extras).hidden;
-            facts.alt = isVisibleAtAlt(extras, this.context.levels.alt);
-            facts.lod = isVisibleAtLod(extras, this.context.levels.lod);
+            Object.assign(facts, switches);
 
             // The state switch: the file writes it from its hidden flag, and in a unit preview the
             // game's rules write over it - the shield, the stealth shell, the collision hulls, the
-            // damage decals, a hardpoint's Damage_Particles bone. See `UnitRules.meshState`.
+            // damage decals, a hardpoint's bones. See `UnitRules.meshState`. A skinned mesh sits on
+            // the model's root for the rules that name a bone, whatever it is skinned to.
             facts.state = this.context.rules.meshState(
-                fileState(extras.alamoHidden !== true),
+                switches.state,
                 extras,
-                target.boneIndex ?? target.ownerBone,
+                this.skinBonesOf(target.mesh).length > 0
+                    ? this.rootBoneIndex()
+                    : (target.boneIndex ?? target.ownerBone),
             );
-
-            // A SKINNED mesh rides no bone, so every track below missed it - see `skinVisibility`.
-            // Only ever a hide, and only ever ONE of the two questions.
-            //
-            // Asking both cost Yoda his blade during every attack. The rule is a hide-or-silence,
-            // so a clip that SHOWS the bones leaves `animation` undefined - and the idle's answer,
-            // computed beside it, then hid the mesh from below. `attack_00` shows the saber bones
-            // and `idle_00` hides them, so the resting pose was overruling the clip on screen.
-            //
-            // A resting pose is what the unit does when nothing is playing. If something is
-            // playing, that clip is the only one entitled to speak.
-            const skin = this.skinBonesOf(target.mesh);
-
-            if (skin.length > 0) {
-                const playing = this.context.animation.active.action !== null;
-                const asked = skinHiddenByClip(
-                    skin,
-                    playing
-                        ? (id) => this.animatedVisibilityOf(id)
-                        : (id) => this.restingVisibilityOf(id),
-                );
-
-                if (asked === true) {
-                    if (playing) {
-                        facts.animation = { shown: false, source: "clip" };
-                    } else {
-                        idle = false;
-                    }
-                }
-            }
         }
 
-        // The bone whose track is this row's animation switch: the row's own bone, or the bone a
-        // rigid mesh rides. A skinned mesh rides none and was answered above.
-        const bone =
-            target.boneIndex ??
-            (target.mesh !== undefined &&
-            this.skinBonesOf(target.mesh).length === 0
-                ? target.ownerBone
-                : undefined);
+        // The bone whose track is this row's animation switch - see `speakingBone`.
+        const id = this.speakingBone(target);
 
-        if (bone !== undefined) {
-            // Deliberately NOT the bone's `visible`: that reads the scene node this chain WRITES.
-            // The canonical id off the NODE, never the display name the tree shows. Two bones can
-            // share a name; only the id separates them - see `boneIds.ts`.
-            const id = this.context.assembly
-                .hull()
-                ?.bonesByIndex.get(bone)?.name;
-
+        if (id !== undefined) {
             const clip = this.animatedVisibilityOf(id);
             facts.animation =
                 clip === undefined
@@ -834,6 +821,86 @@ export class ModelRows {
         facts.animation ??= this.context.rules.idle(idle);
 
         return facts;
+    }
+
+    /**
+     * The canonical id of the bone whose track is a row's animation switch.
+     *
+     * The row's own bone; for a rigid mesh the bone it rides; for a SKINNED mesh the first bone it is
+     * skinned to, which is what the game measures - not the bones further down its skin, and not the
+     * bone the tree files it under. An effect row that is not merged with its bone has none here: its
+     * emission follows its own bone's track in the particle layer.
+     *
+     * Deliberately NOT a bone's `visible`: that reads the scene node this chain WRITES. The canonical
+     * id off the NODE, never the display name the tree shows - two bones can share a name; only the
+     * id separates them, see `boneIds.ts`.
+     */
+    private speakingBone(target: RowTarget): BoneId | undefined {
+        const skin =
+            target.mesh === undefined ? [] : this.skinBonesOf(target.mesh);
+        const bone =
+            target.boneIndex ??
+            (target.mesh !== undefined && skin.length === 0
+                ? target.ownerBone
+                : undefined);
+
+        if (bone !== undefined) {
+            return this.context.assembly.hull()?.bonesByIndex.get(bone)?.name;
+        }
+
+        if (target.mesh === undefined || skin.length === 0) {
+            return undefined;
+        }
+
+        if (this.skinSpeakers.has(target.mesh)) {
+            return this.skinSpeakers.get(target.mesh);
+        }
+
+        // The part the mesh belongs to: its sub-meshes are siblings there, and a mesh index means
+        // nothing across two model files.
+        const part = this.partOf(target.mesh);
+        const id =
+            part === undefined
+                ? undefined
+                : skinVisibilityBone(
+                      target.mesh,
+                      part.root,
+                      part.bonesByIndex.get(0),
+                  );
+
+        this.skinSpeakers.set(target.mesh, id);
+
+        return id;
+    }
+
+    /** The loaded part whose root is nearest above `node`. */
+    private partOf(node: THREE.Object3D): LoadedPart | undefined {
+        const byRoot = new Map(
+            [...this.context.parts.values()].map((part) => [part.root, part]),
+        );
+
+        for (
+            let at: THREE.Object3D | null = node;
+            at !== null;
+            at = at.parent
+        ) {
+            const part = byRoot.get(at);
+
+            if (part !== undefined) {
+                return part;
+            }
+        }
+
+        return undefined;
+    }
+
+    /** The hull's root bone: its lowest index. */
+    private rootBoneIndex(): number | undefined {
+        const indices = [
+            ...(this.context.assembly.hull()?.bonesByIndex.keys() ?? []),
+        ];
+
+        return indices.length === 0 ? undefined : Math.min(...indices);
     }
 
     /**
@@ -889,7 +956,13 @@ export class ModelRows {
     private restingVisibilityOf(id: BoneId | undefined): boolean | undefined {
         const clip = this.restingClipName();
 
-        return clip === undefined ? undefined : this.trackedAt(clip, id, 0);
+        return clip === undefined
+            ? undefined
+            : trackSays(
+                  this.context.animation.active.visibility.get(clip),
+                  id,
+                  0,
+              );
     }
 
     /**
@@ -911,18 +984,26 @@ export class ModelRows {
     }
 
     /**
-     * What a playing clip says about a bone on this frame, or undefined when it says nothing.
+     * What the clips running say about a bone on this frame, or undefined when none says anything.
      *
      * Undefined is NOT false: a clip that never mentions a bone is not asking for it to be hidden,
      * and treating silence as a hide is how an animation came to blink meshes out.
      */
     private animatedVisibilityOf(id: BoneId | undefined): boolean | undefined {
-        return this.context.animation.active.action === null
+        const action = this.context.animation.active.action;
+
+        return action === null
             ? undefined
-            : this.trackedAt(
-                  this.context.animation.active.action.getClip().name,
+            : clipsSay(
+                  [
+                      {
+                          track: this.context.animation.active.visibility.get(
+                              action.getClip().name,
+                          ),
+                          seconds: action.time,
+                      },
+                  ],
                   id,
-                  this.context.animation.active.action.time,
               );
     }
 
@@ -951,35 +1032,6 @@ export class ModelRows {
         this.skinBoneIds.set(mesh, ids);
 
         return ids;
-    }
-
-    /**
-     * What one clip's visibility track says about a bone at a moment, or undefined when it is
-     * silent about it.
-     *
-     * One lookup for both the playing clip and the resting one, so the two cannot drift apart -
-     * which is exactly how this broke before. The track is keyed by CANONICAL ID, and so is the
-     * question; `resolveBoneId` is the fallback for a track written against a bare name.
-     */
-    private trackedAt(
-        clip: string,
-        id: BoneId | undefined,
-        seconds: number,
-    ): boolean | undefined {
-        const track = this.context.animation.active.visibility.get(clip);
-
-        if (id === undefined || track === undefined) {
-            return undefined;
-        }
-
-        const key = track.bones.has(id)
-            ? id
-            : resolveBoneId(track.bones.keys(), id);
-        const bits = key === undefined ? undefined : track.bones.get(key);
-
-        return bits === undefined
-            ? undefined
-            : !hiddenAt(bits, track.fps, seconds);
     }
 
     /**

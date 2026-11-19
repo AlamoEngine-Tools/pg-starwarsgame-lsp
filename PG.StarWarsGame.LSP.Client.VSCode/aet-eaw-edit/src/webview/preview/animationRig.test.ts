@@ -162,14 +162,12 @@ describe("AnimationRig", () => {
         const subject = animation.subjectAnimation("wreck:1");
         assert.ok(subject.restPose.has(bone));
         assert.equal(subject.nodeByName.get("Hatch#2"), bone);
-        assert.ok(subject.fileHidden.has(hull));
         assert.deepEqual(subject.clips, [clip]);
         assert.notEqual(subject.mixer, null);
 
         animation.unregisterPart("wreck:1", [bone, hull]);
         assert.equal(subject.restPose.has(bone), false);
         assert.equal(subject.nodeByName.has("Hatch#2"), false);
-        assert.equal(subject.fileHidden.has(hull), false);
 
         animation.forgetSubject("wreck:1");
         assert.notEqual(animation.subjectAnimation("wreck:1"), subject);

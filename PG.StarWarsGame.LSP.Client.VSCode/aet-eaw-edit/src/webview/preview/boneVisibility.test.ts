@@ -4,7 +4,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { hiddenAt, visibilityTracks } from "./boneVisibility";
+import {
+    type VisibilityTrack,
+    clipsSay,
+    hiddenAt,
+    trackSays,
+    visibilityTracks,
+} from "./boneVisibility";
 
 describe("visibilityTracks", () => {
     const json = {
@@ -176,5 +182,87 @@ describe("the node names a track is keyed by", () => {
 
         assert.equal(tracks.get("attack")?.bones.get("Flash#0"), "1000");
         assert.equal(tracks.get("attack")?.bones.get("Flash#1"), "0001");
+    });
+});
+
+describe("trackSays", () => {
+    const track: VisibilityTrack = {
+        fps: 10,
+        bones: new Map([["Hatch#4", "1100"]]),
+    };
+
+    it("says what a clip's track for one bone says at a moment", () => {
+        assert.equal(trackSays(track, "Hatch#4", 0), true);
+        assert.equal(trackSays(track, "Hatch#4", 0.25), false);
+    });
+
+    it("is silent about a bone the clip has no track for", () => {
+        assert.equal(trackSays(track, "Root#0", 0), undefined);
+        assert.equal(trackSays(undefined, "Hatch#4", 0), undefined);
+    });
+
+    it("finds the track of a bone asked for by its bare name", () => {
+        assert.equal(trackSays(track, "Hatch", 0.25), false);
+    });
+});
+
+describe("clipsSay", () => {
+    const shows: VisibilityTrack = { fps: 10, bones: new Map([["A#1", "1"]]) };
+    const hides: VisibilityTrack = { fps: 10, bones: new Map([["A#1", "0"]]) };
+    const silent: VisibilityTrack = { fps: 10, bones: new Map() };
+
+    it("is the one clip's word when one clip runs", () => {
+        assert.equal(clipsSay([{ track: hides, seconds: 0 }], "A#1"), false);
+        assert.equal(
+            clipsSay([{ track: silent, seconds: 0 }], "A#1"),
+            undefined,
+        );
+        assert.equal(clipsSay([], "A#1"), undefined);
+    });
+
+    it("shows a part if either of two blended clips shows it", () => {
+        assert.equal(
+            clipsSay(
+                [
+                    { track: hides, seconds: 0 },
+                    { track: shows, seconds: 0 },
+                ],
+                "A#1",
+            ),
+            true,
+        );
+        assert.equal(
+            clipsSay(
+                [
+                    { track: hides, seconds: 0 },
+                    { track: hides, seconds: 0 },
+                ],
+                "A#1",
+            ),
+            false,
+        );
+    });
+
+    it("lets an overlay override the clips under it where it speaks, and only there", () => {
+        assert.equal(
+            clipsSay(
+                [
+                    { track: shows, seconds: 0 },
+                    { track: hides, seconds: 0, overlay: true },
+                ],
+                "A#1",
+            ),
+            false,
+        );
+        assert.equal(
+            clipsSay(
+                [
+                    { track: hides, seconds: 0 },
+                    { track: silent, seconds: 0, overlay: true },
+                ],
+                "A#1",
+            ),
+            false,
+        );
     });
 });

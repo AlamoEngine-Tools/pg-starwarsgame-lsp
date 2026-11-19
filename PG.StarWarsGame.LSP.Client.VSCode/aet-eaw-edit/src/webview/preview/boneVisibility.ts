@@ -17,6 +17,8 @@
 // One character per frame. Keys are glTF node names, which carry the `#index` suffix that makes a
 // repeated bone name unique.
 
+import { type BoneId, resolveBoneId } from "./boneIds";
+
 /** One clip's tracks. */
 export interface VisibilityTrack {
     fps: number;
@@ -90,6 +92,70 @@ export function hiddenAt(bits: string, fps: number, seconds: number): boolean {
     );
 
     return bits[frame] !== "1";
+}
+
+/**
+ * What one clip's visibility track says about one bone at a moment: true for shown, false for
+ * hidden, undefined when the clip has no track for that bone.
+ *
+ * The track is keyed by CANONICAL id, and so is the question; `resolveBoneId` is the fallback for a
+ * bone asked for by its bare name. A bone the clip has no track for is SILENT, which is not hidden:
+ * while the clip runs, nothing hides that bone's parts.
+ */
+export function trackSays(
+    track: VisibilityTrack | undefined,
+    id: BoneId | undefined,
+    seconds: number,
+): boolean | undefined {
+    if (id === undefined || track === undefined) {
+        return undefined;
+    }
+
+    const key = track.bones.has(id)
+        ? id
+        : resolveBoneId(track.bones.keys(), id);
+    const bits = key === undefined ? undefined : track.bones.get(key);
+
+    return bits === undefined ? undefined : !hiddenAt(bits, track.fps, seconds);
+}
+
+/** One clip running on a model, at its own playhead. */
+export interface RunningClip {
+    track: VisibilityTrack | undefined;
+    seconds: number;
+    /** An overlay plays over the clips under it rather than blending with them. */
+    overlay?: boolean;
+}
+
+/**
+ * What every clip running on a model says about one bone together.
+ *
+ * Measured in the game: two blended clips show a part if either shows it, and an overlay clip
+ * overrides the clips under it wherever it has a track. Undefined when no running clip speaks for
+ * the bone. The preview runs one clip at a time today, so the list has one entry.
+ */
+export function clipsSay(
+    running: readonly RunningClip[],
+    id: BoneId | undefined,
+): boolean | undefined {
+    let under: boolean | undefined;
+    let over: boolean | undefined;
+
+    for (const clip of running) {
+        const said = trackSays(clip.track, id, clip.seconds);
+
+        if (said === undefined) {
+            continue;
+        }
+
+        if (clip.overlay === true) {
+            over = said;
+        } else {
+            under = (under ?? false) || said;
+        }
+    }
+
+    return over ?? under;
 }
 
 function record(value: unknown): Record<string, unknown> {

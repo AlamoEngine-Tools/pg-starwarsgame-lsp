@@ -58,6 +58,4 @@ export interface SubjectAnimation {
     >;
     /** The clip running on this subject right now. */
     action: THREE.AnimationAction | null;
-    /** Meshes the FILE hides. A clip never brings one of these back. */
-    fileHidden: Set<THREE.Object3D>;
 }

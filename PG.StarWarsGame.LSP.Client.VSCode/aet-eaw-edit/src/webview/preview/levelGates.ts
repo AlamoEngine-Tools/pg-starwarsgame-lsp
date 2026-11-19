@@ -7,7 +7,6 @@
 
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import * as THREE from "three";
-import { type MaterialExtras, resolveMaterial, isVisibleAt } from "./materials";
 import { meshDrawn } from "./meshVisibility";
 import { type ViewportContext } from "./viewportContext";
 
@@ -60,53 +59,16 @@ export class LevelGates {
             this.altDescending,
         );
 
-        // And what the stencil pass counts, which follows the level and the cloak rather than the
-        // reader. It was set at LOAD and by the pass's own setup and nowhere else, so a cloak
-        // engaged after the model was standing left all eight volumes casting - a shadow on the
-        // ground under a ship that is not being drawn. An ALT change had the same hole.
-        this.context.assembly.forEachPartMesh((mesh) =>
-            this.applyMeshVisibility(mesh),
-        );
-
         // A passive subject has no rows, so `refreshRows` below will never speak for it. Its own
-        // file's rules are re-applied instead - the same sweep that ran when it loaded.
+        // file's rules are re-applied instead - the same sweep that ran when it loaded. Both write
+        // what the stencil pass counts as well, by each volume's own switches - see `castsShadow`.
         for (const part of this.context.parts.values()) {
             if (part.subjectId !== ACTIVE_SUBJECT) {
-                this.context.assembly.applyOwnFileVisibility(
-                    part.subjectId,
-                    part.root,
-                );
+                this.context.assembly.applyOwnFileVisibility(part);
             }
         }
 
         this.context.rows.refreshRows();
-    }
-
-    /**
-     * Applies BOTH halves of a sub-mesh's visibility: whether it is drawn, and - for a shadow
-     * volume - whether it is counted.
-     *
-     * The two are separate questions with the same answer source. A shadow volume is never drawn,
-     * so the drawn half always says no, while the level gating that decides which ALT's volume is
-     * the live one still has to reach the stencil pass. Splitting them across two sweeps is what
-     * let ALT1's volume mark a model showing ALT0.
-     */
-    applyMeshVisibility(mesh: THREE.Mesh): void {
-        // NOT the drawn state - that belongs to the row chain, which is the only writer. This keeps
-        // the shadow-volume counting in step, which follows the LEVEL rather than the reader.
-
-        const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-        if (resolveMaterial(extras).archetype === "shadow-volume") {
-            // A cloaked unit casts nothing. The volume is never DRAWN either way, so this is the
-            // only place the cloak can reach it - and a stencil shadow lying on the ground under an
-            // invisible ship is exactly the "something else is still shown" the swap rules out.
-            this.context.environment.shadowVolumes.setCounting(
-                mesh,
-                !this.context.rules.isStealthed() &&
-                    isVisibleAt(extras, this.alt, this.lod),
-            );
-        }
     }
 
     /**
