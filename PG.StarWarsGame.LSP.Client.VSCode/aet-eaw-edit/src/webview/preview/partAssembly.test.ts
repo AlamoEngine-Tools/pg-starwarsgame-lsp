@@ -103,6 +103,36 @@ describe("PartAssembly", () => {
         assert.equal(assembly.hasPart("wreck:1"), true);
     });
 
+    it("knows the hull when an attached hardpoint model landed before it", () => {
+        const hullRoot = new THREE.Group();
+        const turretRoot = new THREE.Group();
+        const turret: LoadedPart = {
+            id: "hp:HP_Gun",
+            root: turretRoot,
+            bones: new Map(),
+            bonesByIndex: new Map(),
+            subjectId: ACTIVE_SUBJECT,
+            attached: true,
+        };
+        const hull: LoadedPart = {
+            id: "hull",
+            root: hullRoot,
+            bones: new Map(),
+            bonesByIndex: new Map(),
+            subjectId: ACTIVE_SUBJECT,
+        };
+        const assembly = new PartAssembly(
+            standInContext({
+                parts: new Map([
+                    ["hp:HP_Gun", turret],
+                    ["hull", hull],
+                ]),
+            }),
+        );
+
+        assert.equal(assembly.hull(), hull);
+    });
+
     it("attaches to a bone by index, to the part root without a bone, and to the model without a part", () => {
         const { assembly, modelRoot, hull } = assemblyWith();
         const turret = hull.bonesByIndex.get(1)!;

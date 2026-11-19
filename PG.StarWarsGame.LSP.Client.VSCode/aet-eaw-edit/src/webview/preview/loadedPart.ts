@@ -26,6 +26,14 @@ export interface LoadedPart {
      * solid geometry.
      */
     subjectId: string;
+    /**
+     * Whether the part hangs on another part's bone - a hardpoint's `Model_To_Attach` - or was placed
+     * at another part's pose, rather than being its subject's own root. Absent means it is not.
+     *
+     * What tells a subject's hull from the models attached to it. Load order cannot: a small turret
+     * model can land before the hull it hangs on.
+     */
+    attached?: boolean;
 }
 
 /**

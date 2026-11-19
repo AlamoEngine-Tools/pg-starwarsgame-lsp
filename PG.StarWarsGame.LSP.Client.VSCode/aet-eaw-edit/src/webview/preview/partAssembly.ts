@@ -228,6 +228,8 @@ export class PartAssembly {
             bones,
             bonesByIndex,
             subjectId,
+            attached:
+                attachToPartId !== undefined || options.pose !== undefined,
         });
 
         // Its own file's word, because the row chain will never speak for it - see
@@ -570,21 +572,33 @@ export class PartAssembly {
      * Everything that describes "the model" - the tree, the stats, the skeleton, the row chain, the
      * bone labels, the camera bindings - asks for this one. It used to be the first part in the
      * scene, full stop, which was the hull only by the luck of load order; now it is the first part
-     * OF THE SUBJECT, and a wreck or a clone arriving cannot be mistaken for it.
+     * OF THE SUBJECT that hangs on no other part, so neither a wreck or a clone arriving nor a turret
+     * model landing before its hull can be mistaken for it.
      */
     hull(): LoadedPart | null {
         return this.rootPartOf(ACTIVE_SUBJECT);
     }
 
-    /** The first-loaded part of one subject - its hull. */
+    /**
+     * One subject's hull: its first-loaded part that hangs on no other part, else its first-loaded
+     * part.
+     */
     private rootPartOf(subjectId: string): LoadedPart | null {
+        let first: LoadedPart | null = null;
+
         for (const part of this.context.parts.values()) {
-            if (part.subjectId === subjectId) {
+            if (part.subjectId !== subjectId) {
+                continue;
+            }
+
+            if (part.attached !== true) {
                 return part;
             }
+
+            first ??= part;
         }
 
-        return null;
+        return first;
     }
 
     /** Every part belonging to one subject. */
