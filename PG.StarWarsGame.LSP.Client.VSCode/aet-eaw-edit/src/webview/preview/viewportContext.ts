@@ -22,6 +22,7 @@ import { type PartAssembly } from "./partAssembly";
 import { type ParticleRig } from "./particleRig";
 import { type TurretRig } from "./turretRig";
 import { type TextureStore } from "./textureStore";
+import { type UnitRules } from "./unitRules";
 
 /**
  * A layer as the other layers see it: every field read-only, and the collections they read too.
@@ -62,6 +63,8 @@ export interface ViewportContext {
     /** The subject's `Scale_Factor`, or 1: what everything parented under `scaledRoot` that must stay a world length divides by. */
     readonly modelScale: number;
     readonly levels: LayerView<LevelGates>;
+    /** The game's rules over the model file's answer, in a unit preview only. */
+    readonly rules: LayerView<UnitRules>;
     readonly queries: LayerView<ModelQueries>;
     readonly assembly: LayerView<PartAssembly, "hiddenParts">;
     readonly animation: LayerView<AnimationRig, "subjects">;

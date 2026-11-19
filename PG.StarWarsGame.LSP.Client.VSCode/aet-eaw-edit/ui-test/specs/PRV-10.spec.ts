@@ -51,8 +51,9 @@ describe("PRV-10", () => {
     it("hides the haze behind the hull in the heat buffer", async () => {
         await openInPreview(model("Nv_sandspeeder.alo"));
         await inNewestWebview(async () => {
-            // The haze's proxy does not run as the model opens (measured: its system emits nothing); its
-            // eye in the model tree switches it on, as a reader would.
+            // The haze's proxy runs as the model opens, since a model file opened directly shows every
+            // effect it marks visible (#452); its eye in the model tree is set on as well, so the check
+            // does not hang on that rule.
             await browser.waitUntil(
                 async () =>
                     browser.execute(() => {

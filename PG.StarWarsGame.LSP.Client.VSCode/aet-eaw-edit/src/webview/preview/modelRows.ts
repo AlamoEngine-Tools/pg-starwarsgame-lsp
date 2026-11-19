@@ -15,7 +15,6 @@ import {
     resolveRow,
     subtreeFacts,
     type RowFacts,
-    damageMeshFacts,
     effectFacts as effectRowFacts,
     restingClip,
 } from "./visibility";
@@ -756,62 +755,33 @@ export class ModelRows {
                     : undefined,
         };
 
+        // What the idle clip a unit stands in says about this row - see `UnitRules.idleFacts`.
+        let idle: boolean | undefined;
+
         if (target.mesh !== undefined) {
             const extras = (target.mesh.userData.alamo ?? {}) as MaterialExtras;
 
-            const spec = resolveMaterial(extras);
-
-            // The shield is the one archetype an ABILITY can talk the model into drawing, so its
-            // `alamoHidden` is not final - and it has to be exempted in BOTH links, because the
-            // level check reads the same flag. Exempting one alone changed nothing.
-            // By the MESH, not the archetype: the shield shader is the engine glow's too on some
-            // models, and archetype alone lit the engines with the ability.
-            const shield = isShieldMesh(extras);
-
-            // The stealth shell and the hull are one switch with two positions. The shell ships
-            // VISIBLE, so `alamoHidden` says nothing about it and the cloak has to say everything:
-            // off, the shell is not drawn; on, the shell is drawn and NOTHING else is.
-            //
-            // The level gate is left alone for it, unlike the shield's - `Ui_tyber` and
-            // `Ui_urai_fen` ship `Stealth_LOD0/1/2`, and a shell exempted from LOD would draw all
-            // three at once.
-            const stealth = isStealthMesh(extras);
-
-            facts.inFile = shield
-                ? this.context.levels.shieldRevealed
-                : stealth
-                  ? this.context.levels.stealthed
-                  : extras.alamoHidden !== true;
-
-            facts.gated =
-                spec.hidden ||
-                !(shield
-                    ? isVisibleAtLevel(
-                          extras,
-                          this.context.levels.alt,
-                          this.context.levels.lod,
-                      )
-                    : isVisibleAt(
-                          extras,
-                          this.context.levels.alt,
-                          this.context.levels.lod,
-                      )) ||
-                this.collisionGatedOff(extras) ||
-                (this.context.levels.stealthed && !stealth);
-
-            // A damage decal's bottom of the chain is the DAMAGE RULE, not the file - see
-            // `damageMeshFacts`. It used to enter as a `gated` veto beside the level gates, which
-            // reached the same answer only because no shipped decal is marked hidden.
-            const decal = (extras.alamoMesh ?? "").toLowerCase();
-            if (this.context.levels.knownDecals.has(decal)) {
-                Object.assign(
-                    facts,
-                    damageMeshFacts(
-                        facts,
-                        this.context.levels.shownDecals.has(decal),
-                    ),
+            // What the damage and detail levels alone say, without the file's own hidden flag.
+            const levelGated =
+                resolveMaterial(extras).hidden ||
+                !isVisibleAtLevel(
+                    extras,
+                    this.context.levels.alt,
+                    this.context.levels.lod,
                 );
-            }
+
+            // The model file's answer. Its hidden flag is read at the level link as well as at the
+            // file link, which keeps the idle a unit stands in - between the two - from showing a
+            // mesh the file hides.
+            facts.inFile = extras.alamoHidden !== true;
+            facts.gated = levelGated || extras.alamoHidden === true;
+
+            // And the game's rules over it, in a unit preview only: the shield, the stealth shell,
+            // the collision hulls and the damage decals. See `UnitRules.meshFacts`.
+            Object.assign(
+                facts,
+                this.context.rules.meshFacts(facts, extras, levelGated),
+            );
 
             // A SKINNED mesh rides no bone, so every track below missed it - see `skinVisibility`.
             // Only ever a hide, and only ever ONE of the two questions.
@@ -821,7 +791,7 @@ export class ModelRows {
             // computed beside it, then hid the mesh from below. `attack_00` shows the saber bones
             // and `idle_00` hides them, so the resting pose was overruling the clip on screen.
             //
-            // A resting pose is what the model does when nothing is playing. If something is
+            // A resting pose is what the unit does when nothing is playing. If something is
             // playing, that clip is the only one entitled to speak.
             const skin = this.skinBonesOf(target.mesh);
 
@@ -838,7 +808,7 @@ export class ModelRows {
                     if (playing) {
                         facts.animated = false;
                     } else {
-                        facts.resting = false;
+                        idle = false;
                     }
                 }
             }
@@ -862,13 +832,13 @@ export class ModelRows {
             // chain from below whenever the playing clip happened to be silent about a bone - so a
             // clip that shows a part the idle hides lost to the idle. Yoda's hilt is that: his
             // `attack_00` shows `b_hilt` and his `idle_00` hides it, and the hilt stayed away.
-            facts.resting =
+            idle =
                 this.context.animation.active.action === null
                     ? this.restingVisibilityOf(id)
                     : undefined;
         }
 
-        return facts;
+        return this.context.rules.idleFacts(facts, idle);
     }
 
     /**
@@ -886,7 +856,7 @@ export class ModelRows {
     private effectFacts(facts: RowFacts, systemId: string): RowFacts {
         const entry = this.context.particles.particleSystems.get(systemId);
 
-        return {
+        return this.context.rules.effectFacts({
             // Which drops the ancestors the MODEL hides: an effect answers to its own bone, as the
             // engine does. See `visibility.effectFacts`.
             ...effectRowFacts(facts),
@@ -897,27 +867,12 @@ export class ModelRows {
                 { id: "effects", on: this.context.particles.particlesVisible },
             ],
             inFile: entry?.gateVisible ?? true,
+            gated: entry !== undefined && !entry.levelVisible,
 
-            // The cloak, in the same chain that swaps the meshes. A cloaked unit shows its stealth
-            // shell and nothing else - not its engines, not its damage smoke, not the proxies of
-            // the ability doing the cloaking.
-            //
-            // Here rather than in the caller's effect decider, which was where it went first: that
-            // put the flag in two places, and the two disagreed the moment anything drove one
-            // without the other. `gated` and not `inFile` because it is a STATE, and because it
-            // leaves `gateVisible` holding what the effect rules last decided - so uncloaking
-            // restores exactly what was playing rather than a guess at it.
-            gated:
-                this.context.levels.stealthed ||
-                (entry !== undefined && !entry.levelVisible),
-        };
-    }
-
-    /** A mesh a hardpoint names as its collision hull, which the engine never draws. */
-    private collisionGatedOff(extras: MaterialExtras): boolean {
-        return this.context.levels.collisionMeshes.has(
-            (extras.alamoMesh ?? "").toLowerCase(),
-        );
+            // The cloak goes on in the rules layer, in the same chain that swaps the meshes - see
+            // `UnitRules.effectFacts`. Not in the caller's effect decider: that put the flag in two
+            // places, and the two disagreed the moment anything drove one without the other.
+        });
     }
 
     /**

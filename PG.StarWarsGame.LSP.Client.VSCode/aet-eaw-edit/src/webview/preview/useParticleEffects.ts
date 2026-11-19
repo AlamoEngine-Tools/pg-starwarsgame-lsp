@@ -139,7 +139,14 @@ export function useParticleEffects({
         // A passive subject's effect answers to its own model and to nothing here. Neither of the
         // rules below is about it: the opening rule is about the first moment of a preview, and a
         // death clone has none - it exists because the ship died, and its explosions ARE the death.
-        if (passiveEffectIdsRef.current.has(particle.id)) {
+        //
+        // And so does every effect of a MODEL preview, which shows the model file as it is: no
+        // hardpoint, ability or opening rule of the game applies to it. The rules below are the
+        // unit preview's, written over that same file answer.
+        if (
+            passiveEffectIdsRef.current.has(particle.id) ||
+            viewportRef.current?.appliesGameRules() !== true
+        ) {
             return passiveEffectPlaysNow(particle);
         }
 

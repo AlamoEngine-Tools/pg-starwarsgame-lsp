@@ -45,6 +45,9 @@ export function passiveEffects(
  *
  * What is left is the model's own switch, which has the last word everywhere else too. The ALT/LOD
  * gate still applies on top, in the viewport, exactly as it does for the subject.
+ *
+ * The same answer is a MODEL preview's for every effect it shows: the model file as it is, with no
+ * rule of the game written over it. See `unitRules.ts`.
  */
 export function passiveEffectPlaysNow(effect: PreviewParticle): boolean {
     return effect.startsVisible;

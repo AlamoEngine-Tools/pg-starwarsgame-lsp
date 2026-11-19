@@ -32,6 +32,7 @@ import { type PendingEffect } from "./useParticleEffects";
 import { BREAKOFF_ATTACHMENT, type PreviewViewport } from "./viewport";
 import { type PreviewAssetLoader } from "./previewAssetLoader";
 import { defaultMode, type PreviewMode } from "./previewMode";
+import { rulesFor } from "./unitRules";
 import { attackerFromProjectile } from "./attacker";
 import { type BreakoffAnchor } from "./breakoff";
 import { type SubjectState, subjectStateFrom } from "../../shared/subjectState";
@@ -184,6 +185,10 @@ export function useHostMessages({
                 scene: (message) => {
                     refreshingRef.current = message.refresh === true;
                     viewport.clear();
+                    // A model preview or a unit preview, by what was opened. Only the first scene
+                    // decides: the viewport ignores every later answer, so a refresh cannot turn
+                    // one into the other.
+                    viewport.setRules(rulesFor(message.scene.kind));
                     setScene(message.scene);
                     setProblems(message.scene.problems);
                     setAnimation(null);

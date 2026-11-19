@@ -918,7 +918,7 @@ export class EnvironmentRig {
             // stealthed does not start out casting. Same pair as `applyMeshVisibility`.
             this.shadowVolumes.setCounting(
                 mesh,
-                !this.context.levels.stealthed &&
+                !this.context.rules.isStealthed() &&
                     isVisibleAt(
                         extras,
                         this.context.levels.alt,

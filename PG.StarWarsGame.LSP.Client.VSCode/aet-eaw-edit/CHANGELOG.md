@@ -16,6 +16,12 @@
   inside it; it is disabled while none is turned and left out for a subject with no turret that turns. The
   two state sliders beside it are 16px shorter so all three fit one row
   ([#438](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/438))
+- **The model preview shows the model file as it is** - a model file opened on its own shows every part the
+  file marks visible, a stealth shell and a shield mesh included, runs every effect the file leaves on and
+  stands in the file's own pose until a clip is played. The game's rules - hardpoints, abilities, cloaks, the
+  XML gates and the state a unit is created in - apply only in the unit preview, a game object opened from its
+  XML. A wrong default in a model file shows in the model preview, and what the game draws in the unit preview
+  ([#452](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/452))
 
 ### Fixes
 

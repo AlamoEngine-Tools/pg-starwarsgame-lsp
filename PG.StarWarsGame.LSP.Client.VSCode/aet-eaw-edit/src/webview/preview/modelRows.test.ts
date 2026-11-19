@@ -7,15 +7,35 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
+import { type MaterialExtras } from "./materials";
 import { meshDrawn } from "./meshVisibility";
 import { ModelRows } from "./modelRows";
+import { type PreviewRules, UnitRules } from "./unitRules";
+import { type VisibilityTrack } from "./boneVisibility";
 import { standInContext } from "./viewportContext.testing";
+
+/** What a test varies about {@link rowsWith}'s model. */
+interface RowsOptions {
+    /** Whose rules the preview takes. A unit preview's by default. */
+    rules?: PreviewRules;
+    /** The file's extras for the mesh sharing the turret bone's row. */
+    turret?: MaterialExtras;
+    /** The file's extras for the second mesh on that bone. */
+    barrel?: MaterialExtras;
+    /** The clips' visibility tracks, by clip name. */
+    visibility?: Map<string, VisibilityTrack>;
+}
 
 /**
  * Rows over a stand-in viewport: a hull with a root bone and one child bone carrying a mesh of its own
  * name, no particle systems, nothing animated, every level and gate open.
  */
-function rowsWith(): { rows: ModelRows; mesh: THREE.Mesh; extra: THREE.Mesh } {
+function rowsWith(options: RowsOptions = {}): {
+    rows: ModelRows;
+    mesh: THREE.Mesh;
+    extra: THREE.Mesh;
+    unit: UnitRules;
+} {
     const root = new THREE.Group();
     const rootBone = new THREE.Bone();
     rootBone.name = "Root#0";
@@ -30,14 +50,22 @@ function rowsWith(): { rows: ModelRows; mesh: THREE.Mesh; extra: THREE.Mesh } {
         new THREE.MeshStandardMaterial(),
     );
     mesh.name = "Turret";
-    mesh.userData.alamo = { alamoMesh: "Turret", alamoShader: "MeshGloss.fx" };
+    mesh.userData.aetTreeKey = "turret";
+    mesh.userData.alamo = options.turret ?? {
+        alamoMesh: "Turret",
+        alamoShader: "MeshGloss.fx",
+    };
     turretBone.add(mesh);
     const extra = new THREE.Mesh(
         new THREE.BufferGeometry(),
         new THREE.MeshStandardMaterial(),
     );
     extra.name = "Barrel";
-    extra.userData.alamo = { alamoMesh: "Barrel", alamoShader: "MeshGloss.fx" };
+    extra.userData.aetTreeKey = "barrel";
+    extra.userData.alamo = options.barrel ?? {
+        alamoMesh: "Barrel",
+        alamoShader: "MeshGloss.fx",
+    };
     turretBone.add(extra);
 
     const hull: LoadedPart = {
@@ -53,12 +81,16 @@ function rowsWith(): { rows: ModelRows; mesh: THREE.Mesh; extra: THREE.Mesh } {
         ]),
         subjectId: ACTIVE_SUBJECT,
     };
+    const unit = new UnitRules(
+        standInContext({ levels: { applyLevels: () => undefined } }),
+    );
+    unit.setRules(options.rules ?? "game");
     const context = standInContext({
         animation: {
             active: {
                 mixer: null,
                 clips: [],
-                visibility: new Map(),
+                visibility: options.visibility ?? new Map(),
                 nodeByName: new Map(),
                 restPose: new Map(),
                 action: null,
@@ -68,12 +100,8 @@ function rowsWith(): { rows: ModelRows; mesh: THREE.Mesh; extra: THREE.Mesh } {
         levels: {
             alt: 0,
             lod: 0,
-            collisionMeshes: new Set(),
-            knownDecals: new Set(),
-            shownDecals: new Set(),
-            shieldRevealed: false,
-            stealthed: false,
         },
+        rules: unit,
         particles: {
             particleSystems: new Map(),
             particlesVisible: true,
@@ -93,7 +121,7 @@ function rowsWith(): { rows: ModelRows; mesh: THREE.Mesh; extra: THREE.Mesh } {
             ],
         },
     });
-    return { rows: new ModelRows(context), mesh, extra };
+    return { rows: new ModelRows(context), mesh, extra, unit };
 }
 
 describe("ModelRows", () => {
@@ -144,5 +172,62 @@ describe("ModelRows", () => {
         assert.deepEqual(rows.hiddenItemIds(), []);
         assert.deepEqual(rows.shownItemIds(), []);
         assert.equal(meshDrawn(extra), true);
+    });
+
+    it("draws the stealth shell and the shield mesh a model file marks visible in a model preview", () => {
+        const { rows, mesh, extra } = rowsWith({
+            rules: "file",
+            turret: { alamoMesh: "stealth", alamoShader: "MeshShield.fx" },
+            barrel: { alamoMesh: "shield", alamoShader: "MeshShield.fx" },
+        });
+
+        rows.treeItems();
+
+        assert.equal(meshDrawn(mesh), true, "the stealth shell is hidden");
+        assert.equal(meshDrawn(extra), true, "the shield mesh is hidden");
+    });
+
+    it("hides the same shell and shield in a unit preview until an ability asks for them", () => {
+        const { rows, mesh, extra, unit } = rowsWith({
+            rules: "game",
+            turret: { alamoMesh: "stealth", alamoShader: "MeshShield.fx" },
+            barrel: { alamoMesh: "shield", alamoShader: "MeshShield.fx" },
+        });
+
+        rows.treeItems();
+        assert.equal(meshDrawn(mesh), false);
+        assert.equal(meshDrawn(extra), false);
+
+        unit.setStealthed(true);
+        unit.setShieldRevealed(true);
+        rows.resolveRows();
+
+        assert.equal(meshDrawn(mesh), true, "the cloak did not show the shell");
+        assert.equal(
+            meshDrawn(extra),
+            false,
+            "a cloaked unit draws its shield",
+        );
+    });
+
+    it("stands a unit in its idle clip, and a model file in its own flags", () => {
+        const visibility = new Map<string, VisibilityTrack>([
+            [
+                "Model_IDLE_00",
+                { fps: 15, bones: new Map([["Turret#1", "00"]]) },
+            ],
+        ]);
+        const model = rowsWith({ rules: "file", visibility });
+        const unit = rowsWith({ rules: "game", visibility });
+
+        model.rows.treeItems();
+        unit.rows.treeItems();
+
+        assert.equal(
+            meshDrawn(model.mesh),
+            true,
+            "the model stood in its idle",
+        );
+        assert.equal(meshDrawn(unit.mesh), false, "the unit ignored its idle");
     });
 });

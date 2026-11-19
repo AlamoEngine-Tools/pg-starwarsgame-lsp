@@ -65,6 +65,7 @@ import {
 } from "./viewportTypes";
 import { CaptureRig } from "./captureRig";
 import { LevelGates } from "./levelGates";
+import { type PreviewRules, UnitRules } from "./unitRules";
 import { ModelQueries } from "./modelQueries";
 import { type ViewportContext } from "./viewportContext";
 import { TextureStore } from "./textureStore";
@@ -159,6 +160,8 @@ export class PreviewViewport {
     private readonly cameraRig: CameraRig;
     /** The detail and damage level, and the gates on what is drawn at it. See `LevelGates`. */
     private readonly levels: LevelGates;
+    /** The game's rules over the file's answer - see `unitRules.ts`. */
+    private readonly rules: UnitRules;
     /** What the model holds, asked of it: the skeleton, a bone's place, the stats and the levels it defines. See `ModelQueries`. */
     private readonly queries: ModelQueries;
     /** Labels, reticles, selection boxes, the skeleton and the bone axes. See `OverlayLayer`. */
@@ -230,6 +233,9 @@ export class PreviewViewport {
             get levels() {
                 return viewport.levels;
             },
+            get rules() {
+                return viewport.rules;
+            },
             get queries() {
                 return viewport.queries;
             },
@@ -262,6 +268,7 @@ export class PreviewViewport {
             },
         };
         this.levels = new LevelGates(context);
+        this.rules = new UnitRules(context);
         this.queries = new ModelQueries(context);
         this.assembly = new PartAssembly(context);
         this.destruction = new DestructionRig(context, {
@@ -519,22 +526,35 @@ export class PreviewViewport {
         this.overlay.dropReticles();
         this.assembly.forgetParts();
         this.cameraRig.forgetBillboards();
-        this.levels.forgetModel();
+        this.rules.forgetModel();
         // Every subject's clips, mixer, tracks, rest pose and node names at once. They hold nodes
         // of a model nobody is looking at any more, and keeping them would leak the whole graph.
         this.animation.forgetSubjects();
     }
 
-    /** Which decal meshes exist, and which of them are showing. See `LevelGates.setDecals`. */
+    /**
+     * Fixes whether this preview applies the game's rules or shows the model file as it is. The
+     * first call decides for the preview's life. See `UnitRules.setRules`.
+     */
+    setRules(rules: PreviewRules): void {
+        this.rules.setRules(rules);
+    }
+
+    /** Whether this preview applies the game's rules over the model file's answer. */
+    appliesGameRules(): boolean {
+        return this.rules.appliesGameRules();
+    }
+
+    /** Which decal meshes exist, and which of them are showing. See `UnitRules.setDecals`. */
     setDecals(known: ReadonlySet<string>, shown: ReadonlySet<string>): void {
-        this.levels.setDecals(known, shown);
+        this.rules.setDecals(known, shown);
     }
 
     /**
-     * Which meshes the hardpoints claim as collision hulls. See `LevelGates.setCollisionMeshes`.
+     * Which meshes the hardpoints claim as collision hulls. See `UnitRules.setCollisionMeshes`.
      */
     setCollisionMeshes(names: ReadonlySet<string>): void {
-        this.levels.setCollisionMeshes(names);
+        this.rules.setCollisionMeshes(names);
     }
 
     /**
@@ -547,17 +567,17 @@ export class PreviewViewport {
 
     /** Shows or hides the shield mesh, for the abilities that reveal it. */
     setShieldRevealed(revealed: boolean): void {
-        this.levels.setShieldRevealed(revealed);
+        this.rules.setShieldRevealed(revealed);
     }
 
-    /** Cloaks the unit, or uncloaks it. See `LevelGates.setStealthed`. */
+    /** Cloaks the unit, or uncloaks it. See `UnitRules.setStealthed`. */
     setStealthed(on: boolean): void {
-        this.levels.setStealthed(on);
+        this.rules.setStealthed(on);
     }
 
     /** Whether a cloak is engaged, which every other visibility rule defers to. */
     isStealthed(): boolean {
-        return this.levels.isStealthed();
+        return this.rules.isStealthed();
     }
 
     /**

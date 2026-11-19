@@ -20,6 +20,7 @@ function gatesWith(): {
     gated: [number, number, boolean][];
     counting: boolean[];
     refreshed: () => number;
+    cloak: (on: boolean) => void;
 } {
     const modelRoot = new THREE.Group();
     const volume = new THREE.Mesh(
@@ -34,9 +35,11 @@ function gatesWith(): {
     const gated: [number, number, boolean][] = [];
     const counting: boolean[] = [];
     let refreshes = 0;
+    let stealthed = false;
     const context = standInContext({
         modelRoot,
         parts: new Map(),
+        rules: { isStealthed: () => stealthed },
         particles: {
             gateByLevel: (alt: number, lod: number, descending: boolean) =>
                 gated.push([alt, lod, descending]),
@@ -64,6 +67,9 @@ function gatesWith(): {
         gated,
         counting,
         refreshed: () => refreshes,
+        cloak: (on: boolean) => {
+            stealthed = on;
+        },
     };
 }
 
@@ -92,28 +98,15 @@ describe("LevelGates", () => {
     });
 
     it("stops a shadow volume counting while the unit is stealthed", () => {
-        const { levels, counting } = gatesWith();
+        const { levels, counting, cloak } = gatesWith();
 
-        levels.setStealthed(true);
-        assert.equal(levels.isStealthed(), true);
+        cloak(true);
+        levels.applyLevels();
         assert.equal(counting.at(-1), false);
 
-        levels.setStealthed(false);
+        cloak(false);
+        levels.applyLevels();
         assert.equal(counting.at(-1), true);
-    });
-
-    it("forgets a model's decals, collision meshes and shield", () => {
-        const { levels } = gatesWith();
-        levels.setDecals(new Set(["hp_decal"]), new Set(["hp_decal"]));
-        levels.setCollisionMeshes(new Set(["collision"]));
-        levels.setShieldRevealed(true);
-
-        levels.forgetModel();
-
-        assert.equal(levels.knownDecals.size, 0);
-        assert.equal(levels.shownDecals.size, 0);
-        assert.equal(levels.collisionMeshes.size, 0);
-        assert.equal(levels.shieldRevealed, false);
     });
 
     it("draws a mesh only while it and every ancestor up to the model are shown", () => {

@@ -49,17 +49,17 @@ export interface RowFacts {
     inFile: boolean;
 
     /**
-     * What the model's RESTING clip says about this row, when it ships one.
+     * What the unit's RESTING clip says about this row, when its model ships one.
      *
-     * The engine never stands still - a unit is always playing something - so a model's true
-     * resting state is its idle clip, not its file. The AT-AT is the case that settled it: its idle
+     * A standing unit plays its idle clip, so a unit's true resting state is that clip, not its
+     * file. The AT-AT is the case that settled it: its idle
      * keys both barrel muzzles off for all 81 frames, and the file leaves those flash meshes
      * unhidden precisely BECAUSE the animation owns that state. Read from the file alone, two
      * muzzle flashes sit on screen that nobody ever sees in game.
      *
      * Absent when the model ships no idle clip, or when that clip says nothing about this row -
-     * then the file is the baseline, which is the user's rule: idle if we have it, the file
-     * otherwise.
+     * then the file is the baseline. Absent in a MODEL preview always: a model file opened on its
+     * own plays nothing it is not asked to, so the file is the answer there. See `UnitRules`.
      */
     resting?: boolean;
 
@@ -391,11 +391,9 @@ export function becauseText(because: string): string {
 /**
  * The same row, asked about the EFFECT it carries rather than the geometry.
  *
- * One difference, and it is the engine's: **Alamo does not inherit visibility.**
- * `RenderObject::Render` draws a submesh when `GetBoneVisibility(mesh.bone)` says so - that bone's
- * own track and nothing above it - and a particle proxy is spawned and killed on
- * `GetVisibleEvent` / `GetInvisibleEvent` of `proxy.bone->index` alone. An ancestor never speaks
- * for it.
+ * One difference, and it is the game's: **Alamo does not inherit visibility.** A sub-mesh is drawn
+ * when its own bone's track says so, and nothing above that bone is asked; a particle proxy starts
+ * and stops on its own bone's track alone. An ancestor never speaks for it.
  *
  * The shipped data depends on that. A proxy bone is a CHILD of the piece its blast covers, and the
  * Nebulon-B's death clip keys `p_explosion_big00#12` ON for exactly the one frame `Busted_00#11`

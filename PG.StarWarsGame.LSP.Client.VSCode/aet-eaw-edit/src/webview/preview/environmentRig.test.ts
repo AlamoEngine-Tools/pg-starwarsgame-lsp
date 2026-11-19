@@ -18,7 +18,8 @@ import { standInContext } from "./viewportContext.testing";
 function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
     const scene = new THREE.Scene();
     const context = standInContext({
-        levels: { alt: 0, lod: 0, stealthed: false },
+        levels: { alt: 0, lod: 0 },
+        rules: { isStealthed: () => false },
         camera: new THREE.PerspectiveCamera(45, 1, 0.1, 10000),
         canvas: { clientWidth: 100, clientHeight: 100 },
         renderer: null,
