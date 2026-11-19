@@ -103,6 +103,17 @@ describe("hiddenAt", () => {
         assert.equal(hiddenAt("01", 30, 1.0 / 30), false, "now on frame 1");
     });
 
+    /**
+     * A keyframe time as the GLB stores it is a 32-bit float, and 17/30 stored that way is a hair
+     * short of frame 17 - so a clip resting exactly on a frame, as a held clip does, read the one
+     * before it. 88 of the first 200 frames at 30 fps land short like this.
+     */
+    it("reads a playhead resting on a stored keyframe time as that frame", () => {
+        const bits = "0".repeat(17) + "10";
+
+        assert.equal(hiddenAt(bits, 30, Math.fround(17 / 30)), false);
+    });
+
     /** A clamped clip sits exactly on its end; the last frame is the answer, not an overrun. */
     it("clamps past the end to the last frame", () => {
         assert.equal(
@@ -262,6 +273,26 @@ describe("clipsSay", () => {
                 ],
                 "A#1",
             ),
+            false,
+        );
+    });
+
+    it("drops an overlay that has finished, so the clips under it decide again", () => {
+        assert.equal(
+            clipsSay(
+                [
+                    { track: shows, seconds: 0 },
+                    { track: hides, seconds: 0, overlay: true, done: true },
+                ],
+                "A#1",
+            ),
+            true,
+        );
+    });
+
+    it("keeps a finished clip that is not an overlay: it holds its frame", () => {
+        assert.equal(
+            clipsSay([{ track: hides, seconds: 0, done: true }], "A#1"),
             false,
         );
     });

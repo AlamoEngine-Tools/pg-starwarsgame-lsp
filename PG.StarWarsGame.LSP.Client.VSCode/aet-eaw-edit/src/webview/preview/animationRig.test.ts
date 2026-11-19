@@ -75,6 +75,35 @@ function rigWith(): {
     };
 }
 
+/**
+ * A four-frame clip at one frame a second, as the exporter writes one: a key on every frame, the last
+ * a copy of the first so a loop is seamless. The bone walks 0, 1, 2 along X and is back at 0 on the
+ * last frame, so the frame on screen can be read off its position.
+ */
+function walk(name: string): THREE.AnimationClip {
+    return new THREE.AnimationClip(name, -1, [
+        new THREE.VectorKeyframeTrack(
+            "Turret.position",
+            [0, 1, 2, 3],
+            [0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0],
+        ),
+    ]);
+}
+
+/** A rig whose active subject also carries {@link walk} as `Walk`. */
+function walkingRig(): { animation: AnimationRig; bone: THREE.Object3D } {
+    const rig = rigWith();
+    rig.animation.active.clips.push(walk("Walk"));
+    return rig;
+}
+
+function near(actual: number, expected: number, what: string): void {
+    assert.ok(
+        Math.abs(actual - expected) < 1e-6,
+        `${what} ${actual}, expected ${expected}`,
+    );
+}
+
 describe("AnimationRig", () => {
     it("keeps one animation per subject, made on first ask", () => {
         const { animation } = rigWith();
@@ -211,5 +240,111 @@ describe("AnimationRig", () => {
 
         animation.seekAnimation(1);
         assert.equal(composed(), 2);
+    });
+
+    // ── where a clip ends ─────────────────────────────────────────────────────
+
+    /**
+     * Measured in the game: a clip that does not loop advances to frame count - 2, is then done, and
+     * holds that frame. The last frame is the loop's copy of the first and is never shown at rest.
+     */
+    it("holds a finished non-looping clip on its second-to-last frame", () => {
+        const { animation, bone } = walkingRig();
+        animation.setAnimationLoop(false);
+        animation.play("Walk");
+
+        animation.advance(10);
+
+        near(bone.position.x, 2, "x");
+        assert.deepEqual(animation.animationProgress(), {
+            time: 2,
+            duration: 2,
+            running: false,
+        });
+    });
+
+    it("wraps a looping clip at its last frame", () => {
+        const { animation, bone } = walkingRig();
+        animation.play("Walk");
+
+        animation.advance(3.5);
+
+        near(animation.animationProgress().time, 0.5, "time");
+        near(animation.animationProgress().duration, 3, "duration");
+        near(bone.position.x, 0.5, "x");
+    });
+
+    it("keeps the playhead when the loop is switched off mid-clip, then holds", () => {
+        const { animation, bone } = walkingRig();
+        animation.play("Walk");
+        animation.advance(1.5);
+
+        animation.setAnimationLoop(false);
+
+        near(animation.animationProgress().time, 1.5, "time");
+        assert.equal(animation.animationProgress().running, true);
+
+        animation.advance(10);
+        near(bone.position.x, 2, "x");
+    });
+
+    it("plays on from the held frame when the loop is switched back on", () => {
+        const { animation, bone } = walkingRig();
+        animation.setAnimationLoop(false);
+        animation.play("Walk");
+        animation.advance(10);
+
+        animation.setAnimationLoop(true);
+        animation.setPaused(false);
+        animation.advance(0.5);
+
+        near(animation.animationProgress().time, 2.5, "time");
+        near(bone.position.x, 1, "x");
+    });
+
+    /** The scrubber's end is the held frame: dragging to the end shows what the clip comes to rest on. */
+    it("seeks no further than the held frame of a non-looping clip", () => {
+        const { animation, bone } = walkingRig();
+        animation.setAnimationLoop(false);
+        animation.play("Walk");
+
+        animation.seekAnimation(10);
+
+        assert.equal(animation.animationProgress().time, 2);
+        near(bone.position.x, 2, "x");
+    });
+
+    /** A death clone plays once, ends on the same frame, and is taken away there. */
+    it("ends a death clone's clip on its second-to-last frame, and takes the clone away there", () => {
+        const hidden: string[] = [];
+        const context = standInContext({
+            assembly: {
+                partsOf: () => [{ id: "clone:1/part" }],
+                applyOwnFileVisibility: () => undefined,
+                setPartHidden: (id: string) => {
+                    hidden.push(id);
+                },
+            },
+            particles: {
+                particleSystems: new Map(),
+                applyEmitterGating: () => undefined,
+                releaseSubjectEffects: () => undefined,
+            },
+        });
+        const animation = new AnimationRig(context);
+        const root = new THREE.Group();
+        const bone = new THREE.Object3D();
+        bone.name = "Turret";
+        root.add(bone);
+        const clone = animation.subjectAnimation("clone:1");
+        clone.mixer = new THREE.AnimationMixer(root);
+        clone.clips.push(walk("Hull_die_00"));
+
+        animation.startDeathClip("clone:1");
+        animation.advancePassiveSubjects(2.5);
+
+        assert.equal(clone.action?.time, 2);
+        near(bone.position.x, 2, "x");
+        assert.deepEqual(hidden, ["clone:1/part"]);
     });
 });

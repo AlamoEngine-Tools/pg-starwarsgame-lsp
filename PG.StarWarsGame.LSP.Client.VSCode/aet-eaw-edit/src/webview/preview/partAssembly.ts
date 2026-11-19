@@ -16,6 +16,7 @@ import {
 import { alamoBoneName, alamoNodeName } from "./skeleton";
 import { type MaterialExtras, resolveMaterial } from "./materials";
 import { clipsSay, poseSays } from "./boneVisibility";
+import { runningClips } from "./clipEnd";
 import { skinVisibilityBone } from "./skinBone";
 import {
     type RowFacts,
@@ -723,15 +724,7 @@ export class PartAssembly {
     applyOwnFileVisibility(part: LoadedPart): void {
         const subject = this.context.animation.subjectAnimation(part.subjectId);
         const action = subject.action;
-        const running =
-            action === null
-                ? []
-                : [
-                      {
-                          track: subject.visibility.get(action.getClip().name),
-                          seconds: action.time,
-                      },
-                  ];
+        const running = runningClips(subject);
         const boneNodes = new Set<THREE.Object3D>(part.bonesByIndex.values());
 
         part.root.traverse((node) => {

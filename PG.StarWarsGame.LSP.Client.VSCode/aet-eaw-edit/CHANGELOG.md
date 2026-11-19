@@ -60,6 +60,12 @@
   stands in included, decides instead. A unit whose idle clip hides nothing now stands in that idle rather
   than in its base pose
   ([#446](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/446))
+- **A clip played once holds its second-to-last frame** - a clip that does not loop ran to its last frame and
+  stopped there, so a part the clip shows or hides on that frame looked different from the game, an X-wing's
+  engine glow after its deploy clip among them. The game stops one frame earlier and holds it; the preview,
+  its scrubber and its "Last frame" button now do the same, death clones included. A looping clip still wraps
+  at its last frame
+  ([#447](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/447))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

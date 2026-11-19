@@ -76,12 +76,19 @@ export function visibilityTracks(json: unknown): Map<string, VisibilityTrack> {
     return tracks;
 }
 
+/** How far short of a frame a playhead may be and still count as on it, in frames. */
+const FRAME_SLACK = 1e-3;
+
 /**
  * Whether a bone is hidden at a moment in a clip.
  *
  * The frame is FLOORED, not rounded: a frame holds until the next one begins, which is both what the
  * engine does and what stops a bone flickering on for half a frame at every boundary. Times outside
  * the clip clamp to its ends, which is what a clamped last frame needs.
+ *
+ * Floored with a thousandth of a frame to spare. Keyframe times reach here as 32-bit floats, and
+ * many land a hair short of their frame - 17/30 does - so a playhead resting exactly on a frame, as a
+ * finished clip's does, read the frame before it.
  */
 export function hiddenAt(bits: string, fps: number, seconds: number): boolean {
     if (bits.length === 0) {
@@ -90,7 +97,7 @@ export function hiddenAt(bits: string, fps: number, seconds: number): boolean {
 
     const frame = Math.min(
         bits.length - 1,
-        Math.max(0, Math.floor(seconds * fps)),
+        Math.max(0, Math.floor(seconds * fps + FRAME_SLACK)),
     );
 
     return bits[frame] !== "1";
@@ -127,14 +134,20 @@ export interface RunningClip {
     seconds: number;
     /** An overlay plays over the clips under it rather than blending with them. */
     overlay?: boolean;
+    /**
+     * Whether the clip has played through and holds its end - see `clipEnd.ts`. A finished clip
+     * still speaks for its held frame; a finished OVERLAY is dropped.
+     */
+    done?: boolean;
 }
 
 /**
  * What every clip running on a model says about one bone together.
  *
  * Measured in the game: two blended clips show a part if either shows it, and an overlay clip
- * overrides the clips under it wherever it has a track. Undefined when no running clip speaks for
- * the bone. The preview runs one clip at a time today, so the list has one entry.
+ * overrides the clips under it wherever it has a track, until it is done - then it is dropped and
+ * the clips under it decide again. Undefined when no running clip speaks for the bone. The preview
+ * runs one clip at a time today, so the list has one entry.
  */
 export function clipsSay(
     running: readonly RunningClip[],
@@ -144,6 +157,10 @@ export function clipsSay(
     let over: boolean | undefined;
 
     for (const clip of running) {
+        if (clip.overlay === true && clip.done === true) {
+            continue;
+        }
+
         const said = trackSays(clip.track, id, clip.seconds);
 
         if (said === undefined) {

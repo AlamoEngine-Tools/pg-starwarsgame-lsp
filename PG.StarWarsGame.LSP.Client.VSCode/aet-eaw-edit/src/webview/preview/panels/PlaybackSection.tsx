@@ -117,10 +117,10 @@ export function PlaybackSection({
                             title={
                                 player.animationLoop
                                     ? l10n.t(
-                                          "Looping. Press to play the clip once and hold its last frame.",
+                                          "Looping. Press to play the clip once and hold the frame it ends on.",
                                       )
                                     : l10n.t(
-                                          "Playing once and holding the last frame. Press to loop.",
+                                          "Playing once and holding the frame it ends on. Press to loop.",
                                       )
                             }
                             disabled={player.animation === null}

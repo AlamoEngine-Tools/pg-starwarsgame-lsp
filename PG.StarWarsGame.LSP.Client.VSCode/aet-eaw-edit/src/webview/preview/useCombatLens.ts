@@ -722,7 +722,7 @@ export function useCombatLens({
             // attacker panel's Repair, the Hardpoints section's `Repair all`, or the reader simply
             // un-ticking one hardpoint. `Repair all` is `destroyAll(false)` and nothing else, so with
             // the restore living in `repairTarget` it put the hardpoints back and left the ship hidden
-            // under its own wreck, with the wreck's clip clamped at its last frame - after which no
+            // under its own wreck, with the wreck's clip held at its end - after which no
             // death ever played again.
             if (unitDead) {
                 restoreFromDeath();

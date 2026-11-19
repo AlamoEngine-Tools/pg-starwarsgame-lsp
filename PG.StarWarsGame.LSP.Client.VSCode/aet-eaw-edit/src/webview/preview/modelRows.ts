@@ -8,6 +8,7 @@
 import * as THREE from "three";
 import { type BoneId } from "./boneIds";
 import { clipsSay, poseSays, trackSays } from "./boneVisibility";
+import { runningClips } from "./clipEnd";
 import {
     type RowOverride,
     type Resolution,
@@ -1008,21 +1009,7 @@ export class ModelRows {
      * and treating silence as a hide is how an animation came to blink meshes out.
      */
     private animatedVisibilityOf(id: BoneId | undefined): boolean | undefined {
-        const action = this.context.animation.active.action;
-
-        return action === null
-            ? undefined
-            : clipsSay(
-                  [
-                      {
-                          track: this.context.animation.active.visibility.get(
-                              action.getClip().name,
-                          ),
-                          seconds: action.time,
-                      },
-                  ],
-                  id,
-              );
+        return clipsSay(runningClips(this.context.animation.active), id);
     }
 
     /**

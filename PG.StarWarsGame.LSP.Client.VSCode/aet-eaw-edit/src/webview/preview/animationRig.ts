@@ -11,6 +11,7 @@ import { ACTIVE_SUBJECT } from "./loadedPart";
 import { deathClip } from "./visibility";
 import * as THREE from "three";
 import { visibilityTracks } from "./boneVisibility";
+import { clipDone, playedLooping, playedOnce } from "./clipEnd";
 import { alamoNodeName } from "./skeleton";
 import { type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { type ViewportContext } from "./viewportContext";
@@ -190,9 +191,10 @@ export class AnimationRig {
             return;
         }
 
-        subject.action = subject.mixer.clipAction(clip);
+        // Its play-once copy, which ends on the held frame - see `clipEnd.ts`.
+        subject.action = subject.mixer.clipAction(playedOnce(clip));
         subject.action.setLoop(THREE.LoopOnce, 1);
-        // Without this the last pose is gone the frame it arrives.
+        // Without this the held pose is gone the frame it arrives.
         subject.action.clampWhenFinished = true;
         subject.action.reset();
         subject.action.play();
@@ -238,19 +240,45 @@ export class AnimationRig {
             return false;
         }
 
-        this.active.action = this.active.mixer.clipAction(clip);
-        this.active.action.setLoop(
+        this.active.action = this.startAction(
+            this.active.mixer,
+            clip,
+            0,
+            this.animationPaused,
+        );
+
+        return true;
+    }
+
+    /**
+     * Starts the active subject's clip at a playhead, looping or not as the panel says.
+     *
+     * A clip that does not loop plays its play-once copy, which ends on the second-to-last frame and
+     * holds it - the game's rule, see `clipEnd.ts`; a looping one plays the clip itself and wraps at
+     * the last frame. Clamped, because without it a non-looping action snaps back to frame 0 the
+     * instant it ends, and the held pose - often the whole point of a death or a deploy - is never on
+     * screen.
+     */
+    private startAction(
+        mixer: THREE.AnimationMixer,
+        clip: THREE.AnimationClip,
+        time: number,
+        paused: boolean,
+    ): THREE.AnimationAction {
+        const action = mixer.clipAction(
+            this.animationLoop ? playedLooping(clip) : playedOnce(clip),
+        );
+        action.setLoop(
             this.animationLoop ? THREE.LoopRepeat : THREE.LoopOnce,
             Infinity,
         );
-        // Without this a non-looping action snaps back to frame 0 the instant it ends, so the last
-        // pose - often the whole point of a death or a deploy - is never on screen.
-        this.active.action.clampWhenFinished = true;
-        this.active.action.timeScale = this.animationSpeed;
-        this.active.action.paused = this.animationPaused;
-        this.active.action.play();
+        action.clampWhenFinished = true;
+        action.timeScale = this.animationSpeed;
+        action.paused = paused;
+        action.play();
+        action.time = Math.min(time, action.getClip().duration);
 
-        return true;
+        return action;
     }
 
     // ── spinning away ─────────────────────────────────────────────────────────
@@ -315,13 +343,27 @@ export class AnimationRig {
     setAnimationLoop(loop: boolean): void {
         this.animationLoop = loop;
 
-        if (this.active.action !== null) {
-            this.active.action.setLoop(
-                loop ? THREE.LoopRepeat : THREE.LoopOnce,
-                Infinity,
-            );
-            this.active.action.clampWhenFinished = true;
+        const old = this.active.action;
+        const mixer = this.active.mixer;
+
+        if (old === null || mixer === null) {
+            return;
         }
+
+        const clip = old.getClip();
+        if (clip === (loop ? playedLooping(clip) : playedOnce(clip))) {
+            return;
+        }
+
+        // The two play different copies of the clip, since each ends somewhere else, so switching
+        // swaps the action - at the same playhead, paused or not as it was. A clip that has finished
+        // was paused by the mixer, and stays held until it is played on.
+        const time = old.time;
+        const paused = old.paused;
+        old.stop();
+        this.active.action = this.startAction(mixer, clip, time, paused);
+        // The stop put the bones back where their bindings began; this puts them at the playhead.
+        this.stepMixer(0);
     }
 
     /**
@@ -430,7 +472,7 @@ export class AnimationRig {
 
             // Gone at the end of it. A death clone is what dying LOOKS like, not what is left
             // afterwards - the engine takes the object away when the clip is done.
-            if (action.time >= action.getClip().duration) {
+            if (clipDone(action)) {
                 // Its effects are released FIRST, and they outlive it. The Calamari clone's three
                 // `p_explosion_huge00` ignite at 59.7s of a 60.1s clip - the detonation the whole
                 // minute builds to - and hiding the part they are attached to cut them 0.4s in, so the
