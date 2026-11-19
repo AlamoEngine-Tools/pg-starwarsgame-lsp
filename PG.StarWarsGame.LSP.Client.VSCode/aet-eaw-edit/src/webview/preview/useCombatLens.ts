@@ -28,10 +28,10 @@ import { type TreeItem } from "./previewTree";
 import { type PreviewViewport } from "./viewport";
 import {
     collisionMeshNames,
-    damageParticleBones,
-    decalNames,
-    engineParticleBones,
+    destroyable,
+    hardpointWrites,
     partHidden,
+    withDestroyed,
 } from "./damage";
 import { stageForHull } from "./levels";
 import { hardpointCards, unitWeapons } from "./hardpointCards";
@@ -311,19 +311,8 @@ export function useCombatLens({
                 return;
             }
 
-            setDestroyed((current) => {
-                if (current.has(id) === isDestroyed) {
-                    return current;
-                }
-
-                const next = new Set(current);
-                if (isDestroyed) {
-                    next.add(id);
-                } else {
-                    next.delete(id);
-                }
-                return next;
-            });
+            // In the order they die - see `Destroyed`.
+            setDestroyed((current) => withDestroyed(current, id, isDestroyed));
 
             const hardpoint = scene?.hardpoints.find((h) => h.id === id);
 
@@ -452,10 +441,9 @@ export function useCombatLens({
      */
     const destroyAll = useCallback(
         (isDestroyed: boolean, log = true): void => {
-            for (const hardpoint of scene?.hardpoints ?? []) {
-                if (hardpoint.isDestroyable) {
-                    setHardpointDestroyed(hardpoint.id, isDestroyed, log);
-                }
+            // In declaration order - see `destroyable`.
+            for (const hardpoint of destroyable(scene?.hardpoints ?? [])) {
+                setHardpointDestroyed(hardpoint.id, isDestroyed, log);
             }
         },
         [scene, setHardpointDestroyed],
@@ -476,30 +464,14 @@ export function useCombatLens({
             }
         }
 
-        // Every decal the scene knows about, and the subset that should be showing.
-        viewport.setDecals(
-            decalNames(
-                scene.hardpoints,
-                new Set(scene.hardpoints.map((h) => h.id)),
-            ),
-            decalNames(scene.hardpoints, destroyed),
-        );
+        // What every hardpoint writes on creation - its decal and its Damage_Particles bone hidden -
+        // and what each dead one wrote, in the order they died: a later death wins where two
+        // hardpoints' bones overlap.
+        viewport.setHardpoints(hardpointWrites(scene.hardpoints, destroyed));
 
         // Never shown in either damage state, so this takes no `destroyed` and does not change with
         // it - it is set here because this is the pass that owns hardpoint-driven visibility.
         viewport.setCollisionMeshes(collisionMeshNames(scene.hardpoints));
-
-        // Every part on or below each hardpoint's Damage_Particles bone: hidden while it lives,
-        // shown once it is destroyed - meshes and effects alike.
-        viewport.setDamageParticles(
-            damageParticleBones(scene.hardpoints, destroyed),
-        );
-
-        // And every part on or below the Engine_Particles bone of each dead hardpoint whose death
-        // hides them.
-        viewport.setEngineParticles(
-            engineParticleBones(scene.hardpoints, destroyed),
-        );
 
         // The ordinary effect rules AND the ability decider. Through the same call as every other
         // effect deliberately: a held proxy then rides the emission gate, so its burst does not

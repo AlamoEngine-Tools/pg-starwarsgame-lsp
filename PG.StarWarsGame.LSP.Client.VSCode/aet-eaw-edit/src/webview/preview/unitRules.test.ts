@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { PREVIEW_SCENE_KIND } from "../../protocol/modelPreview";
+import { type HardpointDeath, type HardpointWrites } from "./damage";
 import { fileState, ruleState } from "./visibility";
 import { type PreviewRules, UnitRules, rulesFor } from "./unitRules";
 import { standInContext } from "./viewportContext.testing";
@@ -47,6 +48,21 @@ function rulesWith(rules?: PreviewRules): {
     return { unit, applied: () => applied };
 }
 
+/** What the hardpoints write: nothing on creation and no death, unless a test says otherwise. */
+function writes(over: Partial<HardpointWrites> = {}): HardpointWrites {
+    return {
+        decals: new Set(),
+        damageBones: new Set(),
+        deaths: [],
+        ...over,
+    };
+}
+
+/** One hardpoint's death, writing nothing unless a test says otherwise. */
+function death(over: Partial<HardpointDeath>): HardpointDeath {
+    return { decal: null, damageBone: null, engineBone: null, ...over };
+}
+
 /** The state switch of a part the file draws. */
 const drawnInFile = fileState(true);
 
@@ -77,7 +93,7 @@ describe("UnitRules", () => {
     it("leaves the model file's answer alone in a model preview", () => {
         const { unit } = rulesWith("file");
         unit.setCollisionMeshes(new Set(["collision"]));
-        unit.setDecals(new Set(["hp_blast"]), new Set());
+        unit.setHardpoints(writes({ decals: new Set(["hp_blast"]) }));
         unit.setStealthed(true);
 
         for (const alamoMesh of ["Collision", "HP_Blast", "stealth", "Hull"]) {
@@ -127,7 +143,7 @@ describe("UnitRules", () => {
     it("hides a unit's collision mesh and its damage decals until the hardpoint is destroyed", () => {
         const { unit } = rulesWith("game");
         unit.setCollisionMeshes(new Set(["collision"]));
-        unit.setDecals(new Set(["hp_blast"]), new Set());
+        unit.setHardpoints(writes({ decals: new Set(["hp_blast"]) }));
 
         assert.deepEqual(
             unit.meshState(drawnInFile, { alamoMesh: "Collision" }),
@@ -138,7 +154,12 @@ describe("UnitRules", () => {
             ruleState(false),
         );
 
-        unit.setDecals(new Set(["hp_blast"]), new Set(["hp_blast"]));
+        unit.setHardpoints(
+            writes({
+                decals: new Set(["hp_blast"]),
+                deaths: [death({ decal: "hp_blast" })],
+            }),
+        );
 
         assert.deepEqual(
             unit.meshState(fileState(false), { alamoMesh: "HP_Blast" }),
@@ -154,19 +175,25 @@ describe("UnitRules", () => {
         assert.equal(unit.idle(undefined), undefined);
     });
 
-    it("forgets a model's decals, collision meshes and shield", () => {
+    it("forgets a model's hardpoints, collision meshes and shield", () => {
         const { unit } = rulesWith("game");
-        unit.setDecals(new Set(["hp_decal"]), new Set(["hp_decal"]));
+        unit.setHardpoints(
+            writes({
+                decals: new Set(["hp_decal"]),
+                damageBones: new Set(["hp_bone"]),
+                deaths: [death({ decal: "hp_decal", engineBone: "hp_bone" })],
+            }),
+        );
         unit.setCollisionMeshes(new Set(["collision"]));
         unit.setShieldRevealed(true);
 
         unit.forgetModel();
 
-        assert.equal(unit.knownDecals.size, 0);
-        assert.equal(unit.shownDecals.size, 0);
+        assert.equal(unit.hardpoints.decals.size, 0);
+        assert.equal(unit.hardpoints.damageBones.size, 0);
+        assert.deepEqual(unit.hardpoints.deaths, []);
         assert.equal(unit.collisionMeshes.size, 0);
         assert.equal(unit.shieldRevealed, false);
-        assert.equal(unit.damageParticles.size, 0);
     });
 });
 
@@ -175,7 +202,7 @@ describe("UnitRules, a hardpoint's Damage_Particles bone", () => {
 
     it("hides every part on the bone or at any depth below it while the hardpoint lives", () => {
         const { unit } = rulesWith("game");
-        unit.setDamageParticles(new Map([["hp_bone", false]]));
+        unit.setHardpoints(writes({ damageBones: new Set(["hp_bone"]) }));
 
         for (const bone of [1, 2, 3]) {
             assert.deepEqual(
@@ -193,7 +220,7 @@ describe("UnitRules, a hardpoint's Damage_Particles bone", () => {
 
     it("leaves every part outside that subtree as it was", () => {
         const { unit } = rulesWith("game");
-        unit.setDamageParticles(new Map([["hp_bone", false]]));
+        unit.setHardpoints(writes({ damageBones: new Set(["hp_bone"]) }));
 
         assert.deepEqual(unit.meshState(drawnInFile, mesh, 0), drawnInFile);
         assert.deepEqual(unit.meshState(drawnInFile, mesh, 4), drawnInFile);
@@ -202,7 +229,12 @@ describe("UnitRules, a hardpoint's Damage_Particles bone", () => {
 
     it("shows them all once it is destroyed, whatever the file says, and the bone is matched by name", () => {
         const { unit } = rulesWith("game");
-        unit.setDamageParticles(new Map([["hp_bone", true]]));
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["hp_bone"]),
+                deaths: [death({ damageBone: "hp_bone" })],
+            }),
+        );
 
         assert.deepEqual(
             unit.meshState(fileState(false), mesh, 2),
@@ -216,8 +248,13 @@ describe("UnitRules, a hardpoint's Damage_Particles bone", () => {
 
     it("comes after the decal rule, and the cloak still comes after it", () => {
         const { unit } = rulesWith("game");
-        unit.setDecals(new Set(["plate"]), new Set());
-        unit.setDamageParticles(new Map([["hp_bone", true]]));
+        unit.setHardpoints(
+            writes({
+                decals: new Set(["plate"]),
+                damageBones: new Set(["hp_bone"]),
+                deaths: [death({ damageBone: "hp_bone" })],
+            }),
+        );
 
         assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), ruleState(true));
 
@@ -232,7 +269,7 @@ describe("UnitRules, a hardpoint's Damage_Particles bone", () => {
 
     it("writes nothing in a model preview", () => {
         const { unit } = rulesWith("file");
-        unit.setDamageParticles(new Map([["hp_bone", false]]));
+        unit.setHardpoints(writes({ damageBones: new Set(["hp_bone"]) }));
 
         assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), drawnInFile);
         assert.deepEqual(unit.effectState(drawnInFile, 3), drawnInFile);
@@ -244,7 +281,7 @@ describe("UnitRules, a hardpoint's Engine_Particles bone", () => {
 
     it("writes nothing while the hardpoint lives", () => {
         const { unit } = rulesWith("game");
-        unit.setEngineParticles(new Set());
+        unit.setHardpoints(writes());
 
         assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), drawnInFile);
         assert.deepEqual(
@@ -255,7 +292,9 @@ describe("UnitRules, a hardpoint's Engine_Particles bone", () => {
 
     it("hides every part on the bone or at any depth below it once a hardpoint that hides them dies", () => {
         const { unit } = rulesWith("game");
-        unit.setEngineParticles(new Set(["hp_bone"]));
+        unit.setHardpoints(
+            writes({ deaths: [death({ engineBone: "hp_bone" })] }),
+        );
 
         for (const bone of [1, 2, 3]) {
             assert.deepEqual(
@@ -273,10 +312,16 @@ describe("UnitRules, a hardpoint's Engine_Particles bone", () => {
         assert.deepEqual(unit.effectState(drawnInFile, 0), drawnInFile);
     });
 
-    it("hides after the Damage_Particles bone shows, in the order a hardpoint dies", () => {
+    it("hides after the Damage_Particles bone shows within one hardpoint's death", () => {
         const { unit } = rulesWith("game");
-        unit.setDamageParticles(new Map([["hp_bone", true]]));
-        unit.setEngineParticles(new Set(["emitdamage"]));
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["hp_bone"]),
+                deaths: [
+                    death({ damageBone: "hp_bone", engineBone: "emitdamage" }),
+                ],
+            }),
+        );
 
         assert.deepEqual(unit.meshState(drawnInFile, mesh, 1), ruleState(true));
         assert.deepEqual(
@@ -288,18 +333,79 @@ describe("UnitRules, a hardpoint's Engine_Particles bone", () => {
 
     it("writes nothing in a model preview", () => {
         const { unit } = rulesWith("file");
-        unit.setEngineParticles(new Set(["hp_bone"]));
+        unit.setHardpoints(
+            writes({ deaths: [death({ engineBone: "hp_bone" })] }),
+        );
 
         assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), drawnInFile);
         assert.deepEqual(unit.effectState(drawnInFile, 3), drawnInFile);
     });
+});
 
-    it("is forgotten with the model", () => {
+describe("UnitRules, the order hardpoints die in", () => {
+    // An engine hardpoint E whose Engine_Particles bone is EmitDamage, and a hardpoint D whose
+    // Damage_Particles bone is HP_Bone, above it: their bones overlap on EmitDamage and below.
+    const engine = death({ engineBone: "emitdamage" });
+    const damage = death({ damageBone: "hp_bone" });
+    const mesh = { alamoMesh: "Plate" };
+
+    it("shows the overlap when the engine hardpoint dies first and the damage hardpoint later", () => {
         const { unit } = rulesWith("game");
-        unit.setEngineParticles(new Set(["hp_bone"]));
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["hp_bone"]),
+                deaths: [engine, damage],
+            }),
+        );
 
-        unit.forgetModel();
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), ruleState(true));
+        assert.deepEqual(unit.effectState(drawnInFile, 3), ruleState(true));
+    });
 
-        assert.equal(unit.engineParticles.size, 0);
+    it("hides the overlap when the damage hardpoint dies first and the engine hardpoint later", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["hp_bone"]),
+                deaths: [damage, engine],
+            }),
+        );
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, mesh, 2),
+            ruleState(false),
+        );
+        assert.deepEqual(unit.effectState(drawnInFile, 3), ruleState(false));
+        // Above the overlap only the damage hardpoint speaks.
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 1), ruleState(true));
+    });
+
+    it("shows a decal a later death names over an earlier engine hide", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({
+                decals: new Set(["plate"]),
+                deaths: [engine, death({ decal: "plate" })],
+            }),
+        );
+
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 3), ruleState(true));
+    });
+
+    it("writes only what creation writes once every death is taken back", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["hp_bone"]),
+                deaths: [engine, damage],
+            }),
+        );
+        unit.setHardpoints(writes({ damageBones: new Set(["hp_bone"]) }));
+
+        assert.deepEqual(unit.hardpoints.deaths, []);
+        assert.deepEqual(
+            unit.meshState(drawnInFile, mesh, 2),
+            ruleState(false),
+        );
     });
 });

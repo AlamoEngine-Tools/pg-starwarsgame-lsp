@@ -10,14 +10,14 @@ import type {
 } from "../../protocol/modelPreview";
 import { PREVIEW_PARTICLE_GATE } from "../../protocol/modelPreview";
 import {
+    type Destroyed,
     collisionMeshNames,
-    damageParticleBones,
-    decalNames,
     destroyable,
     effectPlays,
-    engineParticleBones,
+    hardpointWrites,
     partHidden,
     playsOnOpen,
+    withDestroyed,
 } from "./damage";
 
 function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
@@ -114,101 +114,85 @@ describe("effectPlays", () => {
     });
 });
 
-describe("engineParticleBones", () => {
-    it("names the Engine_Particles bone of every destroyed hardpoint whose death hides it, lowercased", () => {
-        const engine = hardpoint({
-            id: "HP_Engine",
-            engineParticlesBone: "HP_E_Bone",
-            engineDeathHidesEngineParticles: true,
-        });
-
-        assert.deepEqual([...engineParticleBones([engine], new Set())], []);
-        assert.deepEqual(
-            [...engineParticleBones([engine], new Set(["HP_Engine"]))],
-            ["hp_e_bone"],
-        );
+describe("hardpointWrites", () => {
+    const engine = hardpoint({
+        id: "HP_Engine",
+        damageDecalBone: null,
+        damageParticlesBone: null,
+        engineParticlesBone: "HP_E_Bone",
+        engineDeathHidesEngineParticles: true,
     });
 
-    it("leaves out a hardpoint whose death does not hide them, and one that names no bone", () => {
-        const bones = engineParticleBones(
-            [
-                hardpoint({
-                    id: "HP_Keeps",
-                    engineParticlesBone: "HP_E_Bone",
-                    engineDeathHidesEngineParticles: false,
-                }),
-                hardpoint({
-                    id: "HP_None",
-                    engineParticlesBone: null,
-                    engineDeathHidesEngineParticles: true,
-                }),
-            ],
-            new Set(["HP_Keeps", "HP_None"]),
-        );
+    it("names what every hardpoint writes on creation, lowercased, whatever is destroyed", () => {
+        const writes = hardpointWrites([hardpoint(), engine], new Set());
 
-        assert.equal(bones.size, 0);
-    });
-});
-
-describe("damageParticleBones", () => {
-    it("names each hardpoint's Damage_Particles bone, lowercased, and whether it is destroyed", () => {
-        const bones = damageParticleBones(
-            [
-                hardpoint(),
-                hardpoint({
-                    id: "HP_Other",
-                    damageParticlesBone: "HP_M-C_Bone",
-                }),
-                hardpoint({ id: "HP_None", damageParticlesBone: null }),
-            ],
-            new Set(["HP_Other"]),
-        );
-
-        assert.deepEqual(
-            [...bones],
-            [
-                ["hp_f-l_emitdamage", false],
-                ["hp_m-c_bone", true],
-            ],
-        );
-    });
-
-    it("shows a bone two hardpoints name once either of them is destroyed", () => {
-        const bones = damageParticleBones(
-            [hardpoint(), hardpoint({ id: "HP_Twin" })],
-            new Set(["HP_Twin"]),
-        );
-
-        assert.equal(bones.get("hp_f-l_emitdamage"), true);
-    });
-});
-
-describe("decalNames", () => {
-    it("names the blast decal of every destroyed hardpoint", () => {
         // Damage_Decal names a mesh that shares its bone's name, and the file ships it VISIBLE - the
         // game hides it until the hardpoint is blown off, so the preview has to do the same.
-        const names = decalNames([hardpoint()], new Set(["HP_Weapon"]));
-
-        assert.deepEqual([...names], ["hp_f-l_blast"]);
+        assert.deepEqual([...writes.decals], ["hp_f-l_blast"]);
+        assert.deepEqual([...writes.damageBones], ["hp_f-l_emitdamage"]);
+        assert.deepEqual(writes.deaths, []);
     });
 
-    it("names nothing while everything is intact", () => {
-        assert.equal(decalNames([hardpoint()], new Set()).size, 0);
-    });
-
-    it("skips a hardpoint that declares no decal", () => {
-        const plain = hardpoint({ id: "HP_Shield", damageDecalBone: null });
-
-        assert.equal(decalNames([plain], new Set(["HP_Shield"])).size, 0);
-    });
-
-    it("lowercases, because mesh names are matched case-insensitively", () => {
-        const shouty = hardpoint({ damageDecalBone: "HP_F-L_BLAST" });
-
-        assert.deepEqual(
-            [...decalNames([shouty], new Set(["HP_Weapon"]))],
-            ["hp_f-l_blast"],
+    it("lists the deaths in the order the hardpoints died, each with what its death writes", () => {
+        const writes = hardpointWrites(
+            [hardpoint(), engine],
+            new Set(["HP_Engine", "HP_Weapon"]),
         );
+
+        assert.deepEqual(writes.deaths, [
+            { decal: null, damageBone: null, engineBone: "hp_e_bone" },
+            {
+                decal: "hp_f-l_blast",
+                damageBone: "hp_f-l_emitdamage",
+                engineBone: null,
+            },
+        ]);
+    });
+
+    it("writes no engine hide for a hardpoint whose death leaves the engines alone", () => {
+        const keeps = hardpoint({
+            id: "HP_Keeps",
+            engineParticlesBone: "HP_E_Bone",
+            engineDeathHidesEngineParticles: false,
+        });
+
+        assert.equal(
+            hardpointWrites([keeps], new Set(["HP_Keeps"])).deaths[0]
+                .engineBone,
+            null,
+        );
+    });
+});
+
+describe("withDestroyed", () => {
+    it("records deaths in the order they happen, and a repair takes one out", () => {
+        let destroyed: Destroyed = new Set();
+        destroyed = withDestroyed(destroyed, "HP_B", true);
+        destroyed = withDestroyed(destroyed, "HP_A", true);
+        assert.deepEqual([...destroyed], ["HP_B", "HP_A"]);
+
+        destroyed = withDestroyed(destroyed, "HP_B", false);
+        assert.deepEqual([...destroyed], ["HP_A"]);
+
+        // Destroyed again, it died last.
+        destroyed = withDestroyed(destroyed, "HP_B", true);
+        assert.deepEqual([...destroyed], ["HP_A", "HP_B"]);
+    });
+
+    it("leaves the order empty once every hardpoint is repaired", () => {
+        let destroyed: Destroyed = new Set(["HP_A", "HP_B"]);
+        for (const id of ["HP_A", "HP_B"]) {
+            destroyed = withDestroyed(destroyed, id, false);
+        }
+
+        assert.deepEqual([...destroyed], []);
+    });
+
+    it("changes nothing for a hardpoint already in that state", () => {
+        const destroyed: Destroyed = new Set(["HP_A"]);
+
+        assert.equal(withDestroyed(destroyed, "HP_A", true), destroyed);
+        assert.equal(withDestroyed(destroyed, "HP_B", false), destroyed);
     });
 });
 
@@ -219,6 +203,17 @@ describe("destroyable", () => {
         assert.deepEqual(
             destroyable([hardpoint(), shield]).map((h) => h.id),
             ["HP_Weapon"],
+        );
+    });
+
+    it("keeps the order the hardpoints are declared in, which is the order Destroy all kills them", () => {
+        assert.deepEqual(
+            destroyable([
+                hardpoint({ id: "HP_C" }),
+                hardpoint({ id: "HP_A" }),
+                hardpoint({ id: "HP_B" }),
+            ]).map((h) => h.id),
+            ["HP_C", "HP_A", "HP_B"],
         );
     });
 });

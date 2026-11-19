@@ -30,6 +30,7 @@ import { type BreakoffAnchor } from "./breakoff";
 import { type TurretAim, type TurretHandle } from "./turretHandles";
 import { type Inspection } from "./inspector";
 import { type AbilityOwnership } from "./abilityRows";
+import { type HardpointWrites } from "./damage";
 import {
     type OverrideChange,
     type RowOverride,
@@ -549,9 +550,12 @@ export class PreviewViewport {
         return this.rules.appliesGameRules();
     }
 
-    /** Which decal meshes exist, and which of them are showing. See `UnitRules.setDecals`. */
-    setDecals(known: ReadonlySet<string>, shown: ReadonlySet<string>): void {
-        this.rules.setDecals(known, shown);
+    /**
+     * What the hardpoints write: their decals and bones, and each death in the order they died. See
+     * `UnitRules.setHardpoints`.
+     */
+    setHardpoints(writes: HardpointWrites): void {
+        this.rules.setHardpoints(writes);
     }
 
     /**
@@ -559,22 +563,6 @@ export class PreviewViewport {
      */
     setCollisionMeshes(names: ReadonlySet<string>): void {
         this.rules.setCollisionMeshes(names);
-    }
-
-    /**
-     * Each hardpoint's Damage_Particles bone and whether it is destroyed. See
-     * `UnitRules.setDamageParticles`.
-     */
-    setDamageParticles(bones: ReadonlyMap<string, boolean>): void {
-        this.rules.setDamageParticles(bones);
-    }
-
-    /**
-     * The Engine_Particles bones of every dead hardpoint whose death hides them. See
-     * `UnitRules.setEngineParticles`.
-     */
-    setEngineParticles(bones: ReadonlySet<string>): void {
-        this.rules.setEngineParticles(bones);
     }
 
     /**

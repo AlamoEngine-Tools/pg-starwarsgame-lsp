@@ -14,17 +14,46 @@
 //     |- once  Death_Explosion_Particles
 //     '- if Engine_Death_Hide_Engine_Particles: hide every part on the Engine_Particles bone or below it
 //
-// The two bone rules are writes of each part's state switch, so they live with the unit's other state
-// writers in `UnitRules`; this module only names the bones - see `damageParticleBones` and
-// `engineParticleBones`. A particle's gate only names the hardpoint that owns it, for the dock.
+// These are writes of each part's state switch, so they live with the unit's other state writers in
+// `UnitRules`; this module only names what each hardpoint writes, and in which order the hardpoints
+// died - see `hardpointWrites`. A particle's gate only names the hardpoint that owns it, for the dock.
 
 import {
     PREVIEW_PARTICLE_GATE,
     type PreviewHardpoint,
 } from "../../protocol/modelPreview";
 
-/** The ids of the hardpoints currently blown off. */
+/**
+ * The ids of the hardpoints currently blown off, in the ORDER they died: a set's iteration order is
+ * its insertion order, and {@link withDestroyed} only ever appends a death and removes a repair.
+ *
+ * The order matters because a death writes the state switch of the parts its bones reach, and the
+ * last write wins - where two hardpoints' bones overlap, the later death decides. Every way the
+ * hardpoints come back empties it: a repair takes its hardpoint out, Repair all and a starting clip
+ * take every one out, and a new scene starts from the subject's state as the panel opened it.
+ */
 export type Destroyed = ReadonlySet<string>;
+
+/** The destroyed hardpoints after one is destroyed or repaired: a death goes last. */
+export function withDestroyed(
+    current: Destroyed,
+    id: string,
+    destroyed: boolean,
+): Destroyed {
+    if (current.has(id) === destroyed) {
+        return current;
+    }
+
+    const next = new Set(current);
+
+    if (destroyed) {
+        next.add(id);
+    } else {
+        next.delete(id);
+    }
+
+    return next;
+}
 
 /** Whether an attached part should be hidden, because the hardpoint holding it is gone. */
 export function partHidden(
@@ -57,7 +86,7 @@ export interface EffectGate {
  * `startsVisible` has the final say HERE: an effect the model itself ships switched off - like
  * `pi_damage_elec_SD00` - does not appear just because something was destroyed. The one rule that
  * shows it is the Damage_Particles rule, for an effect on or below a destroyed hardpoint's bone, and
- * that writes over this answer in the unit's rules - see `UnitRules.setDamageParticles`.
+ * that writes over this answer in the unit's rules - see `UnitRules.setHardpoints`.
  *
  * An ability proxy ships switched off precisely BECAUSE its ability is what turns it on, so a caller
  * that has a better answer than the default - an ability's - does not ask this.
@@ -66,83 +95,85 @@ export function effectPlays(particle: EffectGate): boolean {
     return particle.startsVisible;
 }
 
-/**
- * Each hardpoint's `Damage_Particles` bone, lowercased, and whether a hardpoint naming it is destroyed.
- *
- * Every part on that bone or at any depth below it is hidden while the hardpoint lives and shown once
- * it is destroyed - see `UnitRules.setDamageParticles`. Two hardpoints naming one bone show it once
- * either is destroyed: a destruction only ever writes shown.
- */
-export function damageParticleBones(
-    hardpoints: readonly PreviewHardpoint[],
-    destroyed: Destroyed,
-): ReadonlyMap<string, boolean> {
-    const bones = new Map<string, boolean>();
-
-    for (const hardpoint of hardpoints) {
-        const bone = (hardpoint.damageParticlesBone ?? "").trim().toLowerCase();
-
-        if (bone !== "") {
-            bones.set(
-                bone,
-                (bones.get(bone) ?? false) || destroyed.has(hardpoint.id),
-            );
-        }
-    }
-
-    return bones;
+/** What one hardpoint's death writes, lowercased for matching; null where it writes nothing. */
+export interface HardpointDeath {
+    /** The `Damage_Decal` part it shows. */
+    decal: string | null;
+    /** The `Damage_Particles` bone whose parts, at any depth, it shows. */
+    damageBone: string | null;
+    /** The `Engine_Particles` bone whose parts, at any depth, it hides - only with the flag. */
+    engineBone: string | null;
 }
 
 /**
- * The `Engine_Particles` bones, lowercased, of every destroyed hardpoint whose death hides them.
- *
- * Every part on such a bone or at any depth below it is hidden once the hardpoint dies - see
- * `UnitRules.setEngineParticles`. `engineDeathHidesEngineParticles` is true unless the XML denies
- * it, as the game reads the tag; a living hardpoint names nothing, because the rule writes nothing
- * until it dies.
+ * What the hardpoints write to the state switch of the unit's parts: on creation, and in the order
+ * they died.
  */
-export function engineParticleBones(
-    hardpoints: readonly PreviewHardpoint[],
-    destroyed: Destroyed,
-): ReadonlySet<string> {
-    const bones = new Set<string>();
+export interface HardpointWrites {
+    /**
+     * Every `Damage_Decal`, hidden when the unit's type loads. `Damage_Decal` names a mesh that
+     * shares its bone's name - measured on `Ev_stardestroyer.alo`, where `HP_F-L_Blast` is both -
+     * and the file ships those meshes VISIBLE.
+     */
+    decals: ReadonlySet<string>;
+    /** Every `Damage_Particles` bone, whose parts at any depth are hidden when its hardpoint is created. */
+    damageBones: ReadonlySet<string>;
+    /** Each destroyed hardpoint's death, in the order they died. */
+    deaths: readonly HardpointDeath[];
+}
 
-    for (const hardpoint of hardpoints) {
-        const bone = (hardpoint.engineParticlesBone ?? "").trim().toLowerCase();
-
-        if (
-            bone !== "" &&
-            hardpoint.engineDeathHidesEngineParticles &&
-            destroyed.has(hardpoint.id)
-        ) {
-            bones.add(bone);
-        }
-    }
-
-    return bones;
+/** Lowercased and trimmed, or null for a tag the hardpoint does not write. */
+function named(value: string | null | undefined): string | null {
+    const name = (value ?? "").trim().toLowerCase();
+    return name === "" ? null : name;
 }
 
 /**
- * The decal meshes that should be showing, lowercased for matching.
+ * What the hardpoints write - see {@link HardpointWrites}. The deaths follow `destroyed`, which
+ * holds them in the order they happened.
  *
- * `Damage_Decal` names a mesh that shares its bone's name - measured on `Ev_stardestroyer.alo`,
- * where `HP_F-L_Blast` is both. The file ships those meshes VISIBLE, so the engine must hide them
- * until the hardpoint is destroyed; the preview starts them hidden for the same reason.
+ * Within one death the game writes in this order: the decal shown, the `Damage_Particles` parts
+ * shown, then - with `Engine_Death_Hide_Engine_Particles`, true unless the XML denies it - the
+ * `Engine_Particles` parts hidden. See `UnitRules.setHardpoints` for how they are replayed.
  */
-export function decalNames(
+export function hardpointWrites(
     hardpoints: readonly PreviewHardpoint[],
     destroyed: Destroyed,
-): ReadonlySet<string> {
-    const names = new Set<string>();
+): HardpointWrites {
+    const byId = new Map(hardpoints.map((h) => [h.id, h]));
+    const decals = new Set<string>();
+    const damageBones = new Set<string>();
 
     for (const hardpoint of hardpoints) {
-        const decal = hardpoint.damageDecalBone ?? "";
-        if (decal !== "" && destroyed.has(hardpoint.id)) {
-            names.add(decal.toLowerCase());
+        const decal = named(hardpoint.damageDecalBone);
+        const bone = named(hardpoint.damageParticlesBone);
+
+        if (decal !== null) {
+            decals.add(decal);
+        }
+
+        if (bone !== null) {
+            damageBones.add(bone);
         }
     }
 
-    return names;
+    const deaths: HardpointDeath[] = [];
+
+    for (const id of destroyed) {
+        const hardpoint = byId.get(id);
+
+        if (hardpoint !== undefined) {
+            deaths.push({
+                decal: named(hardpoint.damageDecalBone),
+                damageBone: named(hardpoint.damageParticlesBone),
+                engineBone: hardpoint.engineDeathHidesEngineParticles
+                    ? named(hardpoint.engineParticlesBone)
+                    : null,
+            });
+        }
+    }
+
+    return { decals, damageBones, deaths };
 }
 
 /**
@@ -185,6 +216,9 @@ export function collisionMeshNames(
  *
  * The rest are still listed, marked as indestructible rather than quietly inert - a shield generator
  * that cannot be shot off is a fact the author wants to see.
+ *
+ * In the order the unit declares its hardpoints, which is the order Destroy all kills them in. The
+ * game's order for hardpoints dying at the same moment is not known; the preview picks this one.
  */
 export function destroyable(
     hardpoints: readonly PreviewHardpoint[],

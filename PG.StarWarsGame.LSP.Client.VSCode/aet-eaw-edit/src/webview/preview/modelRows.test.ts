@@ -376,7 +376,11 @@ describe("ModelRows", () => {
 
     it("hides every mesh on a living hardpoint's Damage_Particles bone and below it, and nothing else", () => {
         const { rows, mesh, extra, gun, unit } = rowsWith();
-        unit.setDamageParticles(new Map([["turret", false]]));
+        unit.setHardpoints({
+            decals: new Set(),
+            damageBones: new Set(["turret"]),
+            deaths: [],
+        });
 
         rows.treeItems();
 
@@ -384,7 +388,11 @@ describe("ModelRows", () => {
         assert.equal(meshDrawn(extra), false, "its second mesh is drawn");
         assert.equal(meshDrawn(gun), false, "the mesh below it is drawn");
 
-        unit.setDamageParticles(new Map([["turret", true]]));
+        unit.setHardpoints({
+            decals: new Set(),
+            damageBones: new Set(["turret"]),
+            deaths: [{ decal: null, damageBone: "turret", engineBone: null }],
+        });
         rows.resolveRows();
 
         assert.equal(meshDrawn(gun), true, "destroying it did not show them");
@@ -395,7 +403,11 @@ describe("ModelRows", () => {
         rows.treeItems();
         assert.equal(meshDrawn(gun), true);
 
-        unit.setEngineParticles(new Set(["turret"]));
+        unit.setHardpoints({
+            decals: new Set(),
+            damageBones: new Set(),
+            deaths: [{ decal: null, damageBone: null, engineBone: "turret" }],
+        });
         rows.resolveRows();
 
         assert.equal(meshDrawn(mesh), false, "the bone's own mesh is drawn");
