@@ -19,7 +19,7 @@ import {
 import { post } from "./previewPost";
 import { type PreviewViewport } from "./viewport";
 import { type PreviewAssetLoader } from "./previewAssetLoader";
-import { effectPlaysNow, hardpointGateAllows } from "./damage";
+import { effectPlaysNow } from "./damage";
 import { passiveEffectPlaysNow, passiveEffects } from "./passiveSubject";
 import { abilityAllows, abilityClaims } from "./abilityRows";
 import { effectState } from "./visibility";
@@ -42,7 +42,6 @@ export interface ParticleEffectsInputs {
     abilityProxyIdsRef: RefObject<ReadonlyMap<string, string[]>>;
     activeAbilitiesRef: RefObject<ReadonlySet<string>>;
     assets: PreviewAssetLoader;
-    destroyedRef: RefObject<ReadonlySet<string>>;
     refreshStats: () => void;
     replacedEffectsRef: RefObject<ReadonlySet<string>>;
     setHiddenEmitters: Dispatch<SetStateAction<ReadonlySet<number>>>;
@@ -56,7 +55,6 @@ export function useParticleEffects({
     abilityProxyIdsRef,
     activeAbilitiesRef,
     assets,
-    destroyedRef,
     refreshStats,
     replacedEffectsRef,
     setHiddenEmitters,
@@ -161,25 +159,20 @@ export function useParticleEffects({
             return false;
         }
 
-        // A cloaked unit shows its stealth shell and nothing else - not its engines, not its
-        // damage smoke, not the proxies of the ability doing the cloaking. The meshes are swapped
-        // by the row chain in the viewport; this is the same rule reaching the effects, which
-        // answer to their own decider.
-        // The engine glow going out with its hardpoint is NOT decided here. It arrives already gated:
-        // the server joins the glow proxy to the engine hardpoint and marks it `HardpointAlive`,
-        // and `hardpointGateAllows` below is what reads that. A second rule here, matching the
-        // hardpoint's `Engine_Particles` bone against the proxy's own bone name, was the same
-        // one-flag-two-gates mistake as the shield mesh - and it never matched anything on any
-        // shipped ship, because the join is on the proxy's PARENT.
+        // Neither the cloak nor a hardpoint's bones are decided here. Both are writes of the
+        // effect's state switch in the unit's rules, after this answer - see `UnitRules`: the
+        // cloak hides every effect, a Damage_Particles bone hides its smoke until the hardpoint
+        // dies, and an Engine_Particles bone hides its glow once it does.
 
         // An ability REPLACES the quiet-on-open rule for the proxies it claims, rather than being
         // ANDed with it. The opening rules hold every non-engine effect back - rightly, on open -
         // but they are about the first moment, not a permanent veto, and ANDing them left an
-        // activated ability changing nothing at all. The damage rules still apply either way.
+        // activated ability changing nothing at all. The hardpoint bone rules still apply either way.
         if (abilityClaims(particle.id, proxies)) {
-            return (
-                hardpointGateAllows(particle, destroyedRef.current) &&
-                abilityAllows(particle.id, proxies, activeAbilitiesRef.current)
+            return abilityAllows(
+                particle.id,
+                proxies,
+                activeAbilitiesRef.current,
             );
         }
 
@@ -190,7 +183,7 @@ export function useParticleEffects({
             return false;
         }
 
-        return effectPlaysNow(particle, destroyedRef.current);
+        return effectPlaysNow(particle);
     }, []);
 
     /**

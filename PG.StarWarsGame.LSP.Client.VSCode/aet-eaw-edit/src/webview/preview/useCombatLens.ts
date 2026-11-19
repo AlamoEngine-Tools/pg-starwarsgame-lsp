@@ -30,6 +30,7 @@ import {
     collisionMeshNames,
     damageParticleBones,
     decalNames,
+    engineParticleBones,
     partHidden,
 } from "./damage";
 import { stageForHull } from "./levels";
@@ -492,6 +493,12 @@ export function useCombatLens({
         // shown once it is destroyed - meshes and effects alike.
         viewport.setDamageParticles(
             damageParticleBones(scene.hardpoints, destroyed),
+        );
+
+        // And every part on or below the Engine_Particles bone of each dead hardpoint whose death
+        // hides them.
+        viewport.setEngineParticles(
+            engineParticleBones(scene.hardpoints, destroyed),
         );
 
         // The ordinary effect rules AND the ability decider. Through the same call as every other

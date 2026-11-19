@@ -238,3 +238,68 @@ describe("UnitRules, a hardpoint's Damage_Particles bone", () => {
         assert.deepEqual(unit.effectState(drawnInFile, 3), drawnInFile);
     });
 });
+
+describe("UnitRules, a hardpoint's Engine_Particles bone", () => {
+    const mesh = { alamoMesh: "Glow" };
+
+    it("writes nothing while the hardpoint lives", () => {
+        const { unit } = rulesWith("game");
+        unit.setEngineParticles(new Set());
+
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), drawnInFile);
+        assert.deepEqual(
+            unit.effectState(fileState(false), 3),
+            fileState(false),
+        );
+    });
+
+    it("hides every part on the bone or at any depth below it once a hardpoint that hides them dies", () => {
+        const { unit } = rulesWith("game");
+        unit.setEngineParticles(new Set(["hp_bone"]));
+
+        for (const bone of [1, 2, 3]) {
+            assert.deepEqual(
+                unit.meshState(drawnInFile, mesh, bone),
+                ruleState(false),
+                `mesh on bone ${bone}`,
+            );
+            assert.deepEqual(
+                unit.effectState(drawnInFile, bone),
+                ruleState(false),
+                `effect on bone ${bone}`,
+            );
+        }
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 4), drawnInFile);
+        assert.deepEqual(unit.effectState(drawnInFile, 0), drawnInFile);
+    });
+
+    it("hides after the Damage_Particles bone shows, in the order a hardpoint dies", () => {
+        const { unit } = rulesWith("game");
+        unit.setDamageParticles(new Map([["hp_bone", true]]));
+        unit.setEngineParticles(new Set(["emitdamage"]));
+
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 1), ruleState(true));
+        assert.deepEqual(
+            unit.meshState(drawnInFile, mesh, 2),
+            ruleState(false),
+        );
+        assert.deepEqual(unit.effectState(drawnInFile, 3), ruleState(false));
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setEngineParticles(new Set(["hp_bone"]));
+
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), drawnInFile);
+        assert.deepEqual(unit.effectState(drawnInFile, 3), drawnInFile);
+    });
+
+    it("is forgotten with the model", () => {
+        const { unit } = rulesWith("game");
+        unit.setEngineParticles(new Set(["hp_bone"]));
+
+        unit.forgetModel();
+
+        assert.equal(unit.engineParticles.size, 0);
+    });
+});

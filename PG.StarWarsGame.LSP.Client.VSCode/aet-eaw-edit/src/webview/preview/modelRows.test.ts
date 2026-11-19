@@ -353,4 +353,17 @@ describe("ModelRows", () => {
 
         assert.equal(meshDrawn(gun), true, "destroying it did not show them");
     });
+
+    it("hides every mesh on a dead engine hardpoint's Engine_Particles bone and below it", () => {
+        const { rows, mesh, extra, gun, unit } = rowsWith();
+        rows.treeItems();
+        assert.equal(meshDrawn(gun), true);
+
+        unit.setEngineParticles(new Set(["turret"]));
+        rows.resolveRows();
+
+        assert.equal(meshDrawn(mesh), false, "the bone's own mesh is drawn");
+        assert.equal(meshDrawn(extra), false, "its second mesh is drawn");
+        assert.equal(meshDrawn(gun), false, "the mesh below it is drawn");
+    });
 });

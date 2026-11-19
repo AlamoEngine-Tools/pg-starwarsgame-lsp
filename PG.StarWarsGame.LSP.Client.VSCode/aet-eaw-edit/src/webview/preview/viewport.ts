@@ -570,6 +570,14 @@ export class PreviewViewport {
     }
 
     /**
+     * The Engine_Particles bones of every dead hardpoint whose death hides them. See
+     * `UnitRules.setEngineParticles`.
+     */
+    setEngineParticles(bones: ReadonlySet<string>): void {
+        this.rules.setEngineParticles(bones);
+    }
+
+    /**
      * Shield meshes the model names but does not draw with a shield shader. See
      * `MaterialBinder.shieldMeshesOffShader`.
      */

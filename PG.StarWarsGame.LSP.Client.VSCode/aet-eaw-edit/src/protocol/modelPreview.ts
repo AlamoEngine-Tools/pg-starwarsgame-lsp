@@ -461,9 +461,9 @@ export interface PreviewTurret {
 /**
  * One mounted hardpoint, with everything needed to destroy and repair it locally.
  *
- * The damage chain, in order: hide {@link partId}, show the proxies parented to
- * {@link damageParticlesBone} on the hull, show the {@link damageDecalBone} mesh, play
- * {@link deathExplosionParticles} once, and hide the engine glow when
+ * The damage chain, in order: hide {@link partId}, show the {@link damageDecalBone} mesh, show every
+ * part on or below {@link damageParticlesBone} on the hull, play {@link deathExplosionParticles} once,
+ * and hide every part on or below {@link engineParticlesBone} when
  * {@link engineDeathHidesEngineParticles} is set. Every one is read from the hardpoint's own tags.
  */
 export interface PreviewHardpoint {

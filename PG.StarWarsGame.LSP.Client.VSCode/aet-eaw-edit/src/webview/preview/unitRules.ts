@@ -63,6 +63,11 @@ export class UnitRules {
      */
     damageParticles: ReadonlyMap<string, boolean> = new Map();
     /**
+     * The `Engine_Particles` bones, lowercased, of every destroyed hardpoint whose death hides them.
+     * See {@link setEngineParticles}.
+     */
+    engineParticles: ReadonlySet<string> = new Set();
+    /**
      * Whether an active ability is holding the SHIELD MESH visible.
      *
      * The mesh ships hidden - `MeshShield.fx` carries `alamoHidden: true` - so this is the unit being
@@ -78,13 +83,14 @@ export class UnitRules {
     stealthed = false;
 
     /**
-     * What the `Damage_Particles` rule writes per hull bone, worked out once per hull and set of
-     * bones: true for shown, false for hidden, absent for a bone no such bone is at or above. This is
-     * asked once per row on every frame of a playing clip, and the answer only changes with those two.
+     * What the hardpoint bone rules write per hull bone, worked out once per hull and set of bones:
+     * true for shown, false for hidden, absent for a bone none of them reaches. This is asked once per
+     * row on every frame of a playing clip, and the answer only changes with those three.
      */
-    private damageWrites: {
+    private boneWrites: {
         hull: unknown;
-        bones: ReadonlyMap<string, boolean>;
+        damage: ReadonlyMap<string, boolean>;
+        engine: ReadonlySet<string>;
         writes: ReadonlyMap<number, boolean>;
     } | null = null;
 
@@ -114,7 +120,8 @@ export class UnitRules {
         this.shownDecals = new Set();
         this.collisionMeshes = new Set();
         this.damageParticles = new Map();
-        this.damageWrites = null;
+        this.engineParticles = new Set();
+        this.boneWrites = null;
         this.shieldRevealed = false;
     }
 
@@ -148,6 +155,19 @@ export class UnitRules {
      */
     setDamageParticles(bones: ReadonlyMap<string, boolean>): void {
         this.damageParticles = bones;
+        this.context.levels.applyLevels();
+    }
+
+    /**
+     * The `Engine_Particles` bones, lowercased, of every destroyed hardpoint whose death hides them -
+     * see `engineParticleBones`.
+     *
+     * Measured in the game: when such a hardpoint dies, every part on its `Engine_Particles` bone or
+     * at any depth below it - effects, meshes, attached models - has its state written hidden, and
+     * nothing shows them again. While the hardpoint lives the rule writes nothing.
+     */
+    setEngineParticles(bones: ReadonlySet<string>): void {
+        this.engineParticles = bones;
         this.context.levels.applyLevels();
     }
 
@@ -210,9 +230,9 @@ export class UnitRules {
             written = ruleState(this.shownDecals.has(name));
         }
 
-        // After the decal: a hardpoint is created after its type loaded, and both rules show on
-        // destruction anyway.
-        written = this.damageParticlesWrite(written, bone);
+        // After the decal: a hardpoint is created after its type loaded, and a dying one shows its
+        // decal before it writes its bones.
+        written = this.hardpointBoneWrite(written, bone);
 
         if (this.collisionMeshes.has(name)) {
             written = ruleState(false);
@@ -243,39 +263,49 @@ export class UnitRules {
 
         return this.stealthed
             ? ruleState(false)
-            : this.damageParticlesWrite(state, bone);
+            : this.hardpointBoneWrite(state, bone);
     }
 
-    /** The `Damage_Particles` rule's write over a part on `bone`, or `state` when it writes nothing. */
-    private damageParticlesWrite(
+    /**
+     * What the hardpoint bone rules write over a part on `bone`, or `state` when they write nothing.
+     */
+    private hardpointBoneWrite(
         state: StateSwitch,
         bone: number | undefined,
     ): StateSwitch {
-        if (bone === undefined || this.damageParticles.size === 0) {
+        if (
+            bone === undefined ||
+            (this.damageParticles.size === 0 && this.engineParticles.size === 0)
+        ) {
             return state;
         }
 
-        const write = this.damageWritesByBone().get(bone);
+        const write = this.boneWritesByBone().get(bone);
 
         return write === undefined ? state : ruleState(write);
     }
 
     /**
-     * Per hull bone, what the `Damage_Particles` rule writes: shown when any such bone at or above it
-     * belongs to a destroyed hardpoint, hidden when every one does to a living hardpoint.
+     * Per hull bone, what the hardpoint bone rules write, in the order a hardpoint is created and
+     * dies - the last write is what the part has:
      *
-     * Shown wins because only a destruction writes after creation, and it writes shown. The bone is
-     * matched by name, without case, as the hardpoint's tag names it.
+     * 1. `Damage_Particles`: hidden when the hardpoint is created, shown once it is destroyed. Shown
+     *    wins where two such bones reach a part, because only a destruction writes after creation.
+     * 2. `Engine_Particles`: hidden once a hardpoint whose death hides them is destroyed, after the
+     *    `Damage_Particles` show of the same death.
+     *
+     * A bone is matched by name, without case, as the hardpoint's tag names it.
      */
-    private damageWritesByBone(): ReadonlyMap<number, boolean> {
+    private boneWritesByBone(): ReadonlyMap<number, boolean> {
         const hull = this.context.assembly.hull();
 
         if (
-            this.damageWrites !== null &&
-            this.damageWrites.hull === hull &&
-            this.damageWrites.bones === this.damageParticles
+            this.boneWrites !== null &&
+            this.boneWrites.hull === hull &&
+            this.boneWrites.damage === this.damageParticles &&
+            this.boneWrites.engine === this.engineParticles
         ) {
-            return this.damageWrites.writes;
+            return this.boneWrites.writes;
         }
 
         const skeleton = this.context.queries.skeleton();
@@ -284,6 +314,7 @@ export class UnitRules {
 
         for (const bone of skeleton) {
             let write: boolean | undefined;
+            let engineHides = false;
             // Bounded by the skeleton's size: a file-controlled parent chain that loops must not hang
             // the preview.
             let steps = skeleton.length;
@@ -293,11 +324,18 @@ export class UnitRules {
                 at !== undefined && steps-- > 0;
                 at = at.parent < 0 ? undefined : byIndex.get(at.parent)
             ) {
-                const named = this.damageParticles.get(at.name.toLowerCase());
+                const name = at.name.toLowerCase();
+                const named = this.damageParticles.get(name);
 
                 if (named !== undefined) {
                     write = (write ?? false) || named;
                 }
+
+                engineHides ||= this.engineParticles.has(name);
+            }
+
+            if (engineHides) {
+                write = false;
             }
 
             if (write !== undefined) {
@@ -305,7 +343,12 @@ export class UnitRules {
             }
         }
 
-        this.damageWrites = { hull, bones: this.damageParticles, writes };
+        this.boneWrites = {
+            hull,
+            damage: this.damageParticles,
+            engine: this.engineParticles,
+            writes,
+        };
 
         return writes;
     }

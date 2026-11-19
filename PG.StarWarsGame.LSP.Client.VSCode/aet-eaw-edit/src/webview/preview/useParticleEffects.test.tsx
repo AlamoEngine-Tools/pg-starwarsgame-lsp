@@ -44,7 +44,6 @@ function decider(
             abilityProxyIdsRef: { current: new Map() },
             activeAbilitiesRef: { current: new Set() },
             assets: {} as PreviewAssetLoader,
-            destroyedRef: { current: new Set() },
             refreshStats: () => undefined,
             replacedEffectsRef: { current: new Set() },
             setHiddenEmitters: () => undefined,

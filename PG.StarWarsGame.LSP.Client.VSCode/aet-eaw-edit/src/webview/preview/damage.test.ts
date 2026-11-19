@@ -15,7 +15,7 @@ import {
     decalNames,
     destroyable,
     effectPlays,
-    hardpointGateAllows,
+    engineParticleBones,
     partHidden,
     playsOnOpen,
 } from "./damage";
@@ -88,23 +88,21 @@ describe("effectPlays", () => {
             hardpointId: "HP_Weapon",
         });
 
-        assert.equal(effectPlays(smoke, new Set()), true);
-        assert.equal(effectPlays(smoke, new Set(["HP_Weapon"])), true);
+        assert.equal(effectPlays(smoke), true);
     });
 
-    it("puts the engine glow out when its hardpoint dies", () => {
+    it("leaves the engine glow to the Engine_Particles rule, which is a state writer of the unit", () => {
         const glow = particle({
             systemRef: "pe_engines",
             gate: "HardpointAlive",
             hardpointId: "HP_Engine",
         });
 
-        assert.equal(effectPlays(glow, new Set()), true);
-        assert.equal(effectPlays(glow, new Set(["HP_Engine"])), false);
+        assert.equal(effectPlays(glow), true);
     });
 
     it("leaves an ungated effect alone", () => {
-        assert.equal(effectPlays(particle(), new Set(["HP_Weapon"])), true);
+        assert.equal(effectPlays(particle()), true);
     });
 
     it("keeps an effect the model ships switched off switched off", () => {
@@ -112,7 +110,43 @@ describe("effectPlays", () => {
         // above it shows it on destruction, and that is the unit's rule, not this one.
         const idle = particle({ startsVisible: false });
 
-        assert.equal(effectPlays(idle, new Set(["HP_Weapon"])), false);
+        assert.equal(effectPlays(idle), false);
+    });
+});
+
+describe("engineParticleBones", () => {
+    it("names the Engine_Particles bone of every destroyed hardpoint whose death hides it, lowercased", () => {
+        const engine = hardpoint({
+            id: "HP_Engine",
+            engineParticlesBone: "HP_E_Bone",
+            engineDeathHidesEngineParticles: true,
+        });
+
+        assert.deepEqual([...engineParticleBones([engine], new Set())], []);
+        assert.deepEqual(
+            [...engineParticleBones([engine], new Set(["HP_Engine"]))],
+            ["hp_e_bone"],
+        );
+    });
+
+    it("leaves out a hardpoint whose death does not hide them, and one that names no bone", () => {
+        const bones = engineParticleBones(
+            [
+                hardpoint({
+                    id: "HP_Keeps",
+                    engineParticlesBone: "HP_E_Bone",
+                    engineDeathHidesEngineParticles: false,
+                }),
+                hardpoint({
+                    id: "HP_None",
+                    engineParticlesBone: null,
+                    engineDeathHidesEngineParticles: true,
+                }),
+            ],
+            new Set(["HP_Keeps", "HP_None"]),
+        );
+
+        assert.equal(bones.size, 0);
     });
 });
 
@@ -326,57 +360,5 @@ describe("collisionMeshNames", () => {
         ]);
 
         assert.equal(names.size, 0);
-    });
-});
-
-describe("hardpointGateAllows", () => {
-    const gated = (over: Partial<PreviewParticle> = {}): PreviewParticle => ({
-        id: "p1",
-        systemRef: "s",
-        partId: "hull",
-        bone: "b",
-        boneIndex: 0,
-        gate: PREVIEW_PARTICLE_GATE.always,
-        startsVisible: false,
-        ...over,
-    });
-
-    it("ignores startsVisible, which is a DEFAULT rather than a permission", () => {
-        // An ability proxy ships switched off - that is what makes it an ability proxy - and
-        // `prs_at-aa_fx` on the real AT-AA carries `startsVisible: false`. Reading that as a veto
-        // meant no ability could ever light its own effect.
-        assert.equal(
-            hardpointGateAllows(gated({ startsVisible: false }), new Set()),
-            true,
-        );
-        assert.equal(
-            hardpointGateAllows(gated({ startsVisible: true }), new Set()),
-            true,
-        );
-    });
-
-    it("leaves damage smoke to the Damage_Particles rule", () => {
-        // Smoke below a living hardpoint's Damage_Particles bone still does not appear because an
-        // ability is on: the unit's state writer hides it after the effect rules have spoken.
-        const onDeath = gated({
-            gate: PREVIEW_PARTICLE_GATE.hardpointDestroyed,
-            hardpointId: "HP_Gun",
-        });
-
-        assert.equal(hardpointGateAllows(onDeath, new Set()), true);
-        assert.equal(hardpointGateAllows(onDeath, new Set(["HP_Gun"])), true);
-    });
-
-    it("still refuses an alive-gated effect once its hardpoint is gone", () => {
-        const whileAlive = gated({
-            gate: PREVIEW_PARTICLE_GATE.hardpointAlive,
-            hardpointId: "HP_Gun",
-        });
-
-        assert.equal(hardpointGateAllows(whileAlive, new Set()), true);
-        assert.equal(
-            hardpointGateAllows(whileAlive, new Set(["HP_Gun"])),
-            false,
-        );
     });
 });

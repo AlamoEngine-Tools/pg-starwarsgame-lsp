@@ -38,6 +38,11 @@
   at any depth below it - meshes, lights, attached models and effects - is now hidden while the hardpoint
   stands and shown once it is destroyed, whatever the model file says
   ([#444](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/444))
+- **A destroyed engine hardpoint puts out everything below its engine bone** - the preview put out only the
+  effects one level below a hardpoint's `Engine_Particles` bone. Once the hardpoint is destroyed, every part on
+  that bone or at any depth below it is hidden, as in the game, unless the hardpoint sets
+  `Engine_Death_Hide_Engine_Particles` to no
+  ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the
