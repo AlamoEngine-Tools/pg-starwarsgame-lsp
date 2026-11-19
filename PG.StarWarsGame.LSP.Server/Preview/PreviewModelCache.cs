@@ -136,8 +136,12 @@ public interface IPreviewModelCache
     ///     and only those are part of the entry's key, so two requests that offer different clips
     ///     and bake the same ones share an entry.
     /// </param>
+    /// <param name="have">
+    ///     The key of the copy the caller already holds, if it holds one. Where the model still has
+    ///     that key, the caller will not open the payload, and none is prepared for it.
+    /// </param>
     PreviewCachedModel? GetOrConvert(string modelPath, IReadOnlyList<(string Name, string Path)> clips,
-        PreviewModelConverter convert, PreviewClipJudge judge);
+        PreviewModelConverter convert, PreviewClipJudge judge, string? have = null);
 
     /// <summary>
     ///     Empties the cache folder - the entries, and whatever else was left in it - and returns how
@@ -214,7 +218,9 @@ public sealed class ProjectPreviewCacheLocation(
 ///     </para>
 ///     <para>
 ///         <strong>Nothing is held in memory but the hash table.</strong> A hit reads the entry's
-///         header and metadata; the GLB stays in the file until it is streamed out.
+///         header and metadata; the GLB stays in the file until it is streamed out. With no project
+///         there is no file: the GLB goes to the request that asked, and what is remembered is its
+///         key, clips and notes - enough to answer "unchanged" without converting again.
 ///     </para>
 /// </remarks>
 public sealed class PreviewModelCache(
@@ -236,7 +242,15 @@ public sealed class PreviewModelCache(
     private static readonly JsonSerializerOptions MetadataJson = new(JsonSerializerDefaults.Web);
 
     /// <summary>Conversions under way, so two requests for one key wait for the same one.</summary>
-    private readonly ConcurrentDictionary<string, Lazy<PreviewCachedModel>> _converting = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Conversion> _converting = new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     What each conversion with no project to keep it in came to, by key: the clips, the notes
+    ///     and the length, never the GLB. Enough to tell a caller that its copy still stands without
+    ///     converting the model again to say so. Small - one line per model served this session.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, (IReadOnlyList<string> Animations,
+        IReadOnlyList<PreviewClipNote> Notes, long Length)> _unkept = new(StringComparer.Ordinal);
 
     /// <summary>
     ///     What the judge said of each model and clip, by the hashes of their bytes: whether the
@@ -250,7 +264,7 @@ public sealed class PreviewModelCache(
     private readonly ConcurrentDictionary<string, bool> _ignored = new(StringComparer.OrdinalIgnoreCase);
 
     public PreviewCachedModel? GetOrConvert(string modelPath, IReadOnlyList<(string Name, string Path)> clips,
-        PreviewModelConverter convert, PreviewClipJudge judge)
+        PreviewModelConverter convert, PreviewClipJudge judge, string? have = null)
     {
         var model = fingerprints.Identify(modelPath);
         if (model is null)
@@ -270,23 +284,33 @@ public sealed class PreviewModelCache(
         var key = KeyOf(model, offered);
         var directory = cacheLocation.Directory;
 
-        // No project, so nowhere to keep it: converted for this request and handed over.
+        // No project, so nowhere to keep it: converted for this request and handed over - unless
+        // the caller holds this very model already. It will not open the payload then, so none is
+        // made; one asked for after all is converted at that moment.
         if (directory is null)
-            return InMemory(key, Convert(model, offered, convert)).With(dropped);
+        {
+            if (have == key && _unkept.TryGetValue(key, out var known))
+                return new PreviewCachedModel(key, known.Animations, known.Notes, known.Length, null,
+                    () => new MemoryStream(Convert(model, offered, convert).Glb, false)).With(dropped);
+
+            var conversion = Convert(model, offered, convert);
+            _unkept[key] = (conversion.Animations, conversion.Notes, conversion.Glb.LongLength);
+            return InMemory(key, conversion).With(dropped);
+        }
 
         if (TryLoad(directory, key) is { } kept)
             return kept.With(dropped);
 
         var pending = _converting.GetOrAdd(key,
-            _ => new Lazy<PreviewCachedModel>(() =>
+            _ => new Conversion(() =>
                 TryLoad(directory, key) ?? ConvertAndKeep(directory, key, model, offered, convert)));
         try
         {
-            return pending.Value.With(dropped);
+            return pending.Wait().With(dropped);
         }
         finally
         {
-            _converting.TryRemove(new KeyValuePair<string, Lazy<PreviewCachedModel>>(key, pending));
+            _converting.TryRemove(new KeyValuePair<string, Conversion>(key, pending));
         }
     }
 
@@ -487,6 +511,77 @@ public sealed class PreviewModelCache(
 
     /// <summary>The metadata section of an entry.</summary>
     private sealed record EntryMetadata(IReadOnlyList<string>? Animations, IReadOnlyList<PreviewClipNote>? Notes);
+
+    /// <summary>
+    ///     One conversion under way, run by the first thread to ask and waited for by the rest.
+    /// </summary>
+    /// <remarks>
+    ///     A WAITER LENDS ITS PRIORITY. The background build converts on a thread below normal
+    ///     priority, and a request that finds its model in that thread's hands would otherwise wait
+    ///     behind everything else the machine is doing. While anyone of a higher priority waits,
+    ///     the converting thread runs at that priority; it takes its own back when the conversion
+    ///     is done. Both happen under one gate, so a waiter arriving as the conversion ends cannot
+    ///     raise a thread that has already moved on to its next model.
+    /// </remarks>
+    private sealed class Conversion
+    {
+        private readonly Lock _gate = new();
+        private readonly Lazy<PreviewCachedModel> _result;
+        private bool _done;
+        private Thread? _owner;
+
+        /// <summary>The highest priority that asked before the conversion had a thread.</summary>
+        private ThreadPriority _wanted = ThreadPriority.Lowest;
+
+        public Conversion(Func<PreviewCachedModel> convert)
+        {
+            _result = new Lazy<PreviewCachedModel>(() =>
+            {
+                var owner = Thread.CurrentThread;
+                ThreadPriority own;
+                lock (_gate)
+                {
+                    _owner = owner;
+                    own = owner.Priority;
+                    if (_wanted > own)
+                        owner.Priority = _wanted;
+                }
+
+                try
+                {
+                    return convert();
+                }
+                finally
+                {
+                    lock (_gate)
+                    {
+                        _done = true;
+                        if (owner.Priority != own)
+                            owner.Priority = own;
+                        _owner = null;
+                    }
+                }
+            });
+        }
+
+        /// <summary>The converted model, converting on this thread if none has started.</summary>
+        public PreviewCachedModel Wait()
+        {
+            var mine = Thread.CurrentThread.Priority;
+            lock (_gate)
+            {
+                if (!_done)
+                {
+                    if (_owner is null)
+                        _wanted = mine > _wanted ? mine : _wanted;
+                    else if (_owner != Thread.CurrentThread && mine > _owner.Priority)
+                        _owner.Priority = mine;
+                }
+            }
+
+            return _result.Value;
+        }
+    }
 
     /// <summary>One section of a file as a read-only stream of its own, which closes the file with it.</summary>
     private sealed class SectionStream : Stream

@@ -318,7 +318,11 @@ export class ModelPreviewPanel extends WebviewPanelHost<
                 return;
 
             case "requestTexture":
-                await this.sendTexture(message.name, message.have);
+                await this.sendTexture(
+                    message.name,
+                    message.have,
+                    message.request,
+                );
                 return;
 
             case "requestParticleSystem":
@@ -548,6 +552,9 @@ export class ModelPreviewPanel extends WebviewPanelHost<
         this.post({
             type: "glb",
             partId: message.partId,
+            // Echoed: two refreshes close together ask for a part twice, and the webview takes
+            // only the reply to its latest request.
+            request: message.request,
             attachToPartId: message.attachToPartId,
             attachBone: message.attachBone,
             animations: result.ok ? result.value.animations : [],
@@ -686,7 +693,11 @@ export class ModelPreviewPanel extends WebviewPanelHost<
      * Not deduplicated here: the webview asks for a name once per scene and says which version it
      * holds, and the server answers a version that still stands without reading the file.
      */
-    private async sendTexture(name: string, have?: string): Promise<void> {
+    private async sendTexture(
+        name: string,
+        have?: string,
+        request?: number,
+    ): Promise<void> {
         if (name === "") {
             return;
         }
@@ -700,6 +711,7 @@ export class ModelPreviewPanel extends WebviewPanelHost<
         this.post({
             type: "texture",
             name,
+            request,
             format: result.ok ? (result.value.format ?? null) : null,
             ...(await this.payloadOf(
                 have,

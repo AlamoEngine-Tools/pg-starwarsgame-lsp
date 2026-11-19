@@ -242,3 +242,44 @@ test("a payload of another length than the reply announced is an error for the r
         server.close();
     }
 });
+
+// A pipe that takes the connection and never answers - its server stopped accepting, or stalled -
+// left the part loading for as long as the panel stayed open.
+test("a pipe that never answers is an error for the reader once the wait is over", async () => {
+    const server = await serve(() => null);
+    try {
+        await assert.rejects(
+            collectTransfer(
+                { pipe: server.pipe, id, length: 4, format: "glb" },
+                undefined,
+                50,
+            ),
+            (error: unknown) =>
+                error instanceof PreviewTransferError &&
+                /did not answer/.test(error.message),
+        );
+    } finally {
+        server.close();
+    }
+});
+
+test("a pipe that stops part way through a payload is an error for the reader once the wait is over", async () => {
+    const server = await serve((_request, socket) => {
+        socket.write(response(TRANSFER_OK, [1, 2, 3, 4]).subarray(0, 11));
+        return null;
+    });
+    try {
+        await assert.rejects(
+            collectTransfer(
+                { pipe: server.pipe, id, length: 4, format: "glb" },
+                undefined,
+                50,
+            ),
+            (error: unknown) =>
+                error instanceof PreviewTransferError &&
+                /did not answer/.test(error.message),
+        );
+    } finally {
+        server.close();
+    }
+});

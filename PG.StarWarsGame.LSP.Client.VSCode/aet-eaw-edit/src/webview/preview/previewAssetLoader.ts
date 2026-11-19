@@ -33,7 +33,7 @@ import { addressingFor } from "./textures";
  */
 export type TexturePayload = Pick<
     ModelPreviewTexture,
-    "format" | "data" | "error" | "version" | "unchanged"
+    "format" | "data" | "error" | "version" | "unchanged" | "request"
 >;
 
 /** The part of the viewport the loader drives. */
@@ -56,6 +56,8 @@ export interface AssetLoaderEvents {
         name: string;
         /** For a texture: the version already held, when one is. */
         have?: string;
+        /** For a texture: the number of this request, which the host echoes on its reply. */
+        request?: number;
     }): void;
     /** A request was made or answered: the loading tally reads `requested` and `settled`. */
     ledgersChanged(): void;
@@ -110,6 +112,16 @@ export class PreviewAssetLoader {
         { version: string; texture: THREE.Texture }
     >();
 
+    /**
+     * The number of the latest request for each texture this scene asked for, by lower-cased name.
+     *
+     * Two refreshes close together ask for a texture twice and the replies land in either order.
+     * Only the reply to the latest request is that texture; one to an earlier request is older
+     * bytes, and belongs to a scene that is no longer on screen.
+     */
+    private readonly asked = new Map<string, number>();
+    private sequence = 0;
+
     private readonly translate: NonNullable<AssetLoaderOptions["translate"]>;
     private readonly decode: NonNullable<AssetLoaderOptions["decode"]>;
 
@@ -145,10 +157,12 @@ export class PreviewAssetLoader {
         }
 
         const have = this.held.get(name.toLowerCase())?.version;
+        const request = ++this.sequence;
+        this.asked.set(name.toLowerCase(), request);
         this.events.post(
             have === undefined
-                ? { type: "requestTexture", name }
-                : { type: "requestTexture", name, have },
+                ? { type: "requestTexture", name, request }
+                : { type: "requestTexture", name, have, request },
         );
         this.events.ledgersChanged();
     }
@@ -188,6 +202,7 @@ export class PreviewAssetLoader {
     clearLedgers(): void {
         this.textures.clear();
         this.shaders.clear();
+        this.asked.clear();
     }
 
     /** An effect or header has come back, or come back empty. */
@@ -226,6 +241,15 @@ export class PreviewAssetLoader {
 
     /** A texture has come back, or come back empty. */
     receiveTexture(name: string, result: TexturePayload): void {
+        // A reply to a request that a later one overtook, or that a new scene no longer waits on,
+        // is nothing to show and nothing to count. One that names no request is taken as it comes.
+        if (
+            result.request !== undefined &&
+            this.asked.get(name.toLowerCase()) !== result.request
+        ) {
+            return;
+        }
+
         // Before the decode, and regardless of how it goes: a texture that did not resolve is an
         // ANSWER. The problems bar is what tells the reader it is missing; the cover only needs to
         // know it is no longer waiting.

@@ -29,6 +29,7 @@ public sealed class PreviewCacheBuilderTest
     {
         public MockFileSystem Files { get; } = new();
         public RecordingCache Cache { get; } = new();
+        public CountingConverter Converter { get; } = new();
         public ShownProgress Progress { get; } = new();
         public string? Directory { get; set; } = PreviewDir;
         public List<string> ParticleSystems { get; } = [];
@@ -66,7 +67,8 @@ public sealed class PreviewCacheBuilderTest
                 : null;
 
             return new PreviewCacheBuilder(new FakeGameIndexService(index), new StubProjects(config), Cache,
-                new FixedLocation(() => Directory), new FileHelper(Files), new ArchiveEntries(Archives), Progress,
+                Converter, new FixedLocation(() => Directory), new FileHelper(Files), new ArchiveEntries(Archives),
+                Progress,
                 NullLogger<PreviewCacheBuilder>.Instance);
         }
     }
@@ -214,6 +216,31 @@ public sealed class PreviewCacheBuilderTest
         Assert.True(rig.Files.File.Exists(Marker));
     }
 
+    /// <summary>
+    ///     A build the reader cancelled is over. A model saved afterwards is converted again like any
+    ///     other save - not shown as a build, and not taken for the end of the one that was
+    ///     cancelled: its marker would keep every later session from building the project.
+    /// </summary>
+    [Fact]
+    public async Task Cancelled_ALaterSaveIsNotShownAsABuild_AndLeavesNoMarker()
+    {
+        var rig = new Rig().With("A.alo", "B.alo", "C.alo");
+        rig.Cache.HoldFirst();
+        var builder = rig.Build();
+        builder.StartUnlessBuilt();
+        await rig.Cache.FirstEntered;
+        builder.Cancel();
+        rig.Cache.Release();
+        await Finished(builder);
+
+        builder.FilesChanged(["/mod/data/art/models/B.alo"]);
+        await Finished(builder);
+
+        Assert.Equal(2, rig.Cache.Calls.Count);
+        Assert.Equal(1, rig.Progress.Begins);
+        Assert.False(rig.Files.File.Exists(Marker));
+    }
+
     // ── an opened subject goes first ──────────────────────────────────────────
 
     [Fact]
@@ -345,6 +372,28 @@ public sealed class PreviewCacheBuilderTest
         Assert.Equal(["Data/Art/Models/B.alo <- B_idle_00.ala"], rig.Cache.Calls);
     }
 
+    /// <summary>
+    ///     A model saved in the moment the worker leaves - after it found its queue empty, before it
+    ///     has gone - is still converted. The window is held open here by the one thing the worker
+    ///     does inside it: ending the progress it showed.
+    /// </summary>
+    [Fact]
+    public async Task Requeue_AsTheWorkerLeaves_IsStillConverted()
+    {
+        var rig = new Rig().With("A.alo");
+        var builder = rig.Build();
+        rig.Progress.OnEnded = () => builder.Requeue([new PreviewBuildItem("Late.alo", [])]);
+
+        builder.StartUnlessBuilt();
+        await Finished(builder);
+
+        Assert.Equal(["Data/Art/Models/A.alo <- ", "Data/Art/Models/Late.alo <- "], rig.Cache.Calls);
+
+        // The build of every model did run to its end, and the late one is no build to show.
+        Assert.True(rig.Files.File.Exists(Marker));
+        Assert.Equal(1, rig.Progress.Begins);
+    }
+
     [Fact]
     public async Task Requeue_WithNoProject_DoesNothing()
     {
@@ -454,6 +503,39 @@ public sealed class PreviewCacheBuilderTest
         Assert.True(rig.Files.File.Exists(Marker));
     }
 
+    /// <summary>The build converts with the server's one converter, the same a request converts with.</summary>
+    [Fact]
+    public async Task TheBuild_ConvertsWithTheConverterItWasGiven()
+    {
+        var rig = new Rig().With("A.alo");
+        var builder = rig.Build();
+
+        builder.StartUnlessBuilt();
+        await Finished(builder);
+        rig.Cache.LastConvert!([1], []);
+        rig.Cache.LastJudge!([1], []);
+
+        Assert.Equal((1, 1), (rig.Converter.Converted, rig.Converter.Judged));
+    }
+
+    private sealed class CountingConverter : IModelGlbConverter
+    {
+        public int Converted { get; private set; }
+        public int Judged { get; private set; }
+
+        public PreviewModelConversion Convert(byte[] aloBytes, IReadOnlyList<PreviewClipSource> offered)
+        {
+            Converted++;
+            return new PreviewModelConversion([], [], []);
+        }
+
+        public IReadOnlyList<PreviewClipVerdict> Judge(byte[] aloBytes, IReadOnlyList<PreviewClipSource> offered)
+        {
+            Judged++;
+            return [];
+        }
+    }
+
     private sealed class FixedLocation(Func<string?> directory) : IPreviewCacheLocation
     {
         public string? Directory => directory();
@@ -474,6 +556,8 @@ public sealed class PreviewCacheBuilderTest
         public Dictionary<string, Exception> Throws { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Task FirstEntered => _entered.Task;
         public int Cleared { get; private set; }
+        public PreviewModelConverter? LastConvert { get; private set; }
+        public PreviewClipJudge? LastJudge { get; private set; }
 
         public int Clear()
         {
@@ -482,11 +566,13 @@ public sealed class PreviewCacheBuilderTest
         }
 
         public PreviewCachedModel? GetOrConvert(string modelPath, IReadOnlyList<(string Name, string Path)> clips,
-            PreviewModelConverter convert, PreviewClipJudge judge)
+            PreviewModelConverter convert, PreviewClipJudge judge, string? have = null)
         {
             lock (Calls)
             {
                 Calls.Add(modelPath + " <- " + string.Join(",", clips.Select(c => c.Name)));
+                LastConvert = convert;
+                LastJudge = judge;
             }
 
             if (_hold)
@@ -516,12 +602,17 @@ public sealed class PreviewCacheBuilderTest
         private Action? _cancel;
 
         public int? Total { get; private set; }
+        public int Begins { get; private set; }
         public List<(int Done, int Total)> Reports { get; } = [];
         public bool Ended { get; private set; }
+
+        /// <summary>Runs once, when the first run is ended.</summary>
+        public Action? OnEnded { get; set; }
 
         public IPreviewBuildProgressRun Begin(int total, Action cancel)
         {
             Total = total;
+            Begins++;
             _cancel = cancel;
             Ended = false;
             return new Run(this);
@@ -542,6 +633,9 @@ public sealed class PreviewCacheBuilderTest
             public void Dispose()
             {
                 owner.Ended = true;
+                var ended = owner.OnEnded;
+                owner.OnEnded = null;
+                ended?.Invoke();
             }
         }
     }

@@ -5,7 +5,8 @@
 // panel posts through the same function rather than each taking it as a prop.
 //
 // It is also where a model request picks up the version already held (#436): every part, wreck and
-// death clone asks through here, so none of the callers has to know the store exists.
+// death clone asks through here, so none of the callers has to know the store exists. The request
+// leaves numbered, and the host echoes the number on the reply: see modelStore.ts.
 
 import type { ModelDetail } from "../../protocol/modelPreview";
 import type { ModelPreviewToHost } from "../../protocol/panels/modelPreview";
@@ -23,7 +24,12 @@ export const heldModels = new ModelStore<ModelDetail>();
 
 export function post(message: ModelPreviewToHost<InspectorSubject>): void {
     if (message.type === "requestGlb") {
-        send({ ...message, have: heldModels.asking(message) });
+        const have = heldModels.asking(message);
+        send({
+            ...message,
+            have,
+            request: heldModels.requestOf(message.partId),
+        });
         return;
     }
 

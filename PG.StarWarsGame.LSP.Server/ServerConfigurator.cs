@@ -563,6 +563,10 @@ public static class ServerConfigurator
                     sp.GetRequiredService<IPreviewCacheLocation>(),
                     sp.GetRequiredService<ILogger<PreviewModelCache>>()));
 
+                // The one conversion from a model and its clips to a GLB, for a request and for the
+                // background build alike (#436).
+                services.AddSingleton<IModelGlbConverter, ModelGlbConverter>();
+
                 // The pipe the preview's large payloads leave by (#436). Opened on the first offer.
                 services.AddSingleton<IPreviewTransferChannel, PreviewTransferPipe>();
 

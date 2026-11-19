@@ -62,6 +62,8 @@ export interface ModelPreviewRequestGlb {
     animations?: string[];
     /** The version of this model the webview already holds, if it holds one. */
     have?: string;
+    /** The webview's number for this request, echoed on the reply. */
+    request?: number;
 }
 
 /** A model's detail for the tree and the inspector, answered with {@link ModelPreviewModelDetail}. */
@@ -78,6 +80,8 @@ export interface ModelPreviewRequestTexture {
     type: "requestTexture";
     name: string;
     have?: string;
+    /** The webview's number for this request, echoed on the reply. */
+    request?: number;
 }
 
 /** A particle system by name, answered with {@link ModelPreviewParticleSystem}. */
@@ -181,6 +185,8 @@ export interface ModelPreviewGlb {
     version?: string | null;
     /** The server says the copy the webview asked with still stands; no `data` is sent. */
     unchanged?: boolean;
+    /** The number of the request this answers. */
+    request?: number;
 }
 
 /**
@@ -200,6 +206,8 @@ export interface ModelPreviewTexture {
     version?: string | null;
     /** The server says the copy the webview asked with still stands; no `data` is sent. */
     unchanged?: boolean;
+    /** The number of the request this answers. */
+    request?: number;
 }
 
 export interface ModelPreviewModelDetail {

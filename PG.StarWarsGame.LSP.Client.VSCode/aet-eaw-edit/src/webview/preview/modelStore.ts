@@ -10,6 +10,10 @@
 // model the new scene has no part for is let go, so what is kept is the scene on screen and nothing
 // from the ones before it.
 //
+// Every request is numbered and the host echoes the number on its reply. Two refreshes close
+// together ask for the same part twice, and the replies land in whatever order the server and the
+// pipe finish them; only the reply to the latest request for a part is that part's model.
+//
 // Not React and not the viewport: bytes and a ledger, so it is tested on its own.
 
 /** What identifies a model request: the model and the clips asked for with it. */
@@ -23,6 +27,8 @@ export interface ModelRequest {
 /** What a reply carries for the model that was asked for. */
 export interface ModelReply {
     partId: string;
+    /** The number of the request this answers, as the host echoes it. */
+    request?: number;
     /** The version the server answers with, when there is a model at all. */
     version?: string | null;
     /** The GLB, when the server sent one. */
@@ -47,14 +53,66 @@ interface Held {
     bytes: Uint8Array;
 }
 
+/** The part of a scene that says which models it will ask for. */
+export interface SceneModels {
+    parts: readonly { resolved: boolean; modelRef: string }[];
+    breakoffProps?: readonly {
+        modelRef?: string | null;
+        animations?: readonly string[] | null;
+    }[];
+    deathClones?: readonly {
+        modelFile?: string | null;
+        animations?: readonly string[] | null;
+    }[];
+}
+
+/**
+ * The models a scene asks for, each as its request names it: the resolved parts with the scene's
+ * clips, and the wrecks and death clones with clips of their own. The store keys what it holds the
+ * same way, so this is what `retain` keeps.
+ */
+export function modelRequestsOf(
+    scene: SceneModels,
+): Pick<ModelRequest, "modelReference" | "animations">[] {
+    const requests: Pick<ModelRequest, "modelReference" | "animations">[] =
+        scene.parts
+            .filter((part) => part.resolved)
+            .map((part) => ({ modelReference: part.modelRef }));
+
+    for (const prop of scene.breakoffProps ?? []) {
+        if ((prop.modelRef ?? "") !== "") {
+            requests.push({
+                modelReference: prop.modelRef ?? "",
+                animations: [...(prop.animations ?? [])],
+            });
+        }
+    }
+
+    for (const clone of scene.deathClones ?? []) {
+        if ((clone.modelFile ?? "") !== "") {
+            requests.push({
+                modelReference: clone.modelFile ?? "",
+                animations: [...(clone.animations ?? [])],
+            });
+        }
+    }
+
+    return requests;
+}
+
 export class ModelStore<TDetail = unknown> {
     private readonly models = new Map<string, Held>();
     private readonly details = new Map<string, TDetail>();
-    /** The request each part is waiting on, so its reply finds the model it was for. */
+    /**
+     * The latest request each part is waiting on, so its reply finds the model it was for and a
+     * reply to an earlier request is told apart.
+     */
     private readonly asked = new Map<
         string,
-        { key: string; modelReference: string }
+        { key: string; modelReference: string; request: number }
     >();
+    /** The number of the last request made. */
+    private sequence = 0;
 
     /**
      * The key a model is held under. The clips are part of it: the same file baked with other clips
@@ -85,18 +143,37 @@ export class ModelStore<TDetail = unknown> {
         this.asked.set(request.partId, {
             key,
             modelReference: request.modelReference,
+            request: ++this.sequence,
         });
         return this.models.get(key)?.version;
+    }
+
+    /** The number of the request a part is waiting on, to send with it and have echoed back. */
+    requestOf(partId: string): number | undefined {
+        return this.asked.get(partId)?.request;
+    }
+
+    /**
+     * Whether a reply answers the request its part is waiting on. False for a reply to an earlier
+     * request for that part, and for one a new scene overtook: neither is anything to show or to
+     * count. A reply that names no request is taken for the one being waited on.
+     */
+    awaits(reply: Pick<ModelReply, "partId" | "request">): boolean {
+        const request = this.asked.get(reply.partId);
+        return (
+            request !== undefined &&
+            (reply.request === undefined || reply.request === request.request)
+        );
     }
 
     /**
      * The bytes a reply stands for: the ones it carries, which are kept, or the ones already held
      * when the server says they still stand. Null when there are none - the model did not load, or
-     * the reply is for a request this store no longer knows.
+     * the reply is not the answer to the request its part is waiting on.
      */
     take(reply: ModelReply): TakenModel | null {
         const request = this.asked.get(reply.partId);
-        if (request === undefined) {
+        if (request === undefined || !this.awaits(reply)) {
             return null;
         }
         this.asked.delete(reply.partId);

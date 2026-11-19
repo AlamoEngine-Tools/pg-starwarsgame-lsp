@@ -59,8 +59,8 @@ public interface IPreviewCacheBuilder
     /// <summary>
     ///     Converts again, in the background, the models these files are or belong to: a model
     ///     itself, the models a clip is offered with, and the models and clips an archive holds.
-    ///     Called with every asset file and archive the file watcher reports. Starts the worker if
-    ///     it is not running; this work is not shown.
+    ///     Called with every model, clip, texture and archive the file watcher reports. Starts the
+    ///     worker if it is not running; this work is not shown.
     /// </summary>
     void FilesChanged(IReadOnlyCollection<string> paths);
 
@@ -87,21 +87,25 @@ public interface IPreviewCacheBuilder
 ///     <para>
 ///         <strong>Never in the way.</strong> One thread below normal priority, one model at a time,
 ///         started only after the index is live. A request does not wait for the queue: it converts
-///         what it needs itself, and the cache makes the two agree on one conversion. What a request
-///         does do is <see cref="Prioritise" /> - the subject just opened will ask for its wrecks and
-///         death clones next, so those go to the front.
+///         what it needs itself, and the cache makes the two agree on one conversion - where the
+///         model a request needs is the one this thread has in hand, the request waits for it and
+///         the thread runs at the request's priority until it is done. What a request does do is
+///         <see cref="Prioritise" /> - the subject just opened will ask for its wrecks and death
+///         clones next, so those go to the front.
 ///     </para>
 ///     <para>
 ///         <strong>Once.</strong> A build that ran to its end leaves a marker in the cache folder
 ///         naming the converter version. While it stands the build does not start by itself again,
 ///         and the cache fills on a miss. A cancelled build leaves none and resumes at the next
-///         start, skipping what is already there. Clearing the cache removes the marker with it.
+///         start, skipping what is already there; a model saved after the cancel is converted like
+///         any other save and ends no build. Clearing the cache removes the marker with it.
 ///     </para>
 /// </remarks>
 public sealed class PreviewCacheBuilder(
     IGameIndexService index,
     IModProjectReloadService projects,
     IPreviewModelCache cache,
+    IModelGlbConverter converter,
     IPreviewCacheLocation cacheLocation,
     IFileHelper fileHelper,
     IMegEntryReader archives,
@@ -335,6 +339,12 @@ public sealed class PreviewCacheBuilder(
             return;
 
         _idle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        StartWorker();
+    }
+
+    /// <summary>Starts a worker on the queue as it stands. Called under the gate, with none running.</summary>
+    private void StartWorker()
+    {
         _worker = new Thread(Work)
         {
             IsBackground = true,
@@ -350,11 +360,11 @@ public sealed class PreviewCacheBuilder(
         using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
         IPreviewBuildProgressRun? shown = null;
         var finished = false;
+        var fullBuild = false;
 
         try
         {
             int total;
-            bool fullBuild;
             lock (_gate)
             {
                 total = _total;
@@ -401,28 +411,65 @@ public sealed class PreviewCacheBuilder(
         {
             shown?.Dispose();
 
-            bool wasFullBuild;
-            TaskCompletionSource idle;
+            bool builtInFull;
+            bool again;
+            TaskCompletionSource? idle = null;
             lock (_gate)
             {
-                wasFullBuild = _fullBuild && finished;
-                if (finished)
+                _run = null;
+
+                again = finished && _queue.Count > 0 && !_stop.IsCancellationRequested;
+                if (again)
+                {
+                    // Queued in the moment between this worker finding the queue empty and its
+                    // leaving: whoever queued it saw a worker and started none. Another takes the
+                    // queue up, and the session is idle when THAT one is done. A build of every
+                    // model this run showed is over all the same; one asked for in that moment is
+                    // the next worker's to show and to mark. This worker stays the one on record
+                    // until the next is started below, so nobody starts a second in between.
+                    builtInFull = fullBuild;
+                    if (fullBuild)
+                        _fullBuild = false;
+
+                    _queued.Clear();
+                    foreach (var waiting in _queue)
+                        _queued.Add(waiting.Key);
+                    _done = 0;
+                    _total = _queue.Count;
+                }
+                else
+                {
+                    // Whichever way this run ended, the build of every model is no longer under
+                    // way: only one that reached its end leaves the marker, and a cancelled one
+                    // must not pass for a build to the worker a later save starts.
+                    builtInFull = _fullBuild && finished;
                     _fullBuild = false;
 
-                // What a cancelled build left behind is not this session's any more.
-                _queue.Clear();
-                _queued.Clear();
-                _done = 0;
-                _total = 0;
-                _worker = null;
-                _run = null;
-                idle = _idle;
+                    // What a cancelled build left behind is not this session's any more.
+                    _queue.Clear();
+                    _queued.Clear();
+                    _done = 0;
+                    _total = 0;
+                    _worker = null;
+                    idle = _idle;
+                }
             }
 
-            if (wasFullBuild)
-                WriteMarker();
-
-            idle.TrySetResult();
+            try
+            {
+                if (builtInFull)
+                    WriteMarker();
+            }
+            finally
+            {
+                if (again)
+                    lock (_gate)
+                    {
+                        StartWorker();
+                    }
+                else
+                    idle?.TrySetResult();
+            }
         }
     }
 
@@ -434,7 +481,7 @@ public sealed class PreviewCacheBuilder(
             cache.GetOrConvert(
                 PreviewModelReference.ModelPath(reference),
                 [.. item.Animations.Select(name => (name, PreviewModelReference.ModelPath(name)))],
-                GetModelGlbHandler.Convert, GetModelGlbHandler.Judge);
+                converter.Convert, converter.Judge);
         }
         catch (AloFormatException e)
         {

@@ -23,6 +23,7 @@ import {
 } from "../../protocol/modelPreview";
 import { type ModelPreviewToWebview } from "../../protocol/panels/modelPreview";
 import { isSubjectSystem, type LoadTally } from "./loadProgress";
+import { modelRequestsOf } from "./modelStore";
 import { particleNotices } from "./particleNotices";
 import { heldModels, post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
@@ -246,12 +247,9 @@ export function useHostMessages({
                     assets.clearLedgers();
 
                     // The scene on screen is what is kept: a model this scene has no part for is let
-                    // go here. An XML edit can drop a hardpoint and the model it attached.
-                    heldModels.retain(
-                        message.scene.parts
-                            .filter((part) => part.resolved)
-                            .map((part) => ({ modelReference: part.modelRef })),
-                    );
+                    // go here. An XML edit can drop a hardpoint and the model it attached. Its
+                    // wrecks and death clones are part of the scene too, held with their own clips.
+                    heldModels.retain(modelRequestsOf(message.scene));
 
                     // Cover the viewport again for the new subject. The expected count is the parts
                     // that RESOLVED, because those are the only ones a GLB is asked for - counting the
@@ -335,6 +333,13 @@ export function useHostMessages({
                     }
                 },
                 glb: async (message) => {
+                    // A reply to a request that a later one for the same part overtook, or that
+                    // was on its way when the scene changed. Not this scene's: not shown, not
+                    // counted, and no reason to say a part failed.
+                    if (!heldModels.awaits(message)) {
+                        return;
+                    }
+
                     // The bytes this reply stands for: the ones it carries, or the ones kept from
                     // the scene before when the server says the model did not change.
                     const taken = heldModels.take(message);

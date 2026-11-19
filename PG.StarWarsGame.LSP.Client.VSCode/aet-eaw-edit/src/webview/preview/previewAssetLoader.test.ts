@@ -15,7 +15,7 @@ import {
 
 /** What the loader did to the viewport and told the panel, in order. */
 interface Recorded {
-    posted: { type: string; name: string; have?: string }[];
+    posted: { type: string; name: string; have?: string; request?: number }[];
     calls: string[];
     problems: { severity: string; message: string }[];
     ledgerChanges: number;
@@ -85,10 +85,55 @@ describe("PreviewAssetLoader", () => {
             loader.requestTexture("hull.dds");
 
             assert.deepEqual(seen.posted, [
-                { type: "requestTexture", name: "hull.dds" },
+                { type: "requestTexture", name: "hull.dds", request: 1 },
             ]);
             assert.equal(loader.requested, 1);
             assert.equal(loader.settled, 0);
+        });
+
+        // Two refreshes close together ask for the same texture twice, and the replies can land
+        // in either order. Only the reply to the latest request is the texture: an older one is
+        // older bytes, and it must not settle the wait of the scene that asked again.
+        it("takes only the reply to the latest request for a name", () => {
+            const { loader, seen } = harness();
+            loader.requestTexture("hull.dds");
+            loader.clearLedgers();
+            loader.requestTexture("hull.dds");
+            const [first, second] = seen.posted.map((p) => p.request);
+
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([1]),
+                version: "v1",
+                request: first,
+            });
+
+            assert.notEqual(first, second);
+            assert.equal(loader.settled, 0);
+            assert.deepEqual(seen.calls, []);
+
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([2]),
+                version: "v2",
+                request: second,
+            });
+            loader.receiveTexture("hull.dds", {
+                format: "dds",
+                data: new Uint8Array([1]),
+                version: "v1",
+                request: first,
+            });
+
+            assert.equal(loader.settled, 1);
+            assert.deepEqual(seen.calls, [
+                "texture hull.dds",
+                "particle texture hull.dds",
+            ]);
+
+            loader.clearLedgers();
+            loader.requestTexture("hull.dds");
+            assert.equal(seen.posted[2].have, "v2");
         });
 
         it("settles on the reply and hands the texture to meshes and particles alike", () => {
@@ -154,8 +199,13 @@ describe("PreviewAssetLoader", () => {
             });
 
             assert.deepEqual(seen.posted, [
-                { type: "requestTexture", name: "hull.dds" },
-                { type: "requestTexture", name: "HULL.dds", have: "v1" },
+                { type: "requestTexture", name: "hull.dds", request: 1 },
+                {
+                    type: "requestTexture",
+                    name: "HULL.dds",
+                    have: "v1",
+                    request: 2,
+                },
             ]);
             assert.equal(decodes, 1);
             assert.deepEqual(seen.calls, [

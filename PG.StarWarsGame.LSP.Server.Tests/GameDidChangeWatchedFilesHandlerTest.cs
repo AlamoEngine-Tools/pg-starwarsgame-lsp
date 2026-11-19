@@ -254,6 +254,45 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Empty(forgotten.Calls);
     }
 
+    /// <summary>
+    ///     The asset catalog lists scripts, sounds and maps as well, and the preview draws none of
+    ///     them. A change to one is no change to any preview: nothing is forgotten, so no open
+    ///     preview is told to ask for its assets again, and the background build hears nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("file:///c:/data/scripts/story.lua")]
+    [InlineData("file:///c:/data/scripts/story.lc")]
+    [InlineData("file:///c:/data/audio/sfx/blast.wav")]
+    [InlineData("file:///c:/data/audio/music/theme.mp3")]
+    [InlineData("file:///c:/data/art/maps/_land_planet_hoth_00.ted")]
+    public async Task Handle_AnAssetThePreviewDoesNotDraw_TellsThePreviewNothing(string uri)
+    {
+        var forgotten = new ForgottenAssets();
+        var told = new ToldBuilder();
+
+        var handler = BuildHandler(previewAssets: forgotten, previewCache: told);
+        await handler.Handle(Changed(uri), CancellationToken.None);
+
+        Assert.Empty(forgotten.Calls);
+        Assert.Empty(told.Calls);
+    }
+
+    /// <summary>What the preview draws: models, clips and textures.</summary>
+    [Theory]
+    [InlineData("file:///c:/data/art/models/hull.alo")]
+    [InlineData("file:///c:/data/art/models/hull_idle_00.ala")]
+    [InlineData("file:///c:/data/art/textures/hull.dds")]
+    [InlineData("file:///c:/data/art/textures/hull.tga")]
+    public async Task Handle_AnAssetThePreviewDraws_HasThePreviewForgetIt(string uri)
+    {
+        var forgotten = new ForgottenAssets();
+
+        var handler = BuildHandler(previewAssets: forgotten);
+        await handler.Handle(Changed(uri), CancellationToken.None);
+
+        Assert.Single(Assert.Single(forgotten.Calls));
+    }
+
     // ── registry and load order changes ──────────────────────────────────────
 
     private const string ModXml = @"c:\mods\mymod\data\xml";

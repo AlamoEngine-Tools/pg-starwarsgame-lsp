@@ -3,6 +3,7 @@
 
 using System.IO.Pipes;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
@@ -187,11 +188,16 @@ public sealed class PreviewTransferPipeTest
 
     private sealed class TrackedStream(byte[] bytes) : MemoryStream(bytes, false)
     {
+        private readonly TaskCompletionSource _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public bool Closed { get; private set; }
+
+        public Task WhenClosed => _closed.Task;
 
         protected override void Dispose(bool disposing)
         {
             Closed = true;
+            _closed.TrySetResult();
             base.Dispose(disposing);
         }
     }
@@ -257,6 +263,269 @@ public sealed class PreviewTransferPipeTest
 
         Assert.Equal([1, 2], cut.Payload);
         Assert.Equal([9], after.Payload);
+    }
+
+    // ── an offer nobody collects ──────────────────────────────────────────────
+
+    /// <summary>
+    ///     The payload of an offer may be a whole converted model in memory. It goes when its time
+    ///     is up, whether or not another offer ever comes to sweep it out.
+    /// </summary>
+    [Fact]
+    public async Task AnOfferNobodyCollects_IsDroppedWhenItsTimeIsUp_WithoutAnotherOffer()
+    {
+        var clock = new FakeTimeProvider();
+        using var pipe = Pipe(clock);
+        var stale = Offer(pipe, [1]);
+        clock.Advance(TimeSpan.FromSeconds(20));
+        var fresh = Offer(pipe, [2]);
+
+        clock.Advance(TimeSpan.FromSeconds(11));
+
+        await using var connection = await ConnectAsync(pipe);
+        Assert.Equal(PreviewTransferFraming.Unknown, (await AskAsync(connection, stale.Id)).Status);
+
+        // The second is 11 s old, and goes in its own time: 30 s after it was offered.
+        clock.Advance(TimeSpan.FromSeconds(20));
+        Assert.Equal(PreviewTransferFraming.Unknown, (await AskAsync(connection, fresh.Id)).Status);
+    }
+
+    // ── a listener that breaks ────────────────────────────────────────────────
+
+    /// <summary>
+    ///     One instance of the pipe failing while it waits is not the end of the channel: it is
+    ///     replaced, and a transfer offered before it broke is still collected.
+    /// </summary>
+    [Fact]
+    public async Task AListenerThatBreaks_IsReplaced_AndTheOfferIsStillCollected()
+    {
+        var opened = 0;
+        using var pipe = new PreviewTransferPipe(NullLogger<PreviewTransferPipe>.Instance, null,
+            name => Interlocked.Increment(ref opened) == 1 ? new BrokenListener() : new PipeListener(name));
+        var transfer = Offer(pipe, [7, 7]);
+
+        await using var connection = await ConnectAsync(pipe);
+        var answer = await AskAsync(connection, transfer.Id);
+
+        Assert.Equal(PreviewTransferFraming.Ok, answer.Status);
+        Assert.Equal([7, 7], answer.Payload);
+    }
+
+    /// <summary>
+    ///     A pipe whose every instance breaks is given up after a few tries rather than spun on -
+    ///     and the next offer opens it again, so no offer names a pipe nothing listens on.
+    /// </summary>
+    [Fact]
+    public async Task AListenerThatKeepsBreaking_IsGivenUp_AndTheNextOfferListensAgain()
+    {
+        var repaired = new TaskCompletionSource();
+        var opened = 0;
+        using var pipe = new PreviewTransferPipe(NullLogger<PreviewTransferPipe>.Instance, null, name =>
+        {
+            Interlocked.Increment(ref opened);
+            return repaired.Task.IsCompleted ? new PipeListener(name) : new BrokenListener();
+        });
+
+        Offer(pipe, [1]);
+        await Soon(pipe.Accepting);
+        Assert.Equal(PreviewTransferPipe.ListenAttempts, opened);
+
+        repaired.SetResult();
+        var transfer = Offer(pipe, [7, 7]);
+
+        await using var connection = await ConnectAsync(pipe);
+        Assert.Equal([7, 7], (await AskAsync(connection, transfer.Id)).Payload);
+    }
+
+    /// <summary>With no instance of the pipe to be had, an offer fails instead of naming one.</summary>
+    [Fact]
+    public void WhenThePipeCannotBeOpened_EveryOfferFails()
+    {
+        using var pipe = new PreviewTransferPipe(NullLogger<PreviewTransferPipe>.Instance, null,
+            _ => throw new IOException("All pipe instances are busy."));
+
+        Assert.Throws<IOException>(() => Offer(pipe, [1]));
+        Assert.Throws<IOException>(() => Offer(pipe, [2]));
+    }
+
+    // ── a client that stops reading ───────────────────────────────────────────
+
+    /// <summary>
+    ///     A payload is open while it is sent - a texture's own file, for one. A client that stops
+    ///     reading must not keep it open: the write is given up after
+    ///     <see cref="PreviewTransferPipe.WriteStall" /> and the payload closed.
+    /// </summary>
+    [Fact]
+    public async Task AClientThatStopsReading_IsGivenUp_AndThePayloadClosed()
+    {
+        var clock = new FakeTimeProvider();
+        var client = new StalledClient();
+        var opened = 0;
+        using var pipe = new PreviewTransferPipe(NullLogger<PreviewTransferPipe>.Instance, clock,
+            _ => Interlocked.Increment(ref opened) == 1 ? client : new IdleListener());
+        var payload = new TrackedStream(new byte[1024]);
+        var transfer = pipe.Offer("dds", 1024, () => payload);
+
+        client.Ask(transfer.Id);
+        await Soon(client.Stalled);
+        Assert.False(payload.Closed);
+
+        clock.Advance(PreviewTransferPipe.WriteStall);
+
+        await Soon(payload.WhenClosed);
+        Assert.True(payload.Closed);
+    }
+
+    private static async Task Soon(Task task)
+    {
+        Assert.Same(task, await Task.WhenAny(task,
+            Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)));
+    }
+
+    /// <summary>An instance of the pipe that fails as soon as it is waited on.</summary>
+    private sealed class BrokenListener : IPreviewPipeListener
+    {
+        public Stream Connection => Stream.Null;
+
+        public Task WaitForConnectionAsync(CancellationToken stop)
+        {
+            return Task.FromException(new IOException("The pipe is broken."));
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>An instance of the pipe nobody connects to.</summary>
+    private sealed class IdleListener : IPreviewPipeListener
+    {
+        public Stream Connection => Stream.Null;
+
+        public Task WaitForConnectionAsync(CancellationToken stop)
+        {
+            return Task.Delay(Timeout.Infinite, stop);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>A real instance of the named pipe.</summary>
+    private sealed class PipeListener(string name) : IPreviewPipeListener
+    {
+        private readonly NamedPipeServerStream _pipe = new(name, PipeDirection.InOut,
+            NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+
+        public Stream Connection => _pipe;
+
+        public Task WaitForConnectionAsync(CancellationToken stop)
+        {
+            return _pipe.WaitForConnectionAsync(stop);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return _pipe.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    ///     A client that connects when the test asks, sends one transfer id, takes the response
+    ///     header and then reads nothing more: every later write waits until it is cancelled.
+    /// </summary>
+    private sealed class StalledClient : Stream, IPreviewPipeListener
+    {
+        private readonly TaskCompletionSource<byte[]> _asked =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private readonly TaskCompletionSource _stalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool _sent;
+        private int _writes;
+
+        /// <summary>Completes when a write is waiting on this client.</summary>
+        public Task Stalled => _stalled.Task;
+
+        public Stream Connection => this;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public async Task WaitForConnectionAsync(CancellationToken stop)
+        {
+            await _asked.Task.WaitAsync(stop);
+        }
+
+        public void Ask(string id)
+        {
+            _asked.TrySetResult(Convert.FromHexString(id));
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            if (_sent)
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+                return 0;
+            }
+
+            _sent = true;
+            var id = await _asked.Task;
+            id.CopyTo(buffer);
+            return id.Length;
+        }
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            // The header is taken; the payload is not.
+            if (Interlocked.Increment(ref _writes) == 1)
+                return;
+
+            _stalled.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class Clock : TimeProvider

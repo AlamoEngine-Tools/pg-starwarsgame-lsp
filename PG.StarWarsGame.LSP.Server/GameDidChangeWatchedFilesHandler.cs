@@ -124,9 +124,11 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         var localisationTextChanged = false;
         HashSet<string>? listedKeys = null;
 
-        // Every asset file and archive reported, whatever happened to it. The preview forgets what
-        // it knew of each BY PATH: a file copied over another keeps the source's write time, so its
-        // stamp alone cannot be trusted to have moved.
+        // Every model, clip, texture and archive reported, whatever happened to it. The preview
+        // forgets what it knew of each BY PATH: a file copied over another keeps the source's write
+        // time, so its stamp alone cannot be trusted to have moved. The catalog's other assets -
+        // scripts, sounds, maps - are nothing a preview draws, and are left out: every open preview
+        // asks for all its assets again when this list is not empty.
         List<string>? changedAssets = null;
 
         // Built on first use so the schema's enum list is walked once per notification, not once
@@ -184,7 +186,8 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 if (path is not null && AssetCatalogBuilder.IsAssetFile(path))
                 {
                     assetsChanged = true;
-                    (changedAssets ??= []).Add(path);
+                    if (PreviewAssetFingerprints.IsDrawn(path))
+                        (changedAssets ??= []).Add(path);
                     if (DocumentLanguages.LanguageIdOf(path) != DocumentLanguages.Lua)
                         continue;
                 }

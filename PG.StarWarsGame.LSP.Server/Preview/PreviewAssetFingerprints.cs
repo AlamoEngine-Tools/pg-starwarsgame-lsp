@@ -37,8 +37,9 @@ public interface IPreviewAssetFingerprints
     PreviewAssetIdentity? Identify(GameAssetLocation location);
 
     /// <summary>
-    ///     Drops everything remembered about these files, whatever their timestamps say. Called for
-    ///     every watched-file event on an asset.
+    ///     Drops everything remembered about these files, whatever their timestamps say. Called
+    ///     with the models, clips, textures and archives of a watched-file notification - never
+    ///     with a script or a sound, which no preview draws.
     /// </summary>
     void Forget(IReadOnlyCollection<string> paths);
 }
@@ -66,6 +67,9 @@ public sealed class PreviewAssetFingerprints(IGameAssetResolver assets, IFileHel
 {
     /// <summary>What the server sends every open preview when <see cref="Changed" /> is raised.</summary>
     public const string ChangedNotification = "aet/previewAssetsChanged";
+
+    /// <summary>The loose files a preview draws from: models, their clips, and textures.</summary>
+    private static readonly string[] DrawnExtensions = [".alo", ".ala", ".dds", ".tga"];
 
     /// <summary>The hash of each loose file already read, by the stamp it had then.</summary>
     private readonly ConcurrentDictionary<string, Fingerprint> _hashes = new(StringComparer.OrdinalIgnoreCase);
@@ -138,6 +142,16 @@ public sealed class PreviewAssetFingerprints(IGameAssetResolver assets, IFileHel
         }
 
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    ///     Whether a change to this loose file can change what a preview draws. Only such a file is
+    ///     worth forgetting: <see cref="Forget" /> has every open preview ask for its assets again.
+    /// </summary>
+    public static bool IsDrawn(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return DrawnExtensions.Any(drawn => extension.Equals(drawn, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>The hash this class takes of a file's bytes.</summary>

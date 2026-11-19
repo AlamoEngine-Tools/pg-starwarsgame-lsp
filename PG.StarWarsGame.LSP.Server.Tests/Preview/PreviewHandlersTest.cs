@@ -160,8 +160,66 @@ public sealed class PreviewHandlersTest
         var disk = new FileHelper(new MockFileSystem());
         var cache = new PreviewModelCache(new PreviewAssetFingerprints(assets, disk), disk,
             location ?? new NoProject(), NullLogger<PreviewModelCache>.Instance);
-        return new GetModelGlbHandler(assets, cache, transfers ?? new OfferedTransfers(), TestCatalogues.English,
+        return new GetModelGlbHandler(assets, cache, new ModelGlbConverter(), transfers ?? new OfferedTransfers(),
+            TestCatalogues.English,
             logger ?? NullLogger<GetModelGlbHandler>.Instance);
+    }
+
+    /// <summary>
+    ///     A conversion takes seconds on a large model, and one under way on the background build's
+    ///     thread is waited for. Neither holds the thread the request arrived on: the handler hands
+    ///     back a task and the conversion runs elsewhere.
+    /// </summary>
+    [Fact]
+    public async Task GetModelGlb_DoesNotHoldItsCallerWhileTheModelIsConverted()
+    {
+        using var cache = new HeldCache();
+        var handler = new GetModelGlbHandler(new StubAssets(), cache, new ModelGlbConverter(),
+            new OfferedTransfers(), TestCatalogues.English, NullLogger<GetModelGlbHandler>.Instance);
+
+        var answer = handler.Handle(new GetModelGlbParams { ModelReference = "Hull.alo", Have = "v1" },
+            CancellationToken.None);
+
+        Assert.False(answer.IsCompleted);
+        cache.Release();
+        var result = await answer;
+        Assert.True(cache.Released);
+        Assert.Equal("v1", cache.Have);
+        Assert.NotNull(result.Error);
+    }
+
+    /// <summary>A cache that holds every request until the test lets it go, and then finds nothing.</summary>
+    private sealed class HeldCache : IPreviewModelCache, IDisposable
+    {
+        private readonly ManualResetEventSlim _release = new();
+
+        /// <summary>Whether the request was let go by the test, rather than giving up its wait.</summary>
+        public bool Released { get; private set; }
+
+        public string? Have { get; private set; }
+
+        public void Dispose()
+        {
+            _release.Dispose();
+        }
+
+        public PreviewCachedModel? GetOrConvert(string modelPath, IReadOnlyList<(string Name, string Path)> clips,
+            PreviewModelConverter convert, PreviewClipJudge judge, string? have = null)
+        {
+            Have = have;
+            Released = _release.Wait(TimeSpan.FromSeconds(5));
+            return null;
+        }
+
+        public int Clear()
+        {
+            return 0;
+        }
+
+        public void Release()
+        {
+            _release.Set();
+        }
     }
 
     /// <summary>
@@ -172,11 +230,23 @@ public sealed class PreviewHandlersTest
     {
         private readonly Dictionary<string, Func<Stream>> _payloads = [];
 
+        /// <summary>What every offer fails with, for a channel that cannot be opened.</summary>
+        public Exception? Fails { get; init; }
+
         public PreviewTransfer Offer(string format, long length, Func<Stream> open)
         {
+            if (Fails is not null)
+                throw Fails;
+
             var id = Guid.NewGuid().ToString("N");
             _payloads[id] = open;
             return new PreviewTransfer("test-pipe", id, length, format);
+        }
+
+        /// <summary>The payload as the pipe opens it; the caller closes it.</summary>
+        public Stream Open(PreviewTransfer transfer)
+        {
+            return _payloads[transfer.Id]();
         }
 
         public byte[] BytesOf(PreviewTransfer transfer)
@@ -448,7 +518,55 @@ public sealed class PreviewHandlersTest
     {
         var files = new FileHelper(disk ?? new MockFileSystem());
         return new GetModelTextureHandler(assets, fingerprints ?? new PreviewAssetFingerprints(assets, files),
-            files, transfers, TestCatalogues.English);
+            files, transfers, TestCatalogues.English, NullLogger<GetModelTextureHandler>.Instance);
+    }
+
+    /// <summary>
+    ///     A loose texture is streamed from the modder's own file while the client collects it. The
+    ///     file must stay theirs meanwhile: saved over, replaced or deleted by whatever tool wrote it.
+    /// </summary>
+    [Fact]
+    public async Task GetModelTexture_WhileALooseFileIsCollected_ItCanStillBeWrittenAndDeleted()
+    {
+        var folder = Directory.CreateTempSubdirectory("aet-preview-texture-");
+        try
+        {
+            var path = Path.Combine(folder.FullName, "Hull.dds");
+            await File.WriteAllBytesAsync(path, [5, 6, 7], TestContext.Current.CancellationToken);
+            var assets = new StubAssets().With("Data/Art/Textures/Hull.dds", [5, 6, 7], path);
+            var transfers = new OfferedTransfers();
+            var files = new FileHelper(new System.IO.Abstractions.FileSystem());
+            var handler = new GetModelTextureHandler(assets, new PreviewAssetFingerprints(assets, files), files,
+                transfers, TestCatalogues.English, NullLogger<GetModelTextureHandler>.Instance);
+
+            var result = await handler.Handle(new GetModelTextureParams { Name = "Hull.dds" },
+                CancellationToken.None);
+
+            await using (transfers.Open(result.Transfer!))
+            {
+                await File.WriteAllBytesAsync(path, [1, 2, 3], TestContext.Current.CancellationToken);
+                File.Delete(path);
+            }
+
+            Assert.False(File.Exists(path));
+        }
+        finally
+        {
+            folder.Delete(true);
+        }
+    }
+
+    /// <summary>A transfer channel that cannot be opened is a texture that did not load, said as one.</summary>
+    [Fact]
+    public async Task GetModelTexture_WhenTheTransferChannelCannotBeOpened_SaysTheTextureCouldNotBeRead()
+    {
+        var assets = new StubAssets().With("Data/Art/Textures/Hull.dds", [5, 6, 7]);
+        var handler = TextureHandler(assets, new OfferedTransfers { Fails = new IOException("no pipe") });
+
+        var result = await handler.Handle(new GetModelTextureParams { Name = "Hull.dds" }, CancellationToken.None);
+
+        Assert.Null(result.Transfer);
+        Assert.NotNull(result.Error);
     }
 
     /// <summary>

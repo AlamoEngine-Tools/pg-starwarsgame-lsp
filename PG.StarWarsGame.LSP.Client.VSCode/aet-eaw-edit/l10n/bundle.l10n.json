@@ -102,6 +102,7 @@
   "EaWEdit LSP: {0} of {1} projects ready - {2}": "EaWEdit LSP: {0} of {1} projects ready - {2}",
   "EaWEdit LSP: {0} of {1} projects ready": "EaWEdit LSP: {0} of {1} projects ready",
   "The preview's data channel could not be reached, so a model or texture was not loaded. Reopen the preview.": "The preview's data channel could not be reached, so a model or texture was not loaded. Reopen the preview.",
+  "The preview's data channel did not answer in time, so a model or texture was not loaded. Reopen the preview.": "The preview's data channel did not answer in time, so a model or texture was not loaded. Reopen the preview.",
   "The server no longer holds a model or texture it offered. Reopen the preview.": "The server no longer holds a model or texture it offered. Reopen the preview.",
   "The preview's data channel sent {0} bytes where {1} were announced. Reopen the preview.": "The preview's data channel sent {0} bytes where {1} were announced. Reopen the preview.",
   "The preview's data channel closed before a model or texture had arrived. Reopen the preview.": "The preview's data channel closed before a model or texture had arrived. Reopen the preview.",

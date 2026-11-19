@@ -31,6 +31,12 @@ export const TRANSFER_GONE = 2;
 const REQUEST_LENGTH = 16;
 const HEADER_LENGTH = 9;
 
+/**
+ * How long a transfer may go without a byte arriving before it is given up. A wait for the pipe to
+ * say something, not for the whole payload: a large model that keeps coming is never cut short.
+ */
+export const TRANSFER_IDLE_MS = 30_000;
+
 /** The request frame for a transfer id. */
 export function transferRequest(id: string): Uint8Array {
     if (!/^[0-9a-fA-F]{32}$/.test(id)) {
@@ -145,11 +151,14 @@ export type TransferConnect = (pipe: string) => net.Socket;
  * Collects one transfer's bytes from the server's pipe.
  *
  * Rejects with a `PreviewTransferError` whose message is for the reader when the pipe cannot be
- * reached, closes before the payload is whole, or the server no longer has the transfer.
+ * reached, closes before the payload is whole, sends nothing for `idleMs`, or the server no longer
+ * has the transfer. A pipe that took the connection and never answered used to leave the part
+ * loading for as long as the panel stayed open.
  */
 export function collectTransfer(
     transfer: PreviewTransfer,
     connect: TransferConnect = (pipe) => net.connect(pipe),
+    idleMs = TRANSFER_IDLE_MS,
 ): Promise<Uint8Array> {
     return new Promise((resolve, reject) => {
         const frame = new TransferFrame();
@@ -175,6 +184,15 @@ export function collectTransfer(
             );
             return;
         }
+
+        // Counted from now and again from every byte that arrives, the connection included.
+        socket.setTimeout(idleMs, () => {
+            fail(
+                l10n.t(
+                    "The preview's data channel did not answer in time, so a model or texture was not loaded. Reopen the preview.",
+                ),
+            );
+        });
 
         socket.on("connect", () => {
             socket.write(transferRequest(transfer.id));

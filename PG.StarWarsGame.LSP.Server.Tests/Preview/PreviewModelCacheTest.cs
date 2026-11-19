@@ -630,6 +630,74 @@ public sealed class PreviewModelCacheTest
     }
 
     /// <summary>
+    ///     With no project nothing is kept, so every request converts - but not one that asks with
+    ///     the version the model still has: its caller will not open the payload, and a refresh of
+    ///     an unchanged model must not convert it only to say "unchanged".
+    /// </summary>
+    [Fact]
+    public void GetOrConvert_WithNoProject_ForTheVersionTheCallerHolds_DoesNotConvertAgain()
+    {
+        var assets = new DiskAssets().With(Model, [1, 2, 3]).With(Clip, [9]);
+        var converter = new CountingConverter
+            { Notes = [new PreviewClipNote("Hull_idle_00.ala", PreviewClipNoteKind.DiffersButPlays, "two bones")] };
+        var cache = Build(assets, false);
+        var first = cache.GetOrConvert(Model, OneClip, converter.Convert);
+
+        var again = cache.GetOrConvert(Model, OneClip, converter.Convert, first!.Key);
+
+        Assert.Equal(1, converter.Calls);
+        Assert.Equal(first.Key, again!.Key);
+        Assert.Equal(first.Animations, again.Animations);
+        Assert.Equal(first.Notes, again.Notes);
+        Assert.Equal(first.Length, again.Length);
+
+        // Asked for after all, the payload is still the model: converted then.
+        Assert.Equal(converter.GlbFor([1, 2, 3], [9]), again.ReadBytes());
+        Assert.Equal(2, converter.Calls);
+
+        // Another version held is a model to send.
+        cache.GetOrConvert(Model, OneClip, converter.Convert, "something else");
+        Assert.Equal(3, converter.Calls);
+    }
+
+    /// <summary>
+    ///     A request that finds its model being converted by the background build waits for that
+    ///     conversion - and the build's thread runs below normal priority, so the request would wait
+    ///     behind everything else the machine is doing. The waiter lends the converting thread its
+    ///     own priority until the conversion is done.
+    /// </summary>
+    [Fact]
+    public void GetOrConvert_AWaiterOfHigherPriority_LendsItToTheThreadConvertingUntilItIsDone()
+    {
+        var assets = new DiskAssets().With(Model, [1, 2, 3]);
+        var cache = Build(assets);
+        var converting = new ManualResetEventSlim();
+        var lent = false;
+        var afterwards = ThreadPriority.Normal;
+
+        var background = new Thread(() =>
+        {
+            cache.GetOrConvert(Model, NoClips, (model, clips) =>
+            {
+                converting.Set();
+                lent = SpinWait.SpinUntil(() => Thread.CurrentThread.Priority == ThreadPriority.Normal,
+                    TimeSpan.FromSeconds(5));
+                return new CountingConverter().Convert(model, clips);
+            });
+            afterwards = Thread.CurrentThread.Priority;
+        }) { Priority = ThreadPriority.BelowNormal, IsBackground = true };
+        background.Start();
+        Assert.True(converting.Wait(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
+
+        var waited = cache.GetOrConvert(Model, NoClips, new CountingConverter().Convert);
+        Assert.True(background.Join(TimeSpan.FromSeconds(20)));
+
+        Assert.NotNull(waited);
+        Assert.True(lent);
+        Assert.Equal(ThreadPriority.BelowNormal, afterwards);
+    }
+
+    /// <summary>
     ///     The indexer revisits the ignore file only when it saves a snapshot, so a project whose
     ///     snapshot is current would never have the new folder listed. The cache asks before its
     ///     first write instead - once, however many models follow, and not at all for a hit.
@@ -847,9 +915,9 @@ public sealed class PreviewModelCacheTest
 file static class EveryClipPlays
 {
     public static PreviewCachedModel? GetOrConvert(this PreviewModelCache cache, string modelPath,
-        IReadOnlyList<(string Name, string Path)> clips, PreviewModelConverter convert)
+        IReadOnlyList<(string Name, string Path)> clips, PreviewModelConverter convert, string? have = null)
     {
         return cache.GetOrConvert(modelPath, clips, convert,
-            (_, offered) => [.. offered.Select(_ => new PreviewClipVerdict(true, null))]);
+            (_, offered) => [.. offered.Select(_ => new PreviewClipVerdict(true, null))], have);
     }
 }
