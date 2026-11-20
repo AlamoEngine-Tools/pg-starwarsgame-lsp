@@ -1401,6 +1401,8 @@ async function stopAllClients(): Promise<void> {
     routeChanges.fire();
     WebviewPanelHost.setProjectCount(clients.size);
     await Promise.all(running.map((project) => stopProjectClient(project)));
+    // Says when the stop is over, not only when it began, so a start that overlapped it shows.
+    logLine("All LSP servers stopped.");
 }
 
 /**
@@ -1444,8 +1446,26 @@ function updateStatus(): void {
     statusItem.show();
 }
 
-/** Serialises discovery runs: a folder change and a project file event can arrive together. */
+/**
+ * Serialises discovery runs. Every caller but the debug Force Startup command reaches this through
+ * {@link restarts}, which already runs one thing at a time; this keeps that command's run from
+ * overlapping one of its.
+ */
 let reconciling: Promise<void> = Promise.resolve();
+
+/**
+ * The one queue every restart and every project discovery runs in (#395), so a discovery and a
+ * settings restart never stop or start clients at the same time. Set as activation begins.
+ */
+let restarts: RestartCoordinator | undefined;
+
+/**
+ * Brings the servers in line with the window's projects, in the queue restarts run in: starts the
+ * projects that appeared, stops the ones that went, leaves the rest.
+ */
+function rediscover(): Promise<void> {
+    return restarts?.request({ causes: ["discovery"] }) ?? Promise.resolve();
+}
 
 /**
  * Discovers the window's projects and brings the running servers in line: starts the projects that
@@ -1664,7 +1684,7 @@ function watchWorkspace(context: vscode.ExtensionContext): void {
         const watcher = vscode.workspace.createFileSystemWatcher(glob);
         const handle = (uri: vscode.Uri, type: 1 | 2 | 3) => {
             if (uri.fsPath.toLowerCase().endsWith(".pgproj")) {
-                onProjectFileTouched(context);
+                onProjectFileTouched();
             }
             forwardWorkspaceChange(uri, type);
         };
@@ -1677,10 +1697,10 @@ function watchWorkspace(context: vscode.ExtensionContext): void {
     }
 }
 
-function onProjectFileTouched(context: vscode.ExtensionContext): void {
+function onProjectFileTouched(): void {
     // Not validated here: the configuration was checked when the servers started, and a project
     // file saved on every keystroke must not raise the same settings errors each time.
-    void reconcileClients(context).then(() => {
+    void rediscover().then(() => {
         // A .pgproj change can add or drop a project reference, which moves the very directories the
         // dependency watchers cover - so rebuild them whenever one changes, wherever it lives.
         for (const project of clients.values()) {
@@ -2735,42 +2755,12 @@ export async function activate(
     );
 
     windowState = context.workspaceState;
-    watchWorkspace(context);
-    // Changes the project remembered for commands; the window asks on its own only when the
-    // document in front belongs to no project and nothing was picked yet.
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.selectProject",
-            async () => {
-                if (clients.size <= 1) {
-                    void vscode.window.showInformationMessage(
-                        vscode.l10n.t("EaWEdit: One project open"),
-                    );
-                    return;
-                }
-                await pickProject();
-            },
-        ),
-    );
-    // A folder added or removed changes which projects the window holds; only the servers of the
-    // projects that came or went start or stop.
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeWorkspaceFolders(() => {
-            // A server kept running may now find a dependency inside a folder, or outside one:
-            // its own watchers over directories outside the folders are rebuilt too.
-            void reconcileClients(context).then(() => {
-                for (const project of clients.values()) {
-                    if (project.state === "ready") {
-                        void refreshDependencyWatchers(project);
-                    }
-                }
-            });
-        }),
-    );
 
-    // Every restart goes through one coordinator: a configuration change, the Restart command and
-    // a start with no server running. See restartCoordinator.ts for the two rules it keeps.
-    const restarts = new RestartCoordinator({
+    // Every restart and every project discovery goes through one coordinator: a configuration
+    // change, the Restart command, a start with no server running, a workspace folder or a project
+    // file coming or going. Set before the watchers below can fire. See restartCoordinator.ts for
+    // the rules it keeps.
+    restarts = new RestartCoordinator({
         running: () => clients.size > 0,
         validate: () => validateConfiguration(context.extensionPath),
         stop: () => stopAllClients(),
@@ -2794,8 +2784,42 @@ export async function activate(
             }
         },
     });
+    const coordinator = restarts;
 
-    const restartServer = () => restarts.request({ causes: ["command"] });
+    watchWorkspace(context);
+    // Changes the project remembered for commands; the window asks on its own only when the
+    // document in front belongs to no project and nothing was picked yet.
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "aet-eaw-edit.lsp.selectProject",
+            async () => {
+                if (clients.size <= 1) {
+                    void vscode.window.showInformationMessage(
+                        vscode.l10n.t("EaWEdit: One project open"),
+                    );
+                    return;
+                }
+                await pickProject();
+            },
+        ),
+    );
+    // A folder added or removed changes which projects the window holds; only the servers of the
+    // projects that came or went start or stop.
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            // A server kept running may now find a dependency inside a folder, or outside one:
+            // its own watchers over directories outside the folders are rebuilt too.
+            void rediscover().then(() => {
+                for (const project of clients.values()) {
+                    if (project.state === "ready") {
+                        void refreshDependencyWatchers(project);
+                    }
+                }
+            });
+        }),
+    );
+
+    const restartServer = () => coordinator.request({ causes: ["command"] });
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
@@ -2814,7 +2838,7 @@ export async function activate(
             // any change may be the one that lets one start. Every setting the validation checks
             // is among the restart settings, so any other change has nothing new to report.
             if (reason !== null || clients.size === 0) {
-                await restarts.request({
+                await coordinator.request({
                     causes: reason === null ? ["start"] : [reason],
                     effects: previewEffectsChanged(affects),
                     assets: previewAssetsChanged(affects),
@@ -3734,7 +3758,8 @@ export async function activate(
     );
 
     if (validateConfiguration(context.extensionPath)) {
-        void reconcileClients(context);
+        // The first discovery, in the same queue as everything after it.
+        void rediscover();
     }
 }
 

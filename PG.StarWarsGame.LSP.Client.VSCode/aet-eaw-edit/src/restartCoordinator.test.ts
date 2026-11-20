@@ -237,4 +237,212 @@ describe("RestartCoordinator", () => {
             await first;
         });
     });
+
+    // Project discovery - a workspace folder added or removed, a .pgproj appearing or going -
+    // brings the client set in line with the workspace. It shares the clients with a restart, so it
+    // runs in the same queue: never beside a restart, never beside another discovery.
+    describe("project discovery", () => {
+        /**
+         * A window whose clients follow the projects of its workspace. The stop and the discovery
+         * each take a few turns, as the real ones do while processes start and stop, and every
+         * client stopped or started is recorded. `overlaps` counts any step that began while another
+         * was still running.
+         */
+        function windowHarness(projects: string[]): {
+            host: RestartHost;
+            events: string[];
+            state: {
+                workspace: Set<string>;
+                clients: Set<string>;
+                valid: boolean;
+                settings: string;
+                overlaps: number;
+            };
+        } {
+            const events: string[] = [];
+            const state = {
+                workspace: new Set(projects),
+                clients: new Set(projects),
+                valid: true,
+                settings: "first",
+                overlaps: 0,
+            };
+            let busy = 0;
+
+            const step = async (work: () => Promise<void>): Promise<void> => {
+                if (busy > 0) {
+                    state.overlaps++;
+                }
+                busy++;
+                try {
+                    await work();
+                } finally {
+                    busy--;
+                }
+            };
+
+            const host: RestartHost = {
+                running: () => state.clients.size > 0,
+                validate: () => {
+                    events.push(state.valid ? "valid" : "invalid, reported");
+                    return state.valid;
+                },
+                stop: () =>
+                    step(async () => {
+                        for (const client of [...state.clients].sort()) {
+                            events.push(`stop ${client}`);
+                        }
+                        await yieldNow();
+                        state.clients.clear();
+                    }),
+                // Reads the workspace when it begins, as discovery reads the folders and finds the
+                // project files before it changes anything.
+                start: () =>
+                    step(async () => {
+                        const wanted = new Set(state.workspace);
+                        await yieldNow();
+                        await yieldNow();
+                        for (const client of [...state.clients].sort()) {
+                            if (!wanted.has(client)) {
+                                events.push(`stop ${client}`);
+                                state.clients.delete(client);
+                            }
+                        }
+                        for (const client of [...wanted].sort()) {
+                            if (!state.clients.has(client)) {
+                                events.push(
+                                    `start ${client} on ${state.settings}`,
+                                );
+                                state.clients.add(client);
+                            }
+                        }
+                    }),
+                log: (line) => events.push(`log ${line}`),
+                refresh: () => undefined,
+            };
+
+            return { host, events, state };
+        }
+
+        it("starts a new project and stops a gone one, leaving the rest and validating nothing", async () => {
+            const { host, events, state } = windowHarness(["alpha", "beta"]);
+            state.workspace = new Set(["alpha", "gamma"]);
+
+            await new RestartCoordinator(host).request({
+                causes: ["discovery"],
+            });
+
+            assert.deepEqual(events, ["stop beta", "start gamma on first"]);
+            assert.deepEqual([...state.clients].sort(), ["alpha", "gamma"]);
+        });
+
+        it("(a) runs a discovery that arrives mid-restart after the restart, never beside it", async () => {
+            const { host, events, state } = windowHarness(["alpha"]);
+            const coordinator = new RestartCoordinator(host);
+
+            const restart = coordinator.request({ causes: ["startup"] });
+            await yieldNow();
+            // The restart's stop is under way when a project folder is added.
+            assert.deepEqual(events.at(-1), "stop alpha");
+            state.workspace = new Set(["alpha", "beta"]);
+            const discovery = coordinator.request({ causes: ["discovery"] });
+            await Promise.all([restart, discovery]);
+
+            assert.equal(state.overlaps, 0);
+            assert.deepEqual([...state.clients].sort(), ["alpha", "beta"]);
+            // Every client started once per run that wanted it, none twice at once.
+            assert.equal(
+                events.filter((e) => e.startsWith("start alpha")).length,
+                1,
+            );
+            assert.equal(
+                events.filter((e) => e.startsWith("start beta")).length,
+                1,
+            );
+        });
+
+        it("(b) holds a settings change that arrives mid-discovery until the discovery is done", async () => {
+            const { host, events, state } = windowHarness(["alpha"]);
+            const coordinator = new RestartCoordinator(host);
+            state.workspace = new Set(["alpha", "beta"]);
+
+            const discovery = coordinator.request({ causes: ["discovery"] });
+            await yieldNow();
+            state.settings = "latest";
+            const restart = coordinator.request({ causes: ["features"] });
+            await Promise.all([discovery, restart]);
+
+            assert.equal(state.overlaps, 0);
+            assert.deepEqual(events, [
+                // The discovery finished on its own, before the restart began.
+                "start beta on latest",
+                "valid",
+                FEATURES_LINE,
+                "stop alpha",
+                "stop beta",
+                "start alpha on latest",
+                "start beta on latest",
+            ]);
+            assert.deepEqual([...state.clients].sort(), ["alpha", "beta"]);
+        });
+
+        it("(c) runs two discoveries back to back one after the other, ending on the last workspace", async () => {
+            const { host, events, state } = windowHarness(["alpha"]);
+            const coordinator = new RestartCoordinator(host);
+
+            state.workspace = new Set(["alpha", "beta"]);
+            const first = coordinator.request({ causes: ["discovery"] });
+            await yieldNow();
+            await yieldNow();
+            // The first is under way and has read the workspace when the second change lands.
+            state.workspace = new Set(["beta", "gamma"]);
+            const second = coordinator.request({ causes: ["discovery"] });
+            await Promise.all([first, second]);
+
+            assert.equal(state.overlaps, 0);
+            assert.deepEqual(events, [
+                "start beta on first",
+                "stop alpha",
+                "start gamma on first",
+            ]);
+            assert.deepEqual([...state.clients].sort(), ["beta", "gamma"]);
+        });
+
+        it("folds a discovery into a restart that has not begun, whose start discovers anyway", async () => {
+            const { host, events, state } = windowHarness(["alpha"]);
+            const coordinator = new RestartCoordinator(host);
+            state.workspace = new Set(["alpha", "beta"]);
+
+            await Promise.all([
+                coordinator.request({ causes: ["startup"] }),
+                coordinator.request({ causes: ["discovery"] }),
+            ]);
+
+            assert.deepEqual(events, [
+                "valid",
+                STARTUP_LINE,
+                "stop alpha",
+                "start alpha on first",
+                "start beta on first",
+            ]);
+        });
+
+        it("still discovers on an invalid configuration, without reporting it again", async () => {
+            const { host, events, state } = windowHarness(["alpha"]);
+            const coordinator = new RestartCoordinator(host);
+            state.valid = false;
+            await coordinator.request({ causes: ["startup"] });
+
+            // A project file saved while a setting is incomplete: its server starts, the others
+            // keep running, and the incomplete setting is not reported once per save.
+            state.workspace = new Set(["alpha", "beta"]);
+            await coordinator.request({ causes: ["discovery"] });
+
+            assert.deepEqual(events, [
+                "invalid, reported",
+                "start beta on first",
+            ]);
+            assert.deepEqual([...state.clients].sort(), ["alpha", "beta"]);
+        });
+    });
 });

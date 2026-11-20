@@ -119,8 +119,8 @@
   holds a mod's or the game's shaders. A changed shader folder, game folder, string table language,
   schema or baseline source, or startup diagnostics sweep used to wait for a manual restart; it now
   restarts the server, open previews reload their effects, and a changed game folder also reloads their
-  models and textures. A setting left incomplete keeps the running server, and changes in quick
-  succession restart it once
+  models and textures. A setting left incomplete keeps the running server, changes in quick
+  succession restart it once, and a project folder or project file added during a restart waits for it
   ([#395](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/395))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
