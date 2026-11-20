@@ -317,6 +317,7 @@
   "IconName": null,
   "SourceFile": null,
   "PassiveMissileShieldRadius": null,
+  "DeathPersistenceOverride": 30,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [],

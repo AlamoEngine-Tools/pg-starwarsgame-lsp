@@ -374,6 +374,7 @@
   "IconName": "i_button_boba_fett.tga",
   "SourceFile": null,
   "PassiveMissileShieldRadius": null,
+  "DeathPersistenceOverride": 30,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [

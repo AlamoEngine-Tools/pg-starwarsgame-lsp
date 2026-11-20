@@ -137,6 +137,57 @@ public sealed class PreviewDeathCloneTest
         Assert.Empty(clone.EndExplosions);
     }
 
+    /// <summary>
+    ///     Measured in the game: an infantry unit's clone stays for GameConstants'
+    ///     <c>Override_Death_Persistence_Duration</c> instead of its own - unless the clone type has a
+    ///     HIDE_WHEN_FOGGED, IMPOSING_PRESENCE, LAND_OBSTACLE or PROXIMITY_MINE behaviour.
+    /// </summary>
+    [Theory]
+    [InlineData("Behavior", "HIDE_WHEN_FOGGED")]
+    [InlineData("LandBehavior", "SELECTABLE, IMPOSING_PRESENCE")]
+    [InlineData("SpaceBehavior", "land_obstacle")]
+    [InlineData("LandBehavior", "PROXIMITY_MINE, SELECTABLE")]
+    public void DeathClones_SayWhenTheCloneKeepsItsOwnPersistence(string list, string behaviors)
+    {
+        var scene = Scene(
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
+            tags => tags.With("Wreck", Tag("Land_Model_Name", "wreck.alo"), Tag(list, behaviors)),
+            Tag("Land_Model_Name", "hull.alo"),
+            Tag("Death_Clone", "Damage_Normal, Wreck"));
+
+        Assert.True(Assert.Single(scene.DeathClones).KeepsItsOwnPersistence);
+    }
+
+    [Fact]
+    public void DeathClones_TakeTheOverrideWithAnyOtherBehavior()
+    {
+        var scene = Scene(
+            [Sym("Ship", "GameObjectType"), Sym("Wreck", "GameObjectType")],
+            tags => tags.With("Wreck",
+                Tag("Land_Model_Name", "wreck.alo"), Tag("LandBehavior", "SELECTABLE, UNSHIELDED")),
+            Tag("Land_Model_Name", "hull.alo"),
+            Tag("Death_Clone", "Damage_Normal, Wreck"));
+
+        Assert.False(Assert.Single(scene.DeathClones).KeepsItsOwnPersistence);
+    }
+
+    [Fact]
+    public void BuildForObject_CarriesTheInfantryDeathPersistenceOverride()
+    {
+        var scene = Scene(
+            [Sym("Ship", "GameObjectType")],
+            tags => tags.With("GameConstants", Tag("Override_Death_Persistence_Duration", "30.0")),
+            Tag("Land_Model_Name", "hull.alo"));
+
+        Assert.Equal(30f, scene.DeathPersistenceOverride);
+    }
+
+    [Fact]
+    public void BuildForObject_SaysNothingOfAnOverrideGameConstantsDoesNotWrite()
+    {
+        Assert.Null(Scene(Tag("Land_Model_Name", "hull.alo")).DeathPersistenceOverride);
+    }
+
     [Fact]
     public void DeathClones_ReportACloneThatIsNotDefined()
     {

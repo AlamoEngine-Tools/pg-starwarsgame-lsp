@@ -12,8 +12,8 @@ import { deathClip, isDeathClipName } from "./visibility";
 import {
     type DeathEnding,
     deathState,
-    ENDS_WITH_ITS_CLIP,
     stepDeath,
+    UNWRITTEN_ENDING,
 } from "./deathEnding";
 import * as THREE from "three";
 import { visibilityTracks } from "./boneVisibility";
@@ -189,7 +189,7 @@ export class AnimationRig {
      */
     startDeathClip(
         subjectId: string,
-        ending: DeathEnding = ENDS_WITH_ITS_CLIP,
+        ending: DeathEnding = UNWRITTEN_ENDING,
         onEnd?: () => void,
     ): void {
         const subject = this.subjects.get(subjectId);

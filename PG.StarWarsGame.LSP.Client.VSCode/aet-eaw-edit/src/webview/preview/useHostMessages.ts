@@ -27,7 +27,7 @@ import { modelRequestsOf } from "./modelStore";
 import { particleNotices } from "./particleNotices";
 import { heldModels, post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
-import { cloneDeath } from "./deathClone";
+import { type CloneDeath } from "./deathClone";
 import { dispatchHostMessage } from "./hostMessages";
 import { type PendingEffect } from "./useParticleEffects";
 import { BREAKOFF_ATTACHMENT, type PreviewViewport } from "./viewport";
@@ -58,6 +58,8 @@ export interface HostMessagesInputs {
         { id: string; prop: PreviewBreakoffProp; at: BreakoffAnchor }[]
     >;
     deadRef: RefObject<boolean>;
+    /** How the clone of the death that happened ends - see `useCombatLens`. */
+    cloneDeathRef: RefObject<CloneDeath | null>;
     detailWantedRef: RefObject<string | null>;
     explosionsRef: RefObject<PendingEffect[]>;
     foldedRef: RefObject<boolean>;
@@ -124,6 +126,7 @@ export function useHostMessages({
     attachPending,
     breakoffsRef,
     deadRef,
+    cloneDeathRef,
     detailWantedRef,
     explosionsRef,
     foldedRef,
@@ -472,18 +475,10 @@ export function useHostMessages({
                         // visible gap between the ship going and the wreck arriving - a capital ship's
                         // clone is three megabytes. Shown and started by the death watch.
                         if (deadRef.current) {
-                            const { ending, onEnd } = cloneDeath(
-                                sceneRef.current?.deathClones?.find(
-                                    (c) =>
-                                        `${DEATH_CLONE_PART}${c.objectId}` ===
-                                        message.partId,
-                                ),
-                                playEffect,
-                            );
                             viewport.startDeathClip(
                                 message.partId,
-                                ending,
-                                onEnd,
+                                cloneDeathRef.current?.ending,
+                                cloneDeathRef.current?.onEnd,
                             );
                         } else {
                             viewport.setPartHidden(message.partId, true);

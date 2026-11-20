@@ -163,10 +163,15 @@ public sealed record PreviewDeathClone(
     // How the clone ENDS, off the clone's own type. A dying object with a death clip stays once the
     // clip is done; Death_Persistence_Duration later it either is destroyed in its
     // Death_Explosions_End, when it names any, or fades out over Death_Fade_Time. Null where the
-    // clone does not declare the tag: 35 of eaw's 126 clone types declare neither number.
+    // clone does not declare the tag: 35 of eaw's 126 clone types declare neither number, and the
+    // game's values for an unwritten tag are the client's to apply.
     float? PersistenceSeconds = null,
     float? FadeSeconds = null,
-    IReadOnlyList<string>? EndExplosions = null)
+    IReadOnlyList<string>? EndExplosions = null,
+    // Whether the clone type has a HIDE_WHEN_FOGGED, IMPOSING_PRESENCE, LAND_OBSTACLE or
+    // PROXIMITY_MINE behaviour, which keeps its own persistence where an infantry unit's death would
+    // otherwise replace it with GameConstants' Override_Death_Persistence_Duration.
+    bool KeepsItsOwnPersistence = false)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<string> Animations { get; init; } = Animations ?? [];

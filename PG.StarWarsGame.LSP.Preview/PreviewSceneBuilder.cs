@@ -180,7 +180,8 @@ public sealed class PreviewSceneBuilder(
             DamageSectionBuilder.DamageTable(effective),
             EngineScaleFactor.Of(effective.ValueOf("Scale_Factor")),
             effective.ValueOf(EncyclopediaTags.IconName),
-            PassiveMissileShieldRadius: effective.FloatOf("Passive_Missile_Shield_Radius"));
+            PassiveMissileShieldRadius: effective.FloatOf("Passive_Missile_Shield_Radius"),
+            DeathPersistenceOverride: _damage.DeathPersistenceOverride(index));
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────

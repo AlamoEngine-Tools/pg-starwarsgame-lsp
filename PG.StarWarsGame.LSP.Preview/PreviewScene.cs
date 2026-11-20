@@ -229,7 +229,11 @@ public sealed record PreviewScene(
     PreviewSourceFile? SourceFile = null,
     // The subject's Passive_Missile_Shield_Radius, or null where it declares none. Measured in the
     // game: a type whose radius is above 0 shows its prs effects once it is created.
-    float? PassiveMissileShieldRadius = null)
+    float? PassiveMissileShieldRadius = null,
+    // GameConstants' Override_Death_Persistence_Duration, or null where it is not written. Measured in
+    // the game: when an infantry unit dies, its clone stays this long instead of its own
+    // Death_Persistence_Duration - see PreviewDeathClone.KeepsItsOwnPersistence for the exceptions.
+    float? DeathPersistenceOverride = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

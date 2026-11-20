@@ -97,9 +97,14 @@ function walkingRig(): { animation: AnimationRig; bone: THREE.Object3D } {
     return rig;
 }
 
-function near(actual: number, expected: number, what: string): void {
+function near(
+    actual: number,
+    expected: number,
+    what: string,
+    within = 1e-6,
+): void {
     assert.ok(
-        Math.abs(actual - expected) < 1e-6,
+        Math.abs(actual - expected) < within,
         `${what} ${actual}, expected ${expected}`,
     );
 }
@@ -314,19 +319,33 @@ describe("AnimationRig", () => {
         near(bone.position.x, 2, "x");
     });
 
-    /**
-     * A death clone plays once and ends on the same frame. With nothing declared about how it
-     * ends, it is gone there.
-     */
+    /** A death clone plays once and ends on the same frame; with no persistence and no fade it goes there. */
     it("ends a death clone's clip on its second-to-last frame", () => {
         const { animation, clone, bone, hidden } = dyingClone(true);
 
-        animation.startDeathClip("clone:1");
+        animation.startDeathClip("clone:1", {
+            persistenceSeconds: 0,
+            fadeSeconds: 0,
+            endsInExplosions: false,
+        });
         animation.advancePassiveSubjects(2.5);
 
         assert.equal(clone.action?.time, 2);
         near(bone.position.x, 2, "x");
         assert.deepEqual(hidden, ["clone:1/part"]);
+    });
+
+    /** Measured: a type that writes neither tag stays for ever - persistence -1 never starts the fade. */
+    it("keeps a death clone that writes nothing about its ending for good", () => {
+        const { animation, clone, hidden } = dyingClone(true);
+
+        animation.startDeathClip("clone:1");
+        for (let i = 0; i < 60; i++) {
+            animation.advancePassiveSubjects(1);
+        }
+
+        assert.deepEqual(hidden, []);
+        assert.equal(clone.death?.alpha, 1);
     });
 
     // ── how a death clone ends ────────────────────────────────────────────────
@@ -352,10 +371,18 @@ describe("AnimationRig", () => {
         near(bone.position.x, 2, "x");
 
         animation.advancePassiveSubjects(0.6);
-        near(clone.death?.alpha ?? -1, 0.5, "alpha half way through the fade");
+        near(
+            clone.death?.alpha ?? -1,
+            0.74,
+            "alpha half a fade time in",
+            0.005,
+        );
         assert.deepEqual(hidden, []);
 
         animation.advancePassiveSubjects(0.5);
+        assert.deepEqual(hidden, [], "still fading a fade time in");
+
+        animation.advancePassiveSubjects(2);
         assert.deepEqual(hidden, ["clone:1/part"]);
         assert.equal(
             released.length,

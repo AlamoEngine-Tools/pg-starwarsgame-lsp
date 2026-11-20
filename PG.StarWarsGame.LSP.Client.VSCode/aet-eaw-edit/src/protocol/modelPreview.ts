@@ -289,6 +289,12 @@ export interface PreviewDeathClone {
     persistenceSeconds?: number | null;
     fadeSeconds?: number | null;
     endExplosions?: string[];
+    /**
+     * Whether the clone type keeps its own persistence where an infantry unit's death would replace
+     * it with GameConstants' `Override_Death_Persistence_Duration`: it has a HIDE_WHEN_FOGGED,
+     * IMPOSING_PRESENCE, LAND_OBSTACLE or PROXIMITY_MINE behaviour.
+     */
+    keepsItsOwnPersistence?: boolean;
 }
 
 /**
@@ -686,6 +692,11 @@ export interface PreviewScene {
      * radius is above 0 shows its `prs` effects once it is created - see `effectGroups.ts`.
      */
     passiveMissileShieldRadius?: number | null;
+    /**
+     * GameConstants' `Override_Death_Persistence_Duration`, or absent where it is not written: how
+     * long an infantry unit's clone stays in place of its own persistence - see `deathEndingOf`.
+     */
+    deathPersistenceOverride?: number | null;
     subject: string;
     parts: PreviewPart[];
     hardpoints: PreviewHardpoint[];

@@ -67,8 +67,10 @@
   at its last frame
   ([#447](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/447))
 - **A death clone stays for its persistence** - a death clone disappeared the moment its clip ended. It now
-  holds its last frame for `Death_Persistence_Duration`, then goes with its `Death_Explosions_End`, or after
-  `Death_Fade_Time` when it names none
+  holds its last frame for `Death_Persistence_Duration`, then goes with its `Death_Explosions_End`, or fades
+  over `Death_Fade_Time` (0.25 seconds when unset) when it names none. A type that never sets the persistence
+  keeps its clone, as the game does, and an infantry unit's clone stays for the GameConstants
+  `Override_Death_Persistence_Duration` instead
   ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
 - **A unit opens with its effects running, and abilities switch them by name** - the unit preview held back
   every effect that did not look like an engine. A unit now opens with every effect the model file marks

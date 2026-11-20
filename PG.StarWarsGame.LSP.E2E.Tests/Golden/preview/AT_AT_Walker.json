@@ -377,6 +377,7 @@
   "IconName": "i_button_atat.tga",
   "SourceFile": null,
   "PassiveMissileShieldRadius": null,
+  "DeathPersistenceOverride": 30,
   "DamageStages": [
     0,
     1,
@@ -422,6 +423,7 @@
       "ScaleFactor": 1.75,
       "PersistenceSeconds": 15,
       "FadeSeconds": null,
+      "KeepsItsOwnPersistence": true,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -767,6 +769,7 @@
       "ScaleFactor": 1.75,
       "PersistenceSeconds": 15,
       "FadeSeconds": null,
+      "KeepsItsOwnPersistence": true,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -1112,6 +1115,7 @@
       "ScaleFactor": 1.75,
       "PersistenceSeconds": 15,
       "FadeSeconds": null,
+      "KeepsItsOwnPersistence": true,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -1457,6 +1461,7 @@
       "ScaleFactor": 1.75,
       "PersistenceSeconds": 15,
       "FadeSeconds": null,
+      "KeepsItsOwnPersistence": true,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",

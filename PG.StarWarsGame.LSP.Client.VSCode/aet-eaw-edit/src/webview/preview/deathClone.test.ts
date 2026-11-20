@@ -17,7 +17,7 @@ import {
     sweepAngles,
     turretSweeps,
 } from "./deathClone";
-import { ENDS_WITH_ITS_CLIP } from "./deathEnding";
+import { UNWRITTEN_ENDING } from "./deathEnding";
 
 const CLONES: PreviewDeathClone[] = [
     {
@@ -387,9 +387,71 @@ describe("deathEndingOf", () => {
         );
     });
 
-    it("ends with the clip where the clone declares nothing, or is not there", () => {
-        assert.deepEqual(deathEndingOf(CLONES[0]), ENDS_WITH_ITS_CLIP);
-        assert.deepEqual(deathEndingOf(undefined), ENDS_WITH_ITS_CLIP);
+    it("takes the game's values for what the clone does not write, or for no clone", () => {
+        assert.deepEqual(deathEndingOf(CLONES[0]), UNWRITTEN_ENDING);
+        assert.deepEqual(deathEndingOf(undefined), UNWRITTEN_ENDING);
+    });
+
+    /**
+     * Measured: when the DYING unit is infantry, GameConstants' `Override_Death_Persistence_Duration`
+     * replaces the clone's own persistence - not for a clone type that keeps its own, not for a
+     * death by Force lightning, and not where GameConstants writes 0 or nothing.
+     */
+    describe("an infantry unit's death", () => {
+        const clone = { ...CLONES[0], persistenceSeconds: 5 };
+        const infantry = {
+            infantry: true,
+            persistenceOverride: 30,
+            damageType: "Damage_Normal",
+        };
+
+        it("takes the override in place of the clone's persistence", () => {
+            assert.equal(deathEndingOf(clone, infantry).persistenceSeconds, 30);
+            assert.equal(
+                deathEndingOf(CLONES[0], infantry).persistenceSeconds,
+                30,
+            );
+        });
+
+        it("keeps the clone's own for a unit that is not infantry", () => {
+            assert.equal(
+                deathEndingOf(clone, { ...infantry, infantry: false })
+                    .persistenceSeconds,
+                5,
+            );
+        });
+
+        it("keeps the clone's own where GameConstants writes 0 or nothing", () => {
+            for (const override of [0, null]) {
+                assert.equal(
+                    deathEndingOf(clone, {
+                        ...infantry,
+                        persistenceOverride: override,
+                    }).persistenceSeconds,
+                    5,
+                );
+            }
+        });
+
+        it("keeps the clone's own for a clone type that keeps it", () => {
+            assert.equal(
+                deathEndingOf(
+                    { ...clone, keepsItsOwnPersistence: true },
+                    infantry,
+                ).persistenceSeconds,
+                5,
+            );
+        });
+
+        it("keeps the clone's own for a death by Force lightning", () => {
+            assert.equal(
+                deathEndingOf(clone, {
+                    ...infantry,
+                    damageType: "damage_force_lightning",
+                }).persistenceSeconds,
+                5,
+            );
+        });
     });
 });
 

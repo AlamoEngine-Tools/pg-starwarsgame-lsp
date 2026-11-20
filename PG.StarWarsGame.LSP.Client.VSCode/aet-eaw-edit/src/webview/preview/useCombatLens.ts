@@ -47,7 +47,12 @@ import {
 } from "./attacker";
 import { shieldRevealed, stealthed } from "./abilityRows";
 import { effectState } from "./visibility";
-import { cloneDeath, cloneForDamage, turretSweeps } from "./deathClone";
+import {
+    type CloneDeath,
+    cloneDeath,
+    cloneForDamage,
+    turretSweeps,
+} from "./deathClone";
 import { everyTurretHandle, type TurretAim } from "./turretHandles";
 import { spinAwayEnd } from "./spinAway";
 import { appendShot, BY_HAND, type DamageLogEntry } from "./damageLog";
@@ -561,11 +566,18 @@ export function useCombatLens({
             viewport.removePart(`${DEATH_CLONE_PART}${clone.objectId}`);
         }
 
+        cloneDeathRef.current = null;
         requestedClonesRef.current.clear();
     }, [dropPassiveEffects]);
 
     /** Read by the glb handler, which has to know whether a clone arriving is already needed. */
     const deadRef = useRef(false);
+
+    /**
+     * How the clone of the death that happened ends, for the glb handler to start a clone that lands
+     * after the death with. Null while the unit lives.
+     */
+    const cloneDeathRef = useRef<CloneDeath | null>(null);
 
     useEffect(() => {
         deadRef.current = unitDead;
@@ -815,10 +827,23 @@ export function useCombatLens({
         // type says which one it would be. Showing it is all that is left.
         const partId = `${DEATH_CLONE_PART}${clone.objectId}`;
 
+        // It stays once its clip is done, and ends as its own type says - and, for an infantry
+        // unit, as GameConstants says - see `deathEndingOf`. Kept for a clone still on its way,
+        // which the glb handler starts when it lands.
+        cloneDeathRef.current = cloneDeath(clone, playEffect, {
+            infantry: (scene?.categories ?? []).some(
+                (category) => category.toLowerCase() === "infantry",
+            ),
+            persistenceOverride: scene?.deathPersistenceOverride ?? null,
+            damageType: attacker.damageType,
+        });
+
         viewportRef.current?.setPartHidden(partId, false);
-        // It stays once its clip is done, and ends as its own type says - see `deathEnding.ts`.
-        const { ending, onEnd } = cloneDeath(clone, playEffect);
-        viewportRef.current?.startDeathClip(partId, ending, onEnd);
+        viewportRef.current?.startDeathClip(
+            partId,
+            cloneDeathRef.current.ending,
+            cloneDeathRef.current.onEnd,
+        );
     }, [
         scene,
         destroyed,
@@ -1250,6 +1275,7 @@ export function useCombatLens({
         setHardpointDestroyed,
         destroyAll,
         deadRef,
+        cloneDeathRef,
         livePools,
         hull,
         hardpointHealthPool,
