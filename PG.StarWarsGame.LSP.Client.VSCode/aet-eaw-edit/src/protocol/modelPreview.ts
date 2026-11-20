@@ -47,6 +47,14 @@ export interface PreviewRgba {
     a: number;
 }
 
+/** The look a cloak takes its unit to. Mirrors the C# `PreviewCloak`. */
+export interface PreviewCloak {
+    /** The colour and alpha it fades and tints towards, or absent where the type writes none. */
+    color?: PreviewRgba | null;
+    /** How long the change takes, in seconds, or absent where the type writes none. */
+    transitionSeconds?: number | null;
+}
+
 /**
  * One model instance in the scene.
  *
@@ -692,6 +700,16 @@ export interface PreviewScene {
      * radius is above 0 shows its `prs` effects once it is created - see `effectGroups.ts`.
      */
     passiveMissileShieldRadius?: number | null;
+    /**
+     * What the type's `Stealth_Ability` writes about the look of its cloak, or absent where it has
+     * none: `Stealth_Color` and `Stealth_Transition_Time`.
+     */
+    stealth?: PreviewCloak | null;
+    /**
+     * What the type's `Force_Cloak_Ability` writes about the look of its cloak, or absent where it has
+     * none: `Force_Cloak_Color` and `Force_Cloak_Transition_In_Secs`.
+     */
+    forceCloak?: PreviewCloak | null;
     /**
      * GameConstants' `Override_Death_Persistence_Duration`, or absent where it is not written: how
      * long an infantry unit's clone stays in place of its own persistence - see `deathEndingOf`.

@@ -22,6 +22,12 @@
   XML gates and the state a unit is created in - apply only in the unit preview, a game object opened from its
   XML. A wrong default in a model file shows in the model preview, and what the game draws in the unit preview
   ([#452](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/452))
+- **Diagnostics for a cloak that misses its parts** - the game decides what a stealth or Force cloak hides by
+  part names, so a unit whose model has no `BASEMESH` part hides nothing when it cloaks, and one with no
+  `STEALTH` part shows no shell: `CrossTag33` (`aetswg-007-0033`) and `CrossTag34` (`aetswg-007-0034`), a
+  warning when the cloak's colour also leaves the look unchanged, information otherwise. `CrossTag35`
+  (`aetswg-007-0035`) notes on a hardpoint that a Force cloak leaves its attached model drawn
+  ([#449](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/449))
 
 ### Fixes
 
@@ -80,6 +86,13 @@
   `pptw`, and so on - and a hardpoint's death and an ability switched on or off count in the order they
   happened. A death clone draws nothing and runs no effect before it is spawned
   ([#448](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/448))
+- **Stealth and Force cloak hide and fade as in the game** - a cloaked unit drew its stealth shell and nothing
+  else. Stealth now hides the parts whose name contains `BASEMESH` and the attached hardpoint models and shows
+  the parts whose name contains `STEALTH`; a Force cloak leaves the attached models drawn; every other part
+  stays as it was. The whole unit, its effects included, tints and fades towards the cloak's colour over its
+  transition time and back, and its shadow volumes go off while it is cloaked - after a stealth they stay off
+  until the detail level changes, as in the game. A death clone now fades out the same way
+  ([#449](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/449))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

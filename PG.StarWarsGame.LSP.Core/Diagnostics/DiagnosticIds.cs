@@ -668,6 +668,37 @@ public static class DiagnosticIds
     public static readonly DiagnosticId HardpointNeverFires = new(DiagnosticGroup.CrossTag, 32);
 
     /// <summary>
+    ///     A unit with a stealth or a Force cloak whose model has no part with BASEMESH in its name,
+    ///     so the cloak hides no part (#449).
+    /// </summary>
+    /// <remarks>
+    ///     Measured in the game: a cloak hides every part whose name contains BASEMESH. A warning when
+    ///     the cloak's look changes nothing either - a white opaque colour or no transition time - and
+    ///     information otherwise. Reported on the unit, never on the model.
+    /// </remarks>
+    public static readonly DiagnosticId CloakHidesNothing = new(DiagnosticGroup.CrossTag, 33);
+
+    /// <summary>
+    ///     A unit with a stealth or a Force cloak whose model has no part with STEALTH in its name,
+    ///     so the cloak shows no part (#449).
+    /// </summary>
+    /// <remarks>
+    ///     Measured in the game: a cloak shows every part whose name contains STEALTH. Severity as
+    ///     for <see cref="CloakHidesNothing" />.
+    /// </remarks>
+    public static readonly DiagnosticId CloakShowsNoShell = new(DiagnosticGroup.CrossTag, 34);
+
+    /// <summary>
+    ///     A unit with a Force cloak and a hardpoint that attaches a model, which the Force cloak
+    ///     leaves drawn (#449).
+    /// </summary>
+    /// <remarks>
+    ///     Measured in the game: a stealth hides the models a hardpoint attaches, a Force cloak does
+    ///     not. Information.
+    /// </remarks>
+    public static readonly DiagnosticId ForceCloakKeepsAttachedModel = new(DiagnosticGroup.CrossTag, 35);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.

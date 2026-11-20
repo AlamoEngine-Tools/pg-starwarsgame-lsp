@@ -23,9 +23,47 @@ import {
 import {
     blendingFor,
     HEAT_LAYER,
+    particleColour,
     ParticleSystemInstance,
     tailGeometry,
 } from "./particleRenderer";
+
+/**
+ * A model's whole look reaches its effects too: the tint multiplies the colour and the fade the
+ * alpha - or, for an additive emitter, the colour, the way the weather fade is applied.
+ */
+describe("particleColour", () => {
+    const particle = { r: 1, g: 0.5, b: 0.25, a: 0.8 };
+    const look = { r: 1, g: 0.5, b: 0.5, a: 0.5 };
+
+    it("is the particle's own colour for a plain model", () => {
+        assert.deepEqual(
+            particleColour(particle, false, 1, { r: 1, g: 1, b: 1, a: 1 }),
+            [1, 0.5, 0.25, 0.8],
+        );
+    });
+
+    it("tints the colour and fades the alpha", () => {
+        assert.deepEqual(
+            particleColour(particle, false, 1, look),
+            [1, 0.25, 0.125, 0.4],
+        );
+    });
+
+    it("fades an additive emitter's colour instead of its alpha", () => {
+        assert.deepEqual(
+            particleColour(particle, true, 1, look),
+            [0.5, 0.125, 0.0625, 0.8],
+        );
+    });
+
+    it("keeps the weather fade where the weather fade goes", () => {
+        assert.deepEqual(
+            particleColour(particle, false, 0.5, { r: 1, g: 1, b: 1, a: 1 }),
+            [1, 0.5, 0.25, 0.4],
+        );
+    });
+});
 
 describe("blendingFor", () => {
     /**

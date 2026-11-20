@@ -18,13 +18,22 @@ function gatesWith(): {
     modelRoot: THREE.Group;
     gated: [number, number, boolean][];
     refreshed: () => number;
+    released: () => number;
 } {
     const modelRoot = new THREE.Group();
     const gated: [number, number, boolean][] = [];
     let refreshes = 0;
+    let releases = 0;
     const context = standInContext({
         modelRoot,
         parts: new Map(),
+        animation: {
+            cloak: {
+                releaseVolumes: () => {
+                    releases++;
+                },
+            },
+        },
         particles: {
             gateByLevel: (alt: number, lod: number, descending: boolean) =>
                 gated.push([alt, lod, descending]),
@@ -41,6 +50,7 @@ function gatesWith(): {
         modelRoot,
         gated,
         refreshed: () => refreshes,
+        released: () => releases,
     };
 }
 
@@ -56,6 +66,17 @@ describe("LevelGates", () => {
             [1, 1, true],
         ]);
         assert.equal(refreshed(), 2);
+    });
+
+    /** Measured: a detail level change gives a past stealth's shadow volumes back. */
+    it("gives a past cloak's shadow volumes back when the detail level changes, and only then", () => {
+        const { levels, released } = gatesWith();
+
+        levels.setLevels(1, 0);
+        assert.equal(released(), 0, "a damage change alone");
+
+        levels.setLevels(1, 2);
+        assert.equal(released(), 1);
     });
 
     it("knows which way the damage level moved", () => {

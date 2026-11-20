@@ -46,6 +46,7 @@ import type { TranslatedEffect } from "./fx/effect";
 import type { FxMaterialState } from "./fx/renderState";
 import { applyBlend, applyDepth } from "./materialState";
 import { particleEffectName } from "./particleEffects";
+import { type Look, PLAIN_LOOK } from "./cloakFade";
 
 /**
  * Ceiling on live particles per emitter.
@@ -221,6 +222,31 @@ export function blendingFor(mode: string): ParticleBlend {
                 blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
             };
     }
+}
+
+/**
+ * One particle's drawn colour and alpha.
+ *
+ * Its own colour, faded by the weather and by its model's whole look - see `cloakFade.ts`. The look's
+ * tint multiplies the colour; its alpha, like the weather fade, multiplies the colour of an additive
+ * emitter, which alpha does not scale, and the alpha of every other.
+ */
+export function particleColour(
+    particle: { r: number; g: number; b: number; a: number },
+    additive: boolean,
+    weather: number,
+    look: Look,
+): [number, number, number, number] {
+    const fade = weather * look.a;
+    const colourFade = additive ? fade : 1;
+    const alphaFade = additive ? 1 : fade;
+
+    return [
+        particle.r * look.r * colourFade,
+        particle.g * look.g * colourFade,
+        particle.b * look.b * colourFade,
+        particle.a * alphaFade,
+    ];
 }
 
 /**
@@ -652,6 +678,8 @@ function stillFrame(): EmitterFrame {
 /** One emitter's live particles and the geometry drawing them. */
 class EmitterRenderer {
     readonly mesh: THREE.Mesh;
+    /** The owning model's whole look - see `cloakFade.ts`. Set by the system every step. */
+    modelLook: Look = PLAIN_LOOK;
 
     private readonly particles: Particle[] = [];
     private readonly clock: SpawnClock;
@@ -1119,18 +1147,21 @@ class EmitterRenderer {
             // game's distance on the colour of an additive emitter and the alpha otherwise.
             const fade = weather ? this.weatherDrawOf(particle) : 1;
             const drawn = weather ? this.weatherDrawn : particle.position;
-            const colourFade = fadeOnColour ? fade : 1;
-            const alphaFade = fadeOnColour ? 1 : fade;
             const px = drawn.x * scale;
             const py = drawn.y * scale;
             const pz = drawn.z * scale;
             const index = look.frame % (columns * columns);
             const originU = (index % columns) * cell;
             const originV = Math.floor(index / columns) * cell;
-            const r = bump ? 0.5 + 0.5 * c : look.r * colourFade;
-            const g = bump ? 0.5 + 0.5 * s : look.g * colourFade;
-            const b = bump ? 0.5 : look.b * colourFade;
-            const a = look.a * alphaFade;
+            const [lr, lg, lb, a] = particleColour(
+                look,
+                fadeOnColour,
+                fade,
+                this.modelLook,
+            );
+            const r = bump ? 0.5 + 0.5 * c : lr;
+            const g = bump ? 0.5 + 0.5 * s : lg;
+            const b = bump ? 0.5 : lb;
 
             for (let corner = 0; corner < 4; corner++) {
                 const cx = QUAD_CORNERS[corner * 2];
@@ -1650,8 +1681,12 @@ class EmitterRenderer {
             const weather = this.weatherHalf > 0;
             const fade = weather ? this.weatherDrawOf(particle) : 1;
             const drawn = weather ? this.weatherDrawn : particle.position;
-            const colourFade = fadeOnColour ? fade : 1;
-            const alphaFade = fadeOnColour ? 1 : fade;
+            const [lr, lg, lb, la] = particleColour(
+                look,
+                fadeOnColour,
+                fade,
+                this.modelLook,
+            );
 
             // The object's uniform scale, applied to the POSITION and the SIZE together, which is
             // what a scale on the world matrix does. It has to be here rather than on the system's
@@ -1661,11 +1696,11 @@ class EmitterRenderer {
             this.offsets[i * 3 + 1] = drawn.y * this.scaleFactor;
             this.offsets[i * 3 + 2] = drawn.z * this.scaleFactor;
 
-            this.colors[i * 3] = look.r * colourFade;
-            this.colors[i * 3 + 1] = look.g * colourFade;
-            this.colors[i * 3 + 2] = look.b * colourFade;
+            this.colors[i * 3] = lr;
+            this.colors[i * 3 + 1] = lg;
+            this.colors[i * 3 + 2] = lb;
 
-            this.alphas[i] = look.a * alphaFade;
+            this.alphas[i] = la;
             this.sizes[i] = look.size * this.scaleFactor;
             this.rotations[i] = look.rotation;
             this.frames[i] = look.frame;
@@ -2219,6 +2254,13 @@ export class ParticleSystemInstance {
 
     setVisible(visible: boolean): void {
         this.root.visible = visible;
+    }
+
+    /** The owning model's whole look, for every emitter - see `cloakFade.ts`. */
+    setLook(look: Look): void {
+        for (const emitter of this.emitters) {
+            emitter.modelLook = look;
+        }
     }
 
     dispose(): void {

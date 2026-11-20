@@ -331,7 +331,10 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // lookup names the type it means, so a name shared across types is nothing to warn about.
         // 161 -> 160: CrossLayerShadowHandler retired. The game has no layers: a definition wins or
         // loses by load order and its registry's rule, which DuplicateDefinitionHandler reports.
-        const int expectedHandlerCount = 160;
+        // 160 -> 163: CloakHidesNothingHandler, CloakShowsNoShellHandler and
+        // ForceCloakKeepsAttachedModelHandler (#449). A cloak decides its parts by name, and a Force
+        // cloak leaves attached models drawn.
+        const int expectedHandlerCount = 163;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
@@ -340,7 +343,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
     ///     The publisher runs the producers in registration order, and that order is the order the
     ///     diagnostics come out in - so it is pinned here, as the publisher's own phases had it before
     ///     the producers became one collection (#307): the document's facts, the index's, the variant
-    ///     chain's, the layers', the hardpoints', the damage stages', the story's, then the two rules
+    ///     chain's, the layers', the hardpoints', the damage stages', the cloaks', the story's, then the two rules
     ///     that used to run after dispatch.
     /// </summary>
     [Fact]
@@ -357,7 +360,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         Assert.Equal(
         [
             typeof(XmlDocumentFactProducer), typeof(XmlIndexFactProducer), typeof(XmlVariantFactProducer),
-            typeof(XmlHardpointFactProducer), typeof(XmlDamageStageFactProducer),
+            typeof(XmlHardpointFactProducer), typeof(XmlDamageStageFactProducer), typeof(XmlCloakFactProducer),
             typeof(StoryFactProducer), typeof(HardcodedSetValueFactProducer), typeof(DamageTypeTailFactProducer)
         ], producers);
     }

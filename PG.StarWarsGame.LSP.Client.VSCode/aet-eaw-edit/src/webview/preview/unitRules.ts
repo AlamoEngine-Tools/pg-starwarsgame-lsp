@@ -17,8 +17,9 @@
 
 import { PREVIEW_SCENE_KIND } from "../../protocol/modelPreview";
 import { type HardpointDeath, type HardpointWrites } from "./damage";
+import { cloakWrite, hiddenOnTypeLoad } from "./cloakWrites";
 import { createdWrite, switchWrite } from "./effectGroups";
-import { type MaterialExtras, isShieldMesh, isStealthMesh } from "./materials";
+import { type MaterialExtras, isShieldMesh } from "./materials";
 import {
     type AnimationSwitch,
     type StateSwitch,
@@ -77,12 +78,11 @@ export class UnitRules {
      */
     shieldRevealed = false;
     /**
-     * Whether a cloak ability is engaged, in which case the STEALTH SHELL is the only thing drawn.
-     *
-     * A swap, not a reveal. The shell ships VISIBLE on all nine models that carry one, so a unit
-     * that is not cloaked has it hidden by this layer, and a cloaked one has everything else hidden.
+     * Whether the unit's shadow VOLUMES are off because of its cloak - measured, and only the volumes,
+     * not the shadow map. Written by whatever steps the cloak - see `cloakFade.ts` for when they
+     * come back.
      */
-    stealthed = false;
+    cloakShadowsOff = false;
     /**
      * The abilities and power modes switched on. Each writes the effect groups it switches when it
      * goes on and again when it goes off - see `effectGroups.ts`.
@@ -138,6 +138,7 @@ export class UnitRules {
         this.collisionMeshes = new Set();
         this.namesAbove = null;
         this.shieldRevealed = false;
+        this.cloakShadowsOff = false;
         this.activeAbilities = new Set();
         this.missileShieldObject = false;
         this.clock = 0;
@@ -219,19 +220,21 @@ export class UnitRules {
     }
 
     /**
-     * Cloaks the unit, or uncloaks it.
-     *
-     * Through the level pass like the shield, because the row chain is the one writer of drawn
-     * state. Setting `visible` on the meshes here would be a second writer.
+     * Whether the unit's shadow volumes are off because of its cloak. Through the level pass, because
+     * the row chain decides what each shadow volume counts.
      */
-    setStealthed(on: boolean): void {
-        this.stealthed = on;
+    setCloakShadowsOff(off: boolean): void {
+        if (this.cloakShadowsOff === off) {
+            return;
+        }
+
+        this.cloakShadowsOff = off;
         this.context.levels.applyLevels();
     }
 
-    /** Whether a cloak is engaged. Never in a model preview, which applies no ability. */
-    isStealthed(): boolean {
-        return this.appliesGameRules() && this.stealthed;
+    /** Whether the unit's shadow volumes are off. Never in a model preview, which applies no ability. */
+    shadowsOff(): boolean {
+        return this.appliesGameRules() && this.cloakShadowsOff;
     }
 
     /**
@@ -239,17 +242,20 @@ export class UnitRules {
      * preview applies them; the last write is what the mesh has.
      *
      * @param bone The hull bone the mesh is on, for the rules that name a bone.
+     * @param attached Whether the mesh belongs to a model a hardpoint attaches.
      */
     meshState(
         state: StateSwitch,
         extras: MaterialExtras,
         bone?: number,
+        attached = false,
     ): StateSwitch {
         if (!this.appliesGameRules()) {
             return state;
         }
 
-        const name = (extras.alamoMesh ?? "").toLowerCase();
+        const meshName = extras.alamoMesh ?? "";
+        const name = meshName.toLowerCase();
         let written = state;
 
         // By the MESH, not the archetype: the shield shader is the engine glow's too on some
@@ -258,22 +264,37 @@ export class UnitRules {
             written = ruleState(this.shieldRevealed);
         }
 
-        // The shell ships VISIBLE, so the cloak says everything about it. Its LOD variants -
-        // `Ui_tyber` and `Ui_urai_fen` ship `Stealth_LOD0/1/2` - are still gated by the detail level.
-        const stealth = isStealthMesh(extras);
-        if (stealth) {
-            written = ruleState(this.stealthed);
-        }
-
-        // The hardpoints' decals and bones, replayed in the order they were written.
-        written = this.hardpointWrite(written, bone, name);
-
-        if (this.collisionMeshes.has(name)) {
+        // Loading the type hides every part named for a cloak or a blast - see `hiddenOnTypeLoad`.
+        // The stealth shell ships VISIBLE on all nine models that carry one; a cloak going on shows
+        // it. Its LOD variants - `Ui_tyber` and `Ui_urai_fen` ship `Stealth_LOD0/1/2` - are still
+        // gated by the detail level.
+        if (hiddenOnTypeLoad(meshName)) {
             written = ruleState(false);
         }
 
-        // Last, because a cloaked unit draws its shell and nothing else.
-        if (this.stealthed && !stealth) {
+        // What the hardpoints write on creation, then every death and every cloak in the one order
+        // they happened.
+        const above = this.bonesAbove(bone);
+        written = this.creationHardpointWrite(written, above, name);
+
+        for (const event of this.timeline()) {
+            if (event.kind === "death") {
+                written = this.deathWrite(written, event.death, above, name);
+            } else {
+                const cloaked = cloakWrite(
+                    event.type,
+                    event.on,
+                    meshName,
+                    attached,
+                    undefined,
+                );
+                if (cloaked !== undefined) {
+                    written = ruleState(cloaked);
+                }
+            }
+        }
+
+        if (this.collisionMeshes.has(name)) {
             written = ruleState(false);
         }
 
@@ -285,27 +306,30 @@ export class UnitRules {
      *
      * In the order the game writes them: what creating the unit writes - its name group (`pte`,
      * `pptw` and `prs` hidden, a missile-shield object's `prs` shown) and every Damage_Particles
-     * bone - then every hardpoint death and every ability switch, in the one order they happened.
-     *
-     * A cloaked unit shows its stealth shell and nothing else - not its engines, not its damage
-     * smoke, not the proxies of the ability doing the cloaking. Written here, over the effect's own
-     * state, rather than into it: the effect keeps what the effect rules last decided, so uncloaking
-     * restores exactly what was playing.
+     * bone - then every hardpoint death and every ability switch, the cloaks among them, in the one
+     * order they happened.
      *
      * @param bone The hull bone the effect is anchored on, for the rules that name a bone.
      * @param name The effect's proxy name, for the rules that read it; none for an effect the model
      *     does not carry.
+     * @param attached Whether the effect belongs to a model a hardpoint attaches.
      */
-    effectState(state: StateSwitch, bone?: number, name?: string): StateSwitch {
+    effectState(
+        state: StateSwitch,
+        bone?: number,
+        name?: string,
+        attached = false,
+    ): StateSwitch {
         if (!this.appliesGameRules()) {
             return state;
         }
 
-        if (this.stealthed) {
-            return ruleState(false);
-        }
-
-        let written = this.createdWrite(state, name, this.missileShieldObject);
+        // Loading the type first, then creating the unit - see `hiddenOnTypeLoad`.
+        let written =
+            name !== undefined && hiddenOnTypeLoad(name)
+                ? ruleState(false)
+                : state;
+        written = this.createdWrite(written, name, this.missileShieldObject);
         const above = this.bonesAbove(bone);
 
         written = this.creationHardpointWrite(written, above, null);
@@ -313,12 +337,15 @@ export class UnitRules {
         for (const event of this.timeline()) {
             if (event.kind === "death") {
                 written = this.deathWrite(written, event.death, above, null);
-            } else if (name !== undefined) {
-                const switched = switchWrite(
-                    name,
+            } else {
+                const switched = cloakWrite(
                     event.type,
                     event.on,
-                    undefined,
+                    name ?? "",
+                    attached,
+                    name === undefined
+                        ? undefined
+                        : switchWrite(name, event.type, event.on, undefined),
                 );
                 if (switched !== undefined) {
                     written = ruleState(switched);
@@ -373,29 +400,9 @@ export class UnitRules {
     }
 
     /**
-     * What the hardpoints write over a part on `bone` named `name`, replayed in the order the game
-     * writes it - see {@link setHardpoints}. `state` when they write nothing.
-     *
-     * A bone is matched by name, without case, as the hardpoint's tag names it, and reaches every part
-     * on it or at any depth below it.
+     * The lowercased names of a hull bone and every bone above it; none without a bone. A hardpoint's
+     * bone is matched by name, without case, and reaches every part on it or at any depth below it.
      */
-    private hardpointWrite(
-        state: StateSwitch,
-        bone: number | undefined,
-        name: string | null,
-    ): StateSwitch {
-        const above = this.bonesAbove(bone);
-        let written = this.creationHardpointWrite(state, above, name);
-
-        // Each death, in the order they happened.
-        for (const death of this.hardpoints.deaths) {
-            written = this.deathWrite(written, death, above, name);
-        }
-
-        return written;
-    }
-
-    /** The lowercased names of a hull bone and every bone above it; none without a bone. */
     private bonesAbove(bone: number | undefined): ReadonlySet<string> {
         const { decals, damageBones, deaths } = this.hardpoints;
 

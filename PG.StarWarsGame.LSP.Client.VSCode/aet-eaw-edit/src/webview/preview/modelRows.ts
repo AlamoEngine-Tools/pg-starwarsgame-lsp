@@ -34,8 +34,8 @@ import {
     resolveMaterial,
     isVisibleAt,
     isShieldMesh,
-    isStealthMesh,
 } from "./materials";
+import { cloakTouches } from "./cloakWrites";
 import { listedInModelTree } from "./particleScene";
 import { meshDrawn, setMeshDrawn } from "./meshVisibility";
 import { treeKeyOf } from "./boneNodes";
@@ -610,8 +610,8 @@ export class ModelRows {
     /**
      * Hands the rows ONE ability speaks for back to the model.
      *
-     * Every channel an ability drives - a proxy's state, the shield mesh's and the shell's - is a
-     * write of the state switch, which the reader's word sits above. So one tick on such a row
+     * Every channel an ability drives - a proxy's state, the shield mesh's, every part a cloak
+     * writes - is a write of the state switch, which the reader's word sits above. So one tick on such a row
      * outranked the ability for good: the switch fired, the chain ignored it, and nothing but a
      * whole-model Reset could undo it. Switching the ability now takes its own rows back, which is
      * the same rule a starting clip already follows.
@@ -625,20 +625,37 @@ export class ModelRows {
             this.rowForSystem(id),
         );
 
-        if (ownership.shieldMesh || ownership.stealthShell) {
+        const cloak = ownership.cloak;
+
+        if (ownership.shieldMesh || cloak !== null) {
             for (const [rowId, target] of this.rowTargets) {
-                if (target.mesh === undefined) {
-                    continue;
-                }
+                if (target.mesh !== undefined) {
+                    const extras = (target.mesh.userData.alamo ??
+                        {}) as MaterialExtras;
 
-                const extras = (target.mesh.userData.alamo ??
-                    {}) as MaterialExtras;
+                    if (
+                        (ownership.shieldMesh && isShieldMesh(extras)) ||
+                        (cloak !== null &&
+                            cloakTouches(
+                                cloak,
+                                extras.alamoMesh ?? "",
+                                this.partOf(target.mesh)?.attached === true,
+                            ))
+                    ) {
+                        released.push(rowId);
+                    }
+                } else if (cloak !== null && target.particleId !== undefined) {
+                    const entry = this.context.particles.particleSystems.get(
+                        target.particleId,
+                    );
+                    const attached =
+                        entry?.attachToPartId !== undefined &&
+                        this.context.parts.get(entry.attachToPartId)
+                            ?.attached === true;
 
-                if (
-                    (ownership.shieldMesh && isShieldMesh(extras)) ||
-                    (ownership.stealthShell && isStealthMesh(extras))
-                ) {
-                    released.push(rowId);
+                    if (cloakTouches(cloak, entry?.proxyName ?? "", attached)) {
+                        released.push(rowId);
+                    }
                 }
             }
         }
@@ -709,7 +726,8 @@ export class ModelRows {
             ) {
                 this.context.environment.shadowVolumes.setCounting(
                     target.mesh,
-                    castsShadow(facts),
+                    // Not while the subject's cloak keeps its shadows off - see `cloakFade.ts`.
+                    castsShadow(facts) && !this.context.rules.shadowsOff(),
                 );
             }
         }
@@ -793,6 +811,8 @@ export class ModelRows {
                 this.skinBonesOf(target.mesh).length > 0
                     ? this.rootBoneIndex()
                     : (target.boneIndex ?? target.ownerBone),
+                // A model a hardpoint attaches, which stealth hides with the BASEMESH parts.
+                this.partOf(target.mesh)?.attached === true,
             );
         }
 
@@ -951,6 +971,8 @@ export class ModelRows {
                   fileWrite,
                   target.boneIndex ?? target.ownerBone,
                   entry?.proxyName,
+                  partId !== undefined &&
+                      this.context.parts.get(partId)?.attached === true,
               )
             : this.context.rules.createdEffectState(
                   fileWrite,

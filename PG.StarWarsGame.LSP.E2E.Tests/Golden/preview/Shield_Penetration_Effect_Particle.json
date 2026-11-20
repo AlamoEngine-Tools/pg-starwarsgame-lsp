@@ -318,6 +318,8 @@
   "SourceFile": null,
   "PassiveMissileShieldRadius": null,
   "DeathPersistenceOverride": 30,
+  "Stealth": null,
+  "ForceCloak": null,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [],

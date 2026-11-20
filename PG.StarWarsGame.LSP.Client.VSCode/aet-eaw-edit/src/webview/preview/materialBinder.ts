@@ -13,7 +13,6 @@ import {
     type MaterialExtras,
     shieldMeshOffShader,
     resolveMaterial,
-    castsShadowMap,
     type MaterialSpec,
     debugColour,
 } from "./materials";
@@ -26,7 +25,10 @@ import {
     applyDepth,
     applyColourScale,
     applyBaseMapColourSpace,
+    applyFallbackLook,
+    applyModelFade,
 } from "./materialState";
+import { type Look, PLAIN_LOOK } from "./cloakFade";
 import { type ViewportContext } from "./viewportContext";
 
 /** The flat grey an untinted mesh draws in, until the real shaders land. */
@@ -393,11 +395,7 @@ export class MaterialBinder {
         // Once a model authors a shadow volume, the volume IS the shadow - the hull stops casting
         // into the map, exactly as the engine does it. Recomputed for every mesh whenever a part
         // arrives, because a volume can turn up after the geometry that it belongs to.
-        mesh.castShadow = castsShadowMap({
-            hasVolumes: this.context.environment.stencilShadowing,
-            hidden: spec.hidden,
-            blend: spec.blend,
-        });
+        mesh.castShadow = this.context.environment.castsIntoShadowMap(mesh);
         mesh.receiveShadow = !spec.hidden;
 
         // A collision hull or a shadow volume draws NOTHING in the engine - the shadow techniques
@@ -688,19 +686,66 @@ export class MaterialBinder {
      * Per mesh rather than per scene, because half the contract is object-relative: WORLD and
      * WORLDVIEWPROJECTION differ for a turret attached on a hull, and a shader working in object
      * space wants the eye and the lights transformed into ITS space, not the hull's.
+     *
+     * And each mesh's model's whole look - its cloak, its death fade: the light scale of a translated
+     * effect, the colour and opacity of a mesh drawn without one. See `cloakFade.ts`.
      */
     updateAlamoUniforms(): void {
         const materials: { mesh: THREE.Mesh; material: AlamoMaterial }[] = [];
+        const fallbacks: { mesh: THREE.Mesh; material: THREE.Material }[] = [];
 
         this.context.modelRoot.traverse((node) => {
-            if (
-                node instanceof THREE.Mesh &&
-                node.material instanceof AlamoMaterial &&
-                node.visible
-            ) {
+            if (!(node instanceof THREE.Mesh) || !node.visible) {
+                return;
+            }
+
+            if (node.material instanceof AlamoMaterial) {
                 materials.push({ mesh: node, material: node.material });
+            } else if (
+                node.material instanceof THREE.Material &&
+                // A material that writes no colour - the stencil shadow volumes' counter - has
+                // nothing to tint or fade, and its draw order must not move. The model's shadow is
+                // what the look changes there, and the cloak turns that off.
+                node.material.colorWrite
+            ) {
+                fallbacks.push({ mesh: node, material: node.material });
             }
         });
+
+        // Each part's subject, by its root, for the look every mesh of it is drawn with - the
+        // subject's cloak, a dying clone's fade - see `AnimationRig.lookOf`.
+        const subjectByRoot = new Map(
+            [...this.context.parts.values()].map((part) => [
+                part.root,
+                part.subjectId,
+            ]),
+        );
+        const looks = new Map<string, Look>();
+        const lookOf = (mesh: THREE.Object3D): Look => {
+            for (
+                let at: THREE.Object3D | null = mesh;
+                at !== null;
+                at = at.parent
+            ) {
+                const subject = subjectByRoot.get(at);
+
+                if (subject !== undefined) {
+                    let look = looks.get(subject);
+                    if (look === undefined) {
+                        look = this.context.animation.lookOf(subject);
+                        looks.set(subject, look);
+                    }
+                    return look;
+                }
+            }
+
+            return PLAIN_LOOK;
+        };
+
+        // A mesh with no translated effect takes the same look on its own colour and opacity.
+        for (const { mesh, material } of fallbacks) {
+            applyFallbackLook(material, lookOf(mesh));
+        }
 
         if (materials.length === 0) {
             return;
@@ -719,6 +764,9 @@ export class MaterialBinder {
         );
 
         for (const { mesh, material } of materials) {
+            const look = lookOf(mesh);
+
+            applyModelFade(material, look.a < 1);
             material.updateFrame(
                 this.context.environment.frameFor(
                     mesh,
@@ -726,6 +774,7 @@ export class MaterialBinder {
                     projection,
                     viewProjection,
                     eyeWorld,
+                    look,
                 ),
             );
         }

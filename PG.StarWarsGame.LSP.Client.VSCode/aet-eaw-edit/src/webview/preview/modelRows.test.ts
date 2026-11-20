@@ -39,6 +39,8 @@ interface RowsOptions {
     effectPart?: string;
     /** The parts that are loaded and held off screen. */
     hiddenParts?: string[];
+    /** Whether the hull is a model a hardpoint attaches, rather than the subject's own root. */
+    attached?: boolean;
     /** The clips the model ships, by name, whether or not they carry a visibility track. */
     clips?: string[];
 }
@@ -133,6 +135,7 @@ function rowsWith(options: RowsOptions = {}): {
             [2, gunBone],
         ]),
         subjectId: ACTIVE_SUBJECT,
+        attached: options.attached,
     };
     const skeleton = [
         { index: 0, name: "Root", parent: -1, visible: true },
@@ -306,16 +309,66 @@ describe("ModelRows", () => {
         assert.equal(meshDrawn(mesh), false);
         assert.equal(meshDrawn(extra), false);
 
-        unit.setStealthed(true);
+        unit.setActiveAbilities(new Set(["STEALTH"]));
         unit.setShieldRevealed(true);
         rows.resolveRows();
 
         assert.equal(meshDrawn(mesh), true, "the cloak did not show the shell");
-        assert.equal(
-            meshDrawn(extra),
-            false,
-            "a cloaked unit draws its shield",
-        );
+        // A cloak writes BASEMESH and STEALTH parts and the attached models; the shield keeps the
+        // state its own ability wrote.
+        assert.equal(meshDrawn(extra), true, "the cloak hid the shield");
+    });
+
+    it("hides the meshes and effects of a model a hardpoint attaches while the unit is stealthed", () => {
+        const { rows, gun, unit, effectDrawn } = rowsWith({
+            attached: true,
+            effectOn: 2,
+        });
+        rows.treeItems();
+        assert.equal(meshDrawn(gun), true);
+
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+        rows.resolveRows();
+
+        assert.equal(meshDrawn(gun), false, "the attached mesh is drawn");
+        assert.equal(effectDrawn(), false, "the attached effect is drawn");
+    });
+
+    /**
+     * Switching a cloak takes back the reader's word on every row the cloak writes - its BASEMESH and
+     * STEALTH parts and the attached models - and on nothing else.
+     */
+    it("gives the rows a cloak writes back to the model when the cloak is switched", () => {
+        const { rows } = rowsWith({
+            turret: { alamoMesh: "Ship_BaseMesh" },
+        });
+        const items = rows.treeItems();
+        const barrel = items.find((item) => item.name === "Barrel")!;
+        const base = items.find((item) => item.name === "Ship_BaseMesh")!;
+        rows.setItemsVisible([base.id, barrel.id], false);
+
+        rows.releaseAbilityRows({
+            systemIds: [],
+            shieldMesh: false,
+            cloak: "STEALTH",
+        });
+
+        assert.deepEqual(rows.hiddenItemIds(), [barrel.id]);
+    });
+
+    it("gives an attached model's rows back to the model when stealth is switched", () => {
+        const { rows } = rowsWith({ attached: true });
+        const items = rows.treeItems();
+        const barrel = items.find((item) => item.name === "Barrel")!;
+        rows.setItemsVisible([barrel.id], false);
+
+        rows.releaseAbilityRows({
+            systemIds: [],
+            shieldMesh: false,
+            cloak: "STEALTH",
+        });
+
+        assert.deepEqual(rows.hiddenItemIds(), []);
     });
 
     it("stands a unit in its idle clip, and a model file in its own flags", () => {
@@ -567,11 +620,11 @@ describe("ModelRows", () => {
         rows.treeItems();
         assert.equal(counting.get(extra), true);
 
-        unit.setStealthed(true);
+        unit.setCloakShadowsOff(true);
         rows.resolveRows();
         assert.equal(counting.get(extra), false);
 
-        unit.setStealthed(false);
+        unit.setCloakShadowsOff(false);
         rows.resolveRows();
         assert.equal(counting.get(extra), true);
     });

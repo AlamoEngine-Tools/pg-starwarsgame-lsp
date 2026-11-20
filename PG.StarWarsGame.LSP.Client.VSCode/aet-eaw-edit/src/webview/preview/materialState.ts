@@ -102,6 +102,91 @@ export function applyDepth(
 }
 
 /**
+ * Lets a material blend by its alpha while its model fades, and gives it back as it was after.
+ *
+ * A model's fade is its light scale's alpha, which the effects write to their output - see
+ * `cloakFade.ts`. An opaque material ignores that alpha, so while the model fades it is drawn
+ * blended; one that already blends keeps its own blend. One rule for every material, whatever its
+ * effect: the state it is given back is the one it had.
+ */
+export function applyModelFade(
+    material: THREE.Material,
+    fading: boolean,
+): void {
+    const base = material.userData.aetFadeBase as
+        { transparent: boolean } | undefined;
+
+    if (fading) {
+        if (base === undefined) {
+            material.userData.aetFadeBase = {
+                transparent: material.transparent,
+            };
+            material.transparent = true;
+        }
+        return;
+    }
+
+    if (base !== undefined) {
+        material.transparent = base.transparent;
+        delete material.userData.aetFadeBase;
+    }
+}
+
+/**
+ * A model's whole look on a mesh drawn by a three.js material rather than a translated effect - see
+ * `cloakFade.ts`.
+ *
+ * Such a material has no light scale to multiply, so the look goes on its own colour and opacity
+ * instead, the colour as tinted, the opacity as faded; both are given back exactly as they were when
+ * the look is plain again. One rule for every such material, by the two properties they all share.
+ *
+ * UNMEASURED: the tint multiplies three.js's linear colour, where the game multiplies its own light
+ * scale; the two spaces are not shown to agree.
+ */
+export function applyFallbackLook(
+    material: THREE.Material,
+    look: { r: number; g: number; b: number; a: number },
+): void {
+    const coloured = material as THREE.Material & { color?: THREE.Color };
+    const plain = look.r === 1 && look.g === 1 && look.b === 1 && look.a === 1;
+    let base = material.userData.aetLookBase as
+        { opacity: number; color: [number, number, number] | null } | undefined;
+
+    if (plain) {
+        if (base !== undefined) {
+            material.opacity = base.opacity;
+            if (base.color !== null) {
+                coloured.color?.setRGB(...base.color);
+            }
+            delete material.userData.aetLookBase;
+        }
+        applyModelFade(material, false);
+        return;
+    }
+
+    if (base === undefined) {
+        base = {
+            opacity: material.opacity,
+            color:
+                coloured.color === undefined
+                    ? null
+                    : [coloured.color.r, coloured.color.g, coloured.color.b],
+        };
+        material.userData.aetLookBase = base;
+    }
+
+    material.opacity = base.opacity * look.a;
+    if (base.color !== null) {
+        coloured.color?.setRGB(
+            base.color[0] * look.r,
+            base.color[1] * look.g,
+            base.color[2] * look.b,
+        );
+    }
+    applyModelFade(material, look.a < 1);
+}
+
+/**
  * How opaque the shadow-map catcher must be to darken the ground by the reader's multiplier.
  *
  * The shadow value is a MULTIPLIER - `DEFAULT_LIGHTS.shadow` is `[0.5, 0.5, 0.5]`, "half as bright",

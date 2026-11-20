@@ -1087,7 +1087,7 @@
   "{0} effects": "{0} effects",
   "on {0}": "on {0}",
   "shows the shield mesh": "shows the shield mesh",
-  "shows the stealth mesh only": "shows the stealth mesh only",
+  "hides the base mesh, shows the stealth mesh": "hides the base mesh, shows the stealth mesh",
   "deploy only": "deploy only",
   "deploy and undeploy": "deploy and undeploy",
   "{0}s recharge": "{0}s recharge",

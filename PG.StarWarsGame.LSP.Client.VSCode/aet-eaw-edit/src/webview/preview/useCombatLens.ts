@@ -45,7 +45,8 @@ import {
     poolsFor,
     resolveHitWithWorkings,
 } from "./attacker";
-import { shieldRevealed, stealthed } from "./abilityRows";
+import { shieldRevealed } from "./abilityRows";
+import { cloakLookFor } from "./cloakFade";
 import { effectState } from "./visibility";
 import {
     type CloneDeath,
@@ -482,9 +483,14 @@ export function useCombatLens({
         // the mesh ships hidden, so nothing else would ever bring it up.
         viewport.setShieldRevealed(shieldRevealed(activeAbilities));
 
-        // The cloak's other half. The shell swaps in here and the effects go dark below, because
-        // a cloaked unit shows the shell and nothing else at all.
-        viewport.setStealthed(stealthed(activeAbilities));
+        // The cloak's look: the whole model fading and tinting towards the cloak's colour. Which
+        // parts it hides and shows is the unit's rules', on its timeline with the other abilities.
+        viewport.setCloak(
+            cloakLookFor(activeAbilities, scene),
+            // HAS the ability: its block in the type's abilities list.
+            (scene.stealth ?? null) !== null ||
+                (scene.forceCloak ?? null) !== null,
+        );
 
         // The effect groups creation and the abilities switch - turbo's engines, power to weapons,
         // the missile shield and the rest. Writes of each effect's state switch in the unit's rules,

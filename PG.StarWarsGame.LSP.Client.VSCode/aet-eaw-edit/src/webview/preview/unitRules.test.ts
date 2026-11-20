@@ -102,7 +102,8 @@ describe("UnitRules", () => {
         const { unit } = rulesWith("file");
         unit.setCollisionMeshes(new Set(["collision"]));
         unit.setHardpoints(writes({ decals: new Set(["hp_blast"]) }));
-        unit.setStealthed(true);
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+        unit.setCloakShadowsOff(true);
 
         for (const alamoMesh of ["Collision", "HP_Blast", "stealth", "Hull"]) {
             assert.deepEqual(
@@ -112,23 +113,53 @@ describe("UnitRules", () => {
         }
         assert.deepEqual(unit.effectState(drawnInFile), drawnInFile);
         assert.equal(unit.idle(false), undefined);
-        assert.equal(unit.isStealthed(), false);
+        assert.equal(unit.shadowsOff(), false);
     });
 
-    it("hides the stealth shell of a unit until it is cloaked, and then everything else", () => {
+    it("hides the stealth shell of a unit until it is cloaked", () => {
         const { unit } = rulesWith("game");
         const shell = { alamoMesh: "stealth" };
-        const hull = { alamoMesh: "Hull" };
 
         assert.deepEqual(unit.meshState(drawnInFile, shell), ruleState(false));
-        assert.deepEqual(unit.meshState(drawnInFile, hull), drawnInFile);
 
-        unit.setStealthed(true);
+        unit.setActiveAbilities(new Set(["STEALTH"]));
 
-        assert.equal(unit.isStealthed(), true);
         assert.deepEqual(unit.meshState(drawnInFile, shell), ruleState(true));
-        assert.deepEqual(unit.meshState(drawnInFile, hull), ruleState(false));
-        assert.deepEqual(unit.effectState(drawnInFile), ruleState(false));
+    });
+
+    /**
+     * Measured: loading the type hides every part whose name CONTAINS `STEALTH`, `buildup` or
+     * `charged`, case ignored - meshes and effects alike.
+     */
+    it("hides every part whose name contains STEALTH, buildup or charged when the type loads", () => {
+        const { unit } = rulesWith("game");
+
+        for (const alamoMesh of [
+            "Phantom_Stealth_Shell",
+            "buildup",
+            "Hull_Charged",
+        ]) {
+            assert.deepEqual(
+                unit.meshState(drawnInFile, { alamoMesh }),
+                ruleState(false),
+                alamoMesh,
+            );
+        }
+        for (const name of [
+            "p_weapon_buildup",
+            "p_weapon_charged",
+            "p_stealth_glow",
+        ]) {
+            assert.deepEqual(
+                unit.effectState(drawnInFile, undefined, name),
+                ruleState(false),
+                name,
+            );
+        }
+        assert.deepEqual(
+            unit.meshState(drawnInFile, { alamoMesh: "Hull" }),
+            drawnInFile,
+        );
     });
 
     it("shows a unit's shield mesh only while an ability holds it up", () => {
@@ -266,13 +297,11 @@ describe("UnitRules, a hardpoint's Damage_Particles bone", () => {
 
         assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), ruleState(true));
 
-        unit.setStealthed(true);
+        unit.setActiveAbilities(new Set(["STEALTH"]));
 
-        assert.deepEqual(
-            unit.meshState(drawnInFile, mesh, 2),
-            ruleState(false),
-        );
-        assert.deepEqual(unit.effectState(drawnInFile, 2), ruleState(false));
+        // A cloak writes BASEMESH and STEALTH parts only: everything else keeps its state.
+        assert.deepEqual(unit.meshState(drawnInFile, mesh, 2), ruleState(true));
+        assert.deepEqual(unit.effectState(drawnInFile, 2), ruleState(true));
     });
 
     it("writes nothing in a model preview", () => {
@@ -534,12 +563,12 @@ describe("UnitRules, the effect name groups", () => {
         assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
     });
 
-    it("still lets the cloak hide everything", () => {
+    it("leaves turbo's engines to turbo when the unit cloaks", () => {
         const { unit } = rulesWith("game");
         unit.setActiveAbilities(new Set(["TURBO"]));
-        unit.setStealthed(true);
+        unit.setActiveAbilities(new Set(["TURBO", "STEALTH"]));
 
-        assert.deepEqual(effect(unit, "pte_engines"), ruleState(false));
+        assert.deepEqual(effect(unit, "pte_engines"), ruleState(true));
     });
 
     it("writes nothing in a model preview", () => {
@@ -660,5 +689,106 @@ describe("UnitRules, deaths and abilities in the order they happened", () => {
             unit.effectState(drawnInFile, 2, "pte_engines"),
             ruleState(true),
         );
+    });
+});
+
+/**
+ * Measured in the game: stealth hides every part whose name contains BASEMESH and every model a
+ * hardpoint attaches, and shows every part whose name contains STEALTH; Force cloak does the same
+ * without the attached models. Either ending shows the BASEMESH parts and the attached models again
+ * and hides the STEALTH parts. Every other part keeps its state.
+ */
+describe("UnitRules, the cloaks", () => {
+    const base = { alamoMesh: "Tie_Phantom_BaseMesh" };
+    const shell = { alamoMesh: "Phantom_Stealth_Shell" };
+    const hull = { alamoMesh: "Hull" };
+
+    it("hides the BASEMESH parts and the attached models, and shows the STEALTH parts, for stealth", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+
+        assert.deepEqual(unit.meshState(drawnInFile, base), ruleState(false));
+        assert.deepEqual(
+            unit.meshState(fileState(false), shell),
+            ruleState(true),
+        );
+        assert.deepEqual(
+            unit.meshState(drawnInFile, hull, undefined, true),
+            ruleState(false),
+            "the attached model",
+        );
+        assert.deepEqual(unit.meshState(drawnInFile, hull), drawnInFile);
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "p_smoke", true),
+            ruleState(false),
+            "the attached model's effect",
+        );
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "pe_engines"),
+            drawnInFile,
+        );
+    });
+
+    it("leaves the attached models alone for Force cloak", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["FORCE_CLOAK"]));
+
+        assert.deepEqual(unit.meshState(drawnInFile, base), ruleState(false));
+        assert.deepEqual(
+            unit.meshState(fileState(false), shell),
+            ruleState(true),
+        );
+        assert.deepEqual(
+            unit.meshState(drawnInFile, hull, undefined, true),
+            drawnInFile,
+        );
+    });
+
+    it("shows the BASEMESH parts and the attached models and hides the STEALTH parts when either ends", () => {
+        for (const cloak of ["STEALTH", "FORCE_CLOAK"]) {
+            const { unit } = rulesWith("game");
+            unit.setActiveAbilities(new Set([cloak]));
+            unit.setActiveAbilities(new Set());
+
+            assert.deepEqual(
+                unit.meshState(fileState(false), base),
+                ruleState(true),
+                cloak,
+            );
+            assert.deepEqual(
+                unit.meshState(drawnInFile, shell),
+                ruleState(false),
+                cloak,
+            );
+            assert.deepEqual(
+                unit.meshState(fileState(false), hull, undefined, true),
+                ruleState(true),
+                `${cloak}: the attached model`,
+            );
+        }
+    });
+
+    it("puts a cloak on the one timeline with the hardpoint deaths", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["hp_bone"]),
+                deaths: [death({ hardpoint: "HP_A", damageBone: "hp_bone" })],
+            }),
+        );
+
+        // The death after the cloak shows the part on its bone, BASEMESH or not.
+        assert.deepEqual(unit.meshState(drawnInFile, base, 2), ruleState(true));
+    });
+
+    it("says when the unit casts no shadow, in a unit preview only", () => {
+        const game = rulesWith("game").unit;
+        game.setCloakShadowsOff(true);
+        assert.equal(game.shadowsOff(), true);
+
+        const file = rulesWith("file").unit;
+        file.setCloakShadowsOff(true);
+        assert.equal(file.shadowsOff(), false);
     });
 });

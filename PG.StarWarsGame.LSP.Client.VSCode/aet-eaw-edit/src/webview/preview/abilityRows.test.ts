@@ -20,7 +20,6 @@ import {
     revealsShield,
     revealsStealth,
     shieldRevealed,
-    stealthed,
 } from "./abilityRows";
 
 function ability(over: Partial<PreviewAbility> = {}): PreviewAbility {
@@ -62,21 +61,6 @@ describe("revealsStealth", () => {
 
     it("reads a type however it is cased", () => {
         assert.equal(revealsStealth(" stealth "), true);
-    });
-});
-
-describe("stealthed", () => {
-    it("is on while any active ability cloaks the unit", () => {
-        assert.equal(stealthed(new Set(["STEALTH"])), true);
-        assert.equal(stealthed(new Set(["SELF_DESTRUCT", "STEALTH"])), true);
-        assert.equal(stealthed(new Set(["FORCE_CLOAK"])), true);
-    });
-
-    it("is off when nothing is cloaking it", () => {
-        // Which is the state a unit that cannot cloak at all is permanently in - and that is what
-        // keeps the shell off `Tyber_Zann_Prisoner`, who uses Tyber's model and declares nothing.
-        assert.equal(stealthed(new Set()), false);
-        assert.equal(stealthed(new Set(["DEFEND", "TURBO"])), false);
     });
 });
 
@@ -158,11 +142,11 @@ describe("abilityOwnership", () => {
         assert.deepEqual(claim.systemIds, []);
     });
 
-    it("claims the stealth shell for both types that cloak", () => {
-        assert.equal(abilityOwnership("STEALTH", proxies).stealthShell, true);
+    it("claims every part a cloak writes, for both types that cloak", () => {
+        assert.equal(abilityOwnership("STEALTH", proxies).cloak, "STEALTH");
         assert.equal(
-            abilityOwnership("FORCE_CLOAK", proxies).stealthShell,
-            true,
+            abilityOwnership("FORCE_CLOAK", proxies).cloak,
+            "FORCE_CLOAK",
         );
     });
 
@@ -171,7 +155,7 @@ describe("abilityOwnership", () => {
 
         assert.deepEqual(claim.systemIds, []);
         assert.equal(claim.shieldMesh, false);
-        assert.equal(claim.stealthShell, false);
+        assert.equal(claim.cloak, null);
     });
 });
 

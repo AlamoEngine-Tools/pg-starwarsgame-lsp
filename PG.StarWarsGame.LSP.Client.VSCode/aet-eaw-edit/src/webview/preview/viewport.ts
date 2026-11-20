@@ -62,6 +62,7 @@ import { PartAssembly } from "./partAssembly";
 import { DestructionRig } from "./destructionRig";
 import { AnimationRig } from "./animationRig";
 import { type DeathEnding } from "./deathEnding";
+import { type CloakKind, type CloakLook } from "./cloakFade";
 import {
     type AddPartOptions,
     type CaptureShot,
@@ -579,9 +580,17 @@ export class PreviewViewport {
         this.rules.setShieldRevealed(revealed);
     }
 
-    /** Cloaks the unit, or uncloaks it. See `UnitRules.setStealthed`. */
-    setStealthed(on: boolean): void {
-        this.rules.setStealthed(on);
+    /**
+     * Brings a cloak in, or - with null - lets it go: the subject's whole model fades and tints towards
+     * it, and back - see `cloakFade.ts`. Only a unit that has a cloak ability shows any of it. Which
+     * parts a cloak hides and shows is the unit's rules', on its timeline with the abilities.
+     */
+    setCloak(
+        cloak: { look: CloakLook; kind: CloakKind } | null,
+        hasCloak: boolean,
+    ): void {
+        this.animation.cloak.setHasCloak(hasCloak);
+        this.animation.cloak.set(cloak?.look ?? null, cloak?.kind);
     }
 
     /** The abilities switched on. See `UnitRules.setActiveAbilities`. */
@@ -592,11 +601,6 @@ export class PreviewViewport {
     /** Whether the unit's type is a missile-shield object. See `UnitRules.setMissileShieldObject`. */
     setMissileShieldObject(on: boolean): void {
         this.rules.setMissileShieldObject(on);
-    }
-
-    /** Whether a cloak is engaged, which every other visibility rule defers to. */
-    isStealthed(): boolean {
-        return this.rules.isStealthed();
     }
 
     /**
@@ -1212,6 +1216,12 @@ export class PreviewViewport {
         this.turret.placeTurretAnchors();
 
         this.animation.advancePassiveSubjects(dt);
+
+        // The subject's cloak coming in or going, and its shadow volumes with it - see
+        // `cloakFade.ts`. The shadow map is not the cloak's.
+        this.animation.cloak.step(dt);
+        this.rules.setCloakShadowsOff(this.animation.cloak.volumesOff());
+
         this.controls.update();
 
         this.particles.step(dt, this.camera.matrixWorldInverse);

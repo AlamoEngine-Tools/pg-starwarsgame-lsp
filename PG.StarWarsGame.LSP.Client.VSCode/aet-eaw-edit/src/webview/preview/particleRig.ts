@@ -21,6 +21,7 @@ import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import { emissionMeshFor } from "./emissionSource";
 import { missingTexture } from "./missingTexture";
+import { PLAIN_LOOK } from "./cloakFade";
 import { type CaptureShot, type ParticlePlacement } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
 
@@ -116,6 +117,16 @@ export class ParticleRig {
     step(dt: number, view: THREE.Matrix4): void {
         if (this.particlesVisible && !this.particlesPaused) {
             for (const [id, entry] of [...this.particleSystems]) {
+                // Its model's whole look - the subject's cloak, a dying clone's fade - for a model's
+                // own effect; a gameplay effect belongs to no model and is drawn as it is.
+                entry.instance.setLook(
+                    entry.origin === "model"
+                        ? this.context.animation.lookOf(
+                              this.subjectOfSystem(entry),
+                          )
+                        : PLAIN_LOOK,
+                );
+
                 // The camera goes in because a streak's length is a screen-space measurement:
                 // a spark flying at the viewer has no tail to draw.
                 entry.instance.update(

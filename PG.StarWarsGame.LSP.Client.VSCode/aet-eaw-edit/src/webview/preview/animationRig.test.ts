@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { AnimationRig } from "./animationRig";
+import { PLAIN_LOOK, cloakLookOf } from "./cloakFade";
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import { standInContext } from "./viewportContext.testing";
 
@@ -422,6 +423,53 @@ describe("AnimationRig", () => {
 
         animation.advancePassiveSubjects(0.6);
         assert.deepEqual(hidden, ["clone:1/part"]);
+    });
+
+    // ── a model's look ────────────────────────────────────────────────────────
+
+    it("gives the subject the cloak's look as it comes in", () => {
+        const { animation } = rigWith();
+
+        assert.deepEqual(animation.lookOf(ACTIVE_SUBJECT), PLAIN_LOOK);
+
+        animation.cloak.setHasCloak(true);
+        animation.cloak.set(
+            cloakLookOf({ r: 255, g: 255, b: 255, a: 0 }, 1),
+            "stealth",
+        );
+        animation.cloak.step(0.5);
+
+        // The spring's value half a transition in is 0.264, and the alpha goes 1 -> 0 by it.
+        near(
+            animation.lookOf(ACTIVE_SUBJECT).a,
+            1 - animation.cloak.value,
+            "alpha",
+        );
+        assert.ok(animation.cloak.value > 0.2 && animation.cloak.value < 0.3);
+    });
+
+    /** The death clone's fade, drawn: its alpha is the look every mesh and effect of it takes. */
+    it("gives a dying clone its death alpha, and no cloak of the subject's", () => {
+        const { animation, clone } = dyingClone(false);
+        animation.cloak.setHasCloak(true);
+        animation.cloak.set(
+            cloakLookOf({ r: 255, g: 0, b: 0, a: 0 }, 1),
+            "stealth",
+        );
+        animation.cloak.step(1);
+
+        assert.deepEqual(animation.lookOf("clone:1"), PLAIN_LOOK);
+
+        animation.startDeathClip("clone:1", {
+            persistenceSeconds: 0,
+            fadeSeconds: 1,
+            endsInExplosions: false,
+        });
+        animation.advancePassiveSubjects(1);
+
+        near(animation.lookOf("clone:1").a, clone.death?.alpha ?? -1, "alpha");
+        assert.ok((clone.death?.alpha ?? 1) < 1, "the fade has begun");
+        assert.equal(animation.lookOf("clone:1").r, 1);
     });
 });
 

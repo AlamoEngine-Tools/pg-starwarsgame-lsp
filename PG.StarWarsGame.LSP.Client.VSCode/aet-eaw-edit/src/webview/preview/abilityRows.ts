@@ -18,6 +18,7 @@ import type {
     PreviewParticle,
 } from "../../protocol/modelPreview";
 import { groupsSwitchedBy, inGroup } from "./effectGroups";
+import { isCloak } from "./cloakWrites";
 
 /** One row in the Gameplay dock's Abilities section. */
 export interface AbilityRow {
@@ -125,39 +126,15 @@ export function revealsShield(abilityType: string): boolean {
 }
 
 /**
- * Ability types that CLOAK the unit: the stealth shell is drawn and nothing else is.
+ * Whether this ability type CLOAKS the unit - what it hides and shows is `cloakWrites.ts`'s.
  *
  * A table rather than a name test, and the two members do not share a word - which is the whole
  * argument for the table. `TIE_Phantom`, `Vengeance_Frigate`, `Tyber_Zann` and `Urai_Fen` declare
  * STEALTH; `Luke_Skywalker_Jedi` declares FORCE_CLOAK and carries the same `stealth` mesh. Reading
  * the mesh's own name for the ability would have left Luke's shell dead.
- *
- * Unlike the shield, the shell ships VISIBLE - every one of the nine does - so a model with one was
- * drawing its cloak over its hull from the first frame, permanently, which is what the reader saw
- * on the Vengeance. See {@link isStealthMesh}.
  */
-const STEALTH_ABILITIES = new Set(["STEALTH", "FORCE_CLOAK"]);
-
-/** Whether this ability type cloaks the unit. */
 export function revealsStealth(abilityType: string): boolean {
-    return STEALTH_ABILITIES.has(abilityType.trim().toUpperCase());
-}
-
-/**
- * Whether the unit is cloaked right now, and so drawing nothing but its stealth shell.
- *
- * False is the permanent answer for a unit that declares no cloak at all, which is what keeps the
- * shell off `Tyber_Zann_Prisoner` - he uses Tyber's model and declares no abilities - and off
- * `W_mousedroid`, a prop no unit declares anything for.
- */
-export function stealthed(active: ReadonlySet<string>): boolean {
-    for (const type of active) {
-        if (revealsStealth(type)) {
-            return true;
-        }
-    }
-
-    return false;
+    return isCloak(abilityType);
 }
 
 /** Whether any active ability is currently holding the shield mesh visible. */
@@ -190,8 +167,11 @@ export interface AbilityOwnership {
     systemIds: readonly string[];
     /** Whether it speaks for the model's shield mesh. */
     shieldMesh: boolean;
-    /** Whether it speaks for the model's stealth shell. */
-    stealthShell: boolean;
+    /**
+     * The cloak it is, or null: a cloak speaks for every part it writes - its BASEMESH and STEALTH
+     * parts and the attached models, see `cloakWrites.ts`.
+     */
+    cloak: string | null;
 }
 
 /** What switching one ability takes back from the reader. */
@@ -208,7 +188,7 @@ export function abilityOwnership(
             )
             .map((particle) => particle.id),
         shieldMesh: revealsShield(type),
-        stealthShell: revealsStealth(type),
+        cloak: revealsStealth(type) ? type : null,
     };
 }
 
@@ -322,12 +302,11 @@ function detailOf(
         parts.push(l10n.t("shows the shield mesh"));
     }
 
-    // ONLY, because that is the whole of what a cloak draws - the hull, the effects and the
-    // shadow volumes all go with it. Said on the row because the ability declares nothing else:
-    // `TIE_Phantom`'s STEALTH is a type and an icon, so without this the row read
-    // "no effects, bones or clips declared" beside a key that cloaks the ship.
+    // Said on the row because the ability declares nothing else: `TIE_Phantom`'s STEALTH is a type
+    // and an icon, so without this the row read "no effects, bones or clips declared" beside a key
+    // that cloaks the ship.
     if (revealsStealth(ability.type)) {
-        parts.push(l10n.t("shows the stealth mesh only"));
+        parts.push(l10n.t("hides the base mesh, shows the stealth mesh"));
     }
 
     if (deployClip !== null) {

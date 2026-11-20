@@ -31,6 +31,12 @@ export class LevelGates {
      * down is not repairing anything.
      */
     setLevels(alt: number, lod: number): void {
+        // Measured: a detail level change gives a past stealth's shadow volumes back - see
+        // `cloakFade.ts`.
+        if (lod !== this.lod) {
+            this.context.animation.cloak.releaseVolumes();
+        }
+
         this.altDescending = alt < this.alt;
         this.alt = alt;
         this.lod = lod;

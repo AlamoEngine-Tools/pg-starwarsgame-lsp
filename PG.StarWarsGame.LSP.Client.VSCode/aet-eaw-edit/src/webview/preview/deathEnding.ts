@@ -11,6 +11,8 @@
 // fades its alpha towards 0 on a critically damped spring of smooth time `Death_Fade_Time`, and is
 // destroyed when it falls to 0.025 or below - about 2.8 fade times in.
 
+import { SteppedSpring } from "./spring";
+
 /** What a dying object's type says about how it ends. */
 export interface DeathEnding {
     /** `Death_Persistence_Duration`: how long it stays once its death clip is over. */
@@ -35,26 +37,17 @@ export const UNWRITTEN_ENDING: DeathEnding = {
 /** The alpha at or below which a fading object is destroyed. */
 const DESTROYED_AT_ALPHA = 0.025;
 
-/** The game's simulation rate, which the fade is stepped at. */
-const FRAMES_PER_SECOND = 30;
-
 /**
  * The alpha `seconds` into a fade of smooth time `fadeSeconds`.
  *
- * Measured: a critically damped spring from 1 towards 0 with omega = 2 / T, stepped at the game's
- * 30 Hz - (1 + omega t) e^(-omega t), an ease-out that starts flat. Taken at the nearest 30 Hz frame,
- * which is what reproduces the measured values at T = 0.25 s. 0 at once for a fade time of 0 or less.
+ * Measured: the game's spring from 1 towards 0 - see `spring.ts`. 0 at once for a fade time of 0 or
+ * less.
  */
 export function fadeAlpha(seconds: number, fadeSeconds: number): number {
-    if (!(fadeSeconds > 0)) {
-        return 0;
-    }
+    const spring = new SteppedSpring(1);
+    spring.advance(seconds, 0, fadeSeconds);
 
-    const omega = 2 / fadeSeconds;
-    const stepped =
-        Math.round(seconds * FRAMES_PER_SECOND + 1e-6) / FRAMES_PER_SECOND;
-
-    return (1 + omega * stepped) * Math.exp(-omega * stepped);
+    return spring.value;
 }
 
 /** One dying object's progress towards its end, on its own clock. */

@@ -18,6 +18,7 @@ import {
 import * as THREE from "three";
 import { visibilityTracks } from "./boneVisibility";
 import { clipDone, playedLooping, playedOnce } from "./clipEnd";
+import { CloakFade, type Look, PLAIN_LOOK } from "./cloakFade";
 import { alamoNodeName } from "./skeleton";
 import { type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { type ViewportContext } from "./viewportContext";
@@ -50,6 +51,11 @@ export class AnimationRig {
     private overridingVisibility = false;
     /** What to do when each dying subject is destroyed, by subject id - see {@link startDeathClip}. */
     private readonly deathEnds = new Map<string, () => void>();
+    /**
+     * The subject's cloak coming in and going, stepped by the viewport - see `cloakFade.ts`. The
+     * subject's alone: a death clone is another object and wears none of it.
+     */
+    readonly cloak = new CloakFade();
 
     constructor(private readonly context: ViewportContext) {}
 
@@ -146,7 +152,22 @@ export class AnimationRig {
     forgetSubjects(): void {
         this.subjects.clear();
         this.deathEnds.clear();
+        this.cloak.reset();
         this.overridingVisibility = false;
+    }
+
+    /**
+     * One subject's whole look - the tint and the alpha every mesh and effect of it is drawn with:
+     * the subject's cloak, or a dying object's fade - see `deathEnding.ts`.
+     */
+    lookOf(subjectId: string): Look {
+        if (subjectId === ACTIVE_SUBJECT) {
+            return this.cloak.current();
+        }
+
+        const alpha = this.subjects.get(subjectId)?.death?.alpha ?? 1;
+
+        return alpha === 1 ? { ...PLAIN_LOOK } : { ...PLAIN_LOOK, a: alpha };
     }
 
     get animationNames(): string[] {

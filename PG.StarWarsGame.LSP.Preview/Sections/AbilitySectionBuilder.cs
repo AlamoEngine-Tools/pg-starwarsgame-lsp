@@ -7,8 +7,9 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Preview.Abilities;
 using PG.StarWarsGame.LSP.Preview;
+using PG.StarWarsGame.LSP.Preview.Abilities;
+using PG.StarWarsGame.LSP.Xml.Abilities;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Preview.Sections;
@@ -114,6 +115,18 @@ public sealed class AbilitySectionBuilder(IMessageCatalog messages)
         }
 
         return modifiers;
+    }
+
+    /// <summary>
+    ///     The look of one cloak, off the first <paramref name="element" /> block in the type's
+    ///     <c>Abilities</c> list, or null where the list has none. Read through
+    ///     <see cref="UnitCloaks" />, the reading the cloak diagnostics share.
+    /// </summary>
+    public static PreviewCloak? Cloak(EffectiveObject effective, string element)
+    {
+        return UnitCloaks.Of(effective, element) is { } cloak
+            ? new PreviewCloak(PreviewTagReader.Colour(cloak.Colour), cloak.TransitionSeconds)
+            : null;
     }
 
     /// <summary>

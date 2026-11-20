@@ -42,6 +42,14 @@ public enum PreviewPartOrigin
 public sealed record PreviewRgba(int R, int G, int B, int A);
 
 /// <summary>
+///     The look a cloak takes its unit to, as its ability block on the type writes it: the colour and
+///     alpha the whole model fades and tints towards, and how long that takes. Either is null where
+///     the block does not write it.
+/// </summary>
+[PublicAPI]
+public sealed record PreviewCloak(PreviewRgba? Color, float? TransitionSeconds);
+
+/// <summary>
 ///     One model instance in the scene.
 /// </summary>
 /// <param name="ModelRef">
@@ -233,7 +241,13 @@ public sealed record PreviewScene(
     // GameConstants' Override_Death_Persistence_Duration, or null where it is not written. Measured in
     // the game: when an infantry unit dies, its clone stays this long instead of its own
     // Death_Persistence_Duration - see PreviewDeathClone.KeepsItsOwnPersistence for the exceptions.
-    float? DeathPersistenceOverride = null)
+    float? DeathPersistenceOverride = null,
+    // The look of the type's Stealth_Ability - Stealth_Color, Stealth_Transition_Time - or null where
+    // its Abilities list has none.
+    PreviewCloak? Stealth = null,
+    // The look of the type's Force_Cloak_Ability - Force_Cloak_Color, Force_Cloak_Transition_In_Secs -
+    // or null where its Abilities list has none.
+    PreviewCloak? ForceCloak = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

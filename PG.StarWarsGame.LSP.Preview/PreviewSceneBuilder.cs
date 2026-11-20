@@ -181,7 +181,9 @@ public sealed class PreviewSceneBuilder(
             EngineScaleFactor.Of(effective.ValueOf("Scale_Factor")),
             effective.ValueOf(EncyclopediaTags.IconName),
             PassiveMissileShieldRadius: effective.FloatOf("Passive_Missile_Shield_Radius"),
-            DeathPersistenceOverride: _damage.DeathPersistenceOverride(index));
+            DeathPersistenceOverride: _damage.DeathPersistenceOverride(index),
+            Stealth: AbilitySectionBuilder.Cloak(effective, UnitCloaks.StealthElement),
+            ForceCloak: AbilitySectionBuilder.Cloak(effective, UnitCloaks.ForceCloakElement));
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────

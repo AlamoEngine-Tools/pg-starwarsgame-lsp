@@ -4,7 +4,7 @@
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Xml;
 
-namespace PG.StarWarsGame.LSP.Preview.Abilities;
+namespace PG.StarWarsGame.LSP.Xml.Abilities;
 
 /// <summary>
 ///     One <c>Unit_Ability</c>, with every child tag it declared.
@@ -30,7 +30,10 @@ public sealed class UnitAbility
         _repeated = repeated;
     }
 
-    /// <summary>The ability's <c>Type</c>, which is its identity. Never empty.</summary>
+    /// <summary>
+    ///     The ability's <c>Type</c>, which is its identity - never empty for a <c>Unit_Ability</c> -
+    ///     or a block's <c>Name</c>.
+    /// </summary>
     public string Type { get; }
 
     /// <summary>One child tag's text, or null when it was not declared.</summary>
@@ -73,6 +76,29 @@ public static class UnitAbilityReader
 
     public static IReadOnlyList<UnitAbility> Read(string? fragment)
     {
+        return ReadElements(fragment, AbilityElement)
+            .Where(ability => ability.Type.Length > 0)
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Every <paramref name="element" /> block in a sub-object list - the type's <c>Abilities</c>
+    ///     list keeps its <c>Stealth_Ability</c> and <c>Force_Cloak_Ability</c> there - each with every
+    ///     child tag it declared, identified by its <c>Name</c> attribute or, without one, by nothing.
+    /// </summary>
+    /// <remarks>
+    ///     The one reading of a cloak block: the preview and the cloak diagnostics both reach it
+    ///     through <see cref="Validation.UnitCloaks" />.
+    /// </remarks>
+    public static IReadOnlyList<UnitAbility> ReadBlocks(string? fragment, string element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+
+        return ReadElements(fragment, element);
+    }
+
+    private static List<UnitAbility> ReadElements(string? fragment, string element)
+    {
         if (string.IsNullOrWhiteSpace(fragment))
             return [];
 
@@ -84,7 +110,7 @@ public static class UnitAbilityReader
 
         foreach (var node in root.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element
-                                 && string.Equals(n.Name, AbilityElement,
+                                 && string.Equals(n.Name, element,
                                      StringComparison.OrdinalIgnoreCase)))
         {
             var tags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -110,10 +136,14 @@ public static class UnitAbilityReader
                 all.Add(text);
             }
 
-            // Type is the identity: an entry without one cannot be bound to a proxy, drawn in a
-            // slot, or named in a row.
-            if (tags.TryGetValue(TypeElement, out var type) && type.Length > 0)
-                abilities.Add(new UnitAbility(type, tags, repeated));
+            // A Unit_Ability's Type is its identity: an entry without one cannot be bound to a proxy,
+            // drawn in a slot, or named in a row - `Read` drops it. A block elsewhere is named by its
+            // Name attribute.
+            var type = element.Equals(AbilityElement, StringComparison.OrdinalIgnoreCase)
+                ? tags.GetValueOrDefault(TypeElement, string.Empty)
+                : node.GetAttributeValue("Name", string.Empty).Trim();
+
+            abilities.Add(new UnitAbility(type, tags, repeated));
         }
 
         return abilities;

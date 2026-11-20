@@ -11,11 +11,69 @@ import {
     applyBlend,
     applyColourScale,
     applyDepth,
+    applyFallbackLook,
+    applyModelFade,
     shadowCatcherOpacity,
 } from "./materialState";
 import { type FxDepthFunc } from "./fx/renderState";
 
 const material = (): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial();
+
+/**
+ * A fading model's alpha is the light scale's, which every effect writes to its output; it only shows
+ * if the material blends by it. So the fade turns blending on for an opaque material, and gives it
+ * back exactly as it was when the model is whole again.
+ */
+describe("applyModelFade", () => {
+    it("blends an opaque material by its alpha while its model fades, and gives it back", () => {
+        const m = material();
+        m.transparent = false;
+
+        applyModelFade(m, true);
+        assert.equal(m.transparent, true);
+        assert.equal(m.blending, THREE.NormalBlending);
+
+        applyModelFade(m, false);
+        assert.equal(m.transparent, false);
+    });
+
+    it("leaves a material that already blends as it is", () => {
+        const m = material();
+        m.transparent = true;
+        m.blending = THREE.AdditiveBlending;
+
+        applyModelFade(m, true);
+        applyModelFade(m, false);
+
+        assert.equal(m.transparent, true);
+        assert.equal(m.blending, THREE.AdditiveBlending);
+    });
+});
+
+/**
+ * A mesh with no translated effect is drawn by a three.js material, which has no light scale to
+ * multiply. The same look reaches it through its own colour and opacity, given back exactly as they
+ * were when the model is whole again.
+ */
+describe("applyFallbackLook", () => {
+    it("tints the colour, fades the opacity, and gives both back", () => {
+        const m = new THREE.MeshStandardMaterial({
+            color: 0x808080,
+            opacity: 1,
+        });
+        const before = m.color.clone();
+
+        applyFallbackLook(m, { r: 1, g: 0.5, b: 0.5, a: 0.5 });
+        assert.equal(m.opacity, 0.5);
+        assert.equal(m.transparent, true);
+        assert.ok(Math.abs(m.color.g - before.g * 0.5) < 1e-6);
+
+        applyFallbackLook(m, { r: 1, g: 1, b: 1, a: 1 });
+        assert.equal(m.opacity, 1);
+        assert.equal(m.transparent, false);
+        assert.ok(m.color.equals(before));
+    });
+});
 
 const scaleUniform = (m: THREE.Material): { value: number } | undefined =>
     (m.userData as { colourScale?: { value: number } }).colourScale;

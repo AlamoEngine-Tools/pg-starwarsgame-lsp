@@ -48,7 +48,13 @@ public static class PreviewTagReader
 
     public static PreviewRgba? Colour(EffectiveObject effective, string tagName)
     {
-        if (effective.ValueOf(tagName) is not { } raw)
+        return Colour(effective.ValueOf(tagName));
+    }
+
+    /// <summary>Four 0-255 channels as the game writes them - alpha 255 when only three are - or null.</summary>
+    public static PreviewRgba? Colour(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
             return null;
 
         var tokens = raw.Split([' ', '\t', ',', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
