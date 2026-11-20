@@ -373,6 +373,7 @@
   "ScaleFactor": 1.75,
   "IconName": "i_button_boba_fett.tga",
   "SourceFile": null,
+  "PassiveMissileShieldRadius": null,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [
@@ -659,8 +660,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#1",
@@ -673,8 +673,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#2",
@@ -687,8 +686,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     }
   ],
   "Animations": [

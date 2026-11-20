@@ -58,9 +58,17 @@ function writes(over: Partial<HardpointWrites> = {}): HardpointWrites {
     };
 }
 
-/** One hardpoint's death, writing nothing unless a test says otherwise. */
+let deathCount = 0;
+
+/** One hardpoint's death, of a hardpoint of its own, writing nothing unless a test says otherwise. */
 function death(over: Partial<HardpointDeath>): HardpointDeath {
-    return { decal: null, damageBone: null, engineBone: null, ...over };
+    return {
+        hardpoint: `HP_${deathCount++}`,
+        decal: null,
+        damageBone: null,
+        engineBone: null,
+        ...over,
+    };
 }
 
 /** The state switch of a part the file draws. */
@@ -406,6 +414,251 @@ describe("UnitRules, the order hardpoints die in", () => {
         assert.deepEqual(
             unit.meshState(drawnInFile, mesh, 2),
             ruleState(false),
+        );
+    });
+});
+
+/**
+ * Measured in the game: an effect name's start puts it in a group the game switches together, compared
+ * over the prefix's length with case ignored - `pe` engines, `pte` turbo engines, `pi` ion stun, `pgw`
+ * gravity well, `pas` sprint, `pptw` power to weapons, `pem` invulnerability, `prs` missile shield. A
+ * unit is created with `pte`, `pptw` and `prs` hidden, and its abilities and power modes switch their
+ * groups.
+ */
+describe("UnitRules, the effect name groups", () => {
+    /** The state a unit's rules give an effect of this name the file draws. */
+    function effect(unit: UnitRules, name: string) {
+        return unit.effectState(drawnInFile, undefined, name);
+    }
+
+    it("hides pte, pptw and prs effects when the unit is created", () => {
+        const { unit } = rulesWith("game");
+
+        assert.deepEqual(effect(unit, "PTE_Corvetteengines"), ruleState(false));
+        assert.deepEqual(effect(unit, "pptw_2mtank"), ruleState(false));
+        assert.deepEqual(effect(unit, "prs_at-aa_fx"), ruleState(false));
+        assert.deepEqual(effect(unit, "pe_corvetteengines"), drawnInFile);
+        assert.deepEqual(effect(unit, "p_smoke_small"), drawnInFile);
+    });
+
+    it("compares a name's start over the prefix's length, case ignored", () => {
+        const { unit } = rulesWith("game");
+
+        assert.deepEqual(effect(unit, "PteEngine"), ruleState(false));
+        assert.deepEqual(effect(unit, "pt_engine"), drawnInFile);
+        assert.deepEqual(effect(unit, "pr"), drawnInFile);
+    });
+
+    it("switches pe off and pte on for turbo and for the S-foil lock", () => {
+        for (const ability of ["TURBO", "SPOILER_LOCK"]) {
+            const { unit } = rulesWith("game");
+            unit.setActiveAbilities(new Set([ability]));
+
+            assert.deepEqual(
+                effect(unit, "pe_engines"),
+                ruleState(false),
+                ability,
+            );
+            assert.deepEqual(
+                effect(unit, "pte_engines"),
+                ruleState(true),
+                ability,
+            );
+        }
+    });
+
+    it("catches a pem effect in the pe rule", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["TURBO"]));
+
+        assert.deepEqual(effect(unit, "pem_invulnerability"), ruleState(false));
+    });
+
+    it("shows each ability's own group while it is on", () => {
+        const shows: [string, string][] = [
+            ["POWER_TO_WEAPONS", "pptw_2mtank"],
+            ["LEECH_SHIELDS", "pptw_2mtank"],
+            ["MISSILE_SHIELD", "prs_at-aa_fx"],
+            ["INVULNERABILITY", "pem_invulnerability"],
+            ["SPRINT", "pas_sprint"],
+            ["INTERDICT", "pgw_grav_well"],
+        ];
+
+        for (const [ability, name] of shows) {
+            const { unit } = rulesWith("game");
+            unit.setActiveAbilities(new Set([ability]));
+
+            assert.deepEqual(
+                unit.effectState(fileState(false), undefined, name),
+                ruleState(true),
+                ability,
+            );
+        }
+    });
+
+    it("lets the later of two abilities decide an effect both switch", () => {
+        const { unit } = rulesWith("game");
+
+        unit.setActiveAbilities(new Set(["INVULNERABILITY"]));
+        unit.setActiveAbilities(new Set(["INVULNERABILITY", "TURBO"]));
+        assert.deepEqual(effect(unit, "pem_invulnerability"), ruleState(false));
+
+        unit.setActiveAbilities(new Set(["TURBO"]));
+        unit.setActiveAbilities(new Set(["TURBO", "INVULNERABILITY"]));
+        assert.deepEqual(effect(unit, "pem_invulnerability"), ruleState(true));
+    });
+
+    /** The power mode's own write when it ends: plain engines back on, turbo engines off. */
+    it("writes pe on and pte off when turbo is switched off", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["TURBO"]));
+        unit.setActiveAbilities(new Set());
+
+        assert.deepEqual(effect(unit, "pte_engines"), ruleState(false));
+        assert.deepEqual(effect(unit, "pe_engines"), ruleState(true));
+    });
+
+    it("hides an ability's group when the ability ends, whatever the file says", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["SPRINT"]));
+        unit.setActiveAbilities(new Set());
+
+        assert.deepEqual(effect(unit, "pas_sprint"), ruleState(false));
+    });
+
+    it("writes nothing for an ability that was never switched on", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set());
+
+        assert.deepEqual(effect(unit, "pas_sprint"), drawnInFile);
+        assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
+    });
+
+    it("still lets the cloak hide everything", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["TURBO"]));
+        unit.setStealthed(true);
+
+        assert.deepEqual(effect(unit, "pte_engines"), ruleState(false));
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setActiveAbilities(new Set(["TURBO"]));
+
+        assert.deepEqual(effect(unit, "pte_engines"), drawnInFile);
+        assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
+    });
+
+    /** Measured: a type whose `Passive_Missile_Shield_Radius` is above 0 shows `prs` once created. */
+    it("shows prs on creation for a missile-shield object", () => {
+        const { unit } = rulesWith("game");
+        unit.setMissileShieldObject(true);
+
+        assert.deepEqual(effect(unit, "prs_interdict_fx"), ruleState(true));
+    });
+
+    it("keeps prs hidden for a unit that only has the missile shield ability, until it is on", () => {
+        const { unit } = rulesWith("game");
+        unit.setMissileShieldObject(false);
+        assert.deepEqual(effect(unit, "prs_at-aa_fx"), ruleState(false));
+
+        unit.setActiveAbilities(new Set(["MISSILE_SHIELD"]));
+        assert.deepEqual(effect(unit, "prs_at-aa_fx"), ruleState(true));
+    });
+
+    it("forgets the switches with the model", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["SPRINT"]));
+        unit.setActiveAbilities(new Set());
+        unit.setMissileShieldObject(true);
+
+        unit.forgetModel();
+
+        assert.deepEqual(effect(unit, "pas_sprint"), drawnInFile);
+        assert.deepEqual(effect(unit, "prs_fx"), ruleState(false));
+    });
+});
+
+/**
+ * Another object the preview shows - a death clone - is created too, so its effects get what creating
+ * it writes, and none of the subject's hardpoint or ability writes.
+ */
+describe("UnitRules, a created object's effects", () => {
+    it("hides its pte, pptw and prs effects and leaves the rest as its file has them", () => {
+        const { unit } = rulesWith("game");
+
+        assert.deepEqual(
+            unit.createdEffectState(drawnInFile, "pte_x"),
+            ruleState(false),
+        );
+        assert.deepEqual(
+            unit.createdEffectState(drawnInFile, "p_explosion_big00"),
+            drawnInFile,
+        );
+    });
+
+    it("takes none of the subject's ability writes", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["TURBO"]));
+
+        assert.deepEqual(
+            unit.createdEffectState(drawnInFile, "pe_engines"),
+            drawnInFile,
+        );
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+
+        assert.deepEqual(
+            unit.createdEffectState(drawnInFile, "pte_x"),
+            drawnInFile,
+        );
+    });
+});
+
+/**
+ * The maintainer's rule: deaths and ability switches are ONE timeline, replayed last write wins after
+ * what creation writes - not the abilities after every death.
+ */
+describe("UnitRules, deaths and abilities in the order they happened", () => {
+    /** HP_Bone's Engine_Particles death hides the effect on EmitDamage, below it. */
+    const dies = writes({
+        deaths: [death({ hardpoint: "HP_E", engineBone: "hp_bone" })],
+    });
+
+    it("shows turbo's engines when turbo is switched on after the engine hardpoint died", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(dies);
+        unit.setActiveAbilities(new Set(["TURBO"]));
+
+        assert.deepEqual(
+            unit.effectState(drawnInFile, 2, "pte_engines"),
+            ruleState(true),
+        );
+    });
+
+    it("hides them when the engine hardpoint dies after turbo is switched on", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["TURBO"]));
+        unit.setHardpoints(dies);
+
+        assert.deepEqual(
+            unit.effectState(drawnInFile, 2, "pte_engines"),
+            ruleState(false),
+        );
+    });
+
+    it("takes a repaired hardpoint's death out of the timeline", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["TURBO"]));
+        unit.setHardpoints(dies);
+        unit.setHardpoints(writes());
+
+        assert.deepEqual(
+            unit.effectState(drawnInFile, 2, "pte_engines"),
+            ruleState(true),
         );
     });
 });

@@ -20,8 +20,7 @@ import { post } from "./previewPost";
 import { type PreviewViewport } from "./viewport";
 import { type PreviewAssetLoader } from "./previewAssetLoader";
 import { effectPlaysNow } from "./damage";
-import { passiveEffectPlaysNow, passiveEffects } from "./passiveSubject";
-import { abilityAllows, abilityClaims } from "./abilityRows";
+import { passiveEffects } from "./passiveSubject";
 import { effectState } from "./visibility";
 
 /** An effect asked for before its system arrived, and where it goes when the system lands. */
@@ -39,26 +38,18 @@ export interface PendingEffect {
 
 /** What useParticleEffects reads from the rest of the preview. */
 export interface ParticleEffectsInputs {
-    abilityProxyIdsRef: RefObject<ReadonlyMap<string, string[]>>;
-    activeAbilitiesRef: RefObject<ReadonlySet<string>>;
     assets: PreviewAssetLoader;
     refreshStats: () => void;
-    replacedEffectsRef: RefObject<ReadonlySet<string>>;
     setHiddenEmitters: Dispatch<SetStateAction<ReadonlySet<number>>>;
-    unboundEffectsRef: RefObject<ReadonlySet<string>>;
     viewportRef: RefObject<PreviewViewport | null>;
 }
 
 export type ParticleEffects = ReturnType<typeof useParticleEffects>;
 
 export function useParticleEffects({
-    abilityProxyIdsRef,
-    activeAbilitiesRef,
     assets,
     refreshStats,
-    replacedEffectsRef,
     setHiddenEmitters,
-    unboundEffectsRef,
     viewportRef,
 }: ParticleEffectsInputs) {
     /**
@@ -85,9 +76,8 @@ export function useParticleEffects({
     /**
      * The effects belonging to a PASSIVE subject, by id.
      *
-     * They answer to their own model rather than to the subject's opening and damage rules - see
-     * `passiveEffectPlaysNow` - and this is how the one place that decides whether an effect draws
-     * tells them apart.
+     * They answer to their own model rather than to the subject's damage rules, and this is how the
+     * preview tells them apart when the subject's effects are dropped.
      */
     const passiveEffectIdsRef = useRef(new Set<string>());
 
@@ -131,60 +121,16 @@ export function useParticleEffects({
      * visibility from the damage rules alone and clobbered the ability decision made moments
      * earlier, so an ability's proxy was drawing before anyone switched it on. Two writers of one
      * flag is the same defect the effect-row work already paid for.
+     *
+     * The proxy's own flag, for every effect: the subject's, a passive subject's, and a model
+     * preview's. Everything the game's rules say about an effect - its name group, the abilities'
+     * groups, the hardpoints' bones, the cloak - is a write of its state switch in the unit's rules,
+     * over this answer - see `UnitRules.effectState`.
      */
-    const effectDrawsNow = useCallback((particle: PreviewParticle): boolean => {
-        const proxies = abilityProxyIdsRef.current;
-
-        // A passive subject's effect answers to its own model and to nothing here. Neither of the
-        // rules below is about it: the opening rule is about the first moment of a preview, and a
-        // death clone has none - it exists because the ship died, and its explosions ARE the death.
-        //
-        // And so does every effect of a MODEL preview, which shows the model file as it is: no
-        // hardpoint, ability or opening rule of the game applies to it. The rules below are the
-        // unit preview's, written over that same file answer.
-        if (
-            passiveEffectIdsRef.current.has(particle.id) ||
-            viewportRef.current?.appliesGameRules() !== true
-        ) {
-            return passiveEffectPlaysNow(particle);
-        }
-
-        // Before every other rule, because it is the only VETO among them: an effect whose name
-        // claims an ability this unit does not declare has nothing that could ever switch it on,
-        // and the game simply never shows it. Everything below is a DEFAULT or a gate - the
-        // distinction three separate defects were spent learning. `Tartan_Patrol_Cruiser` opened
-        // with its TURBO engines burning because an unbound proxy fell through to the ordinary
-        // path, where an engine-named effect is exempt from the quiet-on-open rule.
-        if (unboundEffectsRef.current.has(particle.id)) {
-            return false;
-        }
-
-        // Neither the cloak nor a hardpoint's bones are decided here. Both are writes of the
-        // effect's state switch in the unit's rules, after this answer - see `UnitRules`: the
-        // cloak hides every effect, a Damage_Particles bone hides its smoke until the hardpoint
-        // dies, and an Engine_Particles bone hides its glow once it does.
-
-        // An ability REPLACES the quiet-on-open rule for the proxies it claims, rather than being
-        // ANDed with it. The opening rules hold every non-engine effect back - rightly, on open -
-        // but they are about the first moment, not a permanent veto, and ANDing them left an
-        // activated ability changing nothing at all. The hardpoint bone rules still apply either way.
-        if (abilityClaims(particle.id, proxies)) {
-            return abilityAllows(
-                particle.id,
-                proxies,
-                activeAbilitiesRef.current,
-            );
-        }
-
-        // An active ability REPLACING this effect's family, which is a different statement from
-        // claiming it - see `replacedByAbility`. Below the claim branch on purpose: a proxy an
-        // ability actually drives answers to that ability, not to this.
-        if (replacedEffectsRef.current.has(particle.id)) {
-            return false;
-        }
-
-        return effectPlaysNow(particle);
-    }, []);
+    const effectDrawsNow = useCallback(
+        (particle: PreviewParticle): boolean => effectPlaysNow(particle),
+        [],
+    );
 
     /**
      * Queues a passive subject's own effects, once its geometry is on the way.
@@ -273,6 +219,7 @@ export function useParticleEffects({
                 attachToPartId: particle.partId,
                 attachBone: particle.bone,
                 attachBoneIndex: particle.boneIndex,
+                proxyName: particle.systemRef,
                 levels: {
                     alt: particle.alt ?? null,
                     lod: particle.lod ?? null,

@@ -25,6 +25,11 @@ export interface ParticlePlacement {
     attachBone?: string;
     /** The bone's index, which is what tells two same-named bones apart. */
     attachBoneIndex?: number;
+    /**
+     * The name of the model's proxy this system is, for the rules that read it - the game's effect
+     * name groups. None for an effect the model does not carry.
+     */
+    proxyName?: string;
     /** The ALT/LOD tags on the proxy. Untagged - every level - when omitted. */
     levels?: LevelTagged;
     /**

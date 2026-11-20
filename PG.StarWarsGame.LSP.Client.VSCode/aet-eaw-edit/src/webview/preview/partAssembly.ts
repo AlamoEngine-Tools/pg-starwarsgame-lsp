@@ -389,7 +389,11 @@ export class PartAssembly {
             part.root.visible = !hidden;
         }
 
-        this.context.particles.holdEffectsOf(partId);
+        // Its effects are anchored to the model root, not parented to the part, so the rows decide
+        // whether they draw - see `ModelRows.effectFacts`. Asked again only for a part that has any.
+        if (this.context.particles.holdEffectsOf(partId)) {
+            this.context.rows.refreshRows();
+        }
     }
 
     /**

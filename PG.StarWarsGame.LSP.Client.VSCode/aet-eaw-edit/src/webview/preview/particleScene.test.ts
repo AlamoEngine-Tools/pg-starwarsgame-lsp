@@ -15,7 +15,6 @@ import {
     groupState,
     listedInModelTree,
     particleGroups,
-    replacedByAbility,
 } from "./particleScene";
 
 function particle(over: Partial<PreviewParticle> = {}): PreviewParticle {
@@ -395,115 +394,5 @@ describe("listedInModelTree", () => {
         // falls back to the root bone and files them there. They are what the game DOES to the
         // model, not what the model is made of.
         assert.equal(listedInModelTree("gameplay"), false);
-    });
-});
-
-// TURBO on the CR90, reported as "not toggleable". The key was enabled the whole time and the turbo
-// plume did light; what never happened is the plain engine plume going OUT, so both burned at once
-// out of the same nozzles and the press looked like it did nothing.
-//
-// The user owns this rule: turbo shows the PTE_ (power to engine) effect and HIDES the normal engine
-// effect. Only that pair - whether power-to-weapons replaces anything is not known and is not
-// assumed here.
-describe("replacedByAbility", () => {
-    const engines = particle({
-        id: "pe",
-        systemRef: "PE_Corvetteengines",
-        gate: "Always",
-    });
-    const turbo = particle({
-        id: "pte",
-        systemRef: "PTE_Corvetteengines",
-        gate: "Always",
-    });
-    const proxies = new Map([["TURBO", ["pte"]]]);
-
-    it("holds the plain engines back while turbo is active", () => {
-        const held = replacedByAbility(
-            [engines, turbo],
-            proxies,
-            new Set(["TURBO"]),
-        );
-
-        assert.deepEqual([...held], ["pe"]);
-    });
-
-    it("holds nothing back while turbo is off", () => {
-        // The whole scene at rest: the engines are the one effect exempt from quiet-on-open, and
-        // suppressing them with no ability active would put the ship in space with dead nozzles.
-        assert.deepEqual(
-            [...replacedByAbility([engines, turbo], proxies, new Set())],
-            [],
-        );
-    });
-
-    it("never holds back the effect doing the replacing", () => {
-        const held = replacedByAbility(
-            [engines, turbo],
-            proxies,
-            new Set(["TURBO"]),
-        );
-
-        assert.equal(held.has("pte"), false);
-    });
-
-    it("needs the replacing family to be what the ability actually drives", () => {
-        // An active ability claiming something else entirely must not silence the engines. The
-        // Tartan carries pe_, pte_ AND pptw_ together, so this is a real arrangement, not a guard
-        // against an imaginary one.
-        const weapons = particle({
-            id: "pptw",
-            systemRef: "pptw_ptwsa",
-            gate: "Always",
-        });
-        const held = replacedByAbility(
-            [engines, turbo, weapons],
-            new Map([["POWER_TO_WEAPONS", ["pptw"]]]),
-            new Set(["POWER_TO_WEAPONS"]),
-        );
-
-        assert.deepEqual([...held], []);
-    });
-
-    it("replaces only the pair the user named", () => {
-        // Power to weapons replaces nothing until someone says otherwise - see the note above.
-        const weapons = particle({
-            id: "pptw",
-            systemRef: "pptw_ptwsa",
-            gate: "Always",
-        });
-        const guns = particle({
-            id: "pw",
-            systemRef: "pe_guns",
-            gate: "HardpointAlive",
-        });
-        const held = replacedByAbility(
-            [weapons, guns],
-            new Map([["POWER_TO_WEAPONS", ["pptw"]]]),
-            new Set(["POWER_TO_WEAPONS"]),
-        );
-
-        assert.deepEqual([...held], []);
-    });
-
-    it("holds back every member of the replaced family, not just the first", () => {
-        // Home One carries three engine systems and the Tartan two.
-        const lrg = particle({
-            id: "lrg",
-            systemRef: "pe_tartanengine_lrg",
-            gate: "Always",
-        });
-        const sml = particle({
-            id: "sml",
-            systemRef: "pe_tartanengine_sml",
-            gate: "Always",
-        });
-        const held = replacedByAbility(
-            [lrg, sml, turbo],
-            proxies,
-            new Set(["TURBO"]),
-        );
-
-        assert.deepEqual([...held].sort(), ["lrg", "sml"]);
     });
 });

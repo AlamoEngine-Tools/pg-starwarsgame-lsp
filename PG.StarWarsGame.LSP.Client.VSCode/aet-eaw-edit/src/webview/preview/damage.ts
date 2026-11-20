@@ -18,10 +18,7 @@
 // `UnitRules`; this module only names what each hardpoint writes, and in which order the hardpoints
 // died - see `hardpointWrites`. A particle's gate only names the hardpoint that owns it, for the dock.
 
-import {
-    PREVIEW_PARTICLE_GATE,
-    type PreviewHardpoint,
-} from "../../protocol/modelPreview";
+import { type PreviewHardpoint } from "../../protocol/modelPreview";
 
 /**
  * The ids of the hardpoints currently blown off, in the ORDER they died: a set's iteration order is
@@ -80,23 +77,10 @@ export interface EffectGate {
     startsVisible: boolean;
 }
 
-/**
- * Whether the effect rules have a particle system playing.
- *
- * `startsVisible` has the final say HERE: an effect the model itself ships switched off - like
- * `pi_damage_elec_SD00` - does not appear just because something was destroyed. The one rule that
- * shows it is the Damage_Particles rule, for an effect on or below a destroyed hardpoint's bone, and
- * that writes over this answer in the unit's rules - see `UnitRules.setHardpoints`.
- *
- * An ability proxy ships switched off precisely BECAUSE its ability is what turns it on, so a caller
- * that has a better answer than the default - an ability's - does not ask this.
- */
-export function effectPlays(particle: EffectGate): boolean {
-    return particle.startsVisible;
-}
-
 /** What one hardpoint's death writes, lowercased for matching; null where it writes nothing. */
 export interface HardpointDeath {
+    /** The hardpoint that died, which is what places its death on the unit's timeline. */
+    hardpoint: string;
     /** The `Damage_Decal` part it shows. */
     decal: string | null;
     /** The `Damage_Particles` bone whose parts, at any depth, it shows. */
@@ -164,6 +148,7 @@ export function hardpointWrites(
 
         if (hardpoint !== undefined) {
             deaths.push({
+                hardpoint: id,
                 decal: named(hardpoint.damageDecalBone),
                 damageBone: named(hardpoint.damageParticlesBone),
                 engineBone: hardpoint.engineDeathHidesEngineParticles
@@ -226,83 +211,19 @@ export function destroyable(
     return hardpoints.filter((hardpoint) => hardpoint.isDestroyable);
 }
 
-/** What decides whether an effect is running the moment the model opens. */
-export interface OpeningEffect extends EffectGate {
-    /** The particle system's name, e.g. `p_engine_glow_small`. */
-    systemRef: string;
-    /** The bone it is attached to. */
-    bone: string;
-    /** Damage state the proxy is tagged for, from its `_ALT<n>` suffix, or null when untagged. */
-    alt?: number | null;
-    /** Detail level, same convention. */
-    lod?: number | null;
-}
-
 /**
- * Names that mark a proxy as engine glow when nothing else does.
+ * Whether an effect is running before the unit's rules write over it: the proxy's own flag.
  *
- * A bare `.alo` has no XML behind it, so no hardpoint gates its engines and every proxy arrives as
- * `Always`. The naming is a firm convention in the shipped data - proxies are `p_engine_*` and the
- * bones they are attached to are `ENGINE*` - and it is the only signal left for the commonest case there
- * is, a fighter opened on its own.
+ * Measured in the game: a unit is created with every attached effect running that no switch hides.
+ * The switches are the unit's rules - the name groups (`pte`, `pptw` and `prs` hidden on creation,
+ * the abilities' groups), the hardpoints' bones, the cloak - and they write over this answer in
+ * `UnitRules`. The preview used to hold back every effect that did not look like an engine on top
+ * of that; the game holds back none.
+ *
+ * One predicate, because three call sites ask this question - attaching a system, reacting to a
+ * hardpoint blowing up, and seeding the dock's rows - and any of them disagreeing shows up directly
+ * as the list claiming "off" about something visibly burning.
  */
-const ENGINE_NAME = /engine/i;
-
-/**
- * Whether an effect is playing when the model first appears.
- *
- * A model opens QUIET, showing what an intact one is actually doing: engines lit, nothing else.
- * Playing everything meant a capital ship opened inside its own damage fires and dust plumes, and
- * the one-shot systems had finished before the reader could look at them. Everything held back
- * here is still one tick away in the tree.
- *
- * Deliberately NOT the same question as {@link effectPlays}, which is the proxy's own flag. This is
- * the opening state only.
- */
-export function playsOnOpen(effect: OpeningEffect): boolean {
-    // The model's own switch still has the final say, exactly as it does everywhere else.
-    if (!effect.startsVisible) {
-        return false;
-    }
-
-    // An effect a hardpoint owns is left to that hardpoint's bone rules: an engine glow runs until
-    // its hardpoint dies, damage smoke is hidden until it does - see `UnitRules`.
-    if (
-        effect.gate === PREVIEW_PARTICLE_GATE.hardpointAlive ||
-        effect.gate === PREVIEW_PARTICLE_GATE.hardpointDestroyed
-    ) {
-        return true;
-    }
-
-    // A LEVEL-tagged proxy answers to the ALT/LOD gate and to nothing here. It is already hidden at
-    // ALT 0, so the model still opens quiet - and holding it back on top of that made the ALT
-    // control do nothing on every model whose damage states are carried by proxies rather than by
-    // meshes, which is most of them.
-    if ((effect.alt ?? null) !== null || (effect.lod ?? null) !== null) {
-        return true;
-    }
-
-    return ENGINE_NAME.test(effect.systemRef) || ENGINE_NAME.test(effect.bone);
-}
-
-/**
- * Whether the effect rules have an effect running: its own flag AND the opening rule, together.
- *
- * One predicate rather than two, because three call sites ask this question - attaching a system,
- * reacting to a hardpoint blowing up, and seeding the dock's rows - and any of them disagreeing
- * shows up directly as the list claiming "off" about something visibly burning.
- *
- * An ungated effect is the interesting case. It plays only if it would play on open, so a hull's
- * fires and dust stay off until they are asked for, while its engines run. A gated one is left to
- * its hardpoint's bone rules, however it is named. The destroyed hardpoints are not asked here: the
- * bone rules in `UnitRules` write over this answer.
- */
-export function effectPlaysNow(effect: OpeningEffect): boolean {
-    if (!effectPlays(effect)) {
-        return false;
-    }
-
-    return effect.gate === PREVIEW_PARTICLE_GATE.always
-        ? playsOnOpen(effect)
-        : true;
+export function effectPlaysNow(effect: EffectGate): boolean {
+    return effect.startsVisible;
 }

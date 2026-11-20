@@ -70,6 +70,14 @@
   holds its last frame for `Death_Persistence_Duration`, then goes with its `Death_Explosions_End`, or after
   `Death_Fade_Time` when it names none
   ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
+- **A unit opens with its effects running, and abilities switch them by name** - the unit preview held back
+  every effect that did not look like an engine. A unit now opens with every effect the model file marks
+  visible, except those whose name starts with `pte`, `pptw` or `prs`, which the game hides at creation (a type
+  with a `Passive_Missile_Shield_Radius` shows its `prs`). Abilities and power modes switch the effects by the
+  start of their name - turbo and the S-foil lock swap `pe` for `pte`, power to weapons and shield leech show
+  `pptw`, and so on - and a hardpoint's death and an ability switched on or off count in the order they
+  happened. A death clone draws nothing and runs no effect before it is spawned
+  ([#448](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/448))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

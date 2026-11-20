@@ -611,15 +611,6 @@ export interface PreviewParticle {
      * lit on the way to destruction does not flicker back on as a hardpoint is repaired.
      */
     altDecreaseStayHidden?: boolean;
-    /**
-     * The ability this proxy's BONE NAME claims by its prefix, or absent for the 5404 that claim
-     * nothing.
-     *
-     * A claim is not a binding. The unit has to declare the type as well, and when it does not the
-     * game simply never shows the effect - `Tartan_Patrol_Cruiser` declares POWER_TO_WEAPONS and
-     * carries `Pte_tartanengine_lrg` for a TURBO it does not have. See {@link unboundEffectIds}.
-     */
-    claimsAbility?: string | null;
 }
 
 /**
@@ -690,6 +681,11 @@ export interface PreviewScene {
      * Absent for an object scene and for a model that resolves nowhere.
      */
     sourceFile?: PreviewSourceFile | null;
+    /**
+     * The subject's `Passive_Missile_Shield_Radius`, or absent where it declares none. A type whose
+     * radius is above 0 shows its `prs` effects once it is created - see `effectGroups.ts`.
+     */
+    passiveMissileShieldRadius?: number | null;
     subject: string;
     parts: PreviewPart[];
     hardpoints: PreviewHardpoint[];

@@ -24,6 +24,7 @@ function assemblyWith(): {
     held: string[];
     dropped: string[];
     billboards: THREE.Object3D[][];
+    refreshed: () => number;
 } {
     const modelRoot = new THREE.Group();
     const turret = new THREE.Bone();
@@ -50,6 +51,7 @@ function assemblyWith(): {
     const held: string[] = [];
     const dropped: string[] = [];
     const billboards: THREE.Object3D[][] = [];
+    let refreshes = 0;
     const context = standInContext({
         levels: { alt: 0, lod: 0 },
         modelRoot,
@@ -69,9 +71,18 @@ function assemblyWith(): {
                 billboards.push([...nodes]),
         },
         particles: {
-            holdEffectsOf: (id: string) => held.push(id),
+            // Only the wreck carries effects.
+            holdEffectsOf: (id: string) => {
+                held.push(id);
+                return id === "wreck:1";
+            },
             particleSystems: new Map(),
             removeParticleSystem: () => undefined,
+        },
+        rows: {
+            refreshRows: () => {
+                refreshes++;
+            },
         },
     });
     return {
@@ -82,6 +93,7 @@ function assemblyWith(): {
         held,
         dropped,
         billboards,
+        refreshed: () => refreshes,
     };
 }
 
@@ -284,6 +296,21 @@ describe("PartAssembly", () => {
         assembly.setPartHidden("wreck:1", false);
         assert.equal(wreck.root.visible, true);
         assert.equal(assembly.hiddenParts.has("wreck:1"), false);
+    });
+
+    /**
+     * A part's effects are anchored to the model root, so the rows decide whether they draw; showing a
+     * death clone that was held off screen has to have them say so again.
+     */
+    it("asks the rows again when it hides or shows a part that carries effects, and only then", () => {
+        const { assembly, refreshed } = assemblyWith();
+
+        assembly.setPartHidden("hull", true);
+        assert.equal(refreshed(), 0);
+
+        assembly.setPartHidden("wreck:1", true);
+        assembly.setPartHidden("wreck:1", false);
+        assert.equal(refreshed(), 2);
     });
 
     it("takes a removed part out of the scene and its registrations with it", () => {

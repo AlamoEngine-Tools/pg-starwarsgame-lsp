@@ -584,6 +584,16 @@ export class PreviewViewport {
         this.rules.setStealthed(on);
     }
 
+    /** The abilities switched on. See `UnitRules.setActiveAbilities`. */
+    setActiveAbilities(active: ReadonlySet<string>): void {
+        this.rules.setActiveAbilities(active);
+    }
+
+    /** Whether the unit's type is a missile-shield object. See `UnitRules.setMissileShieldObject`. */
+    setMissileShieldObject(on: boolean): void {
+        this.rules.setMissileShieldObject(on);
+    }
+
     /** Whether a cloak is engaged, which every other visibility rule defers to. */
     isStealthed(): boolean {
         return this.rules.isStealthed();

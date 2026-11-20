@@ -32,6 +32,23 @@ public sealed class PreviewSceneBuilderTest
         Assert.Equal("Rebel", Builder(index, tags, "hull.alo").BuildForObject("Xwing").Affiliation);
     }
 
+    /// <summary>
+    ///     Measured in the game: a type whose <c>Passive_Missile_Shield_Radius</c> is above 0 shows
+    ///     its <c>prs</c> effects once it is created. The client decides that; the scene carries the
+    ///     number, null where the type declares none.
+    /// </summary>
+    [Fact]
+    public void BuildForObject_CarriesThePassiveMissileShieldRadius()
+    {
+        var index = Index([Sym("Field", "GameObjectType"), Sym("Ship", "GameObjectType")]);
+        var tags = new FakeVariantTagSource()
+            .With("Field", Tag("Space_Model_Name", "hull.alo"), Tag("Passive_Missile_Shield_Radius", "300.0"))
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Equal(300f, Builder(index, tags, "hull.alo").BuildForObject("Field").PassiveMissileShieldRadius);
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").PassiveMissileShieldRadius);
+    }
+
     [Fact]
     public void BuildForObject_TakesTheFirstOfSeveralAffiliations()
     {

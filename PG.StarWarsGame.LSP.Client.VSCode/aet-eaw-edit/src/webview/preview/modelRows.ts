@@ -18,6 +18,7 @@ import {
     castsShadow,
     fileState,
     meshSwitches,
+    ruleState,
     subtreeHiddenByReader,
     restingClip,
 } from "./visibility";
@@ -42,7 +43,7 @@ import { type Inspection } from "./inspector";
 import { billboardTypeOf } from "./billboards";
 import { type AbilityOwnership } from "./abilityRows";
 import { type ParticleEntry } from "./particleEntry";
-import { type LoadedPart } from "./loadedPart";
+import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
 import { skinVisibilityBone } from "./skinBone";
 import { triangleCount } from "./modelBounds";
 import { type ViewportContext } from "./viewportContext";
@@ -935,6 +936,38 @@ export class ModelRows {
             target.particleId === undefined
                 ? undefined
                 : this.context.particles.particleSystems.get(target.particleId);
+        const partId = entry?.attachToPartId;
+        const fileWrite = entry?.state ?? fileState(true);
+
+        // An effect of ANOTHER object - a death clone's, a piece of wreckage's - is that object's: it
+        // gets what creating that object writes, and none of the subject's hardpoint or ability
+        // writes, whose bones and switches belong to the subject. A part of no subject the preview
+        // knows is one of those: the subject's own effects wait for their part to load.
+        const ofSubject =
+            partId === undefined ||
+            this.context.parts.get(partId)?.subjectId === ACTIVE_SUBJECT;
+        let state = ofSubject
+            ? this.context.rules.effectState(
+                  fileWrite,
+                  target.boneIndex ?? target.ownerBone,
+                  entry?.proxyName,
+              )
+            : this.context.rules.createdEffectState(
+                  fileWrite,
+                  entry?.proxyName,
+              );
+
+        // Another object the preview holds off screen - a death clone fetched ahead of the death -
+        // is not in the game yet, so nothing on it runs. Effects are anchored to the model root
+        // rather than parented to the part, so hiding the part does not hide them; this does. Not
+        // the subject's own parts: a hardpoint part hidden by its death is a rule of its own.
+        if (
+            !ofSubject &&
+            partId !== undefined &&
+            this.context.assembly.hiddenParts.has(partId)
+        ) {
+            state = ruleState(false);
+        }
 
         return {
             ...facts,
@@ -949,10 +982,7 @@ export class ModelRows {
             // chain that writes the meshes - see `UnitRules.effectState`. Not in the caller's effect
             // decider: that put a flag in two places, and the two disagreed the moment anything drove
             // one without the other.
-            state: this.context.rules.effectState(
-                entry?.state ?? fileState(true),
-                target.boneIndex ?? target.ownerBone,
-            ),
+            state,
             alt: entry?.altVisible ?? true,
             lod: entry?.lodVisible ?? true,
 

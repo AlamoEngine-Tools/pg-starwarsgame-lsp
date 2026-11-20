@@ -27,27 +27,17 @@ const particle = (over: Partial<PreviewParticle> = {}): PreviewParticle => ({
     ...over,
 });
 
-/**
- * The effect decider on the first render, in a preview that applies the game's rules or not, where
- * `unbound` is what the unit's abilities say can never be switched on.
- */
-function decider(
-    gameRules: boolean,
-    unbound: ReadonlySet<string> = new Set(),
-): ParticleEffects["effectDrawsNow"] {
+/** The effect decider on the first render, in a preview that applies the game's rules or not. */
+function decider(gameRules: boolean): ParticleEffects["effectDrawsNow"] {
     let seen: ParticleEffects | undefined;
     const viewport = {
         appliesGameRules: () => gameRules,
     } as unknown as PreviewViewport;
     const Probe = (): null => {
         seen = useParticleEffects({
-            abilityProxyIdsRef: { current: new Map() },
-            activeAbilitiesRef: { current: new Set() },
             assets: {} as PreviewAssetLoader,
             refreshStats: () => undefined,
-            replacedEffectsRef: { current: new Set() },
             setHiddenEmitters: () => undefined,
-            unboundEffectsRef: { current: unbound },
             viewportRef: { current: viewport },
         });
         return null;
@@ -59,22 +49,25 @@ function decider(
 
 describe("useParticleEffects", () => {
     it("runs every effect a model file marks visible in a model preview, and no other", () => {
-        const drawsNow = decider(false, new Set(["hull#1"]));
+        const drawsNow = decider(false);
 
         assert.equal(drawsNow(particle()), true, "a dust cloud is held back");
         assert.equal(
-            drawsNow(particle({ id: "hull#1", systemRef: "pte_engines" })),
+            drawsNow(particle({ systemRef: "pte_engines" })),
             true,
-            "an effect claiming an undeclared ability is held back",
+            "a turbo engine is held back",
         );
         assert.equal(drawsNow(particle({ startsVisible: false })), false);
     });
 
-    it("applies the unit's rules over the file in a unit preview", () => {
-        const drawsNow = decider(true, new Set(["hull#1"]));
+    /**
+     * Measured in the game: a unit is created with every attached effect running that no switch
+     * hides. The switches - the name groups among them - are the unit's rules' writes, over this.
+     */
+    it("runs every effect the file marks visible in a unit preview too", () => {
+        const drawsNow = decider(true);
 
-        assert.equal(drawsNow(particle({ id: "hull#1" })), false);
-        // Held back on open, until #448 brings the unit's opening in line with the game.
-        assert.equal(drawsNow(particle()), false);
+        assert.equal(drawsNow(particle()), true, "a dust cloud is held back");
+        assert.equal(drawsNow(particle({ startsVisible: false })), false);
     });
 });

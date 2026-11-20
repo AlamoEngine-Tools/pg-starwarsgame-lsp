@@ -1,9 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The abilities: which the subject has, which the reader has switched on, and the proxies and effects
-// each one holds off or swaps in. One hook so the command bar, its flyouts and the combat lens read one
-// object.
+// The abilities: which the subject has and which the reader has switched on. What each switches is the
+// unit's rules' - see `effectGroups.ts`. One hook so the command bar, its flyouts and the combat lens
+// read one object.
 
 import {
     useCallback,
@@ -16,13 +16,11 @@ import {
 } from "react";
 import { type PreviewScene } from "../../protocol/modelPreview";
 import { type PreviewViewport } from "./viewport";
-import { replacedByAbility } from "./particleScene";
 import {
     abilityOwnership,
     abilityProxies,
     abilityRows,
     clipFor,
-    unboundEffectIds,
 } from "./abilityRows";
 
 /** What useAbilities reads from the rest of the preview. */
@@ -42,31 +40,12 @@ export function useAbilities({
     /**
      * The abilities the reader has switched on.
      *
-     * Tier 2 - it describes what you are looking at right now, so it resets with the subject. The
-     * proxies it holds off ride the ordinary effect gate, which means a held burst does NOT burn
-     * its life away and come back exhausted.
+     * Tier 2 - it describes what you are looking at right now, so it resets with the subject. In the
+     * order they were switched on, which is the order their writes are replayed in.
      */
     const [activeAbilities, setActiveAbilities] = useState<ReadonlySet<string>>(
         new Set(),
     );
-
-    /**
-     * Same reason again, for the ability decider.
-     *
-     * A system attaching after an ability was switched on has to see the CURRENT set, or it lands
-     * with the visibility the scene had when the handler was made.
-     */
-    const abilityProxyIdsRef = useRef<ReadonlyMap<string, string[]>>(new Map());
-
-    const activeAbilitiesRef = useRef<ReadonlySet<string>>(new Set());
-
-    /**
-     * Effects this unit can never show. Read through a ref for the same reason as the two above:
-     * a system attaches long after the scene lands, and it has to meet the current answer.
-     */
-    const unboundEffectsRef = useRef<ReadonlySet<string>>(new Set());
-    /** What an active ability is standing in for. See {@link replacedByAbility}. */
-    const replacedEffectsRef = useRef<ReadonlySet<string>>(new Set());
 
     /**
      * Which particle ids each ability drives.
@@ -84,38 +63,9 @@ export function useAbilities({
         [scene?.abilities, abilityProxyIds],
     );
 
-    /**
-     * The effects whose ability this unit never declares, which nothing can switch on.
-     *
-     * Not the complement of {@link abilityProxyIds}: that map holds only the BOUND proxies, so an
-     * unbound one is simply absent from it and absence is what let it fall through to the ordinary
-     * path and light up.
-     */
-    const unboundEffects = useMemo(
-        () => unboundEffectIds(scene?.abilities ?? [], scene?.particles ?? []),
-        [scene?.abilities, scene?.particles],
-    );
-
-    /**
-     * The effects an ACTIVE ability replaces - turbo engines standing in for the plain ones.
-     *
-     * Recomputed with the active set rather than held, because it is a statement about right now.
-     */
-    const replacedEffects = useMemo(
-        () =>
-            replacedByAbility(
-                scene?.particles ?? [],
-                abilityProxyIds,
-                activeAbilities,
-            ),
-        [scene?.particles, abilityProxyIds, activeAbilities],
-    );
-
-    // Kept in step for the decider, which the message handler reads through refs.
-    abilityProxyIdsRef.current = abilityProxyIds;
-    activeAbilitiesRef.current = activeAbilities;
-    unboundEffectsRef.current = unboundEffects;
-    replacedEffectsRef.current = replacedEffects;
+    /** The scene's effects, read when an ability is switched - see {@link setAbilityActive}. */
+    const particlesRef = useRef(scene?.particles ?? []);
+    particlesRef.current = scene?.particles ?? [];
 
     /**
      * Switches one ability on or off.
@@ -136,7 +86,7 @@ export function useAbilities({
             // which is the rule a starting clip already follows - scoped, because a mesh hidden for an
             // unrelated reason has to survive it.
             viewportRef.current?.releaseAbilityRows(
-                abilityOwnership(type, abilityProxyIdsRef.current),
+                abilityOwnership(type, particlesRef.current),
             );
 
             setActiveAbilities((current) => {
@@ -169,10 +119,6 @@ export function useAbilities({
     return {
         activeAbilities,
         setActiveAbilities,
-        abilityProxyIdsRef,
-        activeAbilitiesRef,
-        unboundEffectsRef,
-        replacedEffectsRef,
         abilityProxyIds,
         abilities,
         setAbilityActive,

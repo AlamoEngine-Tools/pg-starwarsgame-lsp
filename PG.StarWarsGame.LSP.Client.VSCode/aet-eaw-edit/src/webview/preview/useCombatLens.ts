@@ -473,9 +473,6 @@ export function useCombatLens({
         // it - it is set here because this is the pass that owns hardpoint-driven visibility.
         viewport.setCollisionMeshes(collisionMeshNames(scene.hardpoints));
 
-        // The ordinary effect rules AND the ability decider. Through the same call as every other
-        // effect deliberately: a held proxy then rides the emission gate, so its burst does not
-        // burn away unseen and come back exhausted the moment the ability is switched on.
         // The shield mesh is the one piece of GEOMETRY an ability reveals - DEFEND shows it, and
         // the mesh ships hidden, so nothing else would ever bring it up.
         viewport.setShieldRevealed(shieldRevealed(activeAbilities));
@@ -484,6 +481,17 @@ export function useCombatLens({
         // a cloaked unit shows the shell and nothing else at all.
         viewport.setStealthed(stealthed(activeAbilities));
 
+        // The effect groups creation and the abilities switch - turbo's engines, power to weapons,
+        // the missile shield and the rest. Writes of each effect's state switch in the unit's rules,
+        // on one timeline with the hardpoint deaths - see `effectGroups.ts`.
+        viewport.setMissileShieldObject(
+            (scene.passiveMissileShieldRadius ?? 0) > 0,
+        );
+        viewport.setActiveAbilities(activeAbilities);
+
+        // Each effect's own flag, which the unit's rules above write over. Through the same call as
+        // every other effect deliberately: a held proxy then rides the emission gate, so its burst
+        // does not burn away unseen and come back exhausted the moment it is switched on.
         for (const particle of scene.particles ?? []) {
             viewport.setParticleSystemVisible(
                 particle.id,

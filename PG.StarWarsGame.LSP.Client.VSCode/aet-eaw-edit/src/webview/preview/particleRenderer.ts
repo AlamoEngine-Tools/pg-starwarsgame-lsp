@@ -1956,7 +1956,7 @@ export class ParticleSystemInstance {
      *
      * Every gate resolved HERE rather than by several writers of one flag: the reasons in
      * {@link holds}, and being drawn at all. A system nobody can see is not running - the
-     * reader's tick, the effects master, the level gate and the quiet-on-open rule all hold an
+     * reader's tick, the effects master, the level gate and the unit's rules all hold an
      * effect back by not drawing it, and an emitter that goes on firing behind that is spending its
      * life where nobody can watch it. For a burst that is fatal: `p_explosion_empire_atat00` was
      * exhausted seconds before its row could be ticked on, so switching it on showed nothing at all.

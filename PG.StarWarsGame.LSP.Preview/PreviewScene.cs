@@ -226,7 +226,10 @@ public sealed record PreviewScene(
     string? IconName = null,
     // The file a bare model resolved to, for handing it to AloViewer or the Particle Editor.
     // Null for an object scene and for a model that resolves nowhere.
-    PreviewSourceFile? SourceFile = null)
+    PreviewSourceFile? SourceFile = null,
+    // The subject's Passive_Missile_Shield_Radius, or null where it declares none. Measured in the
+    // game: a type whose radius is above 0 shows its prs effects once it is created.
+    float? PassiveMissileShieldRadius = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

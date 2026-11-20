@@ -1798,7 +1798,7 @@ describe("emission gating", () => {
      * A system nobody can see is not running.
      *
      * The animation gate above already says this for the case a CLIP holds an effect back. The
-     * reader's tick and the quiet-on-open rule hold one exactly the same way - by not drawing it -
+     * reader's tick and the unit's rules hold one exactly the same way - by not drawing it -
      * and that half was never wired, so a hidden system emitted into an invisible scene for as long
      * as the preview was open.
      */
@@ -1814,8 +1814,8 @@ describe("emission gating", () => {
     /**
      * The defect this fixes, in its own right.
      *
-     * `p_explosion_empire_atat00` is six emitters of bursts. Opened quiet - which the opening rules
-     * require - it fired its whole life into a hidden scene during the first seconds, and by the
+     * `p_explosion_empire_atat00` is six emitters of bursts. Held back on open, it fired its whole
+     * life into a hidden scene during the first seconds, and by the
      * time the reader ticked its row on, four of the six were exhausted and there was nothing left
      * to draw. Measured on the live AT-AT: mean luminance 51.61 at rest, 52.32 with the row ticked
      * on, 59.84 with the same system restarted while visible.

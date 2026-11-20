@@ -35,6 +35,10 @@ interface RowsOptions {
     boneHidden?: number[];
     /** A model effect anchored on this bone, by index, under a name of its own. */
     effectOn?: number;
+    /** The part that effect belongs to; the hull when absent. */
+    effectPart?: string;
+    /** The parts that are loaded and held off screen. */
+    hiddenParts?: string[];
     /** The clips the model ships, by name, whether or not they carry a visibility track. */
     clips?: string[];
 }
@@ -155,6 +159,7 @@ function rowsWith(options: RowsOptions = {}): {
             altVisible: true,
             lodVisible: true,
             attachBoneIndex: options.effectOn,
+            attachToPartId: options.effectPart ?? "hull",
             instance: {
                 anchorNode: byIndex[options.effectOn],
                 root: new THREE.Group(),
@@ -205,6 +210,7 @@ function rowsWith(options: RowsOptions = {}): {
                 visit(gun);
             },
             hull: () => hull,
+            hiddenParts: new Set(options.hiddenParts ?? []),
         },
         queries: {
             skeleton: () => [
@@ -423,7 +429,14 @@ describe("ModelRows", () => {
         unit.setHardpoints({
             decals: new Set(),
             damageBones: new Set(["turret"]),
-            deaths: [{ decal: null, damageBone: "turret", engineBone: null }],
+            deaths: [
+                {
+                    hardpoint: "HP_Turret",
+                    decal: null,
+                    damageBone: "turret",
+                    engineBone: null,
+                },
+            ],
         });
         rows.resolveRows();
 
@@ -438,7 +451,14 @@ describe("ModelRows", () => {
         unit.setHardpoints({
             decals: new Set(),
             damageBones: new Set(),
-            deaths: [{ decal: null, damageBone: null, engineBone: "turret" }],
+            deaths: [
+                {
+                    hardpoint: "HP_Engine",
+                    decal: null,
+                    damageBone: null,
+                    engineBone: "turret",
+                },
+            ],
         });
         rows.resolveRows();
 
@@ -635,6 +655,43 @@ describe("ModelRows", () => {
         const shown = rowsWith({ rules: "file", effectOn: 2 });
         shown.rows.treeItems();
         assert.equal(shown.effectDrawn(), true);
+    });
+
+    /**
+     * A death clone is fetched ahead of the death and held off screen, and its effects attach to it
+     * there. Effects are anchored to the model root rather than parented, so hiding the clone's part
+     * does not hide them: until the clone is spawned they draw nothing because of this rule.
+     */
+    it("draws no effect of a part that is held off screen, and draws it once the part is shown", () => {
+        const held = rowsWith({
+            effectOn: 2,
+            effectPart: "deathclone:Wreck",
+            hiddenParts: ["deathclone:Wreck"],
+        });
+        held.rows.treeItems();
+        assert.equal(
+            held.effectDrawn(),
+            false,
+            "the held clone's effect is drawn",
+        );
+
+        const spawned = rowsWith({
+            effectOn: 2,
+            effectPart: "deathclone:Wreck",
+        });
+        spawned.rows.treeItems();
+        assert.equal(spawned.effectDrawn(), true);
+    });
+
+    /** The subject's own part hidden - the hull, once the unit has died - is a rule of its own. */
+    it("leaves the subject's own effects to their rules when the subject's part is hidden", () => {
+        const { rows, effectDrawn } = rowsWith({
+            effectOn: 2,
+            hiddenParts: ["hull"],
+        });
+        rows.treeItems();
+
+        assert.equal(effectDrawn(), true);
     });
 
     it("stands a unit in an idle clip that hides nothing, rather than in its base pose", () => {

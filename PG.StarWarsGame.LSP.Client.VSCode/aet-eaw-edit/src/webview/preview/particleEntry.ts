@@ -19,9 +19,11 @@ export interface ParticleEntry {
     attachBone?: string;
     /** The bone's index, which is what tells two same-named bones apart. */
     attachBoneIndex?: number;
+    /** See `ParticlePlacement.proxyName`. */
+    proxyName?: string;
     /**
      * The effect's state switch, as its last writer left it: the proxy's own flag, or what the
-     * effect rules wrote over it in a unit preview - the opening rule and the damage state.
+     * effect rules wrote over it in a unit preview.
      *
      * Recomputed whenever a hardpoint blows up or is repaired, which is why the reader's own choice
      * cannot live here - it would be overwritten every time anything else on the model changed.

@@ -452,15 +452,8 @@ function ModelPreview(): React.JSX.Element {
         setAnimation,
         viewportRef,
     });
-    const {
-        activeAbilities,
-        setActiveAbilities,
-        abilityProxyIdsRef,
-        activeAbilitiesRef,
-        unboundEffectsRef,
-        replacedEffectsRef,
-        abilityProxyIds,
-    } = abilityState;
+    const { activeAbilities, setActiveAbilities, abilityProxyIds } =
+        abilityState;
 
     /**
      * Which of the seven targeting states the marks are drawn in.
@@ -793,13 +786,9 @@ function ModelPreview(): React.JSX.Element {
     }, []);
 
     const particles = useParticleEffects({
-        abilityProxyIdsRef,
-        activeAbilitiesRef,
         assets,
         refreshStats,
-        replacedEffectsRef,
         setHiddenEmitters,
-        unboundEffectsRef,
         viewportRef,
     });
     const {

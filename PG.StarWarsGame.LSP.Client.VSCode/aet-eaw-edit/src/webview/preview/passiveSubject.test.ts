@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { passiveEffectPlaysNow, passiveEffects } from "./passiveSubject";
+import { passiveEffects } from "./passiveSubject";
 import type { PreviewParticle } from "../../protocol/modelPreview";
 
 const particle = (over: Partial<PreviewParticle> = {}): PreviewParticle => ({
@@ -68,25 +68,5 @@ describe("passiveEffects", () => {
 
     it("has nothing to place for a model that carries no proxies", () => {
         assert.deepEqual(passiveEffects([], "w:1"), []);
-    });
-});
-
-describe("passiveEffectPlaysNow", () => {
-    it("plays what the model says is on", () => {
-        // The opening rules hold a hull's ungated fires and dust back until they are asked for.
-        // They are about the FIRST MOMENT of a preview, and a passive subject has no first moment:
-        // a death clone exists because the ship died, and its explosions ARE the death.
-        assert.equal(passiveEffectPlaysNow(particle()), true);
-    });
-
-    it("respects the model's own switch, which always has the last word", () => {
-        assert.equal(
-            passiveEffectPlaysNow(particle({ startsVisible: false })),
-            false,
-        );
-    });
-
-    it("plays a level-tagged effect too, leaving the ALT gate to decide", () => {
-        assert.equal(passiveEffectPlaysNow(particle({ alt: 1 })), true);
     });
 });

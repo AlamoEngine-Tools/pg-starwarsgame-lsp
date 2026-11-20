@@ -16,7 +16,8 @@
 // what was opened, and does not change for its life.
 
 import { PREVIEW_SCENE_KIND } from "../../protocol/modelPreview";
-import { type HardpointWrites } from "./damage";
+import { type HardpointDeath, type HardpointWrites } from "./damage";
+import { createdWrite, switchWrite } from "./effectGroups";
 import { type MaterialExtras, isShieldMesh, isStealthMesh } from "./materials";
 import {
     type AnimationSwitch,
@@ -46,6 +47,11 @@ const NO_HARDPOINTS: HardpointWrites = {
 };
 
 const NO_NAMES: ReadonlySet<string> = new Set();
+
+/** One thing that happened to the unit after it was created, in the order it happened. */
+type UnitEvent =
+    | { kind: "death"; death: HardpointDeath }
+    | { kind: "ability"; type: string; on: boolean };
 
 export class UnitRules {
     /** Null until the first scene says which preview this is; then fixed. */
@@ -77,6 +83,25 @@ export class UnitRules {
      * that is not cloaked has it hidden by this layer, and a cloaked one has everything else hidden.
      */
     stealthed = false;
+    /**
+     * The abilities and power modes switched on. Each writes the effect groups it switches when it
+     * goes on and again when it goes off - see `effectGroups.ts`.
+     */
+    activeAbilities: ReadonlySet<string> = new Set();
+    /**
+     * Whether the unit's type is a missile-shield object - its `Passive_Missile_Shield_Radius` is
+     * above 0 - which shows its `prs` effects once it is created.
+     */
+    missileShieldObject = false;
+
+    /**
+     * When each death and each ability switch happened, on one clock, so the effect writes replay in
+     * the order they happened. A repaired hardpoint's death leaves; an ability keeps only its LAST
+     * switch, because a later switch of the same ability writes every group the earlier one did.
+     */
+    private clock = 0;
+    private readonly deathAt = new Map<string, number>();
+    private readonly abilityAt = new Map<string, { on: boolean; at: number }>();
 
     /**
      * The lowercased names of each hull bone and of every bone above it, worked out once per hull:
@@ -113,6 +138,11 @@ export class UnitRules {
         this.collisionMeshes = new Set();
         this.namesAbove = null;
         this.shieldRevealed = false;
+        this.activeAbilities = new Set();
+        this.missileShieldObject = false;
+        this.clock = 0;
+        this.deathAt.clear();
+        this.abilityAt.clear();
     }
 
     /**
@@ -133,6 +163,20 @@ export class UnitRules {
      */
     setHardpoints(writes: HardpointWrites): void {
         this.hardpoints = writes;
+
+        // A death is placed on the clock when it is first seen, and leaves it with its repair.
+        const dead = new Set(writes.deaths.map((death) => death.hardpoint));
+        for (const id of [...this.deathAt.keys()]) {
+            if (!dead.has(id)) {
+                this.deathAt.delete(id);
+            }
+        }
+        for (const death of writes.deaths) {
+            if (!this.deathAt.has(death.hardpoint)) {
+                this.deathAt.set(death.hardpoint, ++this.clock);
+            }
+        }
+
         this.context.levels.applyLevels();
     }
 
@@ -145,6 +189,32 @@ export class UnitRules {
     /** Shows or hides the shield mesh, for the abilities that reveal it. */
     setShieldRevealed(revealed: boolean): void {
         this.shieldRevealed = revealed;
+        this.context.levels.applyLevels();
+    }
+
+    /**
+     * The abilities switched on. Each one that went on or off since the last call is placed on the
+     * unit's clock now; their effect groups follow - see {@link effectState}.
+     */
+    setActiveAbilities(active: ReadonlySet<string>): void {
+        for (const type of this.activeAbilities) {
+            if (!active.has(type)) {
+                this.abilityAt.set(type, { on: false, at: ++this.clock });
+            }
+        }
+        for (const type of active) {
+            if (!this.activeAbilities.has(type)) {
+                this.abilityAt.set(type, { on: true, at: ++this.clock });
+            }
+        }
+
+        this.activeAbilities = active;
+        this.context.levels.applyLevels();
+    }
+
+    /** Whether the unit's type is a missile-shield object. See {@link missileShieldObject}. */
+    setMissileShieldObject(on: boolean): void {
+        this.missileShieldObject = on;
         this.context.levels.applyLevels();
     }
 
@@ -213,21 +283,93 @@ export class UnitRules {
     /**
      * An effect's state switch with the game's rules written over it.
      *
+     * In the order the game writes them: what creating the unit writes - its name group (`pte`,
+     * `pptw` and `prs` hidden, a missile-shield object's `prs` shown) and every Damage_Particles
+     * bone - then every hardpoint death and every ability switch, in the one order they happened.
+     *
      * A cloaked unit shows its stealth shell and nothing else - not its engines, not its damage
      * smoke, not the proxies of the ability doing the cloaking. Written here, over the effect's own
      * state, rather than into it: the effect keeps what the effect rules last decided, so uncloaking
      * restores exactly what was playing.
      *
      * @param bone The hull bone the effect is anchored on, for the rules that name a bone.
+     * @param name The effect's proxy name, for the rules that read it; none for an effect the model
+     *     does not carry.
      */
-    effectState(state: StateSwitch, bone?: number): StateSwitch {
+    effectState(state: StateSwitch, bone?: number, name?: string): StateSwitch {
         if (!this.appliesGameRules()) {
             return state;
         }
 
-        return this.stealthed
-            ? ruleState(false)
-            : this.hardpointWrite(state, bone, null);
+        if (this.stealthed) {
+            return ruleState(false);
+        }
+
+        let written = this.createdWrite(state, name, this.missileShieldObject);
+        const above = this.bonesAbove(bone);
+
+        written = this.creationHardpointWrite(written, above, null);
+
+        for (const event of this.timeline()) {
+            if (event.kind === "death") {
+                written = this.deathWrite(written, event.death, above, null);
+            } else if (name !== undefined) {
+                const switched = switchWrite(
+                    name,
+                    event.type,
+                    event.on,
+                    undefined,
+                );
+                if (switched !== undefined) {
+                    written = ruleState(switched);
+                }
+            }
+        }
+
+        return written;
+    }
+
+    /**
+     * The state switch of an effect of ANOTHER object the preview shows - a death clone - with what
+     * creating that object writes over it. None of the subject's hardpoint or ability writes reach
+     * it: their bones and switches are the subject's.
+     */
+    createdEffectState(state: StateSwitch, name?: string): StateSwitch {
+        return this.appliesGameRules()
+            ? this.createdWrite(state, name, false)
+            : state;
+    }
+
+    /** What creating an object writes to an effect of this name. See `effectGroups.createdWrite`. */
+    private createdWrite(
+        state: StateSwitch,
+        name: string | undefined,
+        missileShieldObject: boolean,
+    ): StateSwitch {
+        const created =
+            name === undefined
+                ? undefined
+                : createdWrite(name, missileShieldObject);
+
+        return created === undefined ? state : ruleState(created);
+    }
+
+    /** The deaths and the ability switches, in the order they happened. */
+    private timeline(): UnitEvent[] {
+        const placed: { at: number; event: UnitEvent }[] = [];
+
+        for (const death of this.hardpoints.deaths) {
+            placed.push({
+                at: this.deathAt.get(death.hardpoint) ?? 0,
+                event: { kind: "death", death },
+            });
+        }
+
+        for (const [type, { on, at }] of this.abilityAt) {
+            placed.push({ at, event: { kind: "ability", type, on } });
+        }
+
+        return placed.sort((a, b) => a.at - b.at).map((entry) => entry.event);
     }
 
     /**
@@ -242,20 +384,38 @@ export class UnitRules {
         bone: number | undefined,
         name: string | null,
     ): StateSwitch {
+        const above = this.bonesAbove(bone);
+        let written = this.creationHardpointWrite(state, above, name);
+
+        // Each death, in the order they happened.
+        for (const death of this.hardpoints.deaths) {
+            written = this.deathWrite(written, death, above, name);
+        }
+
+        return written;
+    }
+
+    /** The lowercased names of a hull bone and every bone above it; none without a bone. */
+    private bonesAbove(bone: number | undefined): ReadonlySet<string> {
         const { decals, damageBones, deaths } = this.hardpoints;
 
         if (
-            decals.size === 0 &&
-            damageBones.size === 0 &&
-            deaths.length === 0
+            bone === undefined ||
+            (decals.size === 0 && damageBones.size === 0 && deaths.length === 0)
         ) {
-            return state;
+            return NO_NAMES;
         }
 
-        const above =
-            bone === undefined
-                ? NO_NAMES
-                : (this.namesAboveBones().get(bone) ?? NO_NAMES);
+        return this.namesAboveBones().get(bone) ?? NO_NAMES;
+    }
+
+    /** What the hardpoints write when the unit is created: its decals and Damage_Particles bones hidden. */
+    private creationHardpointWrite(
+        state: StateSwitch,
+        above: ReadonlySet<string>,
+        name: string | null,
+    ): StateSwitch {
+        const { decals, damageBones } = this.hardpoints;
         let written = state;
 
         // The unit's type loads: every decal hidden.
@@ -271,19 +431,28 @@ export class UnitRules {
             }
         }
 
-        // Each death, in the order they happened.
-        for (const death of deaths) {
-            if (name !== null && death.decal === name) {
-                written = ruleState(true);
-            }
+        return written;
+    }
 
-            if (death.damageBone !== null && above.has(death.damageBone)) {
-                written = ruleState(true);
-            }
+    /** What one hardpoint's death writes over a part on a bone below `above`, named `name`. */
+    private deathWrite(
+        state: StateSwitch,
+        death: HardpointDeath,
+        above: ReadonlySet<string>,
+        name: string | null,
+    ): StateSwitch {
+        let written = state;
 
-            if (death.engineBone !== null && above.has(death.engineBone)) {
-                written = ruleState(false);
-            }
+        if (name !== null && death.decal === name) {
+            written = ruleState(true);
+        }
+
+        if (death.damageBone !== null && above.has(death.damageBone)) {
+            written = ruleState(true);
+        }
+
+        if (death.engineBone !== null && above.has(death.engineBone)) {
+            written = ruleState(false);
         }
 
         return written;

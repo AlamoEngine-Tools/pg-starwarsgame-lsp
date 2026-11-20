@@ -10,9 +10,7 @@ import type {
 } from "../../protocol/modelPreview";
 
 import {
-    abilityAllows,
     abilityBarTitle,
-    abilityClaims,
     abilityFacts,
     abilityOwnership,
     abilityProxies,
@@ -23,18 +21,13 @@ import {
     revealsStealth,
     shieldRevealed,
     stealthed,
-    unboundEffectIds,
 } from "./abilityRows";
 
 function ability(over: Partial<PreviewAbility> = {}): PreviewAbility {
     return { type: "TURBO", proxyNames: [], modifiers: [], ...over };
 }
 
-function particle(
-    id: string,
-    bone: string,
-    claimsAbility?: string,
-): PreviewParticle {
+function particle(id: string, bone: string): PreviewParticle {
     return {
         id,
         systemRef: `${bone}.alo`,
@@ -43,7 +36,6 @@ function particle(
         boneIndex: 0,
         gate: "Always",
         startsVisible: true,
-        claimsAbility,
     };
 }
 
@@ -85,62 +77,6 @@ describe("stealthed", () => {
         // keeps the shell off `Tyber_Zann_Prisoner`, who uses Tyber's model and declares nothing.
         assert.equal(stealthed(new Set()), false);
         assert.equal(stealthed(new Set(["DEFEND", "TURBO"])), false);
-    });
-});
-
-describe("unboundEffectIds", () => {
-    // The Tartan, which is the shipped case: `Tartan_Patrol_Cruiser` declares POWER_TO_WEAPONS and
-    // its model carries `pptw_ptwsa` for it plus two `Pte_tartanengine_*` for a TURBO it does not
-    // have. The engine never shows those two; we did.
-    const TARTAN = [
-        particle("pptw", "pptw_ptwsa", "POWER_TO_WEAPONS"),
-        particle("lrg", "Pte_tartanengine_lrg", "TURBO"),
-        particle("sml", "Pte_tartanengine_sml", "TURBO"),
-        particle("glow", "p_engine_glow"),
-    ];
-
-    it("names the effects whose ability the unit never declares", () => {
-        const unbound = unboundEffectIds(
-            [ability({ type: "POWER_TO_WEAPONS" })],
-            TARTAN,
-        );
-
-        assert.deepEqual([...unbound].sort(), ["lrg", "sml"]);
-    });
-
-    it("leaves an effect alone once the unit declares its ability", () => {
-        const unbound = unboundEffectIds(
-            [ability({ type: "POWER_TO_WEAPONS" }), ability({ type: "TURBO" })],
-            TARTAN,
-        );
-
-        assert.equal(unbound.size, 0);
-    });
-
-    it("binds nothing when the unit declares no abilities at all", () => {
-        // The case an unbound effect is most likely to be a real mistake in, and the one a
-        // `declared.length > 0` guard would quietly skip.
-        const unbound = unboundEffectIds([], TARTAN);
-
-        assert.deepEqual([...unbound].sort(), ["lrg", "pptw", "sml"]);
-    });
-
-    it("never touches an ordinary effect", () => {
-        // 5404 proxies claim nothing against 39 that do. A claim of null is not an unbound claim.
-        for (const declared of [[], [ability({ type: "TURBO" })]]) {
-            assert.equal(unboundEffectIds(declared, TARTAN).has("glow"), false);
-        }
-    });
-
-    it("matches the ability type without regard to case", () => {
-        // `Ev_acclamator` writes `power_to_weapons` in lower case, and the proxy names are written
-        // both ways too - `pptw_2mtank` beside `PTE_Corvetteengines`.
-        const unbound = unboundEffectIds(
-            [ability({ type: "power_to_weapons" })],
-            TARTAN,
-        );
-
-        assert.equal(unbound.has("pptw"), false);
     });
 });
 
@@ -186,56 +122,20 @@ describe("abilityProxies", () => {
     });
 });
 
-describe("abilityAllows", () => {
-    const proxies = abilityProxies(
-        [ability({ type: "TURBO", proxyNames: ["PTE_X"] })],
-        [particle("p1", "PTE_X"), particle("p2", "p_smoke")],
-    );
-
-    it("holds an ability proxy off while its ability is inactive", () => {
-        assert.equal(abilityAllows("p1", proxies, new Set()), false);
-    });
-
-    it("lets it play once the ability is activated", () => {
-        assert.equal(abilityAllows("p1", proxies, new Set(["TURBO"])), true);
-    });
-
-    it("says nothing about a proxy no ability claims", () => {
-        // The other 5404. This decider must not touch an ordinary effect, or activating one ability
-        // would silence the whole model.
-        assert.equal(abilityAllows("p2", proxies, new Set()), true);
-        assert.equal(abilityAllows("p2", proxies, new Set(["TURBO"])), true);
-    });
-
-    it("holds a proxy claimed by two abilities until ONE of them is active", () => {
-        const shared = abilityProxies(
-            [
-                ability({ type: "TURBO", proxyNames: ["PTE_X"] }),
-                ability({ type: "SPRINT", proxyNames: ["PTE_X"] }),
-            ],
-            [particle("p1", "PTE_X")],
-        );
-
-        assert.equal(abilityAllows("p1", shared, new Set()), false);
-        assert.equal(abilityAllows("p1", shared, new Set(["SPRINT"])), true);
-    });
-});
-
 describe("abilityOwnership", () => {
-    const proxies = abilityProxies(
-        [
-            ability({ type: "TURBO", proxyNames: ["PTE_X"] }),
-            ability({ type: "POWER_TO_WEAPONS", proxyNames: ["PPTW_Y"] }),
-        ],
-        [
-            particle("p1", "PTE_X"),
-            particle("p2", "PPTW_Y"),
-            particle("p3", "p_smoke"),
-        ],
-    );
+    const proxies = [
+        particle("p1", "PTE_X"),
+        particle("p2", "PPTW_Y"),
+        particle("p3", "p_smoke"),
+        particle("p4", "pe_engines"),
+    ];
 
-    it("names the systems the ability itself drives", () => {
-        assert.deepEqual(abilityOwnership("TURBO", proxies).systemIds, ["p1"]);
+    /** Turbo puts the plain engines out as well as lighting its own, so both are its rows. */
+    it("names every effect in the groups the ability switches", () => {
+        assert.deepEqual(abilityOwnership("TURBO", proxies).systemIds, [
+            "p1",
+            "p4",
+        ]);
     });
 
     it("leaves another ability`s systems alone", () => {
@@ -503,26 +403,6 @@ describe("abilityRows", () => {
         );
 
         assert.equal(rows[0].drivesSomething, false);
-    });
-});
-
-describe("abilityClaims", () => {
-    const proxies = abilityProxies(
-        [ability({ type: "TURBO", proxyNames: ["PTE_X"] })],
-        [particle("p1", "PTE_X"), particle("p2", "p_smoke")],
-    );
-
-    it("says which proxies an ability owns", () => {
-        assert.equal(abilityClaims("p1", proxies), true);
-        assert.equal(abilityClaims("p2", proxies), false);
-    });
-
-    it("is what lets the ability OVERRIDE the quiet-on-open rule", () => {
-        // The opening rules hold every non-engine effect back on open, and that is right - but they
-        // are about the first MOMENT, not a permanent veto. Ability proxies are claimed, so the
-        // ability decides them outright; without this, switching an ability on changed nothing at
-        // all and the row looked broken. Found on the live AT-AA.
-        assert.equal(abilityClaims("p1", proxies), true);
     });
 });
 

@@ -179,7 +179,8 @@ public sealed class PreviewSceneBuilder(
             stages,
             DamageSectionBuilder.DamageTable(effective),
             EngineScaleFactor.Of(effective.ValueOf("Scale_Factor")),
-            effective.ValueOf(EncyclopediaTags.IconName));
+            effective.ValueOf(EncyclopediaTags.IconName),
+            PassiveMissileShieldRadius: effective.FloatOf("Passive_Missile_Shield_Radius"));
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────

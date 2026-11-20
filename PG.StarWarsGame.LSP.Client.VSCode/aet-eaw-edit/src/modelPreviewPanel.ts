@@ -287,7 +287,7 @@ export class ModelPreviewPanel extends WebviewPanelHost<
             case "setSubjectState":
                 // Session-scoped and NOT persisted: a model's damage state, detail level and hidden
                 // meshes describe that model, and restoring them across a restart would fight the
-                // opening rules - a fresh preview must open undamaged, at full detail, and quiet.
+                // opening rules - a fresh preview must open undamaged and at full detail.
                 ModelPreviewPanel.subjectStates.set(
                     this.stateKey,
                     subjectStateFrom(message.state),

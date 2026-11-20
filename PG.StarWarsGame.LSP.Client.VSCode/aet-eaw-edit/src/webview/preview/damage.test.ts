@@ -8,15 +8,13 @@ import type {
     PreviewHardpoint,
     PreviewParticle,
 } from "../../protocol/modelPreview";
-import { PREVIEW_PARTICLE_GATE } from "../../protocol/modelPreview";
 import {
     type Destroyed,
     collisionMeshNames,
     destroyable,
-    effectPlays,
+    effectPlaysNow,
     hardpointWrites,
     partHidden,
-    playsOnOpen,
     withDestroyed,
 } from "./damage";
 
@@ -79,41 +77,6 @@ describe("partHidden", () => {
     });
 });
 
-describe("effectPlays", () => {
-    it("leaves damage smoke to the Damage_Particles rule, which is a state writer of the unit", () => {
-        // The rule reaches every part below the bone, meshes too, so it lives with the unit's other
-        // state writers - see `UnitRules.setDamageParticles`. The gate only names the owner here.
-        const smoke = particle({
-            gate: "HardpointDestroyed",
-            hardpointId: "HP_Weapon",
-        });
-
-        assert.equal(effectPlays(smoke), true);
-    });
-
-    it("leaves the engine glow to the Engine_Particles rule, which is a state writer of the unit", () => {
-        const glow = particle({
-            systemRef: "pe_engines",
-            gate: "HardpointAlive",
-            hardpointId: "HP_Engine",
-        });
-
-        assert.equal(effectPlays(glow), true);
-    });
-
-    it("leaves an ungated effect alone", () => {
-        assert.equal(effectPlays(particle()), true);
-    });
-
-    it("keeps an effect the model ships switched off switched off", () => {
-        // pi_damage_elec_SD00 is present but invisible in the file. Only a Damage_Particles bone
-        // above it shows it on destruction, and that is the unit's rule, not this one.
-        const idle = particle({ startsVisible: false });
-
-        assert.equal(effectPlays(idle), false);
-    });
-});
-
 describe("hardpointWrites", () => {
     const engine = hardpoint({
         id: "HP_Engine",
@@ -140,8 +103,14 @@ describe("hardpointWrites", () => {
         );
 
         assert.deepEqual(writes.deaths, [
-            { decal: null, damageBone: null, engineBone: "hp_e_bone" },
             {
+                hardpoint: "HP_Engine",
+                decal: null,
+                damageBone: null,
+                engineBone: "hp_e_bone",
+            },
+            {
+                hardpoint: "HP_Weapon",
                 decal: "hp_f-l_blast",
                 damageBone: "hp_f-l_emitdamage",
                 engineBone: null,
@@ -218,87 +187,54 @@ describe("destroyable", () => {
     });
 });
 
-describe("playsOnOpen", () => {
-    const gate = (over: Partial<Parameters<typeof playsOnOpen>[0]> = {}) => ({
-        gate: PREVIEW_PARTICLE_GATE.always as string,
-        systemRef: "p_smoke_small",
-        bone: "Root",
-        startsVisible: true,
-        alt: null as number | null,
-        lod: null as number | null,
-        ...over,
-    });
-
-    /**
-     * A model opens QUIET. Otherwise every damage fire, explosion and dust plume on a capital ship
-     * fires the moment the file is opened - a wall of effects over the model the reader came to
-     * look at, and the one-shot ones have already finished by the time they reach the dock.
-     */
-    it("keeps an ordinary effect off", () => {
-        assert.equal(playsOnOpen(gate()), false);
-    });
-
-    it("plays an engine, which is what an intact model is actually doing", () => {
+/**
+ * Measured in the game: a unit is created with every attached effect running that no switch hides.
+ * Which effects a switch hides on creation - by name group, by hardpoint bone - is the unit's rules'
+ * to write; this is the file's answer they write over.
+ */
+describe("effectPlaysNow", () => {
+    it("runs an ordinary effect the file draws, however it is named", () => {
         assert.equal(
-            playsOnOpen(gate({ gate: PREVIEW_PARTICLE_GATE.hardpointAlive })),
+            effectPlaysNow(particle({ systemRef: "p_smoke_small" })),
+            true,
+        );
+        assert.equal(
+            effectPlaysNow(particle({ systemRef: "p_dust_plume" })),
+            true,
+        );
+    });
+
+    it("runs an engine the file draws", () => {
+        assert.equal(
+            effectPlaysNow(particle({ systemRef: "pe_engines" })),
             true,
         );
     });
 
     /**
-     * A bare .alo has no XML, so nothing gates its engine glow and it arrives as `Always`. The name
-     * is the only signal left, and it is a firm convention in the shipped data.
+     * The Damage_Particles and Engine_Particles rules reach every part below a bone, meshes too, so
+     * they live with the unit's other state writers. The gate only names the owner here.
      */
-    it("plays an engine glow named as one on a model with no hardpoints", () => {
-        assert.equal(
-            playsOnOpen(gate({ systemRef: "p_engine_glow_small" })),
-            true,
-        );
-        assert.equal(playsOnOpen(gate({ bone: "ENGINE_01" })), true);
-    });
+    it("leaves an effect a hardpoint owns to the hardpoint's bone rules", () => {
+        const smoke = particle({
+            gate: "HardpointDestroyed",
+            hardpointId: "HP_Weapon",
+        });
+        const glow = particle({
+            gate: "HardpointAlive",
+            hardpointId: "HP_Engine",
+        });
 
-    it("still honours an effect the model itself ships switched off", () => {
-        assert.equal(
-            playsOnOpen(
-                gate({
-                    gate: PREVIEW_PARTICLE_GATE.hardpointAlive,
-                    startsVisible: false,
-                }),
-            ),
-            false,
-        );
+        assert.equal(effectPlaysNow(smoke), true);
+        assert.equal(effectPlaysNow(glow), true);
     });
 
     /**
-     * `Rv_mptl-2a.alo` carries its whole damage story on PROXIES - `p_smoke_small_thin_ALT2`,
-     * `p_electricalstatic_ALT1` and nine more - and not one of its meshes has an ALT tag. Those
-     * arrive ungated, because no hardpoint owns them, so the quiet-on-open rule held them off
-     * permanently and the ALT control appeared to do nothing at all.
-     *
-     * It needs no suppressing: an ALT-tagged proxy is already hidden at ALT 0 by the level gate, so
-     * the model still opens quiet, and selecting ALT 1 is a direct request to see exactly these.
+     * `pi_damage_elec_SD00` is present but invisible in the file. Only a Damage_Particles bone above
+     * it shows it on destruction, and that is the unit's rule, not this one.
      */
-    it("leaves a level-tagged effect to the ALT and LOD gate", () => {
-        assert.equal(
-            playsOnOpen(gate({ systemRef: "p_smoke_small_thin_ALT2", alt: 2 })),
-            true,
-        );
-        assert.equal(
-            playsOnOpen(gate({ systemRef: "p_fire_small", lod: 1 })),
-            true,
-        );
-    });
-
-    it("leaves damage smoke to the Damage_Particles rule however it is named", () => {
-        assert.equal(
-            playsOnOpen(
-                gate({
-                    gate: PREVIEW_PARTICLE_GATE.hardpointDestroyed,
-                    systemRef: "p_engine_fire",
-                }),
-            ),
-            true,
-        );
+    it("keeps an effect the model ships switched off switched off", () => {
+        assert.equal(effectPlaysNow(particle({ startsVisible: false })), false);
     });
 });
 

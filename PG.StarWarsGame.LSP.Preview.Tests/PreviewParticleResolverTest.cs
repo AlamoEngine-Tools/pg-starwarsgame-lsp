@@ -69,43 +69,6 @@ public sealed class PreviewParticleResolverTest
         return (bones, proxies);
     }
 
-    [Fact]
-    public void Resolve_ProxyWithAnAbilityPrefix_ClaimsThatAbility()
-    {
-        var (bones, proxies) = Tartan();
-
-        var particles = PreviewParticleResolver.Resolve("hull", bones, proxies, []);
-
-        Assert.Equal("POWER_TO_WEAPONS", particles[0].ClaimsAbility);
-        Assert.Equal("TURBO", particles[1].ClaimsAbility);
-        Assert.Equal("TURBO", particles[2].ClaimsAbility);
-    }
-
-    [Fact]
-    public void Resolve_OrdinaryProxy_ClaimsNothing()
-    {
-        // 5404 proxies against 39, so this is the overwhelmingly common answer and the one a
-        // caller must not read as "unbound".
-        var (bones, proxies) = Tartan();
-
-        var particles = PreviewParticleResolver.Resolve("hull", bones, proxies, []);
-
-        Assert.Null(particles[3].ClaimsAbility);
-    }
-
-    [Fact]
-    public void Resolve_ClaimIsReadOffTheBone_NotTheSystemName()
-    {
-        // The prefix rule is a BONE-name rule - `AbilityProxyPrefix.Bind` binds on the bone, and a
-        // proxy is free to name a system that carries no prefix at all.
-        var bones = new List<AlamoModelBone> { Bone(0, "root"), Bone(1, "PTE_Corvetteengines", 0) };
-        var proxies = new List<AlamoProxy> { Proxy("some_engine_system", 1) };
-
-        var particles = PreviewParticleResolver.Resolve("hull", bones, proxies, []);
-
-        Assert.Equal("TURBO", particles[0].ClaimsAbility);
-    }
-
     /// <summary>The Star Destroyer's shape: a damage bone with two smoke proxies attached to it.</summary>
     private static (List<AlamoModelBone> Bones, List<AlamoProxy> Proxies) Destroyer()
     {

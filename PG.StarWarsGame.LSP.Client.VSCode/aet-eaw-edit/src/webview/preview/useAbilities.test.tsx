@@ -33,9 +33,5 @@ describe("useAbilities", () => {
         assert.deepEqual(abilities.abilities, []);
         assert.equal(abilities.activeAbilities.size, 0);
         assert.equal(abilities.abilityProxyIds.size, 0);
-        assert.equal(
-            abilities.abilityProxyIdsRef.current,
-            abilities.abilityProxyIds,
-        );
     });
 });

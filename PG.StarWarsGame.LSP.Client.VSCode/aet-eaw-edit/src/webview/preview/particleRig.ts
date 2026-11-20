@@ -253,6 +253,7 @@ export class ParticleRig {
             attachToPartId,
             attachBone,
             attachBoneIndex,
+            proxyName,
             origin,
             scaleFactor = 1,
             at,
@@ -269,6 +270,7 @@ export class ParticleRig {
             attachToPartId,
             attachBone,
             attachBoneIndex,
+            proxyName,
             state: fileState(true),
             levels,
             altVisible: proxyAltVisibleAt(
@@ -443,8 +445,7 @@ export class ParticleRig {
     }
 
     /**
-     * Writes a system's state switch: its proxy's own flag, or what the effect rules say over it -
-     * the opening rule and the current damage state.
+     * Writes a system's state switch: its proxy's own flag, or what the effect rules say over it.
      *
      * The RULES path, called on attach and again whenever a hardpoint is destroyed or repaired -
      * never in response to a click. A hand-set override survives this, so switching one effect on
@@ -532,17 +533,24 @@ export class ParticleRig {
      * 50 sparks - so by the time the ship actually died they were spent, and the blast that covers
      * the wreck breaking up drew two stray particles.
      *
-     * Only ever HOLDS here. Releasing is the clip's business: `advancePassiveSubjects` gates a
-     * playing subject frame by frame, and a subject with no clip is released as it is shown.
+     * Held while the part is hidden and let go when it is shown; a playing passive subject's clip
+     * then gates it frame by frame in `advancePassiveSubjects`. Holding stops the spawning only:
+     * whether the system DRAWS is the rows' answer, which takes the hidden part too - see
+     * `ModelRows.effectFacts`. Answers whether the part carries any effect, so the caller knows
+     * whether there is anything for the rows to say again.
      */
-    holdEffectsOf(partId: string): void {
+    holdEffectsOf(partId: string): boolean {
         const hidden = this.context.assembly.hiddenParts.has(partId);
+        let any = false;
 
         for (const entry of this.particleSystems.values()) {
             if (entry.attachToPartId === partId) {
                 entry.instance.hold("part", hidden);
+                any = true;
             }
         }
+
+        return any;
     }
 
     // ── skeleton ───────────────────────────────────────────────────────

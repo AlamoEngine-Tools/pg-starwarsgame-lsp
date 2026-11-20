@@ -316,6 +316,7 @@
   "ScaleFactor": 1,
   "IconName": null,
   "SourceFile": null,
+  "PassiveMissileShieldRadius": null,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [],
