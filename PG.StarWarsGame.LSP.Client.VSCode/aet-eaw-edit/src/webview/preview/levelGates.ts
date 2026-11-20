@@ -3,7 +3,7 @@
 
 // The viewport's levels: the ALT (damage) and LOD (detail) level the model is shown at - the levels the
 // file itself tags, which both previews select among - and the one answer per mesh of whether it is drawn
-// at all. The game's rules over the file (decals, collision hulls, shield, stealth) are `UnitRules`'.
+// at all. The game's rules over the file (decals, shield, stealth) are `UnitRules`'.
 
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import * as THREE from "three";
@@ -59,11 +59,7 @@ export class LevelGates {
         // systems write the same thing: this one re-derived every mesh from the old override maps
         // and undid whatever the row chain had just settled, so a mesh hidden from the tree came
         // straight back on the next level or material refresh.
-        this.context.particles.gateByLevel(
-            this.alt,
-            this.lod,
-            this.altDescending,
-        );
+        this.context.particles.gateByLevel(this.alt, this.altDescending);
 
         // A passive subject has no rows, so `refreshRows` below will never speak for it. Its own
         // file's rules are re-applied instead - the same sweep that ran when it loaded. Both write

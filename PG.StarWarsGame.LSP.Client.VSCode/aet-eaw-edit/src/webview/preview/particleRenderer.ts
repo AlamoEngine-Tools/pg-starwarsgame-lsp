@@ -1856,9 +1856,9 @@ export class ParticleSystemInstance {
      * says nothing about this" to TRUE - re-armed the emitters of a part that had just been hidden.
      *
      * Only SPAWNING stops either way: the particles already in the air step and die as they would
-     * have, so a held effect trails away rather than vanishing mid-flight. That is what
-     * `Engine::KillParticleSystem` does with `leaveParticles`, and what `RenderObject::KillProxy`
-     * does through `Detach` when a proxy's own bone goes invisible.
+     * have, so a held effect trails away rather than vanishing mid-flight. Measured in the game: an
+     * effect that is stopped while leaving its particles, and one whose proxy bone goes invisible,
+     * both stop spawning and let the particles already out finish.
      */
     private readonly holds = new Set<EmissionHold>();
 

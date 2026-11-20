@@ -34,7 +34,7 @@ public sealed class PreviewParticleResolverTest
         string id, string? damageBone = null, string? engineBone = null,
         bool engineDeathHides = false)
     {
-        return new PreviewHardpoint(id, null, null, null, true, true, null, damageBone, null, null,
+        return new PreviewHardpoint(id, null, null, null, true, true, null, damageBone, null,
             engineBone, null, null, engineDeathHides, null, null, null);
     }
 

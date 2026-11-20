@@ -31,8 +31,6 @@ export interface ParticleEntry {
     state: StateSwitch;
     /** The damage-level switch, held apart so a level change cannot clobber the state. */
     altVisible: boolean;
-    /** The detail-level switch, the same way. */
-    lodVisible: boolean;
     levels: LevelTagged;
     /** The owning object's uniform render scale, so a rebuild keeps it. */
     scaleFactor: number;

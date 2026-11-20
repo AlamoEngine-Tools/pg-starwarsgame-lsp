@@ -15,7 +15,7 @@ import { ParticleSystemInstance, type EmitterProbe } from "./particleRenderer";
 import * as THREE from "three";
 import { type Vector3 as Vector3Like } from "./lighting";
 import { type AlamoParticleContent } from "../../protocol/modelPreview";
-import { proxyAltVisibleAt, proxyLodVisibleAt } from "./levels";
+import { proxyAltVisibleAt } from "./levels";
 import { type StateSwitch, fileState } from "./visibility";
 import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
 import { ACTIVE_SUBJECT } from "./loadedPart";
@@ -51,10 +51,10 @@ export class ParticleRig {
     /**
      * Systems that have been killed but whose particles are still finishing.
      *
-     * `leaveParticles` on the SYSTEM decides this, and it is what the engine does:
-     * `Engine::KillParticleSystem` calls `StopSpawning()` for one that says so and lets the air
-     * clear, and `Kill()` for one that does not. It defaults TRUE, and the ones that say false are
-     * the ENGINE GLOWS - a glow cuts with the engine, a fire trails off. Nothing read the flag, so
+     * `leaveParticles` on the SYSTEM decides this, measured in the game: a stopped system that says
+     * so stops spawning and lets the air clear, one that does not is removed at once. It defaults
+     * TRUE, and the ones that say false are the ENGINE GLOWS - a glow cuts with the engine, a fire
+     * trails off. Nothing read the flag, so
      * a wreck's fire vanished mid-flame the instant its debris expired.
      *
      * Held OUT of {@link particleSystems} rather than flagged inside it: they are no longer
@@ -86,15 +86,17 @@ export class ParticleRig {
 
     constructor(private readonly context: ViewportContext) {}
 
-    /** Shows or hides each system by whether its proxy is tagged for the level the model is shown at. */
-    gateByLevel(alt: number, lod: number, altDescending: boolean): void {
+    /**
+     * Shows or hides each system by whether its proxy is tagged for the damage level the model is
+     * shown at. Never by detail level: measured, that gates meshes only (#450).
+     */
+    gateByLevel(alt: number, altDescending: boolean): void {
         for (const entry of this.particleSystems.values()) {
             entry.altVisible = proxyAltVisibleAt(
                 entry.levels,
                 alt,
                 altDescending,
             );
-            entry.lodVisible = proxyLodVisibleAt(entry.levels, lod);
         }
     }
 
@@ -289,7 +291,6 @@ export class ParticleRig {
                 this.context.levels.alt,
                 this.context.levels.altDescending,
             ),
-            lodVisible: proxyLodVisibleAt(levels, this.context.levels.lod),
             scaleFactor,
             origin,
             instance: this.instantiate(

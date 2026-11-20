@@ -501,7 +501,6 @@ export interface PreviewHardpoint {
     health?: number | null;
     damageParticlesBone?: string | null;
     damageDecalBone?: string | null;
-    collisionMeshBone?: string | null;
     engineParticlesBone?: string | null;
     deathExplosionParticles?: string | null;
     deathBreakoffProp?: string | null;

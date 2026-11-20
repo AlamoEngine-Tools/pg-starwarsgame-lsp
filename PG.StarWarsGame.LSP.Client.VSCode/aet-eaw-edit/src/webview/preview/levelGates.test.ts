@@ -16,12 +16,12 @@ import { standInContext } from "./viewportContext.testing";
 function gatesWith(): {
     levels: LevelGates;
     modelRoot: THREE.Group;
-    gated: [number, number, boolean][];
+    gated: [number, boolean][];
     refreshed: () => number;
     released: () => number;
 } {
     const modelRoot = new THREE.Group();
-    const gated: [number, number, boolean][] = [];
+    const gated: [number, boolean][] = [];
     let refreshes = 0;
     let releases = 0;
     const context = standInContext({
@@ -35,8 +35,8 @@ function gatesWith(): {
             },
         },
         particles: {
-            gateByLevel: (alt: number, lod: number, descending: boolean) =>
-                gated.push([alt, lod, descending]),
+            gateByLevel: (alt: number, descending: boolean) =>
+                gated.push([alt, descending]),
         },
         assembly: { applyOwnFileVisibility: () => undefined },
         rows: {
@@ -55,15 +55,15 @@ function gatesWith(): {
 }
 
 describe("LevelGates", () => {
-    it("moves to a level, hands it to the effects, and refreshes the rows", () => {
+    it("moves to a level, hands the damage level to the effects, and refreshes the rows", () => {
         const { levels, gated, refreshed } = gatesWith();
 
         levels.setLevels(2, 1);
         levels.setLevels(1, 1);
 
         assert.deepEqual(gated, [
-            [2, 1, false],
-            [1, 1, true],
+            [2, false],
+            [1, true],
         ]);
         assert.equal(refreshed(), 2);
     });

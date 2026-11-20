@@ -160,7 +160,6 @@ public sealed record PreviewHardpoint(
     float? Health,
     string? DamageParticlesBone,
     string? DamageDecalBone,
-    string? CollisionMeshBone,
     string? EngineParticlesBone,
     string? DeathExplosionParticles,
     string? DeathBreakoffProp,

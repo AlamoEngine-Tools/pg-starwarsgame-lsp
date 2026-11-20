@@ -197,12 +197,32 @@ describe("ParticleRig", () => {
         });
         const entry = particles.particleSystems.get("fx")!;
 
-        particles.gateByLevel(0, 0, false);
+        particles.gateByLevel(0, false);
         assert.equal(entry.altVisible, false);
-        assert.equal(entry.lodVisible, true);
 
-        particles.gateByLevel(1, 0, false);
+        particles.gateByLevel(1, false);
         assert.equal(entry.altVisible, true);
+    });
+
+    // Measured in the game: detail level gates meshes only - an effect runs at every LOD, whatever
+    // `_LOD` tag its proxy's name carries (#450). No shipped effect carries one; mods do. The rig is
+    // not told the detail level at all, which is what "every LOD" comes down to.
+    it("runs an _LOD-tagged effect at every detail level", () => {
+        const { particles } = rigWith();
+        particles.addParticleSystem("fx", testSystem([emitter()]), {
+            origin: "model",
+            levels: { alt: null, lod: 1, altDecreaseStayHidden: true },
+        });
+        const entry = particles.particleSystems.get("fx")!;
+
+        for (const alt of [0, 1, 2]) {
+            for (const descending of [false, true]) {
+                particles.gateByLevel(alt, descending);
+
+                assert.equal(entry.altVisible, true, `ALT ${alt}`);
+            }
+        }
+        assert.equal("lodVisible" in entry, false);
     });
 
     it("forgets every system, for a new scene", () => {

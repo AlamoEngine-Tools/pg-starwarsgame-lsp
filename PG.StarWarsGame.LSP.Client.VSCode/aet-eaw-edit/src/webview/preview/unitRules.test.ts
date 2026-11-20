@@ -4,8 +4,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { PREVIEW_SCENE_KIND } from "../../protocol/modelPreview";
-import { type HardpointDeath, type HardpointWrites } from "./damage";
+import {
+    PREVIEW_SCENE_KIND,
+    type PreviewHardpoint,
+} from "../../protocol/modelPreview";
+import * as damage from "./damage";
+import {
+    type HardpointDeath,
+    type HardpointWrites,
+    hardpointWrites,
+} from "./damage";
 import { fileState, ruleState } from "./visibility";
 import { type PreviewRules, UnitRules, rulesFor } from "./unitRules";
 import { standInContext } from "./viewportContext.testing";
@@ -100,12 +108,11 @@ describe("UnitRules", () => {
 
     it("leaves the model file's answer alone in a model preview", () => {
         const { unit } = rulesWith("file");
-        unit.setCollisionMeshes(new Set(["collision"]));
         unit.setHardpoints(writes({ decals: new Set(["hp_blast"]) }));
         unit.setActiveAbilities(new Set(["STEALTH"]));
         unit.setCloakShadowsOff(true);
 
-        for (const alamoMesh of ["Collision", "HP_Blast", "stealth", "Hull"]) {
+        for (const alamoMesh of ["HP_Blast", "stealth", "Hull"]) {
             assert.deepEqual(
                 unit.meshState(drawnInFile, { alamoMesh }),
                 drawnInFile,
@@ -179,15 +186,10 @@ describe("UnitRules", () => {
         );
     });
 
-    it("hides a unit's collision mesh and its damage decals until the hardpoint is destroyed", () => {
+    it("hides a unit's damage decals until the hardpoint is destroyed", () => {
         const { unit } = rulesWith("game");
-        unit.setCollisionMeshes(new Set(["collision"]));
         unit.setHardpoints(writes({ decals: new Set(["hp_blast"]) }));
 
-        assert.deepEqual(
-            unit.meshState(drawnInFile, { alamoMesh: "Collision" }),
-            ruleState(false),
-        );
         assert.deepEqual(
             unit.meshState(drawnInFile, { alamoMesh: "HP_Blast" }),
             ruleState(false),
@@ -214,7 +216,7 @@ describe("UnitRules", () => {
         assert.equal(unit.idle(undefined), undefined);
     });
 
-    it("forgets a model's hardpoints, collision meshes and shield", () => {
+    it("forgets a model's hardpoints and shield", () => {
         const { unit } = rulesWith("game");
         unit.setHardpoints(
             writes({
@@ -223,7 +225,6 @@ describe("UnitRules", () => {
                 deaths: [death({ decal: "hp_decal", engineBone: "hp_bone" })],
             }),
         );
-        unit.setCollisionMeshes(new Set(["collision"]));
         unit.setShieldRevealed(true);
 
         unit.forgetModel();
@@ -231,7 +232,6 @@ describe("UnitRules", () => {
         assert.equal(unit.hardpoints.decals.size, 0);
         assert.equal(unit.hardpoints.damageBones.size, 0);
         assert.deepEqual(unit.hardpoints.deaths, []);
-        assert.equal(unit.collisionMeshes.size, 0);
         assert.equal(unit.shieldRevealed, false);
     });
 });
@@ -790,5 +790,51 @@ describe("UnitRules, the cloaks", () => {
         const file = rulesWith("file").unit;
         file.setCloakShadowsOff(true);
         assert.equal(file.shadowsOff(), false);
+    });
+});
+
+describe("UnitRules, a hardpoint's Collision_Mesh (#450)", () => {
+    const hardpoint: PreviewHardpoint = {
+        id: "HP_Weapon",
+        partId: "hp:HP_Weapon",
+        type: null,
+        attachBone: "HP_Bone",
+        isDestroyable: true,
+        isTargetable: true,
+        health: 325,
+        damageParticlesBone: null,
+        damageDecalBone: null,
+        engineParticlesBone: null,
+        deathExplosionParticles: null,
+        deathBreakoffProp: null,
+        engineDeathHidesEngineParticles: false,
+        tooltipText: null,
+        turret: null,
+    };
+
+    // Measured in the game: no XML hides a mesh it names as a Collision_Mesh - the model file's own
+    // flag alone decides. So the rule exists nowhere: no state a hardpoint's collision hull writes,
+    // and the scene does not even carry the hull's name.
+    it("draws a Collision_Mesh the file marks visible", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(hardpointWrites([hardpoint], new Set()));
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, { alamoMesh: "Collision" }),
+            drawnInFile,
+        );
+        assert.equal("setCollisionMeshes" in unit, false);
+        assert.equal("collisionMeshes" in unit, false);
+        assert.equal("collisionMeshNames" in damage, false);
+    });
+
+    it("leaves a Collision_Mesh the file hides hidden", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(hardpointWrites([hardpoint], new Set()));
+
+        assert.deepEqual(
+            unit.meshState(fileState(false), { alamoMesh: "Collision" }),
+            fileState(false),
+        );
     });
 });

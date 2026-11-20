@@ -10,7 +10,6 @@ import type {
 } from "../../protocol/modelPreview";
 import {
     type Destroyed,
-    collisionMeshNames,
     destroyable,
     effectPlaysNow,
     hardpointWrites,
@@ -29,7 +28,6 @@ function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
         health: 325,
         damageParticlesBone: "HP_F-L_EmitDamage",
         damageDecalBone: "HP_F-L_Blast",
-        collisionMeshBone: null,
         engineParticlesBone: null,
         deathExplosionParticles: "Large_Explosion_Space_Empire",
         deathBreakoffProp: null,
@@ -235,61 +233,5 @@ describe("effectPlaysNow", () => {
      */
     it("keeps an effect the model ships switched off switched off", () => {
         assert.equal(effectPlaysNow(particle({ startsVisible: false })), false);
-    });
-});
-
-describe("collisionMeshNames", () => {
-    it("names the collision hull every hardpoint declares, lowercased for matching", () => {
-        // `Collision_Mesh` is set on 267 of foc's hardpoints. Most of the geometry it names is
-        // already hidden in the file - 186 of 187 - so this exists for the one that is not, and for
-        // a mod that ships its hulls visible.
-        const names = collisionMeshNames([
-            hardpoint({ id: "HP_FL", collisionMeshBone: "HP_F-L_Coll" }),
-            hardpoint({ id: "HP_MC", collisionMeshBone: "HP_M-C_Coll" }),
-        ]);
-
-        assert.deepEqual([...names].sort(), ["hp_f-l_coll", "hp_m-c_coll"]);
-    });
-
-    it("does not care whether the hardpoint is intact", () => {
-        // Unlike a decal. A collision hull is never drawn in either state - the engine consumes it
-        // for hit testing and nothing else - so destroying the hardpoint must not reveal it.
-        const intact = collisionMeshNames([
-            hardpoint({ collisionMeshBone: "HP_F-L_Coll" }),
-        ]);
-
-        assert.equal(intact.has("hp_f-l_coll"), true);
-    });
-
-    it("leaves out a hardpoint that declares none", () => {
-        assert.equal(
-            collisionMeshNames([hardpoint({ collisionMeshBone: null })]).size,
-            0,
-        );
-        assert.equal(
-            collisionMeshNames([hardpoint({ collisionMeshBone: "" })]).size,
-            0,
-        );
-    });
-
-    it("leaves out a name that is really the hardpoint ATTACH bone", () => {
-        // MEASURED on the eaw Star Destroyer: the tractor beam and the fighter bay both give
-        // `Collision_Mesh` the same value as `Attachment_Bone` - `HP_trac_bone` and `SPAWN_00`.
-        // Hiding those would prune the whole subtree attached to the attach point, which is the
-        // hardpoint itself, so a hardpoint that names its own attach bone is left alone.
-        const names = collisionMeshNames([
-            hardpoint({
-                id: "HP_Trac",
-                attachBone: "HP_trac_bone",
-                collisionMeshBone: "HP_trac_bone",
-            }),
-            hardpoint({
-                id: "HP_Bay",
-                attachBone: "SPAWN_00",
-                collisionMeshBone: "spawn_00",
-            }),
-        ]);
-
-        assert.equal(names.size, 0);
     });
 });

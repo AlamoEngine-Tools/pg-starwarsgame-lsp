@@ -27,7 +27,6 @@ import { BREAKOFF_PART, DEATH_CLONE_PART } from "./partIds";
 import { type TreeItem } from "./previewTree";
 import { type PreviewViewport } from "./viewport";
 import {
-    collisionMeshNames,
     destroyable,
     hardpointWrites,
     partHidden,
@@ -474,10 +473,6 @@ export function useCombatLens({
         // and what each dead one wrote, in the order they died: a later death wins where two
         // hardpoints' bones overlap.
         viewport.setHardpoints(hardpointWrites(scene.hardpoints, destroyed));
-
-        // Never shown in either damage state, so this takes no `destroyed` and does not change with
-        // it - it is set here because this is the pass that owns hardpoint-driven visibility.
-        viewport.setCollisionMeshes(collisionMeshNames(scene.hardpoints));
 
         // The shield mesh is the one piece of GEOMETRY an ability reveals - DEFEND shows it, and
         // the mesh ships hidden, so nothing else would ever bring it up.

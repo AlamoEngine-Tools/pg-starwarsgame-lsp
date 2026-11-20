@@ -95,6 +95,10 @@
   transition time and back, and its shadow volumes go off while it is cloaked - after a stealth they stay off
   until the detail level changes, as in the game. A death clone now fades out the same way
   ([#449](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/449))
+- **No check the game does not make** - the unit preview hid a mesh a hardpoint names in `Collision_Mesh`,
+  and switched effects tagged `_LOD` by the detail level. The game does neither: the model file alone decides
+  whether a collision mesh is drawn, and the detail level switches meshes only
+  ([#450](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/450))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

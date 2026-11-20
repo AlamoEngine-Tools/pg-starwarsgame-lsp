@@ -64,13 +64,6 @@ export class UnitRules {
      */
     hardpoints: HardpointWrites = NO_HARDPOINTS;
     /**
-     * Meshes a hardpoint claims as its collision hull.
-     *
-     * Kept beside the decals because they are the same kind of fact - hardpoint XML deciding what a
-     * mesh IS. Unlike a decal there is no "shown" half.
-     */
-    collisionMeshes: ReadonlySet<string> = new Set();
-    /**
      * Whether an active ability is holding the SHIELD MESH visible.
      *
      * The mesh ships hidden - `MeshShield.fx` carries `alamoHidden: true` - so this is the unit being
@@ -135,7 +128,6 @@ export class UnitRules {
     /** Drops the hardpoint and shield state of a model that is no longer shown. */
     forgetModel(): void {
         this.hardpoints = NO_HARDPOINTS;
-        this.collisionMeshes = new Set();
         this.namesAbove = null;
         this.shieldRevealed = false;
         this.cloakShadowsOff = false;
@@ -178,12 +170,6 @@ export class UnitRules {
             }
         }
 
-        this.context.levels.applyLevels();
-    }
-
-    /** Which meshes the hardpoints claim as collision hulls. */
-    setCollisionMeshes(names: ReadonlySet<string>): void {
-        this.collisionMeshes = names;
         this.context.levels.applyLevels();
     }
 
@@ -292,10 +278,6 @@ export class UnitRules {
                     written = ruleState(cloaked);
                 }
             }
-        }
-
-        if (this.collisionMeshes.has(name)) {
-            written = ruleState(false);
         }
 
         return written;

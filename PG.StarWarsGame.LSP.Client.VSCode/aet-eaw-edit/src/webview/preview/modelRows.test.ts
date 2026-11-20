@@ -160,7 +160,6 @@ function rowsWith(options: RowsOptions = {}): {
             origin: "model",
             state: { shown: true, writer: "file" },
             altVisible: true,
-            lodVisible: true,
             attachBoneIndex: options.effectOn,
             attachToPartId: options.effectPart ?? "hull",
             instance: {

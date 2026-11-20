@@ -561,13 +561,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Which meshes the hardpoints claim as collision hulls. See `UnitRules.setCollisionMeshes`.
-     */
-    setCollisionMeshes(names: ReadonlySet<string>): void {
-        this.rules.setCollisionMeshes(names);
-    }
-
-    /**
      * Shield meshes the model names but does not draw with a shield shader. See
      * `MaterialBinder.shieldMeshesOffShader`.
      */

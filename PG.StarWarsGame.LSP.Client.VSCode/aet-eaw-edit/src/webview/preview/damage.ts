@@ -162,41 +162,6 @@ export function hardpointWrites(
 }
 
 /**
- * The collision hulls the hardpoints declare, lowercased for matching.
- *
- * The engine consumes a <c>Collision_Mesh</c> for hit testing and never draws it, in EITHER damage
- * state - which is what separates it from a decal, and why nothing here consults the destroyed set.
- *
- * Most of this geometry is already switched off without any help: measured on the shipped models,
- * 186 of 187 collision hulls are marked hidden in the file and the material rules gate the rest off
- * by name. This covers the one that is not, and the mod that ships its hulls visible - a hardpoint
- * saying "this mesh is my collision hull" is the author's own word, and it outranks a guess made
- * from a name.
- *
- * A hardpoint that gives `Collision_Mesh` the same value as its `Attachment_Bone` is skipped. Two of
- * the eaw Star Destroyer's hardpoints do exactly that - `HP_trac_bone` and `SPAWN_00` - and hiding an
- * attach bone would prune the whole subtree standing on it, which is the hardpoint.
- */
-export function collisionMeshNames(
-    hardpoints: readonly PreviewHardpoint[],
-): ReadonlySet<string> {
-    const names = new Set<string>();
-
-    for (const hardpoint of hardpoints) {
-        const mesh = (hardpoint.collisionMeshBone ?? "").toLowerCase();
-
-        if (
-            mesh !== "" &&
-            mesh !== (hardpoint.attachBone ?? "").toLowerCase()
-        ) {
-            names.add(mesh);
-        }
-    }
-
-    return names;
-}
-
-/**
  * The hardpoints worth offering a destroy button for.
  *
  * The rest are still listed, marked as indestructible rather than quietly inert - a shield generator

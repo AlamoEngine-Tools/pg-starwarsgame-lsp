@@ -159,6 +159,34 @@ public sealed class PreviewWireShapeTest
         Assert.Null(json.Property("claimsAbility"));
     }
 
+    /// <summary>
+    ///     Measured in the game: no XML hides the mesh a hardpoint names as its <c>Collision_Mesh</c> -
+    ///     the model file's flag alone decides (#450) - so the scene carries no collision hull for the
+    ///     client to act on.
+    /// </summary>
+    /// <remarks>
+    ///     Built through the record's own constructor by parameter, so the test reads the same before
+    ///     and after the field goes: it is the wire that is asserted, not the arity.
+    /// </remarks>
+    [Fact]
+    public void Hardpoint_CarriesNoCollisionMesh()
+    {
+        var constructor = typeof(PreviewHardpoint).GetConstructors().Single(c => c.GetParameters().Length > 1);
+        var arguments = constructor.GetParameters()
+            .Select(p => p.Name switch
+            {
+                "Id" => "HP_Weapon",
+                "CollisionMeshBone" => "HP_Weapon_Coll",
+                _ => p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null
+            })
+            .ToArray();
+
+        var json = SerializeAsResponse(constructor.Invoke(arguments));
+
+        Assert.Equal("HP_Weapon", json["id"]?.Value<string>());
+        Assert.Null(json.Property("collisionMeshBone"));
+    }
+
     [Fact]
     public void EveryEnumOnTheWire_IsHandledByTheConverter()
     {

@@ -389,9 +389,8 @@ export class ModelRows {
                 kind: "particle",
                 name: this.effectRowName(systemId),
                 parentId: boneId(owner),
-                visible:
-                    entry.state.shown && entry.altVisible && entry.lodVisible,
-                gatedOff: !(entry.altVisible && entry.lodVisible),
+                visible: entry.state.shown && entry.altVisible,
+                gatedOff: !entry.altVisible,
                 systemId,
             });
         }
@@ -515,9 +514,7 @@ export class ModelRows {
                         this.rowResolutions.get(
                             this.rowForSystem(source.systemId),
                         )?.visible ??
-                        (entry.state.shown &&
-                            entry.altVisible &&
-                            entry.lodVisible),
+                        (entry.state.shown && entry.altVisible),
                 });
             }
         }
@@ -1006,7 +1003,8 @@ export class ModelRows {
             // one without the other.
             state,
             alt: entry?.altVisible ?? true,
-            lod: entry?.lodVisible ?? true,
+            // Detail level gates meshes only; an effect runs at every LOD (#450).
+            lod: true,
 
             // The marker mesh's material says nothing about the effect.
             nonVisual: undefined,
