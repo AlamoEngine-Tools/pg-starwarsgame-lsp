@@ -71,4 +71,30 @@ public sealed class CloakHandlersTest
         Assert.Equal("Hardpoint 'HP_TURRET' attaches 'turret.alo', which <Force_Cloak_Ability> leaves drawn.",
             result.Message);
     }
+
+    [Fact]
+    public void KeepsParts_IsInformation_AndNamesTheParts()
+    {
+        var result = Assert.Single(new CloakKeepsPartsHandler().Handle(
+            new CloakKeepsPartsFact(Uri, 0, 0, 1, "UNIT", "unit.alo", "Stealth_Ability", ["Backpack", "p_glow"]),
+            XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.Equal(XmlDiagnosticSeverity.Information, result.Severity);
+        Assert.Equal(
+            "Parts of 'unit.alo' with neither BASEMESH nor STEALTH in their names stay drawn under <Stealth_Ability> - Backpack, p_glow.",
+            result.Message);
+    }
+
+    /// <summary>A long list names the first eight and counts the rest.</summary>
+    [Fact]
+    public void KeepsParts_WithMoreThanEight_CountsTheRest()
+    {
+        string[] parts = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+
+        var result = Assert.Single(new CloakKeepsPartsHandler().Handle(
+            new CloakKeepsPartsFact(Uri, 0, 0, 1, "UNIT", "unit.alo", "Stealth_Ability", parts),
+            XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.EndsWith("- A, B, C, D, E, F, G, H and 2 more.", result.Message);
+    }
 }

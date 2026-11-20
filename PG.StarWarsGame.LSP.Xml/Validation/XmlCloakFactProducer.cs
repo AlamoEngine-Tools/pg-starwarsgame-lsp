@@ -14,9 +14,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Measured in the game: a cloak hides every part whose name contains BASEMESH and shows every
-///         part whose name contains STEALTH; a stealth also hides the models a hardpoint attaches, a
-///         Force cloak does not.
+///         Measured in the game: a cloak hides every part whose name contains BASEMESH, shows every
+///         part whose name contains STEALTH and leaves every other part as it was; a stealth also
+///         hides the models a hardpoint attaches, a Force cloak does not.
 ///     </para>
 ///     <para>
 ///         On the unit's XML object, never on the model: a model shared by a cloaking unit and one
@@ -34,6 +34,11 @@ public sealed class XmlCloakFactProducer(ISchemaProvider schema, IVariantTagSour
     private const string AbilitiesTag = "Abilities";
     private const string HardPointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
+
+    // Measured in the game: when a type loads, every part whose name contains STEALTH, BUILDUP or
+    // CHARGED is hidden - the preview's type-load hide is the same list. STEALTH is the cloak's own
+    // mark; the other two are parts no cloak finds drawn.
+    private static readonly string[] HiddenOnTypeLoad = ["BUILDUP", "CHARGED"];
 
     public string Name => "cloak";
 
@@ -102,6 +107,7 @@ public sealed class XmlCloakFactProducer(ISchemaProvider schema, IVariantTagSour
         var all = index.ModelProxies.TryGetValue(key, out var proxies) ? names.AddRange(proxies) : names;
         var hasBaseMesh = all.Any(n => n.Contains(BaseMeshMark, StringComparison.OrdinalIgnoreCase));
         var hasStealth = all.Any(n => n.Contains(StealthMark, StringComparison.OrdinalIgnoreCase));
+        var kept = PartsKept(index, key);
 
         foreach (var cloak in cloaks)
         {
@@ -114,7 +120,36 @@ public sealed class XmlCloakFactProducer(ISchemaProvider schema, IVariantTagSour
             if (!hasStealth)
                 facts.Add(new CloakShowsNoShellFact(documentUri, line, column, length,
                     objectId, model, cloak.Element, cloak.LookChangesNothing));
+
+            if (kept.Count > 0)
+                facts.Add(new CloakKeepsPartsFact(documentUri, line, column, length,
+                    objectId, model, cloak.Element, kept));
         }
+    }
+
+    /// <summary>
+    ///     The parts a cloak leaves as they were: marked visible by the file, drawn at all - a surface
+    ///     or an effect, never a shadow volume - not hidden when the type loads, and named for neither
+    ///     BASEMESH nor STEALTH. Each name once, in file order. Empty when the model's parts are
+    ///     unknown: a baseline built before the catalogue carried them, or a file that could not be
+    ///     read, says nothing rather than guess.
+    /// </summary>
+    private static List<string> PartsKept(GameIndex index, string key)
+    {
+        if (!index.ModelParts.TryGetValue(key, out var parts))
+            return [];
+
+        return
+        [
+            .. parts
+                .Where(p => p.FileVisible && (p.Proxy || p.Surface)
+                                          && !p.Name.Contains(BaseMeshMark, StringComparison.OrdinalIgnoreCase)
+                                          && !p.Name.Contains(StealthMark, StringComparison.OrdinalIgnoreCase)
+                                          && !HiddenOnTypeLoad.Any(mark =>
+                                              p.Name.Contains(mark, StringComparison.OrdinalIgnoreCase)))
+                .Select(p => p.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+        ];
     }
 
     private static void CheckAttachedModels(

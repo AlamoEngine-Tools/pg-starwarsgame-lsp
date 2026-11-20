@@ -214,6 +214,14 @@ public sealed class FakeGameIndexService : IGameIndexService
         }
     }
 
+    public void ApplyModelParts(ImmutableDictionary<string, ImmutableArray<ModelPart>> parts)
+    {
+        lock (_gate)
+        {
+            Replace(_current with { ModelParts = parts });
+        }
+    }
+
     public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
     {
         lock (_gate)

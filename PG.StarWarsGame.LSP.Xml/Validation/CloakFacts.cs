@@ -45,6 +45,31 @@ public sealed record CloakShowsNoShellFact(
 ) : XmlFact(DocumentUri, Line, Column, Length);
 
 /// <summary>
+///     A cloaking unit whose model draws parts the cloak neither hides nor shows, so they stay drawn
+///     as they were, under the cloak's look.
+/// </summary>
+/// <remarks>
+///     Measured in the game: a cloak hides the parts whose name contains BASEMESH, shows the ones
+///     whose name contains STEALTH and leaves every other part as it was. Counted are the parts the
+///     file marks visible that are drawn at all: surfaces and effects, never a shadow volume or
+///     another mesh the game uses but does not show.
+/// </remarks>
+/// <param name="ObjectId">The cloaking unit.</param>
+/// <param name="ModelName">The model the unit draws.</param>
+/// <param name="Ability">The cloak's element, <c>Stealth_Ability</c> or <c>Force_Cloak_Ability</c>.</param>
+/// <param name="Parts">The parts that stay drawn, each name once, in file order.</param>
+public sealed record CloakKeepsPartsFact(
+    string DocumentUri,
+    int Line,
+    int Column,
+    int Length,
+    string ObjectId,
+    string ModelName,
+    string Ability,
+    IReadOnlyList<string> Parts
+) : XmlFact(DocumentUri, Line, Column, Length);
+
+/// <summary>
 ///     A unit with a Force cloak and a hardpoint that attaches a model, which stays drawn while the
 ///     unit is cloaked.
 /// </summary>

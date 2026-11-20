@@ -159,6 +159,48 @@ public sealed class ModelCatalogBuilderTest
         Assert.Equal(["P_Shipped"], svc.Current.ModelProxies["shipped.alo"].ToArray());
     }
 
+    // A model's parts with their file flags (#449), merged over the baseline's like the rest of the
+    // catalog. A mod's model whose parts could not be read REPLACES the shipped entry with nothing:
+    // the shipped file's parts would describe a model the game no longer loads.
+    [Fact]
+    public void Apply_PublishesTheModelsParts_TheModsOverTheBaselines()
+    {
+        var fs = new MockFileSystem();
+        fs.AddDirectory(Root("mod/art"));
+        var baseline = BaselineIndex.Empty with
+        {
+            ModelParts = ImmutableDictionary<string, ImmutableArray<ModelPart>>.Empty
+                .WithComparers(StringComparer.OrdinalIgnoreCase)
+                .Add("shipped.alo", [new ModelPart("Shipped_Hull", false, true, true)])
+                .Add("my_frigate.alo", [new ModelPart("Old_Hull", false, true, true)])
+                .Add("my_corvette.alo", [new ModelPart("Old_Hull", false, true, true)])
+        };
+        var svc = new FakeGameIndexService(GameIndex.Empty with { Baseline = baseline });
+        var cache = new StubBoneCache
+        {
+            Stored =
+            {
+                [Root("mod/mod.pgproj")] = new Dictionary<string, ModelCatalogEntry>
+                {
+                    ["my_frigate.alo"] = new(["root"], []) { Parts = [new ModelPart("Hull", false, false, true)] },
+                    ["my_corvette.alo"] = new(["root"], [])
+                }
+            }
+        };
+        var builder = Build(fs, svc, cache);
+
+        builder.Apply(WorkspaceConfiguration.Empty with
+        {
+            AssetRoots = [Root("mod/art")],
+            Layers = [new ProjectLayer(0, "mod", [], [], [], [Root("mod/art")], null, Root("mod/mod.pgproj"))]
+        });
+
+        Assert.Equal([new ModelPart("Hull", false, false, true)], svc.Current.ModelParts["my_frigate.alo"].ToArray());
+        Assert.Equal([new ModelPart("Shipped_Hull", false, true, true)],
+            svc.Current.ModelParts["shipped.alo"].ToArray());
+        Assert.False(svc.Current.ModelParts.ContainsKey("my_corvette.alo"));
+    }
+
     /// <summary>
     ///     The reason the snapshot is per LAYER: a layer whose models are unchanged must be served
     ///     from its own snapshot, and must NOT be re-extracted because a sibling layer changed.

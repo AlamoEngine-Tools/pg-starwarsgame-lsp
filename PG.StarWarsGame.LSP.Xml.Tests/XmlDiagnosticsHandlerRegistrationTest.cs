@@ -334,7 +334,8 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // 160 -> 163: CloakHidesNothingHandler, CloakShowsNoShellHandler and
         // ForceCloakKeepsAttachedModelHandler (#449). A cloak decides its parts by name, and a Force
         // cloak leaves attached models drawn.
-        const int expectedHandlerCount = 163;
+        // 163 -> 164: CloakKeepsPartsHandler (#449). The parts a cloak neither hides nor shows.
+        const int expectedHandlerCount = 164;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

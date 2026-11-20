@@ -71,3 +71,30 @@ public sealed class ForceCloakKeepsAttachedModelHandler : XmlDiagnosticsHandler<
         ];
     }
 }
+
+/// <summary>
+///     Reports the parts a cloak leaves drawn as they were. Information: a state of the unit, named,
+///     with nothing implied about whether it is meant.
+/// </summary>
+public sealed class CloakKeepsPartsHandler : XmlDiagnosticsHandler<CloakKeepsPartsFact>
+{
+    // Enough to recognise the model by; a hull of dozens of parts would otherwise fill the hover.
+    private const int NamedParts = 8;
+
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.CloakKeepsParts;
+
+    protected override IEnumerable<XmlDiagnosticResult> Handle(CloakKeepsPartsFact fact, DiagnosticsContext ctx)
+    {
+        var named = string.Join(", ", fact.Parts.Take(NamedParts));
+        var parts = fact.Parts.Count > NamedParts
+            ? ctx.Messages.Format("CloakKeepsParts_AndMore", named, fact.Parts.Count - NamedParts)
+            : named;
+
+        return
+        [
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Information,
+                ctx.Messages.Format("CloakKeepsParts_StayDrawn", fact.ModelName, fact.Ability, parts))
+        ];
+    }
+}

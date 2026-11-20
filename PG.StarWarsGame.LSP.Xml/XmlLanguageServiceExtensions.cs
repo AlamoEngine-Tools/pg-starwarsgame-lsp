@@ -213,6 +213,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, CloakHidesNothingHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, CloakShowsNoShellHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ForceCloakKeepsAttachedModelHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, CloakKeepsPartsHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, LandDamageTableMismatchHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FiresForwardHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AttackDistanceBeyondHardpointRangeHandler>();

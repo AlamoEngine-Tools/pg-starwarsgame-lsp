@@ -26,7 +26,9 @@
   part names, so a unit whose model has no `BASEMESH` part hides nothing when it cloaks, and one with no
   `STEALTH` part shows no shell: `CrossTag33` (`aetswg-007-0033`) and `CrossTag34` (`aetswg-007-0034`), a
   warning when the cloak's colour also leaves the look unchanged, information otherwise. `CrossTag35`
-  (`aetswg-007-0035`) notes on a hardpoint that a Force cloak leaves its attached model drawn
+  (`aetswg-007-0035`) notes on a hardpoint that a Force cloak leaves its attached model drawn, and
+  `CrossTag36` (`aetswg-007-0036`) lists the visible parts and effects whose names say neither, which stay
+  drawn while the unit is cloaked
   ([#449](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/449))
 
 ### Fixes

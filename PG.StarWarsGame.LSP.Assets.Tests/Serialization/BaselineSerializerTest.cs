@@ -98,6 +98,40 @@ public sealed class BaselineSerializerTest
         Assert.Empty(Deserialize(SerializeRawDto(dto)).RegistryLists);
     }
 
+    // Each shipped model's parts with the two file facts the cloak rule needs (#449), in file order.
+    [Fact]
+    public void RoundTrip_ModelParts()
+    {
+        var baseline = BaselineIndex.Empty with
+        {
+            ModelParts = ImmutableDictionary<string, ImmutableArray<ModelPart>>.Empty
+                .Add("ev_stardestroyer.alo",
+                [
+                    new ModelPart("Hull", false, true, true), new ModelPart("Shadow", false, true, false),
+                    new ModelPart("p_smoke", true, false, false)
+                ])
+        };
+
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(
+        [
+            new ModelPart("Hull", false, true, true), new ModelPart("Shadow", false, true, false),
+            new ModelPart("p_smoke", true, false, false)
+        ], result.ModelParts["EV_STARDESTROYER.ALO"].ToArray());
+    }
+
+    // A baseline written before the parts has none: every model's parts read as unknown rather than
+    // as a model with no parts, and the field needs no version.
+    [Fact]
+    public void Deserialize_BaselineWrittenBeforeModelParts_ReadsAsNone()
+    {
+        var dto = RawDto(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        dto.ModelParts = null!;
+
+        Assert.Empty(Deserialize(SerializeRawDto(dto)).ModelParts);
+    }
+
     [Fact]
     public void RoundTrip_Behaviors()
     {
@@ -584,6 +618,8 @@ public sealed class BaselineSerializerTest
             ModelTextures = map,
             ModelProxies = map,
             RegistryLists = map,
+            ModelParts = names.ToImmutableDictionary(n => n, _ => ImmutableArray<ModelPart>.Empty,
+                StringComparer.OrdinalIgnoreCase),
             ParticleSystems = names.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
             GroupMemberships = names.ToImmutableDictionary(n => n, _ => ImmutableArray<GroupMembership>.Empty,
                 StringComparer.OrdinalIgnoreCase),
@@ -599,6 +635,7 @@ public sealed class BaselineSerializerTest
         Assert.Equal(sorted, dto.ParticleSystems);
         Assert.Equal(sorted, dto.GroupMemberships.Select(g => g.GroupKey));
         Assert.Equal(sorted, dto.ObjectTags.Select(t => t.Name));
+        Assert.Equal(sorted, dto.ModelParts.Select(p => p.Name));
         foreach (var entries in new[]
                  {
                      dto.DynamicEnumValues, dto.HardcodedEnumValues, dto.FileTypeMap, dto.ModelBones,

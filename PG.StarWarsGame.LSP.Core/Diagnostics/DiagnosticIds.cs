@@ -699,6 +699,18 @@ public static class DiagnosticIds
     public static readonly DiagnosticId ForceCloakKeepsAttachedModel = new(DiagnosticGroup.CrossTag, 35);
 
     /// <summary>
+    ///     A unit with a stealth or a Force cloak whose model draws parts the cloak neither hides nor
+    ///     shows, which stay drawn under the cloak's look (#449).
+    /// </summary>
+    /// <remarks>
+    ///     Measured in the game: a cloak leaves every part whose name contains neither BASEMESH nor
+    ///     STEALTH as it was. Counted are the parts the model file marks visible that are drawn at
+    ///     all - surfaces and effects, never a shadow volume. Information. Silent for a model whose
+    ///     parts are unknown, as in a baseline built before the catalogue carried them.
+    /// </remarks>
+    public static readonly DiagnosticId CloakKeepsParts = new(DiagnosticGroup.CrossTag, 36);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.

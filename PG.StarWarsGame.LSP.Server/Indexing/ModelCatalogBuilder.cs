@@ -14,8 +14,8 @@ using PG.StarWarsGame.LSP.Server.Startup;
 namespace PG.StarWarsGame.LSP.Server.Indexing;
 
 /// <summary>
-///     The model catalog: the bones, textures, particle-system flag and proxies of every workspace
-///     model, merged over the baseline's layer by layer and published on the game index.
+///     The model catalog: the bones, textures, particle-system flag, proxies and parts of every
+///     workspace model, merged over the baseline's layer by layer and published on the game index.
 /// </summary>
 public sealed class ModelCatalogBuilder
 {
@@ -60,6 +60,9 @@ public sealed class ModelCatalogBuilder
         var particleSystems = _indexService.Current.Baseline.ParticleSystems.ToBuilder();
         // Each model's proxy names (#270), the workspace's model replacing the shipped one's.
         var proxies = _indexService.Current.Baseline.ModelProxies.ToBuilder();
+        // Each model's parts (#449), the workspace's model replacing the shipped one's - with nothing
+        // when its parts could not be read, since the shipped parts describe a file no longer loaded.
+        var parts = _indexService.Current.Baseline.ModelParts.ToBuilder();
 
         var workspaceCount = 0;
         var reusedLayers = 0;
@@ -84,6 +87,8 @@ public sealed class ModelCatalogBuilder
                 if (entry.ParticleSystem) particleSystems.Add(path);
                 else particleSystems.Remove(path);
                 proxies[path] = [.. entry.Proxies];
+                if (entry.Parts is { } modelParts) parts[path] = [.. modelParts];
+                else parts.Remove(path);
                 workspaceCount++;
             }
         }
@@ -99,6 +104,7 @@ public sealed class ModelCatalogBuilder
         _indexService.ApplyModelTextures(mergedTextures.ToImmutable());
         _indexService.ApplyParticleSystems(particleSystems.ToImmutable());
         _indexService.ApplyModelProxies(proxies.ToImmutable());
+        _indexService.ApplyModelParts(parts.ToImmutable());
     }
 
     /// <summary>
@@ -158,7 +164,8 @@ public sealed class ModelCatalogBuilder
                 {
                     Textures = [.. scan.Textures],
                     ParticleSystem = scan.Kind == AloFileKind.Particle,
-                    Proxies = [.. scan.Proxies]
+                    Proxies = [.. scan.Proxies],
+                    Parts = scan.Parts is { } scanned ? [.. scanned] : null
                 };
         }
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using MessagePack;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Core.Caching;
 
@@ -39,9 +40,11 @@ public sealed class ModelBoneCatalogSnapshot
     ///     model; 4 = entries carry the model's proxy names (#270) - a v3 snapshot would name no
     ///     model as a particle system's user; 5 = textures as written again (#292 cut them to the
     ///     file name on read, which hid the path a texture is named by) - a v4 snapshot may carry
-    ///     either form.
+    ///     either form; 6 = entries carry the model's parts with their visible and surface flags
+    ///     (#449) - a v5 snapshot has none, and every model's parts would read as unknown until its
+    ///     files changed.
     /// </remarks>
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     [Key(0)] public int SchemaVersion { get; set; }
 
@@ -79,4 +82,11 @@ public sealed class SerializedModelBones
     /// <summary>The particle names the model's proxies carry, as the file spells them (#270).</summary>
     [Key(4)]
     public string[] Proxies { get; set; } = [];
+
+    /// <summary>
+    ///     The model's meshes and proxies with their visible and surface flags (#449). Null when they
+    ///     could not be read, which is "unknown" and kept apart from an empty list.
+    /// </summary>
+    [Key(5)]
+    public ModelPart[]? Parts { get; set; }
 }

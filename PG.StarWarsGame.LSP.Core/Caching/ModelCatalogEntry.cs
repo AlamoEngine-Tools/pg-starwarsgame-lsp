@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Symbols;
+
 namespace PG.StarWarsGame.LSP.Core.Caching;
 
 /// <summary>
@@ -23,4 +25,10 @@ public sealed record ModelCatalogEntry(string[] Bones, string[] Textures, bool P
 
     /// <summary>The particle names the model's proxies carry, as the file spells them (#270).</summary>
     public string[] Proxies { get; init; } = [];
+
+    /// <summary>
+    ///     The model's meshes and proxies with their visible and surface flags (#449), or null when
+    ///     they could not be read - unknown, which a rule about the parts must not read as "none".
+    /// </summary>
+    public ModelPart[]? Parts { get; init; }
 }

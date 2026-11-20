@@ -189,6 +189,12 @@
   <data name="CloakHidesNothing_HidesNoPartLookUnchanged" xml:space="preserve">
     <value>No part of '{0}' has BASEMESH in its name and &lt;{1}&gt; has a white opaque colour or no transition time, so it hides no part and leaves the look unchanged.</value>
   </data>
+  <data name="CloakKeepsParts_AndMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
+  <data name="CloakKeepsParts_StayDrawn" xml:space="preserve">
+    <value>Parts of '{0}' with neither BASEMESH nor STEALTH in their names stay drawn under &lt;{1}&gt; - {2}.</value>
+  </data>
   <data name="CloakShowsNoShell_ShowsNoPart" xml:space="preserve">
     <value>No part of '{0}' has STEALTH in its name, so &lt;{1}&gt; shows no part.</value>
   </data>

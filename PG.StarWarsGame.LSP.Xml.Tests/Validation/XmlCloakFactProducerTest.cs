@@ -146,22 +146,120 @@ public sealed class XmlCloakFactProducerTest
         Assert.Empty(Produce(Stealth, null));
     }
 
-    // ── fixture ───────────────────────────────────────────────────────────────
+    // ── FR-7: parts the cloak leaves as they are ─────────────────────────────
+
+    private static readonly string[] CloakModel = ["Root", "Unit_BaseMesh", "Unit_Stealth"];
+
+    [Fact]
+    public void ACloakingUnitWithAVisibleSurfaceItNeitherHidesNorShows_IsFlagged()
+    {
+        var fact = Assert.Single(Produce(Stealth, CloakModel, parts:
+        [
+            new ModelPart("Unit_BaseMesh", false, true, true), new ModelPart("Unit_Stealth", false, false, true),
+            new ModelPart("Backpack", false, true, true)
+        ]).OfType<CloakKeepsPartsFact>());
+
+        Assert.Equal("unit.alo", fact.ModelName);
+        Assert.Equal("Stealth_Ability", fact.Ability);
+        Assert.Equal(["Backpack"], fact.Parts);
+    }
+
+    /// <summary>Effects are kept: a visible proxy the cloak does not name stays on.</summary>
+    [Fact]
+    public void AVisibleEffectItNeitherHidesNorShows_IsFlagged()
+    {
+        var fact = Assert.Single(Produce(Stealth, CloakModel, parts:
+        [
+            new ModelPart("Unit_BaseMesh", false, true, true), new ModelPart("p_engine_glow", true, true, false),
+            new ModelPart("p_stealth_shimmer", true, false, false)
+        ]).OfType<CloakKeepsPartsFact>());
+
+        Assert.Equal(["p_engine_glow"], fact.Parts);
+    }
+
+    /// <summary>A shadow volume is no surface, and a hidden part is not drawn to begin with.</summary>
+    [Fact]
+    public void OnlyNonSurfaceAndHiddenParts_AreSilent()
+    {
+        Assert.Empty(Produce(Stealth, CloakModel, parts:
+        [
+            new ModelPart("Unit_BaseMesh", false, true, true), new ModelPart("Shadow", false, true, false),
+            new ModelPart("Panel", false, false, true), new ModelPart("p_off", true, false, false)
+        ]).OfType<CloakKeepsPartsFact>());
+    }
+
+    [Fact]
+    public void EveryVisiblePartNamedForTheCloak_IsSilent()
+    {
+        Assert.Empty(Produce(Stealth, CloakModel, parts:
+        [
+            new ModelPart("Unit_BaseMesh", false, true, true), new ModelPart("Unit_Stealth", false, true, true),
+            new ModelPart("p_basemesh_glow", true, true, false)
+        ]).OfType<CloakKeepsPartsFact>());
+    }
 
     /// <summary>
-    ///     A unit `UNIT` on `unit.alo` with the given abilities list, and - when asked - one hardpoint
-    ///     `HP_TURRET` attaching `hardpointModel`.
+    ///     A part the game hides when the type loads - BUILDUP or CHARGED in its name, the weapon
+    ///     charge effects - is not drawn when the cloak starts, so it is not one that stays drawn.
     /// </summary>
+    [Fact]
+    public void APartHiddenWhenTheTypeLoads_IsNotListed()
+    {
+        var fact = Assert.Single(Produce(Stealth, CloakModel, parts:
+        [
+            new ModelPart("Unit_BaseMesh", false, true, true), new ModelPart("p_weapon_buildup", true, true, false),
+            new ModelPart("p_weapon_Charged", true, true, false), new ModelPart("Engine", false, true, true)
+        ]).OfType<CloakKeepsPartsFact>());
+
+        Assert.Equal(["Engine"], fact.Parts);
+    }
+
+    /// <summary>
+    ///     No part data for the model - a baseline built before the field, or a file whose parts could
+    ///     not be read - says nothing rather than guess.
+    /// </summary>
+    [Fact]
+    public void AModelWithUnknownParts_IsSilent()
+    {
+        Assert.Empty(Produce(Stealth, CloakModel).OfType<CloakKeepsPartsFact>());
+    }
+
+    [Fact]
+    public void AUnitThatCannotCloak_SaysNothingOfItsParts()
+    {
+        Assert.Empty(Produce(null, CloakModel, parts: [new ModelPart("Backpack", false, true, true)]));
+    }
+
+    /// <summary>A name shared by several parts is listed once, in file order.</summary>
+    [Fact]
+    public void APartNameThatRepeats_IsListedOnce()
+    {
+        var fact = Assert.Single(Produce(Stealth, CloakModel, parts:
+        [
+            new ModelPart("Unit_BaseMesh", false, true, true), new ModelPart("Engine", false, true, true),
+            new ModelPart("p_glow", true, true, false), new ModelPart("engine", false, true, true)
+        ]).OfType<CloakKeepsPartsFact>());
+
+        Assert.Equal(["Engine", "p_glow"], fact.Parts);
+    }
+
+    // ── fixture ───────────────────────────────────────────────────────────────
+
     private const string WrittenText =
         "<X><GroundInfantry Name=\"UNIT\">" + Stealth + "</GroundInfantry></X>";
 
+    /// <summary>
+    ///     A unit `UNIT` on `unit.alo` with the given abilities list, and - when asked - one hardpoint
+    ///     `HP_TURRET` attaching `hardpointModel`, and the model's parts when given.
+    /// </summary>
     private static IReadOnlyList<XmlFact> Produce(
         string? abilities,
         IEnumerable<string>? model,
         IEnumerable<string>? proxies = null,
         string? hardpointModel = "",
         bool withHardpoint = true,
-        bool written = false)
+        bool written = false,
+        IEnumerable<ModelPart>? parts = null)
     {
         var unit = new GameSymbol("UNIT", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(Uri, 0, 0), null);
@@ -194,6 +292,10 @@ public sealed class XmlCloakFactProducerTest
         if (proxies is not null)
             proxyMap = proxyMap.Add("unit.alo", [.. proxies]);
 
+        var partMap = ImmutableDictionary<string, ImmutableArray<ModelPart>>.Empty;
+        if (parts is not null)
+            partMap = partMap.Add("unit.alo", [.. parts]);
+
         var index = GameIndex.Empty with
         {
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
@@ -202,7 +304,8 @@ public sealed class XmlCloakFactProducerTest
                 .Add("UNIT", [unit])
                 .Add("HP_TURRET", [hardpoint]),
             ModelBones = bones,
-            ModelProxies = proxyMap
+            ModelProxies = proxyMap,
+            ModelParts = partMap
         };
 
         var text = written ? WrittenText : """<X><GroundInfantry Name="UNIT"></GroundInfantry></X>""";

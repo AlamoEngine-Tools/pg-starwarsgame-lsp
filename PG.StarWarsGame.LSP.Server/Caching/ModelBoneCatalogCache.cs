@@ -56,7 +56,7 @@ public sealed class ModelBoneCatalogCache : IModelBoneCatalogCache
         foreach (var model in snapshot.Models)
             models[model.ModelKey] = new ModelCatalogEntry(model.Bones, model.Textures, model.ParticleSystem)
             {
-                Proxies = model.Proxies
+                Proxies = model.Proxies, Parts = model.Parts
             };
 
         _logger.LogDebug("Reused model snapshot from '{Path}' ({Models} model(s))", path, models.Count);
@@ -81,7 +81,8 @@ public sealed class ModelBoneCatalogCache : IModelBoneCatalogCache
                     .Select(kv => new SerializedModelBones
                     {
                         ModelKey = kv.Key, Bones = kv.Value.Bones, Textures = kv.Value.Textures,
-                        ParticleSystem = kv.Value.ParticleSystem, Proxies = kv.Value.Proxies
+                        ParticleSystem = kv.Value.ParticleSystem, Proxies = kv.Value.Proxies,
+                        Parts = kv.Value.Parts
                     })
                     .ToArray()
             };

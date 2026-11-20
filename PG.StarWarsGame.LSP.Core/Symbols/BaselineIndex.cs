@@ -111,6 +111,15 @@ public sealed record BaselineIndex(
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    ///     Each shipped model's meshes and proxies with whether the file marks each visible and
+    ///     whether a mesh is drawn as a surface, keyed like <see cref="ModelBones" />, from the same
+    ///     scan (#449). Empty in a baseline built before it: a model with no entry is unknown, and a
+    ///     rule about its parts says nothing rather than guess.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<ModelPart>> ModelParts { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<ModelPart>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     ///     Each shipped registry's entries in the order the game loads them, keyed by the registry's
     ///     path (<c>data/xml/gameobjectfiles.xml</c>), each entry in <see cref="Workspace.GamePaths.Key" />
     ///     form as the registry writes it, a repeat kept. <see cref="FileTypeMap" /> types the same files
