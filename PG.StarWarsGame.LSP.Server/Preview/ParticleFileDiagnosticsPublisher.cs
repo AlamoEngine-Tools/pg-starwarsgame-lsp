@@ -125,7 +125,7 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
         IReadOnlyList<PreviewProblem> problems;
         try
         {
-            problems = ParticleNoticeProblems.For(AloParticleReader.Read(bytes));
+            problems = ParticleNoticeProblems.For(AloParticleReader.Read(bytes), _messages);
         }
         catch (AloFormatException e)
         {

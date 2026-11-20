@@ -195,10 +195,9 @@ public sealed class AloParticleReaderTest
         Assert.Equal(1, content.Emitters[0].SpawnOnDeath);
         Assert.Equal("p_normal.tga", content.Emitters[0].NormalTexture);
 
-        // Known editor data the game never reads: said, as the quiet kind.
-        var notice = Assert.Single(content.Notices);
-        Assert.Equal(AlamoParticleNoticeKind.IgnoredByGame, notice.Kind);
-        Assert.Contains("link group 3", notice.Message);
+        // Known editor data the game never reads: recorded, as the quiet kind (#394).
+        Assert.Equal(new AlamoSkippedChunk(AlamoParticleNoticeKind.IgnoredByGame, 0, 0x0100),
+            Assert.Single(content.SkippedChunks));
     }
 
     [Fact]
@@ -207,7 +206,7 @@ public sealed class AloParticleReaderTest
         var content = AloParticleReader.Read(System("p", null, Emitter()));
 
         Assert.Equal(0u, content.Emitters[0].LinkGroup);
-        Assert.Empty(content.Notices);
+        Assert.Empty(content.SkippedChunks);
     }
 
     // ── what the game skips ───────────────────────────────────────────────────
@@ -233,10 +232,8 @@ public sealed class AloParticleReaderTest
         var content = AloParticleReader.Read(System("p", null, emitter));
 
         Assert.Equal("spark", content.Emitters[0].Name);
-        var notice = Assert.Single(content.Notices);
-        Assert.Equal(AlamoParticleNoticeKind.UnreadByGame, notice.Kind);
-        Assert.Contains("0x7F", notice.Message);
-        Assert.Contains("not read by the game", notice.Message);
+        Assert.Equal(new AlamoSkippedChunk(AlamoParticleNoticeKind.UnreadByGame, 0, 0x7F),
+            Assert.Single(content.SkippedChunks));
     }
 
     [Fact]
@@ -252,9 +249,21 @@ public sealed class AloParticleReaderTest
         var content = AloParticleReader.Read(alo);
 
         Assert.Single(content.Emitters);
-        var notice = Assert.Single(content.Notices);
-        Assert.Equal(AlamoParticleNoticeKind.UnreadByGame, notice.Kind);
-        Assert.Contains("0x7E", notice.Message);
+        // The system's own level: no emitter.
+        Assert.Equal(new AlamoSkippedChunk(AlamoParticleNoticeKind.UnreadByGame, null, 0x7E),
+            Assert.Single(content.SkippedChunks));
+    }
+
+    [Fact]
+    public void Read_RecordsASkippedChunkOncePerEmitterThatCarriesIt()
+    {
+        // A file the Particle Editor saved with every emitter linked carries the link group on each
+        // one: recorded by emitter, in file order, which the preview then says as one line.
+        var content = AloParticleReader.Read(System("p", null,
+            Emitter(linkGroup: 3), Emitter(), Emitter(linkGroup: 3)));
+
+        Assert.Equal([0, 2], content.SkippedChunks.Select(s => s.Emitter));
+        Assert.All(content.SkippedChunks, s => Assert.Equal(0x0100u, s.Chunk));
     }
 
     [Fact]
@@ -276,7 +285,7 @@ public sealed class AloParticleReaderTest
 
         Assert.Equal("reordered", content.Emitters[0].Name);
         Assert.Equal(4f, content.Emitters[0].Properties.Lifetime);
-        Assert.Empty(content.Notices);
+        Assert.Empty(content.SkippedChunks);
     }
 
     [Fact]
@@ -602,10 +611,10 @@ public sealed class AloParticleReaderTest
         var content = AloParticleReader.Read(alo);
 
         Assert.Equal(2.5f, content.Emitters[0].Properties.Lifetime);
-        var notice = Assert.Single(content.Notices);
-        Assert.Equal(AlamoParticleNoticeKind.UnreadByGame, notice.Kind);
-        Assert.Contains("0x7F", notice.Message);
-        Assert.Contains("not read by the game", notice.Message);
+        // Recorded as WHAT was skipped where; the line a reader sees is the preview's to word (#394).
+        Assert.Empty(content.SkippedChunks);
+        Assert.Equal(new AlamoSkippedProperty(AlamoParticleNoticeKind.UnreadByGame, 0, 0x7F),
+            Assert.Single(content.SkippedProperties));
     }
 
     [Fact]
@@ -616,9 +625,9 @@ public sealed class AloParticleReaderTest
         var content = AloParticleReader.Read(
             System("p", null, Emitter(properties: [Mini(0x06, I32(1))])));
 
-        var notice = Assert.Single(content.Notices);
-        Assert.Equal(AlamoParticleNoticeKind.IgnoredByGame, notice.Kind);
-        Assert.Contains("0x06", notice.Message);
+        Assert.Empty(content.SkippedChunks);
+        Assert.Equal(new AlamoSkippedProperty(AlamoParticleNoticeKind.IgnoredByGame, 0, 0x06),
+            Assert.Single(content.SkippedProperties));
     }
 
     [Fact]
@@ -629,8 +638,21 @@ public sealed class AloParticleReaderTest
         var content = AloParticleReader.Read(
             System("p", null, Emitter(properties: [Mini(0x49, [1])])));
 
-        var notice = Assert.Single(content.Notices);
-        Assert.Equal(AlamoParticleNoticeKind.UnreadByGame, notice.Kind);
-        Assert.Contains("0x49", notice.Message);
+        Assert.Equal(new AlamoSkippedProperty(AlamoParticleNoticeKind.UnreadByGame, 0, 0x49),
+            Assert.Single(content.SkippedProperties));
+    }
+
+    [Fact]
+    public void Read_RecordsASkippedPropertyOncePerEmitterThatCarriesIt()
+    {
+        // p_rb_station_damage's three emitters each carry 0x06: three records, by emitter, which the
+        // preview then says as one line.
+        var content = AloParticleReader.Read(System("p", null,
+            Emitter(properties: [Mini(0x06, I32(1))]),
+            Emitter(),
+            Emitter(properties: [Mini(0x06, I32(1))])));
+
+        Assert.Equal([0, 2], content.SkippedProperties.Select(s => s.Emitter));
+        Assert.All(content.SkippedProperties, s => Assert.Equal(0x06, s.Property));
     }
 }

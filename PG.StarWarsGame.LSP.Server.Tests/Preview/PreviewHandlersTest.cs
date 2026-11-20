@@ -901,6 +901,27 @@ public sealed class PreviewHandlersTest
         Assert.Contains(expected, result.Error);
     }
 
+    [Fact]
+    public async Task GetParticleSystem_NamesTheFileItRead_AndSaysASkippedPropertyOnce()
+    {
+        // #394: the dock's two damage stages ask for p_rb_station_damage_ALT1 and _ALT2, which are one
+        // file. The answer names the file it read, so the panel can say that file's notes once; and the
+        // property every emitter carries is one note, not one per emitter.
+        var bytes = ParticleFileBytes.ParticleSystem(
+            ParticleFileBytes.Emitter(null, ParticleFileBytes.Mini(0x06, ParticleFileBytes.I32(1))),
+            ParticleFileBytes.Emitter(null, ParticleFileBytes.Mini(0x06, ParticleFileBytes.I32(1))),
+            ParticleFileBytes.Emitter(null, ParticleFileBytes.Mini(0x06, ParticleFileBytes.I32(1))));
+        var assets = new StubAssets().With("Data/Art/Models/p_rb_station_damage.alo", bytes);
+
+        var result = await Particles(assets, new FakeVariantTagSource()).Handle(
+            new GetParticleSystemParams { Name = "p_rb_station_damage_ALT2" }, CancellationToken.None);
+
+        Assert.Null(result.Error);
+        Assert.Equal("p_rb_station_damage.alo", result.File);
+        var problem = Assert.Single(result.Problems);
+        Assert.Equal("Emitters 0-2 - property 0x06 is read past by the game and has no effect", problem.Message);
+    }
+
     [Theory]
     [InlineData("p_alterac")]
     [InlineData("p_lodestone")]

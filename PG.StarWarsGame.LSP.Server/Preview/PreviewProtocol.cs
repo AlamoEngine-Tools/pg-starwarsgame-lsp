@@ -266,9 +266,20 @@ public sealed record GetParticleSystemResult(
 {
     /// <summary>
     ///     What the file carries that the game does not apply, with ids: the system's notices as
-    ///     problems. Empty for a shipped file but two. See <see cref="ParticleNoticeProblems" />.
+    ///     problems, a skipped property once per file. 38 of the 987 shipped files carry one. See
+    ///     <see cref="ParticleNoticeProblems" />.
     /// </summary>
     public IReadOnlyList<PreviewProblem> Problems { get; init; } = [];
+
+    /// <summary>
+    ///     The file read, as its asset name - <c>p_rb_station_damage.alo</c> for a proxy that asked
+    ///     for <c>p_rb_station_damage_ALT2</c>. Absent when nothing was read.
+    /// </summary>
+    /// <remarks>
+    ///     Two damage stages of one model name one file, and each asks for it (#394). The panel says
+    ///     a file's <see cref="Problems" /> once, under this name, however many proxies asked.
+    /// </remarks>
+    public string? File { get; init; }
 }
 
 /// <summary>Request for one shader's source text.</summary>

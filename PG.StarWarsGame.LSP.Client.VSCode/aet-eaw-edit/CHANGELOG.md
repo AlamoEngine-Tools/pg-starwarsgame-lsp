@@ -109,6 +109,11 @@
   both lines, none for the killing hit, none taken away by a repair. The smokes go with the unit when it
   dies
   ([#451](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/451))
+- **A particle file's unread data said once, and plainly** - a chunk or setting the game does not read
+  in a particle file is one note per file, naming the emitters that carry it and saying it has no effect
+  in game. It used to be one note per emitter and per damage stage, worded as if the whole system were
+  skipped
+  ([#394](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/394))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

@@ -24,7 +24,7 @@ import {
 import { type ModelPreviewToWebview } from "../../protocol/panels/modelPreview";
 import { isSubjectSystem, type LoadTally } from "./loadProgress";
 import { modelRequestsOf } from "./modelStore";
-import { particleNotices } from "./particleNotices";
+import { particleNotices, withParticleNotices } from "./particleNotices";
 import { heldModels, post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
 import { type CloneDeath } from "./deathClone";
@@ -600,13 +600,15 @@ export function useHostMessages({
                     }
 
                     // What the file holds that the game does not apply: skipped as the game skips it,
-                    // and said once per system, whichever way the system was asked for.
+                    // and said once per FILE, however many proxies asked for it (#394).
                     const skipped = particleNotices(
                         message.name,
                         message.result,
                     );
                     if (skipped.length > 0) {
-                        setProblems((current) => [...current, ...skipped]);
+                        setProblems((current) =>
+                            withParticleNotices(current, skipped),
+                        );
                     }
 
                     // A particle file opened directly is its own subject and attaches to nothing.

@@ -135,12 +135,15 @@ public sealed class EawPreviewProtocolTest(EawProblemsFixture fixture) : IClassF
         var problems = await ProblemsView.RevalidateAsync(fixture);
         var readPast = ProblemsView.WithCodes(problems, "aetswg-014-0023");
         var smoke = Assert.Single(readPast["P_smoke_med00.alo"]);
-        Assert.Equal("Emitter 0 - property 0x06, which the game reads past", smoke.Message);
+        Assert.Equal("Emitter 0 - property 0x06 is read past by the game and has no effect", smoke.Message);
         Assert.Equal(DiagnosticSeverity.Information, smoke.Severity);
         Assert.Equal(0, smoke.Range.Start.Line);
 
+        // One line per file (#394): the 31 emitters across eaw's 18 such files used to be 31 lines.
         Assert.Equal(Property06.Sorted(Property06.Files), Property06.Sorted(readPast.Keys));
-        Assert.Equal(31, readPast.Values.Sum(l => l.Count));
+        Assert.All(readPast.Values, l => Assert.Single(l));
+        Assert.Equal("Emitters 0-3 - property 0x06 is read past by the game and has no effect",
+            Assert.Single(readPast["P_fire_big01.alo"]).Message);
         Assert.All(readPast.Values.SelectMany(l => l), d => Assert.Equal(DiagnosticSeverity.Information, d.Severity));
         Assert.Empty(ProblemsView.WithCodes(problems, "aetswg-014-0022"));
     }
@@ -230,12 +233,10 @@ public sealed class FocPreviewProtocolTest(FocVanillaFixture fixture) : IClassFi
     {
         var problems = await ProblemsView.RevalidateAsync(fixture);
         var skipped = ProblemsView.WithCodes(problems, "aetswg-014-0022");
-        Assert.Equal([
-                "Emitter 0 - property 0x49 not read by the game, skipped",
-                "Emitter 1 - property 0x49 not read by the game, skipped"
-            ],
-            skipped["P_tactical_corrupt.alo"].Select(d => d.Message.Text()).Order());
-        Assert.Equal("Emitter 0 - property 0x49 not read by the game, skipped",
+        // One line per property per file, naming the emitters (#394).
+        Assert.Equal("Emitters 0-1 - property 0x49 is not read by the game and has no effect",
+            Assert.Single(skipped["P_tactical_corrupt.alo"]).Message.Text());
+        Assert.Equal("Emitter 0 - property 0x49 is not read by the game and has no effect",
             Assert.Single(skipped["P_icon_corrupt.alo"]).Message);
         Assert.All(skipped.Values.SelectMany(l => l), d => Assert.Equal(DiagnosticSeverity.Warning, d.Severity));
         Assert.Equal(["p_icon_corrupt", "p_tactical_corrupt"], Property06.Sorted(skipped.Keys));
@@ -243,6 +244,9 @@ public sealed class FocPreviewProtocolTest(FocVanillaFixture fixture) : IClassFi
         var readPast = ProblemsView.WithCodes(problems, "aetswg-014-0023");
         Assert.Equal(Property06.Sorted(Property06.Files), Property06.Sorted(readPast.Keys));
         Assert.All(readPast.Values.SelectMany(l => l), d => Assert.Equal(DiagnosticSeverity.Information, d.Severity));
+        Assert.All(readPast.Values, l => Assert.Matches(
+            "^Emitters? [0-9, -]+ - property 0x06 is read past by the game and has no effect$",
+            Assert.Single(l).Message.Text()));
     }
 }
 
@@ -258,10 +262,11 @@ public sealed class ParticleEditorProtocolTest(ParticleEditorFixture fixture) : 
 
         var linked = problems["P_prv_linked.alo"];
         var note = Assert.Single(linked, d => d.Code?.String == "aetswg-014-0023");
-        Assert.Equal("Emitter 0 - link group 3, Particle Editor data the game does not read", note.Message);
+        Assert.Equal("Emitter 0 - the Particle Editor's link group is not read by the game and has no effect",
+            note.Message);
         Assert.Equal(DiagnosticSeverity.Information, note.Severity);
         var skipped = Assert.Single(linked, d => d.Code?.String == "aetswg-014-0022");
-        Assert.Equal("Emitter 0 - chunk 0x7F not read by the game, skipped", skipped.Message);
+        Assert.Equal("Emitter 0 - chunk 0x7F is not read by the game and has no effect", skipped.Message);
         Assert.Equal(DiagnosticSeverity.Warning, skipped.Severity);
         Assert.Equal(2, linked.Count);
 

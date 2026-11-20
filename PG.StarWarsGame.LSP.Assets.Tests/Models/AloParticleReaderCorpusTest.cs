@@ -43,18 +43,20 @@ public sealed class AloParticleReaderCorpusTest
                 parsed++;
                 emitters += system.Emitters.Count;
 
-                // The chunk and property id sets are closed over the shipped data but for two
-                // ids: 0x06, which the game reads past (36 files), and 0x49, which its reader has
-                // no case for (2 files). Anything else here is something nobody has measured.
-                foreach (var notice in system.Notices)
-                    switch (notice.Kind)
+                // The chunk id sets are closed over the shipped data, and the property id set but
+                // for two ids: 0x06, which the game reads past (36 files), and 0x49, which its
+                // reader has no case for (2 files). Anything else here is something nobody has
+                // measured.
+                Assert.Empty(system.SkippedChunks);
+                foreach (var skipped in system.SkippedProperties)
+                    switch (skipped.Kind)
                     {
                         case AlamoParticleNoticeKind.IgnoredByGame:
-                            Assert.Contains("0x06", notice.Message);
+                            Assert.Equal(0x06, skipped.Property);
                             ignoredByGame++;
                             break;
                         default:
-                            Assert.Contains("0x49", notice.Message);
+                            Assert.Equal(0x49, skipped.Property);
                             unreadByGame++;
                             break;
                     }

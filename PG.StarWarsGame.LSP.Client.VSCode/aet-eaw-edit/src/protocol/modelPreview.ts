@@ -1237,27 +1237,45 @@ export interface AlamoEmitter {
 
 /** How a particle file's unapplied data is classified. Mirrors the C# `AlamoParticleNoticeKind`. */
 export const ALAMO_PARTICLE_NOTICE_KIND = {
-    /** The game's reader has no case for it: skipped by the game and by the server alike. */
+    /** The game's reader has no case for it: opened, left unread and closed, by the game and the server alike. */
     unreadByGame: "UnreadByGame",
-    /** Known data the game deliberately does not apply - the Particle Editor's link group. */
+    /** Known data the game does not apply - the Particle Editor's link group, property 0x06. */
     ignoredByGame: "IgnoredByGame",
 } as const;
 
-/** One thing a particle file carries that the game does not apply. */
-export interface AlamoParticleNotice {
+/** One chunk a particle file carries that the game does not apply. Mirrors `AlamoSkippedChunk`. */
+export interface AlamoSkippedChunk {
     /** See {@link ALAMO_PARTICLE_NOTICE_KIND}. */
     kind: string;
-    message: string;
+    /** The emitter's index in the file, or null for a chunk at the system's own level. */
+    emitter?: number | null;
+    /** The chunk's id. */
+    chunk: number;
+}
+
+/** One property one emitter carries that the game does not apply. Mirrors `AlamoSkippedProperty`. */
+export interface AlamoSkippedProperty {
+    /** See {@link ALAMO_PARTICLE_NOTICE_KIND}. */
+    kind: string;
+    /** The emitter's index in the file. */
+    emitter: number;
+    /** The property's mini-chunk id. */
+    property: number;
 }
 
 export interface AlamoParticleContent {
     name: string;
     leaveParticles: boolean;
     /**
-     * What the file holds that the game does not apply, one entry each. The server turns these
-     * into the result's `problems`, with ids; the panel reads those, not this.
+     * Every chunk the game does not apply, at the system and the emitter level. The server says
+     * each once per file in the result's `problems`; the panel reads those, not this.
      */
-    notices?: AlamoParticleNotice[] | null;
+    skippedChunks?: AlamoSkippedChunk[] | null;
+    /**
+     * Every property the game does not apply, one entry per emitter carrying it. The server says
+     * each property once per file in the result's `problems`; the panel reads those, not this.
+     */
+    skippedProperties?: AlamoSkippedProperty[] | null;
     emitters: AlamoEmitter[];
 }
 
@@ -1293,9 +1311,15 @@ export interface GetParticleSystemResult {
     scaleFactor?: number | null;
     error?: string | null;
     /**
+     * The file read, as its asset name - `p_rb_station_damage.alo` for a proxy that asked for
+     * `p_rb_station_damage_ALT2`. The panel says a file's `problems` once, under this name, however
+     * many proxies asked for it. Absent when nothing was read.
+     */
+    file?: string | null;
+    /**
      * What the file carries that the game does not apply, with ids: a warning for data the game's
      * reader has no case for, information for known editor data it leaves unapplied. Empty for a
-     * shipped file but two.
+     * shipped file but 38.
      */
     problems?: PreviewProblem[] | null;
 }

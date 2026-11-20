@@ -1507,6 +1507,27 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="ParticleFile_MalformedParticleFile" xml:space="preserve">
     <value>Malformed particle file: {0}</value>
   </data>
+  <data name="ParticleNotice_ChunkNotRead" xml:space="preserve">
+    <value>{0} - chunk 0x{1} is not read by the game and has no effect</value>
+  </data>
+  <data name="ParticleNotice_Emitter" xml:space="preserve">
+    <value>Emitter {0}</value>
+  </data>
+  <data name="ParticleNotice_Emitters" xml:space="preserve">
+    <value>Emitters {0}</value>
+  </data>
+  <data name="ParticleNotice_LinkGroupNotRead" xml:space="preserve">
+    <value>{0} - the Particle Editor's link group is not read by the game and has no effect</value>
+  </data>
+  <data name="ParticleNotice_PropertyNotRead" xml:space="preserve">
+    <value>{0} - property 0x{1} is not read by the game and has no effect</value>
+  </data>
+  <data name="ParticleNotice_PropertyReadPast" xml:space="preserve">
+    <value>{0} - property 0x{1} is read past by the game and has no effect</value>
+  </data>
+  <data name="ParticleNotice_SystemChunkNotRead" xml:space="preserve">
+    <value>Particle system - chunk 0x{0} is not read by the game and has no effect</value>
+  </data>
   <data name="PerFactionIntMap_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>

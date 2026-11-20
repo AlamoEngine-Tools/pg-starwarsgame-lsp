@@ -86,7 +86,8 @@ public sealed class GetParticleSystemHandler(
             var system = AloParticleReader.Read(bytes);
             return Task.FromResult(new GetParticleSystemResult(system, scale)
             {
-                Problems = ParticleNoticeProblems.For(system)
+                Problems = ParticleNoticeProblems.For(system, messages),
+                File = name
             });
         }
         catch (AloFormatException e)

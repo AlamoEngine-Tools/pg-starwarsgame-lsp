@@ -272,16 +272,30 @@ public sealed record AlamoParticleContent(
     IReadOnlyList<AlamoEmitter> Emitters)
 {
     /// <summary>
-    ///     What the file holds that the game does not apply, one entry each. Empty for every
-    ///     shipped file but two, which carry a property the game has no case for.
+    ///     Every chunk the game does not apply, at the system and the emitter level, in file order:
+    ///     one the game has no case for, and the Particle Editor's link group. Empty for every
+    ///     shipped file.
     /// </summary>
     /// <remarks>
     ///     The game's reader opens a chunk or property it does not know, reads nothing and closes
     ///     it, at the system level, the emitter level and inside the property block alike. This
-    ///     reader does the same and says so here, because a file that carries a setting nothing
-    ///     applies is worth a line in the preview's problems. The kind says how loud.
+    ///     reader does the same and records it here, because a file that carries data nothing
+    ///     applies is worth a line in the preview's problems. The kind says how loud. Recorded as
+    ///     data rather than as text, as <see cref="SkippedProperties" /> are: the preview words it,
+    ///     once per chunk per file (#394).
     /// </remarks>
-    public IReadOnlyList<AlamoParticleNotice> Notices { get; init; } = [];
+    public IReadOnlyList<AlamoSkippedChunk> SkippedChunks { get; init; } = [];
+
+    /// <summary>
+    ///     Every property the game does not apply, one entry per emitter that carries it, in file
+    ///     order.
+    /// </summary>
+    /// <remarks>
+    ///     Recorded as data rather than as text: the reader is told once per property per file,
+    ///     naming the emitters (#394), and that wording belongs to the preview. Measured over the
+    ///     shipped trees: 0x06 on 62 emitters in 36 files, 0x49 on 3 emitters in 2 files.
+    /// </remarks>
+    public IReadOnlyList<AlamoSkippedProperty> SkippedProperties { get; init; } = [];
 }
 
 /// <summary>How a particle file's unapplied data is classified, after what the game does with it.</summary>
@@ -300,5 +314,25 @@ public enum AlamoParticleNoticeKind
     IgnoredByGame
 }
 
-/// <summary>One thing a particle file carries that the game does not apply.</summary>
-public sealed record AlamoParticleNotice(AlamoParticleNoticeKind Kind, string Message);
+/// <summary>One property one emitter carries that the game does not apply.</summary>
+/// <param name="Kind">What the game does with it: reads past it, or has no case for it.</param>
+/// <param name="Emitter">The emitter's index in the file.</param>
+/// <param name="Property">The property's mini-chunk id.</param>
+public sealed record AlamoSkippedProperty(AlamoParticleNoticeKind Kind, int Emitter, int Property);
+
+/// <summary>One chunk a particle file carries that the game does not apply.</summary>
+/// <param name="Kind">
+///     What the game does with it. <see cref="AlamoParticleNoticeKind.IgnoredByGame" /> only for
+///     <see cref="ParticleEditorLinkGroup" />: the game has no case for that one either, but it is
+///     known editor data.
+/// </param>
+/// <param name="Emitter">The emitter's index in the file, or null for a chunk at the system's own level.</param>
+/// <param name="Chunk">The chunk's id.</param>
+public sealed record AlamoSkippedChunk(AlamoParticleNoticeKind Kind, int? Emitter, uint Chunk)
+{
+    /// <summary>
+    ///     The Particle Editor's link group: editor state the game never reads, written as the last
+    ///     chunk of a linked emitter. Not in the shipped trees; a file saved there carries it.
+    /// </summary>
+    public const uint ParticleEditorLinkGroup = 0x0100;
+}
