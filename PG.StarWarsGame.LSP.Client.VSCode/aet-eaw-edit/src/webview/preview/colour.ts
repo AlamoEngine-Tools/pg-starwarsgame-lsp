@@ -103,9 +103,9 @@ export function affiliationColour(
 /**
  * A faction colour as the renderer takes it.
  *
- * Alpha is forced opaque, matching `RenderObject::SetColorization`, which comments the same rule:
- * "always force alpha channel to 100%". Vanilla factions do ship colours with other alphas, and
- * honouring them would make those units translucent in a way the game never shows.
+ * Alpha is forced opaque: measured in the game, a faction colour is applied with its alpha set to
+ * full, whatever the colour writes. Vanilla factions do ship colours with other alphas, and honouring
+ * them would make those units translucent in a way the game never shows.
  */
 export function teamColour(colour: PreviewRgba): NormalisedColour {
     return {

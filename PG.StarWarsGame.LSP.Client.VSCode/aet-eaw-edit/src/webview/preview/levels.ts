@@ -4,43 +4,41 @@
 // Damage states and detail levels, the way the engine gates them.
 //
 // ALT and LOD are encoded in mesh and proxy NAMES - `_ALT2`, `_LOD1` - which the reader strips into
-// numbers. The rule is `RenderObject::CheckAltLod`: only TAGGED things are ever switched, so an
-// untagged mesh is the hull itself and must never be hidden by a level change.
+// numbers. Measured in the game: only TAGGED things are ever switched, so an untagged mesh is the
+// hull itself and must never be hidden by a level change. Detail level switches MESHES only - an
+// effect runs at every LOD, whatever `_LOD` tag its proxy carries (#450); the damage level switches
+// both.
 
 import { isVisibleAtLevel, type MaterialExtras } from "./materials";
 
 /** The level tags something carries, with null meaning untagged. */
 export interface LevelTagged {
     alt: number | null;
+    /** The proxy's `_LOD` tag. Read from the file and never a gate - see {@link proxyAltVisibleAt}. */
     lod: number | null;
-    /** See {@link proxyVisibleAt}. Meshes do not have this; only proxies do. */
+    /** See {@link proxyAltVisibleAt}. Meshes do not have this; only proxies do. */
     altDecreaseStayHidden: boolean;
 }
 
 /**
- * Whether a proxy is drawn at the given levels.
+ * The damage-level switch of a proxy - the only level switch an effect has.
  *
- * `altDescending` is a property of the last CHANGE, not a state: the engine computes it as
- * `alt < m_alt` inside `SetALT` and passes `false` for every LOD change. A proxy that sets
- * `altDecreaseStayHidden` is held back on a decreasing step, which is what stops a repaired
- * hardpoint's fire flickering back on as the damage state winds down.
+ * `altDescending` is a property of the last CHANGE, not a state: it is true only for a step down in
+ * damage level, never for a LOD change. A proxy that sets `altDecreaseStayHidden` is held back on a
+ * decreasing step, which is what stops a repaired hardpoint's fire flickering back on as the damage
+ * state winds down. A proxy with no `_ALT` tag is never touched by a level change, whatever `_LOD`
+ * tag it carries: measured, detail level gates meshes only.
  */
-export function proxyVisibleAt(
+export function proxyAltVisibleAt(
     proxy: LevelTagged,
     alt: number,
-    lod: number,
     altDescending: boolean,
 ): boolean {
-    // Untagged proxies are never touched by a level change.
-    if (proxy.alt === null && proxy.lod === null) {
+    if (proxy.alt === null) {
         return true;
     }
 
-    if (proxy.lod !== null && proxy.lod !== lod) {
-        return false;
-    }
-
-    if (proxy.alt !== null && proxy.alt !== alt) {
+    if (proxy.alt !== alt) {
         return false;
     }
 

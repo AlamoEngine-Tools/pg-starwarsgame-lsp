@@ -431,6 +431,34 @@ public sealed class ModelGlbExporterTest
     }
 
     [Fact]
+    public void Export_MarksABoneTheFileHidesInItsNodeExtras()
+    {
+        // The bone's visible flag decides the parts on it while no clip runs, and glTF has no notion
+        // of a hidden node that the client could read instead.
+        var alo = Concat(
+            Skeleton(
+                Bone("ROOT", -1, true, Translation(0, 0, 0)),
+                Bone("HIDDEN", 0, false, Translation(0, 0, 0)),
+                Bone("CARD", 0, false, Translation(0, 0, 0), (int)AlamoBillboardType.ZAxisView),
+                Bone("SHOWN", 0, true, Translation(0, 0, 0))),
+            Mesh("HIDDEN", [TriangleSubMesh()]),
+            Connections([Connection(0, 1)]));
+
+        var gltf = Roundtrip(alo);
+
+        Assert.True(gltf.LogicalNodes.Single(n => n.Name == "HIDDEN#1")
+            .Extras!["alamoBoneHidden"]!.GetValue<bool>());
+
+        // Beside the billboard mode on a bone that has both, not instead of it.
+        var card = gltf.LogicalNodes.Single(n => n.Name == "CARD#2").Extras!;
+        Assert.True(card["alamoBoneHidden"]!.GetValue<bool>());
+        Assert.Equal("ZAxisView", card["alamoBillboard"]!.GetValue<string>());
+
+        // Nothing on a bone the file shows.
+        Assert.Null(gltf.LogicalNodes.Single(n => n.Name == "SHOWN#3").Extras);
+    }
+
+    [Fact]
     public void Export_CarriesTheShaderNameAndParametersInMaterialExtras()
     {
         // glTF has no equivalent of an Alamo shader binding, so the client reconstructs the material
@@ -545,16 +573,16 @@ public sealed class ModelGlbExporterTest
     }
 
     /// <summary>
-    ///     A track binds by INDEX, not by name.
+    ///     A track binds by POSITION, not by name.
     /// </summary>
     /// <remarks>
     ///     This assertion used to run the other way. The user reported that the identical-skeleton
     ///     rule fires all over the BASE GAME, on units whose animations play correctly in the engine
-    ///     - so the engine binds by index and refusing a name disagreement was costing real clips
+    ///     - so the engine does not bind by name, and refusing a disagreement was costing real clips
     ///     their motion. A disagreement is now reported against the object as information instead.
     /// </remarks>
     [Fact]
-    public void Export_DrivesTheBoneAtThatIndexEvenWhenTheNameDisagrees()
+    public void Export_DrivesTheBoneAtThatPositionEvenWhenTheNameDisagrees()
     {
         var alo = Concat(
             Skeleton(
@@ -574,7 +602,42 @@ public sealed class ModelGlbExporterTest
     }
 
     /// <summary>
-    ///     An index past the end of the skeleton is still refused - there is no node to drive.
+    ///     Track i drives bone i + 1 - the root has no track - whatever bone the track names and
+    ///     whatever index it stores.
+    /// </summary>
+    /// <remarks>
+    ///     The game matches a clip's tracks to bones by position. Here the stored indices and the
+    ///     names are both swapped against the skeleton, so binding by either would move the wrong
+    ///     bone.
+    /// </remarks>
+    [Fact]
+    public void Export_DrivesTheBoneAtTheTracksPositionNotTheOneItNames()
+    {
+        var alo = Concat(
+            Skeleton(
+                Bone("ROOT", -1, true, Translation(0, 0, 0)),
+                Bone("A", 0, true, Translation(0, 0, 0)),
+                Bone("B", 0, true, Translation(0, 0, 0))),
+            Mesh("HULL", [TriangleSubMesh()]),
+            Connections([Connection(0, 1)]));
+
+        var ala = AlaChunkFixture.AnimationV1(2, 30f,
+            AlaChunkFixture.BoneV1("B", 2, new Vector3(1, 0, 0), new Vector3(1, 0, 0),
+                translationSamples:
+                [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(0, 0, 0)]),
+            AlaChunkFixture.BoneV1("A", 1, new Vector3(7, 0, 0), new Vector3(1, 0, 0),
+                translationSamples:
+                [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(0, 0, 0)]));
+
+        var gltf = Roundtrip(alo, ("swapped", ala));
+
+        Assert.Equal(1f, LastTranslation(gltf, "A#1").X, 3);
+        Assert.Equal(7f, LastTranslation(gltf, "B#2").X, 3);
+    }
+
+    /// <summary>
+    ///     A track whose position lands past the end of the skeleton has no bone to drive. The tracks
+    ///     before it still drive theirs.
     /// </summary>
     [Fact]
     public void Export_IgnoresAnAnimationTrackBeyondTheSkeleton()
@@ -587,13 +650,28 @@ public sealed class ModelGlbExporterTest
             Connections([Connection(0, 1)]));
 
         var ala = AlaChunkFixture.AnimationV1(2, 30f,
-            AlaChunkFixture.BoneV1("MUZZLE", 9,
+            AlaChunkFixture.BoneV1("TURRET", 1,
+                translationSamples:
+                [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(1, 0, 0)]),
+            AlaChunkFixture.BoneV1("MUZZLE", 2,
                 translationSamples:
                 [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(1, 0, 0)]));
 
         var gltf = Roundtrip(alo, ("beyond", ala));
 
-        Assert.Empty(gltf.LogicalAnimations.SelectMany(a => a.Channels));
+        Assert.All(gltf.LogicalAnimations.SelectMany(a => a.Channels),
+            channel => Assert.Equal("TURRET#1", channel.TargetNode.Name));
+    }
+
+    private static Vector3 LastTranslation(ModelRoot gltf, string node)
+    {
+        return gltf.LogicalAnimations
+            .SelectMany(a => a.Channels)
+            .Single(c => c.TargetNode.Name == node && c.TargetNodePath == PropertyPath.translation)
+            .GetTranslationSampler()
+            .GetLinearKeys()
+            .Last()
+            .Value;
     }
 
     // ── visibility ────────────────────────────────────────────────────────────
@@ -673,11 +751,7 @@ public sealed class ModelGlbExporterTest
     }
 
     /// <summary>
-    ///     Same rule as the motion tracks: a track naming a bone this skeleton does not have is an
-    ///     animation authored against a different model, and must not reach into this one.
-    /// </summary>
-    /// <summary>
-    ///     A visibility track binds by index too, and is filed under the MODEL's name for that bone.
+    ///     A visibility track binds by position too, and is filed under the MODEL's name for that bone.
     /// </summary>
     /// <remarks>
     ///     The key is a glTF NODE name, and the nodes are named after the skeleton being exported. A
@@ -701,6 +775,32 @@ public sealed class ModelGlbExporterTest
 
         var bones = Visibility(Assert.Single(gltf.LogicalAnimations))!["bones"]!.AsObject();
         Assert.Equal(["TURRET#1"], bones.Select(pair => pair.Key));
+    }
+
+    /// <summary>
+    ///     The visibility half of the position rule: the first track hides the FIRST bone after the
+    ///     root, though it names and indexes the second.
+    /// </summary>
+    [Fact]
+    public void Export_FilesAVisibilityTrackUnderTheBoneAtItsPosition()
+    {
+        var alo = Concat(
+            Skeleton(
+                Bone("ROOT", -1, true, Translation(0, 0, 0)),
+                Bone("A", 0, true, Translation(0, 0, 0)),
+                Bone("B", 0, true, Translation(0, 0, 0))),
+            Mesh("HULL", [TriangleSubMesh()]),
+            Connections([Connection(0, 1)]));
+
+        var ala = AlaChunkFixture.AnimationV1(2, 30f,
+            AlaChunkFixture.BoneV1("B", 2, visibility: [false, true]),
+            AlaChunkFixture.BoneV1("A", 1, visibility: [true, true]));
+
+        var gltf = Roundtrip(alo, ("swapped", ala));
+
+        var bones = Visibility(Assert.Single(gltf.LogicalAnimations))!["bones"]!.AsObject();
+        Assert.Equal(["A#1"], bones.Select(pair => pair.Key));
+        Assert.Equal("01", (string)bones["A#1"]!);
     }
 
     /// <summary>

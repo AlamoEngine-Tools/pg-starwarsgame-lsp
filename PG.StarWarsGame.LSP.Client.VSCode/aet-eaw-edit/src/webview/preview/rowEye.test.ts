@@ -25,13 +25,16 @@ describe("rowEye, the three states of the tree`s eye", () => {
         );
     });
 
-    it("is a closed eye for a row the FILE or the level hides", () => {
+    it("is a closed eye for a row any of its own switches hides", () => {
         // The row's own state, whoever set it. What matters for the glyph is that this control can
         // change it: clicking a file-hidden collision hull shows it, which is exactly what the
         // reader reaches for.
         for (const decidedBy of [
             "file",
-            "level",
+            "rules",
+            "alt",
+            "lod",
+            "archetype",
             "animation",
             "idle",
         ] as const) {

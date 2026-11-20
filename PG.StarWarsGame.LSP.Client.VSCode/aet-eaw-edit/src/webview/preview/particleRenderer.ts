@@ -46,6 +46,7 @@ import type { TranslatedEffect } from "./fx/effect";
 import type { FxMaterialState } from "./fx/renderState";
 import { applyBlend, applyDepth } from "./materialState";
 import { particleEffectName } from "./particleEffects";
+import { type Look, PLAIN_LOOK } from "./cloakFade";
 
 /**
  * Ceiling on live particles per emitter.
@@ -221,6 +222,31 @@ export function blendingFor(mode: string): ParticleBlend {
                 blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
             };
     }
+}
+
+/**
+ * One particle's drawn colour and alpha.
+ *
+ * Its own colour, faded by the weather and by its model's whole look - see `cloakFade.ts`. The look's
+ * tint multiplies the colour; its alpha, like the weather fade, multiplies the colour of an additive
+ * emitter, which alpha does not scale, and the alpha of every other.
+ */
+export function particleColour(
+    particle: { r: number; g: number; b: number; a: number },
+    additive: boolean,
+    weather: number,
+    look: Look,
+): [number, number, number, number] {
+    const fade = weather * look.a;
+    const colourFade = additive ? fade : 1;
+    const alphaFade = additive ? 1 : fade;
+
+    return [
+        particle.r * look.r * colourFade,
+        particle.g * look.g * colourFade,
+        particle.b * look.b * colourFade,
+        particle.a * alphaFade,
+    ];
 }
 
 /**
@@ -652,6 +678,8 @@ function stillFrame(): EmitterFrame {
 /** One emitter's live particles and the geometry drawing them. */
 class EmitterRenderer {
     readonly mesh: THREE.Mesh;
+    /** The owning model's whole look - see `cloakFade.ts`. Set by the system every step. */
+    modelLook: Look = PLAIN_LOOK;
 
     private readonly particles: Particle[] = [];
     private readonly clock: SpawnClock;
@@ -1119,18 +1147,21 @@ class EmitterRenderer {
             // game's distance on the colour of an additive emitter and the alpha otherwise.
             const fade = weather ? this.weatherDrawOf(particle) : 1;
             const drawn = weather ? this.weatherDrawn : particle.position;
-            const colourFade = fadeOnColour ? fade : 1;
-            const alphaFade = fadeOnColour ? 1 : fade;
             const px = drawn.x * scale;
             const py = drawn.y * scale;
             const pz = drawn.z * scale;
             const index = look.frame % (columns * columns);
             const originU = (index % columns) * cell;
             const originV = Math.floor(index / columns) * cell;
-            const r = bump ? 0.5 + 0.5 * c : look.r * colourFade;
-            const g = bump ? 0.5 + 0.5 * s : look.g * colourFade;
-            const b = bump ? 0.5 : look.b * colourFade;
-            const a = look.a * alphaFade;
+            const [lr, lg, lb, a] = particleColour(
+                look,
+                fadeOnColour,
+                fade,
+                this.modelLook,
+            );
+            const r = bump ? 0.5 + 0.5 * c : lr;
+            const g = bump ? 0.5 + 0.5 * s : lg;
+            const b = bump ? 0.5 : lb;
 
             for (let corner = 0; corner < 4; corner++) {
                 const cx = QUAD_CORNERS[corner * 2];
@@ -1650,8 +1681,12 @@ class EmitterRenderer {
             const weather = this.weatherHalf > 0;
             const fade = weather ? this.weatherDrawOf(particle) : 1;
             const drawn = weather ? this.weatherDrawn : particle.position;
-            const colourFade = fadeOnColour ? fade : 1;
-            const alphaFade = fadeOnColour ? 1 : fade;
+            const [lr, lg, lb, la] = particleColour(
+                look,
+                fadeOnColour,
+                fade,
+                this.modelLook,
+            );
 
             // The object's uniform scale, applied to the POSITION and the SIZE together, which is
             // what a scale on the world matrix does. It has to be here rather than on the system's
@@ -1661,11 +1696,11 @@ class EmitterRenderer {
             this.offsets[i * 3 + 1] = drawn.y * this.scaleFactor;
             this.offsets[i * 3 + 2] = drawn.z * this.scaleFactor;
 
-            this.colors[i * 3] = look.r * colourFade;
-            this.colors[i * 3 + 1] = look.g * colourFade;
-            this.colors[i * 3 + 2] = look.b * colourFade;
+            this.colors[i * 3] = lr;
+            this.colors[i * 3 + 1] = lg;
+            this.colors[i * 3 + 2] = lb;
 
-            this.alphas[i] = look.a * alphaFade;
+            this.alphas[i] = la;
             this.sizes[i] = look.size * this.scaleFactor;
             this.rotations[i] = look.rotation;
             this.frames[i] = look.frame;
@@ -1821,9 +1856,9 @@ export class ParticleSystemInstance {
      * says nothing about this" to TRUE - re-armed the emitters of a part that had just been hidden.
      *
      * Only SPAWNING stops either way: the particles already in the air step and die as they would
-     * have, so a held effect trails away rather than vanishing mid-flight. That is what
-     * `Engine::KillParticleSystem` does with `leaveParticles`, and what `RenderObject::KillProxy`
-     * does through `Detach` when a proxy's own bone goes invisible.
+     * have, so a held effect trails away rather than vanishing mid-flight. Measured in the game: an
+     * effect that is stopped while leaving its particles, and one whose proxy bone goes invisible,
+     * both stop spawning and let the particles already out finish.
      */
     private readonly holds = new Set<EmissionHold>();
 
@@ -1956,7 +1991,7 @@ export class ParticleSystemInstance {
      *
      * Every gate resolved HERE rather than by several writers of one flag: the reasons in
      * {@link holds}, and being drawn at all. A system nobody can see is not running - the
-     * reader's tick, the effects master, the level gate and the quiet-on-open rule all hold an
+     * reader's tick, the effects master, the level gate and the unit's rules all hold an
      * effect back by not drawing it, and an emitter that goes on firing behind that is spending its
      * life where nobody can watch it. For a burst that is fatal: `p_explosion_empire_atat00` was
      * exhausted seconds before its row could be ticked on, so switching it on showed nothing at all.
@@ -2219,6 +2254,13 @@ export class ParticleSystemInstance {
 
     setVisible(visible: boolean): void {
         this.root.visible = visible;
+    }
+
+    /** The owning model's whole look, for every emitter - see `cloakFade.ts`. */
+    setLook(look: Look): void {
+        for (const emitter of this.emitters) {
+            emitter.modelLook = look;
+        }
     }
 
     dispose(): void {

@@ -376,6 +376,11 @@
   "ScaleFactor": 1.75,
   "IconName": "i_button_atat.tga",
   "SourceFile": null,
+  "PassiveMissileShieldRadius": null,
+  "DeathPersistenceOverride": 30,
+  "Stealth": null,
+  "ForceCloak": null,
+  "DamagedSmokeAsset": null,
   "DamageStages": [
     0,
     1,
@@ -419,6 +424,9 @@
       "ModelFile": "EV_AT-AT.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 1.75,
+      "PersistenceSeconds": 15,
+      "FadeSeconds": null,
+      "KeepsItsOwnPersistence": true,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -463,8 +471,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#1",
@@ -477,8 +484,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#2",
@@ -491,8 +497,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#3",
@@ -505,8 +510,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#4",
@@ -519,8 +523,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#5",
@@ -533,8 +536,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#6",
@@ -547,8 +549,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#7",
@@ -561,8 +562,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#8",
@@ -575,8 +575,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#9",
@@ -589,8 +588,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#10",
@@ -603,8 +601,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#11",
@@ -617,8 +614,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#12",
@@ -631,8 +627,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#13",
@@ -645,8 +640,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#14",
@@ -659,8 +653,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#15",
@@ -673,8 +666,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#16",
@@ -687,8 +679,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#17",
@@ -701,8 +692,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#18",
@@ -715,8 +705,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#19",
@@ -729,8 +718,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#20",
@@ -743,8 +731,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#21",
@@ -757,8 +744,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Cable_Attack_Death_Clone#22",
@@ -771,9 +757,11 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         }
+      ],
+      "EndExplosions": [
+        "Huge_Explosion_Land"
       ]
     },
     {
@@ -782,6 +770,9 @@
       "ModelFile": "EV_AT-AT.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 1.75,
+      "PersistenceSeconds": 15,
+      "FadeSeconds": null,
+      "KeepsItsOwnPersistence": true,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -826,8 +817,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#1",
@@ -840,8 +830,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#2",
@@ -854,8 +843,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#3",
@@ -868,8 +856,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#4",
@@ -882,8 +869,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#5",
@@ -896,8 +882,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#6",
@@ -910,8 +895,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#7",
@@ -924,8 +908,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#8",
@@ -938,8 +921,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#9",
@@ -952,8 +934,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#10",
@@ -966,8 +947,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#11",
@@ -980,8 +960,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#12",
@@ -994,8 +973,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#13",
@@ -1008,8 +986,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#14",
@@ -1022,8 +999,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#15",
@@ -1036,8 +1012,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#16",
@@ -1050,8 +1025,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#17",
@@ -1064,8 +1038,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#18",
@@ -1078,8 +1051,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#19",
@@ -1092,8 +1064,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#20",
@@ -1106,8 +1077,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#21",
@@ -1120,8 +1090,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_00#22",
@@ -1134,9 +1103,11 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         }
+      ],
+      "EndExplosions": [
+        "Huge_Explosion_Land"
       ]
     },
     {
@@ -1145,6 +1116,9 @@
       "ModelFile": "EV_AT-AT.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 1.75,
+      "PersistenceSeconds": 15,
+      "FadeSeconds": null,
+      "KeepsItsOwnPersistence": true,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -1189,8 +1163,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#1",
@@ -1203,8 +1176,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#2",
@@ -1217,8 +1189,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#3",
@@ -1231,8 +1202,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#4",
@@ -1245,8 +1215,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#5",
@@ -1259,8 +1228,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#6",
@@ -1273,8 +1241,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#7",
@@ -1287,8 +1254,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#8",
@@ -1301,8 +1267,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#9",
@@ -1315,8 +1280,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#10",
@@ -1329,8 +1293,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#11",
@@ -1343,8 +1306,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#12",
@@ -1357,8 +1319,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#13",
@@ -1371,8 +1332,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#14",
@@ -1385,8 +1345,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#15",
@@ -1399,8 +1358,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#16",
@@ -1413,8 +1371,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#17",
@@ -1427,8 +1384,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#18",
@@ -1441,8 +1397,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#19",
@@ -1455,8 +1410,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#20",
@@ -1469,8 +1423,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#21",
@@ -1483,8 +1436,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_01#22",
@@ -1497,9 +1449,11 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         }
+      ],
+      "EndExplosions": [
+        "Huge_Explosion_Land"
       ]
     },
     {
@@ -1508,6 +1462,9 @@
       "ModelFile": "EV_AT-AT.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 1.75,
+      "PersistenceSeconds": 15,
+      "FadeSeconds": null,
+      "KeepsItsOwnPersistence": true,
       "Animations": [
         "ev_at-at_attack_00.ala",
         "ev_at-at_ca_die_00.ala",
@@ -1552,8 +1509,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#1",
@@ -1566,8 +1522,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#2",
@@ -1580,8 +1535,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#3",
@@ -1594,8 +1548,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#4",
@@ -1608,8 +1561,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#5",
@@ -1622,8 +1574,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#6",
@@ -1636,8 +1587,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#7",
@@ -1650,8 +1600,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#8",
@@ -1664,8 +1613,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#9",
@@ -1678,8 +1626,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#10",
@@ -1692,8 +1639,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#11",
@@ -1706,8 +1652,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#12",
@@ -1720,8 +1665,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#13",
@@ -1734,8 +1678,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#14",
@@ -1748,8 +1691,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#15",
@@ -1762,8 +1704,7 @@
           "StartsVisible": true,
           "Alt": 1,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#16",
@@ -1776,8 +1717,7 @@
           "StartsVisible": true,
           "Alt": 2,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#17",
@@ -1790,8 +1730,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#18",
@@ -1804,8 +1743,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#19",
@@ -1818,8 +1756,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#20",
@@ -1832,8 +1769,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#21",
@@ -1846,8 +1782,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         },
         {
           "Id": "AT_AT_Walker_Death_Clone_02#22",
@@ -1860,9 +1795,11 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": true,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": true
         }
+      ],
+      "EndExplosions": [
+        "Huge_Explosion_Land"
       ]
     }
   ],
@@ -2127,8 +2064,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#1",
@@ -2141,8 +2077,7 @@
       "StartsVisible": true,
       "Alt": 1,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#2",
@@ -2155,8 +2090,7 @@
       "StartsVisible": true,
       "Alt": 1,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#3",
@@ -2169,8 +2103,7 @@
       "StartsVisible": true,
       "Alt": 2,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#4",
@@ -2183,8 +2116,7 @@
       "StartsVisible": true,
       "Alt": 2,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#5",
@@ -2197,8 +2129,7 @@
       "StartsVisible": true,
       "Alt": 2,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#6",
@@ -2211,8 +2142,7 @@
       "StartsVisible": true,
       "Alt": 1,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#7",
@@ -2225,8 +2155,7 @@
       "StartsVisible": true,
       "Alt": 1,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#8",
@@ -2239,8 +2168,7 @@
       "StartsVisible": true,
       "Alt": 2,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#9",
@@ -2253,8 +2181,7 @@
       "StartsVisible": true,
       "Alt": 2,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#10",
@@ -2267,8 +2194,7 @@
       "StartsVisible": true,
       "Alt": 2,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#11",
@@ -2281,8 +2207,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#12",
@@ -2295,8 +2220,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#13",
@@ -2309,8 +2233,7 @@
       "StartsVisible": true,
       "Alt": 1,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#14",
@@ -2323,8 +2246,7 @@
       "StartsVisible": true,
       "Alt": 2,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#15",
@@ -2337,8 +2259,7 @@
       "StartsVisible": true,
       "Alt": 1,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#16",
@@ -2351,8 +2272,7 @@
       "StartsVisible": true,
       "Alt": 2,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#17",
@@ -2365,8 +2285,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#18",
@@ -2379,8 +2298,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#19",
@@ -2393,8 +2311,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#20",
@@ -2407,8 +2324,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#21",
@@ -2421,8 +2337,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     },
     {
       "Id": "hull#22",
@@ -2435,8 +2350,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": true,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": true
     }
   ],
   "Animations": [

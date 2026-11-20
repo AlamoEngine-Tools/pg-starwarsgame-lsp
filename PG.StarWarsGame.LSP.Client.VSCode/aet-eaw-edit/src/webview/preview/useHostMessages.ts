@@ -27,11 +27,13 @@ import { modelRequestsOf } from "./modelStore";
 import { particleNotices } from "./particleNotices";
 import { heldModels, post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
+import { type CloneDeath } from "./deathClone";
 import { dispatchHostMessage } from "./hostMessages";
 import { type PendingEffect } from "./useParticleEffects";
 import { BREAKOFF_ATTACHMENT, type PreviewViewport } from "./viewport";
 import { type PreviewAssetLoader } from "./previewAssetLoader";
 import { defaultMode, type PreviewMode } from "./previewMode";
+import { rulesFor } from "./unitRules";
 import { attackerFromProjectile } from "./attacker";
 import { type BreakoffAnchor } from "./breakoff";
 import { type SubjectState, subjectStateFrom } from "../../shared/subjectState";
@@ -56,6 +58,8 @@ export interface HostMessagesInputs {
         { id: string; prop: PreviewBreakoffProp; at: BreakoffAnchor }[]
     >;
     deadRef: RefObject<boolean>;
+    /** How the clone of the death that happened ends - see `useCombatLens`. */
+    cloneDeathRef: RefObject<CloneDeath | null>;
     detailWantedRef: RefObject<string | null>;
     explosionsRef: RefObject<PendingEffect[]>;
     foldedRef: RefObject<boolean>;
@@ -69,6 +73,7 @@ export interface HostMessagesInputs {
         bone: string | undefined,
         once: boolean,
         at?: { x: number; y: number; z: number },
+        boneIndex?: number,
     ) => void;
     queuePassiveEffects: (
         particles: readonly PreviewParticle[],
@@ -122,6 +127,7 @@ export function useHostMessages({
     attachPending,
     breakoffsRef,
     deadRef,
+    cloneDeathRef,
     detailWantedRef,
     explosionsRef,
     foldedRef,
@@ -184,6 +190,10 @@ export function useHostMessages({
                 scene: (message) => {
                     refreshingRef.current = message.refresh === true;
                     viewport.clear();
+                    // A model preview or a unit preview, by what was opened. Only the first scene
+                    // decides: the viewport ignores every later answer, so a refresh cannot turn
+                    // one into the other.
+                    viewport.setRules(rulesFor(message.scene.kind));
                     setScene(message.scene);
                     setProblems(message.scene.problems);
                     setAnimation(null);
@@ -466,7 +476,11 @@ export function useHostMessages({
                         // visible gap between the ship going and the wreck arriving - a capital ship's
                         // clone is three megabytes. Shown and started by the death watch.
                         if (deadRef.current) {
-                            viewport.startDeathClip(message.partId);
+                            viewport.startDeathClip(
+                                message.partId,
+                                cloneDeathRef.current?.ending,
+                                cloneDeathRef.current?.onEnd,
+                            );
                         } else {
                             viewport.setPartHidden(message.partId, true);
                         }
@@ -686,6 +700,7 @@ export function useHostMessages({
                                     origin: "gameplay",
                                     attachToPartId: pending.partId,
                                     attachBone: pending.bone,
+                                    attachBoneIndex: pending.boneIndex,
                                     scaleFactor: scale,
                                     at: pending.at,
                                 });

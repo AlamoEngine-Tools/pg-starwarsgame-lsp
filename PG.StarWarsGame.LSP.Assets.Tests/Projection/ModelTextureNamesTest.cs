@@ -4,6 +4,8 @@
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Tests.Models;
+using System.Numerics;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
@@ -92,5 +94,68 @@ public sealed class ModelTextureNamesTest
 
         Assert.Equal(AloFileKind.Model, scan.Kind);
         Assert.Equal(["P_Engine_Glow_ALT2"], scan.Proxies);
+    }
+
+    /// <summary>
+    ///     The parts of a model with the two facts the cloak rule needs (#449): whether the file marks
+    ///     each visible, and whether a mesh is drawn as a surface. A shadow volume is a mesh the game
+    ///     uses and never shows; a proxy is no surface either.
+    /// </summary>
+    [Fact]
+    public void Scan_AModel_NamesItsPartsWithTheirFileFlags()
+    {
+        var alo = AloChunkFixture.Concat(
+            AloChunkFixture.Skeleton(
+                AloChunkFixture.Bone("ROOT", -1, true, AloChunkFixture.Translation(0, 0, 0)),
+                AloChunkFixture.Bone("Glow", 0, true, AloChunkFixture.Translation(0, 0, 0))),
+            AloChunkFixture.Mesh("Body", [SubMesh("MeshGloss.fx")]),
+            AloChunkFixture.Mesh("Shadow", [SubMesh("MeshShadowVolume.fx")]),
+            AloChunkFixture.Mesh("Panel", [SubMesh("MeshAlpha.fx")], hidden: 1),
+            AloChunkFixture.Connections(proxies:
+            [
+                AloChunkFixture.Proxy("p_glow", 1), AloChunkFixture.Proxy("p_off", 1, hidden: 1)
+            ]));
+
+        Assert.Equal(
+        [
+            new ModelPart("Body", false, true, true),
+            new ModelPart("Shadow", false, true, false),
+            new ModelPart("Panel", false, false, true),
+            new ModelPart("p_glow", true, true, false),
+            new ModelPart("p_off", true, false, false)
+        ], ModelTextureNames.Scan(alo).Parts);
+    }
+
+    /// <summary>A mesh is a surface when ANY of its sub-meshes is: one visible pass draws it.</summary>
+    [Fact]
+    public void Scan_AMeshWithOneSurfaceSubMesh_IsASurface()
+    {
+        var alo = AloChunkFixture.Concat(
+            AloChunkFixture.Skeleton(AloChunkFixture.Bone("ROOT", -1, true, AloChunkFixture.Translation(0, 0, 0))),
+            AloChunkFixture.Mesh("Hull", [SubMesh("RSkinShadowVolume.fx"), SubMesh("RSkinGloss.fx")]),
+            AloChunkFixture.Mesh("Hull_Collision", [SubMesh("MeshCollision.fx")]));
+
+        Assert.Equal(
+        [
+            new ModelPart("Hull", false, true, true),
+            new ModelPart("Hull_Collision", false, true, false)
+        ], ModelTextureNames.Scan(alo).Parts);
+    }
+
+    [Fact]
+    public void Scan_SomethingThatIsNoReadableModel_HasNoParts()
+    {
+        Assert.Null(ModelTextureNames.Scan([1, 2, 3, 4]).Parts);
+        Assert.Null(ModelTextureNames.Scan([0x00, 0x09, 0x00, 0x00]).Parts);
+    }
+
+    private static byte[] SubMesh(string shader)
+    {
+        return AloChunkFixture.SubMesh(shader, "alD3dVertNU2",
+            [
+                AloChunkFixture.MasterVertex(new Vector3(0, 0, 0)), AloChunkFixture.MasterVertex(new Vector3(1, 0, 0)),
+                AloChunkFixture.MasterVertex(new Vector3(0, 1, 0))
+            ],
+            [0, 1, 2]);
     }
 }

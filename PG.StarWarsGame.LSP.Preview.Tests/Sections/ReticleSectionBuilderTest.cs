@@ -16,7 +16,7 @@ public sealed class ReticleSectionBuilderTest
 {
     private static PreviewHardpoint Hardpoint(string id, string? type, bool targetable)
     {
-        return new PreviewHardpoint(id, null, type, "BONE", true, targetable, 100f, null, null, null, null,
+        return new PreviewHardpoint(id, null, type, "BONE", true, targetable, 100f, null, null, null,
             null, null, true, null, null, null);
     }
 

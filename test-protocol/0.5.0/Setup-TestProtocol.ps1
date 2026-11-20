@@ -17,7 +17,8 @@
 
     Also done here: PRJ-17 and PRJ-18 copy the archives they read, LUA-25 copies the schema and edits its
     Find_Player annotation, PRV-36 generates its two particle files, PRV-45 copies a model, its twin and
-    their textures from the local game workspace, and PRJ-24, PRJ-25, XML-29 and XML-30 copy the
+    their textures from the local game workspace, PRV-46 copies a model and its textures from there too,
+    and PRJ-24, PRJ-25, XML-29 and XML-30 copy the
     repository's e2e-workspace-load-order to C:\temp\aet-test-load-order, which they edit.
 
 .PARAMETER Test
@@ -41,7 +42,7 @@ $repo = (Resolve-Path (Join-Path $here '..\..')).Path
 $fixtures = Join-Path $here 'fixtures'
 $onDemand = @('XML-14', 'XML-15', 'PRJ-15', 'LUA-26', 'LUA-27', 'LUA-28', 'LUA-34')
 $loadOrderTests = @('PRJ-24', 'PRJ-25', 'XML-29', 'XML-30')
-$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRV-45') + $loadOrderTests
+$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRV-45', 'PRV-46') + $loadOrderTests
 
 function Get-RootOf([string] $root) {
     switch ($root) {
@@ -192,6 +193,30 @@ function Invoke-Extra([string] $testId) {
                 $source = Join-Path $art $pair[0]
                 if (Test-Path $source) { Copy-Item $source (Join-Path $dest $pair[1]) -Force }
                 else { Write-Warning "PRV-45: $source not found; $(Join-Path $dest $pair[1]) is missing." }
+            }
+        }
+        'PRV-46' {
+            # The Star Destroyer model, the two effects its damage bones carry and the textures they name,
+            # as loose files. Its hardpoints are the fixture's own: one names a bone with a mesh and effects
+            # below it, one names the bone of an effect the file hides. Copied from the local game
+            # workspace, so no game file is part of the fixture.
+            $art = Join-Path $repo 'eaw\Data\Art'
+            $dest = 'C:\temp\aet-test-PRV-damage\Data\Art'
+            $copies = @(
+                @('Models\Ev_stardestroyer.alo', 'Models\Prv_damage.alo'),
+                @('Models\P_hp_imperial_damage.alo', 'Models\P_hp_imperial_damage.alo'),
+                @('Models\Pi_damage_elec_sd00.alo', 'Models\Pi_damage_elec_sd00.alo'),
+                @('Textures\P_particle_master.dds', 'Textures\P_particle_master.dds'),
+                @('Textures\P_particle_depth_master.dds', 'Textures\P_particle_depth_master.dds'),
+                @('Textures\Ev_girders00.dds', 'Textures\Ev_girders00.dds'),
+                @('Textures\Ev_stardestroyer.dds', 'Textures\Ev_stardestroyer.dds'),
+                @('Textures\Ev_stardestroyer_bc.dds', 'Textures\Ev_stardestroyer_bc.dds'),
+                @('Textures\W_blast00.dds', 'Textures\W_blast00.dds'),
+                @('Textures\W_buildinglights.dds', 'Textures\W_buildinglights.dds'))
+            foreach ($pair in $copies) {
+                $source = Join-Path $art $pair[0]
+                if (Test-Path $source) { Copy-Item $source (Join-Path $dest $pair[1]) -Force }
+                else { Write-Warning "PRV-46: $source not found; $(Join-Path $dest $pair[1]) is missing." }
             }
         }
     }

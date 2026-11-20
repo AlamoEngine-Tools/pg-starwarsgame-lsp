@@ -8,33 +8,23 @@
 
 import { type SubjectAnimation } from "./subjectAnimation";
 import { ACTIVE_SUBJECT } from "./loadedPart";
-import { deathClip } from "./visibility";
+import { deathClip, isDeathClipName } from "./visibility";
+import {
+    type DeathEnding,
+    deathState,
+    stepDeath,
+    UNWRITTEN_ENDING,
+} from "./deathEnding";
 import * as THREE from "three";
-import { hiddenAt, visibilityTracks } from "./boneVisibility";
-import { type MaterialExtras, resolveMaterial } from "./materials";
+import { visibilityTracks } from "./boneVisibility";
+import { clipDone, playedLooping, playedOnce } from "./clipEnd";
+import { CloakFade, type Look, PLAIN_LOOK } from "./cloakFade";
 import { alamoNodeName } from "./skeleton";
 import { type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { type ViewportContext } from "./viewportContext";
 
 /** Scratch for the bone-palette maths, so a per-frame loop allocates nothing. */
 const SKIN_WORK = new THREE.Matrix4();
-
-/** Every mesh a model's own materials say is not drawn - collision hulls, shadow volumes. */
-function hiddenMeshes(root: THREE.Object3D): Set<THREE.Object3D> {
-    const hidden = new Set<THREE.Object3D>();
-
-    root.traverse((node) => {
-        if (
-            node instanceof THREE.Mesh &&
-            resolveMaterial((node.userData.alamo ?? {}) as MaterialExtras)
-                .hidden
-        ) {
-            hidden.add(node);
-        }
-    });
-
-    return hidden;
-}
 
 export class AnimationRig {
     /** Reused per frame so building the bone palette does not allocate on every draw. */
@@ -59,6 +49,13 @@ export class AnimationRig {
     private animationPaused = false;
     /** Whether a clip is currently driving bone visibility, so the release happens exactly once. */
     private overridingVisibility = false;
+    /** What to do when each dying subject is destroyed, by subject id - see {@link startDeathClip}. */
+    private readonly deathEnds = new Map<string, () => void>();
+    /**
+     * The subject's cloak coming in and going, stepped by the viewport - see `cloakFade.ts`. The
+     * subject's alone: a death clone is another object and wears none of it.
+     */
+    readonly cloak = new CloakFade();
 
     constructor(private readonly context: ViewportContext) {}
 
@@ -89,13 +86,6 @@ export class AnimationRig {
             }
         });
 
-        // What its own file says is not drawn - a collision hull, a shadow volume. Held so a clip
-        // can never bring one back: a shadow volume is not geometry that happens to be switched off
-        // this frame.
-        for (const mesh of hiddenMeshes(root)) {
-            subject.fileHidden.add(mesh);
-        }
-
         if (gltf.animations.length > 0) {
             // Rooted at the first of this subject's parts to bring clips. A clip binds to nodes BY
             // NAME from the root it was given, so a mixer rooted anywhere else drives the wrong
@@ -117,7 +107,6 @@ export class AnimationRig {
 
         for (const node of nodes) {
             subject.restPose.delete(node);
-            subject.fileHidden.delete(node);
 
             // Only where THIS node is the one holding the name. `nodeByName` is first-wins, so one
             // part of a subject must not take another part's entry with it.
@@ -131,6 +120,7 @@ export class AnimationRig {
     /** Forgets a passive subject whose last part has gone. */
     forgetSubject(subjectId: string): void {
         this.subjects.delete(subjectId);
+        this.deathEnds.delete(subjectId);
     }
 
     /**
@@ -161,7 +151,23 @@ export class AnimationRig {
     /** Drops every subject's animation and the visibility a clip was driving, for a new scene. */
     forgetSubjects(): void {
         this.subjects.clear();
+        this.deathEnds.clear();
+        this.cloak.reset();
         this.overridingVisibility = false;
+    }
+
+    /**
+     * One subject's whole look - the tint and the alpha every mesh and effect of it is drawn with:
+     * the subject's cloak, or a dying object's fade - see `deathEnding.ts`.
+     */
+    lookOf(subjectId: string): Look {
+        if (subjectId === ACTIVE_SUBJECT) {
+            return this.cloak.current();
+        }
+
+        const alpha = this.subjects.get(subjectId)?.death?.alpha ?? 1;
+
+        return alpha === 1 ? { ...PLAIN_LOOK } : { ...PLAIN_LOOK, a: alpha };
     }
 
     get animationNames(): string[] {
@@ -182,15 +188,19 @@ export class AnimationRig {
     }
 
     /**
-     * Starts a passive subject's own death clip, once.
+     * Starts a passive subject dying: its own death clip, once, and the clock towards its end.
      *
      * ONCE, and clamped: the user's word is that a death clone is spawned at the exact position of
      * the model it replaces and plays through a single time. There is no picker for it and no loop
      * - it is not something the reader chose, it is what dying looks like.
      *
+     * It then STAYS, on the clip's held frame, and ends as `ending` says - see `deathEnding.ts`.
+     * `onEnd` runs once, the moment it is destroyed: that is when `Death_Explosions_End` go off.
+     * A subject with no clip to play starts its persistence at once.
+     *
      * Separate from LOADING it so the geometry can be fetched early and held: asking for a capital
      * ship's three-megabyte clone at the moment of death left a visible gap between the ship going
-     * and the wreck arriving. Idempotent - a second call does not restart a clip already running,
+     * and the wreck arriving. Idempotent - a second call does not restart a subject already dying,
      * because it is the same wreck.
      *
      * This is `play` for a subject nobody is driving. It is the same machinery: the subject's own
@@ -198,27 +208,38 @@ export class AnimationRig {
      * implementation of all three, because the scene-wide maps it would have had to use were
      * already full of the hull's answers.
      */
-    startDeathClip(subjectId: string): void {
+    startDeathClip(
+        subjectId: string,
+        ending: DeathEnding = UNWRITTEN_ENDING,
+        onEnd?: () => void,
+    ): void {
         const subject = this.subjects.get(subjectId);
 
-        if (
-            subject === undefined ||
-            subject.mixer === null ||
-            subject.action !== null
-        ) {
+        if (subject === undefined || subject.death !== null) {
             return;
+        }
+
+        if (onEnd !== undefined) {
+            this.deathEnds.set(subjectId, onEnd);
         }
 
         const name = deathClip(subject.clips.map((c) => c.name));
         const clip = subject.clips.find((c) => c.name === name);
 
-        if (clip === undefined) {
+        // With no clip to play, the clip is over from the start, and so is the wait for it.
+        subject.death = deathState(
+            ending,
+            subject.mixer === null || clip === undefined,
+        );
+
+        if (subject.mixer === null || clip === undefined) {
             return;
         }
 
-        subject.action = subject.mixer.clipAction(clip);
+        // Its play-once copy, which ends on the held frame - see `clipEnd.ts`.
+        subject.action = subject.mixer.clipAction(playedOnce(clip));
         subject.action.setLoop(THREE.LoopOnce, 1);
-        // Without this the last pose is gone the frame it arrives.
+        // Without this the held pose is gone the frame it arrives.
         subject.action.clampWhenFinished = true;
         subject.action.reset();
         subject.action.play();
@@ -264,19 +285,45 @@ export class AnimationRig {
             return false;
         }
 
-        this.active.action = this.active.mixer.clipAction(clip);
-        this.active.action.setLoop(
+        this.active.action = this.startAction(
+            this.active.mixer,
+            clip,
+            0,
+            this.animationPaused,
+        );
+
+        return true;
+    }
+
+    /**
+     * Starts the active subject's clip at a playhead, looping or not as the panel says.
+     *
+     * A clip that does not loop plays its play-once copy, which ends on the second-to-last frame and
+     * holds it - the game's rule, see `clipEnd.ts`; a looping one plays the clip itself and wraps at
+     * the last frame. Clamped, because without it a non-looping action snaps back to frame 0 the
+     * instant it ends, and the held pose - often the whole point of a death or a deploy - is never on
+     * screen.
+     */
+    private startAction(
+        mixer: THREE.AnimationMixer,
+        clip: THREE.AnimationClip,
+        time: number,
+        paused: boolean,
+    ): THREE.AnimationAction {
+        const action = mixer.clipAction(
+            this.animationLoop ? playedLooping(clip) : playedOnce(clip),
+        );
+        action.setLoop(
             this.animationLoop ? THREE.LoopRepeat : THREE.LoopOnce,
             Infinity,
         );
-        // Without this a non-looping action snaps back to frame 0 the instant it ends, so the last
-        // pose - often the whole point of a death or a deploy - is never on screen.
-        this.active.action.clampWhenFinished = true;
-        this.active.action.timeScale = this.animationSpeed;
-        this.active.action.paused = this.animationPaused;
-        this.active.action.play();
+        action.clampWhenFinished = true;
+        action.timeScale = this.animationSpeed;
+        action.paused = paused;
+        action.play();
+        action.time = Math.min(time, action.getClip().duration);
 
-        return true;
+        return action;
     }
 
     // ── spinning away ─────────────────────────────────────────────────────────
@@ -341,13 +388,27 @@ export class AnimationRig {
     setAnimationLoop(loop: boolean): void {
         this.animationLoop = loop;
 
-        if (this.active.action !== null) {
-            this.active.action.setLoop(
-                loop ? THREE.LoopRepeat : THREE.LoopOnce,
-                Infinity,
-            );
-            this.active.action.clampWhenFinished = true;
+        const old = this.active.action;
+        const mixer = this.active.mixer;
+
+        if (old === null || mixer === null) {
+            return;
         }
+
+        const clip = old.getClip();
+        if (clip === (loop ? playedLooping(clip) : playedOnce(clip))) {
+            return;
+        }
+
+        // The two play different copies of the clip, since each ends somewhere else, so switching
+        // swaps the action - at the same playhead, paused or not as it was. A clip that has finished
+        // was paused by the mixer, and stays held until it is played on.
+        const time = old.time;
+        const paused = old.paused;
+        old.stop();
+        this.active.action = this.startAction(mixer, clip, time, paused);
+        // The stop put the bones back where their bindings began; this puts them at the playhead.
+        this.stepMixer(0);
     }
 
     /**
@@ -424,52 +485,54 @@ export class AnimationRig {
      *
      * The active subject is not here: its mixer is ticked by the loop and its visibility goes
      * through the ROW CHAIN, which is the thing that describes the model being previewed. A passive
-     * subject has no rows, so its track is applied to its own nodes directly - safe now that
-     * `nodeByName` is the subject's own rather than a scene-wide map the hull had filled.
-     *
-     * A mesh the FILE hides is never brought back by the clip: a shadow volume is not geometry that
-     * happens to be switched off this frame.
+     * subject has no rows, so each of its meshes is drawn by its own switches on every frame - see
+     * `PartAssembly.applyOwnFileVisibility`. No bone node is hidden, so a bone the clip hides takes
+     * nothing below it with it, and a mesh the file hides is never brought back by the clip.
      */
     advancePassiveSubjects(dt: number): void {
         for (const [subjectId, subject] of this.subjects) {
+            const death = subject.death;
+
             if (
                 subjectId === ACTIVE_SUBJECT ||
-                subject.action === null ||
-                subject.mixer === null
+                death === null ||
+                death.destroyed
             ) {
                 continue;
             }
 
-            subject.mixer.update(dt);
-
             const action = subject.action;
-            const track = subject.visibility.get(action.getClip().name);
 
-            if (track !== undefined) {
-                // Every bone the track names, proxies included: a proxy carries only the marker
-                // mesh the file already hides, and no effect is attached to it to be taken with it.
-                // Emission is what the clip decides for a proxy (`applyEmitterGating`); what is
-                // already in the air keeps drawing, exactly as it does in the engine.
-                //
-                // Through the subject's own name map rather than a traversal of its whole root:
-                // this runs every frame, and a capital ship's wreck is a hundred nodes.
-                for (const [name, bits] of track.bones) {
-                    const node = subject.nodeByName.get(name);
+            if (action !== null && subject.mixer !== null) {
+                subject.mixer.update(dt);
 
-                    if (node !== undefined && !subject.fileHidden.has(node)) {
-                        node.visible = !hiddenAt(bits, track.fps, action.time);
-                    }
+                const track = subject.visibility.get(action.getClip().name);
+
+                // Emission is what the clip decides for a proxy (`applyEmitterGating`, below); what
+                // is already in the air keeps drawing, exactly as it does in the engine.
+                for (const part of this.context.assembly.partsOf(subjectId)) {
+                    this.context.assembly.applyOwnFileVisibility(part);
                 }
+
+                // The same gate the active subject gets, on this subject's own clip. Without it the
+                // clip decides only what is SEEN: a burst switched off at this moment goes on
+                // burning, and is spent long before the frame that was meant to set it off.
+                this.context.particles.applyEmitterGating(
+                    subjectId,
+                    track,
+                    action,
+                );
             }
 
-            // The same gate the active subject gets, on this subject's own clip. Without it the
-            // clip decides only what is SEEN: a burst switched off at this moment goes on burning,
-            // and is spent long before the frame that was meant to set it off.
-            this.context.particles.applyEmitterGating(subjectId, track, action);
+            // A dying object STAYS once its clip is done, on the held frame, until its ending says
+            // it is gone - see `deathEnding.ts`. The clip is over when there is none, or it is not
+            // a death clip, or it has finished.
+            const clipOver =
+                action === null ||
+                !isDeathClipName(action.getClip().name) ||
+                clipDone(action);
 
-            // Gone at the end of it. A death clone is what dying LOOKS like, not what is left
-            // afterwards - the engine takes the object away when the clip is done.
-            if (action.time >= action.getClip().duration) {
+            if (stepDeath(death, dt, clipOver)) {
                 // Its effects are released FIRST, and they outlive it. The Calamari clone's three
                 // `p_explosion_huge00` ignite at 59.7s of a 60.1s clip - the detonation the whole
                 // minute builds to - and hiding the part they are attached to cut them 0.4s in, so the
@@ -479,6 +542,8 @@ export class AnimationRig {
                 for (const part of this.context.assembly.partsOf(subjectId)) {
                     this.context.assembly.setPartHidden(part.id, true);
                 }
+
+                this.deathEnds.get(subjectId)?.();
             }
         }
     }
@@ -500,8 +565,8 @@ export class AnimationRig {
                 : active.visibility.get(active.action.getClip().name);
 
         if (track !== undefined && active.action !== null) {
-            // Through the ROW CHAIN, which is the only thing that writes visibility - the clip is a
-            // link in it (`animated`), above the level gates and the file. This used to write
+            // Through the ROW CHAIN, which is the only thing that writes visibility - the clip is
+            // one of a part's four switches there (`animation`). This used to write
             // `node.visible` here instead, straight past the chain, and the two disagreed about how
             // a track is keyed: tracks by glTF NODE name, the chain by BONE name. Whichever of them
             // matched was the one that worked, and re-keying the tracks silently swapped which.
@@ -538,7 +603,7 @@ export class AnimationRig {
             nodeByName: new Map(),
             restPose: new Map(),
             action: null,
-            fileHidden: new Set(),
+            death: null,
         };
 
         this.subjects.set(subjectId, made);

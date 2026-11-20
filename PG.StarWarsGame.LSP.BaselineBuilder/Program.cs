@@ -543,18 +543,20 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
         return ModelTextureNames.Scan(buffer.ToArray());
     };
 
-    var (assetFiles, modelBones, modelTextures, particleSystems, modelProxies) = MegAssetCatalogBuilder.Build(
-        megEntries, looseFileSystem, engine.GameRepository.Path,
-        openMegEntry, getBones, getMtdIcons, assetLogger, getTextures);
+    var (assetFiles, modelBones, modelTextures, particleSystems, modelProxies, modelParts) =
+        MegAssetCatalogBuilder.Build(
+            megEntries, looseFileSystem, engine.GameRepository.Path,
+            openMegEntry, getBones, getMtdIcons, assetLogger, getTextures);
 
     baseline = baseline with
     {
         AssetFiles = assetFiles, ModelBones = modelBones, ModelTextures = modelTextures,
-        ParticleSystems = particleSystems, ModelProxies = modelProxies
+        ParticleSystems = particleSystems, ModelProxies = modelProxies, ModelParts = modelParts
     };
     Console.WriteLine($"Asset files: {baseline.AssetFiles.Count} asset file(s) (MEG + loose)");
     Console.WriteLine($"Model bones: {baseline.ModelBones.Count} model(s) with bone data");
     Console.WriteLine($"Model textures: {baseline.ModelTextures.Count} model(s) scanned for textures");
+    Console.WriteLine($"Model parts: {baseline.ModelParts.Count} model(s) with part data");
 
     // ── Serialize ─────────────────────────────────────────────────────────────
 

@@ -146,34 +146,45 @@ public sealed class PreviewWireShapeTest
     }
 
     [Fact]
-    public void ParticleAbilityClaim_CrossesTheWireUnderTheNameTheClientReads()
+    public void Particle_CarriesNoAbilityClaim()
     {
-        // The client's whole veto depends on this one field. A name the TS mirror does not read
-        // arrives as undefined, `unboundEffectIds` returns an empty set, and the Tartan's TURBO
-        // engines are burning again - with every unit test still green, because the rule itself is
-        // right and only the wire is wrong.
+        // What an effect's name does is the client's rule - the game's name groups, see
+        // `effectGroups.ts` - so the server sends no reading of it.
         var particle = new PreviewParticle(
             "hull#0", "Pte_tartanengine_lrg", "hull", "Pte_tartanengine_lrg", 2,
-            PreviewParticleGate.Always, null, true, ClaimsAbility: "TURBO");
-
-        var json = SerializeAsResponse(particle);
-
-        Assert.Equal("TURBO", json["claimsAbility"]?.Value<string>());
-    }
-
-    [Fact]
-    public void ParticleWithNoAbilityClaim_SaysSoRatherThanOmittingIt()
-    {
-        // Null, not absent: the client reads `claimsAbility` optional, and both spellings mean the
-        // same thing there - but 5404 of 5443 proxies take this path, so it is the one worth
-        // pinning against a serializer setting that starts dropping nulls.
-        var particle = new PreviewParticle(
-            "hull#3", "p_engine_glow", "hull", "p_engine_glow", 4,
             PreviewParticleGate.Always, null, true);
 
         var json = SerializeAsResponse(particle);
 
-        Assert.Null(json["claimsAbility"]?.Value<string>());
+        Assert.Null(json.Property("claimsAbility"));
+    }
+
+    /// <summary>
+    ///     Measured in the game: no XML hides the mesh a hardpoint names as its <c>Collision_Mesh</c> -
+    ///     the model file's flag alone decides (#450) - so the scene carries no collision hull for the
+    ///     client to act on.
+    /// </summary>
+    /// <remarks>
+    ///     Built through the record's own constructor by parameter, so the test reads the same before
+    ///     and after the field goes: it is the wire that is asserted, not the arity.
+    /// </remarks>
+    [Fact]
+    public void Hardpoint_CarriesNoCollisionMesh()
+    {
+        var constructor = typeof(PreviewHardpoint).GetConstructors().Single(c => c.GetParameters().Length > 1);
+        var arguments = constructor.GetParameters()
+            .Select(p => p.Name switch
+            {
+                "Id" => "HP_Weapon",
+                "CollisionMeshBone" => "HP_Weapon_Coll",
+                _ => p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null
+            })
+            .ToArray();
+
+        var json = SerializeAsResponse(constructor.Invoke(arguments));
+
+        Assert.Equal("HP_Weapon", json["id"]?.Value<string>());
+        Assert.Null(json.Property("collisionMeshBone"));
     }
 
     [Fact]

@@ -26,8 +26,14 @@ import { post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART } from "./partIds";
 import { type TreeItem } from "./previewTree";
 import { type PreviewViewport } from "./viewport";
-import { collisionMeshNames, decalNames, partHidden } from "./damage";
+import {
+    destroyable,
+    hardpointWrites,
+    partHidden,
+    withDestroyed,
+} from "./damage";
 import { stageForHull } from "./levels";
+import { DamageSmoke } from "./damageSmoke";
 import { hardpointCards, unitWeapons } from "./hardpointCards";
 import { type PreviewMode } from "./previewMode";
 import { allWeaponIds, visibleArcs, weaponRows } from "./weaponRows";
@@ -39,8 +45,15 @@ import {
     poolsFor,
     resolveHitWithWorkings,
 } from "./attacker";
-import { shieldRevealed, stealthed } from "./abilityRows";
-import { cloneForDamage, turretSweeps } from "./deathClone";
+import { shieldRevealed } from "./abilityRows";
+import { cloakLookFor } from "./cloakFade";
+import { effectState } from "./visibility";
+import {
+    type CloneDeath,
+    cloneDeath,
+    cloneForDamage,
+    turretSweeps,
+} from "./deathClone";
 import { everyTurretHandle, type TurretAim } from "./turretHandles";
 import { spinAwayEnd } from "./spinAway";
 import { appendShot, BY_HAND, type DamageLogEntry } from "./damageLog";
@@ -76,6 +89,8 @@ export interface CombatLensInputs {
     /** Written here at every render; made by the caller, whose effect callbacks read it first. */
     destroyedRef: RefObject<ReadonlySet<string>>;
     dropPassiveEffects: (partId: string) => void;
+    /** Takes one gameplay effect away, burning or still on its way. */
+    cancelEffect: (id: string) => void;
     effectDrawsNow: (particle: PreviewParticle) => boolean;
     fireArcs: boolean;
     mode: PreviewMode;
@@ -86,6 +101,7 @@ export interface CombatLensInputs {
         bone: string | undefined,
         once: boolean,
         at?: { x: number; y: number; z: number },
+        boneIndex?: number,
     ) => void;
     playhead: { time: number; duration: number; running: boolean };
     scene: PreviewScene | null;
@@ -104,6 +120,7 @@ export function useCombatLens({
     breakoffsRef,
     destroyedRef,
     dropPassiveEffects,
+    cancelEffect,
     effectDrawsNow,
     fireArcs,
     mode,
@@ -304,19 +321,8 @@ export function useCombatLens({
                 return;
             }
 
-            setDestroyed((current) => {
-                if (current.has(id) === isDestroyed) {
-                    return current;
-                }
-
-                const next = new Set(current);
-                if (isDestroyed) {
-                    next.add(id);
-                } else {
-                    next.delete(id);
-                }
-                return next;
-            });
+            // In the order they die - see `Destroyed`.
+            setDestroyed((current) => withDestroyed(current, id, isDestroyed));
 
             const hardpoint = scene?.hardpoints.find((h) => h.id === id);
 
@@ -445,10 +451,9 @@ export function useCombatLens({
      */
     const destroyAll = useCallback(
         (isDestroyed: boolean, log = true): void => {
-            for (const hardpoint of scene?.hardpoints ?? []) {
-                if (hardpoint.isDestroyable) {
-                    setHardpointDestroyed(hardpoint.id, isDestroyed, log);
-                }
+            // In declaration order - see `destroyable`.
+            for (const hardpoint of destroyable(scene?.hardpoints ?? [])) {
+                setHardpointDestroyed(hardpoint.id, isDestroyed, log);
             }
         },
         [scene, setHardpointDestroyed],
@@ -469,34 +474,39 @@ export function useCombatLens({
             }
         }
 
-        // Every decal the scene knows about, and the subset that should be showing.
-        viewport.setDecals(
-            decalNames(
-                scene.hardpoints,
-                new Set(scene.hardpoints.map((h) => h.id)),
-            ),
-            decalNames(scene.hardpoints, destroyed),
-        );
+        // What every hardpoint writes on creation - its decal and its Damage_Particles bone hidden -
+        // and what each dead one wrote, in the order they died: a later death wins where two
+        // hardpoints' bones overlap.
+        viewport.setHardpoints(hardpointWrites(scene.hardpoints, destroyed));
 
-        // Never shown in either damage state, so this takes no `destroyed` and does not change with
-        // it - it is set here because this is the pass that owns hardpoint-driven visibility.
-        viewport.setCollisionMeshes(collisionMeshNames(scene.hardpoints));
-
-        // The ordinary effect rules AND the ability decider. Through the same call as every other
-        // effect deliberately: a held proxy then rides the emission gate, so its burst does not
-        // burn away unseen and come back exhausted the moment the ability is switched on.
         // The shield mesh is the one piece of GEOMETRY an ability reveals - DEFEND shows it, and
         // the mesh ships hidden, so nothing else would ever bring it up.
         viewport.setShieldRevealed(shieldRevealed(activeAbilities));
 
-        // The cloak's other half. The shell swaps in here and the effects go dark below, because
-        // a cloaked unit shows the shell and nothing else at all.
-        viewport.setStealthed(stealthed(activeAbilities));
+        // The cloak's look: the whole model fading and tinting towards the cloak's colour. Which
+        // parts it hides and shows is the unit's rules', on its timeline with the other abilities.
+        viewport.setCloak(
+            cloakLookFor(activeAbilities, scene),
+            // HAS the ability: its block in the type's abilities list.
+            (scene.stealth ?? null) !== null ||
+                (scene.forceCloak ?? null) !== null,
+        );
 
+        // The effect groups creation and the abilities switch - turbo's engines, power to weapons,
+        // the missile shield and the rest. Writes of each effect's state switch in the unit's rules,
+        // on one timeline with the hardpoint deaths - see `effectGroups.ts`.
+        viewport.setMissileShieldObject(
+            (scene.passiveMissileShieldRadius ?? 0) > 0,
+        );
+        viewport.setActiveAbilities(activeAbilities);
+
+        // Each effect's own flag, which the unit's rules above write over. Through the same call as
+        // every other effect deliberately: a held proxy then rides the emission gate, so its burst
+        // does not burn away unseen and come back exhausted the moment it is switched on.
         for (const particle of scene.particles ?? []) {
             viewport.setParticleSystemVisible(
                 particle.id,
-                effectDrawsNow(particle),
+                effectState(particle.startsVisible, effectDrawsNow(particle)),
             );
         }
 
@@ -562,11 +572,18 @@ export function useCombatLens({
             viewport.removePart(`${DEATH_CLONE_PART}${clone.objectId}`);
         }
 
+        cloneDeathRef.current = null;
         requestedClonesRef.current.clear();
     }, [dropPassiveEffects]);
 
     /** Read by the glb handler, which has to know whether a clone arriving is already needed. */
     const deadRef = useRef(false);
+
+    /**
+     * How the clone of the death that happened ends, for the glb handler to start a clone that lands
+     * after the death with. Null while the unit lives.
+     */
+    const cloneDeathRef = useRef<CloneDeath | null>(null);
 
     useEffect(() => {
         deadRef.current = unitDead;
@@ -671,6 +688,47 @@ export function useCombatLens({
     const hardpointHealthPool = healthNow.hardpoints;
 
     /**
+     * The type's damage smoke, added the way the game adds it - see `damageSmoke.ts`.
+     *
+     * Read off the hull pool the shots deplete, before the leash: the game adds the smoke on the
+     * direct-damage path only, and a correction between the pools is not a hit. One follower per
+     * scene, so a new subject starts from its own full hull.
+     */
+    const smokeRef = useRef<{
+        scene: PreviewScene;
+        smoke: DamageSmoke;
+    } | null>(null);
+
+    useEffect(() => {
+        if (scene === null) {
+            return;
+        }
+
+        if (smokeRef.current?.scene !== scene) {
+            smokeRef.current = {
+                scene,
+                smoke: new DamageSmoke(scene.damagedSmokeAsset),
+            };
+        }
+
+        const pool = hullPool(scene.defence, livePools?.hull);
+        const id = smokeRef.current.smoke.observe(pool.current, pool.max);
+
+        if (id !== null) {
+            // On the hull's ROOT bone, which the game names by position rather than by name.
+            playEffect(
+                id,
+                scene.damagedSmokeAsset ?? "",
+                "hull",
+                undefined,
+                false,
+                undefined,
+                0,
+            );
+        }
+    }, [scene, livePools?.hull, playEffect]);
+
+    /**
      * Whether the HULL is choosing the damage stage rather than the reader.
      *
      * Only when there is a table to choose with: an object that declares none keeps the manual
@@ -731,7 +789,7 @@ export function useCombatLens({
             // attacker panel's Repair, the Hardpoints section's `Repair all`, or the reader simply
             // un-ticking one hardpoint. `Repair all` is `destroyAll(false)` and nothing else, so with
             // the restore living in `repairTarget` it put the hardpoints back and left the ship hidden
-            // under its own wreck, with the wreck's clip clamped at its last frame - after which no
+            // under its own wreck, with the wreck's clip held at its end - after which no
             // death ever played again.
             if (unitDead) {
                 restoreFromDeath();
@@ -746,6 +804,13 @@ export function useCombatLens({
         }
 
         setUnitDead(true);
+
+        // Measured in the game: the dying object is destroyed, and whatever stands in its place is a
+        // NEW object made from its type - so every damage smoke a hit added goes with it, and a revive
+        // starts clean.
+        for (const id of smokeRef.current?.smoke.drop() ?? []) {
+            cancelEffect(id);
+        }
 
         // What the SHIP itself sets off. Its own `Death_Explosions`, which is a third thing from a
         // hardpoint's and a breakoff prop's - it goes off where the ship was, so it attaches to the
@@ -816,8 +881,23 @@ export function useCombatLens({
         // type says which one it would be. Showing it is all that is left.
         const partId = `${DEATH_CLONE_PART}${clone.objectId}`;
 
+        // It stays once its clip is done, and ends as its own type says - and, for an infantry
+        // unit, as GameConstants says - see `deathEndingOf`. Kept for a clone still on its way,
+        // which the glb handler starts when it lands.
+        cloneDeathRef.current = cloneDeath(clone, playEffect, {
+            infantry: (scene?.categories ?? []).some(
+                (category) => category.toLowerCase() === "infantry",
+            ),
+            persistenceOverride: scene?.deathPersistenceOverride ?? null,
+            damageType: attacker.damageType,
+        });
+
         viewportRef.current?.setPartHidden(partId, false);
-        viewportRef.current?.startDeathClip(partId);
+        viewportRef.current?.startDeathClip(
+            partId,
+            cloneDeathRef.current.ending,
+            cloneDeathRef.current.onEnd,
+        );
     }, [
         scene,
         destroyed,
@@ -826,6 +906,7 @@ export function useCombatLens({
         attacker.damageType,
         playEffect,
         restoreFromDeath,
+        cancelEffect,
     ]);
 
     /**
@@ -1249,6 +1330,7 @@ export function useCombatLens({
         setHardpointDestroyed,
         destroyAll,
         deadRef,
+        cloneDeathRef,
         livePools,
         hull,
         hardpointHealthPool,

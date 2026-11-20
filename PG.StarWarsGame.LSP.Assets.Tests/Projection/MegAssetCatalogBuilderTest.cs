@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
@@ -56,7 +57,7 @@ public sealed class MegAssetCatalogBuilderTest
     public void Build_EmptyMegsAndNoLooseFiles_ReturnsEmpty()
     {
         var fs = new MockFileSystem();
-        var (assets, bones, _, _, _) = MegAssetCatalogBuilder.Build(
+        var (assets, bones, _, _, _, _) = MegAssetCatalogBuilder.Build(
             [], fs, "C:/game", _ => null, _ => [], null, NullLogger.Instance);
 
         Assert.Empty(assets);
@@ -129,7 +130,7 @@ public sealed class MegAssetCatalogBuilderTest
         var fs = new MockFileSystem();
         var bones = new[] { "Bone_Root", "Bone_Head" };
 
-        var (_, modelBones, _, _, _) = MegAssetCatalogBuilder.Build(
+        var (_, modelBones, _, _, _, _) = MegAssetCatalogBuilder.Build(
             megs, fs, "C:/game",
             path => path == "data/art/models/unit_at_at.alo" ? new MemoryStream() : null,
             _ => bones,
@@ -159,7 +160,7 @@ public sealed class MegAssetCatalogBuilderTest
         var megs = OneMeg("test.meg", [@"DATA\ART\MODELS\UNIT.ALO"]);
         var fs = new MockFileSystem();
 
-        var (_, modelBones, _, _, _) = MegAssetCatalogBuilder.Build(
+        var (_, modelBones, _, _, _, _) = MegAssetCatalogBuilder.Build(
             megs, fs, "C:/game",
             _ => new MemoryStream(),
             _ => [],
@@ -180,7 +181,7 @@ public sealed class MegAssetCatalogBuilderTest
             ["data/art/models/ev_tie.alo"] = [0x00, 0x02, 0x00, 0x00]
         };
 
-        var (_, _, _, particleSystems, _) = MegAssetCatalogBuilder.Build(
+        var (_, _, _, particleSystems, _, _) = MegAssetCatalogBuilder.Build(
             megs, new MockFileSystem(), "C:/game",
             path => new MemoryStream(bytes[path]),
             _ => [],
@@ -208,7 +209,7 @@ public sealed class MegAssetCatalogBuilderTest
             ["data/art/models/ev_xwing.alo"] = new(AloFileKind.Model, [])
         };
 
-        var (_, _, _, _, proxies) = MegAssetCatalogBuilder.Build(
+        var (_, _, _, _, proxies, _) = MegAssetCatalogBuilder.Build(
             megs, new MockFileSystem(), "C:/game",
             path => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(path)),
             _ => [],
@@ -218,6 +219,37 @@ public sealed class MegAssetCatalogBuilderTest
 
         Assert.Equal(["P_Engine_ALT2"], proxies["EV_TIE.ALO"]);
         Assert.Empty(proxies["ev_xwing.alo"]);
+    }
+
+    // A shipped model's parts with their file flags, from the same scan (#449). A model whose parts
+    // could not be read is left out - unknown - rather than recorded as having none.
+    [Fact]
+    public void Build_RecordsEachModelsParts()
+    {
+        var megs = OneMeg("models.meg",
+            [@"DATA\ART\MODELS\EV_TIE.ALO", @"DATA\ART\MODELS\EV_XWING.ALO", @"DATA\ART\MODELS\P_SMOKE.ALO"]);
+        var scans = new Dictionary<string, AloScan>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["data/art/models/ev_tie.alo"] = new(AloFileKind.Model, [])
+            {
+                Parts = [new ModelPart("Hull", false, true, true), new ModelPart("p_glow", true, false, false)]
+            },
+            ["data/art/models/ev_xwing.alo"] = new(AloFileKind.Model, []),
+            ["data/art/models/p_smoke.alo"] = new(AloFileKind.Particle, [])
+        };
+
+        var (_, _, _, _, _, parts) = MegAssetCatalogBuilder.Build(
+            megs, new MockFileSystem(), "C:/game",
+            path => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(path)),
+            _ => [],
+            null,
+            NullLogger.Instance,
+            stream => scans[new StreamReader(stream).ReadToEnd()]);
+
+        Assert.Equal([new ModelPart("Hull", false, true, true), new ModelPart("p_glow", true, false, false)],
+            parts["EV_TIE.ALO"]);
+        Assert.False(parts.ContainsKey("ev_xwing.alo"));
+        Assert.False(parts.ContainsKey("p_smoke.alo"));
     }
 
     // ── SFX path conventions ──────────────────────────────────────────────────
@@ -415,7 +447,7 @@ public sealed class MegAssetCatalogBuilderTest
             Func<Stream, IEnumerable<string>>? extractMtdIcons = null,
             Func<Stream, AloScan>? extractTextures = null)
     {
-        var (assetFiles, modelBones, _, _, _) = MegAssetCatalogBuilder.Build(
+        var (assetFiles, modelBones, _, _, _, _) = MegAssetCatalogBuilder.Build(
             megs, fs, gameRoot,
             openEntry ?? (_ => null),
             extractBones ?? (_ => []),

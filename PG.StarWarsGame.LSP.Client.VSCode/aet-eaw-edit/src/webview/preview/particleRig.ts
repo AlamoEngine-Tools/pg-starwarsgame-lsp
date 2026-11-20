@@ -15,11 +15,13 @@ import { ParticleSystemInstance, type EmitterProbe } from "./particleRenderer";
 import * as THREE from "three";
 import { type Vector3 as Vector3Like } from "./lighting";
 import { type AlamoParticleContent } from "../../protocol/modelPreview";
-import { proxyVisibleAt } from "./levels";
+import { proxyAltVisibleAt } from "./levels";
+import { type StateSwitch, fileState } from "./visibility";
 import { type VisibilityTrack, hiddenAt } from "./boneVisibility";
 import { ACTIVE_SUBJECT } from "./loadedPart";
 import { emissionMeshFor } from "./emissionSource";
 import { missingTexture } from "./missingTexture";
+import { PLAIN_LOOK } from "./cloakFade";
 import { type CaptureShot, type ParticlePlacement } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
 
@@ -49,10 +51,10 @@ export class ParticleRig {
     /**
      * Systems that have been killed but whose particles are still finishing.
      *
-     * `leaveParticles` on the SYSTEM decides this, and it is what the engine does:
-     * `Engine::KillParticleSystem` calls `StopSpawning()` for one that says so and lets the air
-     * clear, and `Kill()` for one that does not. It defaults TRUE, and the ones that say false are
-     * the ENGINE GLOWS - a glow cuts with the engine, a fire trails off. Nothing read the flag, so
+     * `leaveParticles` on the SYSTEM decides this, measured in the game: a stopped system that says
+     * so stops spawning and lets the air clear, one that does not is removed at once. It defaults
+     * TRUE, and the ones that say false are the ENGINE GLOWS - a glow cuts with the engine, a fire
+     * trails off. Nothing read the flag, so
      * a wreck's fire vanished mid-flame the instant its debris expired.
      *
      * Held OUT of {@link particleSystems} rather than flagged inside it: they are no longer
@@ -84,13 +86,15 @@ export class ParticleRig {
 
     constructor(private readonly context: ViewportContext) {}
 
-    /** Shows or hides each system by whether its proxy is tagged for the level the model is shown at. */
-    gateByLevel(alt: number, lod: number, altDescending: boolean): void {
+    /**
+     * Shows or hides each system by whether its proxy is tagged for the damage level the model is
+     * shown at. Never by detail level: measured, that gates meshes only (#450).
+     */
+    gateByLevel(alt: number, altDescending: boolean): void {
         for (const entry of this.particleSystems.values()) {
-            entry.levelVisible = proxyVisibleAt(
+            entry.altVisible = proxyAltVisibleAt(
                 entry.levels,
                 alt,
-                lod,
                 altDescending,
             );
         }
@@ -115,6 +119,16 @@ export class ParticleRig {
     step(dt: number, view: THREE.Matrix4): void {
         if (this.particlesVisible && !this.particlesPaused) {
             for (const [id, entry] of [...this.particleSystems]) {
+                // Its model's whole look - the subject's cloak, a dying clone's fade - for a model's
+                // own effect; a gameplay effect belongs to no model and is drawn as it is.
+                entry.instance.setLook(
+                    entry.origin === "model"
+                        ? this.context.animation.lookOf(
+                              this.subjectOfSystem(entry),
+                          )
+                        : PLAIN_LOOK,
+                );
+
                 // The camera goes in because a streak's length is a screen-space measurement:
                 // a spark flying at the viewer has no tail to draw.
                 entry.instance.update(
@@ -252,6 +266,7 @@ export class ParticleRig {
             attachToPartId,
             attachBone,
             attachBoneIndex,
+            proxyName,
             origin,
             scaleFactor = 1,
             at,
@@ -268,12 +283,12 @@ export class ParticleRig {
             attachToPartId,
             attachBone,
             attachBoneIndex,
-            gateVisible: true,
+            proxyName,
+            state: fileState(true),
             levels,
-            levelVisible: proxyVisibleAt(
+            altVisible: proxyAltVisibleAt(
                 levels,
                 this.context.levels.alt,
-                this.context.levels.lod,
                 this.context.levels.altDescending,
             ),
             scaleFactor,
@@ -442,24 +457,24 @@ export class ParticleRig {
     }
 
     /**
-     * What the game's rules say about a system: the opening rule and the current damage state.
+     * Writes a system's state switch: its proxy's own flag, or what the effect rules say over it.
      *
      * The RULES path, called on attach and again whenever a hardpoint is destroyed or repaired -
      * never in response to a click. A hand-set override survives this, so switching one effect on
      * does not get undone by an unrelated hardpoint blowing up.
      *
-     * What the rules say is `inFile` for this row - the model's own word - and the chain weighs it
-     * against everything else. It does NOT clear a hand-set override: the reader's word is taken
-     * back only by the reader or by a clip starting, and a row standing against the rules is marked
-     * as one the model does not draw, so nothing here is claimed that is not true.
+     * It is the row's state switch, and the chain ANDs it with the others. It does NOT clear a
+     * hand-set override: the reader's word is taken back only by the reader or by a clip starting,
+     * and a row standing against the rules is marked as one the model does not draw, so nothing here
+     * is claimed that is not true.
      */
-    setParticleSystemVisible(id: string, visible: boolean): void {
+    setParticleSystemVisible(id: string, state: StateSwitch): void {
         const entry = this.particleSystems.get(id);
         if (entry === undefined) {
             return;
         }
 
-        entry.gateVisible = visible;
+        entry.state = state;
         this.context.rows.refreshRows();
     }
 
@@ -530,17 +545,24 @@ export class ParticleRig {
      * 50 sparks - so by the time the ship actually died they were spent, and the blast that covers
      * the wreck breaking up drew two stray particles.
      *
-     * Only ever HOLDS here. Releasing is the clip's business: `advancePassiveSubjects` gates a
-     * playing subject frame by frame, and a subject with no clip is released as it is shown.
+     * Held while the part is hidden and let go when it is shown; a playing passive subject's clip
+     * then gates it frame by frame in `advancePassiveSubjects`. Holding stops the spawning only:
+     * whether the system DRAWS is the rows' answer, which takes the hidden part too - see
+     * `ModelRows.effectFacts`. Answers whether the part carries any effect, so the caller knows
+     * whether there is anything for the rows to say again.
      */
-    holdEffectsOf(partId: string): void {
+    holdEffectsOf(partId: string): boolean {
         const hidden = this.context.assembly.hiddenParts.has(partId);
+        let any = false;
 
         for (const entry of this.particleSystems.values()) {
             if (entry.attachToPartId === partId) {
                 entry.instance.hold("part", hidden);
+                any = true;
             }
         }
+
+        return any;
     }
 
     // ── skeleton ───────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
 // The grid, the floor, the lights and the background describe the viewer, so they follow the person
 // from one file to the next and across sessions. A model's damage state, its detail level and its
 // hidden meshes describe THAT model, so they are held per subject and reset when another is opened
-// - which is also what keeps the agreed opening rules honest (highest detail, undamaged, quiet).
+// - which is also what keeps the agreed opening rules honest (highest detail, undamaged).
 //
 // Everything here is read back from storage that outlives this build, so `viewerSettingsFrom` never
 // trusts what it is handed: a missing field takes its default, a wrong one is refused, and nothing

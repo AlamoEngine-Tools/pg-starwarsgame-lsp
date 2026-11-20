@@ -10,7 +10,7 @@ import {
     levelLabel,
     levelSteps,
     type LevelTagged,
-    proxyVisibleAt,
+    proxyAltVisibleAt,
     stageForHull,
     withDeclaredStages,
 } from "./levels";
@@ -22,37 +22,47 @@ const tagged = (over: Partial<LevelTagged> = {}): LevelTagged => ({
     ...over,
 });
 
-describe("proxyVisibleAt", () => {
+describe("proxyAltVisibleAt", () => {
     it("shows an untagged proxy at every level", () => {
         // The engine only ever touches tagged proxies; untagged ones are the model's normal effects.
-        assert.equal(proxyVisibleAt(tagged(), 0, 0, false), true);
-        assert.equal(proxyVisibleAt(tagged(), 7, 3, true), true);
+        assert.equal(proxyAltVisibleAt(tagged(), 0, false), true);
+        assert.equal(proxyAltVisibleAt(tagged(), 7, true), true);
     });
 
     it("shows a tagged proxy only at its own level", () => {
-        assert.equal(proxyVisibleAt(tagged({ alt: 2 }), 2, 0, false), true);
-        assert.equal(proxyVisibleAt(tagged({ alt: 2 }), 1, 0, false), false);
+        assert.equal(proxyAltVisibleAt(tagged({ alt: 2 }), 2, false), true);
+        assert.equal(proxyAltVisibleAt(tagged({ alt: 2 }), 1, false), false);
     });
 
-    it("requires both levels to match when both are tagged", () => {
+    it("switches a proxy tagged for both levels by its damage level alone", () => {
         const both = tagged({ alt: 1, lod: 2 });
 
-        assert.equal(proxyVisibleAt(both, 1, 2, false), true);
-        assert.equal(proxyVisibleAt(both, 1, 3, false), false);
-        assert.equal(proxyVisibleAt(both, 0, 2, false), false);
+        assert.equal(proxyAltVisibleAt(both, 1, false), true);
+        assert.equal(proxyAltVisibleAt(both, 0, false), false);
     });
 
     it("keeps a stay-hidden proxy out while the damage state winds down", () => {
-        // The repair asymmetry, straight from RenderObject::CheckAltLod: fire lit on the way to
-        // destruction must not flicker back on as the hardpoint is repaired.
+        // The repair asymmetry, measured in the game: fire lit on the way to destruction must not
+        // flicker back on as the hardpoint is repaired.
         const fire = tagged({ alt: 1, altDecreaseStayHidden: true });
 
-        assert.equal(proxyVisibleAt(fire, 1, 0, false), true, "increasing");
-        assert.equal(proxyVisibleAt(fire, 1, 0, true), false, "decreasing");
+        assert.equal(proxyAltVisibleAt(fire, 1, false), true, "increasing");
+        assert.equal(proxyAltVisibleAt(fire, 1, true), false, "decreasing");
     });
 
     it("ignores the descending flag for a proxy that does not set stay-hidden", () => {
-        assert.equal(proxyVisibleAt(tagged({ alt: 1 }), 1, 0, true), true);
+        assert.equal(proxyAltVisibleAt(tagged({ alt: 1 }), 1, true), true);
+    });
+});
+
+describe("proxyAltVisibleAt, an _LOD tag (#450)", () => {
+    it("never switches an effect by its _LOD tag", () => {
+        // Detail level gates meshes only; an effect tagged for a LOD and no ALT is untagged as far as
+        // any level change goes, the repair hold-back included.
+        const lodOnly = tagged({ lod: 2, altDecreaseStayHidden: true });
+
+        assert.equal(proxyAltVisibleAt(lodOnly, 0, true), true);
+        assert.equal(proxyAltVisibleAt(lodOnly, 3, false), true);
     });
 });
 

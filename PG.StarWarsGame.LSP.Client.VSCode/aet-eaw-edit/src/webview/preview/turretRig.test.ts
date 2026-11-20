@@ -724,4 +724,161 @@ describe("TurretRig", () => {
             handles.map((one) => one.id).sort(),
         );
     });
+
+    it("picks a turret whose handles were built while its model was not yet on its hull", () => {
+        // A turret model that lands before its hull waits outside the scene, and its handles can be
+        // built then. Its mesh sits 6 units along X from its bone; the pick box has to be measured in
+        // the bone's own space, which the scene's matrices say nothing about while it waits.
+        const modelRoot = new THREE.Group();
+        const partRoot = new THREE.Group();
+        partRoot.rotation.x = -Math.PI / 2;
+        const bone = new THREE.Object3D();
+        bone.name = "Turret";
+        const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(4, 4, 4),
+            new THREE.MeshBasicMaterial(),
+        );
+        mesh.position.set(6, 0, 0);
+        bone.add(mesh);
+        partRoot.add(bone);
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+        camera.position.set(0, 0, 40);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        const canvas = {
+            getBoundingClientRect: () => ({
+                left: 0,
+                top: 0,
+                width: 100,
+                height: 100,
+            }),
+            setPointerCapture: () => undefined,
+            style: { cursor: "" },
+        };
+        const rig = new TurretRig(
+            standInContext({
+                camera,
+                canvas,
+                modelRoot,
+                parts: new Map([
+                    [
+                        "p",
+                        {
+                            id: "p",
+                            root: partRoot,
+                            bones: new Map([["turret", bone]]),
+                            bonesByIndex: new Map(),
+                            subjectId: "subject",
+                        },
+                    ],
+                ]),
+                cameraRig: { modelSpan: () => 10 },
+                levels: { drawn: () => true },
+                animation: { active: { restPose: new Map() } },
+                modelScale: 1,
+            }),
+            { onTurretAimed: null },
+        );
+
+        rig.setTurretHandles([handle]);
+
+        // The hull arrives and the model is hung on it.
+        modelRoot.add(partRoot);
+        modelRoot.updateMatrixWorld(true);
+
+        const at = mesh.getWorldPosition(new THREE.Vector3()).project(camera);
+        rig.onPointerMove(
+            pointerAt((at.x * 0.5 + 0.5) * 100, (-at.y * 0.5 + 0.5) * 100),
+        );
+
+        assert.deepEqual(
+            anchorsUnder(partRoot).map((a) => a.visible),
+            [true, true],
+            "the turret's mesh does not pick it",
+        );
+    });
+
+    it("picks a SKINNED turret whose handles were built while its model was not yet on its hull", () => {
+        // The Gargantuan's main turret: its rigid meshes are helpers the file hides, and what draws
+        // is a mesh skinned to the turret bone, hanging at the model's root.
+        const modelRoot = new THREE.Group();
+        const partRoot = new THREE.Group();
+        const bone = new THREE.Bone();
+        bone.name = "Turret";
+        partRoot.add(bone);
+        const geometry = new THREE.BoxGeometry(4, 4, 4);
+        geometry.translate(6, 0, 0);
+        const count = geometry.getAttribute("position").count;
+        geometry.setAttribute(
+            "skinIndex",
+            new THREE.Uint16BufferAttribute(new Array(count * 4).fill(0), 4),
+        );
+        geometry.setAttribute(
+            "skinWeight",
+            new THREE.Float32BufferAttribute(
+                Array.from({ length: count * 4 }, (_, i) =>
+                    i % 4 === 0 ? 1 : 0,
+                ),
+                4,
+            ),
+        );
+        const skinned = new THREE.SkinnedMesh(
+            geometry,
+            new THREE.MeshBasicMaterial(),
+        );
+        partRoot.add(skinned);
+        skinned.bind(new THREE.Skeleton([bone]));
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+        camera.position.set(0, 0, 40);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        const rig = new TurretRig(
+            standInContext({
+                camera,
+                canvas: {
+                    getBoundingClientRect: () => ({
+                        left: 0,
+                        top: 0,
+                        width: 100,
+                        height: 100,
+                    }),
+                    setPointerCapture: () => undefined,
+                    style: { cursor: "" },
+                },
+                modelRoot,
+                parts: new Map([
+                    [
+                        "p",
+                        {
+                            id: "p",
+                            root: partRoot,
+                            bones: new Map([["turret", bone]]),
+                            bonesByIndex: new Map(),
+                            subjectId: "subject",
+                        },
+                    ],
+                ]),
+                cameraRig: { modelSpan: () => 10 },
+                levels: { drawn: () => true },
+                animation: { active: { restPose: new Map() } },
+                modelScale: 1,
+            }),
+            { onTurretAimed: null },
+        );
+
+        rig.setTurretHandles([handle]);
+        modelRoot.add(partRoot);
+        modelRoot.updateMatrixWorld(true);
+
+        const at = new THREE.Vector3(6, 0, 0).project(camera);
+        rig.onPointerMove(
+            pointerAt((at.x * 0.5 + 0.5) * 100, (-at.y * 0.5 + 0.5) * 100),
+        );
+
+        assert.deepEqual(
+            anchorsUnder(partRoot).map((a) => a.visible),
+            [true, true],
+            "the skinned turret does not pick it",
+        );
+    });
 });

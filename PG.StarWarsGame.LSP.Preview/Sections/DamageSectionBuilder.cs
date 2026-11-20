@@ -7,6 +7,7 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Preview;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -36,6 +37,13 @@ public sealed class DamageSectionBuilder(
 
     /// <summary>What both shipped corpora write, and what the engine falls back to.</summary>
     private const float DefaultHullVsHardpointsConstraint = 0.2f;
+
+    /// <summary>
+    ///     The behaviours that keep a clone's own <c>Death_Persistence_Duration</c> when an infantry
+    ///     unit's death would replace it - measured in the game.
+    /// </summary>
+    private static readonly string[] PersistenceKeepingBehaviors =
+        ["HIDE_WHEN_FOGGED", "IMPOSING_PRESENCE", "LAND_OBSTACLE", "PROXIMITY_MINE"];
 
     /// <summary>
     ///     What a hit on this subject has to get through.
@@ -107,10 +115,34 @@ public sealed class DamageSectionBuilder(
     /// </remarks>
     private static bool IsShielded(EffectiveObject effective)
     {
+        return HasAnyBehavior(effective, ["SHIELDED"]);
+    }
+
+    /// <summary>
+    ///     Whether any of the three behaviour lists names one of <paramref name="behaviors" />, as a
+    ///     whole token and without case.
+    /// </summary>
+    private static bool HasAnyBehavior(EffectiveObject effective, IReadOnlyCollection<string> behaviors)
+    {
         return PreviewTagReader.BehaviorListTags
             .SelectMany(tag => (effective.ValueOf(tag) ?? string.Empty)
                 .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-            .Any(token => token.Equals("SHIELDED", StringComparison.OrdinalIgnoreCase));
+            .Any(token => behaviors.Contains(token, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    ///     GameConstants' <c>Override_Death_Persistence_Duration</c>, or null where it is not written
+    ///     as a number.
+    /// </summary>
+    public float? DeathPersistenceOverride(GameIndex index)
+    {
+        foreach (var value in RepeatedTagReader.Values(
+                     index, tagSource, EncyclopediaTags.GameConstantsId,
+                     "Override_Death_Persistence_Duration"))
+            if (EngineNumber.ReadFloat(value) is { } parsed)
+                return parsed;
+
+        return null;
     }
 
     /// <summary>
@@ -261,7 +293,12 @@ public sealed class DamageSectionBuilder(
                 model is null ? [] : _parts.ProxiesOf(model, row[1], [], problems),
                 // The clone's OWN scale, read off the resolved clone - variants included - through
                 // the same reader the subject's scale uses.
-                EngineScaleFactor.Of(clone.ValueOf("Scale_Factor"))));
+                EngineScaleFactor.Of(clone.ValueOf("Scale_Factor")),
+                // How it ends, off the clone too: it is the clone that stays and fades.
+                clone.FloatOf("Death_Persistence_Duration"),
+                clone.FloatOf("Death_Fade_Time"),
+                clone.ValueOf("Death_Explosions_End") is { } end ? XmlUtility.SplitList(end) : [],
+                HasAnyBehavior(clone, PersistenceKeepingBehaviors)));
         }
 
         return clones;

@@ -19,9 +19,9 @@ import {
 import { post } from "./previewPost";
 import { type PreviewViewport } from "./viewport";
 import { type PreviewAssetLoader } from "./previewAssetLoader";
-import { effectPlaysNow, hardpointGateAllows } from "./damage";
-import { passiveEffectPlaysNow, passiveEffects } from "./passiveSubject";
-import { abilityAllows, abilityClaims } from "./abilityRows";
+import { effectPlaysNow } from "./damage";
+import { passiveEffects } from "./passiveSubject";
+import { effectState } from "./visibility";
 
 /** An effect asked for before its system arrived, and where it goes when the system lands. */
 export interface PendingEffect {
@@ -34,32 +34,24 @@ export interface PendingEffect {
     once: boolean;
     /** Where to put it when it belongs to no part. See `ParticlePlacement.at`. */
     at?: { x: number; y: number; z: number };
+    /** The bone it rides, by index, where that is what the game names. See `ParticlePlacement.attachBoneIndex`. */
+    boneIndex?: number;
 }
 
 /** What useParticleEffects reads from the rest of the preview. */
 export interface ParticleEffectsInputs {
-    abilityProxyIdsRef: RefObject<ReadonlyMap<string, string[]>>;
-    activeAbilitiesRef: RefObject<ReadonlySet<string>>;
     assets: PreviewAssetLoader;
-    destroyedRef: RefObject<ReadonlySet<string>>;
     refreshStats: () => void;
-    replacedEffectsRef: RefObject<ReadonlySet<string>>;
     setHiddenEmitters: Dispatch<SetStateAction<ReadonlySet<number>>>;
-    unboundEffectsRef: RefObject<ReadonlySet<string>>;
     viewportRef: RefObject<PreviewViewport | null>;
 }
 
 export type ParticleEffects = ReturnType<typeof useParticleEffects>;
 
 export function useParticleEffects({
-    abilityProxyIdsRef,
-    activeAbilitiesRef,
     assets,
-    destroyedRef,
     refreshStats,
-    replacedEffectsRef,
     setHiddenEmitters,
-    unboundEffectsRef,
     viewportRef,
 }: ParticleEffectsInputs) {
     /**
@@ -86,9 +78,8 @@ export function useParticleEffects({
     /**
      * The effects belonging to a PASSIVE subject, by id.
      *
-     * They answer to their own model rather than to the subject's opening and damage rules - see
-     * `passiveEffectPlaysNow` - and this is how the one place that decides whether an effect draws
-     * tells them apart.
+     * They answer to their own model rather than to the subject's damage rules, and this is how the
+     * preview tells them apart when the subject's effects are dropped.
      */
     const passiveEffectIdsRef = useRef(new Set<string>());
 
@@ -132,58 +123,16 @@ export function useParticleEffects({
      * visibility from the damage rules alone and clobbered the ability decision made moments
      * earlier, so an ability's proxy was drawing before anyone switched it on. Two writers of one
      * flag is the same defect the effect-row work already paid for.
+     *
+     * The proxy's own flag, for every effect: the subject's, a passive subject's, and a model
+     * preview's. Everything the game's rules say about an effect - its name group, the abilities'
+     * groups, the hardpoints' bones, the cloak - is a write of its state switch in the unit's rules,
+     * over this answer - see `UnitRules.effectState`.
      */
-    const effectDrawsNow = useCallback((particle: PreviewParticle): boolean => {
-        const proxies = abilityProxyIdsRef.current;
-
-        // A passive subject's effect answers to its own model and to nothing here. Neither of the
-        // rules below is about it: the opening rule is about the first moment of a preview, and a
-        // death clone has none - it exists because the ship died, and its explosions ARE the death.
-        if (passiveEffectIdsRef.current.has(particle.id)) {
-            return passiveEffectPlaysNow(particle);
-        }
-
-        // Before every other rule, because it is the only VETO among them: an effect whose name
-        // claims an ability this unit does not declare has nothing that could ever switch it on,
-        // and the game simply never shows it. Everything below is a DEFAULT or a gate - the
-        // distinction three separate defects were spent learning. `Tartan_Patrol_Cruiser` opened
-        // with its TURBO engines burning because an unbound proxy fell through to the ordinary
-        // path, where an engine-named effect is exempt from the quiet-on-open rule.
-        if (unboundEffectsRef.current.has(particle.id)) {
-            return false;
-        }
-
-        // A cloaked unit shows its stealth shell and nothing else - not its engines, not its
-        // damage smoke, not the proxies of the ability doing the cloaking. The meshes are swapped
-        // by the row chain in the viewport; this is the same rule reaching the effects, which
-        // answer to their own decider.
-        // The engine glow going out with its hardpoint is NOT decided here. It arrives already gated:
-        // the server joins the glow proxy to the engine hardpoint and marks it `HardpointAlive`,
-        // and `hardpointGateAllows` below is what reads that. A second rule here, matching the
-        // hardpoint's `Engine_Particles` bone against the proxy's own bone name, was the same
-        // one-flag-two-gates mistake as the shield mesh - and it never matched anything on any
-        // shipped ship, because the join is on the proxy's PARENT.
-
-        // An ability REPLACES the quiet-on-open rule for the proxies it claims, rather than being
-        // ANDed with it. The opening rules hold every non-engine effect back - rightly, on open -
-        // but they are about the first moment, not a permanent veto, and ANDing them left an
-        // activated ability changing nothing at all. The damage rules still apply either way.
-        if (abilityClaims(particle.id, proxies)) {
-            return (
-                hardpointGateAllows(particle, destroyedRef.current) &&
-                abilityAllows(particle.id, proxies, activeAbilitiesRef.current)
-            );
-        }
-
-        // An active ability REPLACING this effect's family, which is a different statement from
-        // claiming it - see `replacedByAbility`. Below the claim branch on purpose: a proxy an
-        // ability actually drives answers to that ability, not to this.
-        if (replacedEffectsRef.current.has(particle.id)) {
-            return false;
-        }
-
-        return effectPlaysNow(particle, destroyedRef.current);
-    }, []);
+    const effectDrawsNow = useCallback(
+        (particle: PreviewParticle): boolean => effectPlaysNow(particle),
+        [],
+    );
 
     /**
      * Queues a passive subject's own effects, once its geometry is on the way.
@@ -246,6 +195,17 @@ export function useParticleEffects({
         );
     }, []);
 
+    /**
+     * Takes one gameplay effect away, whether it is burning or still waiting for its system to
+     * arrive - an effect asked for a moment before its owner went must not start after it.
+     */
+    const cancelEffect = useCallback((id: string): void => {
+        explosionsRef.current = explosionsRef.current.filter(
+            (pending) => pending.id !== id,
+        );
+        viewportRef.current?.removeParticleSystem(id, true);
+    }, []);
+
     /** Attaches every pending particle whose system and part have both arrived. */
     const attachPending = useCallback((): void => {
         const viewport = viewportRef.current;
@@ -272,6 +232,7 @@ export function useParticleEffects({
                 attachToPartId: particle.partId,
                 attachBone: particle.bone,
                 attachBoneIndex: particle.boneIndex,
+                proxyName: particle.systemRef,
                 levels: {
                     alt: particle.alt ?? null,
                     lod: particle.lod ?? null,
@@ -286,7 +247,7 @@ export function useParticleEffects({
 
             viewport.setParticleSystemVisible(
                 particle.id,
-                effectDrawsNow(particle),
+                effectState(particle.startsVisible, effectDrawsNow(particle)),
             );
         }
 
@@ -332,6 +293,8 @@ export function useParticleEffects({
              * blast - it goes off where the ship was - and wrong for a wreck that flew away first.
              */
             at?: { x: number; y: number; z: number },
+            /** The bone by index, for an effect the game adds on a bone it names by position - the root. */
+            boneIndex?: number,
         ): void => {
             if (name === "") {
                 return;
@@ -349,6 +312,7 @@ export function useParticleEffects({
                     bone,
                     once,
                     at,
+                    boneIndex,
                 });
                 post({ type: "requestParticleSystem", name });
                 return;
@@ -368,6 +332,7 @@ export function useParticleEffects({
                     origin: "gameplay",
                     attachToPartId: partId,
                     attachBone: bone,
+                    attachBoneIndex: boneIndex,
                     scaleFactor: scale,
                     at,
                 });
@@ -387,6 +352,7 @@ export function useParticleEffects({
         effectDrawsNow,
         queuePassiveEffects,
         dropPassiveEffects,
+        cancelEffect,
         attachPending,
         playEffect,
     };

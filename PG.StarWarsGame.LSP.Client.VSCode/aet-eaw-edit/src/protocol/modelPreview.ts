@@ -47,6 +47,14 @@ export interface PreviewRgba {
     a: number;
 }
 
+/** The look a cloak takes its unit to. Mirrors the C# `PreviewCloak`. */
+export interface PreviewCloak {
+    /** The colour and alpha it fades and tints towards, or absent where the type writes none. */
+    color?: PreviewRgba | null;
+    /** How long the change takes, in seconds, or absent where the type writes none. */
+    transitionSeconds?: number | null;
+}
+
 /**
  * One model instance in the scene.
  *
@@ -280,6 +288,21 @@ export interface PreviewDeathClone {
      * rewrites the ids when it puts one in the scene.
      */
     particles: PreviewParticle[];
+    /**
+     * How the clone ENDS, off the clone's own type. Once its death clip is done it stays for
+     * `Death_Persistence_Duration`, then is destroyed in its `Death_Explosions_End` when it names
+     * any, and otherwise fades out over `Death_Fade_Time`. Absent where the clone does not declare
+     * the tag.
+     */
+    persistenceSeconds?: number | null;
+    fadeSeconds?: number | null;
+    endExplosions?: string[];
+    /**
+     * Whether the clone type keeps its own persistence where an infantry unit's death would replace
+     * it with GameConstants' `Override_Death_Persistence_Duration`: it has a HIDE_WHEN_FOGGED,
+     * IMPOSING_PRESENCE, LAND_OBSTACLE or PROXIMITY_MINE behaviour.
+     */
+    keepsItsOwnPersistence?: boolean;
 }
 
 /**
@@ -461,9 +484,9 @@ export interface PreviewTurret {
 /**
  * One mounted hardpoint, with everything needed to destroy and repair it locally.
  *
- * The damage chain, in order: hide {@link partId}, show the proxies parented to
- * {@link damageParticlesBone} on the hull, show the {@link damageDecalBone} mesh, play
- * {@link deathExplosionParticles} once, and hide the engine glow when
+ * The damage chain, in order: hide {@link partId}, show the {@link damageDecalBone} mesh, show every
+ * part on or below {@link damageParticlesBone} on the hull, play {@link deathExplosionParticles} once,
+ * and hide every part on or below {@link engineParticlesBone} when
  * {@link engineDeathHidesEngineParticles} is set. Every one is read from the hardpoint's own tags.
  */
 export interface PreviewHardpoint {
@@ -478,7 +501,6 @@ export interface PreviewHardpoint {
     health?: number | null;
     damageParticlesBone?: string | null;
     damageDecalBone?: string | null;
-    collisionMeshBone?: string | null;
     engineParticlesBone?: string | null;
     deathExplosionParticles?: string | null;
     deathBreakoffProp?: string | null;
@@ -602,15 +624,6 @@ export interface PreviewParticle {
      * lit on the way to destruction does not flicker back on as a hardpoint is repaired.
      */
     altDecreaseStayHidden?: boolean;
-    /**
-     * The ability this proxy's BONE NAME claims by its prefix, or absent for the 5404 that claim
-     * nothing.
-     *
-     * A claim is not a binding. The unit has to declare the type as well, and when it does not the
-     * game simply never shows the effect - `Tartan_Patrol_Cruiser` declares POWER_TO_WEAPONS and
-     * carries `Pte_tartanengine_lrg` for a TURBO it does not have. See {@link unboundEffectIds}.
-     */
-    claimsAbility?: string | null;
 }
 
 /**
@@ -681,6 +694,31 @@ export interface PreviewScene {
      * Absent for an object scene and for a model that resolves nowhere.
      */
     sourceFile?: PreviewSourceFile | null;
+    /**
+     * The subject's `Passive_Missile_Shield_Radius`, or absent where it declares none. A type whose
+     * radius is above 0 shows its `prs` effects once it is created - see `effectGroups.ts`.
+     */
+    passiveMissileShieldRadius?: number | null;
+    /**
+     * What the type's `Stealth_Ability` writes about the look of its cloak, or absent where it has
+     * none: `Stealth_Color` and `Stealth_Transition_Time`.
+     */
+    stealth?: PreviewCloak | null;
+    /**
+     * What the type's `Force_Cloak_Ability` writes about the look of its cloak, or absent where it has
+     * none: `Force_Cloak_Color` and `Force_Cloak_Transition_In_Secs`.
+     */
+    forceCloak?: PreviewCloak | null;
+    /**
+     * The type's `Damaged_Smoke_Asset_Name`, or absent where it names none: the effect a hit that takes
+     * the hull to or below 75 % or 50 % adds on the root bone - see `DamageSmoke`.
+     */
+    damagedSmokeAsset?: string | null;
+    /**
+     * GameConstants' `Override_Death_Persistence_Duration`, or absent where it is not written: how
+     * long an infantry unit's clone stays in place of its own persistence - see `deathEndingOf`.
+     */
+    deathPersistenceOverride?: number | null;
     subject: string;
     parts: PreviewPart[];
     hardpoints: PreviewHardpoint[];

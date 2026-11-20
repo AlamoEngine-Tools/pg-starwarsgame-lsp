@@ -32,6 +32,86 @@ public sealed class PreviewSceneBuilderTest
         Assert.Equal("Rebel", Builder(index, tags, "hull.alo").BuildForObject("Xwing").Affiliation);
     }
 
+    /// <summary>
+    ///     Measured in the game: a type whose <c>Passive_Missile_Shield_Radius</c> is above 0 shows
+    ///     its <c>prs</c> effects once it is created. The client decides that; the scene carries the
+    ///     number, null where the type declares none.
+    /// </summary>
+    [Fact]
+    public void BuildForObject_CarriesThePassiveMissileShieldRadius()
+    {
+        var index = Index([Sym("Field", "GameObjectType"), Sym("Ship", "GameObjectType")]);
+        var tags = new FakeVariantTagSource()
+            .With("Field", Tag("Space_Model_Name", "hull.alo"), Tag("Passive_Missile_Shield_Radius", "300.0"))
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Equal(300f, Builder(index, tags, "hull.alo").BuildForObject("Field").PassiveMissileShieldRadius);
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").PassiveMissileShieldRadius);
+    }
+
+    /// <summary>
+    ///     Measured in the game: a hit that takes the hull to or below 75 % or 50 % adds the type's
+    ///     <c>Damaged_Smoke_Asset_Name</c> on the root bone. The client decides when; the scene carries
+    ///     the asset, null where the type names none (#451).
+    /// </summary>
+    [Fact]
+    public void BuildForObject_CarriesTheDamagedSmokeAsset()
+    {
+        var index = Index([Sym("Speeder", "GameObjectType"), Sym("Ship", "GameObjectType")]);
+        var tags = new FakeVariantTagSource()
+            .With("Speeder", Tag("Space_Model_Name", "hull.alo"),
+                Tag("Damaged_Smoke_Asset_Name", " P_Smoke_Small02.alo "))
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Equal("P_Smoke_Small02.alo",
+            Builder(index, tags, "hull.alo").BuildForObject("Speeder").DamagedSmokeAsset);
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").DamagedSmokeAsset);
+    }
+
+    /// <summary>
+    ///     A cloak fades and tints its unit towards its type's colour over its transition time - read
+    ///     off the <c>Stealth_Ability</c> and <c>Force_Cloak_Ability</c> in the type's
+    ///     <c>Abilities</c> list, as FoC writes them.
+    /// </summary>
+    [Fact]
+    public void BuildForObject_CarriesHowItsCloaksLook()
+    {
+        var index = Index([Sym("Twilek", "GameObjectType")]);
+        var tags = new FakeVariantTagSource().With("Twilek",
+            Tag("Land_Model_Name", "hull.alo"),
+            Tag("Abilities",
+                "<Stealth_Ability Name=\"Stealth_Twilek\"><Stealth_Color>255, 64, 64, 120</Stealth_Color>" +
+                "<Stealth_Transition_Time>.6</Stealth_Transition_Time></Stealth_Ability>" +
+                "<Force_Cloak_Ability Name=\"Cloak\"><Force_Cloak_Color>255, 255, 255, 255</Force_Cloak_Color>" +
+                "<Force_Cloak_Transition_In_Secs>.4</Force_Cloak_Transition_In_Secs></Force_Cloak_Ability>"));
+
+        var scene = Builder(index, tags, "hull.alo").BuildForObject("Twilek");
+
+        Assert.Equal(new PreviewRgba(255, 64, 64, 120), scene.Stealth?.Color);
+        Assert.Equal(0.6f, scene.Stealth?.TransitionSeconds);
+        Assert.Equal(new PreviewRgba(255, 255, 255, 255), scene.ForceCloak?.Color);
+        Assert.Equal(0.4f, scene.ForceCloak?.TransitionSeconds);
+    }
+
+    /// <summary>A type with no cloak block says nothing, and one that writes no tags says that.</summary>
+    [Fact]
+    public void BuildForObject_SaysNothingOfACloakTheTypeDoesNotDescribe()
+    {
+        var index = Index([Sym("Plain", "GameObjectType"), Sym("Bare", "GameObjectType")]);
+        var tags = new FakeVariantTagSource()
+            .With("Plain", Tag("Land_Model_Name", "hull.alo"))
+            .With("Bare", Tag("Land_Model_Name", "hull.alo"),
+                Tag("Abilities",
+                    "<Stealth_Ability Name=\"S\"><Activation_Style>User_Input</Activation_Style></Stealth_Ability>"));
+
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Plain").Stealth);
+
+        var bare = Builder(index, tags, "hull.alo").BuildForObject("Bare").Stealth;
+        Assert.NotNull(bare);
+        Assert.Null(bare.Color);
+        Assert.Null(bare.TransitionSeconds);
+    }
+
     [Fact]
     public void BuildForObject_TakesTheFirstOfSeveralAffiliations()
     {

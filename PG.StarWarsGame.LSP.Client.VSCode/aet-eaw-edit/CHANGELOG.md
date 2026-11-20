@@ -16,9 +16,94 @@
   inside it; it is disabled while none is turned and left out for a subject with no turret that turns. The
   two state sliders beside it are 16px shorter so all three fit one row
   ([#438](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/438))
+- **The model preview shows the model file as it is** - a model file opened on its own shows every part the
+  file marks visible, a stealth shell and a shield mesh included, runs every effect the file leaves on and
+  stands in the file's own pose until a clip is played. The game's rules - hardpoints, abilities, cloaks, the
+  XML gates and the state a unit is created in - apply only in the unit preview, a game object opened from its
+  XML. A wrong default in a model file shows in the model preview, and what the game draws in the unit preview
+  ([#452](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/452))
+- **Diagnostics for a cloak that misses its parts** - the game decides what a stealth or Force cloak hides by
+  part names, so a unit whose model has no `BASEMESH` part hides nothing when it cloaks, and one with no
+  `STEALTH` part shows no shell: `CrossTag33` (`aetswg-007-0033`) and `CrossTag34` (`aetswg-007-0034`), a
+  warning when the cloak's colour also leaves the look unchanged, information otherwise. `CrossTag35`
+  (`aetswg-007-0035`) notes on a hardpoint that a Force cloak leaves its attached model drawn, and
+  `CrossTag36` (`aetswg-007-0036`) lists the visible parts and effects whose names say neither, which stay
+  drawn while the unit is cloaked
+  ([#449](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/449))
 
 ### Fixes
 
+- **A part is drawn only when everything that decides it shows it** - the preview took the first rule with an
+  opinion on a part, so a playing clip showed a mesh the model file hides, marker plates included, and a part
+  of another damage or detail level, and a clip that hid a bone took every part below it along. The game asks
+  four things of every part - its own bone's track in the clip, its state, the damage level and the detail
+  level - and draws it only when all four show it; the preview now does the same, and a part's tooltip names
+  the one that hides it
+  ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
+- **A hardpoint's damage bone hides everything below it** - a hardpoint's `Damage_Particles` bone hid only the
+  effects one level below it, so a mesh on that bone or deeper stayed drawn on an undamaged unit, and an effect
+  further down never appeared when the hardpoint was destroyed. In the unit preview every part on that bone or
+  at any depth below it - meshes, lights, attached models and effects - is now hidden while the hardpoint
+  stands and shown once it is destroyed, whatever the model file says
+  ([#444](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/444))
+- **A destroyed engine hardpoint puts out everything below its engine bone** - the preview put out only the
+  effects one level below a hardpoint's `Engine_Particles` bone. Once the hardpoint is destroyed, every part on
+  that bone or at any depth below it is hidden, as in the game, unless the hardpoint sets
+  `Engine_Death_Hide_Engine_Particles` to no
+  ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
+- **A clip hides a bone's own parts, and nothing below it** - a clip that hid a bone also hid every part on the
+  bones below it, a death clone's and a wreck's included, so a station breaking up lost pieces the game keeps
+  drawn. A clip's track now decides only the parts on its own bone, a skinned mesh follows the first bone after
+  the root in its skin list, a shadow volume casts only while its own bone shows it, and a bone with no track in
+  the clip is shown whatever its parent does
+  ([#445](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/445))
+- **A clip's tracks drive the bones at their position** - the preview bound each track of a clip to the bone
+  index the clip stores. The game binds them by position, the first track to the first bone after the root,
+  whatever the clip names or stores; the preview now does the same. Every shipped clip stores the position, so
+  nothing changes for them; a clip written with other indices now moves and hides the bones it does in the game
+  ([#445](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/445))
+- **A bone the model file hides counts while no clip runs** - the preview ignored a bone's own visible flag, so
+  a model opened on its own drew parts the game keeps hidden in its base pose, an X-wing's second engine glow
+  among them. With no clip running, the parts on such a bone are now hidden; a running clip, the idle a unit
+  stands in included, decides instead. A unit whose idle clip hides nothing now stands in that idle rather
+  than in its base pose
+  ([#446](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/446))
+- **A clip played once holds its second-to-last frame** - a clip that does not loop ran to its last frame and
+  stopped there, so a part the clip shows or hides on that frame looked different from the game, an X-wing's
+  engine glow after its deploy clip among them. The game stops one frame earlier and holds it; the preview,
+  its scrubber and its "Last frame" button now do the same, death clones included. A looping clip still wraps
+  at its last frame
+  ([#447](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/447))
+- **A death clone stays for its persistence** - a death clone disappeared the moment its clip ended. It now
+  holds its last frame for `Death_Persistence_Duration`, then goes with its `Death_Explosions_End`, or fades
+  over `Death_Fade_Time` (0.25 seconds when unset) when it names none. A type that never sets the persistence
+  keeps its clone, as the game does, and an infantry unit's clone stays for the GameConstants
+  `Override_Death_Persistence_Duration` instead
+  ([#443](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/443))
+- **A unit opens with its effects running, and abilities switch them by name** - the unit preview held back
+  every effect that did not look like an engine. A unit now opens with every effect the model file marks
+  visible, except those whose name starts with `pte`, `pptw` or `prs`, which the game hides at creation (a type
+  with a `Passive_Missile_Shield_Radius` shows its `prs`). Abilities and power modes switch the effects by the
+  start of their name - turbo and the S-foil lock swap `pe` for `pte`, power to weapons and shield leech show
+  `pptw`, and so on - and a hardpoint's death and an ability switched on or off count in the order they
+  happened. A death clone draws nothing and runs no effect before it is spawned
+  ([#448](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/448))
+- **Stealth and Force cloak hide and fade as in the game** - a cloaked unit drew its stealth shell and nothing
+  else. Stealth now hides the parts whose name contains `BASEMESH` and the attached hardpoint models and shows
+  the parts whose name contains `STEALTH`; a Force cloak leaves the attached models drawn; every other part
+  stays as it was. The whole unit, its effects included, tints and fades towards the cloak's colour over its
+  transition time and back, and its shadow volumes go off while it is cloaked - after a stealth they stay off
+  until the detail level changes, as in the game. A death clone now fades out the same way
+  ([#449](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/449))
+- **No check the game does not make** - the unit preview hid a mesh a hardpoint names in `Collision_Mesh`,
+  and switched effects tagged `_LOD` by the detail level. The game does neither: the model file alone decides
+  whether a collision mesh is drawn, and the detail level switches meshes only
+  ([#450](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/450))
+- **Damage smoke at 75 % and 50 % hull** - a hit that takes the unit's hull to or below 75 % or 50 % now
+  adds its `Damaged_Smoke_Asset_Name` on the root bone, as in the game: one smoke per hit, even through
+  both lines, none for the killing hit, none taken away by a repair. The smokes go with the unit when it
+  dies
+  ([#451](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/451))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

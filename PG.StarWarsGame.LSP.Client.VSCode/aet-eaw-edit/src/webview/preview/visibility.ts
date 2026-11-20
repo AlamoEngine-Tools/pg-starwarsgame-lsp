@@ -1,38 +1,48 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// Whether a row in the model tree is drawn, and WHICH rule decided.
+// Whether a part in the model tree is drawn, and WHICH switch decided.
 //
-// One ordered chain, evaluated the same way for every row, every time anything changes. Each link
-// either has an opinion or declines to have one, and the first opinion wins. Two kinds of link:
+// Every part of a game object - a mesh, an effect, an attached model - carries four independent
+// switches, and it is drawn only when all four say shown. No switch can show a part another one
+// hides:
 //
-//   VETOES - a master toggle and a hidden ancestor. They can only ever hide. A master switch that
-//   is ON does not force anything on; it simply declines to veto.
+//   ANIMATION - what the clip running says about the part's OWN bone, frame by frame. Silent when
+//   nothing speaks for that bone.
+//   STATE     - one bit with many writers, and the last write is what the part has. The model file
+//   writes it first, from its hidden flag; the game's rules write over it later - see `UnitRules`.
+//   ALT       - whether the part belongs to the current damage level.
+//   LOD       - whether it belongs to the current detail level.
 //
-//   DECIDERS - the reader's own override, then a playing clip's visibility track, then the level
-//   gates, then the file's own flag. Each can hide OR show.
+// No switch is inherited. A part is not hidden because a bone above its own bone is hidden. The one
+// structural exception, an attached hardpoint model, is one part of the unit and is hidden as a whole
+// outside this chain, on its part root.
 //
-// The order is the design:
+// Around the four sit the PREVIEW's own controls, which are not statements about the model:
 //
-//   master toggle > hidden ancestor > the reader > the animation > the level > the file
+//   master toggle > a row the reader hid above this one > the reader's own word on this row
 //
-// The reader sits above the animation because full control over what is on screen is the point of
-// the model view: switching a mesh off during a clip has to actually switch it off, or the tick
-// looks broken. The animation sits above the level and the file because a clip is the model as its
-// author animated it, and where nobody has overridden it, it is the truth.
+// A master that is off and a row the reader switched off above this one can only hide. The reader's
+// word on the row itself beats every switch in both directions, because full control over what is on
+// screen is the point of the model view - a shadow volume is exactly the row worth ticking on.
 //
-// The reader sitting above the animation does NOT mean the two fight. Starting a clip CLEARS every
-// row override - see `clearedForPlayback` - because watching an animation is checking whether the
-// animation works, and that can only be answered against the model as authored. A clip resets the
-// pose each time it runs; it resets the visibilities with it. The one thing that still applies is
-// the master toggles, which are not statements about the model at all: effects switched off because
-// they obstruct the view stay off while the clip plays.
+// Starting a clip CLEARS every row override - see `clearedForPlayback` - because watching an
+// animation is checking whether the animation works, and that can only be answered against the model
+// as authored. The master toggles stay: effects switched off because they obstruct the view stay off
+// while the clip plays.
 //
 // `because` is not decoration. The old tree could say a row was hidden but never why, so a reader
-// looking at a black scene and a tree full of ticks had nothing to go on. Every row can now name
-// the rule that decided it.
+// looking at a black scene and a tree full of ticks had nothing to go on. Every row names the switch
+// that decided it.
 
 import * as l10n from "@vscode/l10n";
+
+import {
+    type MaterialExtras,
+    isVisibleAtAlt,
+    isVisibleAtLod,
+    resolveMaterial,
+} from "./materials";
 
 /** The reader's word on one row. Absent means they have not said anything about it. */
 export type RowOverride = "shown" | "hidden";
@@ -43,39 +53,105 @@ export interface MasterToggle {
     on: boolean;
 }
 
-/** Everything the chain needs to know about one row. */
+/**
+ * Who last wrote a part's state switch.
+ *
+ * `file` is the model file's own hidden flag, written when the model loads. `rules` is any of the
+ * game's rules written over it in a unit preview - a hardpoint, an ability, the state a unit is
+ * created in. A later rule only adds a writer; it never touches the AND below.
+ */
+export type StateWriter = "file" | "rules";
+
+/** The state switch: one bit with many writers, and the last write is what the part has. */
+export interface StateSwitch {
+    shown: boolean;
+    writer: StateWriter;
+}
+
+/** The model file's write of the state switch, which every part starts from. */
+export function fileState(shown: boolean): StateSwitch {
+    return { shown, writer: "file" };
+}
+
+/** A rule of the game writing the state switch, over whatever was written before. */
+export function ruleState(shown: boolean): StateSwitch {
+    return { shown, writer: "rules" };
+}
+
+/**
+ * A mesh's own switches as its model file sets them: the state its hidden flag writes, the damage
+ * and detail level it is tagged for, and whether it is a surface at all.
+ *
+ * One answer for every mesh the preview draws - the rows of the subject and the parts of a death
+ * clone or a wreck alike - so the two cannot read the file differently.
+ */
+export function meshSwitches(
+    extras: MaterialExtras,
+    alt: number,
+    lod: number,
+): Pick<RowFacts, "state" | "alt" | "lod" | "nonVisual"> {
+    return {
+        state: fileState(extras.alamoHidden !== true),
+        alt: isVisibleAtAlt(extras, alt),
+        lod: isVisibleAtLod(extras, lod),
+        nonVisual: resolveMaterial(extras).hidden,
+    };
+}
+
+/**
+ * An effect's state switch, from its proxy's own flag and what the effect rules now say.
+ *
+ * The rules decide the effect as a whole, so the write is put down to the FILE wherever they agree
+ * with the proxy's flag: there is nothing the rules changed for the reader to be told about.
+ */
+export function effectState(
+    startsVisible: boolean,
+    drawsNow: boolean,
+): StateSwitch {
+    return drawsNow === startsVisible
+        ? fileState(drawsNow)
+        : ruleState(drawsNow);
+}
+
+/** Where the animation switch's answer came from. */
+export type AnimationSource =
+    /** The clip being played. */
+    | "clip"
+    /** The idle a unit stands in while nothing else plays - see `UnitRules.idle`. */
+    | "idle"
+    /** The model file's bone flag, while no clip runs - see `poseSays`. */
+    | "pose";
+
+/** The animation switch, when something speaks for the part's own bone. */
+export interface AnimationSwitch {
+    shown: boolean;
+    source: AnimationSource;
+}
+
+/** Everything the chain needs to know about one part. */
 export interface RowFacts {
-    /** The file's own visible flag. */
-    inFile: boolean;
+    /** The state switch, as its last writer left it. */
+    state: StateSwitch;
 
     /**
-     * What the model's RESTING clip says about this row, when it ships one.
+     * The animation switch: what the clip running says about the part's own bone on this frame.
      *
-     * The engine never stands still - a unit is always playing something - so a model's true
-     * resting state is its idle clip, not its file. The AT-AT is the case that settled it: its idle
-     * keys both barrel muzzles off for all 81 frames, and the file leaves those flash meshes
-     * unhidden precisely BECAUSE the animation owns that state. Read from the file alone, two
-     * muzzle flashes sit on screen that nobody ever sees in game.
-     *
-     * Absent when the model ships no idle clip, or when that clip says nothing about this row -
-     * then the file is the baseline, which is the user's rule: idle if we have it, the file
-     * otherwise.
+     * Absent when nothing is playing, or the clip says nothing about that bone, which is NOT the
+     * same as hidden - treating silence as a hide is how an animation came to blink meshes out.
      */
-    resting?: boolean;
+    animation?: AnimationSwitch;
+
+    /** The damage-level switch: whether the part belongs to the current ALT. */
+    alt: boolean;
+
+    /** The detail-level switch: whether the part belongs to the current LOD. */
+    lod: boolean;
 
     /**
-     * Switched off by something other than that flag: a collision or shadow archetype, or an ALT,
-     * LOD or damage level that is not the current one.
+     * Geometry that is no surface at all - a shadow volume, a collision or heat shader. Never drawn
+     * as a mesh whatever its switches say; only the reader can still put it on screen to look at.
      */
-    gated: boolean;
-
-    /**
-     * What a playing clip's visibility track says on this frame, when one names this row.
-     *
-     * Absent when nothing is playing or the clip says nothing about it, which is NOT the same as
-     * false - treating it as false is how an animation came to blink meshes out.
-     */
-    animated?: boolean;
+    nonVisual?: boolean;
 
     /** The reader's override, if they have set one. */
     override?: RowOverride;
@@ -83,31 +159,35 @@ export interface RowFacts {
     /** The masters this row subscribes to, widest first. */
     masters: readonly MasterToggle[];
 
-    /** The name of the nearest ancestor that is itself hidden, when there is one. */
-    ancestorHidden?: string;
-
     /**
-     * The same, but for the ancestor as the MODEL leaves it - absent when the ancestor is only
-     * hidden because the reader hid it.
+     * The name of the nearest row above this one that the READER switched off, when there is one.
      *
-     * Separate because the two answers genuinely differ, and conflating them made a whole subtree
-     * claim the model did not draw it the moment one bone above was unticked. What the model says
-     * about a child is what it would say if nobody had touched the parent.
+     * Only the reader's: a bone row in the tree is a subtree switch, and unticking an arm takes the
+     * hand off screen. The model never hides a part through a bone above it.
      */
-    ancestorHiddenAuthored?: string;
+    ancestorHidden?: string;
 }
 
 /**
  * Which link of the chain settled a row.
  *
- * The typed half of `because`. It exists because the tree's eye has to know whether the decision was
- * this row's own - the reader, the clip, the level, the file - or came from ABOVE it, since only the
- * first kind is something the eye can change. Reading that out of `because` would mean parsing a
- * string written for a person, which is the shape `boneIds.ts` records this project paying for three
- * times.
+ * The typed half of `because`. `master` and `ancestor` speak for something ABOVE the row, which the
+ * tree's eye cannot change; `you` is the reader; the rest name the switch: `archetype` for geometry
+ * that is no surface, `file` and `rules` for the state switch by its last writer, `animation`,
+ * `idle` and `pose` for the animation switch by its source, `alt` and `lod` for the two levels.
  */
 export type VisibilityLink =
-    "master" | "ancestor" | "you" | "animation" | "level" | "idle" | "file";
+    | "master"
+    | "ancestor"
+    | "you"
+    | "archetype"
+    | "file"
+    | "rules"
+    | "animation"
+    | "idle"
+    | "pose"
+    | "alt"
+    | "lod";
 
 /** Whether the row is drawn, and the rule that settled it. */
 export interface Resolution {
@@ -117,15 +197,14 @@ export interface Resolution {
     decidedBy: VisibilityLink;
 
     /**
-     * The same answer for a person: `master:<id>`, `ancestor:<name>`, `you`, `animation`, `level`,
-     * `idle` or `file`.
+     * The same answer for a person: `master:<id>`, `ancestor:<name>`, or the link itself.
      *
      * Written for a tooltip, never parsed - `decidedBy` is what code asks.
      */
     because: string;
 
     /**
-     * What the row would do if the reader had said nothing about it.
+     * What the row would do if the reader had said nothing about it, here or above it.
      *
      * The tree renders a row in italics when this is false, so a ticked row that only stands
      * because someone ticked it looks different from one the model draws by itself - which is the
@@ -142,19 +221,15 @@ export function resolveRow(facts: RowFacts): Resolution {
     const decided = decide(facts, facts.override);
 
     // The same chain, run again with the reader taken back out - of this row AND of the rows above
-    // it. Deriving it instead ("gated or not in the file") would miss the animation, which speaks
-    // for the model too.
-    const authored = decide(
-        { ...facts, ancestorHidden: facts.ancestorHiddenAuthored },
-        undefined,
-    );
+    // it. A row the reader switched off above this one says nothing about what the model draws.
+    const authored = decide({ ...facts, ancestorHidden: undefined }, undefined);
 
     return { ...decided, authored: authored.visible };
 }
 
 /** The chain itself, for one reading of what the reader has said. */
 function decide(
-    facts: Omit<RowFacts, "ancestorHiddenAuthored">,
+    facts: RowFacts,
     override: RowOverride | undefined,
 ): Omit<Resolution, "authored"> {
     // Vetoes first, widest first. A master switch beats an ancestor because it is the broader
@@ -185,25 +260,80 @@ function decide(
         };
     }
 
-    if (facts.animated !== undefined) {
-        return {
-            visible: facts.animated,
-            decidedBy: "animation",
-            because: "animation",
-        };
+    const hiding = hidingSwitch(facts);
+    if (hiding !== undefined) {
+        return { visible: false, decidedBy: hiding, because: hiding };
     }
 
-    if (facts.gated) {
-        return { visible: false, decidedBy: "level", because: "level" };
+    // Every switch says shown. The one worth naming is whatever spoke for the part besides the
+    // file: a rule that wrote its state, else the clip that keyed its bone.
+    const shownBy: VisibilityLink =
+        facts.state.writer === "rules"
+            ? "rules"
+            : facts.animation === undefined
+              ? "file"
+              : animationLink(facts.animation);
+
+    return { visible: true, decidedBy: shownBy, because: shownBy };
+}
+
+/**
+ * The first switch that hides the part, or undefined when all four show it.
+ *
+ * The four are an AND, so any one of them is enough. The order only decides which one the tooltip
+ * names when several agree.
+ */
+function hidingSwitch(facts: RowFacts): VisibilityLink | undefined {
+    if (facts.nonVisual === true) {
+        return "archetype";
     }
 
-    // Below the level gate on purpose: a mesh tagged for another damage or detail state is not part
-    // of this one whatever the idle clip has to say about it.
-    if (facts.resting !== undefined) {
-        return { visible: facts.resting, decidedBy: "idle", because: "idle" };
+    if (!facts.state.shown) {
+        return facts.state.writer;
     }
 
-    return { visible: facts.inFile, decidedBy: "file", because: "file" };
+    if (facts.animation !== undefined && !facts.animation.shown) {
+        return animationLink(facts.animation);
+    }
+
+    if (!facts.alt) {
+        return "alt";
+    }
+
+    return facts.lod ? undefined : "lod";
+}
+
+function animationLink(animation: AnimationSwitch): VisibilityLink {
+    return animation.source === "clip" ? "animation" : animation.source;
+}
+
+/**
+ * Whether the READER has switched the rows under this one off: by their word on this row, or on a
+ * row above it.
+ *
+ * The tree's own meaning and nothing of the game's: unticking an arm takes the hand off screen, but
+ * no switch of the model is inherited. This is what a bone's scene node follows, so the model's own
+ * answer never prunes a subtree.
+ */
+export function subtreeHiddenByReader(facts: RowFacts): boolean {
+    return facts.ancestorHidden !== undefined || facts.override === "hidden";
+}
+
+/**
+ * Whether a shadow volume casts: its own switches as the model leaves them.
+ *
+ * A volume is never drawn as a surface, so the archetype that keeps it off screen says nothing
+ * about whether it casts; the reader's tick on its row puts it on screen to look at, and says nothing
+ * either. What casts is the part the game would draw: a volume whose bone a clip hides, or whose
+ * level or state is off, casts nothing.
+ */
+export function castsShadow(facts: RowFacts): boolean {
+    return resolveRow({
+        ...facts,
+        nonVisual: false,
+        override: undefined,
+        ancestorHidden: undefined,
+    }).visible;
 }
 
 /**
@@ -249,10 +379,12 @@ export function restingClip(clips: readonly string[]): string | undefined {
 export function deathClip(clips: readonly string[]): string | undefined {
     const sorted = [...clips].sort();
 
-    return (
-        sorted.find((clip) => /(^|[^a-z])die([^a-z]|$)/i.test(clip)) ??
-        sorted[0]
-    );
+    return sorted.find(isDeathClipName) ?? sorted[0];
+}
+
+/** Whether a clip's name says it is a death: `die` standing on its own between separators. */
+export function isDeathClipName(clip: string): boolean {
+    return /(^|[^a-z])die([^a-z]|$)/i.test(clip);
 }
 
 /** One row's override changing, where null means "give it back to the model". */
@@ -308,8 +440,8 @@ export function setRow(
     // Stored only where it DISAGREES with the model - `authored` is what this row would do if the
     // reader had never touched it. Asking for what the model already does is not a statement, it is
     // the absence of one, and writing it down anyway is what made a tick permanent: an override
-    // outranks the animation, the level and the file for good, so one tick on an ability's effect
-    // row broke that ability's switch until the whole model was reset.
+    // outranks every switch for good, so one tick on an ability's effect row broke that ability's
+    // switch until the whole model was reset.
     //
     // This is the way BACK, and it is what gives the tree's eye its third state - see `rowEye`. It
     // takes nothing away: a shadow volume is gated off, so asking for it genuinely disagrees and is
@@ -350,7 +482,7 @@ export function clearedForPlayback(): Map<string, RowOverride> {
  *
  * The reason a row looks the way it does was computed and then thrown away - the tree could say a
  * row was hidden but never why, which is what left a reader staring at a black scene and a list of
- * ticks. The chain names the link that decided; this puts it in words.
+ * ticks. The chain names the switch that decided; this puts it in words.
  */
 export function becauseText(because: string): string {
     if (because.startsWith("master:")) {
@@ -372,7 +504,7 @@ export function becauseText(because: string): string {
     // so anything that needs a second sentence is not going to be read at all - "Set by hand.
     // Reset puts it back" spent half its length advertising a button that is already on screen.
     // `idle` is NOT the rest pose. The rest pose is the model with nothing driving the skeleton;
-    // this is the model's own idle clip running and its visibility track deciding the row, which is
+    // this is the unit's own idle clip running and its visibility track deciding the row, which is
     // why it reads as a sibling of `animation` rather than as a pose.
     switch (because) {
         case "you":
@@ -381,82 +513,17 @@ export function becauseText(because: string): string {
             return l10n.t("Set by the idle animation");
         case "animation":
             return l10n.t("Set by the animation playing");
-        case "level":
-            return l10n.t("Not in this damage or detail level");
+        case "pose":
+            return l10n.t("Bone hidden in the model file");
+        case "alt":
+            return l10n.t("Not in this damage level");
+        case "lod":
+            return l10n.t("Not in this detail level");
+        case "rules":
+            return l10n.t("Set by the game rules");
+        case "archetype":
+            return l10n.t("Not drawn as a surface");
         default:
             return l10n.t("As the model draws it");
     }
-}
-
-/**
- * The same row, asked about the EFFECT it carries rather than the geometry.
- *
- * One difference, and it is the engine's: **Alamo does not inherit visibility.**
- * `RenderObject::Render` draws a submesh when `GetBoneVisibility(mesh.bone)` says so - that bone's
- * own track and nothing above it - and a particle proxy is spawned and killed on
- * `GetVisibleEvent` / `GetInvisibleEvent` of `proxy.bone->index` alone. An ancestor never speaks
- * for it.
- *
- * The shipped data depends on that. A proxy bone is a CHILD of the piece its blast covers, and the
- * Nebulon-B's death clip keys `p_explosion_big00#12` ON for exactly the one frame `Busted_00#11`
- * is keyed OFF. Inherit, and that frame cannot be reached at all.
- *
- * The reader stays, because the tree is not the engine: a bone row is a subtree switch, and
- * unticking a chunk has to take its effects with it. That is the ONE ancestor that still counts,
- * and `ancestorHiddenAuthored` is what tells the two apart - it is set only when the MODEL is the
- * reason the ancestor is hidden.
- */
-export function effectFacts(facts: RowFacts): RowFacts {
-    const readerHidIt =
-        facts.ancestorHidden !== undefined &&
-        facts.ancestorHiddenAuthored === undefined;
-
-    return {
-        ...facts,
-        ancestorHidden: readerHidIt ? facts.ancestorHidden : undefined,
-        ancestorHiddenAuthored: undefined,
-    };
-}
-
-/**
- * The same row, asked about a mesh the XML names as a hardpoint's `Damage_Decal`.
- *
- * Its state is the damage RULE's, not the file's. Told by the user, and the shipped art agrees:
- * over the material extras, **0 of 8** `_Blast` meshes on `EV_StarDestroyer.ALO` and **0 of 26** on
- * `EV_ExecutorStarDestroyer.ALO` are marked hidden. Every scorch mark in the corpus says "draw me",
- * so an undamaged hull would wear all of them - the engine cannot be reading the file flag here,
- * and neither may this.
- *
- * The same question, and the same answer, as a particle proxy's `gateVisible`. `Damage_Particles`
- * is the identical case and `Engine_Particles` is its inverse - on while the hardpoint LIVES - and
- * both already come through `effectFacts`, so this is the last of the three still asking the file.
- *
- * `gated` is deliberately untouched. That link is the LEVEL - a decal tagged for another ALT or LOD
- * is not part of this configuration at all - and it is where the damage rule used to be folded in,
- * which made a row's tooltip blame the level for a damage decision.
- */
-export function damageMeshFacts(facts: RowFacts, shown: boolean): RowFacts {
-    return { ...facts, inFile: shown };
-}
-
-/**
- * The same row, asked only about the things that apply to everything BENEATH it.
- *
- * A merged bone/mesh row writes two different things: whether that mesh is drawn, and whether the
- * bone is visible - which prunes its entire subtree. Deciding both from one answer is wrong in one
- * direction: what the FILE says about a mesh, and what the current level says about it, are
- * statements about that mesh alone. Everything else - the reader's own tick, a master switch, a
- * hidden ancestor, a clip hiding the bone - is a statement about the bone and takes the subtree
- * with it, which is what a tree means.
- *
- * The AT-AT is the case that proved it. Its particle proxies are bones named after the effect they
- * carry, each with a marker mesh of the same name that the file marks hidden. Merged into one row,
- * the mesh's flag pruned the bone's subtree, and the effect attached to that bone was vetoed by an
- * ancestor it could not see - so every fire, smoke and explosion proxy on the model was dark and no
- * amount of ticking brought one back.
- */
-export function subtreeFacts(facts: RowFacts): RowFacts {
-    // `resting` stays: it comes from a clip's track, which names a BONE, so it is a statement about
-    // the whole subtree in the same way a playing clip's is.
-    return { ...facts, inFile: true, gated: false };
 }

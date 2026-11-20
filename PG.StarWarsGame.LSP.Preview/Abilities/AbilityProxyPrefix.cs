@@ -20,6 +20,12 @@ namespace PG.StarWarsGame.LSP.Preview.Abilities;
 ///         caller BINDS only when the object actually declares the type this names, and reports the
 ///         rest as unbound - which is normal authoring, not a problem worth a diagnostic.
 ///     </para>
+///     <para>
+///         This decides which ability's row lists a proxy, and nothing about whether it is drawn.
+///         What the game shows is a rule over the name alone - its start compared over the prefix's
+///         length, so without the underscore - and the preview's client applies it, whatever the
+///         object declares.
+///     </para>
 /// </remarks>
 public static class AbilityProxyPrefix
 {

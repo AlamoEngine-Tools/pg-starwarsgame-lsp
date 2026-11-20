@@ -128,14 +128,6 @@ interface EffectFamily {
     gates?: readonly string[];
     /** Marker prefixes, as {@link effectPrefix} reads them. */
     prefixes?: readonly string[];
-    /**
-     * The family this one REPLACES while an ability is driving it. See {@link replacedByAbility}.
-     *
-     * One pair, and it is the user's rule rather than an inference: turbo shows the power-to-engine
-     * effect and hides the normal engine effect. Whether power to weapons does the same to a
-     * weapon effect is not known, so nothing here says it does.
-     */
-    replaces?: string;
 }
 
 /** The families, in the order the panel lists them. Fixed, so the list never shuffles. */
@@ -156,7 +148,6 @@ const FAMILIES: readonly EffectFamily[] = [
         id: "turbo",
         label: l10n.t("Turbo engines"),
         prefixes: ["pte"],
-        replaces: "engines",
     },
     {
         id: "powerToWeapons",
@@ -182,74 +173,6 @@ function claims(family: EffectFamily, particle: PreviewParticle): boolean {
         (family.gates?.includes(particle.gate) ?? false) ||
         (family.prefixes?.includes(effectPrefix(particle.systemRef)) ?? false)
     );
-}
-
-/**
- * The effects held back because an active ability replaces their family.
- *
- * The reported fault was TURBO on the CR90 "not toggleable". Measured on the running panel, the key
- * was enabled and the turbo plume did light - what never happened is the plain engine plume going
- * out, so both burned from the same nozzles and pressing the key looked like it did nothing.
- *
- * Nothing else in the chain can express this. `abilityAllows` gates the proxies an ability CLAIMS,
- * and deliberately leaves every other effect alone - otherwise activating one ability would silence
- * the whole model. Suppressing an effect an ability does not claim is a different statement, and
- * this is the only place that makes it.
- *
- * Driven by the ABILITY, not by the effect being visible: ticking the turbo row in Model mode is a
- * reader inspecting the asset, and killing another row's effect underneath them would fight the
- * rule that the reader's word wins. In Model mode nothing is active, so nothing is held back.
- */
-export function replacedByAbility(
-    particles: readonly PreviewParticle[],
-    proxies: ReadonlyMap<string, string[]>,
-    active: ReadonlySet<string>,
-): Set<string> {
-    const driven = new Set<string>();
-
-    for (const [type, ids] of proxies) {
-        if (active.has(type)) {
-            for (const id of ids) {
-                driven.add(id);
-            }
-        }
-    }
-
-    const held = new Set<string>();
-    if (driven.size === 0) {
-        return held;
-    }
-
-    for (const family of FAMILIES) {
-        if (family.replaces === undefined) {
-            continue;
-        }
-
-        // The ability has to be driving THIS family. An active ability that claims something else
-        // entirely leaves the engines alone - the Tartan carries pe_, pte_ and pptw_ at once.
-        const driving = particles.some(
-            (particle) => driven.has(particle.id) && claims(family, particle),
-        );
-
-        if (!driving) {
-            continue;
-        }
-
-        const replaced = FAMILIES.find((other) => other.id === family.replaces);
-        if (replaced === undefined) {
-            continue;
-        }
-
-        for (const particle of particles) {
-            // Never the effect doing the replacing, which a family could otherwise claim twice -
-            // `pte_` is matched by prefix and an engine gate would match it again.
-            if (claims(replaced, particle) && !driven.has(particle.id)) {
-                held.add(particle.id);
-            }
-        }
-    }
-
-    return held;
 }
 
 /**

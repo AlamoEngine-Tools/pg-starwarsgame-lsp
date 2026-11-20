@@ -10,11 +10,14 @@ import type {
 } from "../../protocol/modelPreview";
 
 import {
+    cloneDeath,
     cloneForDamage,
+    deathEndingOf,
     deathCloneRows,
     sweepAngles,
     turretSweeps,
 } from "./deathClone";
+import { UNWRITTEN_ENDING } from "./deathEnding";
 
 const CLONES: PreviewDeathClone[] = [
     {
@@ -364,5 +367,110 @@ describe("turretSweeps, keyed back to what declared them", () => {
 
         assert.equal(sweeps.length, 1);
         assert.equal(sweeps[0].id, "HP_Turret");
+    });
+});
+
+describe("deathEndingOf", () => {
+    it("reads how the clone ends off its descriptor", () => {
+        assert.deepEqual(
+            deathEndingOf({
+                ...CLONES[0],
+                persistenceSeconds: 20,
+                fadeSeconds: 0.25,
+                endExplosions: ["Large_Explosion_Land"],
+            }),
+            {
+                persistenceSeconds: 20,
+                fadeSeconds: 0.25,
+                endsInExplosions: true,
+            },
+        );
+    });
+
+    it("takes the game's values for what the clone does not write, or for no clone", () => {
+        assert.deepEqual(deathEndingOf(CLONES[0]), UNWRITTEN_ENDING);
+        assert.deepEqual(deathEndingOf(undefined), UNWRITTEN_ENDING);
+    });
+
+    /**
+     * Measured: when the DYING unit is infantry, GameConstants' `Override_Death_Persistence_Duration`
+     * replaces the clone's own persistence - not for a clone type that keeps its own, not for a
+     * death by Force lightning, and not where GameConstants writes 0 or nothing.
+     */
+    describe("an infantry unit's death", () => {
+        const clone = { ...CLONES[0], persistenceSeconds: 5 };
+        const infantry = {
+            infantry: true,
+            persistenceOverride: 30,
+            damageType: "Damage_Normal",
+        };
+
+        it("takes the override in place of the clone's persistence", () => {
+            assert.equal(deathEndingOf(clone, infantry).persistenceSeconds, 30);
+            assert.equal(
+                deathEndingOf(CLONES[0], infantry).persistenceSeconds,
+                30,
+            );
+        });
+
+        it("keeps the clone's own for a unit that is not infantry", () => {
+            assert.equal(
+                deathEndingOf(clone, { ...infantry, infantry: false })
+                    .persistenceSeconds,
+                5,
+            );
+        });
+
+        it("keeps the clone's own where GameConstants writes 0 or nothing", () => {
+            for (const override of [0, null]) {
+                assert.equal(
+                    deathEndingOf(clone, {
+                        ...infantry,
+                        persistenceOverride: override,
+                    }).persistenceSeconds,
+                    5,
+                );
+            }
+        });
+
+        it("keeps the clone's own for a clone type that keeps it", () => {
+            assert.equal(
+                deathEndingOf(
+                    { ...clone, keepsItsOwnPersistence: true },
+                    infantry,
+                ).persistenceSeconds,
+                5,
+            );
+        });
+
+        it("keeps the clone's own for a death by Force lightning", () => {
+            assert.equal(
+                deathEndingOf(clone, {
+                    ...infantry,
+                    damageType: "damage_force_lightning",
+                }).persistenceSeconds,
+                5,
+            );
+        });
+    });
+});
+
+describe("cloneDeath", () => {
+    it("sets off every end explosion, once each, when the clone ends", () => {
+        const played: { name: string; once: boolean }[] = [];
+        const { onEnd } = cloneDeath(
+            {
+                ...CLONES[0],
+                endExplosions: ["Large_Explosion_Land", "Small_Explosion_Land"],
+            },
+            (_id, name, _partId, _bone, once) => played.push({ name, once }),
+        );
+
+        onEnd();
+
+        assert.deepEqual(played, [
+            { name: "Large_Explosion_Land", once: true },
+            { name: "Small_Explosion_Land", once: true },
+        ]);
     });
 });

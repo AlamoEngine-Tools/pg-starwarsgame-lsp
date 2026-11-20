@@ -18,7 +18,8 @@ import { standInContext } from "./viewportContext.testing";
 function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
     const scene = new THREE.Scene();
     const context = standInContext({
-        levels: { alt: 0, lod: 0, stealthed: false },
+        levels: { alt: 0, lod: 0 },
+        rules: {},
         camera: new THREE.PerspectiveCamera(45, 1, 0.1, 10000),
         canvas: { clientWidth: 100, clientHeight: 100 },
         renderer: null,
@@ -50,6 +51,35 @@ const keyLightOf = (scene: THREE.Scene): THREE.DirectionalLight => {
 };
 
 describe("EnvironmentRig", () => {
+    /**
+     * The seam a model's whole look reaches every translated material through: the per-model light
+     * scale the effects multiply by - its colour the tint, its alpha the fade.
+     */
+    it("hands a mesh its model's look as the light scale", () => {
+        const { environment } = rigWith();
+        const mesh = new THREE.Mesh();
+        const identity = new THREE.Matrix4();
+
+        const plain = environment.frameFor(
+            mesh,
+            identity,
+            identity,
+            identity,
+            new THREE.Vector3(),
+        );
+        assert.deepEqual(plain.lightScale, [1, 1, 1, 1]);
+
+        const faded = environment.frameFor(
+            mesh,
+            identity,
+            identity,
+            identity,
+            new THREE.Vector3(),
+            { r: 1, g: 0.25, b: 0.25, a: 0.5 },
+        );
+        assert.deepEqual(faded.lightScale, [1, 0.25, 0.25, 0.5]);
+    });
+
     it("puts the room in the scene, the ground hidden until asked for", () => {
         const { environment, scene } = rigWith();
 

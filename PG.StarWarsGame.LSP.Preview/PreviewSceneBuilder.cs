@@ -179,7 +179,15 @@ public sealed class PreviewSceneBuilder(
             stages,
             DamageSectionBuilder.DamageTable(effective),
             EngineScaleFactor.Of(effective.ValueOf("Scale_Factor")),
-            effective.ValueOf(EncyclopediaTags.IconName));
+            effective.ValueOf(EncyclopediaTags.IconName),
+            PassiveMissileShieldRadius: effective.FloatOf("Passive_Missile_Shield_Radius"),
+            DeathPersistenceOverride: _damage.DeathPersistenceOverride(index),
+            Stealth: AbilitySectionBuilder.Cloak(effective, UnitCloaks.StealthElement),
+            ForceCloak: AbilitySectionBuilder.Cloak(effective, UnitCloaks.ForceCloakElement),
+            // Measured in the game: an empty name adds nothing, so an empty tag is no asset.
+            DamagedSmokeAsset: effective.ValueOf("Damaged_Smoke_Asset_Name")?.Trim() is { Length: > 0 } smoke
+                ? smoke
+                : null);
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────

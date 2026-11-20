@@ -29,7 +29,6 @@ function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
         health: 350,
         damageParticlesBone: null,
         damageDecalBone: null,
-        collisionMeshBone: null,
         engineParticlesBone: null,
         deathExplosionParticles: null,
         deathBreakoffProp: null,

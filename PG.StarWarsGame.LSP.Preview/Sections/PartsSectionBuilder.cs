@@ -146,7 +146,6 @@ public sealed class PartsSectionBuilder(
             effective.FloatOf("Health"),
             effective.ValueOf("Damage_Particles"),
             effective.ValueOf("Damage_Decal"),
-            effective.ValueOf("Collision_Mesh"),
             effective.ValueOf("Engine_Particles"),
             effective.ValueOf("Death_Explosion_Particles"),
             effective.ValueOf("Death_Breakoff_Prop"),

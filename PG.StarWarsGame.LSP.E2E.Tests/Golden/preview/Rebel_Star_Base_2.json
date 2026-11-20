@@ -95,7 +95,6 @@
       "Health": 450,
       "DamageParticlesBone": "HP01_CCM_EMITDAMAGE",
       "DamageDecalBone": "HP01_CCM_BLAST",
-      "CollisionMeshBone": "HP01_CCM_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": null,
@@ -114,7 +113,6 @@
       "Health": 450,
       "DamageParticlesBone": "HP01_LC_EMITDAMAGE",
       "DamageDecalBone": "HP01_LC_BLAST",
-      "CollisionMeshBone": "HP01_LC_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": null,
@@ -133,7 +131,6 @@
       "Health": 450,
       "DamageParticlesBone": "HP01_TBL_EMITDAMAGE",
       "DamageDecalBone": "HP01_TBL_BLAST",
-      "CollisionMeshBone": "HP01_TBL_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": "Hardpoint_Breakoff_Rebel_Station_One_TBL",
@@ -152,7 +149,6 @@
       "Health": 650,
       "DamageParticlesBone": "HP01_SHG_EMITDAMAGE",
       "DamageDecalBone": "HP01_SHG_BLAST",
-      "CollisionMeshBone": "HP01_SHG_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": "Hardpoint_Breakoff_Rebel_Station_One_Shield_Gen",
@@ -171,7 +167,6 @@
       "Health": 1000,
       "DamageParticlesBone": null,
       "DamageDecalBone": null,
-      "CollisionMeshBone": "SPAWN_00",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": null,
@@ -190,7 +185,6 @@
       "Health": 450,
       "DamageParticlesBone": "HP02_LC_EMITDAMAGE",
       "DamageDecalBone": "HP02_LC_BLAST",
-      "CollisionMeshBone": "HP02_LC_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": "Hardpoint_Breakoff_Rebel_Station_Two_Weapon_LC",
@@ -209,7 +203,6 @@
       "Health": 450,
       "DamageParticlesBone": "HP02_PRT_EMITDAMAGE",
       "DamageDecalBone": "HP02_PRT_BLAST",
-      "CollisionMeshBone": "HP02_PRT_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": null,
@@ -228,7 +221,6 @@
       "Health": 450,
       "DamageParticlesBone": "HP02_TBL_EMITDAMAGE",
       "DamageDecalBone": "HP02_TBL_BLAST",
-      "CollisionMeshBone": "HP02_TBL_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": "Hardpoint_Breakoff_Rebel_Station_Two_Weapon_TBL",
@@ -247,7 +239,6 @@
       "Health": null,
       "DamageParticlesBone": "HP01_SupD_EMITDAMAGE",
       "DamageDecalBone": "HP01_SupD_BLAST",
-      "CollisionMeshBone": "HP01_SupD_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": null,
       "DeathBreakoffProp": null,
@@ -266,7 +257,6 @@
       "Health": null,
       "DamageParticlesBone": "HP01_CA_EMITDAMAGE",
       "DamageDecalBone": "HP01_CA_BLAST",
-      "CollisionMeshBone": "HP01_CA_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": null,
       "DeathBreakoffProp": null,
@@ -755,6 +745,11 @@
   "ScaleFactor": 1,
   "IconName": "i_button_rebel_station.tga",
   "SourceFile": null,
+  "PassiveMissileShieldRadius": null,
+  "DeathPersistenceOverride": 30,
+  "Stealth": null,
+  "ForceCloak": null,
+  "DamagedSmokeAsset": null,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [],
@@ -765,6 +760,9 @@
       "ModelFile": "RB_station_02_break.alo",
       "PlaysIdle": false,
       "ScaleFactor": 1,
+      "PersistenceSeconds": 34,
+      "FadeSeconds": null,
+      "KeepsItsOwnPersistence": false,
       "Animations": [
         "rb_station_02_break_die_00.ala"
       ],
@@ -780,8 +778,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#1",
@@ -794,8 +791,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#2",
@@ -808,8 +804,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#3",
@@ -822,8 +817,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#4",
@@ -836,8 +830,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#5",
@@ -850,8 +843,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#6",
@@ -864,8 +856,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#7",
@@ -878,8 +869,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#8",
@@ -892,8 +882,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#9",
@@ -906,8 +895,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#10",
@@ -920,8 +908,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#11",
@@ -934,8 +921,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#12",
@@ -948,8 +934,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#13",
@@ -962,8 +947,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#14",
@@ -976,8 +960,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#15",
@@ -990,8 +973,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#16",
@@ -1004,8 +986,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#17",
@@ -1018,8 +999,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#18",
@@ -1032,8 +1012,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#19",
@@ -1046,8 +1025,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#20",
@@ -1060,8 +1038,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#21",
@@ -1074,8 +1051,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#22",
@@ -1088,8 +1064,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#23",
@@ -1102,8 +1077,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#24",
@@ -1116,8 +1090,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#25",
@@ -1130,8 +1103,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#26",
@@ -1144,8 +1116,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#27",
@@ -1158,8 +1129,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#28",
@@ -1172,8 +1142,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#29",
@@ -1186,8 +1155,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#30",
@@ -1200,8 +1168,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#31",
@@ -1214,8 +1181,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#32",
@@ -1228,8 +1194,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#33",
@@ -1242,8 +1207,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#34",
@@ -1256,8 +1220,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#35",
@@ -1270,8 +1233,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#36",
@@ -1284,8 +1246,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Rebel_Star_Base_2_Death_Clone#37",
@@ -1298,10 +1259,10 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         }
-      ]
+      ],
+      "EndExplosions": []
     }
   ],
   "ProjectileCatalog": [
@@ -1979,8 +1940,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#1",
@@ -1993,8 +1953,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#2",
@@ -2007,8 +1966,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#3",
@@ -2021,8 +1979,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#4",
@@ -2035,8 +1992,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#5",
@@ -2049,8 +2005,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#6",
@@ -2063,8 +2018,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#7",
@@ -2077,8 +2031,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#8",
@@ -2091,8 +2044,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#9",
@@ -2105,8 +2057,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#10",
@@ -2119,8 +2070,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#11",
@@ -2133,8 +2083,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#12",
@@ -2147,8 +2096,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#13",
@@ -2161,8 +2109,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#14",
@@ -2175,8 +2122,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#15",
@@ -2189,8 +2135,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#16",
@@ -2203,8 +2148,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#17",
@@ -2217,8 +2161,7 @@
       "StartsVisible": false,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     }
   ],
   "Animations": []

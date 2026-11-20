@@ -66,6 +66,7 @@ public sealed record GameIndex(
         ModelTextures = original.ModelTextures;
         ParticleSystems = original.ParticleSystems;
         ModelProxies = original.ModelProxies;
+        ModelParts = original.ModelParts;
         WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
         WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
         LoadOrder = original.LoadOrder;
@@ -201,6 +202,15 @@ public sealed record GameIndex(
     /// </summary>
     public ImmutableDictionary<string, ImmutableArray<string>> ModelProxies { get; init; } =
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     Merged (baseline and workspace) catalog of each model's meshes and proxies with whether the
+    ///     file marks each visible and whether a mesh is drawn as a surface, keyed like
+    ///     <see cref="ModelBones" /> (#449). A model missing here has unknown parts - never scanned, or
+    ///     from a baseline built before the field - and a rule about its parts says nothing.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<ModelPart>> ModelParts { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<ModelPart>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     ///     Dynamic enum values discovered by scanning the workspace XML enum files - values the mod has

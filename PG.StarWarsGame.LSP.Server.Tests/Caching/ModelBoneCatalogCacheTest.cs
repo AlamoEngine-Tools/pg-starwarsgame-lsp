@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Caching;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Caching;
 
@@ -38,6 +39,28 @@ public sealed class ModelBoneCatalogCacheTest
     }
 
     // ── round trip ───────────────────────────────────────────────────────────
+
+    // A reused snapshot keeps a model's parts (#449), and keeps "unknown" apart from "none", or the
+    // cloak rule would read an unreadable model as one with nothing drawn.
+    [Fact]
+    public void Save_ThenTryLoad_KeepsAModelsParts()
+    {
+        var cache = Build(new MockFileSystem());
+        cache.Save(PgprojPath, "fp-1", new Dictionary<string, ModelCatalogEntry>
+        {
+            ["ev_speeder.alo"] = new(["root"], [])
+            {
+                Parts = [new ModelPart("Hull", false, true, true), new ModelPart("p_glow", true, false, false)]
+            },
+            ["uv_walker.alo"] = new(["root"], [])
+        });
+
+        var loaded = cache.TryLoad(PgprojPath, "fp-1")!;
+
+        Assert.Equal([new ModelPart("Hull", false, true, true), new ModelPart("p_glow", true, false, false)],
+            loaded["ev_speeder.alo"].Parts!);
+        Assert.Null(loaded["uv_walker.alo"].Parts);
+    }
 
     [Fact]
     public void Save_ThenTryLoad_WithSameFingerprint_ReturnsTheBones()

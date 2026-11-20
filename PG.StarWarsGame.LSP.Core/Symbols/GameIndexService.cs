@@ -244,6 +244,18 @@ public sealed class GameIndexService : IGameIndexService
         RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
+    public void ApplyModelParts(ImmutableDictionary<string, ImmutableArray<ModelPart>> parts)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { ModelParts = parts };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
     public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
     {
         GameIndex snapshot, updated;

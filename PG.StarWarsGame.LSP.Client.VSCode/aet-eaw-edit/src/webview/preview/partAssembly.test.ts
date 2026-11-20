@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
+import { meshDrawn } from "./meshVisibility";
 import { PartAssembly } from "./partAssembly";
 import { standInContext } from "./viewportContext.testing";
 
@@ -23,6 +24,7 @@ function assemblyWith(): {
     held: string[];
     dropped: string[];
     billboards: THREE.Object3D[][];
+    refreshed: () => number;
 } {
     const modelRoot = new THREE.Group();
     const turret = new THREE.Bone();
@@ -49,6 +51,7 @@ function assemblyWith(): {
     const held: string[] = [];
     const dropped: string[] = [];
     const billboards: THREE.Object3D[][] = [];
+    let refreshes = 0;
     const context = standInContext({
         levels: { alt: 0, lod: 0 },
         modelRoot,
@@ -68,9 +71,18 @@ function assemblyWith(): {
                 billboards.push([...nodes]),
         },
         particles: {
-            holdEffectsOf: (id: string) => held.push(id),
+            // Only the wreck carries effects.
+            holdEffectsOf: (id: string) => {
+                held.push(id);
+                return id === "wreck:1";
+            },
             particleSystems: new Map(),
             removeParticleSystem: () => undefined,
+        },
+        rows: {
+            refreshRows: () => {
+                refreshes++;
+            },
         },
     });
     return {
@@ -81,6 +93,7 @@ function assemblyWith(): {
         held,
         dropped,
         billboards,
+        refreshed: () => refreshes,
     };
 }
 
@@ -94,13 +107,165 @@ const under = (node: THREE.Object3D, ancestor: THREE.Object3D): boolean => {
     return false;
 };
 
+/**
+ * An assembly that LOADS parts, over a stand-in viewport whose layers do nothing: each "GLB" names a
+ * scene the stand-in loader hands back. `hull` is a root with a `Turret` bone at index 1, `turret` a
+ * model of its own.
+ */
+function loaderWith(): {
+    assembly: PartAssembly;
+    modelRoot: THREE.Group;
+    parts: Map<string, LoadedPart>;
+    scene: (name: "hull" | "turret") => Uint8Array;
+} {
+    const modelRoot = new THREE.Group();
+    const scaledRoot = new THREE.Group();
+    modelRoot.add(scaledRoot);
+    const parts = new Map<string, LoadedPart>();
+    const scenes: THREE.Group[] = [];
+    const make = (name: "hull" | "turret"): THREE.Group => {
+        const root = new THREE.Group();
+        if (name === "hull") {
+            const bone = new THREE.Bone();
+            bone.name = "Turret#1";
+            bone.position.set(0, 0, 5);
+            root.add(bone);
+        } else {
+            const bone = new THREE.Bone();
+            bone.name = "Barrel#1";
+            root.add(bone);
+        }
+        return root;
+    };
+    const idle = () => undefined;
+    const assembly = new PartAssembly(
+        standInContext({
+            modelRoot,
+            scaledRoot,
+            parts,
+            levels: { alt: 0, lod: 0, applyLevels: idle },
+            loader: {
+                parseAsync: async (bytes: ArrayBuffer) => ({
+                    scene: scenes[new Uint8Array(bytes)[0]],
+                    animations: [],
+                    parser: { json: {} },
+                }),
+            },
+            materials: {
+                applyMaterial: idle,
+                applyWireframe: idle,
+                applyStoredState: idle,
+                bindLoadedTextures: idle,
+            },
+            environment: {
+                collectShadowVolumes: idle,
+                dropShadowVolumes: idle,
+            },
+            cameraRig: { collectBillboards: idle, dropBillboards: idle },
+            animation: {
+                registerPart: idle,
+                unregisterPart: idle,
+                forgetSubject: idle,
+            },
+            particles: {
+                particleSystems: new Map(),
+                removeParticleSystem: idle,
+                holdEffectsOf: idle,
+            },
+        }),
+    );
+    return {
+        assembly,
+        modelRoot,
+        parts,
+        scene: (name) => {
+            scenes.push(make(name));
+            return new Uint8Array([scenes.length - 1]);
+        },
+    };
+}
+
 describe("PartAssembly", () => {
+    it("hangs an attached model on its bone when the model it hangs on arrives after it", async () => {
+        const { assembly, modelRoot, parts, scene } = loaderWith();
+
+        await assembly.addPart("hp:Gun", scene("turret"), "hull", "Turret");
+        const turret = parts.get("hp:Gun")!;
+        assert.equal(
+            under(turret.root, modelRoot),
+            false,
+            "a turret whose hull has not arrived is in the scene",
+        );
+
+        await assembly.addPart("hull", scene("hull"));
+        const bone = parts.get("hull")!.bones.get("turret")!;
+
+        assert.equal(turret.root.parent, bone, "the turret is not on its bone");
+        assert.ok(
+            turret.root
+                .getWorldPosition(new THREE.Vector3())
+                .distanceTo(bone.getWorldPosition(new THREE.Vector3())) < 1e-6,
+        );
+    });
+
+    it("drops a model still waiting for its hull with the scene, or when it is removed", async () => {
+        const { assembly, parts, scene } = loaderWith();
+
+        await assembly.addPart("hp:Gun", scene("turret"), "hull", "Turret");
+        await assembly.addPart("hp:Other", scene("turret"), "hull", "Turret");
+        const other = parts.get("hp:Other")!;
+        assembly.removePart("hp:Other");
+
+        assembly.forgetParts();
+        const gun = parts.get("hp:Gun");
+        assert.equal(gun, undefined);
+
+        await assembly.addPart("hull", scene("hull"));
+        const bone = parts.get("hull")!.bones.get("turret")!;
+        assert.equal(
+            bone.children.length,
+            0,
+            "a forgotten or removed turret was hung on the new hull",
+        );
+        assert.equal(other.root.parent, null);
+    });
+
     it("knows the hull and each subject's parts", () => {
         const { assembly, hull, wreck } = assemblyWith();
 
         assert.equal(assembly.hull(), hull);
         assert.deepEqual(assembly.partsOf("wreck:1"), [wreck]);
         assert.equal(assembly.hasPart("wreck:1"), true);
+    });
+
+    it("knows the hull when an attached hardpoint model landed before it", () => {
+        const hullRoot = new THREE.Group();
+        const turretRoot = new THREE.Group();
+        const turret: LoadedPart = {
+            id: "hp:HP_Gun",
+            root: turretRoot,
+            bones: new Map(),
+            bonesByIndex: new Map(),
+            subjectId: ACTIVE_SUBJECT,
+            attached: true,
+        };
+        const hull: LoadedPart = {
+            id: "hull",
+            root: hullRoot,
+            bones: new Map(),
+            bonesByIndex: new Map(),
+            subjectId: ACTIVE_SUBJECT,
+        };
+        const assembly = new PartAssembly(
+            standInContext({
+                parts: new Map([
+                    ["hp:HP_Gun", turret],
+                    ["hull", hull],
+                ]),
+            }),
+        );
+
+        assert.equal(assembly.hull(), hull);
     });
 
     it("attaches to a bone by index, to the part root without a bone, and to the model without a part", () => {
@@ -131,6 +296,21 @@ describe("PartAssembly", () => {
         assembly.setPartHidden("wreck:1", false);
         assert.equal(wreck.root.visible, true);
         assert.equal(assembly.hiddenParts.has("wreck:1"), false);
+    });
+
+    /**
+     * A part's effects are anchored to the model root, so the rows decide whether they draw; showing a
+     * death clone that was held off screen has to have them say so again.
+     */
+    it("asks the rows again when it hides or shows a part that carries effects, and only then", () => {
+        const { assembly, refreshed } = assemblyWith();
+
+        assembly.setPartHidden("hull", true);
+        assert.equal(refreshed(), 0);
+
+        assembly.setPartHidden("wreck:1", true);
+        assembly.setPartHidden("wreck:1", false);
+        assert.equal(refreshed(), 2);
     });
 
     it("takes a removed part out of the scene and its registrations with it", () => {
@@ -177,5 +357,160 @@ describe("PartAssembly", () => {
         assert.equal(assembly.hasPart("wreck:1"), false);
         assert.equal(assembly.hiddenParts.size, 0);
         assert.deepEqual(assembly.unresolvedAttachments(), []);
+    });
+
+    it("draws a death clone's parts by their own switches, never hiding what is below a hidden bone", () => {
+        // A clone of two bones, Hatch and Inner below it: Hatch carries a mesh, Inner carries a mesh
+        // and a plate the file hides. The clip hides Hatch and shows Inner.
+        const root = new THREE.Group();
+        const hatchBone = new THREE.Bone();
+        hatchBone.name = "Hatch#1";
+        const innerBone = new THREE.Bone();
+        innerBone.name = "Inner#2";
+        hatchBone.add(innerBone);
+        root.add(hatchBone);
+        const mesh = (name: string, extras: Record<string, unknown>) => {
+            const made = new THREE.Mesh(
+                new THREE.BufferGeometry(),
+                new THREE.MeshBasicMaterial(),
+            );
+            made.name = name;
+            made.userData.alamo = { alamoMesh: name, ...extras };
+            return made;
+        };
+        const hatch = mesh("Hatch", {});
+        hatchBone.add(hatch);
+        const inner = mesh("Inner", {});
+        innerBone.add(inner);
+        const plate = mesh("Plate", { alamoHidden: true });
+        innerBone.add(plate);
+        const clone: LoadedPart = {
+            id: "deathclone:X",
+            root,
+            bones: new Map([
+                ["hatch", hatchBone],
+                ["inner", innerBone],
+            ]),
+            bonesByIndex: new Map([
+                [1, hatchBone],
+                [2, innerBone],
+            ]),
+            subjectId: "deathclone:X",
+        };
+        const assembly = new PartAssembly(
+            standInContext({
+                levels: { alt: 0, lod: 0 },
+                parts: new Map([["deathclone:X", clone]]),
+                animation: {
+                    subjectAnimation: () => ({
+                        action: {
+                            getClip: () => ({ name: "x_die_00" }),
+                            time: 0,
+                        },
+                        visibility: new Map([
+                            [
+                                "x_die_00",
+                                {
+                                    fps: 30,
+                                    bones: new Map([
+                                        ["Hatch#1", "0"],
+                                        ["Inner#2", "1"],
+                                    ]),
+                                },
+                            ],
+                        ]),
+                    }),
+                },
+                environment: {
+                    shadowVolumes: { setCounting: () => undefined },
+                },
+            }),
+        );
+
+        assembly.applyOwnFileVisibility(clone);
+
+        assert.equal(
+            meshDrawn(hatch),
+            false,
+            "the hidden bone's mesh is drawn",
+        );
+        assert.equal(meshDrawn(inner), true, "the mesh below it is hidden");
+        assert.equal(
+            meshDrawn(plate),
+            false,
+            "the clip showed a file-hidden plate",
+        );
+        assert.equal(
+            hatchBone.visible,
+            true,
+            "the hidden bone prunes its subtree",
+        );
+    });
+
+    it("hides a wreck's parts on a bone its file hides until its clip runs", () => {
+        const root = new THREE.Group();
+        const hatchBone = new THREE.Bone();
+        hatchBone.name = "Hatch#1";
+        hatchBone.userData.alamoBoneHidden = true;
+        const innerBone = new THREE.Bone();
+        innerBone.name = "Inner#2";
+        hatchBone.add(innerBone);
+        root.add(hatchBone);
+        const mesh = (name: string) => {
+            const made = new THREE.Mesh(
+                new THREE.BufferGeometry(),
+                new THREE.MeshBasicMaterial(),
+            );
+            made.userData.alamo = { alamoMesh: name };
+            return made;
+        };
+        const hatch = mesh("Hatch");
+        hatchBone.add(hatch);
+        const inner = mesh("Inner");
+        innerBone.add(inner);
+        const wreck: LoadedPart = {
+            id: "wreck:2",
+            root,
+            bones: new Map(),
+            bonesByIndex: new Map([
+                [1, hatchBone],
+                [2, innerBone],
+            ]),
+            subjectId: "wreck:2",
+        };
+        let action: unknown = null;
+        const assembly = new PartAssembly(
+            standInContext({
+                levels: { alt: 0, lod: 0 },
+                parts: new Map([["wreck:2", wreck]]),
+                animation: {
+                    subjectAnimation: () => ({
+                        action,
+                        visibility: new Map([
+                            ["x_die_00", { fps: 30, bones: new Map() }],
+                        ]),
+                    }),
+                },
+                environment: {
+                    shadowVolumes: { setCounting: () => undefined },
+                },
+            }),
+        );
+
+        assembly.applyOwnFileVisibility(wreck);
+        assert.equal(
+            meshDrawn(hatch),
+            false,
+            "the file-hidden bone's mesh is drawn",
+        );
+        assert.equal(meshDrawn(inner), true, "the mesh below it is hidden");
+
+        action = { getClip: () => ({ name: "x_die_00" }), time: 0 };
+        assembly.applyOwnFileVisibility(wreck);
+        assert.equal(
+            meshDrawn(hatch),
+            true,
+            "a clip with no track for it hid it",
+        );
     });
 });

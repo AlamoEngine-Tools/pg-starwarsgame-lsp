@@ -84,6 +84,14 @@ public interface IGameIndexService
     {
     }
 
+    /// <summary>
+    ///     Publishes the merged catalog of each model's parts (#449). Defaulted to a no-op for the test
+    ///     doubles, like <see cref="ApplyModelProxies" />; one that ignores it knows no model's parts.
+    /// </summary>
+    void ApplyModelParts(ImmutableDictionary<string, ImmutableArray<ModelPart>> parts)
+    {
+    }
+
     void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values);
 
     void ApplyWorkspaceEnumValueDefinitions(

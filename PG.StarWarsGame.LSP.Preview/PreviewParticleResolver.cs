@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Assets.Models;
-using PG.StarWarsGame.LSP.Preview.Abilities;
 
 namespace PG.StarWarsGame.LSP.Preview;
 
@@ -38,17 +37,6 @@ public enum PreviewParticleGate
 ///     Keeps the effect hidden while the damage state is winding DOWN. This is the repair asymmetry:
 ///     fire lit on the way to destruction should not flicker back on as a hardpoint is repaired.
 /// </param>
-/// <param name="ClaimsAbility">
-///     The ability this proxy's BONE NAME claims by its prefix, or null for the 5404 that claim
-///     nothing. See <see cref="AbilityProxyPrefix" />.
-///     <para>
-///         A claim is not a binding. The object has to declare the type as well, and when it does
-///         not the engine simply never shows the effect - <c>Tartan_Patrol_Cruiser</c> declares
-///         POWER_TO_WEAPONS and carries <c>Pte_tartanengine_lrg</c> for a TURBO it does not have.
-///         Carried on the wire because the client is where visibility is decided, and without it an
-///         unbound engine proxy fell through to the ordinary path and lit up on open.
-///     </para>
-/// </param>
 public sealed record PreviewParticle(
     string Id,
     string SystemRef,
@@ -63,8 +51,7 @@ public sealed record PreviewParticle(
     bool StartsVisible,
     int? Alt = null,
     int? Lod = null,
-    bool AltDecreaseStayHidden = false,
-    string? ClaimsAbility = null);
+    bool AltDecreaseStayHidden = false);
 
 /// <summary>
 ///     Works out which particle system is attached to which bone, and what switches it on.
@@ -134,11 +121,7 @@ public static class PreviewParticleResolver
                 proxy.IsVisible,
                 proxy.Alt,
                 proxy.Lod,
-                proxy.AltDecreaseStayHidden,
-
-                // Off the BONE, as `AbilityProxyPrefix.Bind` reads it - a proxy may name a system
-                // that carries no prefix while riding a bone that does.
-                AbilityProxyPrefix.AbilityFor(bone.Name)));
+                proxy.AltDecreaseStayHidden));
         }
 
         return particles;

@@ -316,6 +316,11 @@
   "ScaleFactor": 1,
   "IconName": "i_button_x_wing.tga",
   "SourceFile": null,
+  "PassiveMissileShieldRadius": null,
+  "DeathPersistenceOverride": 30,
+  "Stealth": null,
+  "ForceCloak": null,
+  "DamagedSmokeAsset": null,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [

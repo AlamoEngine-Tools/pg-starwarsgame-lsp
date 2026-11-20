@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The 3D preview panel: a canvas with the tool dock on the right, matching the layout the story
@@ -452,15 +452,8 @@ function ModelPreview(): React.JSX.Element {
         setAnimation,
         viewportRef,
     });
-    const {
-        activeAbilities,
-        setActiveAbilities,
-        abilityProxyIdsRef,
-        activeAbilitiesRef,
-        unboundEffectsRef,
-        replacedEffectsRef,
-        abilityProxyIds,
-    } = abilityState;
+    const { activeAbilities, setActiveAbilities, abilityProxyIds } =
+        abilityState;
 
     /**
      * Which of the seven targeting states the marks are drawn in.
@@ -793,14 +786,9 @@ function ModelPreview(): React.JSX.Element {
     }, []);
 
     const particles = useParticleEffects({
-        abilityProxyIdsRef,
-        activeAbilitiesRef,
         assets,
-        destroyedRef,
         refreshStats,
-        replacedEffectsRef,
         setHiddenEmitters,
-        unboundEffectsRef,
         viewportRef,
     });
     const {
@@ -813,6 +801,7 @@ function ModelPreview(): React.JSX.Element {
         effectDrawsNow,
         queuePassiveEffects,
         dropPassiveEffects,
+        cancelEffect,
         attachPending,
         playEffect,
     } = particles;
@@ -1044,6 +1033,7 @@ function ModelPreview(): React.JSX.Element {
         breakoffsRef,
         destroyedRef,
         dropPassiveEffects,
+        cancelEffect,
         effectDrawsNow,
         fireArcs,
         mode,
@@ -1076,6 +1066,7 @@ function ModelPreview(): React.JSX.Element {
         setHiddenWeapons,
         setTurretAims,
         deadRef,
+        cloneDeathRef,
         weapons,
         sweepable,
         draggableTurrets,
@@ -1091,6 +1082,7 @@ function ModelPreview(): React.JSX.Element {
         attachPending,
         breakoffsRef,
         deadRef,
+        cloneDeathRef,
         detailWantedRef,
         explosionsRef,
         foldedRef,

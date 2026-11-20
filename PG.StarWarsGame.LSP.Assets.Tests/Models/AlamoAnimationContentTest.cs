@@ -12,6 +12,8 @@ namespace PG.StarWarsGame.LSP.Assets.Tests.Models;
 ///     The reason is not decoration. A dropped clip is indistinguishable from a missing file once it
 ///     is gone, and the preview silently lost 27 of the AT-AT's 30 animations - every die among them
 ///     - with nothing anywhere to say so.
+///     Tracks pair with bones by POSITION, as the game matches them: track i is bone i + 1, because
+///     the root has no track. The index a track stores is never consulted.
 /// </remarks>
 public sealed class AlamoAnimationContentTest
 {
@@ -24,9 +26,33 @@ public sealed class AlamoAnimationContentTest
     [Fact]
     public void WhyNotModel_WhenEveryBoneLinesUp_IsSilent()
     {
-        var animation = Animation((0, "Root"), (2, "B_Head"));
+        var animation = Animation((1, "B_Body"), (2, "B_Head"));
 
         Assert.Null(animation.WhyNotModel(["Root", "B_Body", "B_Head"]));
+    }
+
+    /// <summary>
+    ///     The stored index is not what pairs a track: names that line up by position pair, whatever
+    ///     the track claims its index to be.
+    /// </summary>
+    [Fact]
+    public void WhyNotModel_IgnoresTheStoredIndex()
+    {
+        Assert.Null(Animation((5, "B_Body"), (9, "B_Head")).WhyNotModel(["Root", "B_Body", "B_Head"]));
+    }
+
+    /// <summary>
+    ///     Names and stored indices both swapped against the skeleton: by position, the first track
+    ///     is B_Body's and calls itself B_Head.
+    /// </summary>
+    [Fact]
+    public void WhyNotModel_ForTracksSwappedAgainstTheBones_NamesTheBoneAtThatPosition()
+    {
+        var why = Animation((2, "B_Head"), (1, "B_Body")).WhyNotModel(["Root", "B_Body", "B_Head"]);
+
+        Assert.NotNull(why);
+        Assert.Contains("B_Head", why);
+        Assert.Contains("B_Body", why);
     }
 
     /// <summary>
@@ -40,18 +66,17 @@ public sealed class AlamoAnimationContentTest
     }
 
     /// <summary>
-    ///     The case that cost the AT-AT its die animations. A clip may legitimately drive a bone past
-    ///     the end of the SKELETON, because the engine assumes a bone at the origin of every mesh -
-    ///     see the mesh-names-are-bones rule. The caller decides which list to pass; this only has to
-    ///     report the mismatch clearly enough to tell the two apart.
+    ///     The case that cost the AT-AT its die animations. A clip may legitimately have more tracks
+    ///     than the SKELETON has bones, because the engine assumes a bone at the origin of every mesh
+    ///     - see the mesh-names-are-bones rule. The caller decides which list to pass; this only has
+    ///     to report the mismatch clearly enough to tell the two apart.
     /// </summary>
     [Fact]
-    public void WhyNotModel_ForABoneBeyondTheList_NamesTheIndexAndTheSize()
+    public void WhyNotModel_ForATrackBeyondTheList_NamesTheBoneAndTheSize()
     {
-        var why = Animation((7, "Muzzleflash")).WhyNotModel(["Root", "B_Body"]);
+        var why = Animation((1, "B_Body"), (2, "Muzzleflash")).WhyNotModel(["Root", "B_Body"]);
 
         Assert.NotNull(why);
-        Assert.Contains("7", why);
         Assert.Contains("Muzzleflash", why);
         Assert.Contains("2", why);
     }
@@ -71,10 +96,10 @@ public sealed class AlamoAnimationContentTest
     ///     whole point of having replaced the boolean with a reason.
     /// </summary>
     [Theory]
-    [InlineData(0, "Root", true)]
     [InlineData(1, "B_Body", true)]
+    [InlineData(9, "B_Body", true)]
     [InlineData(1, "B_Arm", false)]
-    [InlineData(9, "B_Body", false)]
+    [InlineData(1, "Root", false)]
     public void MatchesModel_AgreesWithWhyNotModel(int index, string name, bool expected)
     {
         var animation = Animation((index, name));
@@ -105,21 +130,22 @@ public sealed class AlamoAnimationContentTest
     }
 
     [Fact]
-    public void FitsSkeleton_ForABoneBeyondTheList_IsFalse()
+    public void FitsSkeleton_ForATrackBeyondTheList_IsFalse()
     {
-        Assert.False(Animation((7, "Muzzleflash")).FitsSkeleton(["Root", "B_Body"]));
+        Assert.False(Animation((1, "B_Body"), (2, "Muzzleflash")).FitsSkeleton(["Root", "B_Body"]));
     }
 
     [Fact]
-    public void FitsSkeleton_ForANegativeIndex_IsFalse()
+    public void FitsSkeleton_IgnoresTheStoredIndex()
     {
-        Assert.False(Animation((-1, "Root")).FitsSkeleton(["Root", "B_Body"]));
+        Assert.True(Animation((-1, "Root")).FitsSkeleton(["Root", "B_Body"]));
+        Assert.True(Animation((7, "Muzzleflash")).FitsSkeleton(["Root", "B_Body"]));
     }
 
     [Fact]
     public void FitsSkeleton_WhenEveryBoneLinesUp_IsTrue()
     {
-        Assert.True(Animation((0, "Root"), (1, "B_Body")).FitsSkeleton(["Root", "B_Body"]));
+        Assert.True(Animation((1, "B_Body")).FitsSkeleton(["Root", "B_Body"]));
     }
 
     [Fact]

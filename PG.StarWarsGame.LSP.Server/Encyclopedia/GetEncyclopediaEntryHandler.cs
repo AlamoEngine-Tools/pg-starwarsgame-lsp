@@ -9,10 +9,10 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Xml;
-using PG.StarWarsGame.LSP.Preview.Abilities;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.ShipNames;
+using PG.StarWarsGame.LSP.Xml.Abilities;
 
 namespace PG.StarWarsGame.LSP.Server.Encyclopedia;
 

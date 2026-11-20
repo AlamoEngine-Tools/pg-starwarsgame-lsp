@@ -30,7 +30,12 @@ import { type BreakoffAnchor } from "./breakoff";
 import { type TurretAim, type TurretHandle } from "./turretHandles";
 import { type Inspection } from "./inspector";
 import { type AbilityOwnership } from "./abilityRows";
-import { type OverrideChange, type RowOverride } from "./visibility";
+import { type HardpointWrites } from "./damage";
+import {
+    type OverrideChange,
+    type RowOverride,
+    type StateSwitch,
+} from "./visibility";
 import {
     type BackgroundKind,
     type LightRig,
@@ -56,6 +61,8 @@ import { CameraRig } from "./cameraRig";
 import { PartAssembly } from "./partAssembly";
 import { DestructionRig } from "./destructionRig";
 import { AnimationRig } from "./animationRig";
+import { type DeathEnding } from "./deathEnding";
+import { type CloakKind, type CloakLook } from "./cloakFade";
 import {
     type AddPartOptions,
     type CaptureShot,
@@ -65,6 +72,7 @@ import {
 } from "./viewportTypes";
 import { CaptureRig } from "./captureRig";
 import { LevelGates } from "./levelGates";
+import { type PreviewRules, UnitRules } from "./unitRules";
 import { ModelQueries } from "./modelQueries";
 import { type ViewportContext } from "./viewportContext";
 import { TextureStore } from "./textureStore";
@@ -159,6 +167,8 @@ export class PreviewViewport {
     private readonly cameraRig: CameraRig;
     /** The detail and damage level, and the gates on what is drawn at it. See `LevelGates`. */
     private readonly levels: LevelGates;
+    /** The game's rules over the file's answer - see `unitRules.ts`. */
+    private readonly rules: UnitRules;
     /** What the model holds, asked of it: the skeleton, a bone's place, the stats and the levels it defines. See `ModelQueries`. */
     private readonly queries: ModelQueries;
     /** Labels, reticles, selection boxes, the skeleton and the bone axes. See `OverlayLayer`. */
@@ -230,6 +240,9 @@ export class PreviewViewport {
             get levels() {
                 return viewport.levels;
             },
+            get rules() {
+                return viewport.rules;
+            },
             get queries() {
                 return viewport.queries;
             },
@@ -262,6 +275,7 @@ export class PreviewViewport {
             },
         };
         this.levels = new LevelGates(context);
+        this.rules = new UnitRules(context);
         this.queries = new ModelQueries(context);
         this.assembly = new PartAssembly(context);
         this.destruction = new DestructionRig(context, {
@@ -519,22 +533,31 @@ export class PreviewViewport {
         this.overlay.dropReticles();
         this.assembly.forgetParts();
         this.cameraRig.forgetBillboards();
-        this.levels.forgetModel();
+        this.rules.forgetModel();
         // Every subject's clips, mixer, tracks, rest pose and node names at once. They hold nodes
         // of a model nobody is looking at any more, and keeping them would leak the whole graph.
         this.animation.forgetSubjects();
     }
 
-    /** Which decal meshes exist, and which of them are showing. See `LevelGates.setDecals`. */
-    setDecals(known: ReadonlySet<string>, shown: ReadonlySet<string>): void {
-        this.levels.setDecals(known, shown);
+    /**
+     * Fixes whether this preview applies the game's rules or shows the model file as it is. The
+     * first call decides for the preview's life. See `UnitRules.setRules`.
+     */
+    setRules(rules: PreviewRules): void {
+        this.rules.setRules(rules);
+    }
+
+    /** Whether this preview applies the game's rules over the model file's answer. */
+    appliesGameRules(): boolean {
+        return this.rules.appliesGameRules();
     }
 
     /**
-     * Which meshes the hardpoints claim as collision hulls. See `LevelGates.setCollisionMeshes`.
+     * What the hardpoints write: their decals and bones, and each death in the order they died. See
+     * `UnitRules.setHardpoints`.
      */
-    setCollisionMeshes(names: ReadonlySet<string>): void {
-        this.levels.setCollisionMeshes(names);
+    setHardpoints(writes: HardpointWrites): void {
+        this.rules.setHardpoints(writes);
     }
 
     /**
@@ -547,17 +570,30 @@ export class PreviewViewport {
 
     /** Shows or hides the shield mesh, for the abilities that reveal it. */
     setShieldRevealed(revealed: boolean): void {
-        this.levels.setShieldRevealed(revealed);
+        this.rules.setShieldRevealed(revealed);
     }
 
-    /** Cloaks the unit, or uncloaks it. See `LevelGates.setStealthed`. */
-    setStealthed(on: boolean): void {
-        this.levels.setStealthed(on);
+    /**
+     * Brings a cloak in, or - with null - lets it go: the subject's whole model fades and tints towards
+     * it, and back - see `cloakFade.ts`. Only a unit that has a cloak ability shows any of it. Which
+     * parts a cloak hides and shows is the unit's rules', on its timeline with the abilities.
+     */
+    setCloak(
+        cloak: { look: CloakLook; kind: CloakKind } | null,
+        hasCloak: boolean,
+    ): void {
+        this.animation.cloak.setHasCloak(hasCloak);
+        this.animation.cloak.set(cloak?.look ?? null, cloak?.kind);
     }
 
-    /** Whether a cloak is engaged, which every other visibility rule defers to. */
-    isStealthed(): boolean {
-        return this.levels.isStealthed();
+    /** The abilities switched on. See `UnitRules.setActiveAbilities`. */
+    setActiveAbilities(active: ReadonlySet<string>): void {
+        this.rules.setActiveAbilities(active);
+    }
+
+    /** Whether the unit's type is a missile-shield object. See `UnitRules.setMissileShieldObject`. */
+    setMissileShieldObject(on: boolean): void {
+        this.rules.setMissileShieldObject(on);
     }
 
     /**
@@ -878,9 +914,13 @@ export class PreviewViewport {
         this.environment.setShadowColour(colour);
     }
 
-    /** Starts a passive subject's own death clip, once. See `AnimationRig.startDeathClip`. */
-    startDeathClip(subjectId: string): void {
-        this.animation.startDeathClip(subjectId);
+    /** Starts a passive subject dying, once. See `AnimationRig.startDeathClip`. */
+    startDeathClip(
+        subjectId: string,
+        ending?: DeathEnding,
+        onEnd?: () => void,
+    ): void {
+        this.animation.startDeathClip(subjectId, ending, onEnd);
     }
 
     /** Starts a clip by name, answering whether one actually started. See `AnimationRig.play`. */
@@ -989,11 +1029,11 @@ export class PreviewViewport {
     }
 
     /**
-     * What the game's rules say about a system: the opening rule and the current damage state. See
+     * Writes a system's state switch: its proxy's flag, or what the effect rules say over it. See
      * `ParticleRig.setParticleSystemVisible`.
      */
-    setParticleSystemVisible(id: string, visible: boolean): void {
-        this.particles.setParticleSystemVisible(id, visible);
+    setParticleSystemVisible(id: string, state: StateSwitch): void {
+        this.particles.setParticleSystemVisible(id, state);
     }
 
     /** The emitters of one system, in file order. */
@@ -1169,6 +1209,12 @@ export class PreviewViewport {
         this.turret.placeTurretAnchors();
 
         this.animation.advancePassiveSubjects(dt);
+
+        // The subject's cloak coming in or going, and its shadow volumes with it - see
+        // `cloakFade.ts`. The shadow map is not the cloak's.
+        this.animation.cloak.step(dt);
+        this.rules.setCloakShadowsOff(this.animation.cloak.volumesOff());
+
         this.controls.update();
 
         this.particles.step(dt, this.camera.matrixWorldInverse);

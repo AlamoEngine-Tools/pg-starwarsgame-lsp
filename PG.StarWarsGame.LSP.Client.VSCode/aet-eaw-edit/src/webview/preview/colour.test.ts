@@ -57,7 +57,7 @@ describe("teamColour", () => {
     });
 
     it("forces alpha to one, the way the engine does", () => {
-        // RenderObject::SetColorization: "always force alpha channel to 100%". A faction whose Color
+        // Measured in the game: a faction colour's alpha is always set to full. A faction whose Color
         // ships a low alpha must not come out translucent.
         assert.equal(teamColour({ r: 10, g: 20, b: 30, a: 0 }).a, 1);
     });

@@ -23,9 +23,47 @@ import {
 import {
     blendingFor,
     HEAT_LAYER,
+    particleColour,
     ParticleSystemInstance,
     tailGeometry,
 } from "./particleRenderer";
+
+/**
+ * A model's whole look reaches its effects too: the tint multiplies the colour and the fade the
+ * alpha - or, for an additive emitter, the colour, the way the weather fade is applied.
+ */
+describe("particleColour", () => {
+    const particle = { r: 1, g: 0.5, b: 0.25, a: 0.8 };
+    const look = { r: 1, g: 0.5, b: 0.5, a: 0.5 };
+
+    it("is the particle's own colour for a plain model", () => {
+        assert.deepEqual(
+            particleColour(particle, false, 1, { r: 1, g: 1, b: 1, a: 1 }),
+            [1, 0.5, 0.25, 0.8],
+        );
+    });
+
+    it("tints the colour and fades the alpha", () => {
+        assert.deepEqual(
+            particleColour(particle, false, 1, look),
+            [1, 0.25, 0.125, 0.4],
+        );
+    });
+
+    it("fades an additive emitter's colour instead of its alpha", () => {
+        assert.deepEqual(
+            particleColour(particle, true, 1, look),
+            [0.5, 0.125, 0.0625, 0.8],
+        );
+    });
+
+    it("keeps the weather fade where the weather fade goes", () => {
+        assert.deepEqual(
+            particleColour(particle, false, 0.5, { r: 1, g: 1, b: 1, a: 1 }),
+            [1, 0.5, 0.25, 0.4],
+        );
+    });
+});
 
 describe("blendingFor", () => {
     /**
@@ -1798,7 +1836,7 @@ describe("emission gating", () => {
      * A system nobody can see is not running.
      *
      * The animation gate above already says this for the case a CLIP holds an effect back. The
-     * reader's tick and the quiet-on-open rule hold one exactly the same way - by not drawing it -
+     * reader's tick and the unit's rules hold one exactly the same way - by not drawing it -
      * and that half was never wired, so a hidden system emitted into an invisible scene for as long
      * as the preview was open.
      */
@@ -1814,8 +1852,8 @@ describe("emission gating", () => {
     /**
      * The defect this fixes, in its own right.
      *
-     * `p_explosion_empire_atat00` is six emitters of bursts. Opened quiet - which the opening rules
-     * require - it fired its whole life into a hidden scene during the first seconds, and by the
+     * `p_explosion_empire_atat00` is six emitters of bursts. Held back on open, it fired its whole
+     * life into a hidden scene during the first seconds, and by the
      * time the reader ticked its row on, four of the six were exhausted and there was nothing left
      * to draw. Measured on the live AT-AT: mean luminance 51.61 at rest, 52.32 with the row ticked
      * on, 59.84 with the same system restarted while visible.

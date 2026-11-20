@@ -59,7 +59,8 @@ public static class ModelTextureNames
                 var model = AloModelReader.Read(bytes);
                 return new AloScan(kind, ModelTextures(model))
                 {
-                    Proxies = [.. model.Proxies.Select(p => p.Name)]
+                    Proxies = [.. model.Proxies.Select(p => p.Name)],
+                    Parts = ModelParts.Of(model)
                 };
             }
 

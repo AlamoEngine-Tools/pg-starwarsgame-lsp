@@ -42,6 +42,14 @@ public enum PreviewPartOrigin
 public sealed record PreviewRgba(int R, int G, int B, int A);
 
 /// <summary>
+///     The look a cloak takes its unit to, as its ability block on the type writes it: the colour and
+///     alpha the whole model fades and tints towards, and how long that takes. Either is null where
+///     the block does not write it.
+/// </summary>
+[PublicAPI]
+public sealed record PreviewCloak(PreviewRgba? Color, float? TransitionSeconds);
+
+/// <summary>
 ///     One model instance in the scene.
 /// </summary>
 /// <param name="ModelRef">
@@ -226,7 +234,24 @@ public sealed record PreviewScene(
     string? IconName = null,
     // The file a bare model resolved to, for handing it to AloViewer or the Particle Editor.
     // Null for an object scene and for a model that resolves nowhere.
-    PreviewSourceFile? SourceFile = null)
+    PreviewSourceFile? SourceFile = null,
+    // The subject's Passive_Missile_Shield_Radius, or null where it declares none. Measured in the
+    // game: a type whose radius is above 0 shows its prs effects once it is created.
+    float? PassiveMissileShieldRadius = null,
+    // GameConstants' Override_Death_Persistence_Duration, or null where it is not written. Measured in
+    // the game: when an infantry unit dies, its clone stays this long instead of its own
+    // Death_Persistence_Duration - see PreviewDeathClone.KeepsItsOwnPersistence for the exceptions.
+    float? DeathPersistenceOverride = null,
+    // The look of the type's Stealth_Ability - Stealth_Color, Stealth_Transition_Time - or null where
+    // its Abilities list has none.
+    PreviewCloak? Stealth = null,
+    // The look of the type's Force_Cloak_Ability - Force_Cloak_Color, Force_Cloak_Transition_In_Secs -
+    // or null where its Abilities list has none.
+    PreviewCloak? ForceCloak = null,
+    // The type's Damaged_Smoke_Asset_Name, or null where it names none. Measured in the game: each time
+    // a hit takes the hull to or below 75 % or 50 % of its maximum and the unit lives, this effect is
+    // added on the model's root bone, from the game's model folder.
+    string? DamagedSmokeAsset = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

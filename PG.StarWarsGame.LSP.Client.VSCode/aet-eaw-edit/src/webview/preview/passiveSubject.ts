@@ -29,23 +29,3 @@ export function passiveEffects(
         id: `${partId}#${at}`,
     }));
 }
-
-/**
- * Whether one of a passive subject's effects is running.
- *
- * Deliberately NOT the subject's rule. The opening rules hold a hull's ungated fires and dust back
- * until the reader asks for them, and they are about the FIRST MOMENT of a preview - see
- * `playsOnOpen`. A passive subject has no first moment: a death clone exists because the ship died
- * and its explosions ARE the death, and a burning piece of debris is on fire from the instant it
- * breaks off.
- *
- * Nor is it the damage rule. The gate joins a proxy to the hardpoint whose `Damage_Particles` bone
- * is its parent, which is a fact about the SUBJECT's skeleton; a passive subject has its own, so
- * the server sends it no owning hardpoints and everything it carries comes back ungated.
- *
- * What is left is the model's own switch, which has the last word everywhere else too. The ALT/LOD
- * gate still applies on top, in the viewport, exactly as it does for the subject.
- */
-export function passiveEffectPlaysNow(effect: PreviewParticle): boolean {
-    return effect.startsVisible;
-}

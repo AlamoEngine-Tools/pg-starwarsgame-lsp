@@ -13,6 +13,7 @@ import type {
     PreviewDeathClone,
     PreviewTurret,
 } from "../../protocol/modelPreview";
+import { type DeathEnding, UNWRITTEN_ENDING } from "./deathEnding";
 
 /**
  * One card in the Gameplay dock's Death clone section.
@@ -97,6 +98,95 @@ export function deathCloneRows(
             chosen.objectId === clone.objectId &&
             (chosen.damageType ?? null) === (clone.damageType ?? null),
     }));
+}
+
+/** What the death of the unit itself says about how its clone ends. */
+export interface DyingUnit {
+    /** Whether the dying unit's `CategoryMask` names `Infantry`. */
+    infantry: boolean;
+    /** GameConstants' `Override_Death_Persistence_Duration`; 0 or null is no override. */
+    persistenceOverride: number | null;
+    /** The damage type that killed it. */
+    damageType: string;
+}
+
+/** The damage type of a death by Force lightning, which keeps the clone's own persistence. */
+const FORCE_LIGHTNING = "damage_force_lightning";
+
+/**
+ * How a clone ends, off its descriptor - see `deathEnding.ts`. A number the clone does not write
+ * is {@link UNWRITTEN_ENDING}'s.
+ *
+ * Measured: when the dying unit is infantry, GameConstants' `Override_Death_Persistence_Duration`
+ * replaces the clone's persistence, unless the clone type keeps its own (a HIDE_WHEN_FOGGED,
+ * IMPOSING_PRESENCE, LAND_OBSTACLE or PROXIMITY_MINE behaviour) or the death is by Force lightning.
+ * The game also skips the override for clones in its collidable lists and on German-language
+ * Windows; neither is modelled here.
+ */
+export function deathEndingOf(
+    clone: PreviewDeathClone | undefined,
+    dying?: DyingUnit,
+): DeathEnding {
+    const override = dying?.persistenceOverride ?? 0;
+    const overridden =
+        dying !== undefined &&
+        dying.infantry &&
+        override !== 0 &&
+        clone?.keepsItsOwnPersistence !== true &&
+        dying.damageType.toLowerCase() !== FORCE_LIGHTNING;
+
+    return {
+        persistenceSeconds: overridden
+            ? override
+            : (clone?.persistenceSeconds ??
+              UNWRITTEN_ENDING.persistenceSeconds),
+        fadeSeconds: clone?.fadeSeconds ?? UNWRITTEN_ENDING.fadeSeconds,
+        endsInExplosions: (clone?.endExplosions ?? []).length > 0,
+    };
+}
+
+/** Plays a named effect once where it hangs on no part - the shape of `playEffect`. */
+export type PlayEffect = (
+    id: string,
+    name: string,
+    partId: string | undefined,
+    bone: string | undefined,
+    once: boolean,
+) => void;
+
+/** How one clone ends, and what to do the moment it does. */
+export interface CloneDeath {
+    ending: DeathEnding;
+    onEnd: () => void;
+}
+
+/**
+ * How a clone ends, and what happens the moment it does: its `Death_Explosions_End` go off.
+ *
+ * Where the clone is, which is where the ship was - so at the model root, like the ship's own
+ * death blast.
+ */
+export function cloneDeath(
+    clone: PreviewDeathClone | undefined,
+    playEffect: PlayEffect,
+    dying?: DyingUnit,
+): CloneDeath {
+    return {
+        ending: deathEndingOf(clone, dying),
+        onEnd: () => {
+            const at = Date.now();
+
+            (clone?.endExplosions ?? []).forEach((name, index) => {
+                playEffect(
+                    `deathend:${clone!.objectId}:${index}:${at}`,
+                    name,
+                    undefined,
+                    undefined,
+                    true,
+                );
+            });
+        },
+    };
 }
 
 /** How far a turret is turned at one point in a sweep. Degrees, relative to the model. */

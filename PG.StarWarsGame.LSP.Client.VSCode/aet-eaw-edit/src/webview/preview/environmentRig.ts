@@ -26,6 +26,7 @@ import {
     engineLight,
 } from "./fx/uniforms";
 import { HeatPass } from "./heatPass";
+import { type Look, PLAIN_LOOK } from "./cloakFade";
 import { ShadowVolumePass } from "./shadowVolumePass";
 import { BloomPass } from "./bloomPass";
 import { shadowCatcherOpacity } from "./materialState";
@@ -34,7 +35,6 @@ import { type BoundingSphere } from "./framing";
 import {
     type MaterialExtras,
     resolveMaterial,
-    isVisibleAt,
     castsShadowMap,
 } from "./materials";
 import { HEAT_LAYER } from "./particleRenderer";
@@ -760,13 +760,19 @@ export class EnvironmentRig {
         this.fillHarmonics = sphericalHarmonics(fills, ambient);
     }
 
-    /** The engine's per-frame contract, as it stands for one mesh. */
+    /**
+     * The engine's per-frame contract, as it stands for one mesh.
+     *
+     * @param look The whole look of the model the mesh belongs to - see `cloakFade.ts`. It is the
+     *     per-model light scale the effects multiply by: its colour the tint, its alpha the fade.
+     */
     frameFor(
         mesh: THREE.Mesh,
         view: THREE.Matrix4,
         projection: THREE.Matrix4,
         viewProjection: THREE.Matrix4,
         eyeWorld: THREE.Vector3,
+        look: Look = PLAIN_LOOK,
     ): AlamoFrame {
         const world = mesh.matrixWorld;
         const worldInverse = new THREE.Matrix4().copy(world).invert();
@@ -844,7 +850,7 @@ export class EnvironmentRig {
                 this.rig.ambient.colour[2] * this.rig.ambient.intensity,
                 1,
             ],
-            lightScale: [1, 1, 1, 1],
+            lightScale: [look.r, look.g, look.b, look.a],
             time: this.host.elapsed,
             resolution: [
                 this.context.canvas.clientWidth,
@@ -910,43 +916,42 @@ export class EnvironmentRig {
         this.shadowVolumes.setEnabled(this.shadowVolumesEnabled);
         this.placeKeyLight();
 
-        // Which ALT's volume is the live one, before anything is counted.
-        for (const mesh of found) {
-            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-            // The cloak as well as the level, so a model that finds its volumes while already
-            // stealthed does not start out casting. Same pair as `applyMeshVisibility`.
-            this.shadowVolumes.setCounting(
-                mesh,
-                !this.context.levels.stealthed &&
-                    isVisibleAt(
-                        extras,
-                        this.context.levels.alt,
-                        this.context.levels.lod,
-                    ),
-            );
-        }
+        // Which volumes count is not decided here: each casts by its own switches, written by the
+        // rows of the subject and by a passive subject's own sweep - see `castsShadow`. The part
+        // that brought these runs both before it is drawn.
 
         // The model can only be known to have a volume AFTER one is found, and the materials were
         // built before that - so the casting decision has to be taken again over everything.
         this.refreshShadowCasting();
     }
 
-    /** Re-decides which meshes cast into the shadow map, now that the volumes are known. */
+    /**
+     * Re-decides which meshes cast into the shadow map, now that the volumes are known.
+     */
     private refreshShadowCasting(): void {
         this.context.assembly.forEachDrawnMesh((mesh) => {
             if (mesh.userData.aetShadowVolume === true) {
                 return;
             }
 
-            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-            const spec = resolveMaterial(extras);
+            mesh.castShadow = this.castsIntoShadowMap(mesh);
+        });
+    }
 
-            mesh.castShadow = castsShadowMap({
-                hasVolumes: this.stencilShadowing,
-                hidden: spec.hidden,
-                blend: spec.blend,
-            });
+    /**
+     * Whether one mesh casts into the shadow map now: solid geometry of a model with no shadow volume
+     * - see `castsShadowMap`. A cloak does not touch the shadow map: measured, it turns off only the
+     * shadow volumes.
+     */
+    castsIntoShadowMap(mesh: THREE.Mesh): boolean {
+        const spec = resolveMaterial(
+            (mesh.userData.alamo ?? {}) as MaterialExtras,
+        );
+
+        return castsShadowMap({
+            hasVolumes: this.stencilShadowing,
+            hidden: spec.hidden,
+            blend: spec.blend,
         });
     }
 

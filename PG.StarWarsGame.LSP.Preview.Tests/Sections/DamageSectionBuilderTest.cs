@@ -104,9 +104,9 @@ public sealed class DamageSectionBuilderTest
         var (index, resolver) = Setup(tags, Sym("Ship", "GameObjectType"));
         PreviewHardpoint[] hardpoints =
         [
-            new("HP_A", null, "T", "B", true, true, 100f, null, null, null, null, null, null, true, null, null, null),
-            new("HP_B", null, "T", "B", false, true, 50f, null, null, null, null, null, null, true, null, null, null),
-            new("HP_C", null, "T", "B", true, true, 25f, null, null, null, null, null, null, true, null, null, null)
+            new("HP_A", null, "T", "B", true, true, 100f, null, null, null, null, null, true, null, null, null),
+            new("HP_B", null, "T", "B", false, true, 50f, null, null, null, null, null, true, null, null, null),
+            new("HP_C", null, "T", "B", true, true, 25f, null, null, null, null, null, true, null, null, null)
         ];
 
         var defence = Builder(tags).Defence(index, resolver.Resolve("Ship"), hardpoints);

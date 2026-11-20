@@ -159,13 +159,28 @@ public sealed record PreviewDeathClone(
     // measured over 265 ship-to-clone pairs in eaw/ and foc/, 206 declare the
     // same scale and 59 differ - the Millennium Falcon is 0.5 and its clone 1.0, the slave
     // infantry 1.5 against clones at 1.0.
-    float ScaleFactor = 1f)
+    float ScaleFactor = 1f,
+    // How the clone ENDS, off the clone's own type. A dying object with a death clip stays once the
+    // clip is done; Death_Persistence_Duration later it either is destroyed in its
+    // Death_Explosions_End, when it names any, or fades out over Death_Fade_Time. Null where the
+    // clone does not declare the tag: 35 of eaw's 126 clone types declare neither number, and the
+    // game's values for an unwritten tag are the client's to apply.
+    float? PersistenceSeconds = null,
+    float? FadeSeconds = null,
+    IReadOnlyList<string>? EndExplosions = null,
+    // Whether the clone type has a HIDE_WHEN_FOGGED, IMPOSING_PRESENCE, LAND_OBSTACLE or
+    // PROXIMITY_MINE behaviour, which keeps its own persistence where an infantry unit's death would
+    // otherwise replace it with GameConstants' Override_Death_Persistence_Duration.
+    bool KeepsItsOwnPersistence = false)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<string> Animations { get; init; } = Animations ?? [];
 
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<PreviewParticle> Particles { get; init; } = Particles ?? [];
+
+    /// <summary>Never null, so the client has one shape to walk.</summary>
+    public IReadOnlyList<string> EndExplosions { get; init; } = EndExplosions ?? [];
 }
 
 /// <summary>

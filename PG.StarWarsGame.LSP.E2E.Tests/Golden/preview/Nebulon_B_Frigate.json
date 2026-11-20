@@ -68,7 +68,6 @@
       "Health": 260,
       "DamageParticlesBone": "HP_F-L_EMITDAMAGE",
       "DamageDecalBone": "HP_F-L_BLAST",
-      "CollisionMeshBone": "HP_F-L_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": "Hardpoint_Breakoff_Nebulon_Weapon_FL",
@@ -87,7 +86,6 @@
       "Health": 260,
       "DamageParticlesBone": "HP_F-R_EMITDAMAGE",
       "DamageDecalBone": "HP_F-R_BLAST",
-      "CollisionMeshBone": "HP_F-R_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": "Hardpoint_Breakoff_Nebulon_Weapon_FR",
@@ -106,7 +104,6 @@
       "Health": 260,
       "DamageParticlesBone": "HP_B-L_EMITDAMAGE",
       "DamageDecalBone": "HP_B-L_BLAST",
-      "CollisionMeshBone": "HP_B-L_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": "Hardpoint_Breakoff_Nebulon_Weapon_BL",
@@ -125,7 +122,6 @@
       "Health": 260,
       "DamageParticlesBone": "HP_B-R_EMITDAMAGE",
       "DamageDecalBone": "HP_B-R_BLAST",
-      "CollisionMeshBone": "HP_B-R_COLL",
       "EngineParticlesBone": null,
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": "Hardpoint_Breakoff_Nebulon_Weapon_BR",
@@ -144,7 +140,6 @@
       "Health": 260,
       "DamageParticlesBone": "HP_E_EMITDAMAGE",
       "DamageDecalBone": null,
-      "CollisionMeshBone": "HP_E_COLL",
       "EngineParticlesBone": "HP_E_MAINENGINES",
       "DeathExplosionParticles": "Large_Explosion_Space",
       "DeathBreakoffProp": null,
@@ -595,6 +590,11 @@
   "ScaleFactor": 0.7,
   "IconName": "i_button_escort_frigate.tga",
   "SourceFile": null,
+  "PassiveMissileShieldRadius": null,
+  "DeathPersistenceOverride": 30,
+  "Stealth": null,
+  "ForceCloak": null,
+  "DamagedSmokeAsset": null,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [
@@ -646,6 +646,9 @@
       "ModelFile": "RV_nebulonb_D.ALO",
       "PlaysIdle": false,
       "ScaleFactor": 0.76,
+      "PersistenceSeconds": null,
+      "FadeSeconds": null,
+      "KeepsItsOwnPersistence": false,
       "Animations": [
         "rv_nebulonb_d_death_00.ala",
         "rv_nebulonb_d_die_00.ala"
@@ -662,8 +665,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#1",
@@ -676,8 +678,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#2",
@@ -690,8 +691,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#3",
@@ -704,8 +704,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#4",
@@ -718,8 +717,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#5",
@@ -732,8 +730,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#6",
@@ -746,8 +743,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#7",
@@ -760,8 +756,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#8",
@@ -774,8 +769,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#9",
@@ -788,8 +782,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#10",
@@ -802,8 +795,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#11",
@@ -816,8 +808,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#12",
@@ -830,8 +821,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#13",
@@ -844,8 +834,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#14",
@@ -858,8 +847,7 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         },
         {
           "Id": "Nebulon_Death_Clone#15",
@@ -872,10 +860,10 @@
           "StartsVisible": true,
           "Alt": null,
           "Lod": null,
-          "AltDecreaseStayHidden": false,
-          "ClaimsAbility": null
+          "AltDecreaseStayHidden": false
         }
-      ]
+      ],
+      "EndExplosions": []
     }
   ],
   "ProjectileCatalog": [
@@ -1445,8 +1433,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#1",
@@ -1459,8 +1446,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#2",
@@ -1473,8 +1459,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#3",
@@ -1487,8 +1472,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#4",
@@ -1501,8 +1485,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#5",
@@ -1515,8 +1498,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     },
     {
       "Id": "hull#6",
@@ -1529,8 +1511,7 @@
       "StartsVisible": true,
       "Alt": null,
       "Lod": null,
-      "AltDecreaseStayHidden": false,
-      "ClaimsAbility": null
+      "AltDecreaseStayHidden": false
     }
   ],
   "Animations": [

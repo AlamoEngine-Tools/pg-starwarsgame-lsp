@@ -64,4 +64,21 @@ public sealed class SerializedBaseline
     /// </summary>
     [Key(14)]
     public SerializedEnumValues[] RegistryLists { get; set; } = [];
+
+    /// <summary>
+    ///     Each shipped model's parts with their visible and surface flags, keyed like
+    ///     <see cref="ModelBones" /> (#449). Needs no new <see cref="CurrentSchemaVersion" />: a baseline
+    ///     written before it reads as none, every model's parts are unknown, and the rule that reads
+    ///     them stays silent.
+    /// </summary>
+    [Key(15)]
+    public SerializedModelParts[] ModelParts { get; set; } = [];
+}
+
+/// <summary>One model's parts, keyed the way every other consumer spells a model.</summary>
+[MessagePackObject]
+public sealed class SerializedModelParts
+{
+    [Key(0)] public string Name { get; set; } = string.Empty;
+    [Key(1)] public ModelPart[] Parts { get; set; } = [];
 }

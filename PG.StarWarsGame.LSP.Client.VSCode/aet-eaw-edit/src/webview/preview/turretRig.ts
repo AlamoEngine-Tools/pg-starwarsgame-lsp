@@ -1670,11 +1670,19 @@ export class TurretRig {
      * In the bone's space because the turret moves with the bone: the box turns when the turret does,
      * with one transform per hover instead of a walk over the vertices. Overlays - the handles, the
      * arcs - and shadow volumes are left out, the shadow being larger than the turret it belongs to.
+     *
+     * The matrices are brought up to date over the whole tree the bone is in, not only the model
+     * root's: a turret model that arrived before its hull is held out of the scene until the hull
+     * comes, and its handles can be built in the meantime.
      */
     private shapeOf(
         bone: THREE.Object3D,
     ): { mesh: THREE.Mesh; box: THREE.Box3 }[] {
-        this.context.modelRoot.updateMatrixWorld(true);
+        let top = bone;
+        while (top.parent !== null) {
+            top = top.parent;
+        }
+        top.updateMatrixWorld(true);
 
         const toBone = bone.matrixWorld.clone().invert();
         const carried = new Set<THREE.Object3D>();
@@ -1718,7 +1726,9 @@ export class TurretRig {
 
         const vertex = new THREE.Vector3();
 
-        this.context.modelRoot.traverse((node) => {
+        // Over the same tree, for the same reason: a turret model waiting for its hull carries its
+        // own skinned turret, which is not under the model root yet.
+        top.traverse((node) => {
             if (!(node instanceof THREE.SkinnedMesh) || isShadowVolume(node)) {
                 return;
             }

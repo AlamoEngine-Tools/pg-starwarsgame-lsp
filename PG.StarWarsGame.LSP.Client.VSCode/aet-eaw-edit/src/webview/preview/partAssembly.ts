@@ -14,7 +14,16 @@ import {
     type LoadedPart,
 } from "./loadedPart";
 import { alamoBoneName, alamoNodeName } from "./skeleton";
-import { type MaterialExtras, resolveMaterial, isVisibleAt } from "./materials";
+import { type MaterialExtras, resolveMaterial } from "./materials";
+import { clipsSay, poseSays } from "./boneVisibility";
+import { runningClips } from "./clipEnd";
+import { skinVisibilityBone } from "./skinBone";
+import {
+    type RowFacts,
+    castsShadow,
+    meshSwitches,
+    resolveRow,
+} from "./visibility";
 import {
     splitGeometryFromBone,
     cancelRootCorrection,
@@ -26,6 +35,32 @@ import { setMeshDrawn } from "./meshVisibility";
 import { type AddPartOptions } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
 import { bufferOf } from "./payloadBytes";
+
+/**
+ * The bone whose track speaks for a mesh: for a skinned mesh the bone of `skinVisibilityBone`, else
+ * the nearest of the part's bone nodes above it. Undefined for a mesh on no bone of the part.
+ */
+function ownBoneOf(
+    mesh: THREE.Mesh,
+    part: LoadedPart,
+    boneNodes: ReadonlySet<THREE.Object3D>,
+): THREE.Object3D | undefined {
+    if ((mesh as THREE.SkinnedMesh).isSkinnedMesh === true) {
+        return skinVisibilityBone(mesh, part.root, part.bonesByIndex.get(0));
+    }
+
+    for (let at = mesh.parent; at !== null; at = at.parent) {
+        if (boneNodes.has(at)) {
+            return at;
+        }
+
+        if (at === part.root) {
+            break;
+        }
+    }
+
+    return undefined;
+}
 
 /** Releases GPU memory for a subtree; the renderer does not do it on removal. */
 export function disposeTree(root: THREE.Object3D): void {
@@ -48,6 +83,19 @@ export class PartAssembly {
     private readonly attachRequests = new Map<string, AttachmentRequest>();
     /** Parts broken off by a destroyed hardpoint. */
     readonly hiddenParts = new Set<string>();
+    /**
+     * Parts that hang on a part not loaded yet, by the part they hang on: the bone each wants, kept
+     * out of the scene until that part arrives.
+     *
+     * Models arrive as bytes in whatever order the server answers, and a small turret model routinely
+     * lands before the hull it hangs on. Put at the model root instead, it sat inside the hull at the
+     * origin - with the hull's axis correction already taken off, so rotated down - and nothing moved
+     * it once the hull came. Out of the scene it draws nothing until it can be drawn where it belongs.
+     */
+    private readonly waiting = new Map<
+        string,
+        { id: string; bone: string | undefined }[]
+    >();
 
     constructor(private readonly context: ViewportContext) {}
 
@@ -63,6 +111,7 @@ export class PartAssembly {
     forgetParts(): void {
         this.context.parts.clear();
         this.hiddenParts.clear();
+        this.waiting.clear();
         // A new subject asks for its own bones. Keeping the old subject's requests would report a
         // Star Destroyer's missing hardpoint against a Mon Calamari Cruiser for the rest of the session.
         this.attachRequests.clear();
@@ -182,6 +231,12 @@ export class PartAssembly {
         // An unattached PASSIVE part - a death clone - is neither. It is spawned as its own object,
         // so it goes beside the scaled geometry and carries its OWN scale. It used to fall through
         // to the hull's branch and take the SHIP's, which is wrong for 59 of 265 shipped pairs.
+        //
+        // An attached part whose host has not arrived hangs nowhere yet - see `waiting`.
+        const waitsForHost =
+            options.pose === undefined &&
+            attachToPartId !== undefined &&
+            !this.context.parts.has(attachToPartId);
         const parent =
             options.pose !== undefined
                 ? this.context.modelRoot
@@ -211,7 +266,15 @@ export class PartAssembly {
             cancelRootCorrection(root);
         }
 
-        parent.add(root);
+        if (waitsForHost) {
+            const host = attachToPartId ?? "";
+            this.waiting.set(host, [
+                ...(this.waiting.get(host) ?? []),
+                { id, bone: attachBone },
+            ]);
+        } else {
+            parent.add(root);
+        }
 
         if (options.pose !== undefined) {
             root.position.copy(options.pose.position);
@@ -222,20 +285,26 @@ export class PartAssembly {
         // replaces did not - see `stampTreeKeys`.
         stampTreeKeys(root, bonesByIndex, id);
 
-        this.context.parts.set(id, {
+        const part: LoadedPart = {
             id,
             root,
             bones,
             bonesByIndex,
             subjectId,
-        });
+            attached:
+                attachToPartId !== undefined || options.pose !== undefined,
+        };
+        this.context.parts.set(id, part);
+
+        // Whatever was waiting for THIS part can hang on its bones now.
+        this.mountWaitingOn(id);
 
         // Its own file's word, because the row chain will never speak for it - see
         // `LoadedPart.subjectId`. Debris needs exactly this too: outside the chain, nothing else
         // hides its collision hull and its shadow volume, and it dropped showing both. Applied
         // again on every level change, from `applyLevels`.
         if (passive) {
-            this.applyOwnFileVisibility(subjectId, root);
+            this.applyOwnFileVisibility(part);
 
             // The host answers a texture name ONCE, and a wreck is the same ship - so every map it
             // needs was already sent for the hull and its own request comes back silent.
@@ -320,7 +389,11 @@ export class PartAssembly {
             part.root.visible = !hidden;
         }
 
-        this.context.particles.holdEffectsOf(partId);
+        // Its effects are anchored to the model root, not parented to the part, so the rows decide
+        // whether they draw - see `ModelRows.effectFacts`. Asked again only for a part that has any.
+        if (this.context.particles.holdEffectsOf(partId)) {
+            this.context.rows.refreshRows();
+        }
     }
 
     /**
@@ -352,6 +425,14 @@ export class PartAssembly {
         this.context.parts.delete(partId);
         this.hiddenParts.delete(partId);
 
+        // Nor is it hung on its host later, if it was still waiting for one.
+        for (const [host, waiting] of this.waiting) {
+            this.waiting.set(
+                host,
+                waiting.filter((w) => w.id !== partId),
+            );
+        }
+
         // The subject goes with its last part. A repair removes the wreck, and a mixer left behind
         // would keep ticking a clip whose nodes have been disposed. The ACTIVE subject stays
         // whatever happens - it is the scene, and only `clear` ends it.
@@ -366,6 +447,24 @@ export class PartAssembly {
     /** Whether a part's geometry has arrived, so something can be attached to its bones. */
     hasPart(partId: string): boolean {
         return this.context.parts.has(partId);
+    }
+
+    /** Hangs every part that was waiting for `hostId` on the bone it asked for - see `waiting`. */
+    private mountWaitingOn(hostId: string): void {
+        const waiting = this.waiting.get(hostId);
+        if (waiting === undefined) {
+            return;
+        }
+
+        this.waiting.delete(hostId);
+
+        for (const { id, bone } of waiting) {
+            const part = this.context.parts.get(id);
+
+            if (part !== undefined) {
+                this.attachmentFor(hostId, bone).add(part.root);
+            }
+        }
     }
 
     /** The object a part is attached to: a named bone of another part, or the scene root. */
@@ -570,21 +669,33 @@ export class PartAssembly {
      * Everything that describes "the model" - the tree, the stats, the skeleton, the row chain, the
      * bone labels, the camera bindings - asks for this one. It used to be the first part in the
      * scene, full stop, which was the hull only by the luck of load order; now it is the first part
-     * OF THE SUBJECT, and a wreck or a clone arriving cannot be mistaken for it.
+     * OF THE SUBJECT that hangs on no other part, so neither a wreck or a clone arriving nor a turret
+     * model landing before its hull can be mistaken for it.
      */
     hull(): LoadedPart | null {
         return this.rootPartOf(ACTIVE_SUBJECT);
     }
 
-    /** The first-loaded part of one subject - its hull. */
+    /**
+     * One subject's hull: its first-loaded part that hangs on no other part, else its first-loaded
+     * part.
+     */
     private rootPartOf(subjectId: string): LoadedPart | null {
+        let first: LoadedPart | null = null;
+
         for (const part of this.context.parts.values()) {
-            if (part.subjectId === subjectId) {
+            if (part.subjectId !== subjectId) {
+                continue;
+            }
+
+            if (part.attached !== true) {
                 return part;
             }
+
+            first ??= part;
         }
 
-        return null;
+        return first;
     }
 
     /** Every part belonging to one subject. */
@@ -595,32 +706,32 @@ export class PartAssembly {
     }
 
     /**
-     * Draws a passive subject's geometry by its OWN file's rules, at the current levels.
+     * Draws a passive subject's geometry by its OWN file's rules, at the current levels and frame.
      *
      * The row chain speaks only for the ACTIVE subject, so this is the whole of what decides
      * whether a wreck's mesh is on screen. It runs when the geometry loads AND whenever the levels
-     * change: applied once and never again, a death clone kept whatever detail level happened to be
-     * set at the moment it arrived, and moving the control afterwards left it behind. Measured over
-     * the shipped tree that is one ship - the Broadside Class Cruiser, whose clone carries a `_LOD1`
-     * mesh and whose hull declares the levels that make the control live - but the engine plainly
-     * supports it and a mod authoring an ALT-tagged wreck is exactly who would be confused.
+     * change, and on every frame of the subject's own clip: applied once and never again, a death
+     * clone kept whatever detail level happened to be set at the moment it arrived, and moving the
+     * control afterwards left it behind. Measured over the shipped tree that is one ship - the
+     * Broadside Class Cruiser, whose clone carries a `_LOD1` mesh and whose hull declares the levels
+     * that make the control live - but the engine plainly supports it and a mod authoring an
+     * ALT-tagged wreck is exactly who would be confused.
+     *
+     * Each mesh by the same four switches as the subject's rows - `meshSwitches` and `resolveRow` -
+     * with its animation switch from the track of its OWN bone in the running clip, or of the first
+     * bone it is skinned to. No bone node is hidden, so nothing below a bone the clip hides goes with
+     * it; and a mesh the file hides is never shown by a clip.
      *
      * Through {@link setMeshDrawn}, never `visible`: a mesh node is very often a bone node too, and
      * `visible` prunes the whole subtree under it. See `meshVisibility.ts`.
-     *
-     * A node the RUNNING CLIP names is left alone. The clip is the model's own word about this
-     * frame and it sits above the level gate, which is the same precedence `resolveRow` gives the
-     * active subject.
      */
-    applyOwnFileVisibility(subjectId: string, root: THREE.Object3D): void {
-        const subject = this.context.animation.subjectAnimation(subjectId);
+    applyOwnFileVisibility(part: LoadedPart): void {
+        const subject = this.context.animation.subjectAnimation(part.subjectId);
         const action = subject.action;
-        const track =
-            action === null
-                ? undefined
-                : subject.visibility.get(action.getClip().name);
+        const running = runningClips(subject);
+        const boneNodes = new Set<THREE.Object3D>(part.bonesByIndex.values());
 
-        root.traverse((node) => {
+        part.root.traverse((node) => {
             if (
                 !(node instanceof THREE.Mesh) ||
                 node.userData.aetShadowVolume === true
@@ -628,21 +739,36 @@ export class PartAssembly {
                 return;
             }
 
-            if (track?.bones.has(alamoNodeName(node)) === true) {
-                return;
+            const extras = (node.userData.alamo ?? {}) as MaterialExtras;
+            const bone = ownBoneOf(node, part, boneNodes);
+            const said =
+                bone === undefined
+                    ? undefined
+                    : clipsSay(running, alamoNodeName(bone));
+            const facts: RowFacts = {
+                ...meshSwitches(
+                    extras,
+                    this.context.levels.alt,
+                    this.context.levels.lod,
+                ),
+                masters: [],
+                // A running clip decides; with none, the base pose, where the file's bone flag does.
+                animation:
+                    action === null
+                        ? poseSays(bone)
+                        : said === undefined
+                          ? undefined
+                          : { shown: said, source: "clip" },
+            };
+
+            if (resolveMaterial(extras).archetype === "shadow-volume") {
+                this.context.environment.shadowVolumes.setCounting(
+                    node,
+                    castsShadow(facts),
+                );
             }
 
-            const extras = (node.userData.alamo ?? {}) as MaterialExtras;
-
-            setMeshDrawn(
-                node,
-                !resolveMaterial(extras).hidden &&
-                    isVisibleAt(
-                        extras,
-                        this.context.levels.alt,
-                        this.context.levels.lod,
-                    ),
-            );
+            setMeshDrawn(node, resolveRow(facts).visible);
         });
     }
 

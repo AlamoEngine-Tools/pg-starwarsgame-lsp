@@ -183,6 +183,24 @@
   <data name="CaseSensitiveTags_SuspendedPlot" xml:space="preserve">
     <value>the tag is not recognised, and a plot it does not recognise is suspended anyway - so the outcome is the intended one</value>
   </data>
+  <data name="CloakHidesNothing_HidesNoPart" xml:space="preserve">
+    <value>No part of '{0}' has BASEMESH in its name, so &lt;{1}&gt; hides no part.</value>
+  </data>
+  <data name="CloakHidesNothing_HidesNoPartLookUnchanged" xml:space="preserve">
+    <value>No part of '{0}' has BASEMESH in its name and &lt;{1}&gt; has a white opaque colour or no transition time, so it hides no part and leaves the look unchanged.</value>
+  </data>
+  <data name="CloakKeepsParts_AndMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
+  <data name="CloakKeepsParts_StayDrawn" xml:space="preserve">
+    <value>Parts of '{0}' with neither BASEMESH nor STEALTH in their names stay drawn under &lt;{1}&gt; - {2}.</value>
+  </data>
+  <data name="CloakShowsNoShell_ShowsNoPart" xml:space="preserve">
+    <value>No part of '{0}' has STEALTH in its name, so &lt;{1}&gt; shows no part.</value>
+  </data>
+  <data name="CloakShowsNoShell_ShowsNoPartLookUnchanged" xml:space="preserve">
+    <value>No part of '{0}' has STEALTH in its name and &lt;{1}&gt; has a white opaque colour or no transition time, so it shows no part and leaves the look unchanged.</value>
+  </data>
   <data name="CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs" xml:space="preserve">
     <value>'{0}' could not be resolved as an SFX event for &lt;{1}&gt;.</value>
   </data>
@@ -548,6 +566,9 @@
   </data>
   <data name="FloatVector4_IsNotAValidFloat" xml:space="preserve">
     <value>'{0}' is not a valid Float4 for &lt;{1}&gt;. Expected 4 floats separated by spaces or commas.</value>
+  </data>
+  <data name="ForceCloakKeepsAttachedModel_StaysDrawn" xml:space="preserve">
+    <value>Hardpoint '{0}' attaches '{1}', which &lt;Force_Cloak_Ability&gt; leaves drawn.</value>
   </data>
   <data name="ForceDeploymentList_IsNotAValidForce" xml:space="preserve">
     <value>'{0}' is not a valid force deployment entry for &lt;{1}&gt;. Expected: FactionName, PlanetName, UnitTypeName.</value>

@@ -17,6 +17,8 @@ import type {
     PreviewAbility,
     PreviewParticle,
 } from "../../protocol/modelPreview";
+import { groupsSwitchedBy, inGroup } from "./effectGroups";
+import { isCloak } from "./cloakWrites";
 
 /** One row in the Gameplay dock's Abilities section. */
 export interface AbilityRow {
@@ -106,94 +108,6 @@ export function abilityProxies(
 }
 
 /**
- * Whether an ability lets this proxy draw right now.
- *
- * A DECIDER layered over the ordinary effect rules, not a replacement for them: a particle no
- * ability claims is left entirely alone, or activating one ability would silence the whole model.
- * A proxy two abilities claim plays as soon as either is active.
- */
-export function abilityAllows(
-    particleId: string,
-    proxies: ReadonlyMap<string, string[]>,
-    active: ReadonlySet<string>,
-): boolean {
-    let claimed = false;
-
-    for (const [type, ids] of proxies) {
-        if (!ids.includes(particleId)) {
-            continue;
-        }
-
-        if (active.has(type)) {
-            return true;
-        }
-
-        claimed = true;
-    }
-
-    return !claimed;
-}
-
-/**
- * Whether ANY ability claims this proxy.
- *
- * The caller needs this because an ability does not merely gate its proxy - it REPLACES the
- * quiet-on-open rule for it. Those opening rules hold every non-engine effect back, correctly, but
- * they are about the first moment rather than a permanent veto; ANDing them with the ability left
- * an activated ability changing nothing at all. Found on the live AT-AA, where MISSILE_SHIELD's
- * `prs_at-aa_fx` stayed dark however many times its row was ticked.
- *
- * The damage rules still apply on top - a proxy gated to a destroyed hardpoint does not come back just
- * because an ability is on.
- */
-export function abilityClaims(
-    particleId: string,
-    proxies: ReadonlyMap<string, string[]>,
-): boolean {
-    for (const ids of proxies.values()) {
-        if (ids.includes(particleId)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/**
- * Effects the unit can never show, because it does not declare the ability their name claims.
- *
- * The game hides these; it simply never has anything to switch them on. We drew them, and on an
- * engine-named proxy the quiet-on-open rule lets an effect play from the first frame - so
- * `Tartan_Patrol_Cruiser` opened with its TURBO engines burning for a TURBO it does not declare.
- *
- * This is a VETO, not a default: no state, no reader tick and no ability can turn one of these on.
- * That makes it the one rule in the chain that comes first. Contrast {@link abilityAllows}, which
- * is about a bound effect waiting for its ability - a different question with a different answer.
- *
- * Rare by design: 39 proxies over both shipped trees carry a prefix at all, against 5404 that do
- * not, and a proxy claiming nothing is never unbound.
- */
-export function unboundEffectIds(
-    abilities: readonly PreviewAbility[],
-    particles: readonly PreviewParticle[],
-): Set<string> {
-    // Case-insensitive both ways: `Ev_acclamator` writes `power_to_weapons` in lower case, and the
-    // proxy names are written both ways too - `pptw_2mtank` beside `PTE_Corvetteengines`.
-    const declared = new Set(abilities.map((a) => a.type.trim().toUpperCase()));
-    const unbound = new Set<string>();
-
-    for (const particle of particles) {
-        const claim = particle.claimsAbility?.trim().toUpperCase();
-
-        if (claim !== undefined && claim !== "" && !declared.has(claim)) {
-            unbound.add(particle.id);
-        }
-    }
-
-    return unbound;
-}
-
-/**
  * Ability types that reveal the model's SHIELD MESH.
  *
  * A table rather than a name test, deliberately: `MISSILE_SHIELD` and `SHIELD_FLARE` carry the word
@@ -212,39 +126,15 @@ export function revealsShield(abilityType: string): boolean {
 }
 
 /**
- * Ability types that CLOAK the unit: the stealth shell is drawn and nothing else is.
+ * Whether this ability type CLOAKS the unit - what it hides and shows is `cloakWrites.ts`'s.
  *
  * A table rather than a name test, and the two members do not share a word - which is the whole
  * argument for the table. `TIE_Phantom`, `Vengeance_Frigate`, `Tyber_Zann` and `Urai_Fen` declare
  * STEALTH; `Luke_Skywalker_Jedi` declares FORCE_CLOAK and carries the same `stealth` mesh. Reading
  * the mesh's own name for the ability would have left Luke's shell dead.
- *
- * Unlike the shield, the shell ships VISIBLE - every one of the nine does - so a model with one was
- * drawing its cloak over its hull from the first frame, permanently, which is what the reader saw
- * on the Vengeance. See {@link isStealthMesh}.
  */
-const STEALTH_ABILITIES = new Set(["STEALTH", "FORCE_CLOAK"]);
-
-/** Whether this ability type cloaks the unit. */
 export function revealsStealth(abilityType: string): boolean {
-    return STEALTH_ABILITIES.has(abilityType.trim().toUpperCase());
-}
-
-/**
- * Whether the unit is cloaked right now, and so drawing nothing but its stealth shell.
- *
- * False is the permanent answer for a unit that declares no cloak at all, which is what keeps the
- * shell off `Tyber_Zann_Prisoner` - he uses Tyber's model and declares no abilities - and off
- * `W_mousedroid`, a prop no unit declares anything for.
- */
-export function stealthed(active: ReadonlySet<string>): boolean {
-    for (const type of active) {
-        if (revealsStealth(type)) {
-            return true;
-        }
-    }
-
-    return false;
+    return isCloak(abilityType);
 }
 
 /** Whether any active ability is currently holding the shield mesh visible. */
@@ -261,11 +151,11 @@ export function shieldRevealed(active: ReadonlySet<string>): boolean {
 /**
  * The rows one ability speaks for.
  *
- * Every channel an ability drives enters the visibility chain at the BOTTOM of it, as the model's
- * own word: a proxy's `gateVisible` and the shield and shell meshes' `inFile` are all read by the
- * `file` link. The reader sits four links above that. So a single tick on one of these rows outranks
- * the ability permanently - the switch still fires, the chain still ignores it, and there is no way
- * back short of resetting the whole model. That is the defect this exists to fix.
+ * Every channel an ability drives is a write of the part's STATE switch: a proxy's state and the
+ * shield and shell meshes' state. The reader's own word sits above every switch. So a single tick on
+ * one of these rows outranks the ability permanently - the switch still fires, the chain still
+ * ignores it, and there is no way back short of resetting the whole model. That is the defect this
+ * exists to fix.
  *
  * The answer is the same one a clip already gets: switching an ability TAKES ITS OWN ROWS BACK, the
  * way starting a clip takes the whole model back (`clearedForPlayback`). A clip may be global
@@ -273,23 +163,32 @@ export function shieldRevealed(active: ReadonlySet<string>): boolean {
  * rows and the reader's word on everything else still stands.
  */
 export interface AbilityOwnership {
-    /** The particle systems this ability drives. */
+    /** The particle systems this ability switches: every effect in the name groups it writes. */
     systemIds: readonly string[];
     /** Whether it speaks for the model's shield mesh. */
     shieldMesh: boolean;
-    /** Whether it speaks for the model's stealth shell. */
-    stealthShell: boolean;
+    /**
+     * The cloak it is, or null: a cloak speaks for every part it writes - its BASEMESH and STEALTH
+     * parts and the attached models, see `cloakWrites.ts`.
+     */
+    cloak: string | null;
 }
 
 /** What switching one ability takes back from the reader. */
 export function abilityOwnership(
     type: string,
-    proxies: ReadonlyMap<string, string[]>,
+    particles: readonly PreviewParticle[],
 ): AbilityOwnership {
+    const groups = groupsSwitchedBy(type);
+
     return {
-        systemIds: proxies.get(type) ?? [],
+        systemIds: particles
+            .filter((particle) =>
+                groups.some((group) => inGroup(particle.systemRef, group)),
+            )
+            .map((particle) => particle.id),
         shieldMesh: revealsShield(type),
-        stealthShell: revealsStealth(type),
+        cloak: revealsStealth(type) ? type : null,
     };
 }
 
@@ -403,12 +302,11 @@ function detailOf(
         parts.push(l10n.t("shows the shield mesh"));
     }
 
-    // ONLY, because that is the whole of what a cloak draws - the hull, the effects and the
-    // shadow volumes all go with it. Said on the row because the ability declares nothing else:
-    // `TIE_Phantom`'s STEALTH is a type and an icon, so without this the row read
-    // "no effects, bones or clips declared" beside a key that cloaks the ship.
+    // Said on the row because the ability declares nothing else: `TIE_Phantom`'s STEALTH is a type
+    // and an icon, so without this the row read "no effects, bones or clips declared" beside a key
+    // that cloaks the ship.
     if (revealsStealth(ability.type)) {
-        parts.push(l10n.t("shows the stealth mesh only"));
+        parts.push(l10n.t("hides the base mesh, shows the stealth mesh"));
     }
 
     if (deployClip !== null) {
