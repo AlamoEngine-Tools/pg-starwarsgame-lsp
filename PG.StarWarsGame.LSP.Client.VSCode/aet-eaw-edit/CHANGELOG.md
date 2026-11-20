@@ -30,6 +30,11 @@
   `CrossTag36` (`aetswg-007-0036`) lists the visible parts and effects whose names say neither, which stay
   drawn while the unit is cloaked
   ([#449](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/449))
+- **A player for particle files** - a particle file's dock foot holds play, pause, stop and restart
+  for its systems and a speed slider, where a unit has its animation player. Stop lets the particles
+  already in the air finish their lives; play after a stop starts from the top. The Skeleton control
+  is disabled, with its reason, for a subject without bones
+  ([#289](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/289))
 
 ### Fixes
 

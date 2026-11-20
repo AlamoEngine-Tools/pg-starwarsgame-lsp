@@ -1,28 +1,40 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The dock foot: what the other lenses are up to, the skeleton control in Model, and the player in
-// Animation.
+// The dock foot: what the other lenses are up to, the skeleton control in Model, the player in
+// Animation, and a particle file's own player.
 
 import type { AnimationTransport } from "../useAnimationTransport";
+import type { ParticleTransport } from "../particleTransport";
 import type { Dispatch, SetStateAction, RefObject } from "react";
 import type { CombatLens } from "../useCombatLens";
 import type { Abilities } from "../useAbilities";
 import * as l10n from "@vscode/l10n";
-import { type PreviewScene } from "../../../protocol/modelPreview";
+import {
+    PREVIEW_SCENE_KIND,
+    type PreviewScene,
+} from "../../../protocol/modelPreview";
 import { Button } from "../../shared/Button";
 import { PlaybackSection } from "./PlaybackSection";
+import { ParticlePlaybackSection } from "./ParticlePlaybackSection";
 import { type PreviewViewport } from "../viewport";
 import { otherModeChips, type PreviewMode } from "../previewMode";
 import { ModeSelector } from "../../shared/ModeSelector";
 
 export interface DockFootProps {
     abilityState: Abilities;
+    /** The subject's bones - what the skeleton control draws. */
+    boneCount: number;
     combat: CombatLens;
     mode: PreviewMode;
+    /** Whether a particle file's system has arrived for its player to drive. */
+    particleReady: boolean;
+    particleSpeed: number;
+    particleTransport: ParticleTransport;
     player: AnimationTransport;
     scene: PreviewScene | null;
     setMode: Dispatch<SetStateAction<PreviewMode>>;
+    setParticleSpeed: (speed: number) => void;
     setSkeletonMode: (next: "off" | "selected" | "always") => void;
     skeletonMode: "selected" | "off" | "always";
     viewportRef: RefObject<PreviewViewport | null>;
@@ -30,11 +42,16 @@ export interface DockFootProps {
 
 export function DockFoot({
     abilityState,
+    boneCount,
     combat,
     mode,
+    particleReady,
+    particleSpeed,
+    particleTransport,
     player,
     scene,
     setMode,
+    setParticleSpeed,
     setSkeletonMode,
     skeletonMode,
     viewportRef,
@@ -76,6 +93,11 @@ export function DockFoot({
                     <ModeSelector
                         label={l10n.t("How the skeleton is drawn")}
                         value={skeletonMode}
+                        // Disabled rather than removed, and on the BONES rather than on the scene
+                        // kind: a particle file has none (measured - no particle .alo in eaw or foc
+                        // carries a skeleton), and a model without any gets the same answer.
+                        disabled={boneCount === 0}
+                        disabledReason={l10n.t("No skeleton loaded")}
                         options={[
                             {
                                 id: "off",
@@ -111,6 +133,20 @@ export function DockFoot({
                             does, which is what a lens is for. */}
             {mode === "animation" && player.animations.length > 0 && (
                 <PlaybackSection player={player} viewportRef={viewportRef} />
+            )}
+
+            {/* A particle file's player, in the animation player's place. Shown for the whole of
+                            the file's life, disabled until its system arrives, so nothing moves under
+                            the reader when it does. An assembled unit's effects get none: its foot
+                            already holds the animation player, and one dock with two transports
+                            would leave the reader asking which one plays what. */}
+            {scene?.kind === PREVIEW_SCENE_KIND.particle && (
+                <ParticlePlaybackSection
+                    transport={particleTransport}
+                    ready={particleReady}
+                    speed={particleSpeed}
+                    setSpeed={setParticleSpeed}
+                />
             )}
         </>
     );

@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import * as THREE from "three";
 
 import { emitter, properties, testSystem } from "./particleFixture";
+import { PLAIN_LOOK } from "./cloakFade";
 import { ParticleRig } from "./particleRig";
 import { standInContext } from "./viewportContext.testing";
 import { TextureStore } from "./textureStore";
@@ -39,6 +40,8 @@ function rigWith(): { particles: ParticleRig; modelRoot: THREE.Group } {
             translatedShaders: false,
         },
         rows: { refreshRows: () => undefined },
+        // Every system here is the scene's own, drawn as it is.
+        animation: { lookOf: () => PLAIN_LOOK },
     });
     return { particles: new ParticleRig(context), modelRoot };
 }
@@ -46,6 +49,29 @@ function rigWith(): { particles: ParticleRig; modelRoot: THREE.Group } {
 const systemsUnder = (root: THREE.Object3D): number =>
     root.children.filter((child) => child.userData.aetParticleSystem === true)
         .length;
+
+/** A continuous emitter whose particles live half a second, so a stopped one drains in a few frames. */
+const fire = (): ReturnType<typeof testSystem> =>
+    testSystem([
+        emitter({
+            name: "Fire",
+            properties: properties({ particlesPerSecond: 30, lifetime: 0.5 }),
+        }),
+    ]);
+
+/** The particles in the air for one system. */
+const liveOf = (particles: ParticleRig, id: string): number =>
+    particles.particleSystems.get(id)!.instance.emitterParticles(0).length;
+
+/** Runs the rig `frames` steps on at 30 Hz, and returns the live count after each. */
+function run(particles: ParticleRig, id: string, frames: number): number[] {
+    const counts: number[] = [];
+    for (let at = 0; at < frames; at++) {
+        particles.step(1 / 30, new THREE.Matrix4());
+        counts.push(liveOf(particles, id));
+    }
+    return counts;
+}
 
 /** Hangs a triangle on `root` and counts how often its vertices are read. */
 function countedGeometryOn(root: THREE.Object3D): { reads: () => number } {
@@ -166,6 +192,71 @@ describe("ParticleRig", () => {
         assert.doesNotThrow(() => particles.step(1 / 30, new THREE.Matrix4()));
         assert.deepEqual(particles.particleSystemIds(), ["fx"]);
     });
+
+    // #289: Stop holds every emitter and lets what is already in the air finish its life.
+    it("stops every system spawning, and lets the particles in the air finish", () => {
+        const { particles } = rigWith();
+        particles.addParticleSystem("fx", fire(), { origin: "model" });
+        run(particles, "fx", 15);
+        const before = liveOf(particles, "fx");
+        assert.ok(before > 0, "nothing spawned to begin with");
+
+        particles.stopParticles();
+        const after = run(particles, "fx", 30);
+
+        // Not cut: a frame on, all but the ones whose lives ran out are still in the air.
+        assert.ok(after[0] >= before - 2, "the stop cut particles short");
+        for (let at = 1; at < after.length; at++) {
+            assert.ok(
+                after[at] <= after[at - 1],
+                `a particle was born at ${at}`,
+            );
+        }
+        assert.equal(after[after.length - 1], 0);
+        // Held, not removed: the system stays addressable for a restart.
+        assert.deepEqual(particles.particleSystemIds(), ["fx"]);
+        assert.ok(
+            particles.particleSystems
+                .get("fx")!
+                .instance.heldBy.includes("stopped"),
+        );
+    });
+
+    it("holds a system that arrives while stopped", () => {
+        const { particles } = rigWith();
+        particles.stopParticles();
+
+        particles.addParticleSystem("fx", fire(), { origin: "model" });
+
+        assert.equal(Math.max(...run(particles, "fx", 15)), 0);
+    });
+
+    it("plays a stopped system again from nothing on restart", () => {
+        const { particles } = rigWith();
+        particles.addParticleSystem("fx", fire(), { origin: "model" });
+        run(particles, "fx", 15);
+        particles.stopParticles();
+        run(particles, "fx", 30);
+
+        particles.restartParticles();
+
+        assert.ok(
+            liveOf(particles, "fx") === 0,
+            "the restart kept old particles",
+        );
+        assert.ok(Math.max(...run(particles, "fx", 5)) > 0);
+    });
+
+    it("forgets the stop with the scene", () => {
+        const { particles } = rigWith();
+        particles.stopParticles();
+        particles.forgetSystems();
+
+        particles.addParticleSystem("fx", fire(), { origin: "model" });
+
+        assert.ok(Math.max(...run(particles, "fx", 5)) > 0);
+    });
+
     it("keeps its own record of the textures that will never arrive", () => {
         // The marker is decoded through the DOM; here the decode never settles, so nothing is drawn
         // and nothing rejects. What is under test is that the viewport is not asked for a set.

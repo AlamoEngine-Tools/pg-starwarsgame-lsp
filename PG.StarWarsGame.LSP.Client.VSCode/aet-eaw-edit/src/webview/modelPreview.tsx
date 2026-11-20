@@ -69,6 +69,7 @@ import { useParticleEffects } from "./preview/useParticleEffects";
 import { useModelTree } from "./preview/useModelTree";
 import { useAbilities } from "./preview/useAbilities";
 import { useAnimationTransport } from "./preview/useAnimationTransport";
+import { useParticleTransport } from "./preview/useParticleTransport";
 import { useCombatLens } from "./preview/useCombatLens";
 import { WRECK_EFFECT } from "./preview/partIds";
 import { ancestorsOf } from "./preview/skeleton";
@@ -437,8 +438,10 @@ function ModelPreview(): React.JSX.Element {
         hardpointSearchPressed,
     } = flyouts;
 
-    // Nothing sets this yet: #289 adds the particle transport that pauses them.
-    const [particlesPaused] = useState(false);
+    // A particle file's player. Every scene that arrives starts it playing again, a refresh too: the
+    // viewport rebuilds its systems from nothing for each one.
+    const particleTransport = useParticleTransport(viewportRef, scene);
+    const particlesPaused = particleTransport.run === "paused";
     /** Emitter names in file order. Names repeat, so the index is the identity, not the name. */
     const [emitters, setEmitters] = useState<string[]>([]);
     const [hiddenEmitters, setHiddenEmitters] = useState<ReadonlySet<number>>(
@@ -1592,11 +1595,16 @@ function ModelPreview(): React.JSX.Element {
                     overview={
                         <DockFoot
                             abilityState={abilityState}
+                            boneCount={stats?.bones ?? 0}
                             combat={combat}
                             mode={mode}
+                            particleReady={emitters.length > 0}
+                            particleSpeed={particleSpeed}
+                            particleTransport={particleTransport}
                             player={player}
                             scene={scene}
                             setMode={setMode}
+                            setParticleSpeed={room.setParticleSpeed}
                             setSkeletonMode={setSkeletonMode}
                             skeletonMode={skeletonMode}
                             viewportRef={viewportRef}

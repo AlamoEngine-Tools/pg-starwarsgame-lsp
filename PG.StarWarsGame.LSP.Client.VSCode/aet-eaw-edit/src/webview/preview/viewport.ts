@@ -1060,6 +1060,11 @@ export class PreviewViewport {
         this.particles.restartParticles();
     }
 
+    /** Stops every system emitting and lets the air clear. See `ParticleRig.stopParticles`. */
+    stopParticles(): void {
+        this.particles.stopParticles();
+    }
+
     /** The hull's bones, flattened. See `ModelQueries.skeleton`. */
     skeleton(): FlatBone[] {
         return this.queries.skeleton();

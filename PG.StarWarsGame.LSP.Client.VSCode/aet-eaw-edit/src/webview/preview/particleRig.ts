@@ -66,6 +66,11 @@ export class ParticleRig {
     private readonly missingTextures = new Set<string>();
     particlesVisible = true;
     private particlesPaused = false;
+    /**
+     * Whether the reader has pressed Stop. Held here as well as on each instance, so a system that
+     * arrives while stopped is held from birth; a restart and a new scene lift it.
+     */
+    private particlesStopped = false;
     /** One-shot systems - death explosions - removed once they burn out. */
     private readonly transient = new Set<string>();
     /**
@@ -110,6 +115,7 @@ export class ParticleRig {
         this.clearFadingParticles();
         this.transient.clear();
         this.preparations.clear();
+        this.particlesStopped = false;
     }
 
     /**
@@ -504,6 +510,22 @@ export class ParticleRig {
         this.particlesPaused = paused;
     }
 
+    /**
+     * Stops every system emitting, and lets the particles already in the air finish their lives.
+     *
+     * Through the hold gate rather than by removing the systems: they stay addressable, the dock's
+     * emitter rows go on reading them, and {@link restartParticles} rebuilds them from nothing.
+     * Only spawning stops - a stopped emitter's clock is held with it - so nothing new is born while
+     * the trail dies out.
+     */
+    stopParticles(): void {
+        this.particlesStopped = true;
+
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.hold("stopped", true);
+        }
+    }
+
     /** Multiplier on particle time. 1 is real time. */
     setParticleSpeed(speed: number): void {
         this.particleSpeed = Math.max(0, speed);
@@ -514,8 +536,13 @@ export class ParticleRig {
      *
      * Rebuilt rather than rewound: a burst emitter's whole point is the first half second, and there
      * is no way back to it from the middle of a run short of discarding the state.
+     *
+     * Lifts a Stop: the rebuilt instances carry no hold of their own, and this is what Play after
+     * Stop means.
      */
     restartParticles(): void {
+        this.particlesStopped = false;
+
         // The other override: every system is being rebuilt from scratch, and a fading one has no
         // rebuilt twin to belong to.
         this.clearFadingParticles();
@@ -721,6 +748,10 @@ export class ParticleRig {
         );
         instance.attachTo(attachment);
         instance.setVisible(this.particlesVisible);
+        // Born held while the reader has the transport stopped. Not on a restart, which lifted it.
+        if (this.particlesStopped) {
+            instance.hold("stopped", true);
+        }
         // Built after its effects came back, as a hardpoint's blast is: it takes what is in hand.
         instance.applyEffects(
             this.context.materials.translated,
