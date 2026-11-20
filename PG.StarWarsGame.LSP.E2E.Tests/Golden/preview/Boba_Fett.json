@@ -377,6 +377,7 @@
   "DeathPersistenceOverride": 30,
   "Stealth": null,
   "ForceCloak": null,
+  "DamagedSmokeAsset": null,
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [

@@ -710,6 +710,11 @@ export interface PreviewScene {
      */
     forceCloak?: PreviewCloak | null;
     /**
+     * The type's `Damaged_Smoke_Asset_Name`, or absent where it names none: the effect a hit that takes
+     * the hull to or below 75 % or 50 % adds on the root bone - see `DamageSmoke`.
+     */
+    damagedSmokeAsset?: string | null;
+    /**
      * GameConstants' `Override_Death_Persistence_Duration`, or absent where it is not written: how
      * long an infantry unit's clone stays in place of its own persistence - see `deathEndingOf`.
      */

@@ -247,7 +247,11 @@ public sealed record PreviewScene(
     PreviewCloak? Stealth = null,
     // The look of the type's Force_Cloak_Ability - Force_Cloak_Color, Force_Cloak_Transition_In_Secs -
     // or null where its Abilities list has none.
-    PreviewCloak? ForceCloak = null)
+    PreviewCloak? ForceCloak = null,
+    // The type's Damaged_Smoke_Asset_Name, or null where it names none. Measured in the game: each time
+    // a hit takes the hull to or below 75 % or 50 % of its maximum and the unit lives, this effect is
+    // added on the model's root bone, from the game's model folder.
+    string? DamagedSmokeAsset = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

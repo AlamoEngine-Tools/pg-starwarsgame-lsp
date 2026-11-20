@@ -801,6 +801,7 @@ function ModelPreview(): React.JSX.Element {
         effectDrawsNow,
         queuePassiveEffects,
         dropPassiveEffects,
+        cancelEffect,
         attachPending,
         playEffect,
     } = particles;
@@ -1032,6 +1033,7 @@ function ModelPreview(): React.JSX.Element {
         breakoffsRef,
         destroyedRef,
         dropPassiveEffects,
+        cancelEffect,
         effectDrawsNow,
         fireArcs,
         mode,

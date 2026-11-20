@@ -33,6 +33,7 @@ import {
     withDestroyed,
 } from "./damage";
 import { stageForHull } from "./levels";
+import { DamageSmoke } from "./damageSmoke";
 import { hardpointCards, unitWeapons } from "./hardpointCards";
 import { type PreviewMode } from "./previewMode";
 import { allWeaponIds, visibleArcs, weaponRows } from "./weaponRows";
@@ -88,6 +89,8 @@ export interface CombatLensInputs {
     /** Written here at every render; made by the caller, whose effect callbacks read it first. */
     destroyedRef: RefObject<ReadonlySet<string>>;
     dropPassiveEffects: (partId: string) => void;
+    /** Takes one gameplay effect away, burning or still on its way. */
+    cancelEffect: (id: string) => void;
     effectDrawsNow: (particle: PreviewParticle) => boolean;
     fireArcs: boolean;
     mode: PreviewMode;
@@ -98,6 +101,7 @@ export interface CombatLensInputs {
         bone: string | undefined,
         once: boolean,
         at?: { x: number; y: number; z: number },
+        boneIndex?: number,
     ) => void;
     playhead: { time: number; duration: number; running: boolean };
     scene: PreviewScene | null;
@@ -116,6 +120,7 @@ export function useCombatLens({
     breakoffsRef,
     destroyedRef,
     dropPassiveEffects,
+    cancelEffect,
     effectDrawsNow,
     fireArcs,
     mode,
@@ -683,6 +688,47 @@ export function useCombatLens({
     const hardpointHealthPool = healthNow.hardpoints;
 
     /**
+     * The type's damage smoke, added the way the game adds it - see `damageSmoke.ts`.
+     *
+     * Read off the hull pool the shots deplete, before the leash: the game adds the smoke on the
+     * direct-damage path only, and a correction between the pools is not a hit. One follower per
+     * scene, so a new subject starts from its own full hull.
+     */
+    const smokeRef = useRef<{
+        scene: PreviewScene;
+        smoke: DamageSmoke;
+    } | null>(null);
+
+    useEffect(() => {
+        if (scene === null) {
+            return;
+        }
+
+        if (smokeRef.current?.scene !== scene) {
+            smokeRef.current = {
+                scene,
+                smoke: new DamageSmoke(scene.damagedSmokeAsset),
+            };
+        }
+
+        const pool = hullPool(scene.defence, livePools?.hull);
+        const id = smokeRef.current.smoke.observe(pool.current, pool.max);
+
+        if (id !== null) {
+            // On the hull's ROOT bone, which the game names by position rather than by name.
+            playEffect(
+                id,
+                scene.damagedSmokeAsset ?? "",
+                "hull",
+                undefined,
+                false,
+                undefined,
+                0,
+            );
+        }
+    }, [scene, livePools?.hull, playEffect]);
+
+    /**
      * Whether the HULL is choosing the damage stage rather than the reader.
      *
      * Only when there is a table to choose with: an object that declares none keeps the manual
@@ -758,6 +804,13 @@ export function useCombatLens({
         }
 
         setUnitDead(true);
+
+        // Measured in the game: the dying object is destroyed, and whatever stands in its place is a
+        // NEW object made from its type - so every damage smoke a hit added goes with it, and a revive
+        // starts clean.
+        for (const id of smokeRef.current?.smoke.drop() ?? []) {
+            cancelEffect(id);
+        }
 
         // What the SHIP itself sets off. Its own `Death_Explosions`, which is a third thing from a
         // hardpoint's and a breakoff prop's - it goes off where the ship was, so it attaches to the
@@ -853,6 +906,7 @@ export function useCombatLens({
         attacker.damageType,
         playEffect,
         restoreFromDeath,
+        cancelEffect,
     ]);
 
     /**

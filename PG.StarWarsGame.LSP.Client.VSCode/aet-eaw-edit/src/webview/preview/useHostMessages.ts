@@ -73,6 +73,7 @@ export interface HostMessagesInputs {
         bone: string | undefined,
         once: boolean,
         at?: { x: number; y: number; z: number },
+        boneIndex?: number,
     ) => void;
     queuePassiveEffects: (
         particles: readonly PreviewParticle[],
@@ -699,6 +700,7 @@ export function useHostMessages({
                                     origin: "gameplay",
                                     attachToPartId: pending.partId,
                                     attachBone: pending.bone,
+                                    attachBoneIndex: pending.boneIndex,
                                     scaleFactor: scale,
                                     at: pending.at,
                                 });

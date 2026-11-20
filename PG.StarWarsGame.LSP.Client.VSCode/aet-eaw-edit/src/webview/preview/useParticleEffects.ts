@@ -34,6 +34,8 @@ export interface PendingEffect {
     once: boolean;
     /** Where to put it when it belongs to no part. See `ParticlePlacement.at`. */
     at?: { x: number; y: number; z: number };
+    /** The bone it rides, by index, where that is what the game names. See `ParticlePlacement.attachBoneIndex`. */
+    boneIndex?: number;
 }
 
 /** What useParticleEffects reads from the rest of the preview. */
@@ -193,6 +195,17 @@ export function useParticleEffects({
         );
     }, []);
 
+    /**
+     * Takes one gameplay effect away, whether it is burning or still waiting for its system to
+     * arrive - an effect asked for a moment before its owner went must not start after it.
+     */
+    const cancelEffect = useCallback((id: string): void => {
+        explosionsRef.current = explosionsRef.current.filter(
+            (pending) => pending.id !== id,
+        );
+        viewportRef.current?.removeParticleSystem(id, true);
+    }, []);
+
     /** Attaches every pending particle whose system and part have both arrived. */
     const attachPending = useCallback((): void => {
         const viewport = viewportRef.current;
@@ -280,6 +293,8 @@ export function useParticleEffects({
              * blast - it goes off where the ship was - and wrong for a wreck that flew away first.
              */
             at?: { x: number; y: number; z: number },
+            /** The bone by index, for an effect the game adds on a bone it names by position - the root. */
+            boneIndex?: number,
         ): void => {
             if (name === "") {
                 return;
@@ -297,6 +312,7 @@ export function useParticleEffects({
                     bone,
                     once,
                     at,
+                    boneIndex,
                 });
                 post({ type: "requestParticleSystem", name });
                 return;
@@ -316,6 +332,7 @@ export function useParticleEffects({
                     origin: "gameplay",
                     attachToPartId: partId,
                     attachBone: bone,
+                    attachBoneIndex: boneIndex,
                     scaleFactor: scale,
                     at,
                 });
@@ -335,6 +352,7 @@ export function useParticleEffects({
         effectDrawsNow,
         queuePassiveEffects,
         dropPassiveEffects,
+        cancelEffect,
         attachPending,
         playEffect,
     };

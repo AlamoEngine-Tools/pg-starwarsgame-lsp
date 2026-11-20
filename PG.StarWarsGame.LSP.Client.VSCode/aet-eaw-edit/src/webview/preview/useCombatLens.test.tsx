@@ -36,6 +36,7 @@ function inputs(overrides: Partial<CombatLensInputs>): CombatLensInputs {
         breakoffsRef: { current: [] },
         destroyedRef: { current: new Set() },
         dropPassiveEffects: noop,
+        cancelEffect: noop,
         effectDrawsNow: () => true,
         fireArcs: false,
         mode: "model",

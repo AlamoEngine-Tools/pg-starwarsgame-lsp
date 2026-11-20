@@ -99,6 +99,11 @@
   and switched effects tagged `_LOD` by the detail level. The game does neither: the model file alone decides
   whether a collision mesh is drawn, and the detail level switches meshes only
   ([#450](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/450))
+- **Damage smoke at 75 % and 50 % hull** - a hit that takes the unit's hull to or below 75 % or 50 % now
+  adds its `Damaged_Smoke_Asset_Name` on the root bone, as in the game: one smoke per hit, even through
+  both lines, none for the killing hit, none taken away by a repair. The smokes go with the unit when it
+  dies
+  ([#451](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/451))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

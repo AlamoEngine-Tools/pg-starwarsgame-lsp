@@ -50,6 +50,25 @@ public sealed class PreviewSceneBuilderTest
     }
 
     /// <summary>
+    ///     Measured in the game: a hit that takes the hull to or below 75 % or 50 % adds the type's
+    ///     <c>Damaged_Smoke_Asset_Name</c> on the root bone. The client decides when; the scene carries
+    ///     the asset, null where the type names none (#451).
+    /// </summary>
+    [Fact]
+    public void BuildForObject_CarriesTheDamagedSmokeAsset()
+    {
+        var index = Index([Sym("Speeder", "GameObjectType"), Sym("Ship", "GameObjectType")]);
+        var tags = new FakeVariantTagSource()
+            .With("Speeder", Tag("Space_Model_Name", "hull.alo"),
+                Tag("Damaged_Smoke_Asset_Name", " P_Smoke_Small02.alo "))
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Equal("P_Smoke_Small02.alo",
+            Builder(index, tags, "hull.alo").BuildForObject("Speeder").DamagedSmokeAsset);
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").DamagedSmokeAsset);
+    }
+
+    /// <summary>
     ///     A cloak fades and tints its unit towards its type's colour over its transition time - read
     ///     off the <c>Stealth_Ability</c> and <c>Force_Cloak_Ability</c> in the type's
     ///     <c>Abilities</c> list, as FoC writes them.
