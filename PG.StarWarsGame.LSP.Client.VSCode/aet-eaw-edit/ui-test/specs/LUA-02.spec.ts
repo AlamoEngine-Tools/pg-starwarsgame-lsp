@@ -1,5 +1,5 @@
 // LUA-02: aet-eaw-edit.lua.analyzerPath runs another analyzer and restarts the server; a missing one is an error
-// and starts no server; clearing it starts the bundled one again.
+// and stops nothing - the running server stays up (#395); clearing it restarts on the bundled one.
 import fs from "node:fs";
 import path from "node:path";
 import { browser, expect } from "@wdio/globals";
@@ -46,12 +46,15 @@ describe("LUA-02", () => {
     });
 
     it("refuses a missing analyzer and starts again once cleared", async () => {
+        const starts = serverStarts();
         await setSettings({ [KEY]: "C:\\nope\\emmylua_ls.exe" });
         await notification(
             (m) =>
                 m ===
                 'EaWEdit: Lua analyzer not found - C:\\nope\\emmylua_ls.exe. Fix "aet-eaw-edit.lua.analyzerPath", or clear it to use the bundled one',
         );
+        expect(serverStarts()).toBe(starts);
+        await hoverWhen(interdictor, { line: 112, text: "FindDeadlyEnemy" }, (c) => c.join("\n").includes("---"));
         await restartsOn("");
         await serverReady();
     });

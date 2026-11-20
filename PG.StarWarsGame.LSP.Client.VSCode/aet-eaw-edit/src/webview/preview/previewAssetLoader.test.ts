@@ -21,6 +21,7 @@ interface Recorded {
     ledgerChanges: number;
     shaderRequested: number;
     sourceFound: number;
+    sourcesForgotten: number;
     coverage: { translated: number; total: number }[];
 }
 
@@ -38,6 +39,7 @@ function harness(options?: {
         ledgerChanges: 0,
         shaderRequested: 0,
         sourceFound: 0,
+        sourcesForgotten: 0,
         coverage: [],
     };
 
@@ -52,6 +54,7 @@ function harness(options?: {
         setParticleTextureMissing: (name) =>
             seen.calls.push(`particle texture missing ${name}`),
         releaseTexturesExcept: () => seen.calls.push("release"),
+        forgetTranslatedEffects: () => seen.calls.push("forget effects"),
     };
 
     const events: AssetLoaderEvents = {
@@ -59,6 +62,7 @@ function harness(options?: {
         ledgersChanged: () => seen.ledgerChanges++,
         shaderRequested: () => seen.shaderRequested++,
         shaderSourceFound: () => seen.sourceFound++,
+        shaderSourcesForgotten: () => seen.sourcesForgotten++,
         translated: (coverage) => seen.coverage.push(coverage),
         problem: (severity, message) =>
             seen.problems.push({ severity, message }),
@@ -404,6 +408,67 @@ describe("PreviewAssetLoader", () => {
 
             assert.equal(runs, 1);
             assert.deepEqual(seen.calls, []);
+        });
+    });
+
+    // #395: the shader folder changed and the server restarted on it. What came back from the old
+    // folder - an effect, a header, or the word that neither was there - no longer stands.
+    describe("a refetch of the effects", () => {
+        const effect = {} as TranslatedEffect;
+
+        it("asks again for an effect that was not there and translates it when it is", () => {
+            const { loader, seen } = harness({
+                translate: () => ({
+                    effect,
+                    refusal: null,
+                    missingIncludes: [],
+                }),
+            });
+            loader.requestShader("PrimAlpha.fx");
+            loader.receiveShader("PrimAlpha.fx", null);
+
+            loader.refetchShaders(["PrimAlpha.fx"]);
+
+            assert.deepEqual(seen.posted, [
+                { type: "requestShader", name: "PrimAlpha.fx" },
+                { type: "requestShader", name: "PrimAlpha.fx" },
+            ]);
+            assert.equal(loader.requested, 1);
+            assert.equal(loader.settled, 0);
+
+            loader.receiveShader("PrimAlpha.fx", "technique t {}");
+
+            assert.deepEqual(seen.calls, [
+                "forget effects",
+                "translated primalpha.fx",
+            ]);
+            assert.equal(seen.sourceFound, 1);
+            // The panel's "no sources are reachable" reading starts over, not from the old folder.
+            assert.equal(seen.sourcesForgotten, 1);
+        });
+
+        it("drops the translations and the headers from the old folder", () => {
+            let read: string | null = "unset";
+            const { loader, seen } = harness({
+                translate: (_source, readHeader) => {
+                    read = readHeader("common.fxh");
+                    return { effect, refusal: null, missingIncludes: [] };
+                },
+            });
+            loader.receiveShader("common.fxh", "float4 old;");
+            loader.receiveShader("MeshGloss.fx", "technique t {}");
+            assert.equal(read, "float4 old;");
+
+            loader.refetchShaders(["MeshGloss.fx"]);
+            loader.receiveShader("MeshGloss.fx", "technique t {}");
+
+            // Translated again, and against nothing from before: the header is asked for anew.
+            assert.equal(read, null);
+            assert.deepEqual(seen.calls, [
+                "translated meshgloss.fx",
+                "forget effects",
+                "translated meshgloss.fx",
+            ]);
         });
     });
 });

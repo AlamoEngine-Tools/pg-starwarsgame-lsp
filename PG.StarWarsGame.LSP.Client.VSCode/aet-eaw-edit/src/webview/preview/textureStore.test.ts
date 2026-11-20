@@ -116,12 +116,14 @@ function loaderOverAStore(): {
         releaseTexturesExcept: (keep) => {
             store.retain(keep);
         },
+        forgetTranslatedEffects: () => undefined,
     };
     const events: AssetLoaderEvents = {
         post: () => undefined,
         ledgersChanged: () => undefined,
         shaderRequested: () => undefined,
         shaderSourceFound: () => undefined,
+        shaderSourcesForgotten: () => undefined,
         translated: () => undefined,
         problem: () => undefined,
     };
@@ -230,6 +232,7 @@ describe("the textures a preview keeps", () => {
             releaseTexturesExcept: (keep) => {
                 store.retain(keep);
             },
+            forgetTranslatedEffects: () => undefined,
         };
         const loader = new PreviewAssetLoader(
             () => viewport,
@@ -238,6 +241,7 @@ describe("the textures a preview keeps", () => {
                 ledgersChanged: () => undefined,
                 shaderRequested: () => undefined,
                 shaderSourceFound: () => undefined,
+                shaderSourcesForgotten: () => undefined,
                 translated: () => undefined,
                 problem: () => undefined,
             },

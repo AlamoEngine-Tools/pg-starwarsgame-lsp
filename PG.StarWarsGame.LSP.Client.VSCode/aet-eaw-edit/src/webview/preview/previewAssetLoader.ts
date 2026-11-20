@@ -47,6 +47,8 @@ export interface AssetViewport {
     setParticleTextureMissing(name: string): void;
     /** Disposes every texture whose lower-cased name is not among `keep`. */
     releaseTexturesExcept(keep: ReadonlySet<string>): void;
+    /** Drops every translated effect and declared render state; the meshes go back to their archetypes. */
+    forgetTranslatedEffects(): void;
 }
 
 /** What the loader tells the panel. */
@@ -65,6 +67,8 @@ export interface AssetLoaderEvents {
     shaderRequested(): void;
     /** An `.fx` source was reachable at all. */
     shaderSourceFound(): void;
+    /** Every source fetched was forgotten, for a refetch: none is reachable until one comes back. */
+    shaderSourcesForgotten(): void;
     /** An effect was translated; how many sub-meshes now draw with their own shaders. */
     translated(coverage: { translated: number; total: number }): void;
     problem(severity: "warning" | "info", message: string): void;
@@ -203,6 +207,32 @@ export class PreviewAssetLoader {
         this.textures.clear();
         this.shaders.clear();
         this.asked.clear();
+    }
+
+    /**
+     * Forgets every effect and header fetched, and every answer that one was not there, then asks
+     * for these effects again.
+     *
+     * For a changed shader or game folder (#395): what the old folder answered no longer stands,
+     * and a translation made from it would go on drawing. Headers are asked for again as the
+     * effects that include them come back.
+     */
+    refetchShaders(names: readonly string[]): void {
+        this.sources.clear();
+        this.translatedNames.clear();
+        this.shaders.clear();
+        this.events.shaderSourcesForgotten();
+        this.events.ledgersChanged();
+
+        const viewport = this.viewport();
+        if (viewport !== null) {
+            viewport.forgetTranslatedEffects();
+            this.events.translated(viewport.translatedCoverage());
+        }
+
+        for (const name of names) {
+            this.requestShader(name);
+        }
     }
 
     /** An effect or header has come back, or come back empty. */

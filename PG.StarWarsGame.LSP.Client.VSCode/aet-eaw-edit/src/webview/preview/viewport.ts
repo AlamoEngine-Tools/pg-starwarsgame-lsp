@@ -452,6 +452,11 @@ export class PreviewViewport {
         this.materials.applyTranslatedEffect(shaderName, effect);
     }
 
+    /** Back to the archetypes until the effects come again. See `MaterialBinder.forgetTranslatedEffects`. */
+    forgetTranslatedEffects(): void {
+        this.materials.forgetTranslatedEffects();
+    }
+
     /** Whether to draw with translated shaders where one is available. */
     setTranslatedShaders(enabled: boolean): void {
         this.materials.setTranslatedShaders(enabled);

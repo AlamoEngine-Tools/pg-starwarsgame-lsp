@@ -217,6 +217,20 @@ export async function restartServer(): Promise<void> {
     await serverReady();
 }
 
+/**
+ * Changes settings the server reads only when it starts, and waits for the restart the change
+ * brings and for the server to be ready again (#395).
+ */
+export async function setStartupSettings(values: Record<string, unknown>): Promise<void> {
+    const before = serverStarts();
+    await setSettings(values);
+    await browser.waitUntil(async () => serverStarts() > before, {
+        timeout: 60_000,
+        timeoutMsg: `Changing ${Object.keys(values).join(", ")} did not restart the server`,
+    });
+    await serverReady();
+}
+
 /** The repository's vanilla EaW folder. */
 export const eaw = path.join(repo, "eaw");
 

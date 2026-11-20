@@ -61,6 +61,12 @@ import {
     gitHubIssue,
 } from "./diagnosticReport";
 import { offerShaderSources, shaderDirectory } from "./shaderSources";
+import {
+    previewAssetsChanged,
+    previewEffectsChanged,
+    restartReason,
+} from "./settingsRestart";
+import { RestartCoordinator } from "./restartCoordinator";
 import { initDialogGeometryStorage } from "./dialogGeometryStorage";
 import { initPanelLayoutStorage } from "./panelLayoutStorage";
 import { initViewerSettingsStorage } from "./viewerSettingsStorage";
@@ -2762,12 +2768,34 @@ export async function activate(
         }),
     );
 
-    const restartServer = async () => {
-        await stopAllClients();
-        if (validateConfiguration(context.extensionPath)) {
-            await reconcileClients(context);
-        }
-    };
+    // Every restart goes through one coordinator: a configuration change, the Restart command and
+    // a start with no server running. See restartCoordinator.ts for the two rules it keeps.
+    const restarts = new RestartCoordinator({
+        running: () => clients.size > 0,
+        validate: () => validateConfiguration(context.extensionPath),
+        stop: () => stopAllClients(),
+        start: () => reconcileClients(context),
+        log: logLine,
+        refresh: (effects, assets) => {
+            // The webviews hold what the old folders answered, a missing effect included; they
+            // ask again, and the gateway holds each request until the new server is ready.
+            if (effects) {
+                ModelPreviewPanel.refetchEffectsAll();
+            }
+
+            // Models and textures resolve through the game folders. A scene refresh sends
+            // nothing when the scene reads as before, and from one set game folder to another
+            // it does: SET-32 measured nothing asked for again. So every preview is refreshed
+            // as if its assets changed on disk, through the path that notification takes.
+            if (assets) {
+                for (const key of clients.keys()) {
+                    ModelPreviewPanel.refreshAll(key, true);
+                }
+            }
+        },
+    });
+
+    const restartServer = () => restarts.request({ causes: ["command"] });
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
@@ -2777,26 +2805,20 @@ export async function activate(
 
             logLine(`Configuration changed. Servers running=${clients.size}`);
 
-            if (
-                clients.size === 0 &&
-                validateConfiguration(context.extensionPath)
-            ) {
-                logLine("Starting LSP server after configuration change.");
-                await reconcileClients(context);
-            } else if (
-                clients.size > 0 &&
-                (e.affectsConfiguration("aet-eaw-edit.experimental") ||
-                    e.affectsConfiguration("aet-eaw-edit.lsp.executable") ||
-                    e.affectsConfiguration("aet-eaw-edit.lua.analyzerPath"))
-            ) {
-                // The experimental flags travel once via initializationOptions, and the two
-                // executables are picked when the process starts - restart to apply any of them.
-                logLine(
-                    "Experimental features or executables changed - restarting LSP server.",
-                );
-                await restartServer();
-            } else {
-                validateConfiguration(context.extensionPath);
+            const affects = (section: string) =>
+                e.affectsConfiguration(section);
+            const reason = restartReason(affects);
+
+            // What travels once via initializationOptions, and the two executables picked when
+            // the process starts, restart the servers - see settingsRestart.ts. With none running,
+            // any change may be the one that lets one start. Every setting the validation checks
+            // is among the restart settings, so any other change has nothing new to report.
+            if (reason !== null || clients.size === 0) {
+                await restarts.request({
+                    causes: reason === null ? ["start"] : [reason],
+                    effects: previewEffectsChanged(affects),
+                    assets: previewAssetsChanged(affects),
+                });
             }
         }),
     );

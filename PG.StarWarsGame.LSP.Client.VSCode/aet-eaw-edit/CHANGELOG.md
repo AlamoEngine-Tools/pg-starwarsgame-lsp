@@ -114,6 +114,14 @@
   in game. It used to be one note per emitter and per damage stage, worded as if the whole system were
   skipped
   ([#394](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/394))
+- **Shader and startup settings take effect when changed** - `Set Up Base Shader Sources` said "Base
+  shader sources found" for a mod's shader folder; it now looks for the base set and says when a folder
+  holds a mod's or the game's shaders. A changed shader folder, game folder, string table language,
+  schema or baseline source, or startup diagnostics sweep used to wait for a manual restart; it now
+  restarts the server, open previews reload their effects, and a changed game folder also reloads their
+  models and textures. A setting left incomplete keeps the running server, and changes in quick
+  succession restart it once
+  ([#395](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/395))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

@@ -206,6 +206,17 @@ export class MaterialBinder {
     }
 
     /**
+     * Drops every translated effect and declared render state, so each mesh and emitter draws with
+     * its archetype until the effects come back. For a changed shader folder (#395): a translation
+     * from the old folder must not outlive it.
+     */
+    forgetTranslatedEffects(): void {
+        this.translated.clear();
+        this.shaderStates.clear();
+        this.rebuildMaterials();
+    }
+
+    /**
      * How many loaded sub-meshes and emitters a translated effect actually reaches, out of how many
      * there are. The emitters count because a particle file has no sub-meshes at all.
      */

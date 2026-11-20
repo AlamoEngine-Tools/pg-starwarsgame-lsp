@@ -588,5 +588,11 @@
   },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "SET-32": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.shaders.directory": "C:\\temp\\aet-test-SET-shaders\\mod\\Data\\Art\\Shaders"
+    }
   }
 }

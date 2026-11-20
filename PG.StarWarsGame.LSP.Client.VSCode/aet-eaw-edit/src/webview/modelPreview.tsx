@@ -379,6 +379,7 @@ function ModelPreview(): React.JSX.Element {
                     })),
                 shaderRequested: () => setShaderRequested(true),
                 shaderSourceFound: () => setAnyShaderSource(true),
+                shaderSourcesForgotten: () => setAnyShaderSource(false),
                 translated: (coverage) => setTranslatedCount(coverage),
                 problem: (severity, message) =>
                     setProblems((current) =>

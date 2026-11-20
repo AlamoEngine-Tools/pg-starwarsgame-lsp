@@ -776,6 +776,13 @@ export function useHostMessages({
                         message.result.source ?? null,
                     );
                 },
+                refetchEffects: () => {
+                    // Every effect the loaded geometry and particle systems name; the headers
+                    // follow as those come back.
+                    assets.refetchShaders(
+                        viewportRef.current?.shaderNames() ?? [],
+                    );
+                },
                 texture: (message) => {
                     assets.receiveTexture(message.name, message);
                 },
