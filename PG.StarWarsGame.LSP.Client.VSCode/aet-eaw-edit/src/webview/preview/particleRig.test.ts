@@ -14,10 +14,17 @@ import { TextureStore } from "./textureStore";
 
 /**
  * A rig over a stand-in viewport: a model root to hang systems on, nothing translated, no part to
- * attach to. Every system lands on the model root, which is where an unattached one goes.
+ * attach to. Every system lands on the model root, which is where an unattached one goes - or, given
+ * `anchor`, on that node, as a system on a bone does.
  */
-function rigWith(): { particles: ParticleRig; modelRoot: THREE.Group } {
+function rigWith(anchor?: THREE.Object3D): {
+    particles: ParticleRig;
+    modelRoot: THREE.Group;
+} {
     const modelRoot = new THREE.Group();
+    if (anchor !== undefined) {
+        modelRoot.add(anchor);
+    }
     const context = standInContext({
         levels: { alt: 0, altDescending: false, lod: 0 },
         cameraRig: {
@@ -31,7 +38,7 @@ function rigWith(): { particles: ParticleRig; modelRoot: THREE.Group } {
         textures: new TextureStore(),
         assembly: {
             hiddenParts: new Set(),
-            attachmentFor: () => modelRoot,
+            attachmentFor: () => anchor ?? modelRoot,
             partRootOf: () => null,
         },
         materials: {
@@ -347,5 +354,108 @@ describe("ParticleRig", () => {
 
         restore();
         assert.equal(particles.particlesVisible, true);
+    });
+});
+
+/**
+ * #190, pinned: an effect keeps pace with the bone it is anchored on.
+ *
+ * The motion is the report's: the Slave 1 takeoff moves the whole ship by its `Root` bone, up to
+ * 9.3 units per game frame. The bone is moved BEFORE each step, as the animation mixer moves it
+ * before the particle pass, and the gaps are read in the simulation space (the model root).
+ */
+describe("ParticleRig on a bone in flight (#190)", () => {
+    /** Units per 30 Hz frame. */
+    const TRAVEL = 9.3;
+    const FRAMES = 45;
+
+    /** Per frame: the gap from the bone to the newest particle, and to the centroid of the live ones. */
+    function flight(
+        linkToSystem: boolean,
+    ): { newest: number; centroid: number; live: number }[] {
+        const bone = new THREE.Object3D();
+        const { particles } = rigWith(bone);
+        particles.addParticleSystem(
+            "engine",
+            testSystem([
+                emitter({
+                    name: "Engine",
+                    properties: properties({
+                        linkToSystem,
+                        particlesPerSecond: 30,
+                        lifetime: 1,
+                    }),
+                }),
+            ]),
+            { origin: "model" },
+        );
+        const instance = particles.particleSystems.get("engine")!.instance;
+
+        const frames: { newest: number; centroid: number; live: number }[] = [];
+        for (let at = 0; at < FRAMES; at++) {
+            bone.position.x += TRAVEL;
+            particles.step(1 / 30, new THREE.Matrix4());
+
+            const live = instance.emitterParticles(0);
+            if (live.length === 0) {
+                continue;
+            }
+            const gap = (p: { x: number; y: number; z: number }): number =>
+                Math.hypot(
+                    p.x - bone.position.x,
+                    p.y - bone.position.y,
+                    p.z - bone.position.z,
+                );
+            const newest = live.reduce((a, b) => (b.age < a.age ? b : a));
+            const sum = live.reduce(
+                (s, p) => ({
+                    x: s.x + p.position.x,
+                    y: s.y + p.position.y,
+                    z: s.z + p.position.z,
+                }),
+                { x: 0, y: 0, z: 0 },
+            );
+            frames.push({
+                newest: gap(newest.position),
+                centroid: gap({
+                    x: sum.x / live.length,
+                    y: sum.y / live.length,
+                    z: sum.z / live.length,
+                }),
+                live: live.length,
+            });
+        }
+        return frames;
+    }
+
+    it("keeps a linked effect on the bone, newest particle and centroid alike, every frame", () => {
+        const frames = flight(true);
+
+        assert.ok(frames.length >= FRAMES - 1, `${frames.length} frames`);
+        for (const [at, frame] of frames.entries()) {
+            assert.ok(frame.newest < 1e-3, `newest ${frame.newest} at ${at}`);
+            assert.ok(
+                frame.centroid < 1e-2,
+                `centroid ${frame.centroid} at ${at}`,
+            );
+        }
+    });
+
+    // The other direction: an emitter the file does not link is a world-space one, and its particles
+    // stay where they were born. A second's worth of them spans a second of travel, so their centroid
+    // trails by half of it - 30 x 9.3 / 2 = 139.5 units. Carrying them along would be the regression.
+    it("leaves an unlinked effect behind by half a lifetime of travel", () => {
+        const frames = flight(false);
+        const settled = frames.slice(35);
+
+        assert.ok(settled.length > 0);
+        for (const frame of settled) {
+            // Born on the bone all the same: only the carrying differs.
+            assert.ok(frame.newest < 1e-3, `newest ${frame.newest}`);
+            assert.ok(
+                Math.abs(frame.centroid - 139.5) < 0.5,
+                `centroid ${frame.centroid}`,
+            );
+        }
     });
 });
