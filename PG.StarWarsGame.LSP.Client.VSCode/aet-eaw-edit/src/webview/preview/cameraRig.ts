@@ -273,20 +273,28 @@ export class CameraRig {
      * the smoke has drifted to, and neither should push the hull into the distance. What the FAR
      * PLANE is set to is about reach: cull at the hull and a long trail is chopped off in mid-air,
      * which is what put this in in the first place.
+     *
+     * A subject that draws NO geometry is the one case where the two are the same question. A
+     * particle file is nothing but its systems, so they are what the camera goes by: measured by
+     * the hull alone it was a one-unit sphere at the emitter, and the file opened with the camera
+     * inside the effect (#431).
      */
     boundingSphere(includeEffects = false): BoundingSphere {
         // How far the particles will get. Their geometry is allocated full of zeros and filled in over
         // the following seconds, so a box around it measures a point at the origin however large the
         // effect is about to be - and a zero radius puts the camera on its own target, which draws
         // nothing at all, grid included.
-        const particleReach = !includeEffects
-            ? 0
-            : Math.max(
-                  0,
-                  ...[...this.context.particles.particleSystems.values()].map(
-                      (entry) => entry.instance.extent(),
-                  ),
-              );
+        //
+        // The particle rig is the last layer the viewport builds, and the lighting asks for this
+        // sphere while it is being built: until the rig exists nothing reaches anywhere.
+        const particles = this.context.particles as
+            ViewportContext["particles"] | undefined;
+        const particleReach = Math.max(
+            0,
+            ...[...(particles?.particleSystems.values() ?? [])].map((entry) =>
+                entry.instance.extent(),
+            ),
+        );
 
         // Only what is on screen, and only geometry. See `modelBounds.ts` - the firing-arc cones
         // under this same root are thousands of units across and are not the model.
@@ -316,7 +324,10 @@ export class CameraRig {
               })();
 
         // Guards NaN as well as zero: `>` is false for NaN, so the fallback wins.
-        const radius = Math.max(particleReach, sphere.radius);
+        const radius =
+            includeEffects || box.isEmpty()
+                ? Math.max(particleReach, sphere.radius)
+                : sphere.radius;
         return { center: sphere.center, radius: radius > 0 ? radius : 1 };
     }
 

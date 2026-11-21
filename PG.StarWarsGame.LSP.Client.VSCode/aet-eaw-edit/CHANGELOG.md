@@ -149,6 +149,12 @@
   the mod's file is never opened for that name. The preview decodes a file by its bytes, so a PNG saved as
   `.tga` draws, with a note on the mismatch
   ([#420](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/420))
+- **A particle file opens from outside the effect** - a particle file draws no meshes, so the camera had
+  nothing to measure and stood one unit from the emitter: `P_fire_med00.alo` opened inside its own fire, the
+  stage flat yellow. A subject with no drawn geometry is now framed by the reach of its particle systems, and
+  the camera presets, the grid and the draw distance go by the same sphere. A model with meshes is framed by
+  its meshes as before
+  ([#431](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/431))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the
