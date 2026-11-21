@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The dock header: the model's identity and counts behind the left button, the lens dial in the
-// centre, and the hand-off and the severity tag in the right corner.
+// centre, and the hand-off, the stand-in shadow's mark and the severity tag in the right corner.
 
 import type { Dispatch, SetStateAction } from "react";
 import type { Flyouts } from "../useFlyouts";
@@ -15,6 +15,7 @@ import {
     type PreviewScene,
 } from "../../../protocol/modelPreview";
 import { IconButton } from "../../shared/Button";
+import { Icon } from "../../shared/Icon";
 import { post } from "../previewPost";
 import { type ViewportStats } from "../viewport";
 import { type PreviewMode, previewModes } from "../previewMode";
@@ -37,6 +38,8 @@ export interface DockHeaderProps {
     setMode: Dispatch<SetStateAction<PreviewMode>>;
     setProblemsOpen: Dispatch<SetStateAction<boolean>>;
     severity: ValidationState;
+    /** Game rendering is casting the stand-in shadow, which the game does not draw. */
+    standInDrawn: boolean;
     stats: ViewportStats | null;
 }
 
@@ -54,6 +57,7 @@ export function DockHeader({
     setMode,
     setProblemsOpen,
     severity,
+    standInDrawn,
     stats,
 }: DockHeaderProps): React.JSX.Element {
     return (
@@ -168,17 +172,35 @@ export function DockHeader({
                     />
                 )}
 
-                <SeverityTag
-                    severity={severity}
-                    count={notices.length}
-                    expanded={problemsOpen}
-                    disabled={notices.length === 0}
-                    disabledReason={l10n.t(
-                        "Nothing to report about this model",
+                {/* Passive state beside the warnings: a shadow on screen the game does not draw.
+                Not a control - the switch is in Scene settings - so a mark, not a button. */}
+                <span className="header-corner-row">
+                    {standInDrawn && (
+                        <span
+                            className="stand-in-mark"
+                            role="img"
+                            title={l10n.t(
+                                "Stand-in shadow: The game draws none for this model",
+                            )}
+                            aria-label={l10n.t(
+                                "Stand-in shadow: The game draws none for this model",
+                            )}
+                        >
+                            <Icon name="standInShadow" />
+                        </span>
                     )}
-                    title={problemsTitle}
-                    onClick={() => setProblemsOpen((open) => !open)}
-                />
+                    <SeverityTag
+                        severity={severity}
+                        count={notices.length}
+                        expanded={problemsOpen}
+                        disabled={notices.length === 0}
+                        disabledReason={l10n.t(
+                            "Nothing to report about this model",
+                        )}
+                        title={problemsTitle}
+                        onClick={() => setProblemsOpen((open) => !open)}
+                    />
+                </span>
             </span>
         </>
     );

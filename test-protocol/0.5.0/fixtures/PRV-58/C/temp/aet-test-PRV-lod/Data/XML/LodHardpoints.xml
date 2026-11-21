@@ -1,0 +1,12 @@
+﻿<?xml version="1.0"?>
+<HardPoints>
+<!-- A model of its own, attached to a bone of the hull. -->
+<HardPoint Name="HP_Prv_Lod_Crate">
+<Type>HARD_POINT_WEAPON_LASER</Type>
+<Is_Targetable>Yes</Is_Targetable>
+<Is_Destroyable>Yes</Is_Destroyable>
+<Health>100.0</Health>
+<Model_To_Attach>Prv_lod_crate.alo</Model_To_Attach>
+<Attachment_Bone>B_Turret</Attachment_Bone>
+</HardPoint>
+</HardPoints>

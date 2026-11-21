@@ -77,7 +77,7 @@ internal sealed class PreviewModelCodeActionProvider : IXmlCursorCodeActionProvi
         if (string.IsNullOrEmpty(model) || !model.EndsWith(".alo", StringComparison.OrdinalIgnoreCase))
             return [];
 
-        var found = AssetFileLookup.Resolves(index.AssetFiles, model, ModelExtensions, []);
+        var found = AssetFileLookup.Resolves(index.AssetFiles, model, ModelExtensions, false);
         return
         [
             new CommandOrCodeAction(new CodeAction

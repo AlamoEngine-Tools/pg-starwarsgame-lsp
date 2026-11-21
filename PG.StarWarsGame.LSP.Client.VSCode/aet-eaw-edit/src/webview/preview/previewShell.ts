@@ -63,6 +63,20 @@ export const Shell = styled.div`
         position: static;
     }
 
+    /* The severity tag's own line in that column, with the stand-in shadow's mark to its left when
+       there is one - passive state beside the warnings, not a third row. */
+    .header-corner-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .stand-in-mark {
+        display: inline-flex;
+        align-items: center;
+        color: var(--colour-muted);
+    }
+
     /* The model's identity, floating under the button that opens it. Anchored to the header, which
        is position: relative and clips nothing - inside the content it would be trapped by that
        panel's own scroll box. */

@@ -124,9 +124,9 @@ export interface LightRig {
      * What a cast shadow is tinted.
      *
      * One global term rather than a property of the sun, which is where AloViewer keeps it too -
-     * beside ambient and specular. Only the GROUND shadow can take it here: Alamo tints stencil
-     * shadow volumes, while three's shadow mapping has no colour to set, so the ground plane
-     * catches a tinted shadow and self-shadowing on the hull cannot.
+     * beside ambient and specular. The Game renderer's stencil shadows multiply by it, on the hull
+     * and the ground alike, as Alamo's do; the Default renderer's shadow map has no colour to set,
+     * so there only the ground catcher takes it.
      */
     shadow: Colour;
 }
@@ -238,9 +238,10 @@ const WHITE: Colour = [1, 1, 1];
  * crosses two shadows over the model, which reads as a fault rather than as a fill.
  */
 export const DEFAULT_LIGHTS: LightRig = {
-    // The ENGINE's own rig, value for value, out of `Config::GetDefaultEnvironment`. The engine
-    // multiplies each light's colour by its alpha, so the sun ships as mid grey and the two fills
-    // as a dark blue an eighth as strong - and the ambient is a tenth, not a third.
+    // AloViewer's default environment, value for value - NOT the game's, whose lights come from the
+    // map. AloViewer multiplies each light's colour by its alpha, as the engine does, so the sun
+    // ships as mid grey and the two fills as a dark blue an eighth as strong - and the ambient is a
+    // tenth, not a third.
     //
     // What this replaces was a 1.6 white sun with white fills and a 0.35 white ambient: about four
     // times the light, all of it colourless, which blew every hull out to a flat white silhouette

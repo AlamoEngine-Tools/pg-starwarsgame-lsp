@@ -1,0 +1,10 @@
+﻿<?xml version="1.0"?>
+<LodUnits>
+<!-- The hull tags two detail levels; the model its hardpoint attaches tags none, and is far smaller, so it arrives first. -->
+<GroundVehicle Name="Prv_Lod_Walker">
+<Text_ID>TEXT_NONE</Text_ID>
+<Land_Model_Name>Prv_lod_walker.alo</Land_Model_Name>
+<Scale_Factor>1.0</Scale_Factor>
+<HardPoints>HP_Prv_Lod_Crate</HardPoints>
+</GroundVehicle>
+</LodUnits>

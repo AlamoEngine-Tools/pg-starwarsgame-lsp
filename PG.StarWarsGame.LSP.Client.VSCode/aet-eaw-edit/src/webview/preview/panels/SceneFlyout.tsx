@@ -12,7 +12,7 @@ import { type PreviewScene } from "../../../protocol/modelPreview";
 import { IconButton } from "../../shared/Button";
 import { StageFlyout } from "../../shared/Stage";
 import { EffectsSection } from "./EffectsSection";
-import { LightSection } from "./LightSection";
+import { LightSection, type StandInShadow } from "./LightSection";
 import { RoomSection } from "./RoomSection";
 import { WeatherSection } from "./WeatherSection";
 import {
@@ -37,6 +37,7 @@ export interface SceneFlyoutProps {
         change: Partial<DirectionalSetting>,
     ) => void;
     shadowReach: ShadowTintReach;
+    standIn: StandInShadow;
     toggleSection: (id: string) => void;
     translatedCount: { translated: number; total: number };
 }
@@ -54,6 +55,7 @@ export function SceneFlyout({
     setEditing,
     setLight,
     shadowReach,
+    standIn,
     toggleSection,
     translatedCount,
 }: SceneFlyoutProps): React.JSX.Element {
@@ -94,6 +96,7 @@ export function SceneFlyout({
                 setLight={setLight}
                 setLights={room.setLights}
                 shadowReach={shadowReach}
+                standIn={standIn}
                 toggleSection={toggleSection}
             />
 

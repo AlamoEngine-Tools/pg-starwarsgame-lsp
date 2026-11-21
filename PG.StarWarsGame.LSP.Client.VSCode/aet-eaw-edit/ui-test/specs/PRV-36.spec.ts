@@ -1,4 +1,4 @@
-// PRV-36: a particle file with the Particle Editor's link group opens and plays; an unknown chunk is skipped
+// PRV-36: a particle file with the Particle Editor's link group opens and plays; an unknown chunk is passed over
 // with a warning; a foreign chunk in the emitter list is refused. The files are the setup's, made from
 // P_fire_small00. The Problems view half is
 // ParticleEditorProtocolTest.PRV_36_TheLinkGroupIsReadPast_AnUnknownChunkSkipped_AForeignListChunkRefused.
@@ -26,9 +26,11 @@ describe("PRV-36", () => {
             expect(notes.find((n) => n.tone === "info")?.id).toBe("aetswg-014-0023");
             expect(notes.find((n) => n.tone === "warning")?.id).toBe("aetswg-014-0022");
             expect(notes.find((n) => n.tone === "info")?.text).toMatch(
-                /: Emitter 0 - link group 3, Particle Editor data the game does not read$/,
+                /: Emitter 0 - the Particle Editor's link group is not read by the game and has no effect$/,
             );
-            expect(notes.find((n) => n.tone === "warning")?.text).toMatch(/: Emitter 0 - chunk 0x7F not read by the game, skipped$/);
+            expect(notes.find((n) => n.tone === "warning")?.text).toMatch(
+                /: Emitter 0 - chunk 0x7F is not read by the game and has no effect$/,
+            );
         });
     });
 

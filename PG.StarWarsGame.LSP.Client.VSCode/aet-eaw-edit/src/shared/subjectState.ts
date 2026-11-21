@@ -17,8 +17,14 @@
 export interface SubjectState {
     /** Damage state. Checked against the model's own levels before it is applied. */
     alt: number;
-    /** Detail level, same. */
-    lod: number;
+    /**
+     * Detail level, same - or null while the reader has not PICKED one.
+     *
+     * Null rather than 0 because every model tags LOD 0, and in Alamo LOD 0 is the LOWEST detail: a
+     * recorded 0 nobody chose read back as a choice, and a preview closed before its geometry arrived
+     * came back at LOD 0 on the next open. See {@link lodToRecord} and {@link lodOnArrival}.
+     */
+    lod: number | null;
     /** Hardpoints the reader blew off, by id. */
     destroyed: string[];
     /** Emitters switched off, by their index in the opened system's file. */
@@ -50,7 +56,7 @@ export interface SubjectState {
 
 export const EMPTY_SUBJECT_STATE: SubjectState = {
     alt: 0,
-    lod: 0,
+    lod: null,
     destroyed: [],
     hiddenEmitters: [],
     animation: null,
@@ -82,13 +88,69 @@ export function subjectStateFrom(stored: unknown): SubjectState {
     };
 }
 
+/**
+ * The detail level a subject opens at, from the levels its geometry defines (ascending).
+ *
+ * The level recorded for it, if the geometry still defines it - a mesh's `_LOD2` suffix can be
+ * edited away between one open and the next, and a level that no longer exists shows nothing at
+ * all. Otherwise the HIGHEST level: Alamo numbers detail the other way up, so the last level is the
+ * close-up one and LOD 0 the distant one.
+ */
+export function openingLod(
+    defined: readonly number[],
+    recorded: number | null,
+): number {
+    if (recorded !== null && defined.includes(recorded)) {
+        return recorded;
+    }
+
+    return defined.length > 0 ? defined[defined.length - 1] : 0;
+}
+
+/**
+ * The detail level to show as a subject's geometry arrives, from the levels defined so far.
+ *
+ * The reader's pick stands. Until there is one the opening rule FOLLOWS the levels as they arrive
+ * rather than choosing once: a unit's parts arrive one by one, and a hardpoint's model that tags no
+ * level, arriving before the hull, defines only LOD 0 - choosing from that left the unit at its
+ * lowest detail once the hull arrived. The levels only grow while a subject loads, so following
+ * them ends on the opening rule's answer for the whole subject.
+ */
+export function lodOnArrival(
+    defined: readonly number[],
+    shown: number,
+    picked: boolean,
+    recorded: number | null,
+): number {
+    return picked ? shown : openingLod(defined, recorded);
+}
+
+/**
+ * The detail level to record for a subject.
+ *
+ * The one on screen once the reader PICKED it. The opening rule's choice is not recorded: it is made
+ * again on every open, and one made from part of the geometry - or the placeholder 0 shown before
+ * any arrived - would be restored as if it were a pick. Until the reader picks, what was recorded
+ * before stands, so a preview reopened and closed again keeps the level it was left at.
+ */
+export function lodToRecord(
+    shown: number,
+    picked: boolean,
+    recorded: number | null,
+): number | null {
+    return picked ? shown : recorded;
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value)
         ? (value as Record<string, unknown>)
         : {};
 }
 
-function index_(value: unknown, fallback: number): number {
+function index_<T extends number | null>(
+    value: unknown,
+    fallback: T,
+): number | T {
     return typeof value === "number" && Number.isInteger(value) && value >= 0
         ? value
         : fallback;

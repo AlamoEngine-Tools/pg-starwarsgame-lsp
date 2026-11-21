@@ -16,6 +16,11 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     name of that kind, and what a missing one costs, comes from <see cref="AssetKindRules" /> -
 ///     the same rules an asset item of a tuple is checked by.
 /// </summary>
+/// <remarks>
+///     A texture that resolves to a PNG carries an information recommending DDS (#420); the game loads
+///     it, so it is never a warning. A missing <c>.dds</c> whose <c>.tga</c> exists says that the game does
+///     not look for the <c>.tga</c>.
+/// </remarks>
 public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlTagValueFact>
 {
     /// <summary>
@@ -34,7 +39,7 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
 
     private string AssetNounKey => Rule.NounKey;
     private IReadOnlyList<string> AllowedExtensions => Rule.AllowedExtensions;
-    private IReadOnlyList<string> InterchangeableExtensions => Rule.InterchangeableExtensions;
+    private bool TextureLookup => Rule.TextureLookup;
     private bool ResolvesFromMegaTexture => Rule.ResolvesFromMegaTexture;
     private XmlDiagnosticSeverity MissingSeverity => Rule.MissingSeverity;
 
@@ -54,9 +59,21 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
             if (isList && se.Equals(UnusedSlotMarker, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (AssetFileLookup.Resolves(
-                    ctx.Index.AssetFiles, se, AllowedExtensions, InterchangeableExtensions))
+            if (AssetFileLookup.Resolve(ctx.Index.AssetFiles, se, AllowedExtensions, TextureLookup) is { } found)
+            {
+                if (TextureLookup && GameTextureName.IsPng(found))
+                    results.Add(AtItem(new XmlDiagnosticResult(XmlDiagnosticSeverity.Information,
+                        ctx.Messages.Format("TextureIsPng_ResolvesToAPngFile", se),
+                        Id: DiagnosticIds.TextureIsPng), fact, isList, offset, length));
+
+                // Emulate, then warn: the game opens the name as written from below a layer's own .dds.
+                if (TextureLookup &&
+                    AssetFileLookup.UnreachedDds(ctx.Index.AssetFiles, se, found, AllowedExtensions) is { } dds)
+                    results.Add(AtItem(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                        ctx.Messages.Format("TextureDdsNotReached_OpensTheNameAsWritten", se, found, dds),
+                        Id: DiagnosticIds.TextureDdsNotReached), fact, isList, offset, length));
                 continue;
+            }
 
             // Only now, with the file lookup already failed, is it worth asking the mega textures.
             // Unresolved references are the rare case, so the cost of opening a .mtd is paid on the
@@ -64,31 +81,36 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
             if (ResolvesFromMegaTexture && ctx.IconNames?.Contains(se) == true)
                 continue;
 
-            var alternates = AssetFileLookup.AlternateNames(se, InterchangeableExtensions).ToList();
+            var alternates = AssetFileLookup.AlternateNames(se, TextureLookup).ToList();
             var alsoChecked = alternates.Count > 0
                 ? ctx.Messages.Format("AssetFileExistence_AlsoChecked",
                     string.Join(", ", alternates.Select(a => $"'{a}'")))
                 : string.Empty;
+            var unsearched = TextureLookup
+                ? AssetFileLookup.UnsearchedTgaHint(ctx.Index.AssetFiles, se, AllowedExtensions, ctx.Messages)
+                : string.Empty;
             var result = new XmlDiagnosticResult(MissingSeverity,
                 ctx.Messages.Format("AssetFileExistenceHandlerBase_FileWasNotFoundIn",
-                    ctx.Messages.Format(AssetNounKey), se, alsoChecked));
+                    ctx.Messages.Format(AssetNounKey), se, alsoChecked + unsearched));
 
-            // Each name in a list carries its own squiggle. A single value already covers exactly
-            // the span the fact does, so it is left alone.
-            if (isList)
-            {
-                var (line, column) =
-                    XmlUtility.AdvancePosition(fact.Line, fact.Column, fact.RawValue, offset);
-                result = result with
-                {
-                    OverrideLine = line, OverrideColumn = column, OverrideLength = length
-                };
-            }
-
-            results.Add(result);
+            results.Add(AtItem(result, fact, isList, offset, length));
         }
 
         return results;
+    }
+
+    /// <summary>
+    ///     Each name in a list carries its own squiggle. A single value already covers exactly the span the
+    ///     fact does, so it is left alone.
+    /// </summary>
+    private static XmlDiagnosticResult AtItem(XmlDiagnosticResult result, XmlTagValueFact fact, bool isList,
+        int offset, int length)
+    {
+        if (!isList)
+            return result;
+
+        var (line, column) = XmlUtility.AdvancePosition(fact.Line, fact.Column, fact.RawValue, offset);
+        return result with { OverrideLine = line, OverrideColumn = column, OverrideLength = length };
     }
 
     private static bool IsListValued(XmlValueType valueType)

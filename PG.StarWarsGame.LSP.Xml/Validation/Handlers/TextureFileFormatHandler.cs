@@ -1,11 +1,16 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
+/// <summary>
+///     Errors on a texture reference whose extension is none of the formats the game's texture lookup
+///     records - DDS, TGA and PNG (<see cref="GameTextureName.Extensions" />, #420).
+/// </summary>
 public sealed class TextureFileFormatHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
     /// <inheritdoc />
@@ -17,8 +22,7 @@ public sealed class TextureFileFormatHandler : XmlDiagnosticsHandler<XmlTagValue
             return [];
 
         var value = fact.RawValue;
-        if (!value.EndsWith(".tga", StringComparison.OrdinalIgnoreCase) &&
-            !value.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+        if (!GameTextureName.IsTextureFile(value))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

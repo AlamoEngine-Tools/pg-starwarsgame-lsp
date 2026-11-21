@@ -7,6 +7,7 @@ import * as THREE from "three";
 
 import {
     shadowTintReach,
+    standInBlock,
     ShadowVolumePass,
     volumeReach,
 } from "./shadowVolumePass";
@@ -84,6 +85,21 @@ describe("which volumes count", () => {
         );
         assert.equal(pass.active, true);
     });
+
+    it("says the model has a shadow mesh while a volume is held, counting or not", () => {
+        // A fact about the MODEL: a volume a clip or a cloak has switched off is still the
+        // model's shadow mesh, and the game still casts from it once it counts again.
+        const pass = new ShadowVolumePass();
+        assert.equal(pass.authored, false);
+
+        const source = volumeMesh("hull_shadow");
+        pass.add(source);
+        pass.setCounting(source, false);
+        assert.equal(pass.authored, true);
+
+        pass.remove(source);
+        assert.equal(pass.authored, false);
+    });
 });
 
 describe("dropping one part of the scene", () => {
@@ -152,20 +168,65 @@ describe("dropping one part of the scene", () => {
 // in Game mode, the colour applied and the control was dead anyway.
 describe("shadowTintReach", () => {
     it("reaches the ground when the floor is on", () => {
-        assert.equal(shadowTintReach(true, false), "ground");
+        assert.equal(shadowTintReach(true, false, false), "ground");
     });
 
     it("reaches the model when the stencil pass is casting", () => {
         // No floor at all. The darken multiplies the hull itself, which is the half that was missed.
-        assert.equal(shadowTintReach(false, true), "model");
+        assert.equal(shadowTintReach(false, true, false), "model");
     });
 
     it("reaches both when both are on", () => {
-        assert.equal(shadowTintReach(true, true), "both");
+        assert.equal(shadowTintReach(true, true, false), "both");
     });
 
     it("reaches nothing with no floor and nothing casting", () => {
         // The one case where the control is honestly dead - and the only one it should refuse in.
-        assert.equal(shadowTintReach(false, false), "none");
+        assert.equal(shadowTintReach(false, false, false), "none");
+    });
+
+    it("reaches nothing, floor or none, while nothing casts a shadow at all", () => {
+        // The Game renderer on a model without a shadow mesh and without the stand-in: the game
+        // draws no shadow, so the ground has nothing to catch either.
+        assert.equal(shadowTintReach(true, false, true), "uncast");
+        assert.equal(shadowTintReach(false, false, true), "uncast");
+    });
+
+    // Under Game the render geometry of a model with a shadow mesh casts nothing into the shadow
+    // map, so with its shadow mesh switched off - a cloak, a clip, the detail level - the ground has
+    // nothing to catch. It read "ground" with the floor on.
+    it("reaches nothing, floor or none, while the shadow mesh is switched off", () => {
+        assert.equal(shadowTintReach(true, false, false, true), "off");
+        assert.equal(shadowTintReach(false, false, false, true), "off");
+    });
+});
+
+describe("standInBlock", () => {
+    const model = { game: true, shadowMesh: false, particleFile: false };
+
+    it("offers the stand-in under Game for a model without a shadow mesh", () => {
+        assert.equal(standInBlock(model), null);
+    });
+
+    it("withholds it in the Default renderer, which always casts the shadow map", () => {
+        assert.equal(standInBlock({ ...model, game: false }), "default");
+    });
+
+    it("withholds it from a model whose shadow mesh casts the game's own shadow", () => {
+        assert.equal(
+            standInBlock({ ...model, shadowMesh: true }),
+            "shadowMesh",
+        );
+    });
+
+    it("withholds it from a particle file, which has no render geometry", () => {
+        assert.equal(
+            standInBlock({ ...model, particleFile: true }),
+            "particle",
+        );
+        assert.equal(
+            standInBlock({ ...model, particleFile: true, game: false }),
+            "particle",
+        );
     });
 });

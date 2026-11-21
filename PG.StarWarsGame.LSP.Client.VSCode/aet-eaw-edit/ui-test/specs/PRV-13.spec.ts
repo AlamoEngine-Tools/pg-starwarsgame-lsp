@@ -1,5 +1,5 @@
 // PRV-13: editor data the game reads past is an information note in the preview, which still draws the
-// file. The Problems view half (Re-validate Workspace, the 18 files' 31 entries) is
+// file. The Problems view half (Re-validate Workspace, one entry for each of the 18 files) is
 // EawPreviewProtocolTest.PRV_13_EditorDataTheGameReadsPast_IsInformationOnReValidate.
 import { expect } from "@wdio/globals";
 import { serverReady } from "../protocol.js";
@@ -21,7 +21,7 @@ describe("PRV-13", () => {
             const notes = await previewNotes(1);
             const info = notes.filter((n) => n.tone === "info");
             expect(info.map((n) => n.id)).toEqual(["aetswg-014-0023"]);
-            expect(info[0].text).toMatch(/: Emitter 0 - property 0x06, which the game reads past$/);
+            expect(info[0].text).toMatch(/: Emitter 0 - property 0x06 is read past by the game and has no effect$/);
             expect(notes.filter((n) => n.tone === "warning")).toEqual([]);
         });
     });

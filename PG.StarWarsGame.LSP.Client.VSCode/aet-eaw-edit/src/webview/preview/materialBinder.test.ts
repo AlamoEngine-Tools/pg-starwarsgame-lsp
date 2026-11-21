@@ -15,7 +15,10 @@ import { TextureStore } from "./textureStore";
  * A binder over a stand-in viewport: a model root whose meshes are all drawn, no stencil shadows, no
  * particle systems. Nothing here draws a frame, so the camera and the lighting frame are never read.
  */
-function binderWith(): { materials: MaterialBinder; modelRoot: THREE.Group } {
+function binderWith(systems: { effects: string[]; heat?: boolean[] }[] = []): {
+    materials: MaterialBinder;
+    modelRoot: THREE.Group;
+} {
     const modelRoot = new THREE.Group();
     const eachMesh = (visit: (mesh: THREE.Mesh) => void): void =>
         modelRoot.traverse((node) => {
@@ -27,9 +30,21 @@ function binderWith(): { materials: MaterialBinder; modelRoot: THREE.Group } {
         camera: new THREE.PerspectiveCamera(),
         modelRoot,
         textures: new TextureStore(),
-        particles: { particleSystems: new Map() },
+        particles: {
+            particleSystems: new Map(
+                systems.map((system, index) => [
+                    `system${index}`,
+                    {
+                        instance: {
+                            effectNames: () => system.effects,
+                            emitterIsHeat: () =>
+                                system.heat ?? system.effects.map(() => false),
+                        },
+                    },
+                ]),
+            ),
+        },
         environment: {
-            stencilShadowing: false,
             castsIntoShadowMap: () => true,
             frameFor: () => {
                 throw new Error("no frame is drawn here");
@@ -130,5 +145,33 @@ describe("MaterialBinder", () => {
             "MeshAdditive.fx",
             "MeshGloss.fx",
         ]);
+    });
+
+    // #418: the heat composite's strength is the one its effect declares, so a system with heat in it
+    // needs that effect fetched. A heat-flagged emitter names no effect of its own.
+    it("names the heat composite's effect once a system has a heat emitter", () => {
+        const { materials } = binderWith([
+            { effects: ["PrimAlpha.fx"], heat: [false, true] },
+        ]);
+
+        assert.deepEqual(materials.shaderNames(), [
+            "PrimAlpha.fx",
+            "SceneHeat.fx",
+        ]);
+    });
+
+    it("names the heat composite's effect for an emitter on the Heat render mode", () => {
+        const { materials } = binderWith([{ effects: ["PrimHeat.fx"] }]);
+
+        assert.deepEqual(materials.shaderNames(), [
+            "PrimHeat.fx",
+            "SceneHeat.fx",
+        ]);
+    });
+
+    it("does not name the heat composite's effect without heat", () => {
+        const { materials } = binderWith([{ effects: ["PrimAlpha.fx"] }]);
+
+        assert.deepEqual(materials.shaderNames(), ["PrimAlpha.fx"]);
     });
 });

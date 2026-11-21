@@ -108,8 +108,28 @@ public interface IGameAssetResolver
     /// <summary>Which tiers are available, and why one is not.</summary>
     GameAssetTiers Tiers { get; }
 
-    /// <summary>Where <paramref name="gameRelativePath" /> resolves, or null when nowhere.</summary>
+    /// <summary>Where <paramref name="gameRelativePath" /> resolves, exactly as written, or null when nowhere.</summary>
     GameAssetLocation? Locate(string gameRelativePath);
+
+    /// <summary>
+    ///     Where the texture <paramref name="gameRelativePath" /> names resolves by the game's texture lookup,
+    ///     or null when nowhere: each of <see cref="GameTextureName.Candidates" /> in turn, through every tier.
+    /// </summary>
+    /// <remarks>
+    ///     Candidate outer, tier inner, as measured in the game (FoC x64, 2024 release, #420): the texture
+    ///     loader opens the name as written through the game's ordinary file open - mod folders, then loose
+    ///     files, then archives - and only when that fails everywhere does it open the <c>.dds</c>, the same
+    ///     way. So a base game's <c>.tga</c> is what a <c>.tga</c> name opens, not a mod's <c>.dds</c>. The
+    ///     per-tier order of one open is <see cref="Locate" />'s.
+    /// </remarks>
+    GameAssetLocation? LocateTexture(string gameRelativePath)
+    {
+        foreach (var candidate in GameTextureName.Candidates(gameRelativePath))
+            if (Locate(candidate) is { } found)
+                return found;
+
+        return null;
+    }
 
     /// <summary>The bytes of <paramref name="gameRelativePath" />, or null when it resolves nowhere.</summary>
     byte[]? Read(string gameRelativePath);

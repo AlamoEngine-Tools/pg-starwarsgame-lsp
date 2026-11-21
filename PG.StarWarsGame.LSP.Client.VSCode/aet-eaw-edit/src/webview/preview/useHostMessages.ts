@@ -24,7 +24,7 @@ import {
 import { type ModelPreviewToWebview } from "../../protocol/panels/modelPreview";
 import { isSubjectSystem, type LoadTally } from "./loadProgress";
 import { modelRequestsOf } from "./modelStore";
-import { particleNotices } from "./particleNotices";
+import { particleNotices, withParticleNotices } from "./particleNotices";
 import { heldModels, post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
 import { type CloneDeath } from "./deathClone";
@@ -63,7 +63,9 @@ export interface HostMessagesInputs {
     detailWantedRef: RefObject<string | null>;
     explosionsRef: RefObject<PendingEffect[]>;
     foldedRef: RefObject<boolean>;
-    lodChosenRef: RefObject<boolean>;
+    /** Whether this subject's stored damage state has been applied to its geometry. */
+    altRestoredRef: RefObject<boolean>;
+    lodPickedRef: RefObject<boolean>;
     passiveEffectIdsRef: RefObject<Set<string>>;
     pendingRef: RefObject<PreviewParticle[]>;
     playEffect: (
@@ -131,7 +133,8 @@ export function useHostMessages({
     detailWantedRef,
     explosionsRef,
     foldedRef,
-    lodChosenRef,
+    altRestoredRef,
+    lodPickedRef,
     passiveEffectIdsRef,
     pendingRef,
     playEffect,
@@ -208,7 +211,8 @@ export function useHostMessages({
                     setSweeping(new Set());
                     setAlt(0);
                     setLod(0);
-                    lodChosenRef.current = false;
+                    lodPickedRef.current = false;
+                    altRestoredRef.current = false;
                     setDestroyed(new Set());
 
                     // The faction the reader last picked, if THIS subject has one by that name -
@@ -600,13 +604,15 @@ export function useHostMessages({
                     }
 
                     // What the file holds that the game does not apply: skipped as the game skips it,
-                    // and said once per system, whichever way the system was asked for.
+                    // and said once per FILE, however many proxies asked for it (#394).
                     const skipped = particleNotices(
                         message.name,
                         message.result,
                     );
                     if (skipped.length > 0) {
-                        setProblems((current) => [...current, ...skipped]);
+                        setProblems((current) =>
+                            withParticleNotices(current, skipped),
+                        );
                     }
 
                     // A particle file opened directly is its own subject and attaches to nothing.
@@ -772,6 +778,13 @@ export function useHostMessages({
                     assets.receiveShader(
                         message.name,
                         message.result.source ?? null,
+                    );
+                },
+                refetchEffects: () => {
+                    // Every effect the loaded geometry and particle systems name; the headers
+                    // follow as those come back.
+                    assets.refetchShaders(
+                        viewportRef.current?.shaderNames() ?? [],
                     );
                 },
                 texture: (message) => {

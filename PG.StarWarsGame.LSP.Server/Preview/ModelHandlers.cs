@@ -229,14 +229,14 @@ public sealed class GetModelTextureHandler(
             return Task.FromResult(new GetModelTextureResult(null, null,
                 messages.Format("PreviewHandlers_NoTextureWasNamed")));
 
-        // Resolved ONCE. The location says the ACTUAL extension - a .tga reference routinely
-        // resolves to a .dds, and the client picks its decoder from what it is given - and the same
-        // location is what is read, where this used to resolve the name a second time to read it.
-        var location = assets.Locate(TextureDirectory + name);
+        // Resolved ONCE, by the game's texture lookup (#420). The location says the ACTUAL extension -
+        // a .tga reference routinely resolves to a .dds - and the same location is what is read, where
+        // this used to resolve the name a second time to read it. The client decodes by the bytes.
+        var location = assets.LocateTexture(TextureDirectory + name);
         if (location is null)
             return Task.FromResult(new GetModelTextureResult(null, null,
                 messages.Format("PreviewHandlers_TextureWasNotFound", name,
-                    assets.Tiers.Explain(messages))));
+                    UnsearchedTga(name) + assets.Tiers.Explain(messages))));
 
         var format = Path.GetExtension(location.ResolvedPath).TrimStart('.').ToLowerInvariant();
 
@@ -282,6 +282,17 @@ public sealed class GetModelTextureHandler(
             return Task.FromResult(new GetModelTextureResult(null, null,
                 messages.Format("PreviewHandlers_TextureResolvedButCouldNot", name)));
         }
+    }
+
+    /// <summary>
+    ///     For a <c>.dds</c> name, the sentence that the <c>.tga</c> of its stem exists and is not what the
+    ///     game opens (#420, FR-5); empty otherwise.
+    /// </summary>
+    private string UnsearchedTga(string name)
+    {
+        return GameTextureName.UnsearchedTga(name) is { } tga && assets.Locate(TextureDirectory + tga) is not null
+            ? messages.Format("AssetFileExistence_GameDoesNotLookForTga", tga) + " "
+            : string.Empty;
     }
 
     /// <summary>The file a location names and its length, or null for an archive entry or a file that is not there.</summary>

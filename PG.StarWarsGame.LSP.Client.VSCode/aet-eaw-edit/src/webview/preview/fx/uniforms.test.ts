@@ -249,12 +249,12 @@ describe("engineLight", () => {
         );
     });
 
-    it("dims the highlight with the light that casts it", () => {
-        // One global specular for the whole rig, as the engine keeps it, but a light turned down
-        // should not go on highlighting at full strength.
+    it("hands the highlight as twice the specular times the sun's intensity", () => {
+        // #418, measured in the game (FoC x64, 2024 release): DIR_LIGHT_SPECULAR_0 is
+        // 2 x intensity x specular. One global specular for the whole rig, dimmed with the sun.
         assert.deepEqual(
             engineLight(white, [1, 0.5, 0], vector, vector).specular,
-            [0.5, 0.25, 0, 0],
+            [1, 0.5, 0, 0],
         );
     });
 });
@@ -402,7 +402,7 @@ describe("sphericalHarmonics", () => {
         // The regression this port exists for. Every mesh shader takes its ENTIRE diffuse term
         // from this probe - `MeshAlpha.fx` has no separate N.L - so a probe holding nothing but
         // the ambient rendered the whole corpus at a flat 0.1 grey, and the reader reported the
-        // scene as far too dark. The engine's own rig is a 0.5 sun and two 0.5 blue fills.
+        // scene as far too dark. AloViewer's default rig is a 0.5 sun and two 0.5 blue fills.
         const sun = lit(UP, [1, 1, 1], 0.5);
         const fill = lit([0, -0.17, -0.98], [0.25, 0.25, 0.5], 0.5);
         const probe = sphericalHarmonics([sun, fill], [0.1, 0.1, 0.1]);

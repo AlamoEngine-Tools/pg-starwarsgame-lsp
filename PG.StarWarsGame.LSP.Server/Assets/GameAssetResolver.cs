@@ -1,11 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
-using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -32,6 +30,11 @@ namespace PG.StarWarsGame.LSP.Server.Assets;
 ///         filesystem, for the same reason: the shipped data is mixed case, the XML referencing it is
 ///         inconsistent, and a case-sensitive filesystem would otherwise behave differently.
 ///     </para>
+///     <para>
+///         <see cref="Locate" /> opens the path exactly as written. A texture name's fallback to its
+///         <c>.dds</c> is the texture lookup's, <see cref="IGameAssetResolver.LocateTexture" /> by
+///         <see cref="GameTextureName.Candidates" /> (#420).
+///     </para>
 /// </remarks>
 public sealed class GameAssetResolver(
     IFileHelper fileHelper,
@@ -40,13 +43,6 @@ public sealed class GameAssetResolver(
     IMegArchiveSet archives,
     ILogger<GameAssetResolver> logger) : IGameAssetResolver
 {
-    /// <summary>
-    ///     Extensions the engine treats as one asset. A model references a texture by a <c>.tga</c>
-    ///     name that frequently only ever ships as <c>.dds</c>, so honouring the written extension
-    ///     alone would leave most shipped models untextured.
-    /// </summary>
-    private static readonly string[] InterchangeableTextureExtensions = [".tga", ".dds"];
-
     /// <summary>
     ///     The directories a <c>.pgproj</c> can name as asset roots, as game-relative prefixes.
     /// </summary>
@@ -65,16 +61,10 @@ public sealed class GameAssetResolver(
 
         var normalized = fileHelper.NormalizeGamePath(gameRelativePath);
 
-        // Interchange is applied WITHIN each tier before moving to the next, so a mod shipping the
-        // .dds beats the base game's .tga. The other order would make a mod's own texture unreachable.
-        var candidates = Candidates(normalized);
-
-        // Root outer, candidate inner - a whole layer is exhausted, alternate extensions included,
-        // before the next is consulted. The other nesting would let a dependency's .tga beat the root
-        // project's .dds, which inverts the layering the rest of the server agrees on.
+        // Highest-precedence layer first; within a layer, the path as written and then its form inside
+        // an art or audio root.
         foreach (var root in WorkspaceRoots())
-        foreach (var candidate in candidates)
-        foreach (var relative in WorkspaceCandidates(candidate))
+        foreach (var relative in WorkspaceCandidates(normalized))
         {
             var hit = fileHelper.FindInWorkspace([root], relative);
             if (hit is not null)
@@ -82,15 +72,15 @@ public sealed class GameAssetResolver(
         }
 
         var (game, fallback) = GameDirectories();
-        if (game is { } gameDirectory && FindLoose(gameDirectory, candidates) is { } inGame)
+        if (game is { } gameDirectory && fileHelper.FindInWorkspace([gameDirectory.Root], normalized) is { } inGame)
             return new GameAssetLocation(gameRelativePath, inGame, gameDirectory.Tier);
 
-        foreach (var candidate in candidates)
-            if (archives.TryRead(candidate) is not null)
-                return new GameAssetLocation(gameRelativePath, candidate, GameAssetTier.Archive);
+        if (archives.TryRead(normalized) is not null)
+            return new GameAssetLocation(gameRelativePath, normalized, GameAssetTier.Archive);
 
         // The base game folder as the expansion's fallback: consulted only once the archives missed.
-        if (fallback is { } fallbackDirectory && FindLoose(fallbackDirectory, candidates) is { } inFallback)
+        if (fallback is { } fallbackDirectory
+            && fileHelper.FindInWorkspace([fallbackDirectory.Root], normalized) is { } inFallback)
             return new GameAssetLocation(gameRelativePath, inFallback, fallbackDirectory.Tier);
 
         return null;
@@ -119,34 +109,6 @@ public sealed class GameAssetResolver(
                 location.RequestedPath, location.ResolvedPath);
             return null;
         }
-    }
-
-    private string? FindLoose((string Root, GameAssetTier Tier) directory, List<string> candidates)
-    {
-        foreach (var candidate in candidates)
-            if (fileHelper.FindInWorkspace([directory.Root], candidate) is { } hit)
-                return hit;
-
-        return null;
-    }
-
-    /// <summary>
-    ///     The requested path first, then the same name with each interchangeable extension.
-    /// </summary>
-    private static List<string> Candidates(string normalized)
-    {
-        var candidates = new List<string> { normalized };
-
-        var ext = Path.GetExtension(normalized);
-        if (!InterchangeableTextureExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
-            return candidates;
-
-        var stem = normalized[..^ext.Length];
-        foreach (var other in InterchangeableTextureExtensions)
-            if (!other.Equals(ext, StringComparison.OrdinalIgnoreCase))
-                candidates.Add(stem + other);
-
-        return candidates;
     }
 
     /// <summary>

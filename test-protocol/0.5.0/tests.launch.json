@@ -577,7 +577,46 @@
   "PRV-51": {
     "open": "{repo}\\eaw"
   },
+  "PRV-52": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-53": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-54": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-55": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-56": {
+    "open": "C:\\temp\\aet-test-PRV-filter",
+    "settings": {
+      "aet-eaw-edit.shaders.directory": "{shaders}"
+    }
+  },
+  "PRV-57": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-58": {
+    "open": "C:\\temp\\aet-test-PRV-lod"
+  },
+  "PRV-59": {
+    "open": "C:\\temp\\aet-test-PRV-png",
+    "settings": {
+      "aet-eaw-edit.shaders.directory": "{shaders}"
+    }
+  },
+  "PRV-60": {
+    "open": "{repo}\\eaw"
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
+  },
+  "SET-32": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.shaders.directory": "C:\\temp\\aet-test-SET-shaders\\mod\\Data\\Art\\Shaders"
+    }
   }
 }

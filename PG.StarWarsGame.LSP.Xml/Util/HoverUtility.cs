@@ -151,18 +151,14 @@ internal static class HoverUtility
         var ext = Path.GetExtension(value);
         if (string.IsNullOrEmpty(ext)) return null;
 
-        var matches = FindMatches(assetFiles, value, ext);
-
-        // The engine treats TGA and DDS as one texture (TGA wins when both exist, otherwise it
-        // silently falls back to the other format) - resolve the hover the same way.
-        if (matches.Count == 0 && tag.ReferenceKind == ReferenceKind.TextureFile)
-        {
-            var altExt = ext.Equals(".tga", StringComparison.OrdinalIgnoreCase) ? ".dds"
-                : ext.Equals(".dds", StringComparison.OrdinalIgnoreCase) ? ".tga"
-                : null;
-            if (altExt is not null)
-                matches = FindMatches(assetFiles, value[..^ext.Length] + altExt, altExt);
-        }
+        // A texture resolves the way the game looks it up: the name as written, then its first-dot stem
+        // as a .dds (#420). Anything else is the name as written.
+        var matches = new List<string>();
+        foreach (var candidate in tag.ReferenceKind == ReferenceKind.TextureFile
+                     ? GameTextureName.Candidates(value)
+                     : [value])
+            if ((matches = FindMatches(assetFiles, candidate, Path.GetExtension(candidate))).Count > 0)
+                break;
 
         if (matches.Count == 0) return null;
 

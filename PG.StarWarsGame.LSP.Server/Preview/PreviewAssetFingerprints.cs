@@ -68,8 +68,8 @@ public sealed class PreviewAssetFingerprints(IGameAssetResolver assets, IFileHel
     /// <summary>What the server sends every open preview when <see cref="Changed" /> is raised.</summary>
     public const string ChangedNotification = "aet/previewAssetsChanged";
 
-    /// <summary>The loose files a preview draws from: models, their clips, and textures.</summary>
-    private static readonly string[] DrawnExtensions = [".alo", ".ala", ".dds", ".tga"];
+    /// <summary>The loose files a preview draws from: models, their clips, and textures of every format the game loads.</summary>
+    private static readonly string[] DrawnExtensions = [".alo", ".ala", .. GameTextureName.Extensions];
 
     /// <summary>The hash of each loose file already read, by the stamp it had then.</summary>
     private readonly ConcurrentDictionary<string, Fingerprint> _hashes = new(StringComparer.OrdinalIgnoreCase);

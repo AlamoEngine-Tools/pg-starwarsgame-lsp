@@ -248,6 +248,19 @@ export class ModelPreviewPanel extends WebviewPanelHost<
         }
     }
 
+    /**
+     * Tells every open preview to ask for its effects again.
+     *
+     * Called once the servers have restarted on a changed shader or game folder (#395). Every
+     * project's previews, because the settings are the window's, and every project's server
+     * restarted on them.
+     */
+    static refetchEffectsAll(): void {
+        for (const panel of ModelPreviewPanel.live) {
+            panel.post({ type: "refetchEffects" });
+        }
+    }
+
     protected async onMessage(message: ModelPreviewToHost): Promise<void> {
         switch (message.type) {
             case "ready":

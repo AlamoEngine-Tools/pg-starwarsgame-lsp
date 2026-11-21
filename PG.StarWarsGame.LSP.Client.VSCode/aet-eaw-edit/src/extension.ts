@@ -61,6 +61,12 @@ import {
     gitHubIssue,
 } from "./diagnosticReport";
 import { offerShaderSources, shaderDirectory } from "./shaderSources";
+import {
+    previewAssetsChanged,
+    previewEffectsChanged,
+    restartReason,
+} from "./settingsRestart";
+import { RestartCoordinator } from "./restartCoordinator";
 import { initDialogGeometryStorage } from "./dialogGeometryStorage";
 import { initPanelLayoutStorage } from "./panelLayoutStorage";
 import { initViewerSettingsStorage } from "./viewerSettingsStorage";
@@ -613,6 +619,7 @@ const WATCHED_GLOBS = [
     "**/*.meg",
     "**/*.tga",
     "**/*.dds",
+    "**/*.png",
     "**/*.alo",
     "**/*.ala",
     "**/*.wav",
@@ -1395,6 +1402,8 @@ async function stopAllClients(): Promise<void> {
     routeChanges.fire();
     WebviewPanelHost.setProjectCount(clients.size);
     await Promise.all(running.map((project) => stopProjectClient(project)));
+    // Says when the stop is over, not only when it began, so a start that overlapped it shows.
+    logLine("All LSP servers stopped.");
 }
 
 /**
@@ -1438,8 +1447,26 @@ function updateStatus(): void {
     statusItem.show();
 }
 
-/** Serialises discovery runs: a folder change and a project file event can arrive together. */
+/**
+ * Serialises discovery runs. Every caller but the debug Force Startup command reaches this through
+ * {@link restarts}, which already runs one thing at a time; this keeps that command's run from
+ * overlapping one of its.
+ */
 let reconciling: Promise<void> = Promise.resolve();
+
+/**
+ * The one queue every restart and every project discovery runs in (#395), so a discovery and a
+ * settings restart never stop or start clients at the same time. Set as activation begins.
+ */
+let restarts: RestartCoordinator | undefined;
+
+/**
+ * Brings the servers in line with the window's projects, in the queue restarts run in: starts the
+ * projects that appeared, stops the ones that went, leaves the rest.
+ */
+function rediscover(): Promise<void> {
+    return restarts?.request({ causes: ["discovery"] }) ?? Promise.resolve();
+}
 
 /**
  * Discovers the window's projects and brings the running servers in line: starts the projects that
@@ -1658,7 +1685,7 @@ function watchWorkspace(context: vscode.ExtensionContext): void {
         const watcher = vscode.workspace.createFileSystemWatcher(glob);
         const handle = (uri: vscode.Uri, type: 1 | 2 | 3) => {
             if (uri.fsPath.toLowerCase().endsWith(".pgproj")) {
-                onProjectFileTouched(context);
+                onProjectFileTouched();
             }
             forwardWorkspaceChange(uri, type);
         };
@@ -1671,10 +1698,10 @@ function watchWorkspace(context: vscode.ExtensionContext): void {
     }
 }
 
-function onProjectFileTouched(context: vscode.ExtensionContext): void {
+function onProjectFileTouched(): void {
     // Not validated here: the configuration was checked when the servers started, and a project
     // file saved on every keystroke must not raise the same settings errors each time.
-    void reconcileClients(context).then(() => {
+    void rediscover().then(() => {
         // A .pgproj change can add or drop a project reference, which moves the very directories the
         // dependency watchers cover - so rebuild them whenever one changes, wherever it lives.
         for (const project of clients.values()) {
@@ -2729,6 +2756,37 @@ export async function activate(
     );
 
     windowState = context.workspaceState;
+
+    // Every restart and every project discovery goes through one coordinator: a configuration
+    // change, the Restart command, a start with no server running, a workspace folder or a project
+    // file coming or going. Set before the watchers below can fire. See restartCoordinator.ts for
+    // the rules it keeps.
+    restarts = new RestartCoordinator({
+        running: () => clients.size > 0,
+        validate: () => validateConfiguration(context.extensionPath),
+        stop: () => stopAllClients(),
+        start: () => reconcileClients(context),
+        log: logLine,
+        refresh: (effects, assets) => {
+            // The webviews hold what the old folders answered, a missing effect included; they
+            // ask again, and the gateway holds each request until the new server is ready.
+            if (effects) {
+                ModelPreviewPanel.refetchEffectsAll();
+            }
+
+            // Models and textures resolve through the game folders. A scene refresh sends
+            // nothing when the scene reads as before, and from one set game folder to another
+            // it does: SET-32 measured nothing asked for again. So every preview is refreshed
+            // as if its assets changed on disk, through the path that notification takes.
+            if (assets) {
+                for (const key of clients.keys()) {
+                    ModelPreviewPanel.refreshAll(key, true);
+                }
+            }
+        },
+    });
+    const coordinator = restarts;
+
     watchWorkspace(context);
     // Changes the project remembered for commands; the window asks on its own only when the
     // document in front belongs to no project and nothing was picked yet.
@@ -2752,7 +2810,7 @@ export async function activate(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
             // A server kept running may now find a dependency inside a folder, or outside one:
             // its own watchers over directories outside the folders are rebuilt too.
-            void reconcileClients(context).then(() => {
+            void rediscover().then(() => {
                 for (const project of clients.values()) {
                     if (project.state === "ready") {
                         void refreshDependencyWatchers(project);
@@ -2762,12 +2820,7 @@ export async function activate(
         }),
     );
 
-    const restartServer = async () => {
-        await stopAllClients();
-        if (validateConfiguration(context.extensionPath)) {
-            await reconcileClients(context);
-        }
-    };
+    const restartServer = () => coordinator.request({ causes: ["command"] });
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
@@ -2777,26 +2830,20 @@ export async function activate(
 
             logLine(`Configuration changed. Servers running=${clients.size}`);
 
-            if (
-                clients.size === 0 &&
-                validateConfiguration(context.extensionPath)
-            ) {
-                logLine("Starting LSP server after configuration change.");
-                await reconcileClients(context);
-            } else if (
-                clients.size > 0 &&
-                (e.affectsConfiguration("aet-eaw-edit.experimental") ||
-                    e.affectsConfiguration("aet-eaw-edit.lsp.executable") ||
-                    e.affectsConfiguration("aet-eaw-edit.lua.analyzerPath"))
-            ) {
-                // The experimental flags travel once via initializationOptions, and the two
-                // executables are picked when the process starts - restart to apply any of them.
-                logLine(
-                    "Experimental features or executables changed - restarting LSP server.",
-                );
-                await restartServer();
-            } else {
-                validateConfiguration(context.extensionPath);
+            const affects = (section: string) =>
+                e.affectsConfiguration(section);
+            const reason = restartReason(affects);
+
+            // What travels once via initializationOptions, and the two executables picked when
+            // the process starts, restart the servers - see settingsRestart.ts. With none running,
+            // any change may be the one that lets one start. Every setting the validation checks
+            // is among the restart settings, so any other change has nothing new to report.
+            if (reason !== null || clients.size === 0) {
+                await coordinator.request({
+                    causes: reason === null ? ["start"] : [reason],
+                    effects: previewEffectsChanged(affects),
+                    assets: previewAssetsChanged(affects),
+                });
             }
         }),
     );
@@ -3712,7 +3759,8 @@ export async function activate(
     );
 
     if (validateConfiguration(context.extensionPath)) {
-        void reconcileClients(context);
+        // The first discovery, in the same queue as everything after it.
+        void rediscover();
     }
 }
 

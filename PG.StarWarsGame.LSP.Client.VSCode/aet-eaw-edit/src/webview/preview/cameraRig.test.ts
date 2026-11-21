@@ -13,9 +13,10 @@ import { standInContext } from "./viewportContext.testing";
 
 /**
  * A rig over a stand-in viewport: a model root, the hull as one part rooted on it, every mesh drawn, no
- * particle systems. The grid rebuilds are recorded rather than drawn.
+ * particle systems unless `reaches` gives some, one system per reach. The grid rebuilds are recorded
+ * rather than drawn.
  */
-function rigWith(): {
+function rigWith(reaches: number[] | null = []): {
     cameraRig: CameraRig;
     camera: THREE.PerspectiveCamera;
     target: THREE.Vector3;
@@ -26,6 +27,19 @@ function rigWith(): {
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
     const target = new THREE.Vector3();
     const grids: BoundingSphere[] = [];
+    // Null stands for a viewport still being put together: the particle rig is built last.
+    const particles =
+        reaches === null
+            ? undefined
+            : {
+                  particleSystems: new Map(
+                      reaches.map((reach, i) => [
+                          `system${i}`,
+                          { instance: { extent: () => reach } },
+                      ]),
+                  ),
+                  effectReach: () => Math.max(0, ...reaches),
+              };
     const hull: LoadedPart = {
         id: "hull",
         root: modelRoot,
@@ -43,7 +57,7 @@ function rigWith(): {
         assembly: { hull: () => hull },
         materials: {},
         modelRoot,
-        particles: { particleSystems: new Map(), effectReach: () => 0 },
+        particles,
         renderer: null,
     });
     return {
@@ -90,6 +104,63 @@ describe("CameraRig", () => {
             center: { x: 0, y: 0, z: 0 },
             radius: 1,
         });
+    });
+
+    // A particle file draws no meshes: its particle systems are all there is to frame (#431).
+    // The lighting asks for the sphere while the viewport is being built, before any particle rig exists.
+    it("measures an empty model as a unit sphere before the particle rig exists", () => {
+        const { cameraRig } = rigWith(null);
+
+        assert.deepEqual(cameraRig.boundingSphere(), {
+            center: { x: 0, y: 0, z: 0 },
+            radius: 1,
+        });
+    });
+
+    it("measures a subject with no drawn geometry by the reach of its particle systems", () => {
+        const { cameraRig } = rigWith([12, 40]);
+
+        assert.deepEqual(cameraRig.boundingSphere(), {
+            center: { x: 0, y: 0, z: 0 },
+            radius: 40,
+        });
+    });
+
+    it("frames a subject with no drawn geometry from outside its particle systems, grid and all", () => {
+        const { cameraRig, camera, target, grids } = rigWith([40]);
+
+        cameraRig.frameAll();
+
+        assert.ok(
+            camera.position.distanceTo(target) > 40,
+            `distance ${camera.position.distanceTo(target)}`,
+        );
+        assert.equal(grids[0].radius, 40);
+    });
+
+    it("keeps the near plane where the opening put it when the draw distance is picked again", () => {
+        const { cameraRig, camera } = rigWith([40]);
+        cameraRig.frameAll();
+        const near = camera.near;
+        const far = camera.far;
+
+        cameraRig.setDrawDistance(2);
+        cameraRig.setDrawDistance(1);
+
+        assert.equal(camera.near, near);
+        assert.equal(camera.far, far);
+    });
+
+    // The hull is the subject: a plume or a firing effect never pushes it into the distance.
+    it("measures a drawn model by its geometry, whatever its particle systems reach", () => {
+        const { cameraRig, modelRoot } = rigWith([500]);
+        modelRoot.add(box(0));
+        modelRoot.updateMatrixWorld(true);
+
+        assert.ok(
+            Math.abs(cameraRig.boundingSphere().radius - Math.sqrt(3)) < 1e-6,
+        );
+        assert.equal(cameraRig.boundingSphere(true).radius, 500);
     });
 
     it("frames the model at the fitted distance, aims at its centre and grows the grid with it", () => {

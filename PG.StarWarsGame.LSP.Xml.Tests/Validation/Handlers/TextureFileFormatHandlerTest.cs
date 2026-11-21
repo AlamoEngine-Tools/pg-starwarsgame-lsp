@@ -22,6 +22,8 @@ public sealed class TextureFileFormatHandlerTest
     [InlineData("ART/Units/Foo.DDS")]
     [InlineData("icon.tga")]
     [InlineData("icon.dds")]
+    [InlineData("icon.png")]
+    [InlineData("ART/Units/Foo.PNG")]
     public void Valid_texture_extensions_return_no_diagnostics(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(TextureTag, value), XmlHandlerTestFixtures.EmptyCtx)
@@ -30,7 +32,6 @@ public sealed class TextureFileFormatHandlerTest
     }
 
     [Theory]
-    [InlineData("icon.png")]
     [InlineData("icon.bmp")]
     [InlineData("icon.jpg")]
     [InlineData("icon.alo")]

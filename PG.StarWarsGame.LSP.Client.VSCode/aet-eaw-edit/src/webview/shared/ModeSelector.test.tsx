@@ -138,4 +138,29 @@ describe("ModeSelector", () => {
 
         assert.match(html, /title="Look from the front"/);
     });
+
+    /** A whole choice with nothing to act on: every option says the one reason, none can be taken. */
+    it("disables every option with the group's reason, the chosen one included", () => {
+        const html = render(
+            <ModeSelector
+                label="Skeleton"
+                value="off"
+                disabled
+                disabledReason="No skeleton loaded"
+                options={[
+                    { id: "off", label: "Off", title: "No skeleton" },
+                    { id: "always", label: "Always" },
+                ]}
+                onSelect={() => undefined}
+            />,
+        );
+
+        const buttons = [...html.matchAll(/<button[^>]*>/g)].map((m) => m[0]);
+        assert.equal(buttons.length, 2);
+        for (const button of buttons) {
+            assert.match(button, /disabled=""/);
+            assert.match(button, /title="No skeleton loaded"/);
+        }
+        assert.match(html, /role="radiogroup"[^>]*aria-disabled="true"/);
+    });
 });

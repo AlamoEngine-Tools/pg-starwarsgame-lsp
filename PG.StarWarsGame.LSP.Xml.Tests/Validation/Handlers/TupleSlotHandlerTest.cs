@@ -118,6 +118,23 @@ public sealed class TupleSlotHandlerTest
     }
 
     [Fact]
+    public void Texture_AsWrittenInTheGame_DdsInTheProject_WarnsThatTheDdsIsNotOpened_AsAWholeTextureTagDoes()
+    {
+        var index = GameIndex.Empty with
+        {
+            AssetFiles = MergedAssetFileIndex.MergeLayered(["data/art/textures/i_unit.tga"],
+                [("data/art/textures/i_unit.dds", 0)])
+        };
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///units.xml", "en")
+            { Messages = TestCatalogues.English };
+
+        var d = Assert.Single(new TupleSlotAssetHandler().Handle(Fact(Icon, "i_unit.tga"), ctx));
+
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(DiagnosticIds.TextureDdsNotReached, d.Id);
+    }
+
+    [Fact]
     public void Texture_AMissingFile_IsAWarning_UnderTheAssetId()
     {
         var d = Assert.Single(new TupleSlotAssetHandler().Handle(Fact(Icon, "i_gone.tga"), WithModels()));

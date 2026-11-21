@@ -188,3 +188,88 @@ export async function previewNotes(count: number, timeout = 120_000): Promise<No
         return { tone: row.tone, id, text: id === "" ? row.text : row.text.slice(0, -(id.length + 1)) };
     });
 }
+
+export interface Sampling {
+    found: boolean;
+    minFilter: string;
+    magFilter: string;
+    /** The mip levels the GPU holds for the texture. */
+    levels: number;
+}
+
+/**
+ * How the GPU samples a texture the model names, read off the GL texture itself, once it is there. `name` is
+ * lower case. Run inside the preview's webview.
+ */
+export async function textureSampling(name: string, timeout = 60_000): Promise<Sampling> {
+    return browser.waitUntil(
+        async () =>
+            browser.execute((wanted: string) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const v = (window as unknown as { aetDebugViewport: any }).aetDebugViewport;
+                const texture = v.textures.get(wanted);
+                const handle = texture === undefined ? undefined : v.renderer.properties.get(texture).__webglTexture;
+                if (handle === undefined) {
+                    return false;
+                }
+                const gl = v.renderer.getContext() as WebGL2RenderingContext;
+                const names = new Map<number, string>([
+                    [gl.NEAREST, "NEAREST"],
+                    [gl.LINEAR, "LINEAR"],
+                    [gl.NEAREST_MIPMAP_NEAREST, "NEAREST_MIPMAP_NEAREST"],
+                    [gl.LINEAR_MIPMAP_NEAREST, "LINEAR_MIPMAP_NEAREST"],
+                    [gl.NEAREST_MIPMAP_LINEAR, "NEAREST_MIPMAP_LINEAR"],
+                    [gl.LINEAR_MIPMAP_LINEAR, "LINEAR_MIPMAP_LINEAR"],
+                ]);
+                gl.bindTexture(gl.TEXTURE_2D, handle);
+                const result = {
+                    found: true,
+                    minFilter: names.get(gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER)) ?? "?",
+                    magFilter: names.get(gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER)) ?? "?",
+                    levels: gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_IMMUTABLE_LEVELS) as number,
+                };
+                // The bind went past three's state cache; reset it so the next frame binds afresh.
+                v.renderer.resetState();
+                return result;
+            }, name),
+        { timeout, timeoutMsg: `The texture '${name}' never reached the GPU` },
+    ) as Promise<Sampling>;
+}
+
+/** Picks a position of the Renderer switch, by its label. Run inside the preview's webview. */
+export async function pickRenderer(label: string): Promise<void> {
+    await press(`//*[@aria-label='Which renderer draws the model']//button[normalize-space()='${label}']`);
+    await browser.pause(2_000);
+}
+
+/**
+ * The preview's notes once they pass the test, opening the severity tag's list when it is closed. Unlike
+ * `previewNotes`, no count is named: the rows are read until the test holds. Run inside the preview's webview.
+ */
+export async function previewNotesWhen(test: (notes: Note[]) => boolean, timeoutMsg: string, timeout = 120_000): Promise<Note[]> {
+    let notes: Note[] = [];
+    try {
+        await browser.waitUntil(
+            async () => {
+                const rows = await browser.execute(() => {
+                    if (document.querySelector(".preview-problems") === null) {
+                        document.querySelector<HTMLElement>(".validate-btn")?.click();
+                    }
+                    return Array.from(document.querySelectorAll(".preview-problems .problem-row")).map((row) => ({
+                        tone: (row.querySelector('[class*="sev-"]')?.className.match(/sev-(\w+)/) ?? [])[1] ?? "",
+                        text: ((row as HTMLElement).innerText ?? "").replace(/\s+/g, " ").trim(),
+                    }));
+                });
+                notes = rows.map((row) => {
+                    const id = / (aetswg-\d{3}-\d{4})$/.exec(row.text)?.[1] ?? "";
+                    return { tone: row.tone, id, text: id === "" ? row.text : row.text.slice(0, -(id.length + 1)) };
+                });
+                return test(notes);
+            },
+            { timeout, interval: 1_000 },
+        );
+    } catch {
+        throw new Error(`${timeoutMsg}; the notes said ${JSON.stringify(notes)}`);
+    }
+    return notes;
+}

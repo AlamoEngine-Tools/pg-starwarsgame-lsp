@@ -42,7 +42,8 @@ const OBJECT_LIGHT = new THREE.Vector3();
 export const EXTRUSION_RADII = 4;
 
 /** Where the one shadow colour can actually be seen. */
-export type ShadowTintReach = "ground" | "model" | "both" | "none";
+export type ShadowTintReach =
+    "ground" | "model" | "both" | "none" | "uncast" | "off";
 
 /**
  * What the shadow colour reaches right now, which is what decides whether its control is live.
@@ -57,11 +58,29 @@ export type ShadowTintReach = "ground" | "model" | "both" | "none";
  * volume, in Game mode, tints its own hull with the floor switched off. Its own info badge said so.
  *
  * Only the last case is honestly dead, and that is the only one the control should refuse in.
+ *
+ * `uncast` is the other dead case, and it overrides the floor: nothing casts a shadow at all - the
+ * Game renderer on a model without a shadow mesh, with no stand-in - so the ground has nothing to
+ * catch either.
+ *
+ * `off` is the third, and overrides the floor too: the Game renderer on a model whose shadow mesh
+ * a cloak, a clip or the detail level switches off. Its render geometry casts no shadow-map shadow
+ * under Game, so the ground has nothing to catch while the volumes are off.
  */
 export function shadowTintReach(
     floor: boolean,
     stencilCasting: boolean,
+    uncast: boolean,
+    switchedOff = false,
 ): ShadowTintReach {
+    if (uncast) {
+        return "uncast";
+    }
+
+    if (switchedOff) {
+        return "off";
+    }
+
     if (floor && stencilCasting) {
         return "both";
     }
@@ -71,6 +90,32 @@ export function shadowTintReach(
     }
 
     return stencilCasting ? "model" : "none";
+}
+
+/** Why the stand-in shadow cannot be switched on, or null when it can. */
+export type StandInBlock = "default" | "shadowMesh" | "particle" | null;
+
+/**
+ * Whether the Game renderer's stand-in shadow can be asked for.
+ *
+ * Only where the game draws no shadow and the preview has render geometry to cast one from: the
+ * Default renderer always casts the shadow map, a model with a shadow mesh casts the game's own,
+ * and a particle file has no render geometry at all.
+ */
+export function standInBlock(subject: {
+    game: boolean;
+    shadowMesh: boolean;
+    particleFile: boolean;
+}): StandInBlock {
+    if (subject.particleFile) {
+        return "particle";
+    }
+
+    if (!subject.game) {
+        return "default";
+    }
+
+    return subject.shadowMesh ? "shadowMesh" : null;
 }
 
 /**
@@ -189,6 +234,11 @@ void main() {
  * `renderOrder`: the volumes draw after the model, and the darken quad after them. That way one
  * `renderer.render` still produces the finished frame, and the pass works unchanged whether the
  * frame is going to the canvas, through the heat composite, or on to bloom.
+ *
+ * The darken lands after the OPAQUE meshes and before the transparent ones, as the game draws its
+ * shadow phase before its transparent phase: the volumes and the darken are not `transparent`, so
+ * three draws them at the end of its opaque list, and every transparent mesh - glass, engine glow,
+ * an additive light mesh - in its transparent list afterwards, never darkened. Measured by PRV-56.
  */
 export class ShadowVolumePass {
     /** The full-screen darken, added to the scene once. */
@@ -321,6 +371,17 @@ export class ShadowVolumePass {
         return this.drawn.some(
             (mesh) => !this.uncounted.has(mesh.parent as THREE.Mesh),
         );
+    }
+
+    /**
+     * Whether this model authors a shadow mesh at all, counting now or not.
+     *
+     * The model's fact the Game renderer's shadow rule reads: a volume a clip, a cloak or a detail
+     * level has switched off is still the model's shadow mesh, so it still decides that the render
+     * geometry casts no stand-in.
+     */
+    get authored(): boolean {
+        return this.bySource.size > 0;
     }
 
     /**

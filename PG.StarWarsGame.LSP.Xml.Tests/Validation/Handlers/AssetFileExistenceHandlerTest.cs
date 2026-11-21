@@ -140,9 +140,26 @@ public sealed class AssetFileExistenceHandlerTest
         Assert.Empty(TextureSut.Handle(fact, ctx));
     }
 
-    // ── TGA/DDS interchangeability ───────────────────────────────────────────
-    // The engine treats TGA and DDS as one texture: a .tga reference is satisfied by the .dds
-    // (and vice versa); TGA wins when both exist. Only both-missing is a real problem.
+    // ── the texture lookup (#420) ────────────────────────────────────────────
+    // Measured in the game (FoC x64, 2024 release): the name as written, then the name up to its FIRST
+    // dot with .dds appended, nothing else. The cases are shared with the server's asset resolver.
+
+    public static IEnumerable<object?[]> TextureCases => TextureLookupCases.All;
+
+    [Theory]
+    [MemberData(nameof(TextureCases))]
+    public void Texture_FollowsTheGamesLookup(string named, string[] onDisk, string? expected)
+    {
+        var index = new MergedAssetFileIndex([.. onDisk.Select(f => "data/art/textures/" + f.ToLowerInvariant())]);
+
+        var found = AssetFileLookup.Resolve(index, named, AssetKindRules.For(ReferenceKind.TextureFile)!);
+
+        Assert.Equal(expected?.ToLowerInvariant(), found is null ? null : MergedAssetFileIndex.FileNameOf(found));
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), named);
+        var ctx = CtxWith([.. onDisk.Select(f => "data/art/textures/" + f.ToLowerInvariant())]);
+        Assert.Equal(expected is null,
+            TextureSut.Handle(fact, ctx).Any(d => d.Severity == XmlDiagnosticSeverity.Warning));
+    }
 
     [Fact]
     public void Texture_TgaReferenced_OnlyDdsPresent_EmitsNothing()
@@ -154,12 +171,69 @@ public sealed class AssetFileExistenceHandlerTest
     }
 
     [Fact]
-    public void Texture_DdsReferenced_OnlyTgaPresent_EmitsNothing()
+    public void Texture_DdsReferenced_OnlyTgaPresent_WarnsThatTheGameDoesNotLookForTheTga()
     {
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.dds");
         var ctx = CtxWith("data/art/textures/foo.tga");
 
-        Assert.Empty(TextureSut.Handle(fact, ctx));
+        var d = Assert.Single(TextureSut.Handle(fact, ctx));
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("'foo.dds'", d.Message);
+        Assert.Contains("'foo.tga' exists, but the game does not look for it", d.Message);
+    }
+
+    [Fact]
+    public void Texture_DdsReferenced_NeitherPresent_WarnsWithoutTheHint()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.dds");
+
+        var d = Assert.Single(TextureSut.Handle(fact, CtxWith("data/art/textures/bar.tga")));
+        Assert.DoesNotContain("does not look for", d.Message);
+    }
+
+    [Fact]
+    public void Texture_PngPresent_IsInformationRecommendingDds()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.png");
+
+        var d = Assert.Single(TextureSut.Handle(fact, CtxWith("data/art/textures/foo.png")));
+        Assert.Equal(XmlDiagnosticSeverity.Information, d.Severity);
+        Assert.Equal(DiagnosticIds.TextureIsPng, d.Id);
+        Assert.Contains("'foo.png'", d.Message);
+        Assert.Contains("DDS", d.Message);
+    }
+
+    [Fact]
+    public void Texture_PngNamedButDdsFound_CarriesNoPngNote()
+    {
+        // The note is about the file the game opens: here that is the .dds.
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.png");
+
+        Assert.Empty(TextureSut.Handle(fact, CtxWith("data/art/textures/foo.dds")));
+    }
+
+    [Fact]
+    public void Texture_TwoDots_IsCutAtTheFirst()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.hd.tga");
+
+        Assert.Empty(TextureSut.Handle(fact, CtxWith("data/art/textures/foo.dds")));
+        var d = Assert.Single(TextureSut.Handle(fact, CtxWith("data/art/textures/foo.hd.dds")));
+        Assert.Contains("'foo.dds'", d.Message);
+    }
+
+    [Fact]
+    public void Texture_PngInAList_CarriesItsNoteAtItsOwnPosition()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("Textures", XmlValueType.NameReferenceList,
+            referenceKind: ReferenceKind.TextureFile);
+        var fact = XmlHandlerTestFixtures.MakeFact(tag, "foo.tga, bar.png");
+
+        var d = Assert.Single(TextureSut.Handle(fact,
+            CtxWith("data/art/textures/foo.tga", "data/art/textures/bar.png")));
+        Assert.Equal(DiagnosticIds.TextureIsPng, d.Id);
+        Assert.Equal(9, d.OverrideColumn);
+        Assert.Equal(7, d.OverrideLength);
     }
 
     [Fact]
@@ -168,6 +242,94 @@ public sealed class AssetFileExistenceHandlerTest
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile),
             "data/art/textures/foo.tga");
         var ctx = CtxWith("data/art/textures/foo.dds");
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    // ── a .dds the game never reaches (#420) ─────────────────────────────────
+    //
+    // The game opens the name as written through its whole file system - mod folders, loose files,
+    // archives - and tries the .dds only when that open fails. So a project's .dds does not replace a
+    // .tga of the same stem that a lower layer or the game ships, and nothing in the files says why.
+
+    private static DiagnosticsContext CtxLayered(string[] shipped, params (string Path, int? Rank)[] workspace)
+    {
+        var index = GameIndex.Empty with { AssetFiles = MergedAssetFileIndex.MergeLayered(shipped, workspace) };
+        return new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en")
+            { Messages = TestCatalogues.English };
+    }
+
+    [Fact]
+    public void Texture_AsWrittenInTheGame_DdsInTheProject_WarnsThatTheDdsIsNotOpened()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.tga");
+        var ctx = CtxLayered(["data/art/textures/foo.tga"], ("data/art/textures/foo.dds", 0));
+
+        var d = Assert.Single(TextureSut.Handle(fact, ctx));
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(DiagnosticIds.TextureDdsNotReached, d.Id);
+        Assert.Contains("'foo.tga'", d.Message);
+        Assert.Contains("'data/art/textures/foo.tga'", d.Message);
+        Assert.Contains("'data/art/textures/foo.dds'", d.Message);
+    }
+
+    [Fact]
+    public void Texture_AsWrittenInADependency_DdsInTheRootProject_WarnsThatTheDdsIsNotOpened()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.tga");
+        var ctx = CtxLayered([], ("data/art/textures/foo.tga", 0), ("data/art/textures/foo.dds", 1));
+
+        var d = Assert.Single(TextureSut.Handle(fact, ctx));
+        Assert.Equal(DiagnosticIds.TextureDdsNotReached, d.Id);
+    }
+
+    [Theory]
+    // Both in one layer: the name as written is the obvious pick.
+    [InlineData(1, 1)]
+    // The .dds below the name as written: the layer above wins, as for any file.
+    [InlineData(1, 0)]
+    public void Texture_DdsNotAboveTheNameAsWritten_EmitsNothing(int tgaRank, int ddsRank)
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.tga");
+        var ctx = CtxLayered([], ("data/art/textures/foo.tga", tgaRank), ("data/art/textures/foo.dds", ddsRank));
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void Texture_ProjectNameAsWritten_DdsInTheGame_EmitsNothing()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.tga");
+        var ctx = CtxLayered(["data/art/textures/foo.dds"], ("data/art/textures/foo.tga", 0));
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void Texture_BothShippedByTheGame_EmitsNothing()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.tga");
+        var ctx = CtxLayered(["data/art/textures/foo.tga", "data/art/textures/foo.dds"]);
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void Texture_OnlyTheProjectsDds_IsTheFallback_EmitsNothing()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.tga");
+        var ctx = CtxLayered(["data/art/textures/bar.tga"], ("data/art/textures/foo.dds", 0));
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void Texture_AnIconInsideAMegaTexture_DdsInTheProject_EmitsNothing()
+    {
+        // The catalog lists a mega texture's icons by their bare names. Such a name is no file the texture
+        // lookup opens, so nothing is said about which file it finds.
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "i_unit.tga");
+        var ctx = CtxLayered(["i_unit.tga"], ("data/art/textures/i_unit.dds", 0));
 
         Assert.Empty(TextureSut.Handle(fact, ctx));
     }

@@ -37,6 +37,7 @@ import {
     IconBone,
     IconBook,
     IconBox,
+    IconBrightnessHalf,
     IconCamera,
     IconCategory,
     IconCheck,
@@ -183,6 +184,10 @@ const ICONS = {
     lightLow: IconSunLow,
     wind: IconWind,
     bloom: IconSparkles,
+
+    // A disc half in shade: a shadow the preview casts in place of one the game does not draw.
+    // Not `shadowVolume`'s glyph, which is the model's own shadow mesh - the thing this stands in for.
+    standInShadow: IconBrightnessHalf,
 
     // A sweep of coverage from a point, which is what a weapon's firing arc is.
     arcs: IconRadar,

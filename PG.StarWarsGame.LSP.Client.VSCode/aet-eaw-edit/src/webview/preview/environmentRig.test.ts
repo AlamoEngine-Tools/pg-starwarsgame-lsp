@@ -6,23 +6,39 @@ import { describe, it } from "node:test";
 
 import * as THREE from "three";
 
+import { DEFAULT_LIGHTS } from "../../shared/viewerSettings";
 import { VIEWPORT_BACKGROUND } from "./backdrop";
 import { type EnvironmentHost, EnvironmentRig } from "./environmentRig";
+import { lightDirection } from "./lighting";
 import { shadowCatcherOpacity } from "./materialState";
 import { standInContext } from "./viewportContext.testing";
 
 /**
  * A rig over a stand-in viewport: an empty scene, a camera, a unit model at the origin and no particle
- * systems. Nothing here draws a frame, so the renderer is never reached.
+ * systems. Nothing here draws a frame, so the renderer is only asked for its drawing-buffer size.
  */
-function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
+function rigWith(
+    drawn: THREE.Mesh[] = [],
+    room: {
+        centre?: { x: number; y: number; z: number };
+        drawingBuffer?: { width: number; height: number };
+    } = {},
+): {
+    environment: EnvironmentRig;
+    scene: THREE.Scene;
+} {
     const scene = new THREE.Scene();
+    const centre = room.centre ?? { x: 0, y: 0, z: 0 };
+    const buffer = room.drawingBuffer ?? { width: 100, height: 100 };
     const context = standInContext({
         levels: { alt: 0, lod: 0 },
         rules: {},
         camera: new THREE.PerspectiveCamera(45, 1, 0.1, 10000),
         canvas: { clientWidth: 100, clientHeight: 100 },
-        renderer: null,
+        renderer: {
+            getDrawingBufferSize: (target: THREE.Vector2) =>
+                target.set(buffer.width, buffer.height),
+        },
         scene,
         particles: {
             particleSystems: new Map(),
@@ -30,9 +46,12 @@ function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
             wind: { heading: 0, speed: 0 },
         },
         cameraRig: {
-            boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
+            boundingSphere: () => ({ center: centre, radius: 1 }),
         },
-        assembly: { forEachDrawnMesh: () => undefined },
+        assembly: {
+            forEachDrawnMesh: (visit: (mesh: THREE.Mesh) => void) =>
+                drawn.forEach(visit),
+        },
         animation: { skinPalette: () => new Float32Array(0) },
     });
     const host = {
@@ -51,6 +70,67 @@ const keyLightOf = (scene: THREE.Scene): THREE.DirectionalLight => {
 };
 
 describe("EnvironmentRig", () => {
+    /** A solid render mesh, and a shadow mesh, as a model's file names their shaders. */
+    const hull = (): THREE.Mesh => {
+        const mesh = new THREE.Mesh();
+        mesh.userData.alamo = { alamoShader: "MeshGloss.fx" };
+        return mesh;
+    };
+    const shadowMesh = (): THREE.Mesh => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        mesh.userData.alamo = { alamoShader: "MeshShadowVolume.fx" };
+        return mesh;
+    };
+
+    it("casts no shadow-map shadow from render geometry in the Game renderer", () => {
+        // #412: a model without a shadow mesh cast the Default renderer's shadow under Game, which
+        // the game never draws.
+        const mesh = hull();
+        const { environment } = rigWith([mesh]);
+
+        environment.setShadowVolumes(true);
+
+        assert.equal(mesh.castShadow, false);
+        assert.equal(environment.castsIntoShadowMap(mesh), false);
+    });
+
+    it("casts the stand-in shadow under Game while it is on, and stops when it is off", () => {
+        const mesh = hull();
+        const { environment } = rigWith([mesh]);
+        environment.setShadowVolumes(true);
+
+        environment.setStandInShadow(true);
+        assert.equal(mesh.castShadow, true);
+
+        environment.setStandInShadow(false);
+        assert.equal(mesh.castShadow, false);
+    });
+
+    it("casts no stand-in from a model with a shadow mesh", () => {
+        const mesh = hull();
+        const { environment } = rigWith([mesh]);
+        const root = new THREE.Group();
+        root.add(shadowMesh());
+        environment.setShadowVolumes(true);
+        environment.setStandInShadow(true);
+
+        environment.collectShadowVolumes(root);
+
+        assert.equal(environment.shadowMesh().authored, true);
+        assert.equal(mesh.castShadow, false);
+    });
+
+    it("casts from render geometry in the Default renderer, stand-in or none", () => {
+        const mesh = hull();
+        const { environment } = rigWith([mesh]);
+
+        environment.setShadowVolumes(false);
+        assert.equal(mesh.castShadow, true);
+
+        environment.setStandInShadow(true);
+        assert.equal(mesh.castShadow, true);
+    });
+
     /**
      * The seam a model's whole look reaches every translated material through: the per-model light
      * scale the effects multiply by - its colour the tint, its alpha the fade.
@@ -78,6 +158,75 @@ describe("EnvironmentRig", () => {
             { r: 1, g: 0.25, b: 0.25, a: 0.5 },
         );
         assert.deepEqual(faded.lightScale, [1, 0.25, 0.25, 0.5]);
+    });
+
+    /** One frame for a mesh at the origin, with nothing but the rig to read. */
+    const frameOf = (environment: EnvironmentRig) => {
+        const identity = new THREE.Matrix4();
+        return environment.frameFor(
+            new THREE.Mesh(),
+            identity,
+            identity,
+            identity,
+            new THREE.Vector3(),
+        );
+    };
+
+    // #418, measured in the game (FoC x64, 2024 release): DIR_LIGHT_SPECULAR_0 is twice the specular
+    // colour times the sun's intensity.
+    it("hands the sun's highlight as twice its specular times its intensity", () => {
+        const { environment } = rigWith();
+        environment.setLightRig({
+            ...DEFAULT_LIGHTS,
+            sun: { ...DEFAULT_LIGHTS.sun, intensity: 0.75 },
+            specular: [1, 0.5, 0.25],
+        });
+
+        assert.deepEqual(
+            frameOf(environment).lights[0]?.specular,
+            [1.5, 0.75, 0.375, 0],
+        );
+    });
+
+    // #418, measured: the game writes only light 0's uniforms. A fill's DIR_LIGHT_*_1 and _2 keep
+    // whatever the effect declares, so the frame carries no fill at all.
+    it("hands the shaders the sun alone, no fill light", () => {
+        const { environment } = rigWith();
+
+        assert.equal(frameOf(environment).lights.length, 1);
+    });
+
+    // #418: the key light is PLACED off the model's centre for its shadow camera, so its position is
+    // not a direction once the model is off the origin.
+    it("hands the rig's sun direction wherever the model stands", () => {
+        const { environment } = rigWith([], {
+            centre: { x: 400, y: -50, z: 900 },
+        });
+        environment.setLightAngles(30, 20);
+
+        const vector = frameOf(environment).lights[0]?.vector ?? [];
+        const wanted = lightDirection(30, 20);
+        [wanted.x, wanted.y, wanted.z].forEach((component, axis) =>
+            assert.ok(
+                Math.abs((vector[axis] ?? NaN) - component) < 1e-9,
+                `axis ${axis}: ${vector[axis]} against ${component}`,
+            ),
+        );
+    });
+
+    // #418: RESOLUTION_CONSTANTS in the drawing buffer's pixels - not the canvas's CSS pixels, which
+    // differ by the device pixel ratio - with the half-texel terms in z and w.
+    it("hands the resolution in drawing-buffer pixels with the half-texel terms", () => {
+        const { environment } = rigWith([], {
+            drawingBuffer: { width: 200, height: 125 },
+        });
+
+        assert.deepEqual(frameOf(environment).resolution, [
+            200,
+            125,
+            0.5 / 200,
+            0.5 / 125,
+        ]);
     });
 
     it("puts the room in the scene, the ground hidden until asked for", () => {

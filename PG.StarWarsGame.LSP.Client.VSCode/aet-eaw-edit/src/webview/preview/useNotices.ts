@@ -16,6 +16,8 @@ export interface NoticesInputs {
     anyShaderSource: boolean;
     attachmentIssues: string[];
     colourFindings: ColourFinding[];
+    /** The Game renderer is on, and the model on stage authors no shadow mesh. */
+    noShadowMesh: boolean;
     problems: PreviewProblem[];
     problemsOpen: boolean;
     shaderRequested: boolean;
@@ -29,6 +31,7 @@ export function useNotices({
     anyShaderSource,
     attachmentIssues,
     colourFindings,
+    noShadowMesh,
     problems,
     problemsOpen,
     shaderRequested,
@@ -93,11 +96,26 @@ export function useNotices({
                       },
                   ];
 
+        // Info, like the shader gap: the game draws this model no shadow, which is what the preview
+        // now draws too. Said so a missing shadow mesh is not mistaken for a preview fault.
+        const fromShadow = noShadowMesh
+            ? [
+                  {
+                      severity: "info",
+                      message: l10n.t(
+                          "No shadow mesh: The game draws no shadow for this model",
+                      ),
+                      hardpointId: null,
+                  },
+              ]
+            : [];
+
         return [
             ...problems,
             ...fromAttachments,
             ...fromColour,
             ...fromShaders,
+            ...fromShadow,
             ...fromShield,
         ];
     }, [
@@ -107,6 +125,7 @@ export function useNotices({
         translatedOn,
         shaderRequested,
         anyShaderSource,
+        noShadowMesh,
         shieldOffShader,
     ]);
 

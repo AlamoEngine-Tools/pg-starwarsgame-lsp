@@ -21,7 +21,6 @@ public sealed class SymbolCatalog
     private const string GameObjectType = GameTypeNames.GameObjectType;
     private const int MostPerPage = 1000;
 
-    private static readonly string[] s_textureExtensions = [".tga", ".dds"];
     private static readonly string[] s_audioExtensions = [".wav", ".mp3"];
 
     private readonly Dictionary<string, IReadOnlyList<string>> _outlines;
@@ -335,7 +334,8 @@ public sealed class SymbolCatalog
             .. assets.GetByExtension(".alo").Select(p =>
                 (index.ParticleSystems.Contains(ModelBoneKey.From(p)) ? "particleSystems" : "models", p)),
             .. assets.GetByExtension(".ala").Select(p => ("animations", p)),
-            .. s_textureExtensions.SelectMany(assets.GetByExtension).Select(p => ("textures", p)),
+            // Every format the game's texture lookup loads, PNG among them (#420).
+            .. GameTextureName.Extensions.SelectMany(assets.GetByExtension).Select(p => ("textures", p)),
             .. s_audioExtensions.SelectMany(assets.GetByExtension).Select(p => ("audio", p))
         ];
 

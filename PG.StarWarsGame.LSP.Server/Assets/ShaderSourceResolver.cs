@@ -45,11 +45,32 @@ public sealed class ShaderSourceResolver(
     private static readonly string[] ShaderExtensions = [".fx", ".fxh"];
 
     /// <summary>
-    ///     Whether a managed copy of the base shaders is actually reachable.
+    ///     The base set: the header every effect includes, and the particle effects the preview
+    ///     requests by name, one per emitter render mode.
+    /// </summary>
+    /// <remarks>
+    ///     What tells the base sources from a mod's shader folder, which holds compiled <c>.fxo</c>
+    ///     and at most a few sources of its own - often with a copy of the header, never the particle
+    ///     effects in the folders measured. The client's <c>shared/baseShaders.ts</c> is the same list,
+    ///     and <c>scripts/base-shaders.test.js</c> holds the two together.
+    /// </remarks>
+    public static IReadOnlyList<string> BaseShaders { get; } =
+    [
+        "AlamoEngine.fxh",
+        "PrimOpaque.fx", "PrimAdditive.fx", "PrimAlpha.fx", "PrimModulate.fx",
+        "PrimDepthSpriteAdditive.fx", "PrimDepthSpriteAlpha.fx", "PrimDepthSpriteModulate.fx",
+        "PrimDiffuseAlpha.fx", "StencilDarkenToAlpha.fx", "StencilDarkenFinalBlur.fx", "PrimHeat.fx",
+        "PrimParticleBumpAlpha.fx", "PrimDecalBumpAlpha.fx", "PrimAlphaScanlines.fx"
+    ];
+
+    /// <summary>
+    ///     Whether a managed copy of the base shaders is actually reachable: every file of
+    ///     <see cref="BaseShaders" />, in any of the layouts <see cref="Read" /> looks in.
     /// </summary>
     /// <remarks>
     ///     Reported so the UI can explain a plain-looking preview instead of leaving the author to
-    ///     wonder whether something is broken.
+    ///     wonder whether something is broken. One <c>.fx</c> file is not enough: a mod's shader
+    ///     folder has that, and the preview translates nothing from it (#395).
     /// </remarks>
     public bool HasManagedShaders
     {
@@ -57,8 +78,8 @@ public sealed class ShaderSourceResolver(
         {
             var directory = ManagedDirectory();
             return directory is not null
-                   && fileHelper.FileSystem.Directory.EnumerateFiles(
-                       directory, "*.fx", SearchOption.AllDirectories).Any();
+                   && BaseShaders.All(name => ManagedCandidates(directory, name)
+                       .Any(fileHelper.FileSystem.File.Exists));
         }
     }
 

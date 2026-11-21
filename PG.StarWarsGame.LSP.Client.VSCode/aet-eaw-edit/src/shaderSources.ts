@@ -19,7 +19,7 @@ import * as vscode from "vscode";
 import * as yauzl from "yauzl";
 
 import { checkArchive, entryVerdict, extractionVerdict } from "./shaderArchive";
-import { hasShaderSources } from "./shaderLayout";
+import { hasShaderSources, shaderFolderKind } from "./shaderLayout";
 
 export { hasShaderSources };
 
@@ -65,6 +65,20 @@ const DOWNLOAD_NOW = (): string => vscode.l10n.t("Download now");
 const OPEN_DOWNLOAD_PAGE = (): string => vscode.l10n.t("Open download page");
 const CHOOSE_FOLDER = (): string => vscode.l10n.t("Choose folder");
 
+/**
+ * The word that a folder holds a mod's or the game's shaders, not the base sources.
+ *
+ * #395: the setting was pointed at a mod's `Data\Art\Shaders`, which the command then called the
+ * base sources. A project's own shaders are read from there without the setting, so the setting is
+ * never the answer for them.
+ */
+function installedShadersNote(directory: string): string {
+    return vscode.l10n.t(
+        "EaWEdit: \"{0}\" holds a mod's or the game's shaders, not the base shader sources. A project's own shaders need no setting.",
+        directory,
+    );
+}
+
 /** The managed directory, or undefined when the user has not supplied one. */
 export function shaderDirectory(): string | undefined {
     const configured = vscode.workspace
@@ -88,8 +102,9 @@ export async function offerShaderSources(
     context?: vscode.ExtensionContext,
 ): Promise<void> {
     const configured = shaderDirectory();
+    const kind = shaderFolderKind(configured);
 
-    if (hasShaderSources(configured)) {
+    if (kind === "base") {
         void vscode.window.showInformationMessage(
             vscode.l10n.t(
                 'EaWEdit: Base shader sources found in "{0}".',
@@ -97,6 +112,14 @@ export async function offerShaderSources(
             ),
         );
         return;
+    }
+
+    // Said beside the offer rather than instead of it: the folder set is the wrong one, and the
+    // download is still the way to the right one.
+    if (kind === "installed") {
+        void vscode.window.showWarningMessage(
+            installedShadersNote(configured!),
+        );
     }
 
     // Download first when it is available: it is the answer most people want, and the manual route
@@ -140,8 +163,14 @@ export async function offerShaderSources(
     }
 
     const directory = picked[0].fsPath;
+    const pickedKind = shaderFolderKind(directory);
 
-    if (!hasShaderSources(directory)) {
+    if (pickedKind === "installed") {
+        void vscode.window.showWarningMessage(installedShadersNote(directory));
+        return;
+    }
+
+    if (pickedKind !== "base") {
         void vscode.window.showWarningMessage(
             vscode.l10n.t(
                 'EaWEdit: No .fx files found in "{0}". Pick the folder the archive extracted to.',
@@ -162,9 +191,7 @@ export async function offerShaderSources(
         );
 
     void vscode.window.showInformationMessage(
-        vscode.l10n.t(
-            "EaWEdit: Base shader sources set. Reload the window to pick them up.",
-        ),
+        vscode.l10n.t("EaWEdit: Base shader sources set."),
     );
 }
 

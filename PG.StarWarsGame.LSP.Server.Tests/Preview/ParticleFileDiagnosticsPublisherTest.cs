@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
-using System.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
@@ -12,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
+using static PG.StarWarsGame.LSP.Server.Tests.Preview.ParticleFileBytes;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 
@@ -43,6 +43,27 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
         Assert.Contains("0x7F", d.Message.Text());
         Assert.Equal(0, d.Range.Start.Line);
+    }
+
+    [Fact]
+    public async Task RepublishAll_SaysEachSkippedChunkOncePerFile()
+    {
+        // #394: three emitters carrying the same foreign chunk and the Particle Editor's link group,
+        // and one more chunk at the system's own level. One line each, naming the emitters - not a
+        // "skipped" line per emitter that reads as if the system were.
+        var linked = Concat(Chunk(0x007F, false, I32(1)), Chunk(0x0100, false, I32(3)));
+        var published = new List<PublishDiagnosticsParams>();
+        var publisher = Publisher(published, new FakeAssets().With(FlaggedPath,
+            ParticleSystemWith(Chunk(0x007E, false, I32(1)), Emitter(linked), Emitter(linked), Emitter(linked))));
+
+        await publisher.RepublishAllAsync(CancellationToken.None);
+
+        Assert.Equal([
+                "Emitters 0-2 - chunk 0x7F is not read by the game and has no effect",
+                "Emitters 0-2 - the Particle Editor's link group is not read by the game and has no effect",
+                "Particle system - chunk 0x7E is not read by the game and has no effect"
+            ],
+            Assert.Single(published).Diagnostics.Select(d => d.Message.Text()));
     }
 
     [Fact]
@@ -143,80 +164,5 @@ public sealed class ParticleFileDiagnosticsPublisherTest
         {
             _files[path] = (bytes, _files[path].Packed);
         }
-    }
-
-    // ── the smallest particle file that parses ────────────────────────────────
-
-    private static byte[] ParticleSystem(params byte[][] emitters)
-    {
-        return Chunk(0x0900, true, Concat(
-            Chunk(0x0000, false, Str("p_test")),
-            Chunk(0x0001, false, I32(0)),
-            Chunk(0x0800, true, Concat(emitters))));
-    }
-
-    private static byte[] Emitter(byte[]? extra = null)
-    {
-        var volume = Chunk(0x1100, true, Chunk(0x1101, false, new byte[64]));
-        var parts = new List<byte[]>
-        {
-            Chunk(0x0002, true, Concat()),
-            Chunk(0x0003, false, Str("p_particle_master.tga")),
-            Chunk(0x0016, false, Str("spark")),
-            Chunk(0x0029, true, Concat(volume, volume, volume)),
-            Chunk(0x0001, true, Tracks())
-        };
-        if (extra is not null)
-            parts.Add(extra);
-        return Chunk(0x0700, true, Concat([.. parts]));
-    }
-
-    private static byte[] Tracks()
-    {
-        var parts = new List<byte[]>();
-        for (var i = 0; i < 7; i++)
-        {
-            var byteValued = i < 4;
-            var endpoint = byteValued ? new byte[] { 255 } : F32(1f);
-            parts.Add(Chunk(0x0000, true, Concat(Mini(0x02, endpoint), Mini(0x03, endpoint), Mini(0x04, I32(0)))));
-            parts.Add(Chunk(0x0001, true, Concat()));
-        }
-
-        return Concat([.. parts]);
-    }
-
-    private static byte[] Chunk(uint type, bool container, params byte[][] body)
-    {
-        var data = Concat(body);
-        var header = new byte[8];
-        BitConverter.GetBytes(type).CopyTo(header, 0);
-        BitConverter.GetBytes((uint)data.Length | (container ? 0x80000000u : 0u)).CopyTo(header, 4);
-        return Concat(header, data);
-    }
-
-    private static byte[] Mini(byte type, params byte[][] body)
-    {
-        var data = Concat(body);
-        return Concat([type, (byte)data.Length], data);
-    }
-
-    private static byte[] Concat(params byte[][] parts)
-    {
-        return parts.SelectMany(p => p).ToArray();
-    }
-
-    private static byte[] Str(string value)
-    {
-        return Concat(Encoding.ASCII.GetBytes(value), [0]);
-    }
-
-    private static byte[] I32(int value)
-    {
-        return BitConverter.GetBytes(value);
-    }
-
-    private static byte[] F32(float value)
-    {
-        return BitConverter.GetBytes(value);
     }
 }

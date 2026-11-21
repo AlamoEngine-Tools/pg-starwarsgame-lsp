@@ -280,6 +280,22 @@ public sealed class SymbolCatalogTest
         Assert.Equal("layer:0", Page("models").Rows.Single(r => r.Name == "core_frigate.alo").Origin);
     }
 
+    // #420: the game loads a PNG as a texture, so the textures page lists one.
+    [Fact]
+    public void TheTexturesPage_ListsEveryFormatTheGameLoads()
+    {
+        var index = GameIndex.Empty with
+        {
+            AssetFiles = MergedAssetFileIndex.Merge(
+                ["data/art/textures/hull.dds", "data/art/textures/glow.tga", "data/art/textures/icon.png"], [])
+        };
+        var catalog = SymbolCatalog.Build(index, [], [], new SchemaProviderBuilder().Build());
+
+        var rows = catalog.Page(new GetSymbolPageParams("textures") { Limit = 200 }).Rows;
+
+        Assert.Equal(["glow.tga", "hull.dds", "icon.png"], rows.Select(r => r.Name).Order(StringComparer.Ordinal));
+    }
+
     [Fact]
     public void AGameObjectPage_CountsEveryKind_OverTheNameAndOriginFilters_NotTheKindFilter()
     {

@@ -1817,8 +1817,9 @@ class EmitterRenderer {
  *   `clip`     - the animation's visibility track says this proxy's moment has not come.
  *   `part`     - the part it is anchored on is off screen, so nobody could watch it burn.
  *   `released` - it has been taken out of the scene and is finishing what it already threw.
+ *   `stopped`  - the reader pressed Stop on the particle transport; a restart lifts it.
  */
-export type EmissionHold = "clip" | "part" | "released";
+export type EmissionHold = "clip" | "part" | "released" | "stopped";
 
 /**
  * One running particle system.

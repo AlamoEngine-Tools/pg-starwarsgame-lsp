@@ -30,6 +30,11 @@
   `CrossTag36` (`aetswg-007-0036`) lists the visible parts and effects whose names say neither, which stay
   drawn while the unit is cloaked
   ([#449](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/449))
+- **A player for particle files** - a particle file's dock foot holds play, pause, stop and restart
+  for its systems and a speed slider, where a unit has its animation player. Stop lets the particles
+  already in the air finish their lives; play after a stop starts from the top. The Skeleton control
+  is disabled, with its reason, for a subject without bones
+  ([#289](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/289))
 
 ### Fixes
 
@@ -104,6 +109,52 @@
   both lines, none for the killing hit, none taken away by a repair. The smokes go with the unit when it
   dies
   ([#451](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/451))
+- **A particle file's unread data said once, and plainly** - a chunk or setting the game does not read
+  in a particle file is one note per file, naming the emitters that carry it and saying it has no effect
+  in game. It used to be one note per emitter and per damage stage, worded as if the whole system were
+  skipped
+  ([#394](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/394))
+- **Shader and startup settings take effect when changed** - `Set Up Base Shader Sources` said "Base
+  shader sources found" for a mod's shader folder; it now looks for the base set and says when a folder
+  holds a mod's or the game's shaders. A changed shader folder, game folder, string table language,
+  schema or baseline source, or startup diagnostics sweep used to wait for a manual restart; it now
+  restarts the server, open previews reload their effects, and a changed game folder also reloads their
+  models and textures. A setting left incomplete keeps the running server, changes in quick
+  succession restart it once, and a project folder or project file added during a restart waits for it
+  ([#395](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/395))
+- **No shadow the game does not draw** - in Game rendering a model without a shadow mesh no longer
+  casts a shadow, as in the game; a note says so and the shadow colour is disabled with its reason. A
+  Stand-in shadow switch in Scene settings brings one back for an unfinished model, marked as a
+  stand-in in the header
+  ([#412](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/412))
+- **Game rendering lights, bends and blooms as the game does** - TGA and uncompressed DDS textures were
+  sampled blocky and unmipmapped in both renderers; they are now filtered smoothly through a mip chain, an
+  uncompressed DDS keeping the levels it ships. In Game rendering the heat haze bends by the strength the
+  heat effect in the shader folder declares, the sun's highlight is twice its specular times its intensity,
+  the fill lights hand the shaders no light values of their own, the sun direction no longer changes with
+  the model's distance from the origin, bloom blurs in the game's four passes, and the screen resolution the
+  shaders read is the drawing buffer's with its half-texel terms. The shadow colour is disabled with its
+  reason while a cloak, a clip or the detail level switches the shadow mesh off
+  ([#418](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/418))
+- **PNG textures, and texture names looked up as the game looks them up** - the game loads a PNG wherever it
+  loads a texture and decodes every texture by its content, not its extension. A `.png` reference was a format
+  error, a model's PNG drew untextured and the Mod Browser listed none. A `.png` now resolves in hover, the
+  existence checks, both of the preview's renderers and the Mod Browser, filtered and mipmapped like a TGA, with
+  an information recommending DDS (`Assets22`, `aetswg-004-0022`). A name is looked up as written, then as its
+  stem up to the first dot with `.dds` appended, and nothing else: a missing `.dds` is reported missing even
+  when a `.tga` of its stem exists, with a hint that the game does not look for it, a two-dot name is cut at
+  its first dot, and a name as written is found in the base game or a dependency before a mod's `.dds` of its
+  stem is - the game searches mod folders, loose files and archives for the name as written before it tries
+  the `.dds` anywhere. That last case is a warning naming both files (`Assets23`, `aetswg-004-0023`), since
+  the mod's file is never opened for that name. The preview decodes a file by its bytes, so a PNG saved as
+  `.tga` draws, with a note on the mismatch
+  ([#420](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/420))
+- **A particle file opens from outside the effect** - a particle file draws no meshes, so the camera had
+  nothing to measure and stood one unit from the emitter: `P_fire_med00.alo` opened inside its own fire, the
+  stage flat yellow. A subject with no drawn geometry is now framed by the reach of its particle systems, and
+  the camera presets, the grid and the draw distance go by the same sphere. A model with meshes is framed by
+  its meshes as before
+  ([#431](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/431))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the
@@ -132,6 +183,12 @@
   shown releases its textures, and a particle system saved under several names is prepared once.
   `EaWEdit: Clear Preview Cache` empties the folder
   ([#436](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/436))
+- **A unit or model opens at its highest detail level** - a unit whose parts arrive one by one opened at
+  LOD 0, in Alamo the lowest detail, when a hardpoint's model that tags no detail level arrived before the
+  hull: the level was chosen on the first arrival and kept. A preview closed while its geometry was still
+  loading also recorded LOD 0, and the next open of the same unit or model in the window restored it. The
+  level now follows the geometry as it arrives until one is picked by hand, and only a level picked by hand
+  is kept for the next open
 
 ## 0.5.2
 

@@ -29,6 +29,19 @@ public sealed class ShaderSourceResolverTest
 {
     private const string Managed = @"C:\managed";
 
+    /// <summary>
+    ///     The base set: the header every effect includes and the particle effects the preview
+    ///     requests by name, one per emitter render mode.
+    /// </summary>
+    private static readonly string[] BaseSet =
+    [
+        "AlamoEngine.fxh",
+        "PrimOpaque.fx", "PrimAdditive.fx", "PrimAlpha.fx", "PrimModulate.fx",
+        "PrimDepthSpriteAdditive.fx", "PrimDepthSpriteAlpha.fx", "PrimDepthSpriteModulate.fx",
+        "PrimDiffuseAlpha.fx", "StencilDarkenToAlpha.fx", "StencilDarkenFinalBlur.fx", "PrimHeat.fx",
+        "PrimParticleBumpAlpha.fx", "PrimDecalBumpAlpha.fx", "PrimAlphaScanlines.fx"
+    ];
+
     private static ShaderSourceResolver Build(
         MockFileSystem fs, string? managed = null, IReadOnlyList<string>? assetRoots = null)
     {
@@ -173,7 +186,48 @@ public sealed class ShaderSourceResolverTest
         // So the UI can say why a preview looks plain, rather than leaving the author guessing.
         Assert.False(Build(new MockFileSystem()).HasManagedShaders);
 
-        var fs = FileSystemWith((Managed + @"\MeshBump.fx", "// present"));
+        var fs = FileSystemWith([.. BaseSet.Select(name => (Managed + @"\" + name, "// present"))]);
         Assert.True(Build(fs, Managed).HasManagedShaders);
+    }
+
+    [Fact]
+    public void HasManagedShaders_FindsTheBaseSetAsTheArchiveShipsIt()
+    {
+        // The header in Shaders/, the particle effects one folder down in Shaders/Engine/.
+        var fs = FileSystemWith([
+            .. BaseSet.Select(name => (name.EndsWith(".fxh", StringComparison.Ordinal)
+                ? Managed + @"\Shaders\" + name
+                : Managed + @"\Shaders\Engine\" + name, "// present"))
+        ]);
+
+        Assert.True(Build(fs, Managed).HasManagedShaders);
+    }
+
+    [Fact]
+    public void HasManagedShaders_IsFalseForAModsShaderFolder()
+    {
+        // A mod's Data\Art\Shaders: compiled effects and a source or two of its own. One .fx file is
+        // not the base sources, and the preview translates nothing from it.
+        var fs = FileSystemWith(
+            (Managed + @"\AetModEffect.fx", "// the mod's own"),
+            (Managed + @"\AetModEffect.fxo", "compiled"),
+            (Managed + @"\AetModEffectB.fxo", "compiled"));
+
+        Assert.False(Build(fs, Managed).HasManagedShaders);
+    }
+
+    [Fact]
+    public void HasManagedShaders_IsFalseWhenOneOfTheBaseSetIsMissing()
+    {
+        // A mod that ships the header beside its own sources still lacks the particle effects.
+        var mod = FileSystemWith(
+            (Managed + @"\AlamoEngine.fxh", "// the mod's copy"),
+            (Managed + @"\AetModEffect.fx", "// the mod's own"));
+        Assert.False(Build(mod, Managed).HasManagedShaders);
+
+        var partial = FileSystemWith([
+            .. BaseSet.SkipLast(1).Select(name => (Managed + @"\" + name, "// present"))
+        ]);
+        Assert.False(Build(partial, Managed).HasManagedShaders);
     }
 }

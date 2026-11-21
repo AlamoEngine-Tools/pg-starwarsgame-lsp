@@ -256,6 +256,14 @@ export interface ModelPreviewFeatures {
     features: { energyPool: boolean };
 }
 
+/**
+ * Where effects are read from changed and the server restarted on it (#395): every effect and header
+ * the preview holds, and every answer that one was not there, is asked for again.
+ */
+export interface ModelPreviewRefetchEffects {
+    type: "refetchEffects";
+}
+
 export type ModelPreviewToWebview =
     | ModelPreviewScene
     | ModelPreviewGlb
@@ -266,4 +274,5 @@ export type ModelPreviewToWebview =
     | ModelPreviewShader
     | ModelPreviewViewerSettings
     | ModelPreviewProjectile
-    | ModelPreviewFeatures;
+    | ModelPreviewFeatures
+    | ModelPreviewRefetchEffects;

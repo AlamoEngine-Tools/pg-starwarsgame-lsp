@@ -23,8 +23,11 @@ import {
 } from "./fx/effect";
 import { parseFxManifest, selectTechnique } from "./fx/fxParser";
 import { type FxMaterialState, materialStateFrom } from "./fx/renderState";
+import { collectUniformDefaults } from "./fx/semantics";
+import { HEAT_COMPOSITE_EFFECT, HEAT_STRENGTH_PARAMETER } from "./heatPass";
 import { AssetLedger } from "./loadProgress";
 import { bufferOf } from "./payloadBytes";
+import { decodePng, type TextureContent, textureContentOf } from "./pngDecode";
 import { addressingFor } from "./textures";
 
 /**
@@ -47,6 +50,10 @@ export interface AssetViewport {
     setParticleTextureMissing(name: string): void;
     /** Disposes every texture whose lower-cased name is not among `keep`. */
     releaseTexturesExcept(keep: ReadonlySet<string>): void;
+    /** Drops every translated effect and declared render state; the meshes go back to their archetypes. */
+    forgetTranslatedEffects(): void;
+    /** How far heat bends the frame, as the heat effect declares it; null while none is in hand. */
+    setHeatStrength(strength: number | null): void;
 }
 
 /** What the loader tells the panel. */
@@ -65,6 +72,8 @@ export interface AssetLoaderEvents {
     shaderRequested(): void;
     /** An `.fx` source was reachable at all. */
     shaderSourceFound(): void;
+    /** Every source fetched was forgotten, for a refetch: none is reachable until one comes back. */
+    shaderSourcesForgotten(): void;
     /** An effect was translated; how many sub-meshes now draw with their own shaders. */
     translated(coverage: { translated: number; total: number }): void;
     problem(severity: "warning" | "info", message: string): void;
@@ -205,6 +214,33 @@ export class PreviewAssetLoader {
         this.asked.clear();
     }
 
+    /**
+     * Forgets every effect and header fetched, and every answer that one was not there, then asks
+     * for these effects again.
+     *
+     * For a changed shader or game folder (#395): what the old folder answered no longer stands,
+     * and a translation made from it would go on drawing. Headers are asked for again as the
+     * effects that include them come back.
+     */
+    refetchShaders(names: readonly string[]): void {
+        this.sources.clear();
+        this.translatedNames.clear();
+        this.shaders.clear();
+        this.events.shaderSourcesForgotten();
+        this.events.ledgersChanged();
+
+        const viewport = this.viewport();
+        if (viewport !== null) {
+            viewport.setHeatStrength(null);
+            viewport.forgetTranslatedEffects();
+            this.events.translated(viewport.translatedCoverage());
+        }
+
+        for (const name of names) {
+            this.requestShader(name);
+        }
+    }
+
     /** An effect or header has come back, or come back empty. */
     receiveShader(name: string, source: string | null): void {
         this.sources.set(name.toLowerCase(), source);
@@ -213,6 +249,23 @@ export class PreviewAssetLoader {
         // and the wait is over.
         this.shaders.settle(name);
         this.events.ledgersChanged();
+
+        // The heat composite is drawn by the preview's own pass, never translated onto a mesh: all
+        // it gives is the strength it declares, which the game draws with.
+        if (name.toLowerCase() === HEAT_COMPOSITE_EFFECT.toLowerCase()) {
+            this.translatedNames.add(name.toLowerCase());
+            this.viewport()?.setHeatStrength(
+                source === null
+                    ? null
+                    : (collectUniformDefaults(source).get(
+                          HEAT_STRENGTH_PARAMETER,
+                      )?.[0] ?? null),
+            );
+            if (source !== null) {
+                this.events.shaderSourceFound();
+            }
+            return;
+        }
 
         if (source === null) {
             // No copy of this effect is reachable. The archetype material stands, which is the same
@@ -270,6 +323,7 @@ export class PreviewAssetLoader {
         if (kept !== undefined) {
             viewport.setTexture(name, kept.texture);
             viewport.setParticleTexture(name, kept.texture);
+            this.noteContent(name, kept.texture, result.format ?? null);
             return;
         }
 
@@ -289,6 +343,7 @@ export class PreviewAssetLoader {
             // and the loader does not track which asked.
             viewport.setTexture(name, texture);
             viewport.setParticleTexture(name, texture);
+            this.noteContent(name, texture, result.format ?? null);
             return;
         }
 
@@ -314,6 +369,48 @@ export class PreviewAssetLoader {
                     name,
                 ),
         );
+    }
+
+    /**
+     * What the decoded file was, said when it is worth saying (#420): a PNG is information recommending
+     * DDS - the game loads it, so never a warning - and a file whose content is not what its extension
+     * says is information too, since the game decodes it by the content and nobody means the mismatch.
+     */
+    private noteContent(
+        name: string,
+        texture: THREE.Texture,
+        format: string | null,
+    ): void {
+        const content = contentOfTexture(texture);
+        if (content === null) {
+            return;
+        }
+
+        if (content === "png") {
+            this.events.problem(
+                "info",
+                l10n.t(
+                    "Texture '{0}' is a PNG file. The game loads it; DDS is recommended.",
+                    name,
+                ),
+            );
+        }
+
+        if (
+            format !== null &&
+            format !== "" &&
+            format.toLowerCase() !== content
+        ) {
+            this.events.problem(
+                "info",
+                l10n.t(
+                    "Texture '{0}' is a {1} file under a .{2} name. The game decodes it by its content.",
+                    name,
+                    content.toUpperCase(),
+                    format.toLowerCase(),
+                ),
+            );
+        }
     }
 
     /**
@@ -393,24 +490,86 @@ function applyAddressing(
 }
 
 /**
+ * Samples an unpacked texture as the game's samplers do: LINEAR, through a mip chain.
+ *
+ * A `DataTexture` arrives NEAREST with its top level alone, which drew a TGA blocky up close and
+ * shimmering at a distance. The chain is the file's own where it ships one - `mipmaps` holds every
+ * level - and generated from the top level where it ships none.
+ */
+function applyFiltering(texture: THREE.DataTexture): THREE.DataTexture {
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = texture.mipmaps.length === 0;
+
+    return texture;
+}
+
+/**
  * Turns a texture file's bytes into a three.js texture.
  *
  * The ONE place a texture's bytes become a texture: everything before it - the server, the pipe,
- * the host - moves bytes and decides nothing about them. Today `format`, the extension the server
- * found, picks the decoder; choosing by what the bytes ARE instead changes this function and
- * nothing around it.
+ * the host - moves bytes and decides nothing about them. What the bytes ARE picks the decoder, as in
+ * the game (#420): it hands the file to its loader with no format stated, so a PNG under a `.tga` name
+ * loads as a PNG. `format`, the extension the file was found under, decides nothing here; the loader
+ * compares it with the content the texture records, to say when the two disagree.
  *
  * DDS keeps its compressed blocks all the way to the GPU - decoding it would inflate a 2048x2048
- * texture several times over for no gain - while TGA has to be unpacked, because no GPU samples it
- * directly.
+ * texture several times over for no gain - while TGA and PNG have to be unpacked, because no GPU
+ * samples them directly. A PNG is unpacked to the same RGBA a TGA is, top row first and flipped the
+ * same way, so the two formats of one picture draw alike. Every format is sampled LINEAR through a mip
+ * chain, which is what the game's samplers ask for. Bytes no decoder can read are no texture, never a
+ * throw: the caller says the texture is missing.
  */
 export function decodeTexture(
     bytes: Uint8Array,
-    format: string,
+    _format: string,
+): THREE.Texture | null {
+    const content = textureContentOf(bytes);
+    try {
+        const texture = decodeContent(bytes, content);
+        if (texture !== null) {
+            texture.userData.aetTextureContent = content;
+        }
+        return texture;
+    } catch {
+        return null;
+    }
+}
+
+/** The content `decodeTexture` found in the bytes it decoded; null for a texture it did not make. */
+export function contentOfTexture(
+    texture: THREE.Texture,
+): TextureContent | null {
+    const content = (
+        texture.userData as { aetTextureContent?: unknown } | undefined
+    )?.aetTextureContent;
+    return content === "dds" || content === "png" || content === "tga"
+        ? content
+        : null;
+}
+
+/** An unpacked RGBA image as a texture: top row first, flipped as the game's TGAs are, sampled linear. */
+function unpacked(
+    data: Uint8Array,
+    width: number,
+    height: number,
+): THREE.Texture {
+    const texture = new THREE.DataTexture(data, width, height);
+    applyFiltering(texture);
+    texture.needsUpdate = true;
+    // TGA rows run bottom-up, which is also how the game stores them. A PNG is flipped the same, so one
+    // picture draws alike in either format.
+    texture.flipY = true;
+    return applyAddressing(texture, width, height);
+}
+
+function decodeContent(
+    bytes: Uint8Array,
+    content: TextureContent,
 ): THREE.Texture | null {
     const buffer = bufferOf(bytes);
 
-    if (format === "dds") {
+    if (content === "dds") {
         const parsed = new DDSLoader().parse(buffer, true);
 
         // Not every .dds is compressed - the loader hands back a plain pixel format for the
@@ -426,7 +585,12 @@ export function decodeTexture(
             return applyAddressing(texture, parsed.width, parsed.height);
         }
 
-        const level = parsed.mipmaps[0] as { data: Uint8Array } | undefined;
+        const levels = parsed.mipmaps as {
+            data: Uint8Array;
+            width: number;
+            height: number;
+        }[];
+        const level = levels[0];
         if (level === undefined) {
             return null;
         }
@@ -436,23 +600,28 @@ export function decodeTexture(
             parsed.width,
             parsed.height,
         );
+
+        // The levels the file ships, kept; a file that ships one has its chain generated.
+        if (levels.length > 1) {
+            texture.mipmaps = levels;
+        }
+
+        applyFiltering(texture);
         texture.needsUpdate = true;
         return applyAddressing(texture, parsed.width, parsed.height);
     }
 
-    if (format === "tga") {
-        const parsed = new TGALoader().parse(buffer);
-
-        const texture = new THREE.DataTexture(
-            parsed.data,
-            parsed.width,
-            parsed.height,
-        );
-        texture.needsUpdate = true;
-        // TGA rows run bottom-up, which is also how the game stores them.
-        texture.flipY = true;
-        return applyAddressing(texture, parsed.width, parsed.height);
+    if (content === "png") {
+        const image = decodePng(bytes);
+        return image === null
+            ? null
+            : unpacked(image.data, image.width, image.height);
     }
 
-    return null;
+    const parsed = new TGALoader().parse(buffer);
+    return parsed.data instanceof Uint8Array &&
+        parsed.width !== undefined &&
+        parsed.height !== undefined
+        ? unpacked(parsed.data, parsed.width, parsed.height)
+        : null;
 }

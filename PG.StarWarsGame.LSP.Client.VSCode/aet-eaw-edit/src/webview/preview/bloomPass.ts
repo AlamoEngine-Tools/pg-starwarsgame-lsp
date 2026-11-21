@@ -3,19 +3,16 @@
 
 // The engine's bloom, as the last link of the frame's pass chain.
 //
-// `Engine/SceneBloom.fx` calls itself "fake-HDR blooming" and describes its own shape at the top:
-// "First you have to do a bright filter to pull stuff you want to glow out of the scene. Then you
-// do a series of bloom passes with the code ping-ponging between two render targets to blur the
-// hotspots out." Three passes, and this runs the same three:
+// `Engine/SceneBloom.fx` runs in three passes - a bright filter, a blur ping-ponged between two
+// render targets, and a combine - and this runs the same three:
 //
-//   1. BRIGHT FILTER. Not a threshold - `BloomCutoff` ships at 1.0 and luminance never reaches it,
-//      so every pixel takes the else branch, `return pixel*pixel*pixel*pixel*pixel`. A fifth-power
-//      roll-off keeps the near-white and crushes everything else, smoothly. This replaced three's
-//      `UnrealBloomPass`, whose hard threshold switches on at an edge: with a cutoff a hull at 0.84
-//      contributes nothing and at 0.86 contributes fully, where the engine has it fading in from
-//      the bottom.
-//   2. BLUR, four taps at the corners of a square, averaged - `pixel * 0.25f` - ping-ponged between
-//      two buffers with the square widening each time.
+//   1. BRIGHT FILTER. Not a threshold: below `BloomCutoff`, which luminance never reaches, a pixel
+//      takes a fifth-power roll-off that keeps the near-white and crushes everything else,
+//      smoothly. This replaced three's `UnrealBloomPass`, whose hard threshold switches on at an
+//      edge: with a cutoff a hull at 0.84 contributes nothing and at 0.86 contributes fully, where
+//      the engine has it fading in from the bottom.
+//   2. BLUR, four taps at the corners of a square, averaged, ping-ponged between two buffers with
+//      the square widening each time.
 //   3. COMBINE, `BloomStrength * texel` blended over the frame with `SrcBlend = ONE,
 //      DestBlend = INVSRCCOLOR`. That is D3D's "AddSmooth": `dst + src * (1 - dst)`, which rolls off
 //      as the destination approaches white instead of clipping the way a plain add does.
@@ -44,16 +41,15 @@ export const BLOOM_SIZE = 0.25;
 /**
  * How many times the blur is ping-ponged, and how far down the buffers are scaled.
  *
- * OURS, not the engine's. `SceneBloom.fx` says the passes ping-pong but neither the shader nor
- * AloViewer says how many times or at what resolution - AloViewer runs the three passes once each
- * straight onto the back buffer, which cannot be what the engine does with them. So the schedule is
- * a judgement call and is marked as one.
+ * The game's: measured in the game (FoC x64, 2024 release), four ping-pong passes between two
+ * buffers at a quarter of the frame's resolution. Neither `SceneBloom.fx` nor AloViewer says it -
+ * AloViewer runs the three passes once each straight onto the back buffer.
  *
  * The reach follows from the shader's own delta schedule: a tap sits `BloomSize * (1 + 2i)`
- * half-texels out, so eight iterations at quarter resolution carry light tens of screen pixels -
+ * half-texels out, so four iterations at quarter resolution carry light a handful of screen pixels -
  * a glow around an engine nozzle rather than a haze over the whole hull.
  */
-const ITERATIONS = 8;
+const ITERATIONS = 4;
 
 /** Buffer scale for the blur chain. Quarter resolution, which is also four times the reach. */
 const DOWNSAMPLE = 4;
@@ -71,8 +67,8 @@ export function brightPass(value: number, cutoff = BLOOM_CUTOFF): number {
 /**
  * How far one blur tap sits from the centre, in texture coordinates.
  *
- * `delta = BloomSize * (half_pixel + 2.0f * BloomIteration * half_pixel)`, with `half_pixel` being
- * `0.5 / width` - AloViewer fills `m_resolutionConstants.zw` with exactly that.
+ * `BloomSize * (1 + 2i)` half-texels out on iteration `i`, a half-texel being `0.5 / width` -
+ * AloViewer fills `m_resolutionConstants.zw` with exactly that.
  */
 export function blurDelta(iteration: number, size: number): number {
     return BLOOM_SIZE * (1 + 2 * iteration) * (0.5 / Math.max(1, size));
