@@ -22,7 +22,7 @@ function controls(turrets: {
         combat: { altDrivenByHull: false },
         levels: { alt: [0], lod: [0] },
         lod: 0,
-        lodChosenRef: { current: false },
+        lodPickedRef: { current: false },
         lodCost: new Map(),
         lodSteps: null,
         scene: null,

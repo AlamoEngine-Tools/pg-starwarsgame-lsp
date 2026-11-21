@@ -18,8 +18,8 @@
     Also done here: PRJ-17 and PRJ-18 copy the archives they read, LUA-25 copies the schema and edits its
     Find_Player annotation, PRV-36 generates its two particle files, PRV-45 copies a model, its twin and
     their textures from the local game workspace, PRV-46 copies a model and its textures from there too,
-    PRV-56 copies a model from there and generates a TGA texture for it, and PRJ-24, PRJ-25, XML-29 and
-    XML-30 copy the
+    PRV-56 copies a model from there and generates a TGA texture for it, PRV-58 copies two models from
+    there, and PRJ-24, PRJ-25, XML-29 and XML-30 copy the
     repository's e2e-workspace-load-order to C:\temp\aet-test-load-order, which they edit.
 
 .PARAMETER Test
@@ -43,7 +43,7 @@ $repo = (Resolve-Path (Join-Path $here '..\..')).Path
 $fixtures = Join-Path $here 'fixtures'
 $onDemand = @('XML-14', 'XML-15', 'PRJ-15', 'LUA-26', 'LUA-27', 'LUA-28', 'LUA-34')
 $loadOrderTests = @('PRJ-24', 'PRJ-25', 'XML-29', 'XML-30')
-$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRV-45', 'PRV-46', 'PRV-56') + $loadOrderTests
+$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRV-45', 'PRV-46', 'PRV-56', 'PRV-58') + $loadOrderTests
 
 function Get-RootOf([string] $root) {
     switch ($root) {
@@ -229,6 +229,22 @@ function Invoke-Extra([string] $testId) {
             if (Test-Path $source) { Copy-Item $source (Join-Path $dest 'Models\Prv_filter.alo') -Force }
             else { Write-Warning "PRV-56: $source not found; the model is missing." }
             python (Join-Path $here 'make_textures.py') (Join-Path $dest 'Textures\EB_Basewall.tga')
+        }
+        'PRV-58' {
+            # A unit whose parts arrive one by one: the AT-AT as its hull, which tags two detail levels, and
+            # a crate pile as the model its hardpoint attaches, which tags none and is a sixteenth of the
+            # size, so it arrives first. Copied from the local game workspace, so no game file is part of
+            # the fixture.
+            $models = Join-Path $repo 'eaw\Data\Art\Models'
+            $dest = 'C:\temp\aet-test-PRV-lod\Data\Art\Models'
+            $copies = @(
+                @('Ev_at-at.alo', 'Prv_lod_walker.alo'),
+                @('W_crates24.alo', 'Prv_lod_crate.alo'))
+            foreach ($pair in $copies) {
+                $source = Join-Path $models $pair[0]
+                if (Test-Path $source) { Copy-Item $source (Join-Path $dest $pair[1]) -Force }
+                else { Write-Warning "PRV-58: $source not found; $(Join-Path $dest $pair[1]) is missing." }
+            }
         }
     }
 }

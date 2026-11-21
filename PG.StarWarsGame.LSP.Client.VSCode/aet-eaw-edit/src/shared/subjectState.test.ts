@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 
 import {
     EMPTY_SUBJECT_STATE,
+    lodOnArrival,
     lodToRecord,
     openingLod,
     subjectStateFrom,
@@ -121,21 +122,50 @@ describe("openingLod", () => {
     });
 });
 
+describe("lodOnArrival", () => {
+    /**
+     * A unit's parts arrive one by one. A hardpoint's model that tags no level, arriving before the
+     * hull, defines only LOD 0; choosing once from that left the unit at its lowest detail.
+     */
+    it("follows the levels as the geometry arrives until the reader picks one", () => {
+        assert.equal(lodOnArrival([0], 0, false, null), 0);
+        assert.equal(lodOnArrival([0, 1, 2], 0, false, null), 2);
+    });
+
+    it("keeps the level the reader picked", () => {
+        assert.equal(lodOnArrival([0, 1, 2], 0, true, null), 0);
+        assert.equal(lodOnArrival([0, 1, 2, 3], 1, true, 2), 1);
+    });
+
+    it("restores a recorded pick once the geometry defines its level", () => {
+        assert.equal(lodOnArrival([0], 0, false, 1), 0);
+        assert.equal(lodOnArrival([0, 1, 2], 0, false, 1), 1);
+    });
+});
+
 describe("lodToRecord", () => {
     /**
      * The 0 a subject shows while its geometry is on its way is a placeholder. Recorded, a preview
      * closed before the geometry arrived came back at LOD0 on the next open.
      */
-    it("records nothing before a level was chosen", () => {
+    it("records nothing before the reader picks a level", () => {
         assert.equal(lodToRecord(0, false, null), null);
     });
 
-    it("keeps the level recorded before until the subject chooses again", () => {
+    /**
+     * The opening rule's choice is not recorded: it is made again on every open from the levels that
+     * have arrived, and one made from part of the geometry would be restored as if it were a pick.
+     */
+    it("records nothing for the level the opening rule chose", () => {
+        assert.equal(lodToRecord(1, false, null), null);
+    });
+
+    it("keeps the level recorded before until the reader picks again", () => {
         assert.equal(lodToRecord(0, false, 2), 2);
         assert.equal(lodToRecord(0, false, 0), 0);
     });
 
-    it("records the level on screen once it was chosen", () => {
+    it("records the level on screen once the reader picked it", () => {
         assert.equal(lodToRecord(2, true, null), 2);
         assert.equal(lodToRecord(0, true, 2), 0);
     });

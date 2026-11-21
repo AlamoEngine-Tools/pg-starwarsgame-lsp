@@ -18,11 +18,11 @@ export interface SubjectState {
     /** Damage state. Checked against the model's own levels before it is applied. */
     alt: number;
     /**
-     * Detail level, same - or null while none has been CHOSEN, by the opening rule or by the reader.
+     * Detail level, same - or null while the reader has not PICKED one.
      *
      * Null rather than 0 because every model tags LOD 0, and in Alamo LOD 0 is the LOWEST detail: a
      * recorded 0 nobody chose read back as a choice, and a preview closed before its geometry arrived
-     * came back at LOD 0 on the next open. See {@link lodToRecord} and {@link openingLod}.
+     * came back at LOD 0 on the next open. See {@link lodToRecord} and {@link lodOnArrival}.
      */
     lod: number | null;
     /** Hardpoints the reader blew off, by id. */
@@ -108,18 +108,37 @@ export function openingLod(
 }
 
 /**
+ * The detail level to show as a subject's geometry arrives, from the levels defined so far.
+ *
+ * The reader's pick stands. Until there is one the opening rule FOLLOWS the levels as they arrive
+ * rather than choosing once: a unit's parts arrive one by one, and a hardpoint's model that tags no
+ * level, arriving before the hull, defines only LOD 0 - choosing from that left the unit at its
+ * lowest detail once the hull arrived. The levels only grow while a subject loads, so following
+ * them ends on the opening rule's answer for the whole subject.
+ */
+export function lodOnArrival(
+    defined: readonly number[],
+    shown: number,
+    picked: boolean,
+    recorded: number | null,
+): number {
+    return picked ? shown : openingLod(defined, recorded);
+}
+
+/**
  * The detail level to record for a subject.
  *
- * The one on screen once it was CHOSEN - by the opening rule, once geometry arrived, or by the
- * reader. Until then the level shown is a placeholder, and what was recorded before stands: a
- * preview reopened and closed again before its geometry arrived keeps the level it was left at.
+ * The one on screen once the reader PICKED it. The opening rule's choice is not recorded: it is made
+ * again on every open, and one made from part of the geometry - or the placeholder 0 shown before
+ * any arrived - would be restored as if it were a pick. Until the reader picks, what was recorded
+ * before stands, so a preview reopened and closed again keeps the level it was left at.
  */
 export function lodToRecord(
     shown: number,
-    chosen: boolean,
+    picked: boolean,
     recorded: number | null,
 ): number | null {
-    return chosen ? shown : recorded;
+    return picked ? shown : recorded;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

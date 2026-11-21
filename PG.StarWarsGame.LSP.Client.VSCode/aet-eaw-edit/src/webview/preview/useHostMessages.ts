@@ -63,7 +63,9 @@ export interface HostMessagesInputs {
     detailWantedRef: RefObject<string | null>;
     explosionsRef: RefObject<PendingEffect[]>;
     foldedRef: RefObject<boolean>;
-    lodChosenRef: RefObject<boolean>;
+    /** Whether this subject's stored damage state has been applied to its geometry. */
+    altRestoredRef: RefObject<boolean>;
+    lodPickedRef: RefObject<boolean>;
     passiveEffectIdsRef: RefObject<Set<string>>;
     pendingRef: RefObject<PreviewParticle[]>;
     playEffect: (
@@ -131,7 +133,8 @@ export function useHostMessages({
     detailWantedRef,
     explosionsRef,
     foldedRef,
-    lodChosenRef,
+    altRestoredRef,
+    lodPickedRef,
     passiveEffectIdsRef,
     pendingRef,
     playEffect,
@@ -208,7 +211,8 @@ export function useHostMessages({
                     setSweeping(new Set());
                     setAlt(0);
                     setLod(0);
-                    lodChosenRef.current = false;
+                    lodPickedRef.current = false;
+                    altRestoredRef.current = false;
                     setDestroyed(new Set());
 
                     // The faction the reader last picked, if THIS subject has one by that name -

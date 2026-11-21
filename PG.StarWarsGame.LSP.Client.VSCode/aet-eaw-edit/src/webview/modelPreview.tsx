@@ -100,7 +100,7 @@ import { type PreviewMode } from "./preview/previewMode";
 import { boneRowIndex } from "./preview/weaponRows";
 import { type ReticleState } from "./preview/reticles";
 import { type BreakoffAnchor } from "./preview/breakoff";
-import { openingLod, type SubjectState } from "../shared/subjectState";
+import { lodOnArrival, type SubjectState } from "../shared/subjectState";
 import {
     type DirectionalName,
     type DirectionalSetting,
@@ -479,15 +479,16 @@ function ModelPreview(): React.JSX.Element {
     const [lod, setLod] = useState(0);
 
     /**
-     * Whether the detail level on screen was CHOSEN - by the opening rule once geometry arrived, or by
-     * the reader - rather than the placeholder 0 a subject shows until then.
+     * Whether the reader has picked a detail level themselves.
      *
-     * The opening rule puts a model at its HIGHEST level, which is the close-up one. The engine's
-     * numbering runs the opposite way to most - LOD0 is the distant, lowest-detail mesh - so
-     * defaulting to zero opened every model on its crudest version. Only a chosen level is recorded
-     * for the next open; see `lodToRecord`.
+     * Until they do, the opening rule follows the model as its geometry arrives: the HIGHEST level,
+     * which is the close-up one. The engine's numbering runs the opposite way to most - LOD0 is the
+     * distant, lowest-detail mesh - so defaulting to zero opened every model on its crudest version.
+     * Only a picked level is recorded for the next open; see `lodOnArrival` and `lodToRecord`.
      */
-    const lodChosenRef = useRef(false);
+    const lodPickedRef = useRef(false);
+    /** Whether this subject's stored damage state has been applied, which happens once per scene. */
+    const altRestoredRef = useRef(false);
     const [levels, setLevels] = useState<DefinedLevels>({ alt: [0], lod: [0] });
 
     const tree = useModelTree({
@@ -805,26 +806,34 @@ function ModelPreview(): React.JSX.Element {
         // anything yet". Choosing from it picked LOD 0 and latched, and since Alamo numbers detail
         // the other way up, every model opened at its LOWEST detail and stayed there. The guard
         // below tested for an EMPTY list, which that placeholder never is.
-        if (
-            lodChosenRef.current ||
-            (current?.parts ?? 0) === 0 ||
-            defined.lod.length === 0
-        ) {
+        if ((current?.parts ?? 0) === 0 || defined.lod.length === 0) {
             return;
         }
 
         // Where this subject was left, but only if the model still HAS that level. A mesh's `_ALT2`
         // suffix can be edited away between one open and the next, and restoring a level that no
-        // longer exists shows nothing at all - indistinguishable from a broken model. The detail
-        // level is restored only if one was CHOSEN before: see `openingLod`.
+        // longer exists shows nothing at all - indistinguishable from a broken model.
         const previous = storedSubjectRef.current;
 
-        if (previous !== null && defined.alt.includes(previous.alt)) {
-            setAlt(previous.alt);
+        if (!altRestoredRef.current) {
+            altRestoredRef.current = true;
+
+            if (previous !== null && defined.alt.includes(previous.alt)) {
+                setAlt(previous.alt);
+            }
         }
 
-        lodChosenRef.current = true;
-        setLod(openingLod(defined.lod, previous?.lod ?? null));
+        // The detail level on EVERY arrival, not on the first one: a unit's parts arrive one by one,
+        // and a hardpoint's model arriving before the hull defines only LOD 0. The reader's pick
+        // stands; a picked level restored from before is shown once the geometry defines it.
+        setLod((shown) =>
+            lodOnArrival(
+                defined.lod,
+                shown,
+                lodPickedRef.current,
+                previous?.lod ?? null,
+            ),
+        );
     }, []);
 
     const particles = useParticleEffects({
@@ -1128,7 +1137,8 @@ function ModelPreview(): React.JSX.Element {
         detailWantedRef,
         explosionsRef,
         foldedRef,
-        lodChosenRef,
+        altRestoredRef,
+        lodPickedRef,
         passiveEffectIdsRef,
         pendingRef,
         playEffect,
@@ -1232,7 +1242,7 @@ function ModelPreview(): React.JSX.Element {
         hiddenEmitters,
         loading,
         lod,
-        lodChosenRef,
+        lodPickedRef,
         restoredRef,
         setCollapsed,
         setTreeItems,
@@ -1500,7 +1510,7 @@ function ModelPreview(): React.JSX.Element {
                                     combat={combat}
                                     levels={levels}
                                     lod={lod}
-                                    lodChosenRef={lodChosenRef}
+                                    lodPickedRef={lodPickedRef}
                                     lodCost={lodCost}
                                     lodSteps={lodSteps}
                                     scene={scene}

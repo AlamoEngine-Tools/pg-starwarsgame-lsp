@@ -23,7 +23,8 @@ export interface SubjectStateControlsProps {
     combat: CombatLens;
     levels: DefinedLevels;
     lod: number;
-    lodChosenRef: RefObject<boolean>;
+    /** Set when the reader moves the detail slider: their pick stands from then on. */
+    lodPickedRef: RefObject<boolean>;
     lodCost: Map<number, LevelCost>;
     lodSteps: LevelSteps;
     scene: PreviewScene | null;
@@ -42,7 +43,7 @@ export function SubjectStateControls({
     combat,
     levels,
     lod,
-    lodChosenRef,
+    lodPickedRef,
     lodCost,
     lodSteps,
     scene,
@@ -129,7 +130,7 @@ export function SubjectStateControls({
                                 step={1}
                                 value={lodSteps.positionOf(lod)}
                                 onChange={(e) => {
-                                    lodChosenRef.current = true;
+                                    lodPickedRef.current = true;
                                     setLod(
                                         lodSteps.levelAt(
                                             Number(e.target.value),

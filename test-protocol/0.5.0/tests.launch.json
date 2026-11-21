@@ -598,6 +598,9 @@
   "PRV-57": {
     "open": "{repo}\\eaw"
   },
+  "PRV-58": {
+    "open": "C:\\temp\\aet-test-PRV-lod"
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   },

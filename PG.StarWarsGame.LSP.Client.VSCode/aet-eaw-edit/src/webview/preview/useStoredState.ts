@@ -35,8 +35,8 @@ export interface StoredStateInputs {
     hiddenEmitters: ReadonlySet<number>;
     loading: LoadState;
     lod: number;
-    /** Whether `lod` was chosen - by the opening rule or by the reader - rather than a placeholder. */
-    lodChosenRef: RefObject<boolean>;
+    /** Whether the reader picked `lod`, rather than the opening rule following the model. */
+    lodPickedRef: RefObject<boolean>;
     restoredRef: RefObject<boolean>;
     setCollapsed: Dispatch<SetStateAction<ReadonlySet<string>>>;
     setTreeItems: Dispatch<SetStateAction<TreeItem[]>>;
@@ -59,7 +59,7 @@ export function useStoredState({
     hiddenEmitters,
     loading,
     lod,
-    lodChosenRef,
+    lodPickedRef,
     restoredRef,
     setCollapsed,
     setTreeItems,
@@ -139,9 +139,9 @@ export function useStoredState({
      * Session-scoped on purpose: reopening the same model should pick up where you were, while a
      * fresh window must obey the opening rules rather than restore last week's damage.
      *
-     * The detail level only once it was chosen. Until the geometry arrives the preview shows LOD 0
-     * as a placeholder, and recording it made a preview closed during the load reopen at LOD 0 -
-     * the lowest detail in Alamo. See `lodToRecord`.
+     * The detail level only once the reader picked it. Until then the opening rule follows the
+     * geometry as it arrives, from a placeholder LOD 0, and recording that made a preview closed
+     * during the load reopen at LOD 0 - the lowest detail in Alamo. See `lodToRecord`.
      */
     useEffect(() => {
         if (!restoredRef.current) {
@@ -154,7 +154,7 @@ export function useStoredState({
                 alt,
                 lod: lodToRecord(
                     lod,
-                    lodChosenRef.current,
+                    lodPickedRef.current,
                     storedSubjectRef.current?.lod ?? null,
                 ),
                 destroyed: [...destroyed],
