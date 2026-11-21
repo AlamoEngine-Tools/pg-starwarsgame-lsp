@@ -516,21 +516,33 @@ export function collectTextureNames(
     return [...names].sort();
 }
 
+/** Which renderer draws the model: the archetype reading of its shaders, or the game's own. */
+export type PreviewRenderer = "default" | "game";
+
 /**
  * Whether a sub-mesh should cast into the shadow MAP.
  *
- * The engine casts from the authored shadow volume, never from the render mesh, so a model that
- * carries one hands the job over entirely - casting from both would draw the same shadow twice from
- * two different silhouettes, which is exactly the artefact a shadow volume exists to avoid. The 63%
- * of shipped models that author no volume keep casting from the hull, because otherwise they would
- * cast nothing at all.
+ * The shadow map is the Default renderer's, cast from the render geometry. The Game renderer casts
+ * as the engine does: from the authored shadow mesh alone, through the stencil volumes, and not at
+ * all for a model without one - the game draws such a model no shadow. The stand-in is the one way
+ * back to the shadow map under Game, for an unfinished model with no shadow mesh yet; a model with
+ * one has the game's own shadow and takes no stand-in.
  */
 export function castsShadowMap(subject: {
-    hasVolumes: boolean;
+    renderer: PreviewRenderer;
+    shadowMesh: boolean;
+    standIn: boolean;
     hidden: boolean;
     blend: BlendMode;
 }): boolean {
-    if (subject.hasVolumes || subject.hidden) {
+    if (subject.hidden) {
+        return false;
+    }
+
+    if (
+        subject.renderer === "game" &&
+        (subject.shadowMesh || !subject.standIn)
+    ) {
         return false;
     }
 

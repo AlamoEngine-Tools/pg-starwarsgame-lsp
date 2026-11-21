@@ -72,6 +72,14 @@ export interface EnvironmentHost {
     readonly elapsed: number;
 }
 
+/** What the model's own shadow mesh is doing - facts about the model, not about the renderer. */
+export interface ShadowMeshState {
+    /** The model authors a shadow mesh. */
+    authored: boolean;
+    /** A shadow mesh counts now: at this level, under no clip or cloak that switches it off. */
+    counting: boolean;
+}
+
 export class EnvironmentRig {
     readonly grid: THREE.GridHelper;
     readonly floor: THREE.Mesh;
@@ -147,15 +155,16 @@ export class EnvironmentRig {
      */
     readonly shadowVolumes = new ShadowVolumePass();
     /**
-     * OFF until the volume pass is right.
-     *
-     * It is close but not correct: some of the volume's own silhouette still darkens pixels it
-     * should not, so on a model with an authored volume it can blacken the hull. A half-working
-     * renderer on by default is worse than one behind a switch - the reader has no way to tell a
-     * shadow bug from a model bug. Default mode keeps three's shadow mapping; this is what Game
-     * mode will use once it draws only what it should.
+     * Whether the Game renderer is on, which is what draws the stencil volumes - see
+     * `setShadowVolumes`. Under it the render geometry casts nothing into the shadow map, unless
+     * the stand-in is asked for.
      */
     private shadowVolumesEnabled = false;
+    /**
+     * The stand-in shadow: the shadow map cast from the render geometry under the Game renderer,
+     * for a model without a shadow mesh. The game draws that model no shadow - see `castsShadowMap`.
+     */
+    private standInShadow = false;
     /** Whether heat sprites bend the frame at all. */
     private heatEnabled = true;
     /** Built the first time bloom is switched on, like the heat buffers - it is not free either. */
@@ -227,8 +236,8 @@ export class EnvironmentRig {
             // BLACK, always. The catcher DRAWS its colour rather than multiplying, and the reader's
             // shadow value is a MULTIPLIER - painting that value put a mid grey on a dark floor and
             // made the shadow brighter than the ground. Black at `1 - m` gives `dst * m` instead;
-            // `setShadowColour` sets the alpha. It only applies to the 63% of models that author no
-            // volume, which is why it showed up on trees.
+            // `setShadowColour` sets the alpha. It only catches the shadow map - the Default
+            // renderer's, or the Game renderer's stand-in - which is why it showed up on trees.
             color: 0x000000,
             transparent: true,
             // `DEFAULT_LIGHTS.shadow` is 0.5 - half as bright - and `setShadowColour` re-derives
@@ -307,17 +316,6 @@ export class EnvironmentRig {
         this.bloom?.dispose();
         this.shadowVolumes.dispose();
         this.frameCopy?.dispose();
-    }
-
-    /**
-     * Whether the stencil volumes are the thing casting this model's shadow right now.
-     *
-     * Both halves matter. Weighing only "does the model author a volume" left a model with volumes
-     * casting NOTHING in the shading mode that does not draw volumes - it had already handed its
-     * shadow over to a pass that was switched off.
-     */
-    get stencilShadowing(): boolean {
-        return this.shadowVolumesEnabled && this.shadowVolumes.active;
     }
 
     /**
@@ -447,15 +445,17 @@ export class EnvironmentRig {
     }
 
     /**
-     * Whether the engine's stencil shadows are being cast right now.
+     * What the model's shadow mesh is doing.
      *
-     * Public because the shadow COLOUR control has to know. The tint reaches the hull through this
-     * pass with no ground involved, so gating that control on the floor alone disabled it while it
-     * was working. Both halves matter here for the same reason they do inside: Game mode with no
-     * authored volume casts nothing, and 63% of models author none.
+     * Public because the shadow COLOUR control, the stand-in toggle and the note about a missing
+     * shadow mesh have to know. Facts about the MODEL only: which renderer is on is the panel's own
+     * state, and reading it back from here would read it before the switch reached the rig.
      */
-    castsStencilShadows(): boolean {
-        return this.stencilShadowing;
+    shadowMesh(): ShadowMeshState {
+        return {
+            authored: this.shadowVolumes.authored,
+            counting: this.shadowVolumes.active,
+        };
     }
 
     /** Draws the extruded volumes themselves, for diagnosing what the stencil is counting. */
@@ -467,6 +467,12 @@ export class EnvironmentRig {
     setShadowVolumes(on: boolean): void {
         this.shadowVolumesEnabled = on;
         this.shadowVolumes.setEnabled(on);
+        this.refreshShadowCasting();
+    }
+
+    /** Whether the Game renderer casts the stand-in shadow for a model without a shadow mesh. */
+    setStandInShadow(on: boolean): void {
+        this.standInShadow = on;
         this.refreshShadowCasting();
     }
 
@@ -939,9 +945,9 @@ export class EnvironmentRig {
     }
 
     /**
-     * Whether one mesh casts into the shadow map now: solid geometry of a model with no shadow volume
-     * - see `castsShadowMap`. A cloak does not touch the shadow map: measured, it turns off only the
-     * shadow volumes.
+     * Whether one mesh casts into the shadow map now: solid geometry under the Default renderer, or
+     * under the Game renderer as the stand-in for a model with no shadow mesh - see `castsShadowMap`.
+     * A cloak does not touch the shadow map: measured, it turns off only the shadow volumes.
      */
     castsIntoShadowMap(mesh: THREE.Mesh): boolean {
         const spec = resolveMaterial(
@@ -949,7 +955,9 @@ export class EnvironmentRig {
         );
 
         return castsShadowMap({
-            hasVolumes: this.stencilShadowing,
+            renderer: this.shadowVolumesEnabled ? "game" : "default",
+            shadowMesh: this.shadowVolumes.authored,
+            standIn: this.standInShadow,
             hidden: spec.hidden,
             blend: spec.blend,
         });

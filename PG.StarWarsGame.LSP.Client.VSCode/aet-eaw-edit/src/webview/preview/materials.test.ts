@@ -541,26 +541,40 @@ describe("debugColour", () => {
     });
 });
 
-describe("shadow volumes take over from the shadow map", () => {
-    it("stops visible geometry casting a mapped shadow once the model authors a volume", () => {
-        // The engine casts from the authored volume, never from the render mesh. Leaving the shadow
-        // map casting as well would draw the same shadow twice, from two different silhouettes.
+describe("castsShadowMap", () => {
+    const solid = {
+        renderer: "game",
+        shadowMesh: false,
+        standIn: false,
+        hidden: false,
+        blend: "opaque",
+    } as const;
+
+    it("never casts from render geometry in the Game renderer", () => {
+        // The game casts from the authored shadow mesh only, and draws no shadow for a model
+        // without one - the reported fault was the Default renderer's shadow under Game.
+        assert.equal(castsShadowMap(solid), false);
+        assert.equal(castsShadowMap({ ...solid, shadowMesh: true }), false);
+    });
+
+    it("casts the stand-in shadow in the Game renderer for a model without a shadow mesh", () => {
+        assert.equal(castsShadowMap({ ...solid, standIn: true }), true);
+    });
+
+    it("casts no stand-in for a model whose shadow mesh casts the game's own shadow", () => {
         assert.equal(
-            castsShadowMap({
-                hasVolumes: true,
-                hidden: false,
-                blend: "opaque",
-            }),
+            castsShadowMap({ ...solid, standIn: true, shadowMesh: true }),
             false,
         );
     });
 
-    it("keeps casting from the hull on the 63% of models that author no volume", () => {
+    it("casts from render geometry in the Default renderer, shadow mesh or none", () => {
+        assert.equal(castsShadowMap({ ...solid, renderer: "default" }), true);
         assert.equal(
             castsShadowMap({
-                hasVolumes: false,
-                hidden: false,
-                blend: "opaque",
+                ...solid,
+                renderer: "default",
+                shadowMesh: true,
             }),
             true,
         );
@@ -568,11 +582,7 @@ describe("shadow volumes take over from the shadow map", () => {
 
     it("never casts from geometry the engine does not draw", () => {
         assert.equal(
-            castsShadowMap({
-                hasVolumes: false,
-                hidden: true,
-                blend: "opaque",
-            }),
+            castsShadowMap({ ...solid, renderer: "default", hidden: true }),
             false,
         );
     });
@@ -581,8 +591,8 @@ describe("shadow volumes take over from the shadow map", () => {
         // A glow has no silhouette worth casting, and an alpha card would cast its whole quad.
         assert.equal(
             castsShadowMap({
-                hasVolumes: false,
-                hidden: false,
+                ...solid,
+                renderer: "default",
                 blend: "additive",
             }),
             false,

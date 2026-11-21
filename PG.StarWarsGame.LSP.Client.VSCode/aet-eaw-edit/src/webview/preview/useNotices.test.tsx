@@ -16,6 +16,7 @@ function inputs(overrides: Partial<NoticesInputs>): NoticesInputs {
         anyShaderSource: false,
         attachmentIssues: [],
         colourFindings: [],
+        noShadowMesh: false,
         problems: [],
         problemsOpen: false,
         shaderRequested: false,
@@ -76,5 +77,19 @@ describe("useNotices", () => {
 
         assert.equal(notices.severity, "info");
         assert.equal(notices.problemsTitle, "Hide 1 note");
+    });
+
+    it("notes that the game draws no shadow for a model without a shadow mesh", () => {
+        const notices = firstRender(inputs({ noShadowMesh: true }));
+
+        assert.deepEqual(
+            notices.notices.map((n) => [n.severity, n.message]),
+            [
+                [
+                    "info",
+                    "No shadow mesh: The game draws no shadow for this model",
+                ],
+            ],
+        );
     });
 });

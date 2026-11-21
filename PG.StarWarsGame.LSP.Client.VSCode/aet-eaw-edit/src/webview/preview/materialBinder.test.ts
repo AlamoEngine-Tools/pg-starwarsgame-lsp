@@ -29,7 +29,6 @@ function binderWith(): { materials: MaterialBinder; modelRoot: THREE.Group } {
         textures: new TextureStore(),
         particles: { particleSystems: new Map() },
         environment: {
-            stencilShadowing: false,
             castsIntoShadowMap: () => true,
             frameFor: () => {
                 throw new Error("no frame is drawn here");

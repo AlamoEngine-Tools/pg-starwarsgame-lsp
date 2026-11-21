@@ -55,7 +55,7 @@ export { VIEWPORT_BACKGROUND };
 import { TurretRig } from "./turretRig";
 import { ParticleRig } from "./particleRig";
 import { MaterialBinder } from "./materialBinder";
-import { EnvironmentRig } from "./environmentRig";
+import { EnvironmentRig, type ShadowMeshState } from "./environmentRig";
 import { ModelRows } from "./modelRows";
 import { CameraRig } from "./cameraRig";
 import { PartAssembly } from "./partAssembly";
@@ -198,10 +198,11 @@ export class PreviewViewport {
             Math.min(globalThis.devicePixelRatio ?? 1, 2),
         );
 
-        // The engine casts shadows with stencil volumes (Crow, 1977) and ships the volume geometry
-        // in the model; we cast with a shadow map instead. Reproducing the stencil technique would
-        // buy nothing here - the volumes are authored for a renderer we are not, and a depth map
-        // gives a truer picture of the actual hull, which is what someone checking a model wants.
+        // Two shadow techniques, one per renderer. The Game renderer casts the engine's: stencil
+        // volumes (Crow, 1977) from the shadow mesh the model ships, and nothing at all for a model
+        // without one - see `ShadowVolumePass`. This shadow map is the Default renderer's, cast from
+        // the render geometry, and under Game only the stand-in for a model with no shadow mesh -
+        // see `castsShadowMap`.
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -897,11 +898,10 @@ export class PreviewViewport {
     }
 
     /**
-     * Whether the engine's stencil shadows are being cast right now. See
-     * `EnvironmentRig.castsStencilShadows`.
+     * What the model's shadow mesh is doing. See `EnvironmentRig.shadowMesh`.
      */
-    castsStencilShadows(): boolean {
-        return this.environment.castsStencilShadows();
+    shadowMesh(): ShadowMeshState {
+        return this.environment.shadowMesh();
     }
 
     /** Draws the extruded volumes themselves, for diagnosing what the stencil is counting. */
@@ -912,6 +912,11 @@ export class PreviewViewport {
     /** Whether the engine's stencil shadows are drawn at all. See `EnvironmentRig.setShadowVolumes`. */
     setShadowVolumes(on: boolean): void {
         this.environment.setShadowVolumes(on);
+    }
+
+    /** Whether Game rendering casts the stand-in shadow. See `EnvironmentRig.setStandInShadow`. */
+    setStandInShadow(on: boolean): void {
+        this.environment.setStandInShadow(on);
     }
 
     /** Tints the shadow, wherever it can be seen. See `EnvironmentRig.setShadowColour`. */

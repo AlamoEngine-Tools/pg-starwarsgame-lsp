@@ -105,7 +105,7 @@ import {
     type DirectionalName,
     type DirectionalSetting,
 } from "../shared/viewerSettings";
-import { shadowTintReach } from "./preview/shadowVolumePass";
+import { shadowTintReach, standInBlock } from "./preview/shadowVolumePass";
 import { RightDock } from "./shared/RightDock";
 
 import { initPanelLayout } from "./shared/panelLayoutBridge";
@@ -511,19 +511,56 @@ function ModelPreview(): React.JSX.Element {
     const lodSteps = useMemo(() => levelSteps(levels.lod), [levels.lod]);
 
     /**
+     * Game rendering's stand-in shadow, for a model without a shadow mesh.
+     *
+     * Tier 2: it describes the model in front of the reader - an unfinished one - so it is off for
+     * every new preview, kept through a refresh, and never stored. Plain panel state does all of
+     * that: a panel's subject is fixed for its life, and another file opens another panel.
+     */
+    const [standInShadow, setStandInShadow] = useState(false);
+
+    /**
+     * What the model's shadow mesh is doing: facts about the MODEL, read back from the viewport.
+     *
+     * On `stats`, this component's signal that geometry has arrived, and on the levels, which
+     * decide whether a volume counts. The renderer is the panel's own state and is NOT read back
+     * from here: a memo runs before the effect that tells the viewport, so a value read back would
+     * be the previous renderer's.
+     */
+    const shadowMesh = useMemo(
+        () =>
+            viewportRef.current?.shadowMesh() ?? {
+                authored: false,
+                counting: false,
+            },
+        [stats, alt, lod],
+    );
+    const particleFile = scene?.kind === "Particle";
+    /** Game rendering on a model that authors no shadow mesh: the game draws it no shadow. */
+    const noShadowMesh =
+        translatedOn &&
+        stats !== null &&
+        scene !== null &&
+        !particleFile &&
+        !shadowMesh.authored;
+    const standInBlocked = standInBlock({
+        game: translatedOn,
+        shadowMesh: shadowMesh.authored,
+        particleFile,
+    });
+    /** The stand-in is drawn now - what the header marks. */
+    const standInDrawn = standInShadow && standInBlocked === null;
+
+    /**
      * Where the shadow colour can be seen, which decides whether its control is live.
      *
-     * Depends on `translatedOn` because the stencil pass follows the renderer, and on `stats`
-     * because a model with no authored volume casts nothing through it - and whether one is loaded
-     * is not known until geometry arrives.
+     * The stencil pass follows the renderer and casts only from a shadow mesh that counts; under
+     * Game a model without a shadow mesh casts nothing at all unless the stand-in is on.
      */
-    const shadowReach = useMemo(
-        () =>
-            shadowTintReach(
-                floor,
-                viewportRef.current?.castsStencilShadows() ?? false,
-            ),
-        [floor, translatedOn, stats],
+    const shadowReach = shadowTintReach(
+        floor,
+        translatedOn && shadowMesh.counting,
+        translatedOn && !shadowMesh.authored && !standInDrawn,
     );
 
     /**
@@ -1244,6 +1281,7 @@ function ModelPreview(): React.JSX.Element {
             animationLoop,
             animationPaused,
             translated: translatedOn,
+            standInShadow: standInDrawn,
         },
         {
             levelsApplied: (viewport) => {
@@ -1307,6 +1345,7 @@ function ModelPreview(): React.JSX.Element {
         anyShaderSource,
         attachmentIssues,
         colourFindings,
+        noShadowMesh,
         problems,
         problemsOpen,
         shaderRequested,
@@ -1403,6 +1442,11 @@ function ModelPreview(): React.JSX.Element {
                                 setEditing={setEditing}
                                 setLight={setLight}
                                 shadowReach={shadowReach}
+                                standIn={{
+                                    on: standInShadow,
+                                    set: setStandInShadow,
+                                    blocked: standInBlocked,
+                                }}
                                 toggleSection={toggleSection}
                                 translatedCount={translatedCount}
                             />
@@ -1560,6 +1604,7 @@ function ModelPreview(): React.JSX.Element {
                             setMode={setMode}
                             setProblemsOpen={setProblemsOpen}
                             severity={severity}
+                            standInDrawn={standInDrawn}
                             stats={stats}
                         />
                     }

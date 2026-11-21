@@ -403,9 +403,9 @@ export class MaterialBinder {
         // throw a second silhouette over the model; an additive glow or an alpha-blended girder has
         // no opaque body to cast from, and a shadow map has no way to express a partial one - an
         // engine flare casting a hard black shadow is worse than it casting none.
-        // Once a model authors a shadow volume, the volume IS the shadow - the hull stops casting
-        // into the map, exactly as the engine does it. Recomputed for every mesh whenever a part
-        // arrives, because a volume can turn up after the geometry that it belongs to.
+        // Under the Game renderer the shadow mesh IS the shadow and the hull casts nothing into the
+        // map, as the engine does it - see `castsShadowMap`. Recomputed for every mesh whenever a
+        // part arrives, because a volume can turn up after the geometry that it belongs to.
         mesh.castShadow = this.context.environment.castsIntoShadowMap(mesh);
         mesh.receiveShadow = !spec.hidden;
 

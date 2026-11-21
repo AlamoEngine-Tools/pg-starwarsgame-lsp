@@ -15,7 +15,10 @@ import { standInContext } from "./viewportContext.testing";
  * A rig over a stand-in viewport: an empty scene, a camera, a unit model at the origin and no particle
  * systems. Nothing here draws a frame, so the renderer is never reached.
  */
-function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
+function rigWith(drawn: THREE.Mesh[] = []): {
+    environment: EnvironmentRig;
+    scene: THREE.Scene;
+} {
     const scene = new THREE.Scene();
     const context = standInContext({
         levels: { alt: 0, lod: 0 },
@@ -32,7 +35,10 @@ function rigWith(): { environment: EnvironmentRig; scene: THREE.Scene } {
         cameraRig: {
             boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
         },
-        assembly: { forEachDrawnMesh: () => undefined },
+        assembly: {
+            forEachDrawnMesh: (visit: (mesh: THREE.Mesh) => void) =>
+                drawn.forEach(visit),
+        },
         animation: { skinPalette: () => new Float32Array(0) },
     });
     const host = {
@@ -51,6 +57,67 @@ const keyLightOf = (scene: THREE.Scene): THREE.DirectionalLight => {
 };
 
 describe("EnvironmentRig", () => {
+    /** A solid render mesh, and a shadow mesh, as a model's file names their shaders. */
+    const hull = (): THREE.Mesh => {
+        const mesh = new THREE.Mesh();
+        mesh.userData.alamo = { alamoShader: "MeshGloss.fx" };
+        return mesh;
+    };
+    const shadowMesh = (): THREE.Mesh => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        mesh.userData.alamo = { alamoShader: "MeshShadowVolume.fx" };
+        return mesh;
+    };
+
+    it("casts no shadow-map shadow from render geometry in the Game renderer", () => {
+        // #412: a model without a shadow mesh cast the Default renderer's shadow under Game, which
+        // the game never draws.
+        const mesh = hull();
+        const { environment } = rigWith([mesh]);
+
+        environment.setShadowVolumes(true);
+
+        assert.equal(mesh.castShadow, false);
+        assert.equal(environment.castsIntoShadowMap(mesh), false);
+    });
+
+    it("casts the stand-in shadow under Game while it is on, and stops when it is off", () => {
+        const mesh = hull();
+        const { environment } = rigWith([mesh]);
+        environment.setShadowVolumes(true);
+
+        environment.setStandInShadow(true);
+        assert.equal(mesh.castShadow, true);
+
+        environment.setStandInShadow(false);
+        assert.equal(mesh.castShadow, false);
+    });
+
+    it("casts no stand-in from a model with a shadow mesh", () => {
+        const mesh = hull();
+        const { environment } = rigWith([mesh]);
+        const root = new THREE.Group();
+        root.add(shadowMesh());
+        environment.setShadowVolumes(true);
+        environment.setStandInShadow(true);
+
+        environment.collectShadowVolumes(root);
+
+        assert.equal(environment.shadowMesh().authored, true);
+        assert.equal(mesh.castShadow, false);
+    });
+
+    it("casts from render geometry in the Default renderer, stand-in or none", () => {
+        const mesh = hull();
+        const { environment } = rigWith([mesh]);
+
+        environment.setShadowVolumes(false);
+        assert.equal(mesh.castShadow, true);
+
+        environment.setStandInShadow(true);
+        assert.equal(mesh.castShadow, true);
+    });
+
     /**
      * The seam a model's whole look reaches every translated material through: the per-model light
      * scale the effects multiply by - its colour the tint, its alpha the fade.

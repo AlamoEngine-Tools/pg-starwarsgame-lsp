@@ -1,14 +1,16 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// Scene > Light: the sun, the fill and the ambient, one directional at a time, and the shadow tint.
+// Scene > Light: the sun, the fill and the ambient, one directional at a time, the shadow tint and
+// Game rendering's stand-in shadow.
 
 import type { Dispatch, SetStateAction } from "react";
 import * as l10n from "@vscode/l10n";
+import { IconButton } from "../../shared/Button";
 import { DockSection } from "../../shared/DockSection";
 import { Field } from "../../shared/Field";
 import { ViewRow } from "../../shared/ViewRow";
-import { SHADOW_TINT_TITLE } from "../previewLabels";
+import { SHADOW_TINT_TITLE, STAND_IN_BLOCKED } from "../previewLabels";
 import { ModeSelector } from "../../shared/ModeSelector";
 import {
     colourFromHex,
@@ -19,8 +21,15 @@ import {
     LIGHT_NAMES,
     type LightRig,
 } from "../../../shared/viewerSettings";
-import { type ShadowTintReach } from "../shadowVolumePass";
+import { type ShadowTintReach, type StandInBlock } from "../shadowVolumePass";
 import { type LightBearing } from "../lightBearing";
+
+/** Game rendering's stand-in shadow: whether it is asked for, and why it cannot be, if it cannot. */
+export interface StandInShadow {
+    on: boolean;
+    set: Dispatch<SetStateAction<boolean>>;
+    blocked: StandInBlock;
+}
 
 export interface LightSectionProps {
     bearing: LightBearing;
@@ -34,6 +43,7 @@ export interface LightSectionProps {
     ) => void;
     setLights: Dispatch<SetStateAction<LightRig>>;
     shadowReach: ShadowTintReach;
+    standIn: StandInShadow;
     toggleSection: (id: string) => void;
 }
 
@@ -46,6 +56,7 @@ export function LightSection({
     setLight,
     setLights,
     shadowReach,
+    standIn,
     toggleSection,
 }: LightSectionProps): React.JSX.Element {
     return (
@@ -263,7 +274,9 @@ export function LightSection({
                     /* Dead ONLY when nothing can show it. It was gated on the floor alone, which
                                                    disabled a working control: in Game mode the stencil darken tints the hull's
                                                    own self-shadowing with no ground under it at all. */
-                    disabled={shadowReach === "none"}
+                    disabled={
+                        shadowReach === "none" || shadowReach === "uncast"
+                    }
                     title={SHADOW_TINT_TITLE[shadowReach]}
                     onChange={(e) =>
                         setLights((current) => ({
@@ -271,6 +284,42 @@ export function LightSection({
                             shadow: colourFromHex(e.target.value),
                         }))
                     }
+                />
+            </Field>
+
+            {/* Beside the shadow colour, because it decides whether there is a shadow to tint. A
+            toggle, not a mode: it puts back a shadow the game does not draw, so it stays off until
+            asked for, and the header marks it while it is drawn. Disabled with the reason wherever
+            there is nothing for it to stand in for. */}
+            <Field
+                label={l10n.t("Stand-in shadow")}
+                inline
+                info={
+                    <>
+                        {l10n.t(
+                            "The game draws no shadow for a model without a shadow mesh, and neither does the Game renderer. The stand-in casts the Default renderer's shadow-map shadow from the render geometry, for an unfinished model. Off in every new preview.",
+                        )}
+                    </>
+                }
+            >
+                <IconButton
+                    icon="standInShadow"
+                    className={standIn.on ? "active" : undefined}
+                    pressed={standIn.on}
+                    title={
+                        standIn.on
+                            ? l10n.t("Stop casting the stand-in shadow")
+                            : l10n.t(
+                                  "Cast a stand-in shadow from the render geometry",
+                              )
+                    }
+                    disabled={standIn.blocked !== null}
+                    disabledReason={
+                        standIn.blocked === null
+                            ? ""
+                            : STAND_IN_BLOCKED[standIn.blocked]
+                    }
+                    onClick={() => standIn.set((on) => !on)}
                 />
             </Field>
 

@@ -122,6 +122,11 @@
   models and textures. A setting left incomplete keeps the running server, changes in quick
   succession restart it once, and a project folder or project file added during a restart waits for it
   ([#395](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/395))
+- **No shadow the game does not draw** - in Game rendering a model without a shadow mesh no longer
+  casts a shadow, as in the game; a note says so and the shadow colour is disabled with its reason. A
+  Stand-in shadow switch in Scene settings brings one back for an unfinished model, marked as a
+  stand-in in the header
+  ([#412](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/412))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

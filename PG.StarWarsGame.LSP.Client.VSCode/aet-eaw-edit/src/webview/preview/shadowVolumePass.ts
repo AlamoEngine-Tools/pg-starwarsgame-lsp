@@ -42,7 +42,7 @@ const OBJECT_LIGHT = new THREE.Vector3();
 export const EXTRUSION_RADII = 4;
 
 /** Where the one shadow colour can actually be seen. */
-export type ShadowTintReach = "ground" | "model" | "both" | "none";
+export type ShadowTintReach = "ground" | "model" | "both" | "none" | "uncast";
 
 /**
  * What the shadow colour reaches right now, which is what decides whether its control is live.
@@ -57,11 +57,20 @@ export type ShadowTintReach = "ground" | "model" | "both" | "none";
  * volume, in Game mode, tints its own hull with the floor switched off. Its own info badge said so.
  *
  * Only the last case is honestly dead, and that is the only one the control should refuse in.
+ *
+ * `uncast` is the other dead case, and it overrides the floor: nothing casts a shadow at all - the
+ * Game renderer on a model without a shadow mesh, with no stand-in - so the ground has nothing to
+ * catch either.
  */
 export function shadowTintReach(
     floor: boolean,
     stencilCasting: boolean,
+    uncast: boolean,
 ): ShadowTintReach {
+    if (uncast) {
+        return "uncast";
+    }
+
     if (floor && stencilCasting) {
         return "both";
     }
@@ -71,6 +80,32 @@ export function shadowTintReach(
     }
 
     return stencilCasting ? "model" : "none";
+}
+
+/** Why the stand-in shadow cannot be switched on, or null when it can. */
+export type StandInBlock = "default" | "shadowMesh" | "particle" | null;
+
+/**
+ * Whether the Game renderer's stand-in shadow can be asked for.
+ *
+ * Only where the game draws no shadow and the preview has render geometry to cast one from: the
+ * Default renderer always casts the shadow map, a model with a shadow mesh casts the game's own,
+ * and a particle file has no render geometry at all.
+ */
+export function standInBlock(subject: {
+    game: boolean;
+    shadowMesh: boolean;
+    particleFile: boolean;
+}): StandInBlock {
+    if (subject.particleFile) {
+        return "particle";
+    }
+
+    if (!subject.game) {
+        return "default";
+    }
+
+    return subject.shadowMesh ? "shadowMesh" : null;
 }
 
 /**
@@ -321,6 +356,17 @@ export class ShadowVolumePass {
         return this.drawn.some(
             (mesh) => !this.uncounted.has(mesh.parent as THREE.Mesh),
         );
+    }
+
+    /**
+     * Whether this model authors a shadow mesh at all, counting now or not.
+     *
+     * The model's fact the Game renderer's shadow rule reads: a volume a clip, a cloak or a detail
+     * level has switched off is still the model's shadow mesh, so it still decides that the render
+     * geometry casts no stand-in.
+     */
+    get authored(): boolean {
+        return this.bySource.size > 0;
     }
 
     /**

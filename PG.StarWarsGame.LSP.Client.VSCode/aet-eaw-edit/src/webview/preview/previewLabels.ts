@@ -12,7 +12,7 @@ import { TREE_KIND_ICONS, TREE_KIND_LABELS } from "../shared/TreeRow";
 import type { GroupState } from "./particleScene";
 import type { TreeKind } from "./previewTree";
 import type { EyeState } from "./rowEye";
-import type { ShadowTintReach } from "./shadowVolumePass";
+import type { ShadowTintReach, StandInBlock } from "./shadowVolumePass";
 import type { PresetView } from "./viewportTypes";
 
 /** What each kind is called in the filter row - the shared tree row's names for them. */
@@ -65,6 +65,16 @@ export const SHADOW_TINT_TITLE: Record<ShadowTintReach, string> = {
     none: l10n.t(
         "Nothing can show it: Switch the ground on, or the Game renderer on a model that authors a shadow volume",
     ),
+    uncast: l10n.t(
+        "Nothing casts a shadow: The game draws none without a shadow mesh",
+    ),
+};
+
+/** Why the stand-in shadow cannot be switched on, by the reason `standInBlock` gives. */
+export const STAND_IN_BLOCKED: Record<Exclude<StandInBlock, null>, string> = {
+    default: l10n.t("The Default renderer always casts a shadow"),
+    shadowMesh: l10n.t("The shadow mesh casts the game's own shadow"),
+    particle: l10n.t("A particle file has no render geometry to cast from"),
 };
 
 /** Said once when a model loads with no mesh reaching the screen. */

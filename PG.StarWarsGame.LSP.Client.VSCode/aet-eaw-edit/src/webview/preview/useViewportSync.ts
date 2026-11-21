@@ -50,6 +50,8 @@ export interface ViewportSettings {
     animationPaused: boolean;
     /** The effects' own translated shaders, and with them Game mode's shadow volumes. */
     translated: boolean;
+    /** Game rendering's stand-in shadow, for a model without a shadow mesh. */
+    standInShadow: boolean;
 }
 
 /** What the panel reads back after a push that changes what the viewport reports. */
@@ -151,12 +153,15 @@ export function useViewportSync(
         current.setTranslatedShaders(settings.translated);
 
         // Game mode shadows the way the ENGINE does: stencil volumes cast by the model's own
-        // authored shadow mesh, with the shadow colour reaching the hull as well as the ground.
-        // Default mode keeps three's shadow mapping, which is the right answer for the 63% of
-        // models that author no volume at all.
+        // authored shadow mesh, with the shadow colour reaching the hull as well as the ground,
+        // and no shadow for a model without one. Default mode keeps three's shadow mapping.
         current.setShadowVolumes(settings.translated);
         readback.translatedApplied(current);
     }, [settings.translated]);
+
+    useEffect(() => {
+        viewport()?.setStandInShadow(settings.standInShadow);
+    }, [settings.standInShadow]);
 
     // ── particles ─────────────────────────────────────────────────────────────
     useEffect(() => {
