@@ -1061,9 +1061,10 @@ public static class DiagnosticIds
         new(DiagnosticGroup.Preview, 8);
 
     /// <summary>
-    ///     A hardpoint names no <c>Attachment_Bone</c>. Measured: the game attaches it to nothing -
-    ///     it is placed at <c>Fire_Bone_A</c>, or at the map origin with that unset too, and its
-    ///     <c>Model_To_Attach</c> is never attached.
+    ///     A hardpoint names no <c>Attachment_Bone</c> and loses something by it. Measured: the game
+    ///     attaches it to nothing - it is placed at <c>Fire_Bone_A</c>, or at the map origin with
+    ///     that unset too, and its <c>Model_To_Attach</c> is never attached. Reported when it names
+    ///     a model or no fire bone either; one placed at its fire bone with no model loses nothing.
     /// </summary>
     public static readonly DiagnosticId PreviewHardpointNoBone = new(DiagnosticGroup.Preview, 9);
 

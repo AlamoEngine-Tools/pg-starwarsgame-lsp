@@ -253,7 +253,7 @@ public sealed class XmlEditorProtocolTest(XmlScratchFixture fixture) : IClassFix
     }
 
     [Fact]
-    public async Task XML_21_AHardpointWithoutAnAttachmentBone_IsTwoErrorsInThePreview()
+    public async Task XML_21_AHardpointWithoutAnAttachmentBone_IsAnErrorInThePreviewWhereItLosesSomething()
     {
         await ProtocolDocument.WaitForScanAsync(fixture);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
@@ -266,10 +266,18 @@ public sealed class XmlEditorProtocolTest(XmlScratchFixture fixture) : IClassFix
         Assert.Equal("Hardpoint 'HP_Scratch_NoBone_Targetable' is targetable but names no Attachment_Bone. The game " +
                      "places it at the map origin and draws its reticle in the screen corner. It cannot be hit, so " +
                      "the unit cannot be destroyed.", targetable.Message);
-        var fireBone = Assert.Single(problems, p => p.DiagnosticId.ToString() == "aetswg-014-0009");
-        Assert.Equal("error", fireBone.Severity);
-        Assert.Equal("Hardpoint 'HP_Scratch_NoBone_FireBone' names no Attachment_Bone. The game places it at " +
-                     "Fire_Bone_A 'MuzzleA_00'; a Model_To_Attach is never attached.", fireBone.Message);
+        // Nobody can target these three. The one at its fire bone with no model loses nothing (#466).
+        var lost = problems.Where(p => p.DiagnosticId.ToString() == "aetswg-014-0009").ToList();
+        Assert.All(lost, p => Assert.Equal("error", p.Severity));
+        Assert.Equal(
+        [
+            "Hardpoint 'HP_Scratch_NoBone_Model' names no Attachment_Bone, so its Model_To_Attach " +
+            "'EV_StarDestroyer.ALO' is never attached. The game places it at Fire_Bone_A 'MuzzleA_00'.",
+            "Hardpoint 'HP_Scratch_NoBone_Nowhere' names no Attachment_Bone and no Fire_Bone_A. The game places " +
+            "it at the map origin."
+        ], lost.Select(p => p.Message));
+        Assert.DoesNotContain(problems,
+            p => p.Message.Contains("HP_Scratch_NoBone_FireBone", StringComparison.Ordinal));
         Assert.DoesNotContain(problems, p => p.Message.Contains("screen root", StringComparison.OrdinalIgnoreCase));
     }
 }

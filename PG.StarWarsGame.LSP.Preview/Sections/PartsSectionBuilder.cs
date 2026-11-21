@@ -84,22 +84,32 @@ public sealed class PartsSectionBuilder(
         // destroyed, so one of these makes the whole unit indestructible.
         //
         // Two findings rather than one, because they differ in what the author has to do about
-        // them and in what suppressing them would cost. Both are errors: the unit is broken either
-        // way, shot at or not.
+        // them and in what suppressing them would cost. Both are errors.
+        //
+        // A finding only where something is lost: a reticle, a model, or a place on the unit. A
+        // hardpoint nobody can target, placed at its Fire_Bone_A and naming no model, loses none
+        // of the three and is not reported. Every shipped hardpoint without an attachment bone has
+        // that shape - 45 in the base game, 88 in the expansion.
         if (string.IsNullOrEmpty(attachBone))
         {
             var fireBoneA = effective.ValueOf("Fire_Bone_A");
             var placed = string.IsNullOrEmpty(fireBoneA)
                 ? messages.Format("PreviewScene_PlacedAtOrigin")
                 : messages.Format("PreviewScene_PlacedAtFireBone", fireBoneA);
-            problems.Add(isTargetable
-                ? new PreviewProblem(DiagnosticIds.PreviewTargetableHardpointNoBone, "error",
+            if (isTargetable)
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewTargetableHardpointNoBone, "error",
                     messages.Format(string.IsNullOrEmpty(fireBoneA)
                             ? "PreviewScene_TargetableNoBoneUnkillable"
                             : "PreviewScene_TargetableNoBone",
                         hardpointId, AttachmentBoneTag, placed),
-                    hardpointId)
-                : new PreviewProblem(DiagnosticIds.PreviewHardpointNoBone, "error",
+                    hardpointId));
+            else if (!string.IsNullOrEmpty(model))
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointNoBone, "error",
+                    messages.Format("PreviewScene_HardpointNoBoneModel", hardpointId, AttachmentBoneTag, model,
+                        placed),
+                    hardpointId));
+            else if (string.IsNullOrEmpty(fireBoneA))
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointNoBone, "error",
                     messages.Format("PreviewScene_HardpointNoBone", hardpointId, AttachmentBoneTag, placed),
                     hardpointId));
         }

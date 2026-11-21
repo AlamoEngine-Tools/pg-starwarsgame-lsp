@@ -624,6 +624,12 @@
       "aet-eaw-edit.lsp.source.baseGameDirectory": "C:\\temp\\aet-test-PRV-nogame"
     }
   },
+  "PRV-63": {
+    "open": "C:\\temp\\aet-test-PRV-nobone",
+    "settings": {
+      "aet-eaw-edit.lsp.source.baseGameDirectory": "{eaw}"
+    }
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   },

@@ -1676,7 +1676,10 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>Hardpoint '{0}' is mounted but not defined in this project.</value>
   </data>
   <data name="PreviewScene_HardpointNoBone" xml:space="preserve">
-    <value>Hardpoint '{0}' names no {1}. {2}; a Model_To_Attach is never attached.</value>
+    <value>Hardpoint '{0}' names no {1} and no Fire_Bone_A. {2}.</value>
+  </data>
+  <data name="PreviewScene_HardpointNoBoneModel" xml:space="preserve">
+    <value>Hardpoint '{0}' names no {1}, so its Model_To_Attach '{2}' is never attached. {3}.</value>
   </data>
   <data name="PreviewScene_HardpointUnreachable" xml:space="preserve">
     <value>Hardpoint '{0}' is destroyable but names no Collision_Mesh, so no shot can reach it. The unit can never be finished through its hardpoints.</value>

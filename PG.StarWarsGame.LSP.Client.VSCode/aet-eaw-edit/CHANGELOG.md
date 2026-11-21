@@ -162,6 +162,13 @@
   `aetswg-014-0024`). `Copy Bug Report Info` says whether each game folder is set, detected or absent, and how
   many archives are read
   ([#465](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/465))
+- **A hardpoint without an attachment bone is an error only where it loses something** - the preview
+  reported every hardpoint that names no `Attachment_Bone` (`Preview9`, `aetswg-014-0009`), the shipped
+  corvette's guns included: 45 hardpoints of the base game and 88 of the expansion, none of them wrong. One
+  that cannot be targeted, fires from its `Fire_Bone_A` and attaches no model is no longer reported. The
+  error stays for one that names a model, which the game never attaches, and for one with no fire bone
+  either, which the game places at the map origin; each message now says which of the two it is
+  ([#466](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/466))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

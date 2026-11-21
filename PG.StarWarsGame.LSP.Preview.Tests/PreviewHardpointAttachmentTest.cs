@@ -27,6 +27,11 @@ namespace PG.StarWarsGame.LSP.Preview.Tests;
 ///         about them, and reporting the pair under one id would have a reader suppress "hardpoint
 ///         placement is broken" and silence "this unit cannot be killed".
 ///     </para>
+///     <para>
+///         A finding only where something is lost. A hardpoint nobody can target, placed at its
+///         <c>Fire_Bone_A</c> and naming no model, loses nothing: every shipped hardpoint without an
+///         attachment bone has that shape - 45 in the base game, 88 in the expansion.
+///     </para>
 /// </remarks>
 public sealed class PreviewHardpointAttachmentTest
 {
@@ -95,8 +100,9 @@ public sealed class PreviewHardpointAttachmentTest
     }
 
     /// <summary>
-    ///     An error too: the hardpoint is placed at the map origin and its model is never attached,
-    ///     which breaks the unit whether or not anyone shoots at it.
+    ///     An error too: with no fire bone either the hardpoint is placed at the map origin, which
+    ///     breaks the unit whether or not anyone shoots at it. It names no model, so the message
+    ///     does not speak of one.
     /// </summary>
     [Fact]
     public void UntargetableHardpointWithNoAttachmentBone_IsAnError()
@@ -108,8 +114,45 @@ public sealed class PreviewHardpointAttachmentTest
 
         Assert.Equal("error", problem.Severity);
         Assert.Contains("map origin", problem.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Model_To_Attach", problem.Message, StringComparison.Ordinal);
+        Assert.Contains("no Fire_Bone_A", problem.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Model_To_Attach", problem.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("screen root", problem.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     The shape every shipped hardpoint without an attachment bone has (#466): nobody can target
+    ///     it, it fires from the hull's own bone and it names no model. The game places it at that
+    ///     bone and has no model to leave off, so there is nothing to report.
+    /// </summary>
+    [Fact]
+    public void UntargetableHardpointAtItsFireBone_WithNoModel_ReportsNothing()
+    {
+        var scene = SceneWith(false, null, "HP_Gun_Fire");
+
+        Assert.DoesNotContain(scene.Problems,
+            p => p.DiagnosticId == DiagnosticIds.PreviewHardpointNoBone
+                 || p.DiagnosticId == DiagnosticIds.PreviewTargetableHardpointNoBone);
+    }
+
+    /// <summary>
+    ///     Measured: without an attachment bone the model is never attached. The model the author
+    ///     named is what is lost, so the message names it.
+    /// </summary>
+    [Theory]
+    [InlineData("HP_Gun_Fire", "Fire_Bone_A 'HP_Gun_Fire'")]
+    [InlineData(null, "map origin")]
+    public void UntargetableHardpointWithAModelAndNoAttachmentBone_SaysTheModelIsNeverAttached(
+        string? fireBoneA, string placed)
+    {
+        var scene = SceneWith(false, null, fireBoneA, "turret.alo");
+
+        var problem = Assert.Single(scene.Problems,
+            p => p.DiagnosticId == DiagnosticIds.PreviewHardpointNoBone);
+
+        Assert.Equal("error", problem.Severity);
+        Assert.Equal("HP_Gun", problem.HardpointId);
+        Assert.Contains("Model_To_Attach 'turret.alo' is never attached", problem.Message, StringComparison.Ordinal);
+        Assert.Contains(placed, problem.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -141,7 +184,7 @@ public sealed class PreviewHardpointAttachmentTest
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static PreviewScene SceneWith(bool targetable, string? attachmentBone,
-        string? fireBoneA = null)
+        string? fireBoneA = null, string? model = null)
     {
         var index = Index([Sym("Ship", "GameObjectType"), Sym("HP_Gun", "HardPoint")]);
 
@@ -154,12 +197,14 @@ public sealed class PreviewHardpointAttachmentTest
             hardpointTags.Add(Tag("Attachment_Bone", attachmentBone));
         if (fireBoneA is not null)
             hardpointTags.Add(Tag("Fire_Bone_A", fireBoneA));
+        if (model is not null)
+            hardpointTags.Add(Tag("Model_To_Attach", model));
 
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Gun"))
             .With("HP_Gun", [.. hardpointTags]);
 
-        return Builder(index, tags, "hull.alo").BuildForObject("Ship");
+        return Builder(index, tags, "hull.alo", "turret.alo").BuildForObject("Ship");
     }
 
     private static PreviewSceneBuilder Builder(

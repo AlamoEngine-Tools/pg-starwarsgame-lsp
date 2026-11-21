@@ -16,6 +16,6 @@
 	</SpaceUnit>
 	<SpaceUnit Name="Scratch_Bone_Test">
 		<Space_Model_Name>EV_StarDestroyer.ALO</Space_Model_Name>
-		<HardPoints>HP_Scratch_NoBone_Targetable, HP_Scratch_NoBone_FireBone</HardPoints>
+		<HardPoints>HP_Scratch_NoBone_Targetable, HP_Scratch_NoBone_FireBone, HP_Scratch_NoBone_Model, HP_Scratch_NoBone_Nowhere</HardPoints>
 	</SpaceUnit>
 </SpaceUnits>
