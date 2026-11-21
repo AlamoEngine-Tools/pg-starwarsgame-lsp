@@ -164,6 +164,10 @@
   shown releases its textures, and a particle system saved under several names is prepared once.
   `EaWEdit: Clear Preview Cache` empties the folder
   ([#436](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/436))
+- **A unit or model reopens at its highest detail level** - a preview closed while its geometry was still
+  loading recorded LOD 0, the level shown until the geometry arrives, and the next open of the same unit or
+  model in the window restored it - in Alamo the lowest detail. Only a detail level chosen by the opening
+  rule or picked by hand is now kept for the next open
 
 ## 0.5.2
 

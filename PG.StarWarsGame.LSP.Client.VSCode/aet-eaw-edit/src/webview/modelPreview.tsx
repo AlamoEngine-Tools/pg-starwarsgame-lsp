@@ -100,7 +100,7 @@ import { type PreviewMode } from "./preview/previewMode";
 import { boneRowIndex } from "./preview/weaponRows";
 import { type ReticleState } from "./preview/reticles";
 import { type BreakoffAnchor } from "./preview/breakoff";
-import { type SubjectState } from "../shared/subjectState";
+import { openingLod, type SubjectState } from "../shared/subjectState";
 import {
     type DirectionalName,
     type DirectionalSetting,
@@ -479,11 +479,13 @@ function ModelPreview(): React.JSX.Element {
     const [lod, setLod] = useState(0);
 
     /**
-     * Whether the user has picked a detail level themselves.
+     * Whether the detail level on screen was CHOSEN - by the opening rule once geometry arrived, or by
+     * the reader - rather than the placeholder 0 a subject shows until then.
      *
-     * Until they do, the preview follows the model: it opens at the HIGHEST level, which is the
-     * close-up one. The engine's numbering runs the opposite way to most - LOD0 is the distant,
-     * lowest-detail mesh - so defaulting to zero opened every model on its crudest version.
+     * The opening rule puts a model at its HIGHEST level, which is the close-up one. The engine's
+     * numbering runs the opposite way to most - LOD0 is the distant, lowest-detail mesh - so
+     * defaulting to zero opened every model on its crudest version. Only a chosen level is recorded
+     * for the next open; see `lodToRecord`.
      */
     const lodChosenRef = useRef(false);
     const [levels, setLevels] = useState<DefinedLevels>({ alt: [0], lod: [0] });
@@ -813,7 +815,8 @@ function ModelPreview(): React.JSX.Element {
 
         // Where this subject was left, but only if the model still HAS that level. A mesh's `_ALT2`
         // suffix can be edited away between one open and the next, and restoring a level that no
-        // longer exists shows nothing at all - indistinguishable from a broken model.
+        // longer exists shows nothing at all - indistinguishable from a broken model. The detail
+        // level is restored only if one was CHOSEN before: see `openingLod`.
         const previous = storedSubjectRef.current;
 
         if (previous !== null && defined.alt.includes(previous.alt)) {
@@ -821,11 +824,7 @@ function ModelPreview(): React.JSX.Element {
         }
 
         lodChosenRef.current = true;
-        setLod(
-            previous !== null && defined.lod.includes(previous.lod)
-                ? previous.lod
-                : defined.lod[defined.lod.length - 1],
-        );
+        setLod(openingLod(defined.lod, previous?.lod ?? null));
     }, []);
 
     const particles = useParticleEffects({
@@ -1233,6 +1232,7 @@ function ModelPreview(): React.JSX.Element {
         hiddenEmitters,
         loading,
         lod,
+        lodChosenRef,
         restoredRef,
         setCollapsed,
         setTreeItems,

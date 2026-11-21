@@ -595,6 +595,9 @@
       "aet-eaw-edit.shaders.directory": "{shaders}"
     }
   },
+  "PRV-57": {
+    "open": "{repo}\\eaw"
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   },

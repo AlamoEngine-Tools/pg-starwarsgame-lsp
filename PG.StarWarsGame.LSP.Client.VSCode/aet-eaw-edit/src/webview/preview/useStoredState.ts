@@ -13,7 +13,7 @@ import {
 import { post } from "./previewPost";
 import { buildTree, defaultCollapsed, type TreeItem } from "./previewTree";
 import { type PreviewViewport } from "./viewport";
-import { type SubjectState } from "../../shared/subjectState";
+import { lodToRecord, type SubjectState } from "../../shared/subjectState";
 import { type LoadState } from "./loadProgress";
 import {
     type Attacker,
@@ -35,6 +35,8 @@ export interface StoredStateInputs {
     hiddenEmitters: ReadonlySet<number>;
     loading: LoadState;
     lod: number;
+    /** Whether `lod` was chosen - by the opening rule or by the reader - rather than a placeholder. */
+    lodChosenRef: RefObject<boolean>;
     restoredRef: RefObject<boolean>;
     setCollapsed: Dispatch<SetStateAction<ReadonlySet<string>>>;
     setTreeItems: Dispatch<SetStateAction<TreeItem[]>>;
@@ -57,6 +59,7 @@ export function useStoredState({
     hiddenEmitters,
     loading,
     lod,
+    lodChosenRef,
     restoredRef,
     setCollapsed,
     setTreeItems,
@@ -135,6 +138,10 @@ export function useStoredState({
      *
      * Session-scoped on purpose: reopening the same model should pick up where you were, while a
      * fresh window must obey the opening rules rather than restore last week's damage.
+     *
+     * The detail level only once it was chosen. Until the geometry arrives the preview shows LOD 0
+     * as a placeholder, and recording it made a preview closed during the load reopen at LOD 0 -
+     * the lowest detail in Alamo. See `lodToRecord`.
      */
     useEffect(() => {
         if (!restoredRef.current) {
@@ -145,7 +152,11 @@ export function useStoredState({
             type: "setSubjectState",
             state: {
                 alt,
-                lod,
+                lod: lodToRecord(
+                    lod,
+                    lodChosenRef.current,
+                    storedSubjectRef.current?.lod ?? null,
+                ),
                 destroyed: [...destroyed],
                 hiddenEmitters: [...hiddenEmitters],
                 animation,

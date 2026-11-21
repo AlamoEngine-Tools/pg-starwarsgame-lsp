@@ -17,8 +17,14 @@
 export interface SubjectState {
     /** Damage state. Checked against the model's own levels before it is applied. */
     alt: number;
-    /** Detail level, same. */
-    lod: number;
+    /**
+     * Detail level, same - or null while none has been CHOSEN, by the opening rule or by the reader.
+     *
+     * Null rather than 0 because every model tags LOD 0, and in Alamo LOD 0 is the LOWEST detail: a
+     * recorded 0 nobody chose read back as a choice, and a preview closed before its geometry arrived
+     * came back at LOD 0 on the next open. See {@link lodToRecord} and {@link openingLod}.
+     */
+    lod: number | null;
     /** Hardpoints the reader blew off, by id. */
     destroyed: string[];
     /** Emitters switched off, by their index in the opened system's file. */
@@ -50,7 +56,7 @@ export interface SubjectState {
 
 export const EMPTY_SUBJECT_STATE: SubjectState = {
     alt: 0,
-    lod: 0,
+    lod: null,
     destroyed: [],
     hiddenEmitters: [],
     animation: null,
@@ -82,13 +88,50 @@ export function subjectStateFrom(stored: unknown): SubjectState {
     };
 }
 
+/**
+ * The detail level a subject opens at, from the levels its geometry defines (ascending).
+ *
+ * The level recorded for it, if the geometry still defines it - a mesh's `_LOD2` suffix can be
+ * edited away between one open and the next, and a level that no longer exists shows nothing at
+ * all. Otherwise the HIGHEST level: Alamo numbers detail the other way up, so the last level is the
+ * close-up one and LOD 0 the distant one.
+ */
+export function openingLod(
+    defined: readonly number[],
+    recorded: number | null,
+): number {
+    if (recorded !== null && defined.includes(recorded)) {
+        return recorded;
+    }
+
+    return defined.length > 0 ? defined[defined.length - 1] : 0;
+}
+
+/**
+ * The detail level to record for a subject.
+ *
+ * The one on screen once it was CHOSEN - by the opening rule, once geometry arrived, or by the
+ * reader. Until then the level shown is a placeholder, and what was recorded before stands: a
+ * preview reopened and closed again before its geometry arrived keeps the level it was left at.
+ */
+export function lodToRecord(
+    shown: number,
+    chosen: boolean,
+    recorded: number | null,
+): number | null {
+    return chosen ? shown : recorded;
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value)
         ? (value as Record<string, unknown>)
         : {};
 }
 
-function index_(value: unknown, fallback: number): number {
+function index_<T extends number | null>(
+    value: unknown,
+    fallback: T,
+): number | T {
     return typeof value === "number" && Number.isInteger(value) && value >= 0
         ? value
         : fallback;
