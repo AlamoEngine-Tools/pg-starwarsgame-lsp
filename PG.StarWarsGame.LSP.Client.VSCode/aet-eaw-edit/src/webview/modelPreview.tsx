@@ -555,12 +555,14 @@ function ModelPreview(): React.JSX.Element {
      * Where the shadow colour can be seen, which decides whether its control is live.
      *
      * The stencil pass follows the renderer and casts only from a shadow mesh that counts; under
-     * Game a model without a shadow mesh casts nothing at all unless the stand-in is on.
+     * Game a model without a shadow mesh casts nothing at all unless the stand-in is on, and one
+     * whose shadow mesh is switched off casts nothing while it is.
      */
     const shadowReach = shadowTintReach(
         floor,
         translatedOn && shadowMesh.counting,
         translatedOn && !shadowMesh.authored && !standInDrawn,
+        translatedOn && shadowMesh.authored && !shadowMesh.counting,
     );
 
     /**

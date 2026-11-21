@@ -68,6 +68,9 @@ export const SHADOW_TINT_TITLE: Record<ShadowTintReach, string> = {
     uncast: l10n.t(
         "Nothing casts a shadow: The game draws none without a shadow mesh",
     ),
+    off: l10n.t(
+        "Nothing casts a shadow: A cloak, a clip or the detail level switches the shadow mesh off",
+    ),
 };
 
 /** Why the stand-in shadow cannot be switched on, by the reason `standInBlock` gives. */

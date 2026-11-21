@@ -458,6 +458,11 @@ export class PreviewViewport {
         this.materials.forgetTranslatedEffects();
     }
 
+    /** How far heat bends the frame, as the heat effect declares it. See `EnvironmentRig.setHeatStrength`. */
+    setHeatStrength(strength: number | null): void {
+        this.environment.setHeatStrength(strength);
+    }
+
     /** Whether to draw with translated shaders where one is available. */
     setTranslatedShaders(enabled: boolean): void {
         this.materials.setTranslatedShaders(enabled);

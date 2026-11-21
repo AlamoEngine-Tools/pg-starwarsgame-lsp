@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 
 import * as THREE from "three";
 
-import { HeatPass } from "./heatPass";
+import { HEAT_STRENGTH_FALLBACK, HeatPass } from "./heatPass";
 
 /**
  * A renderer that records what the pass asks of it, in order. The pass is a SEQUENCE - what is
@@ -138,5 +138,18 @@ describe("HeatPass", () => {
 
         assert.equal(camera.layers.mask, before);
         assert.equal(renderer.autoClear, true);
+    });
+
+    // #418: the game sets no strength of its own, so the effect's declared one applies. The value
+    // here is a dummy, not the shipped effect's.
+    it("bends by the strength the effect declares, and by the fallback without one", () => {
+        const pass = new HeatPass(3);
+        assert.equal(pass.strength, HEAT_STRENGTH_FALLBACK);
+
+        pass.setStrength(0.7);
+        assert.equal(pass.strength, 0.7);
+
+        pass.setStrength(null);
+        assert.equal(pass.strength, HEAT_STRENGTH_FALLBACK);
     });
 });

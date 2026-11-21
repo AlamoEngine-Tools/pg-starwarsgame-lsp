@@ -29,6 +29,8 @@ import {
     applyModelFade,
 } from "./materialState";
 import { type Look, PLAIN_LOOK } from "./cloakFade";
+import { HEAT_COMPOSITE_EFFECT } from "./heatPass";
+import { PARTICLE_EFFECT_BY_MODE } from "../../shared/baseShaders";
 import { type ViewportContext } from "./viewportContext";
 
 /** The flat grey an untinted mesh draws in, until the real shaders land. */
@@ -108,9 +110,22 @@ export class MaterialBinder {
 
         // The particle systems' effects too: an emitter is drawn through the engine's own
         // `Prim*.fx` for its render mode, fetched and translated like any mesh effect.
+        //
+        // A heat sprite names none - the distortion pass draws it - but it bends the frame through
+        // the heat composite, whose strength is the one that effect declares. So a system with heat
+        // in it, a heat flag or the Heat render mode, has that effect fetched too.
+        const heatMode = PARTICLE_EFFECT_BY_MODE.get("Heat");
         for (const entry of this.context.particles.particleSystems.values()) {
-            for (const name of entry.instance.effectNames()) {
+            const effects = entry.instance.effectNames();
+            for (const name of effects) {
                 names.add(name);
+            }
+
+            if (
+                entry.instance.emitterIsHeat().some(Boolean) ||
+                (heatMode !== undefined && effects.includes(heatMode))
+            ) {
+                names.add(HEAT_COMPOSITE_EFFECT);
             }
         }
 

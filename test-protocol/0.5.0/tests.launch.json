@@ -589,6 +589,12 @@
   "PRV-55": {
     "open": "{repo}\\eaw"
   },
+  "PRV-56": {
+    "open": "C:\\temp\\aet-test-PRV-filter",
+    "settings": {
+      "aet-eaw-edit.shaders.directory": "{shaders}"
+    }
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   },

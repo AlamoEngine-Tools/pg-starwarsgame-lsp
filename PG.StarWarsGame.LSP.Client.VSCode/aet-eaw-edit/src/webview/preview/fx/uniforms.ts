@@ -141,7 +141,7 @@ function shBasis(x: number, y: number, z: number): number[] {
  * the header's shipped probe, a PLACEHOLDER sky with constant terms R 0.7379 G 0.4108 B 0.5165 that
  * gave every translated model a mauve cast. Neutral was the right instinct and the wrong answer:
  * these shaders have no other diffuse term, so a flat probe renders the entire corpus at the
- * ambient's own value - 0.1 grey on the engine's default rig - with no shading in it at all. Six
+ * ambient's own value - 0.1 grey on AloViewer's default rig - with no shading in it at all. Six
  * times too dark on the lit side, and the reader saw it immediately.
  *
  * Nine terms is a band-limited cosine lobe, so the probe overshoots a delta light by about six per
@@ -236,7 +236,7 @@ export function probeDiffuse(
 }
 
 /**
- * One light of the rig, in the terms the engine's own shaders read.
+ * The sun, in the terms the engine's own shaders read - the one light they are handed.
  *
  * The values here are the engine's, NOT three's. three's `DirectionalLight` carries the same rig
  * multiplied by PI, because `MeshStandardMaterial` applies a Lambert BRDF of `albedo / PI` that
@@ -262,12 +262,12 @@ export function engineLight(
         diffuse: [r * scale, g * scale, b * scale, 1],
 
         // ONE global specular for the whole rig, as the engine keeps it and as AloViewer's settings
-        // dialog exposes it - but scaled by this light, so turning a light down stops it
-        // highlighting at full strength.
+        // dialog exposes it, handed as TWICE the specular times the sun's intensity. Measured in
+        // the game (FoC x64, 2024 release).
         specular: [
-            specular[0] * scale,
-            specular[1] * scale,
-            specular[2] * scale,
+            2 * specular[0] * scale,
+            2 * specular[1] * scale,
+            2 * specular[2] * scale,
             0,
         ],
     };

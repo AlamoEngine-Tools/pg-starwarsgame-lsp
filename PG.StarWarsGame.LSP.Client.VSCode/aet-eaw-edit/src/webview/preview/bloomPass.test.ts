@@ -4,7 +4,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { BLOOM_SIZE, blurDelta, brightPass } from "./bloomPass";
+import * as THREE from "three";
+
+import { BLOOM_SIZE, BloomPass, blurDelta, brightPass } from "./bloomPass";
 
 describe("brightPass", () => {
     // `Engine/SceneBloom.fx`, ps_bright_filter: a pixel below the cutoff is raised to the FIFTH
@@ -48,5 +50,45 @@ describe("blurDelta", () => {
 
     it("is measured in texture coordinates, so it halves when the buffer doubles", () => {
         assert.ok(Math.abs(blurDelta(3, 1600) - blurDelta(3, 800) / 2) < 1e-12);
+    });
+});
+
+describe("BloomPass", () => {
+    /** A renderer that records each full-screen draw: into which buffer, at what size. */
+    const recording = () => {
+        const draws: string[] = [];
+        let target: THREE.WebGLRenderTarget | null = null;
+        const renderer = {
+            autoClear: true,
+            getDrawingBufferSize: (size: THREE.Vector2) => size.set(800, 400),
+            setRenderTarget: (into: THREE.WebGLRenderTarget | null) => {
+                target = into;
+            },
+            render: () => {
+                draws.push(
+                    target === null
+                        ? "canvas"
+                        : `${target.width}x${target.height}`,
+                );
+            },
+        };
+        return { renderer: renderer as unknown as THREE.WebGLRenderer, draws };
+    };
+
+    // #418, measured in the game (FoC x64, 2024 release): four ping-pong blur passes at a quarter of
+    // the frame's resolution, between the bright filter and the combine.
+    it("blurs in four passes at quarter resolution", () => {
+        const { renderer, draws } = recording();
+
+        new BloomPass().render(renderer, new THREE.Texture());
+
+        assert.deepEqual(draws, [
+            "200x100",
+            "200x100",
+            "200x100",
+            "200x100",
+            "200x100",
+            "canvas",
+        ]);
     });
 });

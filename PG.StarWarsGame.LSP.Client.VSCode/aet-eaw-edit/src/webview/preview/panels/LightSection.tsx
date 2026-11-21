@@ -71,7 +71,7 @@ export function LightSection({
                 info={
                     <>
                         {l10n.t(
-                            "The engine's own rig: A sun that casts the shadow and two fills that do not. All three reach the translated shaders.",
+                            "AloViewer's default rig: A sun that casts the shadow and two fills that do not. The translated shaders take the sun's direction and highlight, and all three as diffuse light.",
                         )}
                     </>
                 }
@@ -275,7 +275,9 @@ export function LightSection({
                                                    disabled a working control: in Game mode the stencil darken tints the hull's
                                                    own self-shadowing with no ground under it at all. */
                     disabled={
-                        shadowReach === "none" || shadowReach === "uncast"
+                        shadowReach === "none" ||
+                        shadowReach === "uncast" ||
+                        shadowReach === "off"
                     }
                     title={SHADOW_TINT_TITLE[shadowReach]}
                     onChange={(e) =>

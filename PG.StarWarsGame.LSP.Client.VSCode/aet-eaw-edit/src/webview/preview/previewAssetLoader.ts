@@ -23,6 +23,8 @@ import {
 } from "./fx/effect";
 import { parseFxManifest, selectTechnique } from "./fx/fxParser";
 import { type FxMaterialState, materialStateFrom } from "./fx/renderState";
+import { collectUniformDefaults } from "./fx/semantics";
+import { HEAT_COMPOSITE_EFFECT, HEAT_STRENGTH_PARAMETER } from "./heatPass";
 import { AssetLedger } from "./loadProgress";
 import { bufferOf } from "./payloadBytes";
 import { addressingFor } from "./textures";
@@ -49,6 +51,8 @@ export interface AssetViewport {
     releaseTexturesExcept(keep: ReadonlySet<string>): void;
     /** Drops every translated effect and declared render state; the meshes go back to their archetypes. */
     forgetTranslatedEffects(): void;
+    /** How far heat bends the frame, as the heat effect declares it; null while none is in hand. */
+    setHeatStrength(strength: number | null): void;
 }
 
 /** What the loader tells the panel. */
@@ -226,6 +230,7 @@ export class PreviewAssetLoader {
 
         const viewport = this.viewport();
         if (viewport !== null) {
+            viewport.setHeatStrength(null);
             viewport.forgetTranslatedEffects();
             this.events.translated(viewport.translatedCoverage());
         }
@@ -243,6 +248,23 @@ export class PreviewAssetLoader {
         // and the wait is over.
         this.shaders.settle(name);
         this.events.ledgersChanged();
+
+        // The heat composite is drawn by the preview's own pass, never translated onto a mesh: all
+        // it gives is the strength it declares, which the game draws with.
+        if (name.toLowerCase() === HEAT_COMPOSITE_EFFECT.toLowerCase()) {
+            this.translatedNames.add(name.toLowerCase());
+            this.viewport()?.setHeatStrength(
+                source === null
+                    ? null
+                    : (collectUniformDefaults(source).get(
+                          HEAT_STRENGTH_PARAMETER,
+                      )?.[0] ?? null),
+            );
+            if (source !== null) {
+                this.events.shaderSourceFound();
+            }
+            return;
+        }
 
         if (source === null) {
             // No copy of this effect is reachable. The archetype material stands, which is the same
@@ -423,6 +445,21 @@ function applyAddressing(
 }
 
 /**
+ * Samples an unpacked texture as the game's samplers do: LINEAR, through a mip chain.
+ *
+ * A `DataTexture` arrives NEAREST with its top level alone, which drew a TGA blocky up close and
+ * shimmering at a distance. The chain is the file's own where it ships one - `mipmaps` holds every
+ * level - and generated from the top level where it ships none.
+ */
+function applyFiltering(texture: THREE.DataTexture): THREE.DataTexture {
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = texture.mipmaps.length === 0;
+
+    return texture;
+}
+
+/**
  * Turns a texture file's bytes into a three.js texture.
  *
  * The ONE place a texture's bytes become a texture: everything before it - the server, the pipe,
@@ -432,7 +469,8 @@ function applyAddressing(
  *
  * DDS keeps its compressed blocks all the way to the GPU - decoding it would inflate a 2048x2048
  * texture several times over for no gain - while TGA has to be unpacked, because no GPU samples it
- * directly.
+ * directly. Either way it is sampled LINEAR through a mip chain, which is what the game's samplers
+ * ask for.
  */
 export function decodeTexture(
     bytes: Uint8Array,
@@ -456,7 +494,12 @@ export function decodeTexture(
             return applyAddressing(texture, parsed.width, parsed.height);
         }
 
-        const level = parsed.mipmaps[0] as { data: Uint8Array } | undefined;
+        const levels = parsed.mipmaps as {
+            data: Uint8Array;
+            width: number;
+            height: number;
+        }[];
+        const level = levels[0];
         if (level === undefined) {
             return null;
         }
@@ -466,6 +509,13 @@ export function decodeTexture(
             parsed.width,
             parsed.height,
         );
+
+        // The levels the file ships, kept; a file that ships one has its chain generated.
+        if (levels.length > 1) {
+            texture.mipmaps = levels;
+        }
+
+        applyFiltering(texture);
         texture.needsUpdate = true;
         return applyAddressing(texture, parsed.width, parsed.height);
     }
@@ -478,6 +528,7 @@ export function decodeTexture(
             parsed.width,
             parsed.height,
         );
+        applyFiltering(texture);
         texture.needsUpdate = true;
         // TGA rows run bottom-up, which is also how the game stores them.
         texture.flipY = true;

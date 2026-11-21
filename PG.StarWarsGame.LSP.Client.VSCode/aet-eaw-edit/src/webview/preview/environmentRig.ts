@@ -136,7 +136,7 @@ export class EnvironmentRig {
      * probe built from the ambient alone was doing: 0.1 grey over the entire model, unshaded.
      *
      * Rebuilt whenever the rig changes rather than fixed at construction. It used to be a hard 0.6
-     * that nothing ever updated, so Game mode washed out under six times the engine's own 0.1 and
+     * that nothing ever updated, so Game mode washed out under six times AloViewer's 0.1 and
      * the reader's Ambient slider moved the scene light while the translated shaders ignored it.
      */
     private harmonics = sphericalHarmonics([], DEFAULT_LIGHTS.ambient.colour);
@@ -147,6 +147,8 @@ export class EnvironmentRig {
     );
     /** Built the first time a heat sprite is on screen, and not before - it costs two buffers. */
     private heat: HeatPass | null = null;
+    /** The strength the heat effect declares, held for a heat pass not built yet. Null for none. */
+    private heatStrength: number | null = null;
     /**
      * The engine's own shadows: stencil volumes cast by the authored shadow mesh.
      *
@@ -502,6 +504,15 @@ export class EnvironmentRig {
     }
 
     /**
+     * How far heat bends the frame: the strength the heat effect declares, or null while none is in
+     * hand. See `HEAT_STRENGTH_PARAMETER`.
+     */
+    setHeatStrength(strength: number | null): void {
+        this.heatStrength = strength;
+        this.heat?.setStrength(strength);
+    }
+
+    /**
      * Draws the heat buffer rather than the bent picture.
      *
      * Forces the heat path on while it is on, even with nothing distorting: a debug view that shows
@@ -551,9 +562,9 @@ export class EnvironmentRig {
         key.shadow.bias = -0.0005;
         key.shadow.normalBias = 0.02;
 
-        // Two fills, not one, which is AloViewer's own rig and the engine's: it numbers three
-        // directional lights and a translated shader asks for all three by semantic. With only two
-        // supplied, DIR_LIGHT_VEC_2 kept whatever the header declared.
+        // Two fills, not one, which is AloViewer's own rig and the engine's. They light the Default
+        // renderer's materials here and the translated shaders through the probe only: the game
+        // writes no DIR_LIGHT_*_1 or _2 uniform, so those keep what the effect declares.
         const fill1 = new THREE.DirectionalLight(0xffffff, 0.5);
         const fill2 = new THREE.DirectionalLight(0xffffff, 0.25);
 
@@ -789,30 +800,34 @@ export class EnvironmentRig {
             return [out.x, out.y, out.z];
         };
 
-        // Direction TO the light, which is what the engine's vectors mean. A three
-        // DirectionalLight's position IS its direction, since it always targets the origin.
-        // Direction off the three light, because that is where `placeKeyLight` put it - but the
-        // COLOUR and intensity off the rig, because three's copy of them is multiplied by PI for a
-        // BRDF the engine's shaders do not have. See `engineLight`.
-        const settings = [this.rig.sun, this.rig.fill1, this.rig.fill2];
-
-        const lights = this.alamoLights.map((light, index) => {
-            const direction = light.position.clone().normalize();
-            const rotationOnly = new THREE.Matrix4().extractRotation(
-                worldInverse,
-            );
-            const inObject = direction
-                .clone()
-                .applyMatrix4(rotationOnly)
-                .normalize();
-
-            return engineLight(
-                settings[index] ?? this.rig.sun,
+        // The SUN alone. Measured in the game (FoC x64, 2024 release): only light 0's uniforms are
+        // ever written, so a shader's DIR_LIGHT_*_1 and _2 keep the values its effect declares, and
+        // the fills reach a surface through the light probe and nowhere else.
+        //
+        // Direction TO the light, which is what the engine's vectors mean, off the rig's own angles -
+        // the pair `placeKeyLight` and the probe use. NOT off the three light: that one is PLACED a
+        // distance out from the model's centre for its shadow camera, so its position is a direction
+        // only while the model stands on the origin. The colour and intensity come off the rig too,
+        // because three's copy of them is multiplied by PI for a BRDF the engine's shaders do not
+        // have. See `engineLight`.
+        const toLight = lightDirection(this.lightAzimuth, this.lightElevation);
+        const direction = new THREE.Vector3(
+            toLight.x,
+            toLight.y,
+            toLight.z,
+        ).normalize();
+        const inObject = direction
+            .clone()
+            .applyMatrix4(new THREE.Matrix4().extractRotation(worldInverse))
+            .normalize();
+        const lights = [
+            engineLight(
+                this.rig.sun,
                 this.rig.specular,
                 [direction.x, direction.y, direction.z],
                 [inObject.x, inObject.y, inObject.z],
-            );
-        });
+            ),
+        ];
 
         // The Alamo shaders do their own bone lookup, so the palette is handed over rather than
         // left to three's vertex shader - but not raw. `Skeleton.boneMatrices` maps BIND WORLD
@@ -858,16 +873,26 @@ export class EnvironmentRig {
             ],
             lightScale: [look.r, look.g, look.b, look.a],
             time: this.host.elapsed,
-            resolution: [
-                this.context.canvas.clientWidth,
-                this.context.canvas.clientHeight,
-                0,
-                0,
-            ],
+            resolution: this.resolutionConstants(),
             sphericalHarmonics: this.harmonics,
             sphericalHarmonicsFill: this.fillHarmonics,
             skinMatrices,
         };
+    }
+
+    /**
+     * RESOLUTION_CONSTANTS: the frame's size in DRAWING-BUFFER pixels, then half a texel of it.
+     *
+     * The drawing buffer, not the canvas's CSS size - the two differ by the device pixel ratio, and a
+     * shader offsetting by a texel offsets by the buffer's. `z` and `w` are `0.5 / width` and
+     * `0.5 / height`, the half-texel a full-screen effect shifts its lookups by.
+     */
+    private resolutionConstants(): [number, number, number, number] {
+        this.context.renderer.getDrawingBufferSize(FRAME_SIZE);
+        const width = Math.max(1, FRAME_SIZE.x);
+        const height = Math.max(1, FRAME_SIZE.y);
+
+        return [width, height, 0.5 / width, 0.5 / height];
     }
 
     rebuildGrid(sphere: BoundingSphere): void {
@@ -990,7 +1015,10 @@ export class EnvironmentRig {
         // switching bloom on lifted every antialiased edge in the picture. The engine has no colour
         // management at all: every surface it composites through is a plain `D3DFMT_A8R8G8B8`.
         if (bending) {
-            this.heat ??= new HeatPass(HEAT_LAYER);
+            if (this.heat === null) {
+                this.heat = new HeatPass(HEAT_LAYER);
+                this.heat.setStrength(this.heatStrength);
+            }
             this.heat.render(
                 this.context.renderer,
                 this.context.scene,

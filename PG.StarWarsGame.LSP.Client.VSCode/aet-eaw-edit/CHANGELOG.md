@@ -127,6 +127,15 @@
   Stand-in shadow switch in Scene settings brings one back for an unfinished model, marked as a
   stand-in in the header
   ([#412](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/412))
+- **Game rendering lights, bends and blooms as the game does** - TGA and uncompressed DDS textures were
+  sampled blocky and unmipmapped in both renderers; they are now filtered smoothly through a mip chain, an
+  uncompressed DDS keeping the levels it ships. In Game rendering the heat haze bends by the strength the
+  heat effect in the shader folder declares, the sun's highlight is twice its specular times its intensity,
+  the fill lights hand the shaders no light values of their own, the sun direction no longer changes with
+  the model's distance from the origin, bloom blurs in the game's four passes, and the screen resolution the
+  shaders read is the drawing buffer's with its half-texel terms. The shadow colour is disabled with its
+  reason while a cloak, a clip or the detail level switches the shadow mesh off
+  ([#418](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/418))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

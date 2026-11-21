@@ -295,10 +295,10 @@ describe("viewport fidelity settings", () => {
     });
 });
 
-describe("the default light rig is the engine`s own", () => {
+describe("the default light rig is AloViewer`s", () => {
     const { lights } = DEFAULT_VIEWER_SETTINGS;
 
-    it("uses the engine`s angles", () => {
+    it("uses AloViewer`s angles", () => {
         // `Z Angle` and `Tilt` in AloViewer's Nature panel, straight out of GetDefaultEnvironment.
         assert.deepEqual([lights.sun.azimuth, lights.sun.elevation], [0, 45]);
         assert.deepEqual(

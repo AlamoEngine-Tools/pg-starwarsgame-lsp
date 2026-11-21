@@ -42,7 +42,8 @@ const OBJECT_LIGHT = new THREE.Vector3();
 export const EXTRUSION_RADII = 4;
 
 /** Where the one shadow colour can actually be seen. */
-export type ShadowTintReach = "ground" | "model" | "both" | "none" | "uncast";
+export type ShadowTintReach =
+    "ground" | "model" | "both" | "none" | "uncast" | "off";
 
 /**
  * What the shadow colour reaches right now, which is what decides whether its control is live.
@@ -61,14 +62,23 @@ export type ShadowTintReach = "ground" | "model" | "both" | "none" | "uncast";
  * `uncast` is the other dead case, and it overrides the floor: nothing casts a shadow at all - the
  * Game renderer on a model without a shadow mesh, with no stand-in - so the ground has nothing to
  * catch either.
+ *
+ * `off` is the third, and overrides the floor too: the Game renderer on a model whose shadow mesh
+ * a cloak, a clip or the detail level switches off. Its render geometry casts no shadow-map shadow
+ * under Game, so the ground has nothing to catch while the volumes are off.
  */
 export function shadowTintReach(
     floor: boolean,
     stencilCasting: boolean,
     uncast: boolean,
+    switchedOff = false,
 ): ShadowTintReach {
     if (uncast) {
         return "uncast";
+    }
+
+    if (switchedOff) {
+        return "off";
     }
 
     if (floor && stencilCasting) {
@@ -224,6 +234,11 @@ void main() {
  * `renderOrder`: the volumes draw after the model, and the darken quad after them. That way one
  * `renderer.render` still produces the finished frame, and the pass works unchanged whether the
  * frame is going to the canvas, through the heat composite, or on to bloom.
+ *
+ * The darken lands after the OPAQUE meshes and before the transparent ones, as the game draws its
+ * shadow phase before its transparent phase: the volumes and the darken are not `transparent`, so
+ * three draws them at the end of its opaque list, and every transparent mesh - glass, engine glow,
+ * an additive light mesh - in its transparent list afterwards, never darkened. Measured by PRV-56.
  */
 export class ShadowVolumePass {
     /** The full-screen darken, added to the scene once. */

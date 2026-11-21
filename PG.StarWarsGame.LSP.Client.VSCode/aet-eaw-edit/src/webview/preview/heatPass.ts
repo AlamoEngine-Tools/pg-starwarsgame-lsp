@@ -18,15 +18,11 @@
 //   3. Draw one full-screen quad with `Engine/SceneHeat.fx`, which reads the scene through the
 //      distortion field.
 //
-// `SceneHeat.fx`'s whole pixel shader is three lines, and they say exactly what the offset is:
-//
-//     half4 distortion_pixel = tex2D(DistortionSampler, In.Tex0);
-//     half4 distortion = DistortionAmount * 2.0 * (distortion_pixel - 0.5);
-//     half4 scene_pixel = tex2D(SceneSampler, In.Tex0 + distortion.xy);
-//
-// No alpha term anywhere. This used to multiply the offset by the distortion buffer's accumulated
-// alpha, which is not in the shader and which the emitters make tiny - `Large_Explosion_Space_Empire`
-// authors its `heat` emitter at alpha 0.196 - so the picture barely moved. It also cleared the
+// The composite offsets each scene lookup by the distortion field's colour around its neutral
+// 0.5, scaled by `DistortionAmount`, with no alpha term anywhere. This used to multiply the offset
+// by the distortion buffer's accumulated alpha, which is not in the shader and which the emitters
+// make tiny - `Large_Explosion_Space_Empire` authors its `heat` emitter at alpha 0.196 - so the
+// picture barely moved. It also cleared the
 // buffer at alpha ZERO, and three premultiplies a clear colour, so the neutral 0.5 was stored as 0
 // and every pixel the sprites did not cover asked for a hard pull to one side. The clear is opaque
 // now, exactly as `D3DCOLOR_XRGB(129,128,255)` is.
@@ -34,16 +30,28 @@
 import * as THREE from "three";
 
 /**
- * How far the frame can be pulled, as a fraction of the screen.
- *
- * AloViewer's own choice: `m_heatEffect->GetEffect()->SetFloat("DistortionAmount", 0.05f)`.
- *
- * This was 0.01, which is the constant in `Engine/PrimHeat.fx` - the per-SPRITE heat shader, where
- * each quad samples the scene itself. That is a different technique from the one implemented here,
- * and its constant does not belong to it. `SceneHeat.fx`, the full-screen composite this actually
- * is, declares 0.25 and the reference renderer turns it down to 0.05.
+ * The effect the game composites heat with, fetched from the reader's own shader copy like any
+ * other effect. Its declared strength is the one the game draws with - see `HEAT_STRENGTH_PARAMETER`.
  */
-const DISTORTION_AMOUNT = 0.05;
+export const HEAT_COMPOSITE_EFFECT = "SceneHeat.fx";
+
+/**
+ * The parameter of `HEAT_COMPOSITE_EFFECT` that says how far the frame can be pulled, as a fraction
+ * of the screen.
+ *
+ * Measured in the game (FoC x64, 2024 release): it sets no value of its own, so the default the
+ * effect declares is what bends the frame. Read from the reader's copy at run time - no value of
+ * the effect's is kept here.
+ */
+export const HEAT_STRENGTH_PARAMETER = "DistortionAmount";
+
+/**
+ * The strength until the effect's own arrives, or when no copy of it is reachable.
+ *
+ * AloViewer's own choice, `SetFloat("DistortionAmount", 0.05f)` - NOT the game's, which sets none.
+ * It stands in only so a heat sprite still bends something without a shader copy.
+ */
+export const HEAT_STRENGTH_FALLBACK = 0.05;
 
 /**
  * The channel value that means "no offset here".
@@ -148,7 +156,7 @@ export class HeatPass {
             uniforms: {
                 uScene: { value: null },
                 uHeat: { value: null },
-                uAmount: { value: DISTORTION_AMOUNT },
+                uAmount: { value: HEAT_STRENGTH_FALLBACK },
                 uDebug: { value: 0 },
                 uNeutral: { value: NEUTRAL_CHANNEL },
             },
@@ -162,6 +170,17 @@ export class HeatPass {
         this.quad.add(
             new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.composite),
         );
+    }
+
+    /** How far the frame can be pulled, as a fraction of the screen. */
+    get strength(): number {
+        return this.composite.uniforms.uAmount.value as number;
+    }
+
+    /** The strength the heat effect declares, or null for none: the fallback then stands. */
+    setStrength(strength: number | null): void {
+        this.composite.uniforms.uAmount.value =
+            strength ?? HEAT_STRENGTH_FALLBACK;
     }
 
     /**

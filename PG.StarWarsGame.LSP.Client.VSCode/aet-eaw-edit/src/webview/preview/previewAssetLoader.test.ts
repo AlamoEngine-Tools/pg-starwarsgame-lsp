@@ -23,6 +23,8 @@ interface Recorded {
     sourceFound: number;
     sourcesForgotten: number;
     coverage: { translated: number; total: number }[];
+    /** Every heat strength handed to the viewport, null for "none declared". */
+    heat: (number | null)[];
 }
 
 function harness(options?: {
@@ -41,6 +43,7 @@ function harness(options?: {
         sourceFound: 0,
         sourcesForgotten: 0,
         coverage: [],
+        heat: [],
     };
 
     const viewport: AssetViewport = {
@@ -55,6 +58,7 @@ function harness(options?: {
             seen.calls.push(`particle texture missing ${name}`),
         releaseTexturesExcept: () => seen.calls.push("release"),
         forgetTranslatedEffects: () => seen.calls.push("forget effects"),
+        setHeatStrength: (strength) => seen.heat.push(strength),
     };
 
     const events: AssetLoaderEvents = {
@@ -342,6 +346,55 @@ describe("PreviewAssetLoader", () => {
 
             assert.equal(loader.requested, 1);
             assert.equal(seen.posted.length, 3);
+        });
+    });
+
+    // #418: the game sets no heat strength of its own, so the composite effect's declared default is
+    // what bends the frame. The source here is a dummy, not the shipped effect.
+    describe("the heat composite's effect", () => {
+        const effect = {} as TranslatedEffect;
+        const translating = () =>
+            harness({
+                translate: () => ({
+                    effect,
+                    refusal: null,
+                    missingIncludes: [],
+                }),
+            });
+
+        it("hands the viewport the strength the effect declares, and translates nothing", () => {
+            const { loader, seen } = translating();
+            loader.requestShader("SceneHeat.fx");
+
+            loader.receiveShader(
+                "SceneHeat.fx",
+                "float Other = 2.0f;\nfloat DistortionAmount = 0.7f;\n",
+            );
+
+            assert.deepEqual(seen.heat, [0.7]);
+            assert.deepEqual(seen.calls, []);
+            assert.equal(loader.settled, 1);
+        });
+
+        it("hands the viewport no strength when the effect is not there or declares none", () => {
+            const { loader, seen } = translating();
+
+            loader.receiveShader("SceneHeat.fx", null);
+            loader.receiveShader("sceneheat.fx", "float Other = 2.0f;");
+
+            assert.deepEqual(seen.heat, [null, null]);
+        });
+
+        it("forgets the strength when the effects are fetched again", () => {
+            const { loader, seen } = translating();
+            loader.receiveShader(
+                "SceneHeat.fx",
+                "float DistortionAmount = 0.7;",
+            );
+
+            loader.refetchShaders(["SceneHeat.fx"]);
+
+            assert.deepEqual(seen.heat, [0.7, null]);
         });
     });
 

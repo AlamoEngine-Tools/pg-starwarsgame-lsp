@@ -117,6 +117,7 @@ function loaderOverAStore(): {
             store.retain(keep);
         },
         forgetTranslatedEffects: () => undefined,
+        setHeatStrength: () => undefined,
     };
     const events: AssetLoaderEvents = {
         post: () => undefined,
@@ -233,6 +234,7 @@ describe("the textures a preview keeps", () => {
                 store.retain(keep);
             },
             forgetTranslatedEffects: () => undefined,
+            setHeatStrength: () => undefined,
         };
         const loader = new PreviewAssetLoader(
             () => viewport,

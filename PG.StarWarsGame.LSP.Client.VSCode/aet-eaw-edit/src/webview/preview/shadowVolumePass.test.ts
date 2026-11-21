@@ -191,6 +191,14 @@ describe("shadowTintReach", () => {
         assert.equal(shadowTintReach(true, false, true), "uncast");
         assert.equal(shadowTintReach(false, false, true), "uncast");
     });
+
+    // Under Game the render geometry of a model with a shadow mesh casts nothing into the shadow
+    // map, so with its shadow mesh switched off - a cloak, a clip, the detail level - the ground has
+    // nothing to catch. It read "ground" with the floor on.
+    it("reaches nothing, floor or none, while the shadow mesh is switched off", () => {
+        assert.equal(shadowTintReach(true, false, false, true), "off");
+        assert.equal(shadowTintReach(false, false, false, true), "off");
+    });
 });
 
 describe("standInBlock", () => {
