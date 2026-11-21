@@ -30,4 +30,55 @@ public sealed class GameTextureNameTest
     {
         Assert.Equal("Game/hull.tga", GameTextureName.FileName("Game/hull.tga"));
     }
+
+    // #420, measured in the game (FoC x64, 2024 release): the name as written, then the name up to its FIRST
+    // dot with .dds appended - and nothing else, whatever the extension.
+    [Theory]
+    [InlineData("hull.png", "hull.png|hull.dds")]
+    [InlineData("hull.tga", "hull.tga|hull.dds")]
+    [InlineData("hull.bmp", "hull.bmp|hull.dds")]
+    [InlineData("hull.dds", "hull.dds")]
+    [InlineData("hull.DDS", "hull.DDS")]
+    [InlineData("hull.two.tga", "hull.two.tga|hull.dds")]
+    [InlineData("hull.two.dds", "hull.two.dds|hull.dds")]
+    [InlineData("Data/Art/Textures/hull.two.tga", "Data/Art/Textures/hull.two.tga|Data/Art/Textures/hull.dds")]
+    [InlineData(@"Art.Old\hull.tga", @"Art.Old\hull.tga|Art.Old\hull.dds")]
+    public void Candidates_AreTheNameAsWritten_ThenItsFirstDotStemAsDds(string named, string expected)
+    {
+        Assert.Equal(expected.Split('|'), GameTextureName.Candidates(named));
+    }
+
+    [Theory]
+    [InlineData("hull.dds", true)]
+    [InlineData("hull.TGA", true)]
+    [InlineData("hull.png", true)]
+    [InlineData("hull.alo", false)]
+    [InlineData("hull.bmp", false)]
+    [InlineData("hull", false)]
+    public void IsTextureFile_KnowsTheFormatsTheCatalogRecords(string name, bool expected)
+    {
+        Assert.Equal(expected, GameTextureName.IsTextureFile(name));
+    }
+
+    [Theory]
+    [InlineData("hull.png", true)]
+    [InlineData("data/art/textures/HULL.PNG", true)]
+    [InlineData("hull.tga", false)]
+    [InlineData("hull.png.dds", false)]
+    public void IsPng_IsByTheFileFound(string path, bool expected)
+    {
+        Assert.Equal(expected, GameTextureName.IsPng(path));
+    }
+
+    // FR-5: a .dds name whose file is missing is NOT satisfied by the .tga of that stem; this is the file
+    // a hint names.
+    [Theory]
+    [InlineData("hull.dds", "hull.tga")]
+    [InlineData("Data/Art/Textures/Hull.DDS", "Data/Art/Textures/Hull.tga")]
+    [InlineData("hull.tga", null)]
+    [InlineData("hull.png", null)]
+    public void UnsearchedTga_IsTheTgaADdsNameNeverReaches(string named, string? expected)
+    {
+        Assert.Equal(expected, GameTextureName.UnsearchedTga(named));
+    }
 }

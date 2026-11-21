@@ -35,7 +35,8 @@ public sealed class GameAssetResolverTest
 
     private const string ModelPath = "Data/Art/Models/Ev_stardestroyer.alo";
 
-    private static GameAssetResolver Build(
+    // The interface, because the texture lookup is its member: every resolver gets it the same way.
+    private static IGameAssetResolver Build(
         MockFileSystem fs,
         IReadOnlyList<string>? assetRoots = null,
         string? gamePath = null,
@@ -215,59 +216,93 @@ public sealed class GameAssetResolverTest
         Assert.True(resolver.Tiers.CanResolveShippedAssets);
     }
 
-    // ── extension interchange ─────────────────────────────────────────────────
+    // ── the texture lookup (#420) ─────────────────────────────────────────────
+
+    public static IEnumerable<object?[]> TextureCases => TextureLookupCases.All;
+
+    [Theory]
+    [MemberData(nameof(TextureCases))]
+    public void LocateTexture_FollowsTheGamesLookup(string named, string[] onDisk, string? expected)
+    {
+        var fs = FileSystemWith([.. onDisk.Select(f => $@"C:\games\eaw\Data\Art\Textures\{f}")]);
+        var resolver = Build(fs, null, BaseGame);
+
+        var found = resolver.LocateTexture("Data/Art/Textures/" + named);
+
+        Assert.Equal(expected?.ToLowerInvariant(),
+            found is null ? null : Path.GetFileName(found.ResolvedPath).ToLowerInvariant());
+    }
 
     [Fact]
-    public void Locate_ResolvesATgaRequestAgainstADdsOnDisk()
+    public void LocateTexture_ResolvesATgaRequestAgainstADdsOnDisk()
     {
-        // The engine treats the two as one asset; the shipped models reference .tga names for textures
-        // that only ever ship as .dds.
+        // The shipped models reference .tga names for textures that only ever ship as .dds.
         var fs = FileSystemWith(@"C:\games\eaw\Data\Art\Textures\Ai_rancor.dds");
         var resolver = Build(fs, null, BaseGame);
 
-        var found = resolver.Locate("Data/Art/Textures/Ai_rancor.tga");
+        var found = resolver.LocateTexture("Data/Art/Textures/Ai_rancor.tga");
 
         Assert.NotNull(found);
         Assert.EndsWith(".dds", found.ResolvedPath, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Locate_PrefersTheRequestedExtensionWithinATier()
+    public void LocateTexture_OpensTheNameAsWrittenInAnyTierBeforeTheDds()
     {
-        var fs = FileSystemWith(
-            @"C:\games\eaw\Data\Art\Textures\Ai_rancor.dds",
-            @"C:\games\eaw\Data\Art\Textures\Ai_rancor.tga");
-        var resolver = Build(fs, null, BaseGame);
-
-        Assert.EndsWith(".tga", resolver.Locate("Data/Art/Textures/Ai_rancor.tga")!.ResolvedPath,
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void Locate_LetsAModsAlternateExtensionShadowTheBaseGamesExactMatch()
-    {
-        // Interchange is applied WITHIN a tier before moving to the next, so a mod shipping the .dds
-        // wins over the base game's .tga. The other order would make a mod's own texture unreachable.
+        // The game opens the name as written through its whole file system and tries the .dds only when
+        // that open fails, so the base game's .tga is what a .tga name opens - not a mod's .dds.
         var fs = FileSystemWith(
             @"C:\mod\Data\Art\Textures\Ai_rancor.dds",
             @"C:\games\eaw\Data\Art\Textures\Ai_rancor.tga");
         var resolver = Build(fs, [@"C:\mod"], BaseGame);
 
-        Assert.Equal(GameAssetTier.Workspace, resolver.Locate("Data/Art/Textures/Ai_rancor.tga")!.Tier);
+        Assert.Equal(GameAssetTier.BaseGameLoose, resolver.LocateTexture("Data/Art/Textures/Ai_rancor.tga")!.Tier);
     }
 
     [Fact]
-    public void Locate_DoesNotLetADependencysExactMatchBeatTheRootProjectsAlternate()
+    public void LocateTexture_LetsADependencysNameAsWrittenBeatTheRootProjectsDds()
     {
-        // Layer precedence dominates extension preference: the root project owns the asset even when
-        // it ships the other format. Nesting these loops the other way round inverts the layering.
         var fs = FileSystemWith(
             @"C:\mod\Data\Art\Textures\Ai_rancor.dds",
             @"C:\dependency\Data\Art\Textures\Ai_rancor.tga");
         var resolver = Build(fs, [@"C:\mod", @"C:\dependency"]);
 
-        Assert.Contains(@"C:\mod", resolver.Locate("Data/Art/Textures/Ai_rancor.tga")!.ResolvedPath,
+        Assert.Contains(@"C:\dependency", resolver.LocateTexture("Data/Art/Textures/Ai_rancor.tga")!.ResolvedPath,
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LocateTexture_TakesTheRootProjectsDdsOverADependencysDds()
+    {
+        // Layer precedence still holds for one name: the fallback is looked up through every layer in turn.
+        var fs = FileSystemWith(
+            @"C:\mod\Data\Art\Textures\Ai_rancor.dds",
+            @"C:\dependency\Data\Art\Textures\Ai_rancor.dds");
+        var resolver = Build(fs, [@"C:\mod", @"C:\dependency"]);
+
+        Assert.Contains(@"C:\mod", resolver.LocateTexture("Data/Art/Textures/Ai_rancor.tga")!.ResolvedPath,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LocateTexture_FindsTheFallbackInAnArchive()
+    {
+        var archives = new StubArchives(("data/art/textures/ai_rancor.dds", [9]));
+        var resolver = Build(new MockFileSystem(), null, BaseGame, archives: archives);
+
+        var found = resolver.LocateTexture("Data/Art/Textures/Ai_rancor.png");
+
+        Assert.Equal(GameAssetTier.Archive, found!.Tier);
+    }
+
+    [Fact]
+    public void Locate_OpensOnlyTheNameAsWritten()
+    {
+        // The fallback is the texture lookup's, not every asset's: Locate itself is exact.
+        var fs = FileSystemWith(@"C:\games\eaw\Data\Art\Textures\Ai_rancor.dds");
+        var resolver = Build(fs, null, BaseGame);
+
+        Assert.Null(resolver.Locate("Data/Art/Textures/Ai_rancor.tga"));
     }
 
     [Fact]

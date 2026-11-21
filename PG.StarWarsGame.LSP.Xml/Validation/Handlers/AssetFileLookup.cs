@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -26,19 +27,92 @@ public static class AssetFileLookup
     ///     The extensions a bare filename may be matched against, so a partial path is only matched
     ///     to catalog entries of the right asset type.
     /// </param>
-    /// <param name="interchangeable">
-    ///     Extensions the engine treats as ONE asset - a .tga reference is satisfied by the .dds and
-    ///     the other way round. Empty means exact-extension matching only.
+    /// <param name="textureLookup">
+    ///     Whether the name is looked up as the game looks up a texture (<see cref="GameTextureName.Candidates" />):
+    ///     as written, then its first-dot stem as a <c>.dds</c>. False means the name as written only.
     /// </param>
     public static bool Resolves(
         IAssetFileIndex index, string normalised, IReadOnlyList<string> allowedExtensions,
-        IReadOnlyList<string> interchangeable)
+        bool textureLookup)
     {
-        if (Exists(index, normalised, allowedExtensions))
-            return true;
+        return Resolve(index, normalised, allowedExtensions, textureLookup) is not null;
+    }
 
-        return AlternateNames(normalised, interchangeable)
-            .Any(alternate => Exists(index, alternate, allowedExtensions));
+    /// <summary>The catalog path <paramref name="name" /> resolves to by <paramref name="rule" />, or null.</summary>
+    public static string? Resolve(IAssetFileIndex index, string name, AssetKindRule rule)
+    {
+        return Resolve(index, name, rule.AllowedExtensions, rule.TextureLookup);
+    }
+
+    /// <summary>
+    ///     The catalog path <paramref name="normalised" /> resolves to, or null: the first of the names the
+    ///     lookup tries that the catalog holds. See <see cref="Resolves" /> for the parameters.
+    /// </summary>
+    public static string? Resolve(
+        IAssetFileIndex index, string normalised, IReadOnlyList<string> allowedExtensions, bool textureLookup)
+    {
+        foreach (var candidate in textureLookup ? GameTextureName.Candidates(normalised) : [normalised])
+            if (Find(index, candidate, allowedExtensions) is { } found)
+                return found;
+
+        return null;
+    }
+
+    /// <summary>
+    ///     For a missing texture named as a <c>.dds</c> whose <c>.tga</c> IS in the catalog, the sentence that
+    ///     the game does not look for that <c>.tga</c> (#420, FR-5), with a leading space; empty otherwise.
+    /// </summary>
+    public static string UnsearchedTgaHint(
+        IAssetFileIndex index, string name, IReadOnlyList<string> allowedExtensions, IMessageCatalog messages)
+    {
+        return GameTextureName.UnsearchedTga(name) is { } tga && Find(index, tga, allowedExtensions) is not null
+            ? " " + messages.Format("AssetFileExistence_GameDoesNotLookForTga", tga)
+            : string.Empty;
+    }
+
+    /// <summary>
+    ///     The <c>.dds</c> the game never reaches for the texture <paramref name="name" />, or null: the catalog
+    ///     path of the <c>.dds</c> of its stem, when <paramref name="found" /> is the name as written and that
+    ///     <c>.dds</c> ships in a layer ABOVE it.
+    /// </summary>
+    /// <remarks>
+    ///     Measured in the game (#420): the name as written is looked for through the whole file system - mod
+    ///     folders, loose files, archives - before the <c>.dds</c> is tried anywhere. So a project's
+    ///     <c>foo.dds</c> does not replace the <c>foo.tga</c> a lower layer or the game ships for a reference
+    ///     that says <c>foo.tga</c>, where any other file of the higher layer would win. Only that case is
+    ///     answered: in one layer the name as written is the obvious pick, and a <c>.dds</c> below it loses
+    ///     as every lower file does.
+    /// </remarks>
+    public static string? UnreachedDds(
+        IAssetFileIndex index, string name, string found, IReadOnlyList<string> allowedExtensions)
+    {
+        var candidates = GameTextureName.Candidates(name);
+        if (candidates.Count < 2)
+            return null;
+
+        // A bare catalog name is an icon inside a mega texture, not a file the texture lookup opens: which
+        // file a name finds is then not this rule's to say.
+        if (!found.Contains('/'))
+            return null;
+
+        // Found by the fallback already: the .dds IS what the game opens.
+        if (!string.Equals(MergedAssetFileIndex.FileNameOf(found),
+                MergedAssetFileIndex.FileNameOf(Canonical(candidates[0])), StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return Find(index, candidates[1], allowedExtensions) is { } dds &&
+               Precedence(index, dds) > Precedence(index, found)
+            ? dds
+            : null;
+    }
+
+    /// <summary>
+    ///     Where a catalog path stands among the layers: the rank of its project, with the game's own files
+    ///     below every project. A loose file no project declares stands with the lowest project.
+    /// </summary>
+    private static int Precedence(IAssetFileIndex index, string path)
+    {
+        return index.LayerRankOf(path) ?? (index.IsPackedAsset(path) ? -1 : 0);
     }
 
     /// <summary>
@@ -57,18 +131,10 @@ public static class AssetFileLookup
         return false;
     }
 
-    /// <summary>The same name with each other interchangeable extension.</summary>
-    public static IEnumerable<string> AlternateNames(
-        string normalised, IReadOnlyList<string> interchangeable)
+    /// <summary>The names the lookup tries after the name as written: none unless it is a texture lookup.</summary>
+    public static IEnumerable<string> AlternateNames(string normalised, bool textureLookup)
     {
-        var ext = Path.GetExtension(normalised);
-        if (string.IsNullOrEmpty(ext) ||
-            !interchangeable.Contains(ext, StringComparer.OrdinalIgnoreCase))
-            yield break;
-
-        foreach (var other in interchangeable)
-            if (!other.Equals(ext, StringComparison.OrdinalIgnoreCase))
-                yield return normalised[..^ext.Length] + other;
+        return textureLookup ? GameTextureName.Candidates(normalised).Skip(1) : [];
     }
 
     /// <summary>
@@ -91,14 +157,14 @@ public static class AssetFileLookup
         return GamePaths.Normalize(path);
     }
 
-    private static bool Exists(
+    private static string? Find(
         IAssetFileIndex index, string normalised, IReadOnlyList<string> allowedExtensions)
     {
         var canonical = Canonical(normalised);
 
         // Exact relative-path match (e.g. "data/art/textures/foo.tga").
         if (index.Contains(canonical))
-            return true;
+            return canonical;
 
         // Bare filename or partial path (e.g. "foo.tga", "textures/foo.tga"): match any catalog
         // entry of the right asset type whose path ends with "/<value>". The leading separator is
@@ -113,7 +179,7 @@ public static class AssetFileLookup
         // was missing and every extension was scanned to no purpose.
         var fileName = MergedAssetFileIndex.FileNameOf(canonical);
         if (fileName.Length == 0)
-            return false;
+            return null;
 
         var suffix = "/" + canonical;
         foreach (var path in index.GetByFileName(fileName))
@@ -123,9 +189,9 @@ public static class AssetFileLookup
 
             if (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(path, canonical, StringComparison.OrdinalIgnoreCase))
-                return true;
+                return path;
         }
 
-        return false;
+        return null;
     }
 }

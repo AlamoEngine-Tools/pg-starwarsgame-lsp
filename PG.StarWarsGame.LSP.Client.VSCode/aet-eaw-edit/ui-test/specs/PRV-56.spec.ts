@@ -6,7 +6,12 @@
 // Before, the TGA was sampled NEAREST from its top level alone.
 import { browser, expect } from "@wdio/globals";
 import { serverReady } from "../protocol.js";
-import { openInPreview, openSceneSettings, press } from "./preview.js";
+import {
+    openInPreview,
+    openSceneSettings,
+    pickRenderer as pick,
+    textureSampling as sampling,
+} from "./preview.js";
 import { closeAll, inNewestWebview } from "./storyGraph.js";
 
 const MODEL =
@@ -30,80 +35,6 @@ async function loaded(): Promise<void> {
         { timeout: 120_000, timeoutMsg: "The model did not load" },
     );
     await browser.pause(3_000);
-}
-
-/** Picks a position of the Renderer switch, by its label. */
-async function pick(label: string): Promise<void> {
-    await press(
-        `//*[@aria-label='Which renderer draws the model']//button[normalize-space()='${label}']`,
-    );
-    await browser.pause(2_000);
-}
-
-interface Sampling {
-    found: boolean;
-    minFilter: string;
-    magFilter: string;
-    /** The mip levels the GPU holds for the texture. */
-    levels: number;
-}
-
-/** How the GPU samples the generated TGA, read off the GL texture itself. Run inside the preview. */
-async function sampling(name: string): Promise<Sampling> {
-    return browser.waitUntil(
-        async () =>
-            browser.execute((wanted: string) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const v = (window as unknown as { aetDebugViewport: any })
-                    .aetDebugViewport;
-                const texture = v.textures.get(wanted);
-                const handle =
-                    texture === undefined
-                        ? undefined
-                        : v.renderer.properties.get(texture).__webglTexture;
-                if (handle === undefined) {
-                    return false;
-                }
-                const gl = v.renderer.getContext() as WebGL2RenderingContext;
-                const names = new Map<number, string>([
-                    [gl.NEAREST, "NEAREST"],
-                    [gl.LINEAR, "LINEAR"],
-                    [gl.NEAREST_MIPMAP_NEAREST, "NEAREST_MIPMAP_NEAREST"],
-                    [gl.LINEAR_MIPMAP_NEAREST, "LINEAR_MIPMAP_NEAREST"],
-                    [gl.NEAREST_MIPMAP_LINEAR, "NEAREST_MIPMAP_LINEAR"],
-                    [gl.LINEAR_MIPMAP_LINEAR, "LINEAR_MIPMAP_LINEAR"],
-                ]);
-                gl.bindTexture(gl.TEXTURE_2D, handle);
-                const result = {
-                    found: true,
-                    minFilter:
-                        names.get(
-                            gl.getTexParameter(
-                                gl.TEXTURE_2D,
-                                gl.TEXTURE_MIN_FILTER,
-                            ),
-                        ) ?? "?",
-                    magFilter:
-                        names.get(
-                            gl.getTexParameter(
-                                gl.TEXTURE_2D,
-                                gl.TEXTURE_MAG_FILTER,
-                            ),
-                        ) ?? "?",
-                    levels: gl.getTexParameter(
-                        gl.TEXTURE_2D,
-                        gl.TEXTURE_IMMUTABLE_LEVELS,
-                    ) as number,
-                };
-                // The bind went past three's state cache; reset it so the next frame binds afresh.
-                v.renderer.resetState();
-                return result;
-            }, name),
-        {
-            timeout: 60_000,
-            timeoutMsg: `The texture '${name}' never reached the GPU`,
-        },
-    ) as Promise<Sampling>;
 }
 
 interface Drawn {

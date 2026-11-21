@@ -28,9 +28,6 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </remarks>
 public sealed class ModelTextureExistenceHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
-    /// <summary>The extensions a texture may be found under. Same set the XML-facing handler uses.</summary>
-    private static readonly string[] TextureExtensions = [".tga", ".dds"];
-
     /// <summary>Models, so a bare model name matches a catalog entry of the right kind.</summary>
     private static readonly string[] ModelExtensions = [".alo"];
 
@@ -53,7 +50,7 @@ public sealed class ModelTextureExistenceHandler : XmlDiagnosticsHandler<XmlTagV
         {
             // A model that does not resolve is ModelFileExistence's business. Following "this model
             // is missing" with "and so is every texture in it" buries the one useful line.
-            if (!AssetFileLookup.Resolves(ctx.Index.AssetFiles, model, ModelExtensions, []))
+            if (!AssetFileLookup.Resolves(ctx.Index.AssetFiles, model, ModelExtensions, false))
                 continue;
 
             // One entry per texture, not per sub-mesh: a model binds one skin across many of them,
@@ -76,17 +73,34 @@ public sealed class ModelTextureExistenceHandler : XmlDiagnosticsHandler<XmlTagV
                         ctx.Messages.Format("ModelTextureExistence_ModelNamesTextureByPath", model, texture.Trim(),
                             name), Id: DiagnosticIds.ModelTextureNamedByPath));
 
-                if (AssetFileLookup.Resolves(
-                        ctx.Index.AssetFiles, name, TextureExtensions, TextureExtensions))
+                // The game's texture lookup, by the rule an XML texture reference gets (#420).
+                if (AssetFileLookup.Resolve(ctx.Index.AssetFiles, name, TextureRule) is { } found)
+                {
+                    if (GameTextureName.IsPng(found))
+                        results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Information,
+                            ctx.Messages.Format("ModelTextureExistence_ModelNamesAPngTexture", model, name),
+                            Id: DiagnosticIds.TextureIsPng));
+
+                    // Emulate, then warn: the game opens the name as written from below a layer's own .dds.
+                    if (AssetFileLookup.UnreachedDds(ctx.Index.AssetFiles, name, found,
+                            TextureRule.AllowedExtensions) is { } dds)
+                        results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                            ctx.Messages.Format("ModelTextureExistence_ModelNamesATextureWhoseDdsIsNotReached",
+                                model, name, found, dds), Id: DiagnosticIds.TextureDdsNotReached));
                     continue;
+                }
 
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    ctx.Messages.Format("ModelTextureExistence_ModelReferencesTextureWhichWas", model, name)));
+                    ctx.Messages.Format("ModelTextureExistence_ModelReferencesTextureWhichWas", model, name)
+                    + AssetFileLookup.UnsearchedTgaHint(ctx.Index.AssetFiles, name, TextureRule.AllowedExtensions,
+                        ctx.Messages)));
             }
         }
 
         return results;
     }
+
+    private static AssetKindRule TextureRule => AssetKindRules.For(ReferenceKind.TextureFile)!;
 
     private static IEnumerable<string> Normalize(string raw)
     {

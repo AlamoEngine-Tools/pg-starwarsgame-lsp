@@ -26,7 +26,7 @@ public enum ReferenceKind
     /// <summary>.alo 3D model asset filename.</summary>
     ModelFile,
 
-    /// <summary>.tga / .dds texture or icon asset filename.</summary>
+    /// <summary>.dds / .tga / .png texture or icon asset filename.</summary>
     TextureFile,
 
     /// <summary>Audio sample filename resolved by the engine SFX system.</summary>

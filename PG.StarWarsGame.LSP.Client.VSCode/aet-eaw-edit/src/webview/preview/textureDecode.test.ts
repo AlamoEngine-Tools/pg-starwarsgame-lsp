@@ -69,6 +69,18 @@ function uncompressedDds(size: number, levels: number): Uint8Array {
     return file;
 }
 
+/**
+ * A 2x2 8-bit RGBA PNG, top row first: (10, 20, 30, 255) (40, 50, 60, 255), then (70, 80, 90, 255)
+ * (100, 110, 120, 128). Written by Python's zlib, so it is no output of the decoder under test.
+ */
+const TWO_BY_TWO_PNG = new Uint8Array([
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 2, 0,
+    0, 0, 2, 8, 6, 0, 0, 0, 114, 182, 13, 36, 0, 0, 0, 26, 73, 68, 65, 84, 120,
+    218, 99, 224, 18, 145, 251, 175, 97, 100, 243, 159, 193, 45, 32, 234, 127,
+    74, 94, 69, 3, 0, 50, 91, 6, 138, 121, 232, 132, 18, 0, 0, 0, 0, 73, 69, 78,
+    68, 174, 66, 96, 130,
+]);
+
 describe("decodeTexture", () => {
     it("decodes a texture from its file's bytes", () => {
         const texture = decodeTexture(onePixelTga(10, 20, 30), "tga");
@@ -99,9 +111,56 @@ describe("decodeTexture", () => {
         assert.deepEqual([...image.data], [1, 2, 3, 255]);
     });
 
-    it("has no texture for a format it does not decode", () => {
+    it("has no texture for bytes it cannot decode, rather than throwing", () => {
         assert.equal(decodeTexture(new Uint8Array([1, 2, 3]), "png"), null);
         assert.equal(decodeTexture(new Uint8Array([1, 2, 3]), ""), null);
+        assert.equal(
+            decodeTexture(new Uint8Array([0x44, 0x44, 0x53, 0x20, 1]), "dds"),
+            null,
+        );
+    });
+
+    // #420: the game decodes a PNG wherever it loads a texture, as the TGA it is handled like.
+    it("decodes a PNG as it unpacks a TGA: top row first, flipped, linear through a generated mip chain", () => {
+        const texture = decodeTexture(TWO_BY_TWO_PNG, "png");
+
+        assert.ok(texture instanceof THREE.DataTexture);
+        const image = texture.image as {
+            width: number;
+            height: number;
+            data: Uint8Array;
+        };
+        assert.equal(image.width, 2);
+        assert.equal(image.height, 2);
+        assert.deepEqual(
+            [...image.data],
+            [
+                10, 20, 30, 255, 40, 50, 60, 255, 70, 80, 90, 255, 100, 110,
+                120, 128,
+            ],
+        );
+        assert.equal(texture.flipY, true);
+        assert.equal(texture.minFilter, THREE.LinearMipmapLinearFilter);
+        assert.equal(texture.magFilter, THREE.LinearFilter);
+        assert.equal(texture.generateMipmaps, true);
+        assert.equal(
+            texture.colorSpace,
+            decodeTexture(onePixelTga(1, 2, 3), "tga")?.colorSpace,
+        );
+    });
+
+    // #420: the game hands the file's bytes to its loader with no format stated, so the CONTENT decides.
+    it("decodes by the bytes, whatever extension the file was found under", () => {
+        const pngAsTga = decodeTexture(TWO_BY_TWO_PNG, "tga");
+        const tgaAsDds = decodeTexture(onePixelTga(10, 20, 30), "dds");
+        const ddsAsPng = decodeTexture(uncompressedDds(4, 1), "png");
+
+        assert.equal((pngAsTga?.image as { width: number }).width, 2);
+        assert.deepEqual(
+            [...(tgaAsDds?.image as { data: Uint8Array }).data],
+            [10, 20, 30, 255],
+        );
+        assert.equal((ddsAsPng?.image as { width: number }).width, 4);
     });
 
     // #418: the game samples through LINEAR samplers with a mip chain. A TGA arrived NEAREST with its top

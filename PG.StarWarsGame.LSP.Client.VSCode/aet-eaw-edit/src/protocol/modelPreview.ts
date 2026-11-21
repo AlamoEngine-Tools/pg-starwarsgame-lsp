@@ -1350,12 +1350,12 @@ export interface GetModelTextureParams {
 /**
  * A texture, undecoded.
  *
- * `format` is the ACTUAL extension found, which is frequently not the one asked for - the engine
- * treats `.tga` and `.dds` as one asset and most shipped models reference a `.tga` name for a file
- * that only ever ships as `.dds`. Pick the decoder from this, never from the requested name.
+ * `format` is the ACTUAL extension found, which is frequently not the one asked for - the game opens
+ * the `.dds` of a texture name that does not exist, and most shipped models reference a `.tga` name for
+ * a file that only ever ships as `.dds`. It picks no decoder: the bytes do, as in the game (#420).
  */
 export interface GetModelTextureResult {
-    /** `dds` or `tga`, without the dot. */
+    /** `dds`, `tga` or `png`, without the dot. */
     format?: string | null;
     /**
      * Where the file's bytes are collected, or absent when the texture did not resolve. As for a

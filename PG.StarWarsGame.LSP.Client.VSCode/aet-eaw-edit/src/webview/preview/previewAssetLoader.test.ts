@@ -10,8 +10,23 @@ import type { TranslatedEffect, TranslationResult } from "./fx/effect";
 import {
     type AssetLoaderEvents,
     type AssetViewport,
+    decodeTexture,
     PreviewAssetLoader,
 } from "./previewAssetLoader";
+
+/** A 2x2 8-bit RGBA PNG, written by Python's zlib. */
+const TWO_BY_TWO_PNG = new Uint8Array([
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 2, 0,
+    0, 0, 2, 8, 6, 0, 0, 0, 114, 182, 13, 36, 0, 0, 0, 26, 73, 68, 65, 84, 120,
+    218, 99, 224, 18, 145, 251, 175, 97, 100, 243, 159, 193, 45, 32, 234, 127,
+    74, 94, 69, 3, 0, 50, 91, 6, 138, 121, 232, 132, 18, 0, 0, 0, 0, 73, 69, 78,
+    68, 174, 66, 96, 130,
+]);
+
+/** A 1x1 uncompressed 24-bit TGA. */
+const ONE_PIXEL_TGA = new Uint8Array([
+    0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 24, 0, 30, 20, 10,
+]);
 
 /** What the loader did to the viewport and told the panel, in order. */
 interface Recorded {
@@ -178,6 +193,65 @@ describe("PreviewAssetLoader", () => {
             assert.equal(decoded.length, 1);
             assert.equal(decoded[0].bytes, data);
             assert.equal(decoded[0].format, "dds");
+        });
+
+        // #420: a PNG is drawn, and the notes recommend DDS - information, never a warning: the game loads it.
+        it("notes a PNG texture as information recommending DDS", () => {
+            const { loader, seen } = harness({ decode: decodeTexture });
+
+            loader.receiveTexture("Hull.png", {
+                format: "png",
+                data: TWO_BY_TWO_PNG,
+            });
+
+            assert.deepEqual(seen.calls, [
+                "texture Hull.png",
+                "particle texture Hull.png",
+            ]);
+            assert.deepEqual(seen.problems, [
+                {
+                    severity: "info",
+                    message:
+                        "Texture 'Hull.png' is a PNG file. The game loads it; DDS is recommended.",
+                },
+            ]);
+        });
+
+        // #420: decoded by the bytes, as the game does - and the mismatch said, since nobody means it.
+        it("notes a texture whose content is not what its extension says", () => {
+            const { loader, seen } = harness({ decode: decodeTexture });
+
+            loader.receiveTexture("Hull.tga", {
+                format: "tga",
+                data: TWO_BY_TWO_PNG,
+            });
+
+            assert.deepEqual(seen.calls, [
+                "texture Hull.tga",
+                "particle texture Hull.tga",
+            ]);
+            assert.deepEqual(
+                seen.problems.map((p) => p.severity),
+                ["info", "info"],
+            );
+            assert.ok(
+                seen.problems.some(
+                    (p) =>
+                        p.message ===
+                        "Texture 'Hull.tga' is a PNG file under a .tga name. The game decodes it by its content.",
+                ),
+            );
+        });
+
+        it("says nothing of a texture whose content matches its extension", () => {
+            const { loader, seen } = harness({ decode: decodeTexture });
+
+            loader.receiveTexture("Hull.tga", {
+                format: "tga",
+                data: ONE_PIXEL_TGA,
+            });
+
+            assert.deepEqual(seen.problems, []);
         });
 
         // A texture that did not arrive carries the host's reason, and that is what is said.

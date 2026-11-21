@@ -183,7 +183,7 @@ public sealed class HoverUtilityTest
     [Fact]
     public void BuildAssetReferenceHover_TgaReferenced_OnlyDdsPresent_ResolvesToDds()
     {
-        // The engine treats TGA and DDS interchangeably - hover must resolve the reference the
+        // A missing .tga falls back to the .dds in the game - hover must resolve the reference the
         // same way instead of showing nothing.
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.tga",
@@ -195,14 +195,38 @@ public sealed class HoverUtilityTest
     }
 
     [Fact]
-    public void BuildAssetReferenceHover_DdsReferenced_OnlyTgaPresent_ResolvesToTga()
+    public void BuildAssetReferenceHover_DdsReferenced_OnlyTgaPresent_ResolvesNowhere()
     {
+        // #420: the game never opens the .tga for a missing .dds, so neither does the hover.
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.dds",
             Loose("data/art/textures/foo.tga"), 0, 0, 7, TestCatalogues.English);
 
+        Assert.Null(hover);
+    }
+
+    [Fact]
+    public void BuildAssetReferenceHover_PngPresent_ResolvesToThePng()
+    {
+        var hover = HoverUtility.BuildAssetReferenceHover(
+            AssetTag(ReferenceKind.TextureFile), "foo.png",
+            Loose("data/art/textures/foo.png"), 0, 0, 7, TestCatalogues.English);
+
         Assert.NotNull(hover);
-        Assert.Contains("data/art/textures/foo.tga", hover.Contents.MarkupContent!.Value);
+        Assert.Contains("data/art/textures/foo.png", hover.Contents.MarkupContent!.Value);
+    }
+
+    [Fact]
+    public void BuildAssetReferenceHover_TwoDots_ResolvesToTheFirstDotStemAsDds()
+    {
+        var hover = HoverUtility.BuildAssetReferenceHover(
+            AssetTag(ReferenceKind.TextureFile), "foo.hd.tga",
+            Loose("data/art/textures/foo.dds", "data/art/textures/foo.hd.dds"), 0, 0, 10, TestCatalogues.English);
+
+        Assert.NotNull(hover);
+        var md = hover.Contents.MarkupContent!.Value;
+        Assert.Contains("data/art/textures/foo.dds", md);
+        Assert.DoesNotContain("foo.hd.dds", md);
     }
 
     [Fact]

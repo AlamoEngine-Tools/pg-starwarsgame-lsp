@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
@@ -29,7 +30,8 @@ public static class MegAssetCatalogBuilder
             // their model under a name prefix with nothing else to discover them by.
             // Scripts are catalogued so a game object's `Lua_Script` resolves the way the game loads
             // it - vanilla ships them packed, so a mod's reference to one has nothing loose to find.
-            ".tga", ".dds", ".alo", ".ala", ".wav", ".mp3", ".ted", ".lua", ".lc");
+            // The textures are the formats the game's texture lookup decodes, PNG among them (#420).
+            [.. GameTextureName.Extensions, ".alo", ".ala", ".wav", ".mp3", ".ted", ".lua", ".lc"]);
 
     /// <summary>Every extension the catalog records, for reporting counts per extension.</summary>
     public static IReadOnlyCollection<string> KnownAssetExtensions => AssetExtensions;

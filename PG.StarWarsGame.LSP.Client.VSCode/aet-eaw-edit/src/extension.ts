@@ -619,6 +619,7 @@ const WATCHED_GLOBS = [
     "**/*.meg",
     "**/*.tga",
     "**/*.dds",
+    "**/*.png",
     "**/*.alo",
     "**/*.ala",
     "**/*.wav",

@@ -569,6 +569,39 @@ public sealed class PreviewHandlersTest
         Assert.NotNull(result.Error);
     }
 
+    // #420: the texture is looked up as the game looks it up - the name as written, then its first-dot
+    // stem as a .dds - and served in the format of the file found.
+    [Theory]
+    [InlineData("Hull.png", "Data/Art/Textures/Hull.png", "png")]
+    [InlineData("Hull.png", "Data/Art/Textures/Hull.dds", "dds")]
+    [InlineData("Hull.tga", "Data/Art/Textures/Hull.dds", "dds")]
+    [InlineData("Hull.two.tga", "Data/Art/Textures/Hull.dds", "dds")]
+    public async Task GetModelTexture_FollowsTheGamesLookup(string name, string onDisk, string format)
+    {
+        var assets = new StubAssets().With(onDisk, [5, 6, 7]);
+        var transfers = new OfferedTransfers();
+
+        var result = await TextureHandler(assets, transfers)
+            .Handle(new GetModelTextureParams { Name = name }, CancellationToken.None);
+
+        Assert.Null(result.Error);
+        Assert.Equal(format, result.Format);
+        Assert.Equal([5, 6, 7], transfers.BytesOf(result.Transfer!));
+    }
+
+    [Fact]
+    public async Task GetModelTexture_ADdsNameWithOnlyATga_IsNotFound_AndSaysTheGameDoesNotLookForIt()
+    {
+        var assets = new StubAssets().With("Data/Art/Textures/Hull.tga", [5, 6, 7]);
+
+        var result = await TextureHandler(assets, new OfferedTransfers())
+            .Handle(new GetModelTextureParams { Name = "Hull.dds" }, CancellationToken.None);
+
+        Assert.Null(result.Transfer);
+        Assert.Contains("'Hull.dds' was not found", result.Error);
+        Assert.Contains("'Hull.tga' exists, but the game does not look for it", result.Error);
+    }
+
     /// <summary>
     ///     A refresh asks for every texture again and says which version it holds. For one that did
     ///     not change the reply offers nothing - no bytes are read, held or sent (#436, FR-4).
@@ -1147,19 +1180,11 @@ public sealed class PreviewHandlersTest
         /// <param name="path">The asset's game-relative path.</param>
         /// <param name="bytes">The asset's bytes.</param>
         /// <param name="resolvedAs">
-        ///     The path to report as found, which may differ in extension from the request - that is
-        ///     the whole point of the .tga/.dds interchange.
+        ///     The path to report as found, when it is not the asset's own.
         /// </param>
         public StubAssets With(string path, byte[] bytes, string? resolvedAs = null)
         {
             _files[path] = (bytes, resolvedAs ?? path);
-
-            // The interchange happens in the real resolver, so the stub mirrors it: a .dds on disk
-            // answers a .tga request.
-            var extension = Path.GetExtension(path);
-            if (extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
-                _files[Path.ChangeExtension(path, ".tga")] = (bytes, resolvedAs ?? path);
-
             return this;
         }
     }

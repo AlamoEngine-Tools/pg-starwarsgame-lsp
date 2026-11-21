@@ -73,7 +73,10 @@
     <value>{0} file '{1}' was not found in the game data or workspace asset files.{2}</value>
   </data>
   <data name="AssetFileExistence_AlsoChecked" xml:space="preserve">
-    <value> Also checked {0} (the game treats these formats interchangeably).</value>
+    <value> Also checked {0}, which the game opens when the name as written is missing.</value>
+  </data>
+  <data name="AssetFileExistence_GameDoesNotLookForTga" xml:space="preserve">
+    <value>'{0}' exists, but the game does not look for it when a .dds name is missing.</value>
   </data>
   <data name="AssetKind_Asset" xml:space="preserve">
     <value>Asset</value>
@@ -1441,6 +1444,12 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="ModelTextureExistence_ModelNamesTextureByPath" xml:space="preserve">
     <value>Model '{0}' names its texture by a path, '{1}'. The game keeps the file name '{2}' and looks it up in its texture directories. The reference is inside the model, so the fix is in the art rather than on this line.</value>
   </data>
+  <data name="ModelTextureExistence_ModelNamesAPngTexture" xml:space="preserve">
+    <value>Model '{0}' names texture '{1}', a PNG file. The game loads it; DDS is recommended. The reference is inside the model, so the fix is in the art rather than on this line.</value>
+  </data>
+  <data name="ModelTextureExistence_ModelNamesATextureWhoseDdsIsNotReached" xml:space="preserve">
+    <value>Model '{0}' names texture '{1}', which opens '{2}', not '{3}' from a layer above it. The game opens the name as written wherever it exists and tries its .dds only when that fails.</value>
+  </data>
   <data name="MovieFrameTrigger_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>
@@ -2581,8 +2590,14 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="TagComparison_ButIsAgainst" xml:space="preserve">
     <value>&lt;{0}&gt; {1} &lt;{2}&gt;, but is {3} against {4}</value>
   </data>
+  <data name="TextureDdsNotReached_OpensTheNameAsWritten" xml:space="preserve">
+    <value>Texture '{0}' opens '{1}', not '{2}' from a layer above it. The game opens the name as written wherever it exists and tries its .dds only when that fails.</value>
+  </data>
   <data name="TextureFileFormat_IsNotAValidTexture" xml:space="preserve">
-    <value>'{0}' is not a valid texture filename for &lt;{1}&gt;. Expected a .tga or .dds file.</value>
+    <value>'{0}' is not a valid texture filename for &lt;{1}&gt;. Expected a .dds, .tga or .png file.</value>
+  </data>
+  <data name="TextureIsPng_ResolvesToAPngFile" xml:space="preserve">
+    <value>Texture '{0}' is a PNG file. The game loads it; DDS is recommended.</value>
   </data>
   <data name="TupleItems_CommaSeparatedPairs" xml:space="preserve">
     <value>comma-separated pairs</value>
@@ -2801,13 +2816,13 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>**Reference:** space-separated list of audio sample filenames</value>
   </data>
   <data name="ValueTypeHint_ReferenceSpaceSeparatedListTga" xml:space="preserve">
-    <value>**Reference:** space-separated list of `.tga` / `.dds` texture filenames</value>
+    <value>**Reference:** space-separated list of `.dds` / `.tga` / `.png` texture filenames</value>
   </data>
   <data name="ValueTypeHint_ReferenceSpaceSeparatedLocalisationString" xml:space="preserve">
     <value>**Reference:** space-separated localisation string keys (`TEXT_xxx`)</value>
   </data>
   <data name="ValueTypeHint_ReferenceTgaDdsTextureFilename" xml:space="preserve">
-    <value>**Reference:** `.tga` or `.dds` texture filename</value>
+    <value>**Reference:** `.dds`, `.tga` or `.png` texture filename</value>
   </data>
   <data name="ValueTypeHint_XmlObjectName" xml:space="preserve">
     <value>**Reference:** XML object name</value>

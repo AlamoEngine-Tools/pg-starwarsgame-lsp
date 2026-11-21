@@ -413,6 +413,22 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId ModelTextureNamedByPath = new(DiagnosticGroup.Assets, 21);
 
+    /// <summary>
+    ///     A texture reference - in the XML or inside a model the XML names - resolves to a PNG file. The game
+    ///     loads it: its texture loader decides the format by the file's content, and PNG is one it decodes.
+    ///     Information, never a warning, recommending DDS, the format the game is built around (#420).
+    /// </summary>
+    public static readonly DiagnosticId TextureIsPng = new(DiagnosticGroup.Assets, 22);
+
+    /// <summary>
+    ///     A texture reference - in the XML or inside a model the XML names - opens the file named as written
+    ///     from the game or a lower layer, while a layer above it ships the <c>.dds</c> of the same stem. The
+    ///     game looks for the name as written through its whole file system before it tries the
+    ///     <c>.dds</c>, so the higher layer's file is never opened for this name. Warning: the lookup is
+    ///     emulated, and nothing in the files says why the replacement does not show (#420).
+    /// </summary>
+    public static readonly DiagnosticId TextureDdsNotReached = new(DiagnosticGroup.Assets, 23);
+
     // ── Localisation ──
     public static readonly DiagnosticId LocalisationKeyExistence = new(DiagnosticGroup.Localisation, 1);
     public static readonly DiagnosticId LocalisationKeyListExistence = new(DiagnosticGroup.Localisation, 2);

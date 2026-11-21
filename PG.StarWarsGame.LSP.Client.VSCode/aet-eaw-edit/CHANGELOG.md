@@ -136,6 +136,19 @@
   shaders read is the drawing buffer's with its half-texel terms. The shadow colour is disabled with its
   reason while a cloak, a clip or the detail level switches the shadow mesh off
   ([#418](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/418))
+- **PNG textures, and texture names looked up as the game looks them up** - the game loads a PNG wherever it
+  loads a texture and decodes every texture by its content, not its extension. A `.png` reference was a format
+  error, a model's PNG drew untextured and the Mod Browser listed none. A `.png` now resolves in hover, the
+  existence checks, both of the preview's renderers and the Mod Browser, filtered and mipmapped like a TGA, with
+  an information recommending DDS (`Assets22`, `aetswg-004-0022`). A name is looked up as written, then as its
+  stem up to the first dot with `.dds` appended, and nothing else: a missing `.dds` is reported missing even
+  when a `.tga` of its stem exists, with a hint that the game does not look for it, a two-dot name is cut at
+  its first dot, and a name as written is found in the base game or a dependency before a mod's `.dds` of its
+  stem is - the game searches mod folders, loose files and archives for the name as written before it tries
+  the `.dds` anywhere. That last case is a warning naming both files (`Assets23`, `aetswg-004-0023`), since
+  the mod's file is never opened for that name. The preview decodes a file by its bytes, so a PNG saved as
+  `.tga` draws, with a note on the mismatch
+  ([#420](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/420))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

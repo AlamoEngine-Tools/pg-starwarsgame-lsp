@@ -31,6 +31,9 @@ public sealed class MegAssetCatalogBuilderTest
     [InlineData(".tga", true)]
     [InlineData(".TGA", true)]
     [InlineData(".dds", true)]
+    // #420: the game loads a PNG wherever it loads a texture.
+    [InlineData(".png", true)]
+    [InlineData(".PNG", true)]
     [InlineData(".alo", true)]
     [InlineData(".wav", true)]
     [InlineData(".mp3", true)]

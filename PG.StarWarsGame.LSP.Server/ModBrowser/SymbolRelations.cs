@@ -38,7 +38,6 @@ public sealed class SymbolRelations(
     private const string Overrides = "overrides";
     private const string UsedBy = "usedBy";
     private static readonly char[] s_separators = [',', ' ', '\t', '\n', '\r'];
-    private static readonly string[] s_textureInterchange = [".tga", ".dds"];
 
     // Which objects name each asset: every object's tags, read once per index on the first request
     // that needs it, never on open (about 830 ms on the EaW tree - measured in code comments). Kept
@@ -285,9 +284,11 @@ public sealed class SymbolRelations(
 
     private IEnumerable<SymbolRow> ModelsNaming(string texture)
     {
-        var key = TextureKey(texture);
+        // The models whose names the game opens as this file, by its texture lookup (#420).
         return index.ModelTextures
-            .Where(m => m.Value.Any(named => TextureKey(named) == key))
+            .Where(m => m.Value.Any(named =>
+                string.Equals(Texture(GameTextureName.FileName(named))?.Name, texture,
+                    StringComparison.OrdinalIgnoreCase)))
             .Select(m => catalog.Find("models", m.Key) ?? catalog.Find("particleSystems", m.Key))
             .OfType<SymbolRow>()
             .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase);
@@ -437,27 +438,16 @@ public sealed class SymbolRelations(
     }
 
     /// <summary>
-    ///     The texture a name means: the name as written, else the same name as a <c>.tga</c> or a
-    ///     <c>.dds</c>, which the game takes for one texture - a model routinely names a <c>.tga</c>
-    ///     that only ever ships as a <c>.dds</c>. The asset resolver's rule, so the browser and the
-    ///     model preview agree on what is missing.
+    ///     The texture a name means, by the game's texture lookup: the name as written, else its first-dot
+    ///     stem as a <c>.dds</c> (<see cref="GameTextureName.Candidates" />, #420) - a model routinely names a
+    ///     <c>.tga</c> that only ever ships as a <c>.dds</c>, and a missing <c>.dds</c> never means the
+    ///     <c>.tga</c>. The asset resolver's rule, so the browser and the model preview agree on what is missing.
     /// </summary>
     private SymbolRow? Texture(string name)
     {
-        if (catalog.Find("textures", name) is { } written) return written;
-        var extension = Path.GetExtension(name);
-        if (!s_textureInterchange.Contains(extension, StringComparer.OrdinalIgnoreCase)) return null;
-        return s_textureInterchange
-            .Where(e => !e.Equals(extension, StringComparison.OrdinalIgnoreCase))
-            .Select(e => catalog.Find("textures", Path.ChangeExtension(name, e)))
-            .FirstOrDefault(r => r is not null);
-    }
-
-    // A texture name as one key for its .tga and its .dds, in any case.
-    private static string TextureKey(string name)
-    {
-        var lower = GameTextureName.FileName(name).ToLowerInvariant();
-        return s_textureInterchange.Contains(Path.GetExtension(lower)) ? Path.ChangeExtension(lower, ".tga") : lower;
+        return GameTextureName.Candidates(name)
+            .Select(candidate => catalog.Find("textures", candidate))
+            .FirstOrDefault(found => found is not null);
     }
 
     private static SymbolRow Missing(string name, string? type)

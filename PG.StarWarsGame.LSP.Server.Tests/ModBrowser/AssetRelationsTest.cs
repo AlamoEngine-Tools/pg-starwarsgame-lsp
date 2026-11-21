@@ -96,13 +96,17 @@ public sealed class AssetRelationsTest
                 "data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala", "data/art/models/ev_tie_die.ala",
                 "data/art/models/p_smoke.alo", "data/art/textures/tie.tga", "data/art/textures/smoke.tga",
                 "data/art/textures/i_tie.tga", "data/art/textures/glow.dds", "data/art/models/stray_walk.ala",
-                "data/audio/units/tie_speed1_eng.wav"
+                "data/audio/units/tie_speed1_eng.wav",
+                // #420: an effect naming a PNG, a .dds of which only the .tga ships, and a two-dot name.
+                "data/art/models/p_fire.alo", "data/art/textures/fire.png", "data/art/textures/ember.tga",
+                "data/art/textures/spark.dds"
             ], ["data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala"]),
-            ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_smoke.alo"),
+            ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_smoke.alo", "p_fire.alo"),
             ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .WithComparers(StringComparer.OrdinalIgnoreCase)
                 // The effect names its glow as a .tga that only ships as a .dds.
-                .Add("ev_tie.alo", ["Tie.tga"]).Add("p_smoke.alo", ["Smoke.tga", "Glow.tga"]),
+                .Add("ev_tie.alo", ["Tie.tga"]).Add("p_smoke.alo", ["Smoke.tga", "Glow.tga"])
+                .Add("p_fire.alo", ["Fire.png", "Ember.dds", "Spark.hd.tga"]),
             ModelProxies = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .WithComparers(StringComparer.OrdinalIgnoreCase)
                 .Add("ev_tie.alo", ["P_Smoke_ALT2", "P_Missing_LOD0"])
@@ -263,6 +267,27 @@ public sealed class AssetRelationsTest
         Assert.Equal(["Tie_Fighter"], Names(relations.Rows("textures", "i_tie.tga", "usedBy")));
         // Named as a .tga by the effect, shipped as a .dds: the game takes them for one texture.
         Assert.Equal(["p_smoke.alo"], Names(relations.Rows("textures", "glow.dds", "usedBy")));
+    }
+
+    // #420: the game's lookup - the name as written, then its first-dot stem as a .dds, nothing else.
+    [Fact]
+    public void AParticleSystem_OpensIntoItsTextures_AsTheGameLooksThemUp()
+    {
+        var rows = Relations().Rows("particleSystems", "p_fire.alo", "textures")!;
+
+        Assert.Equal(["fire.png", "Ember.dds", "spark.dds"], Names(rows));
+        // A .dds name is not satisfied by the .tga of its stem: the game never opens it.
+        Assert.Equal("missing", rows[1].Origin);
+    }
+
+    [Fact]
+    public void ATexture_IsUsedOnlyByTheModelsTheGameOpensItFor()
+    {
+        var relations = Relations();
+
+        Assert.Equal(["p_fire.alo"], Names(relations.Rows("textures", "fire.png", "usedBy")));
+        Assert.Equal(["p_fire.alo"], Names(relations.Rows("textures", "spark.dds", "usedBy")));
+        Assert.Empty(Names(relations.Rows("textures", "ember.tga", "usedBy")));
     }
 
     [Fact]

@@ -330,7 +330,10 @@ public sealed record GetModelTextureParams : IRequest<GetModelTextureResult>
 ///     round trip through an image codec and inflate a compressed 2048x2048 texture several times
 ///     over, for nothing.
 /// </remarks>
-/// <param name="Format">The file extension without the dot - <c>dds</c> or <c>tga</c>.</param>
+/// <param name="Format">
+///     The extension of the file found, without the dot - <c>dds</c>, <c>tga</c> or <c>png</c>. Not what
+///     decodes it: the client decodes by the bytes, as the game does (#420).
+/// </param>
 /// <param name="Transfer">
 ///     Where the client collects the file's bytes, or null when the texture did not resolve. As for
 ///     a model, the bytes do not cross JSON-RPC.

@@ -142,6 +142,51 @@ public sealed class ModelTextureExistenceHandlerTest
         Assert.Empty(Sut.Handle(fact, ctx));
     }
 
+    // #420: the model's own textures follow the game's lookup, shared with the XML check and the resolver.
+    public static IEnumerable<object?[]> TextureCases => TextureLookupCases.All;
+
+    [Theory]
+    [MemberData(nameof(TextureCases))]
+    public void Texture_FollowsTheGamesLookup(string named, string[] onDisk, string? expected)
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "ev_ship.alo");
+        var ctx = CtxWith(new FakeModelTextures(named),
+            ["data/art/models/ev_ship.alo", .. onDisk.Select(f => "data/art/textures/" + f.ToLowerInvariant())]);
+
+        Assert.Equal(expected is null,
+            Sut.Handle(fact, ctx).Any(d => d.Severity == XmlDiagnosticSeverity.Warning));
+    }
+
+    [Fact]
+    public void DdsReference_WithOnlyATga_WarnsThatTheGameDoesNotLookForTheTga()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "ev_ship.alo");
+        var ctx = CtxWith(new FakeModelTextures("hull.dds"),
+            "data/art/models/ev_ship.alo", "data/art/textures/hull.tga");
+
+        var d = Assert.Single(Sut.Handle(fact, ctx));
+
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("'hull.dds'", d.Message);
+        Assert.Contains("'hull.tga' exists, but the game does not look for it", d.Message);
+    }
+
+    [Fact]
+    public void PngTexture_IsInformationRecommendingDds()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "ev_ship.alo");
+        var ctx = CtxWith(new FakeModelTextures("hull.png"),
+            "data/art/models/ev_ship.alo", "data/art/textures/hull.png");
+
+        var d = Assert.Single(Sut.Handle(fact, ctx));
+
+        Assert.Equal(XmlDiagnosticSeverity.Information, d.Severity);
+        Assert.Equal(DiagnosticIds.TextureIsPng, d.Id);
+        Assert.Contains("ev_ship.alo", d.Message);
+        Assert.Contains("'hull.png'", d.Message);
+        Assert.Contains("DDS", d.Message);
+    }
+
     [Fact]
     public void NotAModelReference_EmitsNothing()
     {
@@ -159,6 +204,30 @@ public sealed class ModelTextureExistenceHandlerTest
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "ev_ship.alo");
 
         Assert.Empty(Sut.Handle(fact, CtxWith(null, "data/art/models/ev_ship.alo")));
+    }
+
+    [Fact]
+    public void TextureAsWrittenInTheGame_DdsInTheProject_WarnsThatTheDdsIsNotOpened()
+    {
+        // The game opens the name as written wherever it finds it before it tries the .dds (#420), so
+        // the project's hull.dds does not replace the game's hull.tga for a model naming hull.tga.
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "ev_ship.alo");
+        var index = GameIndex.Empty with
+        {
+            AssetFiles = MergedAssetFileIndex.MergeLayered(
+                ["data/art/models/ev_ship.alo", "data/art/textures/hull.tga"],
+                [("data/art/textures/hull.dds", 0)])
+        };
+        var ctx = new DiagnosticsContext(new SchemaProviderBuilder().Build(), index, "file:///test.xml", "en",
+            ModelTextures: new FakeModelTextures("hull.tga")) { Messages = TestCatalogues.English };
+
+        var d = Assert.Single(Sut.Handle(fact, ctx));
+
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(DiagnosticIds.TextureDdsNotReached, d.Id);
+        Assert.Contains("ev_ship.alo", d.Message);
+        Assert.Contains("'hull.tga'", d.Message);
+        Assert.Contains("'data/art/textures/hull.dds'", d.Message);
     }
 
     [Fact]

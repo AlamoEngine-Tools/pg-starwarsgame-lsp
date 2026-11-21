@@ -889,6 +889,8 @@
   "Top": "Top",
   "Look from above": "Look from above",
   "Texture '{0}' was not found. Anything that draws with it shows the AET logo instead.": "Texture '{0}' was not found. Anything that draws with it shows the AET logo instead.",
+  "Texture '{0}' is a PNG file. The game loads it; DDS is recommended.": "Texture '{0}' is a PNG file. The game loads it; DDS is recommended.",
+  "Texture '{0}' is a {1} file under a .{2} name. The game decodes it by its content.": "Texture '{0}' is a {1} file under a .{2} name. The game decodes it by its content.",
   "Engines": "Engines",
   "Hardpoint damage": "Hardpoint damage",
   "Turbo engines": "Turbo engines",
