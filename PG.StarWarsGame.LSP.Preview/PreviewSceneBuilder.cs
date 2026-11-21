@@ -141,6 +141,16 @@ public sealed class PreviewSceneBuilder(
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelNotFound, "error",
                 _messages.Format("PreviewScene_ModelWasNotFound", hull, assets.Tiers.Explain(_messages))));
 
+        // The clips are named after the model whose skeleton they were authored against, which
+        // is the OVERRIDE when a unit borrows another model's set. A hull that was not found is the
+        // finding; its clips are not a second one.
+        var animationModel = animationSource ?? hull ?? string.Empty;
+        var animations = AnimationSectionBuilder.AnimationsFor(index, animationModel);
+        if (hull is not null && parts[0].Resolved
+                             && AnimationSectionBuilder.UnreadClips(assets, _messages, animationModel, animations) is
+                                 { } unread)
+            problems.Add(unread);
+
         // Every part, not just the hull: a turret carries its own muzzle flashes and engine glow.
         var particles = parts
             .Where(part => part.Resolved)
@@ -149,9 +159,7 @@ public sealed class PreviewSceneBuilder(
 
         return new PreviewScene(PreviewSceneKind.Object, effective.ObjectId, parts, hardpoints,
             _factions.Factions(index), problems, assets.Tiers, animationSource, particles,
-            // The clips are named after the model whose skeleton they were authored against, which
-            // is the OVERRIDE when a unit borrows another model's set.
-            AnimationSectionBuilder.AnimationsFor(index, animationSource ?? hull ?? string.Empty),
+            animations,
             // The HULL's cameras only. A turret carries its own skeleton and could in principle
             // declare one, but it was aimed at the turret, and the subject here is the whole unit.
             hull is null ? [] : _models.CamerasOf(hull, problems),
@@ -166,7 +174,7 @@ public sealed class PreviewSceneBuilder(
             // neighbour often enough to be dangerous - it did, once.
             _damage.Defence(index, effective, hardpoints),
             _abilities.Abilities(effective, particles,
-                AnimationSectionBuilder.AnimationsFor(index, animationSource ?? hull ?? string.Empty), problems,
+                animations, problems,
                 icons, index.Localisation),
             _damage.DeathClones(index, resolver, effective, problems),
             DamageSectionBuilder.SpinAway(effective),

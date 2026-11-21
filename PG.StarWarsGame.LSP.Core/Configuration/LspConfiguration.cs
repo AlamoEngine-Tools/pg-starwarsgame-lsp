@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Text.Json.Serialization;
+
 namespace PG.StarWarsGame.LSP.Core.Configuration;
 
 public record LspConfiguration
@@ -22,6 +24,17 @@ public record LspConfiguration
 
     public string? GamePath { get; init; }
     public string? ExpansionPath { get; init; }
+
+    /// <summary>
+    ///     Whether <see cref="GamePath" /> was found by looking for an install rather than set by the editor
+    ///     or the configuration file. Decided by the server, never read from a file.
+    /// </summary>
+    [JsonIgnore]
+    public bool GamePathDetected { get; init; }
+
+    /// <summary><see cref="GamePathDetected" /> for <see cref="ExpansionPath" />.</summary>
+    [JsonIgnore]
+    public bool ExpansionPathDetected { get; init; }
 
     /// <summary>
     ///     Where the user's copy of the base game's shader SOURCES lives.

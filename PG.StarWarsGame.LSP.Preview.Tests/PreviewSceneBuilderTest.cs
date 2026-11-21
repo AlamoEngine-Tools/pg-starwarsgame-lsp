@@ -550,6 +550,99 @@ public sealed class PreviewSceneBuilderTest
             scene.Animations.Order());
     }
 
+    // ── animation files the game data lists and nothing can read (#465) ───────
+    //
+    // The clips are listed from the asset catalog, which holds the shipped game's names whether or not
+    // its files can be reached. One that cannot be read was dropped where its bytes were looked for, and
+    // the model opened with fewer animations - or none - and not a word.
+
+    private static GameIndex WalkerIndex()
+    {
+        return Index([], new Dictionary<string, string[]> { ["ev_walker.alo"] = ["Root"] })
+            with
+            {
+                AssetFiles = MergedAssetFileIndex.Merge([
+                    "data/art/models/ev_walker_idle_00.ala",
+                    "data/art/models/ev_walker_move_00.ala",
+                    "data/art/models/ev_walker_die_00.ala"
+                ], [])
+            };
+    }
+
+    [Fact]
+    public void BuildForModel_SaysWhichListedAnimationFilesCannotBeRead()
+    {
+        var scene = Builder(WalkerIndex(), new FakeVariantTagSource(), "ev_walker.alo", "ev_walker_idle_00.ala")
+            .BuildForModel("ev_walker.alo");
+
+        var problem = Assert.Single(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewAnimationFilesUnread);
+        Assert.Equal("warning", problem.Severity);
+        Assert.Contains("2 of 3", problem.Message);
+        Assert.Contains("'ev_walker.alo'", problem.Message);
+        Assert.Contains("ev_walker_die_00.ala", problem.Message);
+        Assert.Contains("ev_walker_move_00.ala", problem.Message);
+        Assert.DoesNotContain("ev_walker_idle_00.ala", problem.Message);
+        // Where files are read from, as a missing model is told.
+        Assert.Contains("Only this workspace's own files can be resolved", problem.Message);
+        // Still offered: the list is what the game data names, and the conversion says what it baked.
+        Assert.Equal(3, scene.Animations.Count);
+    }
+
+    [Fact]
+    public void BuildForModel_SaysNothingWhenEveryListedAnimationFileIsRead()
+    {
+        var scene = Builder(WalkerIndex(), new FakeVariantTagSource(), "ev_walker.alo",
+                "ev_walker_idle_00.ala", "ev_walker_move_00.ala", "ev_walker_die_00.ala")
+            .BuildForModel("ev_walker.alo");
+
+        Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewAnimationFilesUnread);
+    }
+
+    [Fact]
+    public void BuildForModel_NamesAFewUnreadAnimationFilesAndCountsTheRest()
+    {
+        var clips = Enumerable.Range(0, 12).Select(i => $"data/art/models/ev_walker_idle_{i:00}.ala");
+        var index = Index([], new Dictionary<string, string[]> { ["ev_walker.alo"] = ["Root"] })
+            with
+            {
+                AssetFiles = MergedAssetFileIndex.Merge(clips, [])
+            };
+
+        var scene = Builder(index, new FakeVariantTagSource(), "ev_walker.alo").BuildForModel("ev_walker.alo");
+
+        var problem = Assert.Single(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewAnimationFilesUnread);
+        Assert.Contains("12 of 12", problem.Message);
+        Assert.Contains("ev_walker_idle_00.ala", problem.Message);
+        Assert.Contains("ev_walker_idle_04.ala", problem.Message);
+        Assert.DoesNotContain("ev_walker_idle_05.ala", problem.Message);
+        Assert.Contains("7 more", problem.Message);
+    }
+
+    [Fact]
+    public void BuildForModel_SaysNothingOfAnimationFilesForAModelThatWasNotFound()
+    {
+        // The missing model is the finding; its clips are not a second one.
+        var scene = Builder(WalkerIndex(), new FakeVariantTagSource()).BuildForModel("ev_walker.alo");
+
+        Assert.DoesNotContain(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewAnimationFilesUnread);
+    }
+
+    [Fact]
+    public void BuildForObject_SaysWhichListedAnimationFilesOfItsHullCannotBeRead()
+    {
+        var index = WalkerIndex() with
+        {
+            WorkspaceDefinitions = ImmutableDictionary.CreateRange(StringComparer.OrdinalIgnoreCase,
+                [KeyValuePair.Create("Walker", ImmutableArray.Create(Sym("Walker", "GameObjectType")))])
+        };
+        var tags = new FakeVariantTagSource().With("Walker", Tag("Land_Model_Name", "ev_walker.alo"));
+
+        var scene = Builder(index, tags, "ev_walker.alo").BuildForObject("Walker");
+
+        var problem = Assert.Single(scene.Problems, p => p.DiagnosticId == DiagnosticIds.PreviewAnimationFilesUnread);
+        Assert.Contains("3 of 3", problem.Message);
+    }
+
     /// <summary>
     ///     A clip belongs to the LONGEST model name that prefixes it, not to every model that does.
     /// </summary>

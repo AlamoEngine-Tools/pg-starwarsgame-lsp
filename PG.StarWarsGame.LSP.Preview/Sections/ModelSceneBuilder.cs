@@ -63,6 +63,11 @@ public sealed class ModelSceneBuilder(
             ? _parts.ParticlesOf(part, [], problems)
             : [];
 
+        // A model that was not found is the finding; its clips are not a second one.
+        var animations = AnimationSectionBuilder.AnimationsFor(index, modelReference);
+        if (resolved && AnimationSectionBuilder.UnreadClips(assets, messages, modelReference, animations) is { } unread)
+            problems.Add(unread);
+
         return new PreviewScene(
             kind,
             modelReference,
@@ -73,7 +78,7 @@ public sealed class ModelSceneBuilder(
             assets.Tiers,
             null,
             particles,
-            AnimationSectionBuilder.AnimationsFor(index, modelReference),
+            animations,
             resolved ? CamerasOf(modelReference, problems) : [])
         {
             SourceFile = SourceFileOf(location)

@@ -610,6 +610,20 @@
   "PRV-60": {
     "open": "{repo}\\eaw"
   },
+  "PRV-61": {
+    "open": "C:\\temp\\aet-test-PRV-anim",
+    "settings": {
+      "aet-eaw-edit.lsp.source.expansionDirectory": "{foc}",
+      "aet-eaw-edit.lsp.source.baseGameDirectory": "{eaw}"
+    }
+  },
+  "PRV-62": {
+    "open": "C:\\temp\\aet-test-PRV-anim",
+    "settings": {
+      "aet-eaw-edit.lsp.source.expansionDirectory": "C:\\temp\\aet-test-PRV-nogame",
+      "aet-eaw-edit.lsp.source.baseGameDirectory": "C:\\temp\\aet-test-PRV-nogame"
+    }
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   },

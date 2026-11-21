@@ -155,6 +155,13 @@
   the camera presets, the grid and the draw distance go by the same sphere. A model with meshes is framed by
   its meshes as before
   ([#431](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/431))
+- **Animation files that cannot be read are said** - a model's animations are listed from the game data,
+  which names the shipped game's files whether or not they can be reached. With no game folder set or found,
+  or one that does not hold them, a mod's copy of a base-game model opened with no animations and not a word.
+  The preview now names the files it lists and cannot read, and where files are read from (`Preview24`,
+  `aetswg-014-0024`). `Copy Bug Report Info` says whether each game folder is set, detected or absent, and how
+  many archives are read
+  ([#465](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/465))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

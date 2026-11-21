@@ -43,6 +43,16 @@ export interface ServerStatusWorkspace {
     otherProjectFiles: number;
 }
 
+/**
+ * Whether the shipped game's files can be read: how each game folder came to be - `Set`, `Detected` or
+ * `None` - and how many archives are read. States and a count, never a folder.
+ */
+export interface ServerStatusGameFolders {
+    baseGame: string;
+    expansion: string;
+    archives: number;
+}
+
 /** The opt-in tier: counts that help rebuild a setup as a test case. */
 export interface ServerStatusExtended {
     /** `layers` counts project layers, the root included. */
@@ -129,4 +139,6 @@ export interface ServerStatus {
     warnings: string[];
     /** Present only when the request asked for `extended`. */
     extended?: ServerStatusExtended | null;
+    /** Absent from a server older than the field. */
+    gameFolders?: ServerStatusGameFolders | null;
 }

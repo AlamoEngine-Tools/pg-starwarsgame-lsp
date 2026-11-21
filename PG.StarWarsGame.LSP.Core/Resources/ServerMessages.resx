@@ -1639,6 +1639,12 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="PreviewModelAction_Preview" xml:space="preserve">
     <value>Preview model {0}</value>
   </data>
+  <data name="PreviewScene_AnimationFilesAndMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
+  <data name="PreviewScene_AnimationFilesUnread" xml:space="preserve">
+    <value>{0} of {1} animation files of '{2}' are in the game data but could not be read: {3}. {4}</value>
+  </data>
   <data name="PreviewScene_AnimationSkeletonDiffers" xml:space="preserve">
     <value>'{0}' takes its animations from '{1}', whose skeleton differs from '{2}' ({3} bones against {4}). The clips play, bound by bone index - where the two skeletons disagree, a clip drives whatever bone sits at that index.</value>
   </data>

@@ -53,14 +53,19 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
     // Only a path left unset is looked for; one the editor or the file sets is taken as given.
     private LspConfiguration WithDetectedInstalls(LspConfiguration config)
     {
-        var gamePath = string.IsNullOrWhiteSpace(config.GamePath) ? _installs.FindBaseGame() : config.GamePath;
-        var expansionPath = string.IsNullOrWhiteSpace(config.ExpansionPath)
-            ? _installs.FindExpansion()
-            : config.ExpansionPath;
+        var findGame = string.IsNullOrWhiteSpace(config.GamePath);
+        var findExpansion = string.IsNullOrWhiteSpace(config.ExpansionPath);
+        var gamePath = findGame ? _installs.FindBaseGame() : config.GamePath;
+        var expansionPath = findExpansion ? _installs.FindExpansion() : config.ExpansionPath;
         if (gamePath != config.GamePath || expansionPath != config.ExpansionPath)
             _logger.LogInformation("Game installs detected (base game={GamePath}, expansion={ExpansionPath})",
                 gamePath ?? "<none>", expansionPath ?? "<none>");
-        return config with { GamePath = gamePath, ExpansionPath = expansionPath };
+        return config with
+        {
+            GamePath = gamePath, ExpansionPath = expansionPath,
+            GamePathDetected = findGame && !string.IsNullOrWhiteSpace(gamePath),
+            ExpansionPathDetected = findExpansion && !string.IsNullOrWhiteSpace(expansionPath)
+        };
     }
 
     private static string? ResolveWorkspaceRoot(object? initOptions)

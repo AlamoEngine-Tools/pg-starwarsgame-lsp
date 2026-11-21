@@ -1177,6 +1177,15 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PreviewParticleIgnoredByGame =
         new(DiagnosticGroup.Preview, 23);
 
+    /// <summary>
+    ///     Animation files the game data lists for the previewed model cannot be read: the asset catalog
+    ///     names them, and no project, game folder or archive this server reaches holds them. The model
+    ///     opens without those clips. Warning, said once per subject with the files named and where files
+    ///     are read from, because a clip that is not offered looks exactly like one that never existed (#465).
+    /// </summary>
+    public static readonly DiagnosticId PreviewAnimationFilesUnread =
+        new(DiagnosticGroup.Preview, 24);
+
     // ── Lua analyzer ──
     // What the Lua analyzer (emmylua_ls) reports that holds for any Lua, whatever the engine binds:
     // one id per analyzer rule, numbered in the order a rule was adopted, never renumbered. A rule

@@ -52,6 +52,43 @@ public sealed class AnimationSectionBuilder(IMessageCatalog messages)
         return ModelAnimationClips.For(index, PreviewModelReference.Normalise(modelReference));
     }
 
+    /// <summary>How many unread animation files are named before the rest are counted.</summary>
+    private const int NamedUnreadClips = 5;
+
+    /// <summary>
+    ///     The finding for the clips of <paramref name="clips" /> that nothing can read, or null when every
+    ///     one resolves (#465).
+    /// </summary>
+    /// <remarks>
+    ///     The list comes from the asset catalog, which carries the shipped game's file NAMES whether or not
+    ///     its files are reachable: with no game folder set, or one that does not hold them, a clip is listed
+    ///     and its bytes are nowhere. The conversion leaves such a clip out without a note - it has no file to
+    ///     speak of - so a model of the base game that a mod ships under its own name opened with no
+    ///     animations and not a word. Said here, where the list is made, once per subject, with where files
+    ///     are read from - the sentence a missing model gets.
+    /// </remarks>
+    /// <param name="assets">Resolves a clip the way the conversion reads it.</param>
+    /// <param name="messages">The catalogue the finding is worded from.</param>
+    /// <param name="modelReference">The model the clips belong to, as the finding names it.</param>
+    /// <param name="clips">The clips offered for it, as <see cref="AnimationsFor" /> lists them.</param>
+    public static PreviewProblem? UnreadClips(IGameAssetResolver assets, IMessageCatalog messages,
+        string modelReference, IReadOnlyList<string> clips)
+    {
+        var unread = clips
+            .Where(clip => assets.Locate(PreviewModelReference.ModelPath(clip)) is null)
+            .ToList();
+        if (unread.Count == 0)
+            return null;
+
+        var named = string.Join(", ", unread.Take(NamedUnreadClips));
+        if (unread.Count > NamedUnreadClips)
+            named = messages.Format("PreviewScene_AnimationFilesAndMore", named, unread.Count - NamedUnreadClips);
+
+        return new PreviewProblem(DiagnosticIds.PreviewAnimationFilesUnread, "warning",
+            messages.Format("PreviewScene_AnimationFilesUnread", unread.Count, clips.Count, modelReference, named,
+                assets.Tiers.Explain(messages)));
+    }
+
     /// <summary>
     ///     The model whose animations this object actually plays, or null when it uses its own.
     /// </summary>

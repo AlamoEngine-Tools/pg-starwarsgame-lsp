@@ -67,6 +67,9 @@ public sealed class LspConfigurationProviderTest : IDisposable
 
         Assert.Equal("C:/Steam/Empire at War/GameData", provider.Current.GamePath);
         Assert.Equal("C:/Steam/Empire at War/corruption", provider.Current.ExpansionPath);
+        // Said in the bug report: a detected folder is not one the author chose (#465).
+        Assert.True(provider.Current.GamePathDetected);
+        Assert.True(provider.Current.ExpansionPathDetected);
     }
 
     [Fact]
@@ -81,6 +84,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Equal("D:/eaw", provider.Current.GamePath);
         Assert.Equal("D:/foc", provider.Current.ExpansionPath);
         Assert.Equal(0, installs.Calls);
+        Assert.False(provider.Current.GamePathDetected);
+        Assert.False(provider.Current.ExpansionPathDetected);
     }
 
     [Fact]
@@ -93,6 +98,8 @@ public sealed class LspConfigurationProviderTest : IDisposable
 
         Assert.Null(provider.Current.GamePath);
         Assert.Null(provider.Current.ExpansionPath);
+        Assert.False(provider.Current.GamePathDetected);
+        Assert.False(provider.Current.ExpansionPathDetected);
     }
 
     // ── null / default ───────────────────────────────────────────────────────
