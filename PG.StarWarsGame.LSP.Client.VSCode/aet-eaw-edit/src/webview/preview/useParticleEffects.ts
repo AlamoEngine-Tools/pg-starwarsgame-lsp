@@ -150,15 +150,22 @@ export function useParticleEffects({
      */
     const dropPassiveEffects = useCallback((partId: string): void => {
         const mine = `${partId}#`;
+        const viewport = viewportRef.current;
 
-        for (const id of [...passiveEffectIdsRef.current]) {
-            if (!id.startsWith(mine)) {
-                continue;
-            }
+        const gone = [...passiveEffectIdsRef.current].filter((id) =>
+            id.startsWith(mine),
+        );
 
+        for (const id of gone) {
             passiveEffectIdsRef.current.delete(id);
-            viewportRef.current?.removeParticleSystem(id);
         }
+
+        // One change to the scene, not one per effect the part carried.
+        viewport?.batch(() => {
+            for (const id of gone) {
+                viewport.removeParticleSystem(id);
+            }
+        });
 
         pendingRef.current = pendingRef.current.filter(
             (particle) => !particle.id.startsWith(mine),
@@ -184,6 +191,10 @@ export function useParticleEffects({
         }
 
         const stillWaiting: PreviewParticle[] = [];
+        const ready: {
+            particle: PreviewParticle;
+            system: AlamoParticleContent;
+        }[] = [];
 
         for (const particle of pendingRef.current) {
             const system = systemsRef.current.get(
@@ -192,36 +203,47 @@ export function useParticleEffects({
 
             if (system === undefined || !viewport.hasPart(particle.partId)) {
                 stillWaiting.push(particle);
-                continue;
+            } else {
+                ready.push({ particle, system });
             }
-
-            // The MODEL's own: it is in the scene's proxy list, it names a bone, and it is part of
-            // what the asset is. This is the one call site that says so.
-            viewport.addParticleSystem(particle.id, system, {
-                origin: "model",
-                attachToPartId: particle.partId,
-                attachBone: particle.bone,
-                attachBoneIndex: particle.boneIndex,
-                proxyName: particle.systemRef,
-                levels: {
-                    alt: particle.alt ?? null,
-                    lod: particle.lod ?? null,
-                    altDecreaseStayHidden:
-                        particle.altDecreaseStayHidden ?? false,
-                },
-                scaleFactor:
-                    systemScalesRef.current.get(
-                        particle.systemRef.toLowerCase(),
-                    ) ?? 1,
-            });
-
-            viewport.setParticleSystemVisible(
-                particle.id,
-                effectState(particle.startsVisible, effectDrawsNow(particle)),
-            );
         }
 
         pendingRef.current = stillWaiting;
+
+        // One change to the scene, however many attach. MEASURED on a mod's capital ship: each of
+        // its 193 systems re-ran the row chain twice and measured the model twice as it attached,
+        // one 3.7 second frame while the unit loaded.
+        viewport.batch(() => {
+            for (const { particle, system } of ready) {
+                // The MODEL's own: it is in the scene's proxy list, it names a bone, and it is part
+                // of what the asset is. This is the one call site that says so.
+                viewport.addParticleSystem(particle.id, system, {
+                    origin: "model",
+                    attachToPartId: particle.partId,
+                    attachBone: particle.bone,
+                    attachBoneIndex: particle.boneIndex,
+                    proxyName: particle.systemRef,
+                    levels: {
+                        alt: particle.alt ?? null,
+                        lod: particle.lod ?? null,
+                        altDecreaseStayHidden:
+                            particle.altDecreaseStayHidden ?? false,
+                    },
+                    scaleFactor:
+                        systemScalesRef.current.get(
+                            particle.systemRef.toLowerCase(),
+                        ) ?? 1,
+                });
+
+                viewport.setParticleSystemVisible(
+                    particle.id,
+                    effectState(
+                        particle.startsVisible,
+                        effectDrawsNow(particle),
+                    ),
+                );
+            }
+        });
 
         // Everything the dock reads, not just the tree. Systems attach well after the geometry
         // does, and a model can declare its damage states ENTIRELY on proxies - `Rv_mptl-2a.alo`
@@ -395,30 +417,33 @@ export function useParticleEffects({
                     (pending) => !waiting.includes(pending),
                 );
 
-                // The scale that arrived with THIS system, not a lookup: an effect asked for before
-                // its system landed takes the same route as one asked for after, and the two
-                // disagreeing is exactly how a wreck's fire came back unscaled.
-                for (const pending of waiting) {
-                    if (pending.once) {
-                        viewport?.playOnce(
-                            pending.id,
-                            system,
-                            pending.partId,
-                            pending.bone,
-                            scale,
-                            pending.at,
-                        );
-                    } else {
-                        viewport?.addParticleSystem(pending.id, system, {
-                            origin: "gameplay",
-                            attachToPartId: pending.partId,
-                            attachBone: pending.bone,
-                            attachBoneIndex: pending.boneIndex,
-                            scaleFactor: scale,
-                            at: pending.at,
-                        });
+                // One change to the scene, however many were waiting on this system.
+                viewport?.batch(() => {
+                    // The scale that arrived with THIS system, not a lookup: an effect asked for
+                    // before its system landed takes the same route as one asked for after, and
+                    // the two disagreeing is exactly how a wreck's fire came back unscaled.
+                    for (const pending of waiting) {
+                        if (pending.once) {
+                            viewport.playOnce(
+                                pending.id,
+                                system,
+                                pending.partId,
+                                pending.bone,
+                                scale,
+                                pending.at,
+                            );
+                        } else {
+                            viewport.addParticleSystem(pending.id, system, {
+                                origin: "gameplay",
+                                attachToPartId: pending.partId,
+                                attachBone: pending.bone,
+                                attachBoneIndex: pending.boneIndex,
+                                scaleFactor: scale,
+                                at: pending.at,
+                            });
+                        }
                     }
-                }
+                });
             }
 
             attachPending();

@@ -76,6 +76,7 @@ import { type PreviewRules, UnitRules } from "./unitRules";
 import { ModelQueries } from "./modelQueries";
 import { type ViewportContext } from "./viewportContext";
 import { TextureStore } from "./textureStore";
+import { asOneChange } from "./sceneBatch";
 
 export type {
     AddPartOptions,
@@ -816,6 +817,14 @@ export class PreviewViewport {
     /** Everything the model is made of, as flat items for ONE tree. See `ModelRows.treeItems`. */
     treeItems(): TreeItem[] {
         return this.rows.treeItems();
+    }
+
+    /**
+     * Runs `work` as one change to the scene: the rows are refreshed and the depth range refitted
+     * once after it, however many of its steps asked for either. See `sceneBatch.ts`.
+     */
+    batch(work: () => void): void {
+        asOneChange(this.rows, this.cameraRig, work);
     }
 
     /** The row that owns one effect. See `ModelRows.rowForSystem`. */

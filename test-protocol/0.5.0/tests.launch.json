@@ -648,6 +648,9 @@
       "aet-eaw-edit.lsp.source.baseGameDirectory": "{eaw}"
     }
   },
+  "PRV-68": {
+    "open": "{repo}\\eaw"
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   },

@@ -420,11 +420,17 @@ export class PartAssembly {
         // They no longer live inside the part's subtree, so nothing else would ever take them:
         // before, disposing the part quietly freed their buffers underneath them, which left every
         // entry in `particleSystems` still being stepped against disposed geometry.
-        for (const [id, entry] of [...this.context.particles.particleSystems]) {
-            if (entry.attachToPartId === partId) {
-                this.context.particles.removeParticleSystem(id);
+        //
+        // One change to the depth range, not one per effect the part carried.
+        this.context.cameraRig.batch(() => {
+            for (const [id, entry] of [
+                ...this.context.particles.particleSystems,
+            ]) {
+                if (entry.attachToPartId === partId) {
+                    this.context.particles.removeParticleSystem(id);
+                }
             }
-        }
+        });
 
         this.dropRegistrations(part.subjectId, part.root);
         part.root.removeFromParent();

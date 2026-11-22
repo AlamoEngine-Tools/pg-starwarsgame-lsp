@@ -70,6 +70,7 @@ function assemblyWith(): {
         cameraRig: {
             dropBillboards: (nodes: ReadonlySet<THREE.Object3D>) =>
                 billboards.push([...nodes]),
+            batch: (work: () => void) => work(),
         },
         particles: {
             // Only the wreck carries effects.
@@ -153,7 +154,11 @@ function loaderWith(): {
                 collectShadowVolumes: idle,
                 dropShadowVolumes: idle,
             },
-            cameraRig: { collectBillboards: idle, dropBillboards: idle },
+            cameraRig: {
+                collectBillboards: idle,
+                dropBillboards: idle,
+                batch: (work: () => void) => work(),
+            },
             animation: {
                 registerPart: idle,
                 unregisterPart: idle,

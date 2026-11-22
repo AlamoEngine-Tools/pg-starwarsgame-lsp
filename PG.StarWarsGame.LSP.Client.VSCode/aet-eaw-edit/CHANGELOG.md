@@ -195,6 +195,12 @@
   no explosion played, all 145 went off together on the repair, and destroying them a second time added 145
   more - the preview's memory grew from 1.4 GB to 2.4 GB. An explosion now plays where its bone is and leaves
   when it has burnt out, and a second round holds no more than the first
+- **Destroying every hardpoint no longer freezes the preview for seconds** - every explosion put in the scene,
+  and every effect of the unit the rules wrote after it, decided again what each row of the model draws and
+  measured the whole model again. A change of many steps now does both once, and so does a unit attaching its
+  effects as it loads. Measured on a mod's capital ship with 145 hardpoints destroyed at once: the frozen frame
+  at the press fell from 5.9 seconds to 1.4, the one at `Repair all hardpoints` from 1.6 seconds to 0.15, and
+  the longest frame while the unit loads from 3.7 seconds to 0.35
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

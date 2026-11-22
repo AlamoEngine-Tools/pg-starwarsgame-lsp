@@ -124,6 +124,8 @@ export class ParticleRig {
      */
     step(dt: number, view: THREE.Matrix4): void {
         if (this.particlesVisible && !this.particlesPaused) {
+            const burntOut: string[] = [];
+
             for (const [id, entry] of [...this.particleSystems]) {
                 // Its model's whole look - the subject's cloak, a dying clone's fade - for a model's
                 // own effect; a gameplay effect belongs to no model and is drawn as it is.
@@ -145,9 +147,19 @@ export class ParticleRig {
 
                 // A death explosion is over once it stops emitting and its last spark dies.
                 if (this.transient.has(id) && entry.instance.exhausted) {
-                    this.transient.delete(id);
-                    this.removeParticleSystem(id);
+                    burntOut.push(id);
                 }
+            }
+
+            // One change to the depth range, however many burnt out in this frame: the explosions
+            // of a unit destroyed at one press end within a few frames of each other.
+            if (burntOut.length > 0) {
+                this.context.cameraRig.batch(() => {
+                    for (const id of burntOut) {
+                        this.transient.delete(id);
+                        this.removeParticleSystem(id);
+                    }
+                });
             }
 
             // The ones already killed, finishing. Stepped in the SAME gate as the live systems, so
@@ -284,7 +296,7 @@ export class ParticleRig {
 
         // Immediate: the id is about to name something else, and a fading twin under it would be
         // orphaned in the scene for good.
-        this.removeParticleSystem(id, true);
+        this.takeOut(id, true);
 
         const entry: ParticleEntry = {
             id,
@@ -339,10 +351,10 @@ export class ParticleRig {
         // The depth range again, because the effects reach further than the model and they arrive
         // AFTER the camera was fitted to it. Without this, Boba Fett's flamethrower - 206 units of
         // throw on a seven-unit model - was culled at 156 and looked like a flame that stops.
-        this.context.cameraRig.applyClipPlanes(
-            this.context.cameraRig.boundingSphere(),
-            this.context.cameraRig.fitDistance,
-        );
+        //
+        // Once, for the system that is now there. It was fitted for the one taken out under the
+        // same id as well, which measured the whole model a second time for nothing.
+        this.context.cameraRig.refitDepthRange();
     }
 
     // ── levels ────────────────────────────────────────────────────────────────
@@ -355,6 +367,15 @@ export class ParticleRig {
      * system under the same id, and a wholesale reset of the scene or the renderer.
      */
     removeParticleSystem(id: string, immediate = false): void {
+        this.takeOut(id, immediate);
+
+        // And back in again once the effect is gone, so a one-off explosion does not leave the
+        // depth range stretched for the rest of the session.
+        this.context.cameraRig.refitDepthRange();
+    }
+
+    /** Takes a system out and says nothing to the rest of the scene: the caller does. */
+    private takeOut(id: string, immediate: boolean): void {
         const entry = this.particleSystems.get(id);
 
         if (entry !== undefined) {
@@ -381,13 +402,6 @@ export class ParticleRig {
         }
 
         this.particleSystems.delete(id);
-
-        // And back in again once the effect is gone, so a one-off explosion does not leave the
-        // depth range stretched for the rest of the session.
-        this.context.cameraRig.applyClipPlanes(
-            this.context.cameraRig.boundingSphere(),
-            this.context.cameraRig.fitDistance,
-        );
     }
 
     /** Names of the running systems, for the emitter list in the dock. */
@@ -567,6 +581,10 @@ export class ParticleRig {
                 entry.attachBoneIndex,
                 entry.scaleFactor,
             );
+        }
+
+        // One refresh answers for every system - see `setParticlesVisible`.
+        if (this.particleSystems.size > 0) {
             this.refreshParticleVisibility();
         }
     }
@@ -679,11 +697,14 @@ export class ParticleRig {
      * whether it drains or is cut - an engine glow goes out with the ship, an explosion does not.
      */
     releaseSubjectEffects(subjectId: string): void {
-        for (const [id, entry] of [...this.particleSystems]) {
-            if (this.subjectOfSystem(entry) === subjectId) {
-                this.removeParticleSystem(id);
+        // One change to the depth range, not one per effect the subject carried.
+        this.context.cameraRig.batch(() => {
+            for (const [id, entry] of [...this.particleSystems]) {
+                if (this.subjectOfSystem(entry) === subjectId) {
+                    this.removeParticleSystem(id);
+                }
             }
-        }
+        });
     }
 
     /**

@@ -231,3 +231,77 @@ describe("CameraRig", () => {
         assert.deepEqual(cameraRig.billboards, [card]);
     });
 });
+
+describe("CameraRig in a batch", () => {
+    /** Counts how often the model is measured from here on. */
+    function measurings(cameraRig: CameraRig): () => number {
+        let count = 0;
+        const measure = cameraRig.boundingSphere.bind(cameraRig);
+        cameraRig.boundingSphere = (includeEffects?: boolean) => {
+            count++;
+            return measure(includeEffects);
+        };
+        return () => count;
+    }
+
+    it("puts the far plane past an effect that has arrived", () => {
+        const reaches: number[] = [];
+        const { cameraRig, camera, modelRoot } = rigWith(reaches);
+        modelRoot.add(box(0));
+        cameraRig.frameAll();
+        const before = camera.far;
+
+        reaches.push(5000);
+        cameraRig.refitDepthRange();
+
+        assert.ok(camera.far > before, `${camera.far} against ${before}`);
+    });
+
+    // Measured on a mod's capital ship: every explosion put in the scene measured the whole model
+    // twice over, a second of the press that destroys every hardpoint.
+    it("measures the model once for a batch, however often its steps asked", () => {
+        const reaches: number[] = [];
+        const { cameraRig, camera, modelRoot } = rigWith(reaches);
+        modelRoot.add(box(0));
+        cameraRig.frameAll();
+        const before = camera.far;
+        const measured = measurings(cameraRig);
+
+        cameraRig.batch(() => {
+            reaches.push(5000);
+            cameraRig.refitDepthRange();
+            cameraRig.refitDepthRange();
+            cameraRig.refitDepthRange();
+
+            assert.equal(measured(), 0, "measured inside the batch");
+            assert.equal(camera.far, before);
+        });
+
+        assert.equal(measured(), 1);
+        assert.ok(camera.far > before, `${camera.far} against ${before}`);
+    });
+
+    it("measures nothing for a batch that asked for nothing", () => {
+        const { cameraRig, modelRoot } = rigWith();
+        modelRoot.add(box(0));
+        const measured = measurings(cameraRig);
+
+        cameraRig.batch(() => undefined);
+
+        assert.equal(measured(), 0);
+    });
+
+    it("waits for the outermost batch to end", () => {
+        const { cameraRig, modelRoot } = rigWith();
+        modelRoot.add(box(0));
+        const measured = measurings(cameraRig);
+
+        cameraRig.batch(() => {
+            cameraRig.batch(() => cameraRig.refitDepthRange());
+
+            assert.equal(measured(), 0, "measured when the inner batch ended");
+        });
+
+        assert.equal(measured(), 1);
+    });
+});

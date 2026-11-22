@@ -760,3 +760,107 @@ describe("ModelRows", () => {
         assert.equal(meshDrawn(mesh), true, "the base pose decided");
     });
 });
+
+describe("ModelRows in a batch", () => {
+    /** Counts the runs of the visibility chain from here on. */
+    function chainRuns(rows: ModelRows): () => number {
+        let runs = 0;
+        const resolve = rows.resolveRows.bind(rows);
+        rows.resolveRows = (): void => {
+            runs++;
+            resolve();
+        };
+        return () => runs;
+    }
+
+    // Measured on a mod's capital ship with every hardpoint destroyed at one press: the chain ran
+    // once per explosion put in the scene and once per effect the rules pass wrote after it, 3.0 of
+    // the 5.9 seconds the press froze the preview for.
+    it("refreshes the rows once for a batch, however often its steps asked", () => {
+        const { rows } = rowsWith();
+        const runs = chainRuns(rows);
+
+        rows.batch(() => {
+            rows.refreshRows();
+            rows.refreshRows();
+            rows.refreshRows();
+
+            assert.equal(runs(), 0, "refreshed inside the batch");
+        });
+
+        assert.equal(runs(), 1);
+    });
+
+    it("refreshes the rows at once outside a batch", () => {
+        const { rows } = rowsWith();
+        const runs = chainRuns(rows);
+
+        rows.refreshRows();
+        rows.refreshRows();
+
+        assert.equal(runs(), 2);
+    });
+
+    it("refreshes nothing for a batch that asked for nothing", () => {
+        const { rows } = rowsWith();
+        const runs = chainRuns(rows);
+
+        rows.batch(() => undefined);
+
+        assert.equal(runs(), 0);
+    });
+
+    // The dock reads the rows at the end of the rules pass: that reading is the refresh.
+    it("owes nothing once the rows were read inside the batch", () => {
+        const { rows } = rowsWith();
+        const runs = chainRuns(rows);
+
+        rows.batch(() => {
+            rows.refreshRows();
+            rows.treeItems();
+        });
+
+        assert.equal(runs(), 1);
+    });
+
+    it("refreshes again for what was asked after the rows were read", () => {
+        const { rows } = rowsWith();
+        const runs = chainRuns(rows);
+
+        rows.batch(() => {
+            rows.treeItems();
+            rows.refreshRows();
+        });
+
+        assert.equal(runs(), 2);
+    });
+
+    it("waits for the outermost batch to end", () => {
+        const { rows } = rowsWith();
+        const runs = chainRuns(rows);
+
+        rows.batch(() => {
+            rows.batch(() => rows.refreshRows());
+
+            assert.equal(runs(), 0, "refreshed when the inner batch ended");
+        });
+
+        assert.equal(runs(), 1);
+    });
+
+    it("refreshes what was asked before a step failed, and holds nothing afterwards", () => {
+        const { rows } = rowsWith();
+        const runs = chainRuns(rows);
+
+        assert.throws(() =>
+            rows.batch(() => {
+                rows.refreshRows();
+                throw new Error("a step failed");
+            }),
+        );
+        assert.equal(runs(), 1);
+
+        rows.refreshRows();
+        assert.equal(runs(), 2);
+    });
+});

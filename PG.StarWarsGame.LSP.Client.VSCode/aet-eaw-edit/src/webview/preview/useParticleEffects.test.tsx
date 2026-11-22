@@ -54,10 +54,20 @@ function effects(): {
     hook: ParticleEffects;
     posted: { type: string; name: string }[];
     started: { how: string; id: string; scale: number | undefined }[];
+    /** The ids put in the viewport by each batch the hook opened, and those it put in outside one. */
+    changes: { batches: string[][]; loose: string[] };
 } {
     const posted: { type: string; name: string }[] = [];
     const started: { how: string; id: string; scale: number | undefined }[] =
         [];
+    const changes: { batches: string[][]; loose: string[] } = {
+        batches: [],
+        loose: [],
+    };
+    let open: string[] | null = null;
+    const noted = (id: string): void => {
+        (open ?? changes.loose).push(id);
+    };
     const viewport = {
         appliesGameRules: () => true,
         hasPart: () => true,
@@ -65,18 +75,39 @@ function effects(): {
         shaderNames: () => [],
         removeParticleSystem: () => undefined,
         setParticleSystemVisible: () => undefined,
+        batch: (work: () => void) => {
+            // A batch inside a batch is the same change.
+            if (open !== null) {
+                work();
+                return;
+            }
+
+            open = [];
+            try {
+                work();
+            } finally {
+                changes.batches.push(open);
+                open = null;
+            }
+        },
         playOnce: (
             id: string,
             _system: AlamoParticleContent,
             _part?: string,
             _bone?: string,
             scale?: number,
-        ) => started.push({ how: "once", id, scale }),
+        ) => {
+            noted(id);
+            started.push({ how: "once", id, scale });
+        },
         addParticleSystem: (
             id: string,
             _system: AlamoParticleContent,
             placement: { scaleFactor?: number },
-        ) => started.push({ how: "kept", id, scale: placement.scaleFactor }),
+        ) => {
+            noted(id);
+            started.push({ how: "kept", id, scale: placement.scaleFactor });
+        },
     } as unknown as PreviewViewport;
     const assets = new PreviewAssetLoader(() => null, {
         post: (message) => posted.push(message),
@@ -100,7 +131,7 @@ function effects(): {
     };
     renderToStaticMarkup(<Probe />);
     assert.ok(seen);
-    return { hook: seen, posted, started };
+    return { hook: seen, posted, started, changes };
 }
 
 const EXPLOSION = "Large_Explosion_Space";
@@ -252,6 +283,45 @@ describe("useParticleEffects", () => {
             hook.takeSystem("p_wreck_fire", testSystem([emitter()]), 1);
 
             assert.equal(started.length, 2);
+        });
+    });
+
+    // Measured on a mod's capital ship: every system put in the scene re-ran the row chain and
+    // measured the model, one 3.7 second frame while the unit loaded.
+    describe("the systems put in the scene together", () => {
+        const startedIn = (batches: string[][]): string[][] =>
+            batches.filter((ids) => ids.length > 0);
+
+        it("are one change when they were waiting on a system that arrives", () => {
+            const { hook, changes } = effects();
+            hook.playEffect("explosion:a", EXPLOSION, "hull", "HP_A", true);
+            hook.playEffect("explosion:b", EXPLOSION, "hull", "HP_B", true);
+            hook.playEffect("wreck:c", EXPLOSION, "wreck", undefined, false);
+
+            hook.takeSystem(EXPLOSION, testSystem([emitter()]), 1);
+
+            assert.deepEqual(changes.loose, []);
+            assert.deepEqual(startedIn(changes.batches), [
+                ["explosion:a", "explosion:b", "wreck:c"],
+            ]);
+        });
+
+        it("are one change when a part's own effects attach", () => {
+            const { hook, changes } = effects();
+            hook.takeSystem("p_wreck_fire", testSystem([emitter()]), 1);
+
+            hook.queuePassiveEffects(
+                [
+                    particle({ systemRef: "p_wreck_fire" }),
+                    particle({ systemRef: "p_wreck_fire" }),
+                ],
+                "wreck:1",
+            );
+
+            assert.deepEqual(changes.loose, []);
+            assert.deepEqual(startedIn(changes.batches), [
+                ["wreck:1#0", "wreck:1#1"],
+            ]);
         });
     });
 
