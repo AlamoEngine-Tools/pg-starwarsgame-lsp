@@ -32,6 +32,7 @@ import {
     IconArrowsHorizontal,
     IconArrowUp,
     IconAsterisk,
+    IconAtom,
     IconAxisX,
     IconBolt,
     IconBone,
@@ -55,6 +56,7 @@ import {
     IconCube3dSphere,
     IconDeviceFloppy,
     IconDots,
+    IconEngineOff,
     IconExternalLink,
     IconEye,
     IconEyeClosed,
@@ -65,6 +67,7 @@ import {
     IconFilterOff,
     IconFlag,
     IconFlame,
+    IconGauge,
     IconGift,
     IconGridDots,
     IconHandClick,
@@ -167,6 +170,13 @@ const ICONS = {
     // A tank, because its turret is the one shape that says turret: there is no glyph for a turret
     // alone, and a crosshair is already the targeting mark.
     turret: IconTank,
+
+    // What a unit is doing or has had done to it, beside its damage state: how fast it is going,
+    // an ion stun - a charge, which the lens already has the bolt for - and its engines disabled
+    // for a time.
+    speed: IconGauge,
+    ionStun: IconAtom,
+    enginesDisabled: IconEngineOff,
 
     // ── the room ──────────────────────────────────────────────────────────────
     // A globe, not an aperture: this opens the settings for the ROOM the model stands in, and an

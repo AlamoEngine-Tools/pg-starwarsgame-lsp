@@ -78,6 +78,23 @@ public sealed class PreviewSceneBuilderTest
     }
 
     /// <summary>
+    ///     Measured in the game: a ship's engine effects are as bright as it is fast against its
+    ///     <c>Max_Speed</c>, and dark for a type whose <c>Max_Speed</c> is not above 0. The client
+    ///     decides that; the scene carries the number, null where the type writes none.
+    /// </summary>
+    [Fact]
+    public void BuildForObject_CarriesTheMaxSpeed()
+    {
+        var index = Index([Sym("Cruiser", "GameObjectType"), Sym("Prop", "GameObjectType")]);
+        var tags = new FakeVariantTagSource()
+            .With("Cruiser", Tag("Space_Model_Name", "hull.alo"), Tag("Max_Speed", "1.5"))
+            .With("Prop", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Equal(1.5f, Builder(index, tags, "hull.alo").BuildForObject("Cruiser").MaxSpeed);
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Prop").MaxSpeed);
+    }
+
+    /// <summary>
     ///     Measured in the game: a hit that takes the hull to or below 75 % or 50 % adds the type's
     ///     <c>Damaged_Smoke_Asset_Name</c> on the root bone. The client decides when; the scene carries
     ///     the asset, null where the type names none (#451).

@@ -2828,3 +2828,76 @@ describe("the room an emitter's buffers have", () => {
         });
     });
 });
+
+/**
+ * The brightness an emitter is drawn at.
+ *
+ * Measured in the game: an emitter carries a brightness, and each particle's red, green, blue AND
+ * alpha are multiplied by it as the particle is drawn - whatever the blend mode. The space locomotor
+ * sets a ship's engine effects to 0.2 at rest rising to 1 at full speed through it.
+ */
+describe("the brightness an emitter is drawn at", () => {
+    function smoke(
+        over: Partial<AlamoEmitterProperties> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "glow",
+                    properties: properties({
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                        ...over,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    /** The colour and the alpha the first particle is drawn with. */
+    function drawn(instance: ParticleSystemInstance): number[] {
+        const geometry = instance.emitterMesh(0)!.geometry;
+        return [
+            ...valuesOf(geometry.getAttribute("iColor")).slice(0, 3),
+            valuesOf(geometry.getAttribute("iAlpha"))[0],
+        ];
+    }
+
+    it("is full unless something sets it", () => {
+        const plain = smoke();
+        const set = smoke();
+        set.setBrightness(1);
+        plain.update(0.1);
+        set.update(0.1);
+
+        assert.deepEqual(drawn(set), drawn(plain));
+        assert.ok(drawn(plain).every((value) => value > 0));
+    });
+
+    for (const blendMode of ["Additive", "Transparent"] as const) {
+        it(`scales the colour and the alpha alike of a ${blendMode} emitter`, () => {
+            const full = smoke({ blendMode });
+            const dim = smoke({ blendMode });
+            dim.setBrightness(0.25);
+            full.update(0.1);
+            dim.update(0.1);
+
+            const expected = drawn(full).map((value) => value * 0.25);
+            for (const [i, value] of drawn(dim).entries()) {
+                assert.ok(
+                    Math.abs(value - expected[i]) < 1e-6,
+                    `component ${i}: ${value} against ${expected[i]}`,
+                );
+            }
+        });
+    }
+
+    it("draws nothing visible at none", () => {
+        const dark = smoke();
+        dark.setBrightness(0);
+        dark.update(0.1);
+
+        assert.deepEqual(drawn(dark), [0, 0, 0, 0]);
+    });
+});

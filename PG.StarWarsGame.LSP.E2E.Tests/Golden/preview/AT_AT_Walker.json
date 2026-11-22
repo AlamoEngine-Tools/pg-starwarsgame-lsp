@@ -381,6 +381,7 @@
   "Stealth": null,
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
+  "MaxSpeed": 0.5,
   "Behaviors": [
     "SELECTABLE",
     "ABILITY_COUNTDOWN",

@@ -321,6 +321,7 @@
   "Stealth": null,
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
+  "MaxSpeed": null,
   "Behaviors": [
     "DUMMY_SPACE_FIGHTER_SQUADRON"
   ],

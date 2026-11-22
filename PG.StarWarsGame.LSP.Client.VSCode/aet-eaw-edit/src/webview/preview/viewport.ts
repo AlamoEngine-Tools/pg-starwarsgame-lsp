@@ -622,6 +622,26 @@ export class PreviewViewport {
         this.rules.setBehaviors(behaviors);
     }
 
+    /** The type's `Max_Speed`, or null where it writes none. See `UnitRules.setMaxSpeed`. */
+    setMaxSpeed(maxSpeed: number | null): void {
+        this.rules.setMaxSpeed(maxSpeed);
+    }
+
+    /** The unit's speed as a share of its `Max_Speed`. See `UnitRules.setSpeed`. */
+    setUnitSpeed(share: number): void {
+        this.rules.setSpeed(share);
+    }
+
+    /** Disables the unit's engines for a time, or brings them back. See `UnitRules.setEnginesDisabled`. */
+    setEnginesDisabled(disabled: boolean): void {
+        this.rules.setEnginesDisabled(disabled);
+    }
+
+    /** Ion stuns the unit, or ends the stun. See `UnitRules.setIonStunned`. */
+    setIonStunned(stunned: boolean): void {
+        this.rules.setIonStunned(stunned);
+    }
+
     /**
      * Puts the subject's geometry at the size the game draws it.
      *

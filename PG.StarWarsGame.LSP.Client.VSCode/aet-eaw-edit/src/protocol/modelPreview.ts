@@ -707,6 +707,12 @@ export interface PreviewScene {
      */
     behaviors?: readonly string[] | null;
     /**
+     * The type's `Max_Speed`, **per FRAME** as the game reads it, or absent where it writes none.
+     * A ship's engine effects are as bright as it is fast against it, and dark for a type whose
+     * `Max_Speed` is not above 0 - see `engineGlow.ts`.
+     */
+    maxSpeed?: number | null;
+    /**
      * What the type's `Stealth_Ability` writes about the look of its cloak, or absent where it has
      * none: `Stealth_Color` and `Stealth_Transition_Time`.
      */

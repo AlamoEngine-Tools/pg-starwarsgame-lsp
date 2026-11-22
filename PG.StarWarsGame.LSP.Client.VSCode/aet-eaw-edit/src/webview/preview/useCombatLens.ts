@@ -197,6 +197,28 @@ export function useCombatLens({
     const [destroyed, setDestroyed] = useState<ReadonlySet<string>>(new Set());
 
     /**
+     * What the unit is doing and what has been done to it, put on by hand: how fast it is going as
+     * a share of its `Max_Speed`, whether it is ion stunned, and whether its engines are disabled
+     * for a time. In the game a projectile does the last two; nothing moves or shoots a unit here
+     * unless the reader does.
+     *
+     * TIER 2 - they reset on open: a fresh preview opens at full speed with nothing done to it.
+     */
+    const [speed, setSpeed] = useState(1);
+    const [ionStunned, setIonStunned] = useState(false);
+    const [enginesDisabled, setEnginesDisabled] = useState(false);
+
+    /**
+     * Which of them apply, by the behaviours the type lists - a model opened as a file lists none.
+     * The space locomotor is what moves a ship and sets its engine effects by its speed; the ion
+     * stun behaviour is what a stun is done to.
+     */
+    const movedByLocomotor = (scene?.behaviors ?? []).includes(
+        "SIMPLE_SPACE_LOCOMOTOR",
+    );
+    const stunnable = (scene?.behaviors ?? []).includes("ION_STUN_EFFECT");
+
+    /**
      * Which hardpoints are swinging, by id.
      *
      * A set rather than the one boolean this was: the button lived on the panel and swung every
@@ -528,6 +550,7 @@ export function useCombatLens({
             // What the game does to a unit by its behaviours: the ion stun effects hidden until it
             // is stunned, the engine effects hidden while its engines are offline.
             viewport.setBehaviors(scene.behaviors ?? []);
+            viewport.setMaxSpeed(scene.maxSpeed ?? null);
             viewport.setActiveAbilities(activeAbilities);
 
             // Each effect's own flag, which the unit's rules above write over. Through the same call as
@@ -570,7 +593,34 @@ export function useCombatLens({
         setAttackerProjectile(null);
         setDamageLog([]);
         requestedClonesRef.current.clear();
+
+        setSpeed(1);
+        setIonStunned(false);
+        setEnginesDisabled(false);
     }, [scene]);
+
+    // The unit's speed and its engines disabled: read on every frame its effects are drawn, so
+    // handing them over is all it takes.
+    useEffect(() => {
+        const viewport = viewportRef.current;
+        if (viewport === null) {
+            return;
+        }
+
+        viewport.setUnitSpeed(speed);
+        viewport.setEnginesDisabled(enginesDisabled && movedByLocomotor);
+    }, [speed, enginesDisabled, movedByLocomotor, scene]);
+
+    // A stun switches the ion effects, which is the rows' to draw: the dock follows.
+    useEffect(() => {
+        const viewport = viewportRef.current;
+        if (viewport === null) {
+            return;
+        }
+
+        viewport.setIonStunned(ionStunned && stunnable);
+        setTreeItems(viewport.treeItems() ?? []);
+    }, [ionStunned, stunnable, scene]);
 
     /** Whether the subject has been finished off, and by which clone. */
     const [unitDead, setUnitDead] = useState(false);
@@ -1369,6 +1419,14 @@ export function useCombatLens({
         hull,
         hardpointHealthPool,
         altDrivenByHull,
+        speed,
+        setSpeed,
+        movedByLocomotor,
+        ionStunned,
+        setIonStunned,
+        stunnable,
+        enginesDisabled,
+        setEnginesDisabled,
         shipTargetable,
         liveDefence,
         fire,

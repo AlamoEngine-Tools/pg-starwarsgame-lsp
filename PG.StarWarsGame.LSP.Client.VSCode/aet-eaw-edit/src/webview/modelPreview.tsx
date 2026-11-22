@@ -40,6 +40,7 @@ import { AbilityCommandBar } from "./preview/panels/AbilityCommandBar";
 import { AbilityInfoFlyout } from "./preview/panels/AbilityInfoFlyout";
 import { AttackControls } from "./preview/panels/AttackControls";
 import { SubjectStateControls } from "./preview/panels/SubjectStateControls";
+import { UnitStateControls } from "./preview/panels/UnitStateControls";
 import { turnedTurretCount } from "./preview/turretHandles";
 import { CardInfoFlyout } from "./preview/panels/CardInfoFlyout";
 import { DamageLogFlyout } from "./preview/panels/DamageLogFlyout";
@@ -1537,13 +1538,19 @@ function ModelPreview(): React.JSX.Element {
                                 />
                             }
                             end={
-                                <AttackControls
-                                    attackOpen={attackOpen}
-                                    combat={combat}
-                                    mode={mode}
-                                    scene={scene}
-                                    setAttackOpen={setAttackOpen}
-                                />
+                                <>
+                                    <UnitStateControls
+                                        combat={combat}
+                                        scene={scene}
+                                    />
+                                    <AttackControls
+                                        attackOpen={attackOpen}
+                                        combat={combat}
+                                        mode={mode}
+                                        scene={scene}
+                                        setAttackOpen={setAttackOpen}
+                                    />
+                                </>
                             }
                         />
                         {/* What the command bar cannot say in an icon.

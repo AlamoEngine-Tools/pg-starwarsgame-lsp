@@ -22,8 +22,10 @@ import {
     createdWrite,
     EFFECT_GROUP,
     inGroup,
+    ION_STUN_SWITCH,
     switchWrite,
 } from "./effectGroups";
+import { disabledFlicker, engineBrightness } from "./engineGlow";
 import { type MaterialExtras, isShieldMesh } from "./materials";
 import {
     type AnimationSwitch,
@@ -102,6 +104,21 @@ export class UnitRules {
      * them: see {@link effectState} for the ion stun effects and the engines going offline.
      */
     private behaviors: ReadonlySet<string> = new Set();
+    /**
+     * The unit's speed as a share of its `Max_Speed`, 0 at rest to 1 at full speed. The reader's:
+     * nothing moves a unit in the preview. A unit opens at full speed.
+     */
+    private speed = 1;
+    /** The type's `Max_Speed`, or null where it writes none. */
+    private maxSpeed: number | null = null;
+    /**
+     * Whether the unit's engines are disabled for a time - in the game by a hit that drained its
+     * power, from a projectile that disables engines; here by the reader. Not the engines going
+     * offline for good with the last engine hardpoint: see {@link effectBrightness}.
+     */
+    private enginesDisabled = false;
+    /** Whether the unit is ion stunned - in the game by a projectile, here by the reader. */
+    private ionStunned = false;
 
     /**
      * When each death and each ability switch happened, on one clock, so the effect writes replay in
@@ -150,6 +167,10 @@ export class UnitRules {
         this.activeAbilities = new Set();
         this.missileShieldObject = false;
         this.behaviors = new Set();
+        this.speed = 1;
+        this.maxSpeed = null;
+        this.enginesDisabled = false;
+        this.ionStunned = false;
         this.clock = 0;
         this.deathAt.clear();
         this.abilityAt.clear();
@@ -188,6 +209,67 @@ export class UnitRules {
         }
 
         this.context.levels.applyLevels();
+    }
+
+    /** The type's `Max_Speed`, or null where it writes none. See {@link effectBrightness}. */
+    setMaxSpeed(maxSpeed: number | null): void {
+        this.maxSpeed = maxSpeed;
+    }
+
+    /**
+     * The unit's speed as a share of its `Max_Speed`. Read on every frame the effects are drawn,
+     * so nothing has to be asked again here.
+     */
+    setSpeed(share: number): void {
+        this.speed = Math.min(1, Math.max(0, share));
+    }
+
+    /** Disables the unit's engines for a time, or brings them back. See {@link effectBrightness}. */
+    setEnginesDisabled(disabled: boolean): void {
+        this.enginesDisabled = disabled;
+    }
+
+    /**
+     * Ion stuns the unit, or ends the stun. Measured in the game: a stun shows the `pi` effects of
+     * a unit with the ion stun behaviour and its end hides them again - placed on the unit's clock
+     * like an ability's switch, so it replays in order with everything else. A unit without the
+     * behaviour takes no stun.
+     */
+    setIonStunned(stunned: boolean): void {
+        if (this.ionStunned === stunned) {
+            return;
+        }
+
+        this.ionStunned = stunned;
+        this.abilityAt.set(ION_STUN_SWITCH, { on: stunned, at: ++this.clock });
+        this.context.levels.applyLevels();
+    }
+
+    /**
+     * The brightness an effect of this name is drawn at, `seconds` into the preview's run: the
+     * engine effects of a ship by its speed, or flickering while its engines are disabled for a
+     * time - see `engineGlow.ts`. Everything else, every unit the space locomotor does not move,
+     * and every model opened as a file, is drawn as it is.
+     *
+     * Both engine groups alike: the game sets the one the ship is on - `pte` under turbo, else
+     * `pe` - and the other is hidden.
+     */
+    effectBrightness(name: string | undefined, seconds: number): number {
+        if (
+            !this.appliesGameRules() ||
+            name === undefined ||
+            !this.behaviors.has(SPACE_LOCOMOTOR_BEHAVIOR) ||
+            !(
+                inGroup(name, EFFECT_GROUP.engines) ||
+                inGroup(name, EFFECT_GROUP.turboEngines)
+            )
+        ) {
+            return 1;
+        }
+
+        return this.enginesDisabled
+            ? disabledFlicker(seconds)
+            : engineBrightness(this.speed, this.maxSpeed);
     }
 
     /** Shows or hides the shield mesh, for the abilities that reveal it. */
@@ -460,6 +542,14 @@ export class UnitRules {
         }
 
         for (const [type, { on, at }] of this.abilityAt) {
+            // A stun reaches only a unit with the behaviour - see `setIonStunned`.
+            if (
+                type === ION_STUN_SWITCH &&
+                !this.behaviors.has(ION_STUN_BEHAVIOR)
+            ) {
+                continue;
+            }
+
             placed.push({ at, event: { kind: "ability", type, on } });
         }
 

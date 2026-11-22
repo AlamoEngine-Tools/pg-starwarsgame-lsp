@@ -750,6 +750,7 @@
   "Stealth": null,
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
+  "MaxSpeed": null,
   "Behaviors": [
     "DUMMY_STAR_BASE",
     "SELECTABLE",

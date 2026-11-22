@@ -51,6 +51,13 @@ const ION_STUN_OBJECT: readonly GroupWrite[] = [
     { group: EFFECT_GROUP.ionStun, shown: false },
 ];
 
+/**
+ * The switch an ion stun is: not an ability of the unit's but a state done to it, by a projectile
+ * in the game and by the reader here. It shows the `pi` effects while it lasts and hides them when
+ * it ends - on a unit with the behaviour, which is the caller's to check.
+ */
+export const ION_STUN_SWITCH = "ION_STUN";
+
 /** Turbo engines in place of the plain ones. */
 const TURBO: readonly GroupWrite[] = [
     { group: EFFECT_GROUP.engines, shown: false },
@@ -74,6 +81,7 @@ const WHILE_ON: ReadonlyMap<string, readonly GroupWrite[]> = new Map([
     ["INVULNERABILITY", [{ group: EFFECT_GROUP.invulnerability, shown: true }]],
     ["SPRINT", [{ group: EFFECT_GROUP.sprint, shown: true }]],
     ["INTERDICT", [{ group: EFFECT_GROUP.gravityWell, shown: true }]],
+    [ION_STUN_SWITCH, [{ group: EFFECT_GROUP.ionStun, shown: true }]],
 ]);
 
 /** Whether an effect of this name is in the group: its start against the prefix, case ignored. */

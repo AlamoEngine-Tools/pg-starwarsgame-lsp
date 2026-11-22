@@ -738,6 +738,12 @@ export const Shell = styled.div`
         min-width: 165px;
     }
 
+    /* A speed is a percentage: three digits and a sign at most. */
+
+    .stage-field.speed .stage-value {
+        min-width: 44px;
+    }
+
     /* Short enough that both of them and the turret reset fit the left slot in one row: at a 1906px
        window the slot is 538px wide, and at 84px the three measured 549px and wrapped. The
        renderer that used to share the slot lives in Scene > Effects now. */

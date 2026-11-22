@@ -727,6 +727,149 @@ describe("UnitRules, the engines offline", () => {
 });
 
 /**
+ * How bright a ship's engine effects are drawn, and the states the reader puts a unit in.
+ *
+ * Measured in the game - see `engineGlow.ts` for the brightness, and for the ion stun: a stun shows
+ * the `pi` effects of a unit with the ION_STUN_EFFECT behaviour, and its end hides them again.
+ */
+describe("UnitRules, a ship's speed and the states done to it", () => {
+    function ship(): UnitRules {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR", "ION_STUN_EFFECT"]);
+        unit.setMaxSpeed(1.5);
+        return unit;
+    }
+
+    it("draws the engine effects at full brightness at full speed, which is how a unit opens", () => {
+        const unit = ship();
+
+        assert.equal(unit.effectBrightness("pe_engines", 0), 1);
+        assert.equal(unit.effectBrightness("PTE_engines", 0), 1);
+    });
+
+    it("dims the engine effects with the speed, down to a fifth at rest", () => {
+        const unit = ship();
+
+        unit.setSpeed(0);
+        assert.equal(unit.effectBrightness("pe_engines", 0), 0.2);
+
+        unit.setSpeed(0.5);
+        assert.ok(
+            Math.abs(unit.effectBrightness("pe_engines", 0) - 0.6) < 1e-9,
+        );
+    });
+
+    it("leaves every other effect at full brightness", () => {
+        const unit = ship();
+        unit.setSpeed(0);
+
+        assert.equal(unit.effectBrightness("p_smoke", 0), 1);
+        assert.equal(unit.effectBrightness("pi_damage", 0), 1);
+        assert.equal(unit.effectBrightness(undefined, 0), 1);
+    });
+
+    it("draws the engine effects of a type that cannot move dark", () => {
+        const unit = ship();
+        unit.setMaxSpeed(0);
+
+        assert.equal(unit.effectBrightness("pe_engines", 0), 0);
+    });
+
+    it("leaves the brightness alone for a unit the space locomotor does not move, and in a model preview", () => {
+        const { unit: walker } = rulesWith("game");
+        walker.setSpeed(0);
+        assert.equal(walker.effectBrightness("pe_engines", 0), 1);
+
+        const { unit: file } = rulesWith("file");
+        file.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+        file.setSpeed(0);
+        assert.equal(file.effectBrightness("pe_engines", 0), 1);
+    });
+
+    it("flickers the engine effects at up to a fifth while the engines are disabled, and keeps them drawn", () => {
+        const unit = ship();
+        unit.setEnginesDisabled(true);
+
+        const values = Array.from({ length: 30 }, (_, frame) =>
+            unit.effectBrightness("pe_engines", frame / 30 + 0.001),
+        );
+        assert.ok(values.every((value) => value >= 0 && value <= 0.2));
+        assert.ok(new Set(values).size > 10);
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "pe_engines"),
+            drawnInFile,
+        );
+
+        unit.setEnginesDisabled(false);
+        assert.equal(unit.effectBrightness("pe_engines", 0), 1);
+    });
+
+    it("shows the pi effects while the unit is ion stunned, whatever the file says, and hides them after", () => {
+        const unit = ship();
+        assert.deepEqual(
+            unit.effectState(fileState(false), undefined, "pi_damage_elec"),
+            ruleState(false),
+        );
+
+        unit.setIonStunned(true);
+        assert.deepEqual(
+            unit.effectState(fileState(false), undefined, "pi_damage_elec"),
+            ruleState(true),
+        );
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "p_smoke"),
+            drawnInFile,
+        );
+
+        unit.setIonStunned(false);
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "pi_damage_elec"),
+            ruleState(false),
+        );
+    });
+
+    it("stuns nothing that has no ion stun behaviour", () => {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+        unit.setIonStunned(true);
+
+        assert.deepEqual(
+            unit.effectState(fileState(false), undefined, "pi_damage_elec"),
+            fileState(false),
+        );
+    });
+
+    it("asks for the level pass when a stun starts or ends, and only then", () => {
+        const { unit, applied } = rulesWith("game");
+        unit.setBehaviors(["ION_STUN_EFFECT"]);
+        const before = applied();
+
+        unit.setIonStunned(true);
+        unit.setIonStunned(true);
+        unit.setSpeed(0.3);
+        unit.setEnginesDisabled(true);
+
+        assert.equal(applied(), before + 1);
+    });
+
+    it("forgets all of it with the model", () => {
+        const unit = ship();
+        unit.setSpeed(0);
+        unit.setEnginesDisabled(true);
+        unit.setIonStunned(true);
+
+        unit.forgetModel();
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR", "ION_STUN_EFFECT"]);
+
+        assert.equal(unit.effectBrightness("pe_engines", 0), 1);
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "pi_damage_elec"),
+            ruleState(false),
+        );
+    });
+});
+
+/**
  * Another object the preview shows - a death clone - is created too, so its effects get what creating
  * it writes, and none of the subject's hardpoint or ability writes.
  */

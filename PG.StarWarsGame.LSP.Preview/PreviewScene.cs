@@ -257,7 +257,12 @@ public sealed record PreviewScene(
     // them. Measured: an object with ION_STUN_EFFECT hides its pi effects when it is created and
     // shows them only while it is ion stunned; the space locomotor hides the engine effects while
     // the unit's engines are offline.
-    IReadOnlyList<string>? Behaviors = null)
+    IReadOnlyList<string>? Behaviors = null,
+    // The type's Max_Speed, per FRAME as the game reads it, or null where it writes none. Measured in
+    // the game: the space locomotor sets a ship's engine effects to a brightness of 0.2 + 0.8 x
+    // speed / Max_Speed while its engines are online - and to 0 for a type whose Max_Speed is not
+    // above 0.
+    float? MaxSpeed = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<string> Behaviors { get; init; } = Behaviors ?? [];

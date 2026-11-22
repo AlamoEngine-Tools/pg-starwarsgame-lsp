@@ -196,7 +196,8 @@ public sealed class PreviewSceneBuilder(
             DamagedSmokeAsset: effective.ValueOf("Damaged_Smoke_Asset_Name")?.Trim() is { Length: > 0 } smoke
                 ? smoke
                 : null,
-            Behaviors: PreviewTagReader.Behaviors(effective));
+            Behaviors: PreviewTagReader.Behaviors(effective),
+            MaxSpeed: effective.FloatOf("Max_Speed"));
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ function rigWith(anchor?: THREE.Object3D): {
         modelRoot.add(anchor);
     }
     const context = standInContext({
+        rules: { effectBrightness: () => 1 },
         levels: { alt: 0, altDescending: false, lod: 0 },
         cameraRig: {
             cameraPosition: { x: 0, y: 0, z: 10 },

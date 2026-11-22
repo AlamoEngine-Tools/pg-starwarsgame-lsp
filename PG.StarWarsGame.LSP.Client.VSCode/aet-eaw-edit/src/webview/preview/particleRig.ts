@@ -88,6 +88,8 @@ export class ParticleRig {
      * a model whose animation you still want at speed.
      */
     private particleSpeed = 1;
+    /** Seconds the rig has been stepped for, the clock an engine's flicker runs on. */
+    private seconds = 0;
 
     constructor(private readonly context: ViewportContext) {}
 
@@ -123,6 +125,8 @@ export class ParticleRig {
      * off or paused. `view` is the camera's inverse world matrix, for the streaks measured on screen.
      */
     step(dt: number, view: THREE.Matrix4): void {
+        this.seconds += dt;
+
         if (this.particlesVisible && !this.particlesPaused) {
             const burntOut: string[] = [];
 
@@ -135,6 +139,18 @@ export class ParticleRig {
                               this.subjectOfSystem(entry),
                           )
                         : PLAIN_LOOK,
+                );
+
+                // And how bright the unit's rules draw it - a ship's engine effects by its speed.
+                // The subject's own alone: another object the preview shows has no speed here.
+                entry.instance.setBrightness(
+                    entry.origin === "model" &&
+                        this.subjectOfSystem(entry) === ACTIVE_SUBJECT
+                        ? this.context.rules.effectBrightness(
+                              entry.proxyName,
+                              this.seconds,
+                          )
+                        : 1,
                 );
 
                 // The camera goes in because a streak's length is a screen-space measurement:

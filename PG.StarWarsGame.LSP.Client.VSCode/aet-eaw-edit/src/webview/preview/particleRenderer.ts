@@ -823,6 +823,12 @@ class EmitterRenderer {
     readonly mesh: THREE.Mesh;
     /** The owning model's whole look - see `cloakFade.ts`. Set by the system every step. */
     modelLook: Look = PLAIN_LOOK;
+    /**
+     * The brightness the emitter is drawn at: 1 unless something sets it. Measured in the game: an
+     * emitter carries one, and each particle's red, green, blue AND alpha are multiplied by it as
+     * the particle is drawn, whatever the blend mode - a ship's engine effects by its speed.
+     */
+    brightness = 1;
 
     private readonly particles: Particle[] = [];
     private readonly clock: SpawnClock;
@@ -1334,9 +1340,11 @@ class EmitterRenderer {
                 fade,
                 this.modelLook,
             );
-            const r = bump ? 0.5 + 0.5 * c : lr;
-            const g = bump ? 0.5 + 0.5 * s : lg;
-            const b = bump ? 0.5 : lb;
+            // The brightness last: it scales the colour as it is drawn, alpha included.
+            const r = (bump ? 0.5 + 0.5 * c : lr) * this.brightness;
+            const g = (bump ? 0.5 + 0.5 * s : lg) * this.brightness;
+            const b = (bump ? 0.5 : lb) * this.brightness;
+            const drawnAlpha = a * this.brightness;
 
             for (let corner = 0; corner < 4; corner++) {
                 const cx = QUAD_CORNERS[corner * 2];
@@ -1351,7 +1359,7 @@ class EmitterRenderer {
                 corners[at + 3] = r;
                 corners[at + 4] = g;
                 corners[at + 5] = b;
-                corners[at + 6] = a;
+                corners[at + 6] = drawnAlpha;
                 corners[at + 7] = originU + (cx * 0.5 + 0.5) * cell;
                 corners[at + 8] = originV + (cy * 0.5 + 0.5) * cell;
             }
@@ -1875,11 +1883,11 @@ class EmitterRenderer {
             instances[at + 1] = drawn.y * this.scaleFactor;
             instances[at + 2] = drawn.z * this.scaleFactor;
 
-            instances[at + 3] = lr;
-            instances[at + 4] = lg;
-            instances[at + 5] = lb;
+            instances[at + 3] = lr * this.brightness;
+            instances[at + 4] = lg * this.brightness;
+            instances[at + 5] = lb * this.brightness;
 
-            instances[at + 6] = la;
+            instances[at + 6] = la * this.brightness;
             instances[at + 7] = look.size * this.scaleFactor;
             instances[at + 8] = look.rotation;
             instances[at + 9] = look.frame;
@@ -2436,6 +2444,13 @@ export class ParticleSystemInstance {
     setLook(look: Look): void {
         for (const emitter of this.emitters) {
             emitter.modelLook = look;
+        }
+    }
+
+    /** The brightness every emitter is drawn at - see `EmitterRenderer.brightness`. */
+    setBrightness(brightness: number): void {
+        for (const emitter of this.emitters) {
+            emitter.brightness = brightness;
         }
     }
 

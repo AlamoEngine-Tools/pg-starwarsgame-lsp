@@ -595,6 +595,7 @@
   "Stealth": null,
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
+  "MaxSpeed": 2.2,
   "Behaviors": [
     "DUMMY_STARSHIP",
     "SELECTABLE",
