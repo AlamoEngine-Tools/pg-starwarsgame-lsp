@@ -525,6 +525,9 @@ export function useCombatLens({
             viewport.setMissileShieldObject(
                 (scene.passiveMissileShieldRadius ?? 0) > 0,
             );
+            // What the game does to a unit by its behaviours: the ion stun effects hidden until it
+            // is stunned, the engine effects hidden while its engines are offline.
+            viewport.setBehaviors(scene.behaviors ?? []);
             viewport.setActiveAbilities(activeAbilities);
 
             // Each effect's own flag, which the unit's rules above write over. Through the same call as

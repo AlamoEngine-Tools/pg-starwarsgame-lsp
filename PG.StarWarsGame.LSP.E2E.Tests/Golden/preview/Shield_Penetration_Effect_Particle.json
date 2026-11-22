@@ -321,6 +321,7 @@
   "Stealth": null,
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
+  "Behaviors": [],
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [],

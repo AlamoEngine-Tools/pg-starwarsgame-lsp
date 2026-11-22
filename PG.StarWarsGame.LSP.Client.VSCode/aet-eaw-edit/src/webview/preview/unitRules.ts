@@ -18,7 +18,12 @@
 import { PREVIEW_SCENE_KIND } from "../../protocol/modelPreview";
 import { type HardpointDeath, type HardpointWrites } from "./damage";
 import { cloakWrite, hiddenOnTypeLoad } from "./cloakWrites";
-import { createdWrite, switchWrite } from "./effectGroups";
+import {
+    createdWrite,
+    EFFECT_GROUP,
+    inGroup,
+    switchWrite,
+} from "./effectGroups";
 import { type MaterialExtras, isShieldMesh } from "./materials";
 import {
     type AnimationSwitch,
@@ -45,7 +50,13 @@ const NO_HARDPOINTS: HardpointWrites = {
     decals: new Set(),
     damageBones: new Set(),
     deaths: [],
+    enginesOffline: false,
 };
+
+/** The behaviour whose object hides its `pi` effects until it is ion stunned. */
+const ION_STUN_BEHAVIOR = "ION_STUN_EFFECT";
+/** The behaviour that moves a ship, and keeps its engine effects hidden while its engines are offline. */
+const SPACE_LOCOMOTOR_BEHAVIOR = "SIMPLE_SPACE_LOCOMOTOR";
 
 const NO_NAMES: ReadonlySet<string> = new Set();
 
@@ -86,6 +97,11 @@ export class UnitRules {
      * above 0 - which shows its `prs` effects once it is created.
      */
     missileShieldObject = false;
+    /**
+     * The behaviours the unit's type lists, upper-cased. What the game does to a unit depends on
+     * them: see {@link effectState} for the ion stun effects and the engines going offline.
+     */
+    private behaviors: ReadonlySet<string> = new Set();
 
     /**
      * When each death and each ability switch happened, on one clock, so the effect writes replay in
@@ -133,6 +149,7 @@ export class UnitRules {
         this.cloakShadowsOff = false;
         this.activeAbilities = new Set();
         this.missileShieldObject = false;
+        this.behaviors = new Set();
         this.clock = 0;
         this.deathAt.clear();
         this.abilityAt.clear();
@@ -202,6 +219,14 @@ export class UnitRules {
     /** Whether the unit's type is a missile-shield object. See {@link missileShieldObject}. */
     setMissileShieldObject(on: boolean): void {
         this.missileShieldObject = on;
+        this.context.levels.applyLevels();
+    }
+
+    /** The behaviours the unit's type lists, however cased. See {@link behaviors}. */
+    setBehaviors(behaviors: readonly string[]): void {
+        this.behaviors = new Set(
+            behaviors.map((behavior) => behavior.trim().toUpperCase()),
+        );
         this.context.levels.applyLevels();
     }
 
@@ -323,9 +348,17 @@ export class UnitRules {
      * An effect's state switch with the game's rules written over it.
      *
      * In the order the game writes them: what creating the unit writes - its name group (`pte`,
-     * `pptw` and `prs` hidden, a missile-shield object's `prs` shown) and every Damage_Particles
-     * bone - then every hardpoint death and every ability switch, the cloaks among them, in the one
-     * order they happened.
+     * `pptw` and `prs` hidden, a missile-shield object's `prs` shown, `pi` hidden on an object with
+     * the ion stun behaviour) and every Damage_Particles bone - then every hardpoint death and
+     * every ability switch, the cloaks among them, in the one order they happened.
+     *
+     * And last, while the unit's engines are offline, its engine effects hidden. Measured in the
+     * game: an engine hardpoint dying takes the engines offline when the unit has none left
+     * undestroyed, and the space locomotor then hides the engine group it is on - `pe`, or `pte`
+     * under turbo - on every service, so nothing written after it shows them. Turbo is switched off
+     * with the engines, which hides `pte`: both groups are off. A hardpoint's `Engine_Particles`
+     * plays no part in this - on the Star Destroyer the glow is not below that bone - and neither
+     * does a unit the space locomotor does not move.
      *
      * @param bone The hull bone the effect is anchored on, for the rules that name a bone.
      * @param name The effect's proxy name, for the rules that read it; none for an effect the model
@@ -347,7 +380,12 @@ export class UnitRules {
             name !== undefined && hiddenOnTypeLoad(name)
                 ? ruleState(false)
                 : state;
-        written = this.createdWrite(written, name, this.missileShieldObject);
+        written = this.createdWrite(
+            written,
+            name,
+            this.missileShieldObject,
+            this.behaviors.has(ION_STUN_BEHAVIOR),
+        );
         const above = this.bonesAbove(bone);
 
         written = this.creationHardpointWrite(written, above, null);
@@ -371,6 +409,16 @@ export class UnitRules {
             }
         }
 
+        if (
+            name !== undefined &&
+            this.hardpoints.enginesOffline &&
+            this.behaviors.has(SPACE_LOCOMOTOR_BEHAVIOR) &&
+            (inGroup(name, EFFECT_GROUP.engines) ||
+                inGroup(name, EFFECT_GROUP.turboEngines))
+        ) {
+            written = ruleState(false);
+        }
+
         return written;
     }
 
@@ -381,7 +429,7 @@ export class UnitRules {
      */
     createdEffectState(state: StateSwitch, name?: string): StateSwitch {
         return this.appliesGameRules()
-            ? this.createdWrite(state, name, false)
+            ? this.createdWrite(state, name, false, false)
             : state;
     }
 
@@ -390,11 +438,12 @@ export class UnitRules {
         state: StateSwitch,
         name: string | undefined,
         missileShieldObject: boolean,
+        ionStunObject: boolean,
     ): StateSwitch {
         const created =
             name === undefined
                 ? undefined
-                : createdWrite(name, missileShieldObject);
+                : createdWrite(name, missileShieldObject, ionStunObject);
 
         return created === undefined ? state : ruleState(created);
     }

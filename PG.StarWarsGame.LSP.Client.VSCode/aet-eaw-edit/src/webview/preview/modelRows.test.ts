@@ -470,6 +470,7 @@ describe("ModelRows", () => {
             decals: new Set(),
             damageBones: new Set(["turret"]),
             deaths: [],
+            enginesOffline: false,
         });
 
         rows.treeItems();
@@ -489,6 +490,7 @@ describe("ModelRows", () => {
                     engineBone: null,
                 },
             ],
+            enginesOffline: false,
         });
         rows.resolveRows();
 
@@ -511,6 +513,7 @@ describe("ModelRows", () => {
                     engineBone: "turret",
                 },
             ],
+            enginesOffline: false,
         });
         rows.resolveRows();
 

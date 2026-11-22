@@ -617,6 +617,11 @@ export class PreviewViewport {
         this.rules.setMissileShieldObject(on);
     }
 
+    /** The behaviours the unit's type lists. See `UnitRules.setBehaviors`. */
+    setBehaviors(behaviors: readonly string[]): void {
+        this.rules.setBehaviors(behaviors);
+    }
+
     /**
      * Puts the subject's geometry at the size the game draws it.
      *

@@ -195,7 +195,8 @@ public sealed class PreviewSceneBuilder(
             // Measured in the game: an empty name adds nothing, so an empty tag is no asset.
             DamagedSmokeAsset: effective.ValueOf("Damaged_Smoke_Asset_Name")?.Trim() is { Length: > 0 } smoke
                 ? smoke
-                : null);
+                : null,
+            Behaviors: PreviewTagReader.Behaviors(effective));
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────

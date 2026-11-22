@@ -226,6 +226,17 @@
   in the game: a rule that reaches it hides or shows it whole, a rule that names a part looks at the unit's own
   model, and inside the attached model each part is drawn as its file has it. Reported on a mod's star
   destroyer, which stood without its two bow weapons
+- **A ship's engine glow goes out when its engines go offline** - with every engine hardpoint of a unit
+  destroyed its glow burned on. In the game an engine hardpoint's death takes the engines offline when the
+  unit has none left undestroyed, and the ship then keeps its `pe` and `pte` effects hidden until one is back;
+  a hardpoint's `Engine_Particles` hides only what is on or below the bone it names, which on most ships is
+  not the glow. The unit preview does the same. Reported on a mod's star destroyer with seven engine
+  hardpoints, whose seven glows stayed on with all of them destroyed
+- **Ion stun effects are off until a unit is ion stunned** - a unit whose type has the `ION_STUN_EFFECT`
+  behaviour hides its `pi` effects when it is created, as the game does; the unit preview showed them from the
+  start wherever the model file does not hide them itself. A type without the behaviour keeps them as its
+  model has them, in the game and in the preview. Reported on a mod's star destroyer, which opened with its
+  ion sparks running
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

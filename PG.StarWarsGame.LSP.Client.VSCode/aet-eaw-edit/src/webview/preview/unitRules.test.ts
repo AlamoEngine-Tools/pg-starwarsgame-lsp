@@ -62,6 +62,7 @@ function writes(over: Partial<HardpointWrites> = {}): HardpointWrites {
         decals: new Set(),
         damageBones: new Set(),
         deaths: [],
+        enginesOffline: false,
         ...over,
     };
 }
@@ -606,6 +607,122 @@ describe("UnitRules, the effect name groups", () => {
 
         assert.deepEqual(effect(unit, "pas_sprint"), drawnInFile);
         assert.deepEqual(effect(unit, "prs_fx"), ruleState(false));
+    });
+});
+
+/**
+ * The ion stun effects.
+ *
+ * Measured in the game: an object with the ION_STUN_EFFECT behaviour hides its `pi` effects when it
+ * is created and shows them only while it is ion stunned. An object without the behaviour takes
+ * no such write: its `pi` effects stay as its model file has them. Reported on a mod's star
+ * destroyer, which opened with its ion sparks running.
+ */
+describe("UnitRules, the ion stun effects", () => {
+    function effect(unit: UnitRules, name: string) {
+        return unit.effectState(drawnInFile, undefined, name);
+    }
+
+    it("hides pi effects when a unit with the ion stun behaviour is created", () => {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR", "ion_stun_effect"]);
+
+        assert.deepEqual(effect(unit, "PI_Damage_Elec_SD00"), ruleState(false));
+        assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
+        assert.deepEqual(effect(unit, "p_smoke"), drawnInFile);
+    });
+
+    it("leaves the pi effects of a unit without the behaviour as its file has them", () => {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+
+        assert.deepEqual(effect(unit, "pi_damage_elec"), drawnInFile);
+    });
+
+    it("asks for the level pass when the behaviours are set, and forgets them with the model", () => {
+        const { unit, applied } = rulesWith("game");
+        const before = applied();
+        unit.setBehaviors(["ION_STUN_EFFECT"]);
+        assert.equal(applied(), before + 1);
+
+        unit.forgetModel();
+
+        assert.deepEqual(effect(unit, "pi_damage_elec"), drawnInFile);
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setBehaviors(["ION_STUN_EFFECT"]);
+
+        assert.deepEqual(effect(unit, "pi_damage_elec"), drawnInFile);
+    });
+});
+
+/**
+ * The engines going offline.
+ *
+ * Measured in the game: when an engine hardpoint dies and the unit has no other left undestroyed,
+ * its engines go offline, and the space locomotor then keeps the engine effects hidden - `pe`, or
+ * `pte` under turbo - whatever else writes them. A hardpoint's `Engine_Particles` plays no part:
+ * on the Star Destroyer the glow is not below that bone at all. Reported on a mod's star destroyer
+ * with seven engine hardpoints, whose glow stayed on with all of them destroyed.
+ */
+describe("UnitRules, the engines offline", () => {
+    function effect(unit: UnitRules, name: string) {
+        return unit.effectState(drawnInFile, undefined, name);
+    }
+
+    function shipWith(over: Partial<HardpointWrites>): UnitRules {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+        unit.setHardpoints(writes(over));
+        return unit;
+    }
+
+    it("hides the pe and pte effects, and nothing else", () => {
+        const unit = shipWith({ enginesOffline: true });
+
+        assert.deepEqual(
+            effect(unit, "pe_stardestroyerengines"),
+            ruleState(false),
+        );
+        assert.deepEqual(effect(unit, "PTE_engines"), ruleState(false));
+        assert.deepEqual(effect(unit, "p_smoke"), drawnInFile);
+        assert.deepEqual(
+            effect(unit, "pptw_fx"),
+            ruleState(false),
+            "as created",
+        );
+    });
+
+    it("leaves the engine effects on while the engines are online", () => {
+        const unit = shipWith({ enginesOffline: false });
+
+        assert.deepEqual(effect(unit, "pe_stardestroyerengines"), drawnInFile);
+    });
+
+    // The locomotor writes on every service: turbo switched on afterwards shows nothing.
+    it("keeps them hidden whatever an ability writes afterwards", () => {
+        const unit = shipWith({ enginesOffline: true });
+        unit.setActiveAbilities(new Set(["TURBO"]));
+
+        assert.deepEqual(effect(unit, "pte_engines"), ruleState(false));
+        assert.deepEqual(effect(unit, "pe_engines"), ruleState(false));
+    });
+
+    it("writes nothing for a unit the space locomotor does not move", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(writes({ enginesOffline: true }));
+
+        assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+        unit.setHardpoints(writes({ enginesOffline: true }));
+
+        assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
     });
 });
 

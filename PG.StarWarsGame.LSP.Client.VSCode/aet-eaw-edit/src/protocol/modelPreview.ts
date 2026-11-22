@@ -700,6 +700,13 @@ export interface PreviewScene {
      */
     passiveMissileShieldRadius?: number | null;
     /**
+     * The behaviours the type lists, upper-cased and each once, out of all three of its lists.
+     * What the game does to a unit depends on them: one with `ION_STUN_EFFECT` hides its `pi`
+     * effects until it is ion stunned, and the space locomotor keeps the engine effects hidden
+     * while the engines are offline - see `UnitRules.effectState`. Absent from an older server.
+     */
+    behaviors?: readonly string[] | null;
+    /**
      * What the type's `Stealth_Ability` writes about the look of its cloak, or absent where it has
      * none: `Stealth_Color` and `Stealth_Transition_Time`.
      */

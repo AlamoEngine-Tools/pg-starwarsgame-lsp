@@ -42,6 +42,15 @@ const MISSILE_SHIELD_OBJECT: readonly GroupWrite[] = [
     { group: EFFECT_GROUP.missileShield, shown: true },
 ];
 
+/**
+ * What creating an object with the ION_STUN_EFFECT behaviour writes. Measured in the game: the
+ * behaviour takes the stun off when it starts, which hides the `pi` effects; a stun shows them and
+ * its end hides them again. An object without the behaviour takes none of these writes.
+ */
+const ION_STUN_OBJECT: readonly GroupWrite[] = [
+    { group: EFFECT_GROUP.ionStun, shown: false },
+];
+
 /** Turbo engines in place of the plain ones. */
 const TURBO: readonly GroupWrite[] = [
     { group: EFFECT_GROUP.engines, shown: false },
@@ -53,7 +62,8 @@ const TURBO: readonly GroupWrite[] = [
  * opposite of each.
  *
  * Only the ones the preview can switch: a unit's own abilities. Ion stun is done TO a unit by a
- * projectile, so nothing here switches `pi`.
+ * projectile, so no ability here switches `pi` - creating a unit with the behaviour hides it, see
+ * `ION_STUN_OBJECT`.
  */
 const WHILE_ON: ReadonlyMap<string, readonly GroupWrite[]> = new Map([
     ["TURBO", TURBO],
@@ -100,16 +110,24 @@ function lastWrite(
  *
  * @param missileShieldObject Whether the object's type is a missile-shield object: its
  *     `Passive_Missile_Shield_Radius` is above 0.
+ * @param ionStunObject Whether the object's type has the ION_STUN_EFFECT behaviour.
  */
 export function createdWrite(
     name: string,
     missileShieldObject: boolean,
+    ionStunObject = false,
 ): boolean | undefined {
-    const created = lastWrite(name, ON_CREATION, undefined);
+    let created = lastWrite(name, ON_CREATION, undefined);
 
-    return missileShieldObject
-        ? lastWrite(name, MISSILE_SHIELD_OBJECT, created)
-        : created;
+    if (missileShieldObject) {
+        created = lastWrite(name, MISSILE_SHIELD_OBJECT, created);
+    }
+
+    if (ionStunObject) {
+        created = lastWrite(name, ION_STUN_OBJECT, created);
+    }
+
+    return created;
 }
 
 /**

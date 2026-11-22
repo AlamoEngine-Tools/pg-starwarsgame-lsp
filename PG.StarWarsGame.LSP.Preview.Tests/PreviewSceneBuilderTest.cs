@@ -50,6 +50,34 @@ public sealed class PreviewSceneBuilderTest
     }
 
     /// <summary>
+    ///     Measured in the game: an object with the <c>ION_STUN_EFFECT</c> behaviour hides its
+    ///     <c>pi</c> effects when it is created and shows them only while it is ion stunned, and the
+    ///     space locomotor hides the engine effects while the engines are offline. The client
+    ///     decides both; the scene carries the behaviours the type lists, out of all three lists,
+    ///     upper-cased and each once.
+    /// </summary>
+    [Fact]
+    public void BuildForObject_CarriesTheBehavioursTheTypeLists()
+    {
+        var index = Index([
+            Sym("Cruiser", "GameObjectType"), Sym("Walker", "GameObjectType"), Sym("Prop", "GameObjectType")
+        ]);
+        var tags = new FakeVariantTagSource()
+            .With("Cruiser", Tag("Space_Model_Name", "hull.alo"),
+                Tag("Behavior", "SELECTABLE"),
+                Tag("SpaceBehavior", "SIMPLE_SPACE_LOCOMOTOR, Ion_Stun_Effect , selectable"))
+            .With("Walker", Tag("Space_Model_Name", "hull.alo"),
+                Tag("LandBehavior", "WALK_LOCOMOTOR, ION_STUN_EFFECT"))
+            .With("Prop", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Equal(["SELECTABLE", "SIMPLE_SPACE_LOCOMOTOR", "ION_STUN_EFFECT"],
+            Builder(index, tags, "hull.alo").BuildForObject("Cruiser").Behaviors);
+        Assert.Equal(["WALK_LOCOMOTOR", "ION_STUN_EFFECT"],
+            Builder(index, tags, "hull.alo").BuildForObject("Walker").Behaviors);
+        Assert.Empty(Builder(index, tags, "hull.alo").BuildForObject("Prop").Behaviors);
+    }
+
+    /// <summary>
     ///     Measured in the game: a hit that takes the hull to or below 75 % or 50 % adds the type's
     ///     <c>Damaged_Smoke_Asset_Name</c> on the root bone. The client decides when; the scene carries
     ///     the asset, null where the type names none (#451).

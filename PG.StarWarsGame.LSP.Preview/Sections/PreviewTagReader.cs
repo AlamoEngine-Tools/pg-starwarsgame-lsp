@@ -16,6 +16,31 @@ public static class PreviewTagReader
     /// <summary>The three tags an object lists its behaviours under, as the engine's parser reads them.</summary>
     public static readonly string[] BehaviorListTags = ["Behavior", "SpaceBehavior", "LandBehavior"];
 
+    /// <summary>
+    ///     Whether any of the three behaviour lists names one of <paramref name="behaviors" />, as a
+    ///     whole token and without case.
+    /// </summary>
+    public static bool HasAnyBehavior(EffectiveObject effective, IReadOnlyCollection<string> behaviors)
+    {
+        return Behaviors(effective).Any(token => behaviors.Contains(token, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    ///     Every behaviour the object lists, upper-cased and each once, in the order of the three lists
+    ///     and of each list's entries.
+    /// </summary>
+    public static List<string> Behaviors(EffectiveObject effective)
+    {
+        return
+        [
+            .. BehaviorListTags
+                .SelectMany(tag => (effective.ValueOf(tag) ?? string.Empty)
+                    .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                .Select(token => token.ToUpperInvariant())
+                .Distinct(StringComparer.Ordinal)
+        ];
+    }
+
     /// <summary>The first entry of a comma-separated list, or null when there is none.</summary>
     public static string? FirstToken(string? value)
     {
