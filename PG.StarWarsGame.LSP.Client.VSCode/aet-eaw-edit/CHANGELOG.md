@@ -181,6 +181,14 @@
   particles to the graphics card on every frame, whatever was alive. Measured on a mod's capital ship with
   every hardpoint destroyed - 4,840 emitters and nothing alive - the preview drew at 9 frames a second and
   now draws at 53. An emitter copies the particles it has, and nothing when it has none
+- **A unit's effects and wrecks are loaded with the unit** - a hardpoint's death explosion, the hull's damage
+  smoke, the unit's death blast, a wreck's model and the fire it trails were each asked for at the moment they
+  were started - an explosion once per destroyed hardpoint - and their textures only after that. Each is now
+  asked for once while the unit loads, with its textures and shaders, and a texture is copied to the graphics
+  card as it arrives; none of them runs before it is started. Measured on a mod's capital ship with 145
+  hardpoints destroyed at once: 145 requests and 15.6 MB of textures after the press became none, and the
+  explosions were in the scene after 5.4 seconds instead of 13.3. An explosion answered more than once no
+  longer leaves a copy of itself at the centre of the scene
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

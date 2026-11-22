@@ -118,6 +118,7 @@ function loaderOverAStore(): {
         },
         forgetTranslatedEffects: () => undefined,
         setHeatStrength: () => undefined,
+        uploadTexture: () => undefined,
     };
     const events: AssetLoaderEvents = {
         post: () => undefined,
@@ -235,6 +236,7 @@ describe("the textures a preview keeps", () => {
             },
             forgetTranslatedEffects: () => undefined,
             setHeatStrength: () => undefined,
+            uploadTexture: () => undefined,
         };
         const loader = new PreviewAssetLoader(
             () => viewport,

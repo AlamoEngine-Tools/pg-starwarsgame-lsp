@@ -45,7 +45,7 @@ import { AlamoMaterial } from "./alamoMaterial";
 import type { TranslatedEffect } from "./fx/effect";
 import type { FxMaterialState } from "./fx/renderState";
 import { applyBlend, applyDepth } from "./materialState";
-import { particleEffectName } from "./particleEffects";
+import { emitterEffectName } from "./particleEffects";
 import { type Look, PLAIN_LOOK } from "./cloakFade";
 
 /**
@@ -1048,9 +1048,7 @@ class EmitterRenderer {
      * for a heat sprite, which the distortion pass draws with the preview's own program.
      */
     get effectName(): string | null {
-        return this.emitter.properties.isHeatParticle
-            ? null
-            : particleEffectName(this.emitter.properties.blendMode);
+        return emitterEffectName(this.emitter);
     }
 
     /** Whether this emitter is drawn through an engine effect right now. */

@@ -488,6 +488,17 @@ export class PreviewViewport {
     }
 
     /**
+     * Copies a texture to the graphics card now.
+     *
+     * Left alone, a texture is copied on the first frame that draws with it. For the model that
+     * is the frame the cover comes off; for an effect fetched up front it is the frame the
+     * effect starts on. One already there, unchanged, is not copied again.
+     */
+    uploadTexture(texture: THREE.Texture): void {
+        this.renderer.initTexture(texture);
+    }
+
+    /**
      * Disposes every texture the scene on screen did not ask for. See `TextureStore.retain`.
      *
      * @param keep Lower-cased names of the textures to keep.

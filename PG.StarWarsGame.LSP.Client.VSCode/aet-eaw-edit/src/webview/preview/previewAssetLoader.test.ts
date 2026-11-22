@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import type * as THREE from "three";
 
 import type { TranslatedEffect, TranslationResult } from "./fx/effect";
+import { emitter, properties, testSystem } from "./particleFixture";
 import {
     type AssetLoaderEvents,
     type AssetViewport,
@@ -40,6 +41,10 @@ interface Recorded {
     coverage: { translated: number; total: number }[];
     /** Every heat strength handed to the viewport, null for "none declared". */
     heat: (number | null)[];
+    /** How many textures were copied to the graphics card on arrival. */
+    uploads: number;
+    /** Asked for and not yet answered, as the panel would read it at each change. */
+    outstanding: number[];
 }
 
 function harness(options?: {
@@ -59,6 +64,8 @@ function harness(options?: {
         sourcesForgotten: 0,
         coverage: [],
         heat: [],
+        uploads: 0,
+        outstanding: [],
     };
 
     const viewport: AssetViewport = {
@@ -74,11 +81,15 @@ function harness(options?: {
         releaseTexturesExcept: () => seen.calls.push("release"),
         forgetTranslatedEffects: () => seen.calls.push("forget effects"),
         setHeatStrength: (strength) => seen.heat.push(strength),
+        uploadTexture: () => seen.uploads++,
     };
 
     const events: AssetLoaderEvents = {
         post: (message) => seen.posted.push(message),
-        ledgersChanged: () => seen.ledgerChanges++,
+        ledgersChanged: () => {
+            seen.ledgerChanges++;
+            seen.outstanding.push(loader.requested - loader.settled);
+        },
         shaderRequested: () => seen.shaderRequested++,
         shaderSourceFound: () => seen.sourceFound++,
         shaderSourcesForgotten: () => seen.sourcesForgotten++,
@@ -538,10 +549,142 @@ describe("PreviewAssetLoader", () => {
         });
     });
 
+    // An effect is started by name from many places - every hardpoint of a capital ship names the
+    // one explosion - and the host answers every request it is sent. Asked for through here, a
+    // name goes out once, and what the system needs is fetched before any emitter of it exists.
+    describe("a particle system request", () => {
+        it("posts a name once and counts it once, however it is cased", () => {
+            const { loader, seen } = harness();
+
+            loader.requestSystem("Large_Explosion_Space");
+            loader.requestSystem("large_explosion_space");
+
+            assert.deepEqual(seen.posted, [
+                {
+                    type: "requestParticleSystem",
+                    name: "Large_Explosion_Space",
+                },
+            ]);
+            assert.equal(loader.requested, 1);
+            assert.equal(loader.settled, 0);
+        });
+
+        it("asks for the textures and effects a system names when it arrives", () => {
+            const { loader, seen } = harness();
+            loader.requestSystem("Large_Explosion_Space");
+
+            loader.receiveSystem(
+                "Large_Explosion_Space",
+                testSystem([
+                    emitter({ colorTexture: "P_Fire.tga" }),
+                    emitter({
+                        colorTexture: "p_smoke.tga",
+                        properties: properties({ blendMode: "Transparent" }),
+                    }),
+                ]),
+            );
+
+            assert.deepEqual(seen.posted.slice(1), [
+                { type: "requestTexture", name: "p_fire.tga", request: 1 },
+                { type: "requestTexture", name: "p_smoke.tga", request: 2 },
+                { type: "requestShader", name: "PrimAdditive.fx" },
+                { type: "requestShader", name: "PrimAlpha.fx" },
+            ]);
+            // Nothing was put in the scene for it.
+            assert.deepEqual(seen.calls, []);
+            assert.equal(loader.requested, 5);
+            assert.equal(loader.settled, 1);
+        });
+
+        // The cover lifts the moment nothing is outstanding. A system counted as answered before
+        // its textures were asked for would lift it for one render, over an effect not yet dressed.
+        it("never reads as finished between a system arriving and its textures being asked for", () => {
+            const { loader, seen } = harness();
+            loader.requestSystem("Large_Explosion_Space");
+            seen.outstanding.length = 0;
+
+            loader.receiveSystem(
+                "Large_Explosion_Space",
+                testSystem([emitter()]),
+            );
+
+            assert.ok(seen.outstanding.length > 0);
+            assert.ok(
+                seen.outstanding.every((count) => count > 0),
+                `outstanding ${seen.outstanding.join(", ")}`,
+            );
+        });
+
+        it("counts a system that could not be read as answered", () => {
+            const { loader, seen } = harness();
+            loader.requestSystem("Missing_Effect");
+
+            loader.receiveSystem("Missing_Effect", null);
+
+            assert.equal(seen.posted.length, 1);
+            assert.equal(loader.requested, 1);
+            assert.equal(loader.settled, 1);
+        });
+
+        it("asks again for a new subject", () => {
+            const { loader, seen } = harness();
+            loader.requestSystem("Large_Explosion_Space");
+
+            loader.clearLedgers();
+            loader.requestSystem("Large_Explosion_Space");
+
+            assert.equal(seen.posted.length, 2);
+            assert.equal(loader.requested, 1);
+        });
+    });
+
+    // A texture nothing draws yet - an explosion's, fetched up front - was copied to the graphics
+    // card on the frame that first drew with it, which is the frame the explosion starts on.
+    describe("a texture that arrives", () => {
+        it("is copied to the graphics card then, not on the first frame that draws with it", () => {
+            const { loader, seen } = harness();
+            loader.requestTexture("p_fire.tga");
+
+            loader.receiveTexture("p_fire.tga", {
+                format: "tga",
+                data: new Uint8Array([1]),
+                version: "v1",
+            });
+
+            assert.equal(seen.uploads, 1);
+        });
+
+        it("is not copied when it did not resolve", () => {
+            const { loader, seen } = harness({ decode: () => null });
+            loader.requestTexture("p_fire.tga");
+
+            loader.receiveTexture("p_fire.tga", { format: "tga" });
+
+            assert.equal(seen.uploads, 0);
+        });
+    });
+
     // #395: the shader folder changed and the server restarted on it. What came back from the old
     // folder - an effect, a header, or the word that neither was there - no longer stands.
     describe("a refetch of the effects", () => {
         const effect = {} as TranslatedEffect;
+
+        // An effect fetched up front has no emitter in the scene to name its shaders again.
+        it("asks again for the effects of every system that arrived, built or not", () => {
+            const { loader, seen } = harness();
+            loader.requestSystem("Large_Explosion_Space");
+            loader.receiveSystem(
+                "Large_Explosion_Space",
+                testSystem([emitter()]),
+            );
+            seen.posted.length = 0;
+
+            loader.refetchShaders([]);
+
+            assert.deepEqual(seen.posted, [
+                { type: "requestShader", name: "PrimAdditive.fx" },
+            ]);
+        });
 
         it("asks again for an effect that was not there and translates it when it is", () => {
             const { loader, seen } = harness({

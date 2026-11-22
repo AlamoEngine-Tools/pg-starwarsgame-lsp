@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<PrefetchHardpoints>
+<!-- A destroyable hardpoint that attaches no model and sheds a wreck: the wreck's model is in no part
+     of the unit, so nothing has it until it is asked for. -->
+<HardPoint Name="HP_Prv_Prefetch_A">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>Yes</Is_Targetable>
+<Is_Destroyable>Yes</Is_Destroyable>
+<Health>100.0</Health>
+<Attachment_Bone>MuzzleA_00</Attachment_Bone>
+<Death_Breakoff_Prop>Prv_Prefetch_Wreck</Death_Breakoff_Prop>
+<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
+<Fire_Bone_B>MuzzleA_00</Fire_Bone_B>
+<Fire_Cone_Width>90.0</Fire_Cone_Width>
+<Fire_Cone_Height>90.0</Fire_Cone_Height>
+</HardPoint>
+</PrefetchHardpoints>

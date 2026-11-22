@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<PrefetchUnits>
+<SpaceUnit Name="Prv_Prefetch_Unit">
+<Text_ID>TEXT_NONE</Text_ID>
+<Space_Model_Name>Rv_corvette.alo</Space_Model_Name>
+<Scale_Factor>1.0</Scale_Factor>
+<Tactical_Health>100</Tactical_Health>
+<HardPoints>HP_Prv_Prefetch_A</HardPoints>
+</SpaceUnit>
+<!-- The wreck the hardpoint sheds: a model of its own, which no part of the unit draws. -->
+<SpaceProp Name="Prv_Prefetch_Wreck">
+<Text_ID>TEXT_NONE</Text_ID>
+<Space_Model_Name>Ev_bike.alo</Space_Model_Name>
+<Scale_Factor>1.0</Scale_Factor>
+<Tactical_Health>100</Tactical_Health>
+<SpaceBehavior>DEBRIS</SpaceBehavior>
+<Debris_Movement_Vector>-0.2, 0.0, -0.5</Debris_Movement_Vector>
+<Debris_Facing_Rotate_Vector>0.9, 0.4, 0.3</Debris_Facing_Rotate_Vector>
+<Debris_Min_Lifetime_Seconds>15.0</Debris_Min_Lifetime_Seconds>
+<Debris_Max_Lifetime_Seconds>25.0</Debris_Max_Lifetime_Seconds>
+<Remove_Upon_Death>true</Remove_Upon_Death>
+</SpaceProp>
+</PrefetchUnits>
