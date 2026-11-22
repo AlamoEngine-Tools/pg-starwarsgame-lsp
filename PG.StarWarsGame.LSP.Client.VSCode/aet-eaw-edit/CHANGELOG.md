@@ -54,6 +54,14 @@
 
 ### Fixes
 
+- **A hardpoint's wreck drifts and turns as the game moves it** - the preview applied a prop's
+  `Debris_Movement_Vector` in the model's own axes, so the four weapon wrecks of the Star Destroyer all slid
+  across the hull towards its centreline. The game adds the vector to the wreck's position in world axes every
+  logic frame, whatever way the ship heads, so the same prop leaves a ship outwards at one heading and inwards
+  at the opposite one; the previewed ship stands at facing 0, heading along world +X, and a wreck drifts from
+  it as it does from such a ship in the game. `Debris_Facing_Rotate_Vector` is added to the wreck's three
+  facing angles - a roll about the heading, a pitch, a yaw - where the preview had the pitch and the yaw
+  changed places, and a wreck starts standing as the ship does, not as the bone its hardpoint hung on
 - **A part is drawn only when everything that decides it shows it** - the preview took the first rule with an
   opinion on a part, so a playing clip showed a mesh the model file hides, marker plates included, and a part
   of another damage or detail level, and a clip that hid a bone took every part below it along. The game asks

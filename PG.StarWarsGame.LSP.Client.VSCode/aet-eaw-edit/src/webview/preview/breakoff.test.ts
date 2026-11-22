@@ -7,10 +7,12 @@ import { describe, it } from "node:test";
 import type {
     PreviewBreakoffProp,
     PreviewHardpoint,
+    PreviewVector3,
 } from "../../protocol/modelPreview";
 
 import {
     ALAMO_FRAME_SECONDS,
+    type BreakoffOrientation,
     breakoffAnchor,
     breakoffFor,
     breakoffLifetime,
@@ -123,55 +125,161 @@ describe("breakoffPose", () => {
     // 600-unit hull ten units over its whole 20-second life - visually stationary.
     const perSecond = 1 / ALAMO_FRAME_SECONDS;
 
+    /** A vector turned by a quaternion: what the wreck's orientation does to one of its own axes. */
+    function turned(q: BreakoffOrientation, v: PreviewVector3): PreviewVector3 {
+        const tx = 2 * (q.y * v.z - q.z * v.y);
+        const ty = 2 * (q.z * v.x - q.x * v.z);
+        const tz = 2 * (q.x * v.y - q.y * v.x);
+
+        return {
+            x: v.x + q.w * tx + (q.y * tz - q.z * ty),
+            y: v.y + q.w * ty + (q.z * tx - q.x * tz),
+            z: v.z + q.w * tz + (q.x * ty - q.y * tx),
+        };
+    }
+
+    function near(actual: PreviewVector3, expected: PreviewVector3): void {
+        const off = Math.max(
+            Math.abs(actual.x - expected.x),
+            Math.abs(actual.y - expected.y),
+            Math.abs(actual.z - expected.z),
+        );
+        assert.ok(
+            off < 1e-6,
+            `expected ${JSON.stringify(expected)}, was ${JSON.stringify(actual)}`,
+        );
+    }
+
+    /** A prop that drifts or turns by one vector a frame and does nothing else. */
+    function prop(
+        movementVector: PreviewVector3 | null,
+        facingRotateVector: PreviewVector3 | null = null,
+    ): PreviewBreakoffProp {
+        return { ...PROP, movementVector, facingRotateVector };
+    }
+
+    // The scene's axes on a ship at facing 0: X is its left, Y is up, Z is its bow.
+    const LEFT = { x: 1, y: 0, z: 0 };
+    const UP = { x: 0, y: 1, z: 0 };
+    const BOW = { x: 0, y: 0, z: 1 };
+    // The wreck's own axes, as its file has them: Alamo's, with the bow down -Y and up along Z.
+    const FILE_LEFT = { x: 1, y: 0, z: 0 };
+    const FILE_BOW = { x: 0, y: -1, z: 0 };
+    const FILE_UP = { x: 0, y: 0, z: 1 };
+
     it("drifts along the movement vector, in units per logic frame", () => {
         const pose = breakoffPose(PROP, 2);
 
-        // The prop declares -20 on ALAMO Y, which is glTF -Z: `(x, y, z) -> (x, z, -y)`.
-        assert.equal(pose.offset.x, 0);
-        assert.equal(pose.offset.y, 0);
-        assert.ok(Math.abs(pose.offset.z - 20 * 2 * perSecond) < 1e-6);
-    });
-
-    it("turns on the facing vector, in degrees per logic frame", () => {
-        const pose = breakoffPose(PROP, 2);
-
-        // 90 about ALAMO Z - the up axis - is 90 about glTF Y.
-        assert.ok(Math.abs(pose.rotation.y - 90 * 2 * perSecond) < 1e-6);
+        // The prop declares -20 on world Y, which is the right of a ship at facing 0.
+        near(pose.offset, { x: -20 * 2 * perSecond, y: 0, z: 0 });
     });
 
     /**
-     * The declared vectors are in ALAMO axes, where Z is up; the scene runs in the model's glTF
-     * space, where Y is. Applied raw, a piece told to fall DOWNWARD slid sideways instead - which
-     * is the same axis confusion that `accelerationIn` exists for on the particle side.
+     * The game adds the vector to the wreck's WORLD position, whatever way the ship heads, and a
+     * ship at facing 0 heads along world +X. Applied in the model's own axes instead - which is the
+     * game at a heading of 270 - the Star Destroyer's four weapon wrecks all slid across the hull
+     * towards its centreline.
      */
-    it("turns the Alamo up axis into the glTF one", () => {
-        const up = {
-            ...PROP,
-            movementVector: { x: 0, y: 0, z: 1 },
-            facingRotateVector: null,
-        };
-
-        const pose = breakoffPose(up, ALAMO_FRAME_SECONDS);
-
-        assert.ok(Math.abs(pose.offset.y - 1) < 1e-6, `y was ${pose.offset.y}`);
-        assert.equal(pose.offset.x, 0);
-        assert.equal(pose.offset.z, 0);
+    it("drifts along world X towards the bow of a ship at facing 0", () => {
+        near(
+            breakoffPose(prop({ x: 1, y: 0, z: 0 }), ALAMO_FRAME_SECONDS)
+                .offset,
+            BOW,
+        );
     });
 
-    it("flips the Alamo depth axis, which is what sent debris the wrong way", () => {
-        const forward = {
-            ...PROP,
-            movementVector: { x: 0, y: 1, z: 0 },
-            facingRotateVector: null,
-        };
-
-        const pose = breakoffPose(forward, ALAMO_FRAME_SECONDS);
-
-        assert.ok(
-            Math.abs(pose.offset.z - -1) < 1e-6,
-            `z was ${pose.offset.z}`,
+    it("drifts along world Y towards the left of a ship at facing 0", () => {
+        near(
+            breakoffPose(prop({ x: 0, y: 1, z: 0 }), ALAMO_FRAME_SECONDS)
+                .offset,
+            LEFT,
         );
-        assert.equal(pose.offset.y, 0);
+    });
+
+    it("drifts along world Z upwards", () => {
+        near(
+            breakoffPose(prop({ x: 0, y: 0, z: 1 }), ALAMO_FRAME_SECONDS)
+                .offset,
+            UP,
+        );
+    });
+
+    it("sends the Star Destroyer's front left wreck astern and down, not across the hull", () => {
+        const pose = breakoffPose(
+            prop({ x: -0.2, y: 0, z: -0.5 }),
+            ALAMO_FRAME_SECONDS,
+        );
+
+        near(pose.offset, { x: 0, y: -0.5, z: -0.2 });
+    });
+
+    /**
+     * The game creates the wreck with its PARENT's facing, not with the orientation of the bone
+     * the hardpoint hung on, so it starts standing exactly as the ship does.
+     */
+    it("stands as the ship does at the moment it breaks off", () => {
+        const pose = breakoffPose(PROP, 0);
+
+        near(pose.offset, { x: 0, y: 0, z: 0 });
+        near(turned(pose.orientation, FILE_LEFT), LEFT);
+        near(turned(pose.orientation, FILE_BOW), BOW);
+        near(turned(pose.orientation, FILE_UP), UP);
+    });
+
+    it("turns on the facing vector, in degrees per logic frame", () => {
+        // 90 a frame about Z: half a frame is 45 degrees, flat.
+        const pose = breakoffPose(PROP, ALAMO_FRAME_SECONDS / 2);
+        const half = Math.SQRT1_2;
+
+        near(turned(pose.orientation, FILE_UP), UP);
+        near(turned(pose.orientation, FILE_BOW), { x: half, y: 0, z: half });
+    });
+
+    /**
+     * The three numbers are added to the wreck's three facing angles. The Z angle is a turn about
+     * the up axis, the Y angle a pitch about the left axis, the X angle a roll about the heading.
+     * Fed to the wreck's own axes after being turned into the scene's, the Y and Z rates changed
+     * places: a wreck told to yaw flat tumbled end over end instead.
+     */
+    it("yaws flat on the Z angle, from the bow towards the left", () => {
+        const pose = breakoffPose(
+            prop(null, { x: 0, y: 0, z: 90 }),
+            ALAMO_FRAME_SECONDS,
+        );
+
+        near(turned(pose.orientation, FILE_UP), UP);
+        near(turned(pose.orientation, FILE_BOW), LEFT);
+    });
+
+    it("pitches on the Y angle, about the left axis", () => {
+        const pose = breakoffPose(
+            prop(null, { x: 0, y: 90, z: 0 }),
+            ALAMO_FRAME_SECONDS,
+        );
+
+        near(turned(pose.orientation, FILE_LEFT), LEFT);
+        near(turned(pose.orientation, FILE_UP), BOW);
+    });
+
+    it("rolls on the X angle, about the heading", () => {
+        const pose = breakoffPose(
+            prop(null, { x: 90, y: 0, z: 0 }),
+            ALAMO_FRAME_SECONDS,
+        );
+
+        near(turned(pose.orientation, FILE_BOW), BOW);
+        near(turned(pose.orientation, FILE_UP), { x: -1, y: 0, z: 0 });
+    });
+
+    it("applies the roll first, the pitch second and the yaw last", () => {
+        const pose = breakoffPose(
+            prop(null, { x: 0, y: 90, z: 90 }),
+            ALAMO_FRAME_SECONDS,
+        );
+
+        // Pitched, the wreck's up points at the bow; yawed after that, at the left. The other way
+        // round the yaw would leave its up alone and the pitch would put it on the bow.
+        near(turned(pose.orientation, FILE_UP), LEFT);
     });
 
     it("reads the frame length off the engine, not off a guess", () => {
@@ -182,22 +290,11 @@ describe("breakoffPose", () => {
     it("sits still where the prop declares no motion", () => {
         // A prop with no vectors is debris that simply stays where the hardpoint was, which is a
         // perfectly ordinary thing to author.
-        const still = {
-            ...PROP,
-            movementVector: null,
-            facingRotateVector: null,
-        };
-        const pose = breakoffPose(still, 5);
+        const pose = breakoffPose(prop(null), 5);
 
         assert.deepEqual(pose.offset, { x: 0, y: 0, z: 0 });
-        assert.deepEqual(pose.rotation, { x: 0, y: 0, z: 0 });
-    });
-
-    it("is at the hardpoint at the moment it breaks off", () => {
-        const pose = breakoffPose(PROP, 0);
-
-        assert.deepEqual(pose.offset, { x: 0, y: 0, z: 0 });
-        assert.deepEqual(pose.rotation, { x: 0, y: 0, z: 0 });
+        near(turned(pose.orientation, FILE_BOW), BOW);
+        near(turned(pose.orientation, FILE_UP), UP);
     });
 });
 
