@@ -568,6 +568,29 @@ export function tailGeometry(
 const QUAD_CORNERS = [-1, -1, 1, -1, 1, 1, -1, 1];
 
 /**
+ * Marks the first `items` of an attribute for the graphics card, and nothing when there are none.
+ *
+ * An attribute marked without a range is copied whole, and these are sized for the particle
+ * ceiling: measured on a mod's capital ship, 4,840 emitters with nothing alive copied room for
+ * 5,003 particles each, every frame, and the preview drew at 9 frames a second. The range is set
+ * afresh each time, because an emitter that is stepped and not drawn never has its ranges taken off.
+ */
+function markWritten(
+    geometry: THREE.BufferGeometry,
+    name: string,
+    items: number,
+): void {
+    if (items <= 0) {
+        return;
+    }
+
+    const attribute = geometry.attributes[name] as THREE.BufferAttribute;
+    attribute.clearUpdateRanges();
+    attribute.addUpdateRange(0, items * attribute.itemSize);
+    attribute.needsUpdate = true;
+}
+
+/**
  * The sampler names the engine's particle effects read the colour sheet and the second texture
  * through. The second texture is one chunk of the file: the bump effects read it as the normal map,
  * the depth sprites as the depth map.
@@ -650,7 +673,7 @@ class EngineDraw {
     written(count: number): void {
         this.geometry.setDrawRange(0, count * 6);
         for (const name of ["position", "color", "uv"]) {
-            this.geometry.attributes[name].needsUpdate = true;
+            markWritten(this.geometry, name, count * 4);
         }
     }
 
@@ -1725,7 +1748,7 @@ class EmitterRenderer {
             "iFrame",
         ];
         for (const name of tailed ? [...written, "iStretch"] : written) {
-            this.geometry.attributes[name].needsUpdate = true;
+            markWritten(this.geometry, name, count);
         }
     }
 

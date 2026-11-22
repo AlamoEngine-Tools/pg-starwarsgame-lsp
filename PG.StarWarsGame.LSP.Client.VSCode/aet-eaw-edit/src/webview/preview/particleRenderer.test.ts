@@ -1653,6 +1653,42 @@ describe("engine effects", () => {
             "p_asteroid_n.tga",
         ]);
     });
+
+    // The quads are built for the particle ceiling; what is alive is a handful of them.
+    it("marks only the live particles' corners for the graphics card", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        instance.update(0.5, viewFrom(100));
+        const live = instance.emitterParticles(0).length;
+
+        assert.ok(live > 0, "nothing spawned, so the test proves nothing");
+        assert.deepEqual(attribute(instance, "position").updateRanges, [
+            { start: 0, count: live * 4 * 3 },
+        ]);
+        assert.deepEqual(attribute(instance, "color").updateRanges, [
+            { start: 0, count: live * 4 * 4 },
+        ]);
+        assert.deepEqual(attribute(instance, "uv").updateRanges, [
+            { start: 0, count: live * 4 * 2 },
+        ]);
+    });
+
+    it("marks nothing for the graphics card while nothing is alive", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([still({ particlesPerSecond: 0 })]),
+            ),
+        );
+        instance.update(0.5, viewFrom(100));
+        instance.update(0.5, viewFrom(100));
+
+        assert.equal(instance.emitterParticles(0).length, 0);
+        for (const name of ["position", "color", "uv"]) {
+            assert.equal(attribute(instance, name).version, 0, name);
+        }
+    });
 });
 
 describe("heat particles", () => {
@@ -2295,5 +2331,96 @@ describe("weather emitters", () => {
             instance.emitterMesh(0)!.geometry.getAttribute("iRotation")
                 .array[0];
         assert.notEqual(turnsOf(windy), turnsOf(calm));
+    });
+});
+
+/**
+ * Every emitter's buffers are sized for the particle ceiling, and an attribute marked without a range
+ * is copied whole. Measured on a mod's capital ship after its hardpoints blew up: 4,840 emitters with
+ * nothing alive, each copying room for 5,003 particles every frame, drew at 9 frames a second.
+ */
+describe("what an emitter copies to the graphics card", () => {
+    const WRITTEN = [
+        "iOffset",
+        "iColor",
+        "iAlpha",
+        "iSize",
+        "iRotation",
+        "iFrame",
+    ];
+
+    function running(
+        over: Partial<AlamoEmitterProperties> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "smoke",
+                    properties: properties({
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                        ...over,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    const attribute = (
+        instance: ParticleSystemInstance,
+        name: string,
+    ): THREE.BufferAttribute =>
+        instance
+            .emitterMesh(0)!
+            .geometry.getAttribute(name) as THREE.BufferAttribute;
+
+    it("marks only the live particles", () => {
+        const instance = running();
+        instance.update(0.5);
+        const live = instance.emitterParticles(0).length;
+
+        assert.ok(live > 0, "nothing spawned, so the test proves nothing");
+        for (const name of WRITTEN) {
+            const written = attribute(instance, name);
+            assert.deepEqual(
+                written.updateRanges,
+                [{ start: 0, count: live * written.itemSize }],
+                name,
+            );
+        }
+    });
+
+    // A hidden emitter is stepped and never drawn, so nothing takes its ranges off it.
+    it("keeps one range however many frames go by undrawn", () => {
+        const instance = running();
+        instance.update(0.5);
+        instance.update(0.5);
+        const live = instance.emitterParticles(0).length;
+
+        assert.deepEqual(attribute(instance, "iOffset").updateRanges, [
+            { start: 0, count: live * 3 },
+        ]);
+    });
+
+    it("marks nothing while nothing is alive", () => {
+        const instance = running({ particlesPerSecond: 0 });
+        instance.update(0.5);
+        instance.update(0.5);
+
+        assert.equal(instance.emitterParticles(0).length, 0);
+        for (const name of [...WRITTEN, "iStretch"]) {
+            assert.equal(attribute(instance, name).version, 0, name);
+        }
+    });
+
+    it("marks the stretch too for an emitter with a tail", () => {
+        const instance = running({ hasTail: true });
+        instance.update(0.5);
+        const live = instance.emitterParticles(0).length;
+
+        assert.deepEqual(attribute(instance, "iStretch").updateRanges, [
+            { start: 0, count: live },
+        ]);
     });
 });

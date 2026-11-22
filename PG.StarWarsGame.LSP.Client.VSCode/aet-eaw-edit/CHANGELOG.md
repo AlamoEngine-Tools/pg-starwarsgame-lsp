@@ -177,6 +177,10 @@
   two mod models of 149 MB and 193 MB, the preview's memory after the load fell from 250 MB to 188 MB and
   from 258 MB to 177 MB
   ([#442](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/442))
+- **Spent particle systems no longer slow the preview** - every particle emitter copied room for 5,003
+  particles to the graphics card on every frame, whatever was alive. Measured on a mod's capital ship with
+  every hardpoint destroyed - 4,840 emitters and nothing alive - the preview drew at 9 frames a second and
+  now draws at 53. An emitter copies the particles it has, and nothing when it has none
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the
