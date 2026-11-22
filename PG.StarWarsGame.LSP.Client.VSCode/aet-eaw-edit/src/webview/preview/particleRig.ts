@@ -247,6 +247,10 @@ export class ParticleRig {
     ): void {
         // Always the Gameplay lens's. A one-shot IS an event - a hardpoint blowing up - and an
         // event is never something the model declares.
+        //
+        // Marked first, so it is born knowing what it is: a one-shot is never held for its part
+        // being off screen - see `addParticleSystem`.
+        this.transient.add(id);
         this.addParticleSystem(id, system, {
             origin: "gameplay",
             attachToPartId,
@@ -254,7 +258,6 @@ export class ParticleRig {
             scaleFactor,
             at,
         });
-        this.transient.add(id);
     }
 
     /**
@@ -313,7 +316,14 @@ export class ParticleRig {
         // Held from birth when it is attached to something already off screen: a death clone's effects
         // attach while the clone is still hidden, and a one-shot that runs there is spent before
         // anyone sees it.
+        //
+        // Not an effect played once by an event. That is the other way round: it belongs to a unit
+        // on screen, and the unit hides its hull the moment it dies - destroying the last hardpoint
+        // does both at once. MEASURED on a mod's capital ship: all 145 explosions of a unit
+        // destroyed at once were held here, never played and never left, and went off together
+        // when the unit was repaired.
         if (
+            !this.transient.has(id) &&
             attachToPartId !== undefined &&
             this.context.assembly.hiddenParts.has(attachToPartId)
         ) {
@@ -582,10 +592,14 @@ export class ParticleRig {
         const hidden = this.context.assembly.hiddenParts.has(partId);
         let any = false;
 
-        for (const entry of this.particleSystems.values()) {
+        for (const [id, entry] of this.particleSystems) {
             if (entry.attachToPartId === partId) {
-                entry.instance.hold("part", hidden);
                 any = true;
+
+                // An explosion already going off plays out: see `addParticleSystem`.
+                if (!this.transient.has(id)) {
+                    entry.instance.hold("part", hidden);
+                }
             }
         }
 

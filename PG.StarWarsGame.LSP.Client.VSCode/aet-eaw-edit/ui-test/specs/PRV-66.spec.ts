@@ -3,7 +3,9 @@
 // ship - and its textures only after that, so the explosion arrived seconds after the press. The Star
 // Destroyer's hardpoints all name one explosion and a wreck that trails fire: destroying every one of them
 // asks the server for no particle system, no texture and no effect, and is sent no wreck's model: each was
-// sent with the unit. And none of it runs before it is started.
+// sent with the unit. And none of it runs before it is started. Destroying every hardpoint kills the unit,
+// which hides its hull: the explosions play all the same and leave when they have burnt out, where they
+// were held on the hidden hull, unplayed, until the unit was repaired.
 import { browser, expect } from "@wdio/globals";
 import { command, serverReady } from "../protocol.js";
 import { press } from "./preview.js";
@@ -54,6 +56,33 @@ async function startedEffects(): Promise<string[]> {
             }
         ).aetDebugViewport.particles;
         return [...rig.particleSystems].filter(([, entry]) => entry.origin === "gameplay").map(([id]) => id);
+    });
+}
+
+/** The explosions in the scene and the particles they have in the air. Run inside the preview. */
+async function explosionsNow(): Promise<{ count: number; live: number }> {
+    return browser.execute(() => {
+        const rig = (
+            window as unknown as {
+                aetDebugViewport: {
+                    particles: {
+                        particleSystems: Map<
+                            string,
+                            { instance: { emitters: { particles: unknown[] }[] } }
+                        >;
+                    };
+                };
+            }
+        ).aetDebugViewport.particles;
+        let count = 0;
+        let live = 0;
+        for (const [id, entry] of rig.particleSystems) {
+            if (id.startsWith("explosion:")) {
+                count++;
+                live += entry.instance.emitters.reduce((sum, e) => sum + e.particles.length, 0);
+            }
+        }
+        return { count, live };
     });
 }
 
@@ -112,16 +141,22 @@ describe("PRV-66", () => {
             // since each leaves once it has burnt out.
             let explosions = 0;
             let dropped = 0;
+            let live = 0;
             for (let i = 0; i < 24; i++) {
                 await pause(500);
                 const started = await startedEffects();
                 explosions = Math.max(explosions, started.filter((id) => id.startsWith("explosion:")).length);
                 dropped = Math.max(dropped, await wrecks());
+                live = Math.max(live, (await explosionsNow()).live);
             }
             const answers = await browser.execute(() => (window as Watched).__prv66!);
-            console.log("PRV-66 destroyed: " + JSON.stringify({ explosions, dropped, ...answers }));
+            // The hardpoints' explosions, not a wreck's own: those go off when the wreck burns out, later.
+            const left = (await startedEffects()).filter((id) => id.startsWith("explosion:HP_")).length;
+            console.log("PRV-66 destroyed: " + JSON.stringify({ explosions, live, left, dropped, ...answers }));
 
             expect(explosions).toBeGreaterThan(0);
+            expect(live).toBeGreaterThan(0);
+            expect(left).toBe(0);
             expect(dropped).toBeGreaterThan(0);
             expect(answers.systems).toBe(0);
             expect(answers.textures).toBe(0);

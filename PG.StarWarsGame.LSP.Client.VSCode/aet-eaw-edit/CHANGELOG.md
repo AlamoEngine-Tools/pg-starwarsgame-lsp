@@ -189,6 +189,12 @@
   hardpoints destroyed at once: 145 requests and 15.6 MB of textures after the press became none, and the
   explosions were in the scene after 5.4 seconds instead of 13.3. An explosion answered more than once no
   longer leaves a copy of itself at the centre of the scene
+- **A hardpoint's explosion plays when the unit dies with it** - destroying the last hardpoint kills the unit
+  and hides its hull, and an explosion on a hidden hull was held: it never played, never left the scene, and
+  went off when the unit was repaired. Measured on a mod's capital ship with 145 hardpoints destroyed at once:
+  no explosion played, all 145 went off together on the repair, and destroying them a second time added 145
+  more - the preview's memory grew from 1.4 GB to 2.4 GB. An explosion now plays where its bone is and leaves
+  when it has burnt out, and a second round holds no more than the first
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

@@ -20,8 +20,11 @@ import { TextureStore } from "./textureStore";
 function rigWith(anchor?: THREE.Object3D): {
     particles: ParticleRig;
     modelRoot: THREE.Group;
+    /** The parts that are off screen: add an id to hide that part. */
+    hidden: Set<string>;
 } {
     const modelRoot = new THREE.Group();
+    const hidden = new Set<string>();
     if (anchor !== undefined) {
         modelRoot.add(anchor);
     }
@@ -37,7 +40,7 @@ function rigWith(anchor?: THREE.Object3D): {
         parts: new Map(),
         textures: new TextureStore(),
         assembly: {
-            hiddenParts: new Set(),
+            hiddenParts: hidden,
             attachmentFor: () => anchor ?? modelRoot,
             partRootOf: () => null,
         },
@@ -50,7 +53,7 @@ function rigWith(anchor?: THREE.Object3D): {
         // Every system here is the scene's own, drawn as it is.
         animation: { lookOf: () => PLAIN_LOOK },
     });
-    return { particles: new ParticleRig(context), modelRoot };
+    return { particles: new ParticleRig(context), modelRoot, hidden };
 }
 
 const systemsUnder = (root: THREE.Object3D): number =>
@@ -354,6 +357,102 @@ describe("ParticleRig", () => {
 
         restore();
         assert.equal(particles.particlesVisible, true);
+    });
+});
+
+/**
+ * What a hidden part does to the effects on it.
+ *
+ * A death clone is loaded ahead of the death and kept off screen, and its effects wait with it. An
+ * explosion is not one of those: it is an event of the unit that set it off, and the unit hides its
+ * hull the moment it dies. MEASURED on a mod's capital ship: 145 hardpoints destroyed at once killed
+ * the unit, every explosion was held on the hidden hull, none played and none left - and all 145
+ * went off together when the unit was repaired.
+ */
+describe("ParticleRig on a part that is off screen", () => {
+    /** One burst of five sparks that live a fifth of a second: over within ten frames. */
+    const blast = (): ReturnType<typeof testSystem> =>
+        testSystem([
+            emitter({
+                name: "Blast",
+                properties: properties({
+                    useBursts: true,
+                    burstCount: 1,
+                    particlesPerBurst: 5,
+                    burstDelay: 0,
+                    lifetime: 0.2,
+                }),
+            }),
+        ]);
+
+    /** The most particles a system had in the air over `frames` steps, while it was in the scene. */
+    const peak = (
+        particles: ParticleRig,
+        id: string,
+        frames: number,
+    ): number => {
+        let most = 0;
+        for (let at = 0; at < frames; at++) {
+            particles.step(1 / 30, new THREE.Matrix4());
+            const entry = particles.particleSystems.get(id);
+            if (entry === undefined) {
+                break;
+            }
+            most = Math.max(most, entry.instance.emitterParticles(0).length);
+        }
+        return most;
+    };
+
+    it("holds a system added on a hidden part until the part is shown", () => {
+        const { particles, hidden } = rigWith();
+        hidden.add("clone");
+
+        particles.addParticleSystem("fx", blast(), {
+            origin: "model",
+            attachToPartId: "clone",
+        });
+
+        assert.equal(peak(particles, "fx", 15), 0);
+
+        hidden.delete("clone");
+        particles.holdEffectsOf("clone");
+
+        assert.ok(peak(particles, "fx", 15) > 0);
+    });
+
+    it("plays a one-shot started on a hidden part, and lets it go when it has burnt out", () => {
+        const { particles, hidden } = rigWith();
+        hidden.add("hull");
+
+        particles.playOnce("explosion:a", blast(), "hull", "HP_A");
+
+        assert.ok(peak(particles, "explosion:a", 30) > 0);
+        assert.equal(particles.particleSystems.has("explosion:a"), false);
+    });
+
+    it("goes on playing a one-shot whose part is hidden while it plays", () => {
+        const { particles, hidden } = rigWith();
+        particles.playOnce("explosion:a", blast(), "hull", "HP_A");
+
+        hidden.add("hull");
+        particles.holdEffectsOf("hull");
+
+        assert.ok(peak(particles, "explosion:a", 30) > 0);
+        assert.equal(particles.particleSystems.has("explosion:a"), false);
+    });
+
+    it("still holds what the part carries beside the one-shot", () => {
+        const { particles, hidden } = rigWith();
+        particles.addParticleSystem("smoke", fire(), {
+            origin: "model",
+            attachToPartId: "hull",
+        });
+        particles.playOnce("explosion:a", blast(), "hull", "HP_A");
+
+        hidden.add("hull");
+        assert.equal(particles.holdEffectsOf("hull"), true);
+
+        assert.equal(Math.max(...run(particles, "smoke", 15)), 0);
     });
 });
 
