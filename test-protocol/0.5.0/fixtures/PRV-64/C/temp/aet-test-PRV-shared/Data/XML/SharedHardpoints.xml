@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<SharedHardpoints>
+<!-- Two hardpoints attaching one model file, the hull's own: three parts of one model. -->
+<HardPoint Name="HP_Prv_Shared_A">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>No</Is_Targetable>
+<Is_Destroyable>No</Is_Destroyable>
+<Model_To_Attach>Rv_corvette.alo</Model_To_Attach>
+<Attachment_Bone>MuzzleA_00</Attachment_Bone>
+<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
+<Fire_Bone_B>MuzzleA_00</Fire_Bone_B>
+<Fire_Cone_Width>90.0</Fire_Cone_Width>
+<Fire_Cone_Height>90.0</Fire_Cone_Height>
+</HardPoint>
+<HardPoint Name="HP_Prv_Shared_B">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>No</Is_Targetable>
+<Is_Destroyable>No</Is_Destroyable>
+<Model_To_Attach>Rv_corvette.alo</Model_To_Attach>
+<Attachment_Bone>MuzzleA_01</Attachment_Bone>
+<Fire_Bone_A>MuzzleA_01</Fire_Bone_A>
+<Fire_Bone_B>MuzzleA_01</Fire_Bone_B>
+<Fire_Cone_Width>90.0</Fire_Cone_Width>
+<Fire_Cone_Height>90.0</Fire_Cone_Height>
+</HardPoint>
+<!-- Two more attaching another model. The unit does not list them: the spec swaps them in, so the
+     preview meets a model it does not hold, named by two parts at once. -->
+<HardPoint Name="HP_Prv_Shared_C">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>No</Is_Targetable>
+<Is_Destroyable>No</Is_Destroyable>
+<Model_To_Attach>Ev_bike.alo</Model_To_Attach>
+<Attachment_Bone>MuzzleA_00</Attachment_Bone>
+<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
+<Fire_Bone_B>MuzzleA_00</Fire_Bone_B>
+<Fire_Cone_Width>90.0</Fire_Cone_Width>
+<Fire_Cone_Height>90.0</Fire_Cone_Height>
+</HardPoint>
+<HardPoint Name="HP_Prv_Shared_D">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>No</Is_Targetable>
+<Is_Destroyable>No</Is_Destroyable>
+<Model_To_Attach>Ev_bike.alo</Model_To_Attach>
+<Attachment_Bone>MuzzleA_01</Attachment_Bone>
+<Fire_Bone_A>MuzzleA_01</Fire_Bone_A>
+<Fire_Bone_B>MuzzleA_01</Fire_Bone_B>
+<Fire_Cone_Width>90.0</Fire_Cone_Width>
+<Fire_Cone_Height>90.0</Fire_Cone_Height>
+</HardPoint>
+</SharedHardpoints>

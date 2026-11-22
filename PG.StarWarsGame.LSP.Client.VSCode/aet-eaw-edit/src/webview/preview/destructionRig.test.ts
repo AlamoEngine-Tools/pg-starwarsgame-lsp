@@ -13,6 +13,7 @@ import {
     BREAKOFF_ATTACHMENT,
     type LoadedPart,
 } from "./loadedPart";
+import { type ParsedModel } from "./parsedModel";
 import { standInContext } from "./viewportContext.testing";
 
 const PROP: PreviewBreakoffProp = {
@@ -67,7 +68,7 @@ function rigWith(modelScale = 1): {
             attachmentFor: () => bone,
             addPart: async (
                 id: string,
-                _glb: Uint8Array,
+                _model: unknown,
                 _to?: string,
                 _bone?: string,
                 options?: {
@@ -117,15 +118,19 @@ function rigWith(modelScale = 1): {
 }
 
 describe("DestructionRig", () => {
-    /** The stand-in assembly never parses it. */
-    const GLB = new Uint8Array(0);
+    /** The stand-in assembly never copies it. */
+    const MODEL: ParsedModel = {
+        scene: new THREE.Group(),
+        clips: [],
+        visibility: new Map(),
+    };
 
     it("loads a wreck as a subject of its own, where its bone is", async () => {
         const { destruction, added } = rigWith();
 
         await destruction.addBreakoff(
             "HP_1",
-            GLB,
+            MODEL,
             { partId: "hull", bone: "HP_Bone", boneIndex: 3 },
             PROP,
         );
@@ -141,7 +146,7 @@ describe("DestructionRig", () => {
         const { destruction, expired, wreck } = rigWith();
         await destruction.addBreakoff(
             "HP_1",
-            GLB,
+            MODEL,
             { partId: "hull", bone: "HP_Bone", boneIndex: 3 },
             PROP,
         );
@@ -157,8 +162,8 @@ describe("DestructionRig", () => {
 
     it("takes a wreck out through the assembly when it is cleared", async () => {
         const { destruction, removed } = rigWith();
-        await destruction.addBreakoff("HP_1", GLB, { partId: "hull" }, PROP);
-        await destruction.addBreakoff("HP_2", GLB, { partId: "hull" }, PROP);
+        await destruction.addBreakoff("HP_1", MODEL, { partId: "hull" }, PROP);
+        await destruction.addBreakoff("HP_2", MODEL, { partId: "hull" }, PROP);
 
         destruction.clearBreakoff("HP_1");
         assert.deepEqual(removed, [`${BREAKOFF_ATTACHMENT}HP_1`]);

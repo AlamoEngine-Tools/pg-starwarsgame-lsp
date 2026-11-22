@@ -169,6 +169,14 @@
   error stays for one that names a model, which the game never attaches, and for one with no fire bone
   either, which the game places at the map origin; each message now says which of the two it is
   ([#466](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/466))
+- **The preview holds each model once** - once a unit was drawn, its preview kept every model twice: the
+  bytes it arrived as, for a refresh, and the vertex data read from them. A model named by several parts -
+  twenty turrets of one file - was read and held once more for each of them, and every refresh read all of
+  it again. A model is now read once and its bytes are let go; the hull, each hardpoint's model and each
+  wreck of that file draw from the one reading, and a refresh after an XML edit reads nothing. Measured on
+  two mod models of 149 MB and 193 MB, the preview's memory after the load fell from 250 MB to 188 MB and
+  from 258 MB to 177 MB
+  ([#442](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/442))
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

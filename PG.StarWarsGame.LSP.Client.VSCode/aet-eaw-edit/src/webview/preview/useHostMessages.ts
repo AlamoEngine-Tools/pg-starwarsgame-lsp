@@ -25,6 +25,7 @@ import { type ModelPreviewToWebview } from "../../protocol/panels/modelPreview";
 import { isSubjectSystem, type LoadTally } from "./loadProgress";
 import { modelRequestsOf } from "./modelStore";
 import { particleNotices, withParticleNotices } from "./particleNotices";
+import type { ParsedModel } from "./parsedModel";
 import { heldModels, post } from "./previewPost";
 import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
 import { type CloneDeath } from "./deathClone";
@@ -354,12 +355,38 @@ export function useHostMessages({
                         return;
                     }
 
-                    // The bytes this reply stands for: the ones it carries, or the ones kept from
-                    // the scene before when the server says the model did not change.
+                    // The model this reply stands for: the one read from the bytes it carries, or
+                    // the one kept from the scene before when the server says the model did not
+                    // change.
                     const taken = heldModels.take(message);
-                    const glb = taken?.bytes ?? null;
 
-                    if (glb === null) {
+                    // The parts that asked for this model while the reply was due sent no request
+                    // of their own: this reply is each one's answer, handled as if it had come for
+                    // that part - the same model, or the same nothing, without the error said again.
+                    // Numbered now, so a scene arriving during the reading overtakes them like any
+                    // other reply; started behind the reading, so the part that asked first is added
+                    // first.
+                    const waiting = heldModels
+                        .answeredWith(message.partId)
+                        .map((part) => ({
+                            ...message,
+                            partId: part.partId,
+                            request: heldModels.requestOf(part.partId),
+                            attachToPartId: part.attachToPartId,
+                            attachBone: part.attachBone,
+                            data: null,
+                            error: null,
+                        }));
+                    let model: ParsedModel | null;
+                    try {
+                        model = taken === null ? null : await taken.model;
+                    } finally {
+                        for (const reply of waiting) {
+                            void onMessage(reply);
+                        }
+                    }
+
+                    if (model === null) {
                         const error = message.error ?? null;
                         if (error !== null) {
                             setProblems((current) => [
@@ -401,7 +428,7 @@ export function useHostMessages({
                         if (pending !== undefined) {
                             await viewport.addBreakoff(
                                 pending.id,
-                                glb,
+                                model,
                                 pending.at,
                                 pending.prop,
                             );
@@ -446,7 +473,7 @@ export function useHostMessages({
                         // not reach it by mesh name.
                         await viewport.addPart(
                             message.partId,
-                            glb,
+                            model,
                             undefined,
                             undefined,
                             {
@@ -494,7 +521,7 @@ export function useHostMessages({
 
                     await viewport.addPart(
                         message.partId,
-                        glb,
+                        model,
                         message.attachToPartId ?? undefined,
                         message.attachBone ?? undefined,
                     );

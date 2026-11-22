@@ -16,6 +16,7 @@ import {
     breakoffPose,
 } from "./breakoff";
 import { BREAKOFF_ATTACHMENT } from "./loadedPart";
+import { type ParsedModel } from "./parsedModel";
 import { disposeTree } from "./partAssembly";
 import { spinAwayPose } from "./spinAway";
 import { type ViewportContext } from "./viewportContext";
@@ -95,7 +96,7 @@ export class DestructionRig {
      */
     async addBreakoff(
         key: string,
-        glb: Uint8Array,
+        model: ParsedModel,
         at: BreakoffAnchor,
         prop: PreviewBreakoffProp,
     ): Promise<void> {
@@ -117,7 +118,7 @@ export class DestructionRig {
 
         const root = await this.context.assembly.addPart(
             wreckId,
-            glb,
+            model,
             undefined,
             undefined,
             {

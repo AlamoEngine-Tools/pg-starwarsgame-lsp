@@ -8,6 +8,7 @@ import * as THREE from "three";
 
 import { ACTIVE_SUBJECT, type LoadedPart } from "./loadedPart";
 import { meshDrawn } from "./meshVisibility";
+import { type ParsedModel } from "./parsedModel";
 import { PartAssembly } from "./partAssembly";
 import { standInContext } from "./viewportContext.testing";
 
@@ -108,21 +109,19 @@ const under = (node: THREE.Object3D, ancestor: THREE.Object3D): boolean => {
 };
 
 /**
- * An assembly that LOADS parts, over a stand-in viewport whose layers do nothing: each "GLB" names a
- * scene the stand-in loader hands back. `hull` is a root with a `Turret` bone at index 1, `turret` a
- * model of its own.
+ * An assembly that LOADS parts, over a stand-in viewport whose layers do nothing. `hull` is a model
+ * whose root has a `Turret` bone at index 1, `turret` a model of its own.
  */
 function loaderWith(): {
     assembly: PartAssembly;
     modelRoot: THREE.Group;
     parts: Map<string, LoadedPart>;
-    scene: (name: "hull" | "turret") => Uint8Array;
+    scene: (name: "hull" | "turret") => ParsedModel;
 } {
     const modelRoot = new THREE.Group();
     const scaledRoot = new THREE.Group();
     modelRoot.add(scaledRoot);
     const parts = new Map<string, LoadedPart>();
-    const scenes: THREE.Group[] = [];
     const make = (name: "hull" | "turret"): THREE.Group => {
         const root = new THREE.Group();
         if (name === "hull") {
@@ -144,13 +143,6 @@ function loaderWith(): {
             scaledRoot,
             parts,
             levels: { alt: 0, lod: 0, applyLevels: idle },
-            loader: {
-                parseAsync: async (bytes: ArrayBuffer) => ({
-                    scene: scenes[new Uint8Array(bytes)[0]],
-                    animations: [],
-                    parser: { json: {} },
-                }),
-            },
             materials: {
                 applyMaterial: idle,
                 applyWireframe: idle,
@@ -178,14 +170,33 @@ function loaderWith(): {
         assembly,
         modelRoot,
         parts,
-        scene: (name) => {
-            scenes.push(make(name));
-            return new Uint8Array([scenes.length - 1]);
-        },
+        scene: (name) => ({
+            scene: make(name),
+            clips: [],
+            visibility: new Map(),
+        }),
     };
 }
 
 describe("PartAssembly", () => {
+    // One model, read once, is the hull of nothing and the turret of everything that mounts it.
+    it("builds every part of one model from a copy, and leaves the model as it was read", async () => {
+        const { assembly, parts, scene } = loaderWith();
+        const turret = scene("turret");
+        await assembly.addPart("hull", scene("hull"));
+
+        await assembly.addPart("hp:Left", turret, "hull", "Turret");
+        await assembly.addPart("hp:Right", turret, "hull", "Turret");
+
+        const left = parts.get("hp:Left")!;
+        const right = parts.get("hp:Right")!;
+        assert.notEqual(left.root, right.root);
+        assert.notEqual(left.root, turret.scene);
+        assert.notEqual(left.bones.get("barrel"), right.bones.get("barrel"));
+        assert.equal(turret.scene.parent, null, "the model kept is in a scene");
+        assert.equal(turret.scene.children.length, 1);
+    });
+
     it("hangs an attached model on its bone when the model it hangs on arrives after it", async () => {
         const { assembly, modelRoot, parts, scene } = loaderWith();
 

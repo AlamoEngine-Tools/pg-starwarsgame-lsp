@@ -188,16 +188,18 @@ describe("AnimationRig", () => {
         };
         root.add(hull);
         const clip = new THREE.AnimationClip("Open", 1, []);
-        const gltf = {
-            animations: [clip],
-            parser: { json: {} },
-        } as unknown as Parameters<typeof animation.registerPart>[2];
+        const hides = { fps: 30, bones: new Map([["Hatch#2", "10"]]) };
+        const model = {
+            clips: [clip],
+            visibility: new Map([["Open", hides]]),
+        };
 
-        animation.registerPart("wreck:1", root, gltf);
+        animation.registerPart("wreck:1", root, model);
         const subject = animation.subjectAnimation("wreck:1");
         assert.ok(subject.restPose.has(bone));
         assert.equal(subject.nodeByName.get("Hatch#2"), bone);
         assert.deepEqual(subject.clips, [clip]);
+        assert.equal(subject.visibility.get("Open"), hides);
         assert.notEqual(subject.mixer, null);
 
         animation.unregisterPart("wreck:1", [bone, hull]);

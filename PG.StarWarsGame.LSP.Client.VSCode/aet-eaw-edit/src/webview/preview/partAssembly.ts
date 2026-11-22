@@ -1,9 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The viewport's parts as an assembly: a loaded GLB turned into a part and hung on the bone it attaches
+// The viewport's parts as an assembly: a copy of a read model turned into a part and hung on the bone it attaches
 // to (or held until that bone arrives), hidden, shown and removed again, the hull and each subject's parts,
-// and the walks over their meshes every other layer uses. It reads the loader, the scene roots and the other
+// and the walks over their meshes every other layer uses. It reads the scene roots and the other
 // layers it hands a new part to; nothing else.
 
 import { type AttachmentRequest, attachmentProblem } from "./attachments";
@@ -34,7 +34,7 @@ import { isOverlay } from "./modelBounds";
 import { setMeshDrawn } from "./meshVisibility";
 import { type AddPartOptions } from "./viewportTypes";
 import { type ViewportContext } from "./viewportContext";
-import { bufferOf } from "./payloadBytes";
+import { type ParsedModel, partOf } from "./parsedModel";
 
 /**
  * The bone whose track speaks for a mesh: for a skinned mesh the bone of `skinVisibilityBone`, else
@@ -62,7 +62,13 @@ function ownBoneOf(
     return undefined;
 }
 
-/** Releases GPU memory for a subtree; the renderer does not do it on removal. */
+/**
+ * Releases GPU memory for a subtree; the renderer does not do it on removal.
+ *
+ * The vertex data itself belongs to the model the part was copied from and stays with it: another
+ * part of that model still on screen has its buffers made again on the next frame, and a model
+ * nothing holds any more is collected with its data.
+ */
 export function disposeTree(root: THREE.Object3D): void {
     root.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) {
@@ -131,11 +137,13 @@ export class PartAssembly {
      * the detail levels and could not carry a clip. What differs between one model and the next is
      * which SUBJECT it belongs to, which is {@link AddPartOptions}, not which loader it uses.
      *
+     * The part is a COPY of the model, which stays as it was read - see `parsedModel.ts`.
+     *
      * Hands back the root it built, for a caller that has its own state to keep beside it.
      */
     async addPart(
         id: string,
-        glb: Uint8Array,
+        model: ParsedModel,
         attachToPartId?: string,
         attachBone?: string,
         options: AddPartOptions = {},
@@ -146,8 +154,7 @@ export class PartAssembly {
         // active subject and will never speak for this one.
         const passive = subjectId !== ACTIVE_SUBJECT;
 
-        const gltf = await this.context.loader.parseAsync(bufferOf(glb), "");
-        const root = gltf.scene;
+        const root = partOf(model);
 
         const bones = new Map<string, THREE.Object3D>();
         const bonesByIndex = new Map<number, THREE.Object3D>();
@@ -337,7 +344,7 @@ export class PartAssembly {
         // Everything the animation needs goes to THIS PART'S SUBJECT, never to the scene. One path
         // for the hull, an attached turret, a death clone and a piece of wreckage alike - what used
         // to differ between them was only which of these maps they were allowed into.
-        this.context.animation.registerPart(subjectId, root, gltf);
+        this.context.animation.registerPart(subjectId, root, model);
 
         this.context.levels.applyLevels();
 
