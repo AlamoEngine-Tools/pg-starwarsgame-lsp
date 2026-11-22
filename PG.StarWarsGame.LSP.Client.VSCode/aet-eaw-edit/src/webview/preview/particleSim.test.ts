@@ -9,6 +9,7 @@ import {
     appearanceOf,
     atlasFrame,
     emitterExtent,
+    expectedParticles,
     sampleTrack,
     sampleVolume,
     seededRandom,
@@ -1407,5 +1408,112 @@ describe("cubePhase", () => {
             y: 0,
             z: 0,
         });
+    });
+});
+
+/**
+ * How many particles an emitter is expected to hold at once, which is the room its buffers are
+ * given before the first is born.
+ */
+describe("expectedParticles", () => {
+    const expected = (
+        over: Partial<AlamoEmitterProperties>,
+        perAttempt = 1,
+    ): number =>
+        expectedParticles(
+            emitter({ properties: properties(over) }),
+            perAttempt,
+        );
+
+    it("is a steady emitter's rate over its lifetime, and one for the remainder it carries", () => {
+        assert.equal(expected({ particlesPerSecond: 30, lifetime: 0.5 }), 16);
+    });
+
+    it("is one burst of an emitter whose bursts die before the next", () => {
+        assert.equal(
+            expected({
+                useBursts: true,
+                particlesPerBurst: 50,
+                burstDelay: 2,
+                lifetime: 0.5,
+            }),
+            50,
+        );
+    });
+
+    it("is every burst still in the air of an emitter whose bursts overlap", () => {
+        // A burst every half second living two seconds: the ones at 0, 0.5, 1, 1.5 and 2.
+        assert.equal(
+            expected({
+                useBursts: true,
+                particlesPerBurst: 10,
+                burstDelay: 0.5,
+                lifetime: 2,
+            }),
+            50,
+        );
+    });
+
+    it("is no more bursts than the emitter fires", () => {
+        assert.equal(
+            expected({
+                useBursts: true,
+                particlesPerBurst: 10,
+                burstDelay: 0.5,
+                burstCount: 2,
+                lifetime: 2,
+            }),
+            20,
+        );
+    });
+
+    it("counts the longest a particle can live: the random share, and the lifetime volume", () => {
+        assert.equal(
+            expected({
+                particlesPerSecond: 10,
+                lifetime: 1,
+                randomLifetimePercent: 0.5,
+            }),
+            16,
+        );
+        assert.equal(
+            expectedParticles(
+                emitter({
+                    lifetime: volume({
+                        shape: "Box",
+                        min: { x: 1, y: 0, z: 0 },
+                        max: { x: 3, y: 0, z: 0 },
+                    }),
+                    properties: properties({
+                        particlesPerSecond: 10,
+                        lifetime: 1,
+                    }),
+                }),
+            ),
+            31,
+        );
+    });
+
+    // Measured in the game: a weather field is born at once, the per-second value being the count.
+    it("is a weather field's whole count, whatever its lifetime", () => {
+        assert.equal(
+            expected({
+                isWeatherParticle: true,
+                particlesPerSecond: 800,
+                lifetime: 0.1,
+            }),
+            800,
+        );
+    });
+
+    it("is that many for each point an emitter is born at", () => {
+        assert.equal(
+            expected({ particlesPerSecond: 2, lifetime: 1 }, 100),
+            300,
+        );
+    });
+
+    it("is at least one, so an emitter fed by another has somewhere to start", () => {
+        assert.equal(expected({ particlesPerSecond: 0, lifetime: 1 }), 1);
     });
 });

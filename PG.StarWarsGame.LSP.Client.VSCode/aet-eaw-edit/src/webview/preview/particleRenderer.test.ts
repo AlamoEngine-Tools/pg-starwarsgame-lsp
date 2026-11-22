@@ -1689,6 +1689,82 @@ describe("engine effects", () => {
             assert.equal(attribute(instance, name).version, 0, name);
         }
     });
+
+    /**
+     * The effect's stream is four corners a particle and six indices, so room for the ceiling was
+     * 1 MB an emitter - held by every emitter of every explosion, alive or not.
+     */
+    describe("the room its stream has", () => {
+        /** The particles the effect's stream of the first emitter has room for. */
+        const room = (instance: ParticleSystemInstance): number =>
+            attribute(instance, "position").count / 4;
+
+        it("is none before a particle is born", () => {
+            const instance = withEffect(
+                new ParticleSystemInstance(
+                    "test",
+                    testSystem([still({ particlesPerSecond: 0 })]),
+                ),
+            );
+            instance.update(0.5, viewFrom(100));
+
+            assert.equal(room(instance), 0);
+            assert.equal(instance.emitterMesh(0)!.geometry.index!.count, 0);
+        });
+
+        it("is what the emitter is expected to hold, in every attribute and the index", () => {
+            // Ten a second living two seconds: twenty, and one for the remainder the clock carries.
+            const instance = withEffect(
+                new ParticleSystemInstance(
+                    "test",
+                    testSystem([still({ lifetime: 2 })]),
+                ),
+            );
+            for (let i = 0; i < 40; i++) {
+                instance.update(0.1, viewFrom(100));
+            }
+            const geometry = instance.emitterMesh(0)!.geometry;
+
+            assert.equal(room(instance), 21);
+            for (const name of ["position", "color", "uv", "normal"]) {
+                assert.equal(attribute(instance, name).count, 21 * 4, name);
+            }
+            assert.equal(geometry.index!.count, 21 * 6);
+            assert.ok(instance.emitterParticles(0).length <= 21);
+        });
+
+        it("grows with an emitter that holds more than expected, and draws every particle of it", () => {
+            // A trail has no clock of its own: what it holds is its parent's doing.
+            const instance = withEffect(
+                new ParticleSystemInstance(
+                    "test",
+                    testSystem([
+                        emitter({
+                            name: "sparks",
+                            spawnDuringLife: 1,
+                            properties: properties({
+                                particlesPerSecond: 20,
+                                lifetime: 100,
+                            }),
+                        }),
+                        still({ particlesPerSecond: 20, lifetime: 1 }),
+                    ]),
+                ),
+            );
+            for (let i = 0; i < 30; i++) {
+                instance.update(0.1, viewFrom(100));
+            }
+            const live = instance.emitterParticles(1).length;
+            const mesh = instance.emitterMesh(1)!;
+            const positions = mesh.geometry.getAttribute("position");
+
+            assert.ok(live > 21, `${live} alive, so nothing had to grow`);
+            assert.ok(positions.count / 4 >= live, "less room than particles");
+            assert.ok(positions.count / 4 < 5003, "room for the ceiling");
+            assert.equal(mesh.geometry.drawRange.count, live * 6);
+            assert.equal(mesh.geometry.index!.count, (positions.count / 4) * 6);
+        });
+    });
 });
 
 describe("heat particles", () => {
@@ -2422,5 +2498,142 @@ describe("what an emitter copies to the graphics card", () => {
         assert.deepEqual(attribute(instance, "iStretch").updateRanges, [
             { start: 0, count: live },
         ]);
+    });
+});
+
+/**
+ * The room an emitter's own stream has.
+ *
+ * Measured on a mod's capital ship with every hardpoint destroyed at once: every emitter held room
+ * for the ceiling of 5,003 particles in each of its two streams - 1.2 MB an emitter, 1.4 GB for the
+ * unit - and handing the new ones to the graphics card was 0.8 of the 1.4 seconds the first frame
+ * after the press took.
+ */
+describe("the room an emitter's buffers have", () => {
+    const INSTANCED = [
+        "iOffset",
+        "iColor",
+        "iAlpha",
+        "iSize",
+        "iRotation",
+        "iFrame",
+        "iStretch",
+    ];
+
+    function running(
+        over: Partial<AlamoEmitterProperties> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "smoke",
+                    properties: properties({
+                        particlesPerSecond: 30,
+                        lifetime: 0.5,
+                        ...over,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    const sprites = (
+        instance: ParticleSystemInstance,
+        emitterIndex = 0,
+    ): THREE.InstancedBufferGeometry =>
+        instance.emitterMesh(emitterIndex)!
+            .geometry as THREE.InstancedBufferGeometry;
+
+    /** The particles the emitter's own stream has room for. */
+    const room = (instance: ParticleSystemInstance, emitterIndex = 0): number =>
+        sprites(instance, emitterIndex).getAttribute("iOffset").count;
+
+    it("is none before a particle is born", () => {
+        const instance = running({ initialDelay: 10 });
+        assert.equal(room(instance), 0);
+
+        instance.update(0.5);
+
+        assert.equal(instance.emitterParticles(0).length, 0);
+        assert.equal(room(instance), 0);
+    });
+
+    it("is what the emitter is expected to hold, in every attribute", () => {
+        // Thirty a second living half a second: fifteen, and one for the remainder the clock carries.
+        const instance = running();
+        for (let i = 0; i < 60; i++) {
+            instance.update(1 / 30);
+        }
+
+        assert.ok(instance.emitterParticles(0).length > 10);
+        for (const name of INSTANCED) {
+            assert.equal(sprites(instance).getAttribute(name).count, 16, name);
+        }
+    });
+
+    it("leaves a sprite that is not a streak unstretched in the room it is given", () => {
+        const instance = running();
+        instance.update(0.5);
+
+        const stretches = sprites(instance).getAttribute("iStretch")
+            .array as Float32Array;
+        assert.ok(stretches.length > 0);
+        assert.ok(stretches.every((stretch) => stretch === 1));
+    });
+
+    it("grows with an emitter that holds more than expected, and draws every particle of it", () => {
+        // A trail has no clock of its own: what it holds is its parent's doing.
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "sparks",
+                    spawnDuringLife: 1,
+                    position: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 20 },
+                    }),
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                    }),
+                }),
+                emitter({
+                    name: "smoke trail",
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 1,
+                    }),
+                }),
+            ]),
+        );
+        for (let i = 0; i < 30; i++) {
+            instance.update(0.1);
+        }
+        const live = instance.emitterParticles(1).length;
+        const geometry = sprites(instance, 1);
+        const offsets = geometry.getAttribute("iOffset").array;
+
+        assert.ok(live > 21, `${live} alive, so nothing had to grow`);
+        assert.ok(room(instance, 1) >= live, "less room than particles");
+        assert.ok(room(instance, 1) < 5003, "room for the ceiling");
+        assert.equal(geometry.instanceCount, live);
+        // Every one of them written where its parent was: 20 up the z axis.
+        for (let i = 0; i < live; i++) {
+            assert.equal(offsets[i * 3 + 2], 20, `particle ${i}`);
+        }
+    });
+
+    // Measured in the game: an emitter's count is clamped to 5003 before its buffers are sized.
+    it("never has room past the ceiling", () => {
+        const instance = running({
+            isWeatherParticle: true,
+            particlesPerSecond: 20000,
+        });
+        instance.update(0.1);
+
+        assert.equal(instance.emitterParticles(0).length, 5003);
+        assert.equal(room(instance), 5003);
     });
 });

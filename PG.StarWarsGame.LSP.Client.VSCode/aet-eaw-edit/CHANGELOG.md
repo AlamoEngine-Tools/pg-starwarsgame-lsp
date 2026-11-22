@@ -201,6 +201,12 @@
   effects as it loads. Measured on a mod's capital ship with 145 hardpoints destroyed at once: the frozen frame
   at the press fell from 5.9 seconds to 1.4, the one at `Repair all hardpoints` from 1.6 seconds to 0.15, and
   the longest frame while the unit loads from 3.7 seconds to 0.35
+- **An effect holds room for the particles it has** - every emitter kept room for 5,003 particles, the game's
+  ceiling, in each of two vertex streams: 1.2 MB an emitter, with nothing alive. An emitter is now given the
+  room it is expected to need when its first particle is born, and more when it comes to hold more. Measured
+  on a mod's capital ship with 145 hardpoints destroyed at once: the preview's memory after the press fell from
+  1.35 GB to 0.4 GB and with the unit just loaded from 512 MB to 308 MB, the frozen frame at the press from
+  1.4 seconds to 0.44, and a frame while the explosions burn from 57 milliseconds to 38
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

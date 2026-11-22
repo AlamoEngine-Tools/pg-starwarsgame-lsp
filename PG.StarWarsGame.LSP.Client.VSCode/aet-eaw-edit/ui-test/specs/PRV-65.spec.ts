@@ -1,5 +1,5 @@
 // PRV-65: a particle system copies to the graphics card what is alive, not the room it has. Every emitter's
-// buffers are sized for the game's ceiling of 5,003 particles; copied whole each frame, a capital ship's
+// buffers were sized for the game's ceiling of 5,003 particles; copied whole each frame, a capital ship's
 // spent explosions - thousands of emitters with nothing alive - drew at 9 frames a second. Read as bytes
 // handed to the graphics card per frame, which says the same on any machine.
 import { browser, expect } from "@wdio/globals";

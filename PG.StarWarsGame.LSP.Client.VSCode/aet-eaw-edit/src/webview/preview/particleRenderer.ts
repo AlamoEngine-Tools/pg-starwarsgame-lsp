@@ -30,6 +30,7 @@ import {
     appearanceOf,
     atlasColumns,
     cubePhase,
+    expectedParticles,
     type Particle,
     type Random,
     seededRandom,
@@ -57,6 +58,23 @@ import { type Look, PLAIN_LOOK } from "./cloakFade";
  * are retired first on an ordinary emitter so the effect keeps running.
  */
 const MAX_PARTICLES = 5003;
+
+/**
+ * The room to give a stream that has `has` and now needs `needed`.
+ *
+ * A stream is given room when its first particle is written, never before: what the emitter is
+ * expected to hold by its own numbers, so that one running as authored is given room once, and
+ * double what it had when it comes to hold more than that. Never past the ceiling - nothing holds
+ * more particles than that.
+ *
+ * MEASURED on a mod's capital ship with every hardpoint destroyed at once: each emitter held room
+ * for the ceiling in both of its streams, 1.2 MB with nothing alive, 1.4 GB for the unit - and
+ * handing the new ones to the graphics card was 0.8 of the 1.4 seconds the first frame after the
+ * press took.
+ */
+function roomFor(needed: number, has: number, expected: number): number {
+    return Math.min(MAX_PARTICLES, Math.max(needed, has * 2, expected));
+}
 
 /** Reused so the per-frame ground lookup allocates nothing. */
 const GROUND_SCRATCH = new THREE.Vector3();
@@ -570,10 +588,11 @@ const QUAD_CORNERS = [-1, -1, 1, -1, 1, 1, -1, 1];
 /**
  * Marks the first `items` of an attribute for the graphics card, and nothing when there are none.
  *
- * An attribute marked without a range is copied whole, and these are sized for the particle
- * ceiling: measured on a mod's capital ship, 4,840 emitters with nothing alive copied room for
- * 5,003 particles each, every frame, and the preview drew at 9 frames a second. The range is set
- * afresh each time, because an emitter that is stepped and not drawn never has its ranges taken off.
+ * An attribute marked without a range is copied whole, room and all - and these were sized for
+ * the particle ceiling then: measured on a mod's capital ship, 4,840 emitters with nothing alive
+ * copied room for 5,003 particles each, every frame, and the preview drew at 9 frames a second.
+ * They have room ahead of need still - see `roomFor`. The range is set afresh each time, because
+ * an emitter that is stepped and not drawn never has its ranges taken off.
  */
 function markWritten(
     geometry: THREE.BufferGeometry,
@@ -600,48 +619,25 @@ const SECOND_TEXTURE_SAMPLERS = ["NormalSampler", "DepthSampler"];
 
 /**
  * An emitter drawn through the engine's own effect: the translated program, the pass's render
- * state, and a vertex stream of CPU-built quads sized for the particle ceiling.
+ * state, and a vertex stream of CPU-built quads with room for the particles the emitter has - see
+ * `roomFor`.
  */
 class EngineDraw {
-    readonly geometry = new THREE.BufferGeometry();
+    geometry: THREE.BufferGeometry;
     readonly material: AlamoMaterial;
-    readonly positions = new Float32Array(MAX_PARTICLES * 4 * 3);
-    readonly colours = new Float32Array(MAX_PARTICLES * 4 * 4);
-    readonly uvs = new Float32Array(MAX_PARTICLES * 4 * 2);
+    positions = new Float32Array(0);
+    colours = new Float32Array(0);
+    uvs = new Float32Array(0);
+    /** How many particles the stream has room for. */
+    private capacity = 0;
 
     constructor(
         effect: TranslatedEffect,
         state: FxMaterialState,
         noDepthTest: boolean,
     ) {
-        // Position, colour, uv: the engine's own particle vertex. The bump effects declare a normal
-        // input their vertex shader never reads; it is fed zeros so the attribute is not missing.
-        this.geometry.setAttribute(
-            "position",
-            new THREE.BufferAttribute(this.positions, 3),
-        );
-        this.geometry.setAttribute(
-            "color",
-            new THREE.BufferAttribute(this.colours, 4),
-        );
-        this.geometry.setAttribute(
-            "uv",
-            new THREE.BufferAttribute(this.uvs, 2),
-        );
-        this.geometry.setAttribute(
-            "normal",
-            new THREE.BufferAttribute(
-                new Float32Array(MAX_PARTICLES * 4 * 3),
-                3,
-            ),
-        );
-        const index = new Uint32Array(MAX_PARTICLES * 6);
-        for (let i = 0; i < MAX_PARTICLES; i++) {
-            const v = i * 4;
-            index.set([v, v + 1, v + 2, v, v + 2, v + 3], i * 6);
-        }
-        this.geometry.setIndex(new THREE.BufferAttribute(index, 1));
-        this.geometry.setDrawRange(0, 0);
+        // No room until a particle is written - see `reserve`.
+        this.geometry = this.stream();
 
         // No sub-mesh behind a particle, so no parameters of its own: the effect's declared
         // defaults stand, which for the bump effect is white diffuse and no emissive.
@@ -654,6 +650,64 @@ class EngineDraw {
         this.material.side = THREE.DoubleSide;
         this.material.depthTest = state.depthTest && !noDepthTest;
         this.material.needsUpdate = true;
+    }
+
+    /**
+     * Gives the stream room for `count` particles, and says whether that took a new geometry -
+     * which the caller's mesh then has to be handed.
+     *
+     * A new GEOMETRY rather than new attributes on the old one: the graphics card's buffers are
+     * freed with the geometry they were made for, so an attribute swapped out from under it would
+     * leave its buffer behind. Nothing is carried over - every write fills the stream from its
+     * first particle.
+     */
+    reserve(count: number, expected: number): boolean {
+        if (count <= this.capacity) {
+            return false;
+        }
+
+        this.capacity = roomFor(count, this.capacity, expected);
+        this.positions = new Float32Array(this.capacity * 4 * 3);
+        this.colours = new Float32Array(this.capacity * 4 * 4);
+        this.uvs = new Float32Array(this.capacity * 4 * 2);
+
+        this.geometry.dispose();
+        this.geometry = this.stream();
+        return true;
+    }
+
+    /** A geometry over the arrays as they stand, with nothing drawn yet. */
+    private stream(): THREE.BufferGeometry {
+        const geometry = new THREE.BufferGeometry();
+
+        // Position, colour, uv: the engine's own particle vertex. The bump effects declare a normal
+        // input their vertex shader never reads; it is fed zeros so the attribute is not missing.
+        geometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(this.positions, 3),
+        );
+        geometry.setAttribute(
+            "color",
+            new THREE.BufferAttribute(this.colours, 4),
+        );
+        geometry.setAttribute("uv", new THREE.BufferAttribute(this.uvs, 2));
+        geometry.setAttribute(
+            "normal",
+            new THREE.BufferAttribute(
+                new Float32Array(this.capacity * 4 * 3),
+                3,
+            ),
+        );
+
+        const index = new Uint32Array(this.capacity * 6);
+        for (let i = 0; i < this.capacity; i++) {
+            const v = i * 4;
+            index.set([v, v + 1, v + 2, v, v + 2, v + 3], i * 6);
+        }
+        geometry.setIndex(new THREE.BufferAttribute(index, 1));
+        geometry.setDrawRange(0, 0);
+
+        return geometry;
     }
 
     /** Hands the colour sheet and the second texture to whichever samplers the effect declares. */
@@ -706,7 +760,7 @@ class EmitterRenderer {
 
     private readonly particles: Particle[] = [];
     private readonly clock: SpawnClock;
-    private readonly geometry: THREE.InstancedBufferGeometry;
+    private geometry: THREE.InstancedBufferGeometry;
     private readonly material: THREE.ShaderMaterial;
 
     /**
@@ -716,13 +770,18 @@ class EmitterRenderer {
     private engine: EngineDraw | null = null;
     private normalTexture: THREE.Texture | null = null;
 
-    private readonly offsets = new Float32Array(MAX_PARTICLES * 3);
-    private readonly colors = new Float32Array(MAX_PARTICLES * 3);
-    private readonly alphas = new Float32Array(MAX_PARTICLES);
-    private readonly sizes = new Float32Array(MAX_PARTICLES);
-    private readonly rotations = new Float32Array(MAX_PARTICLES);
-    private readonly frames = new Float32Array(MAX_PARTICLES);
-    private readonly stretches = new Float32Array(MAX_PARTICLES).fill(1);
+    /** How many particles the emitter is expected to hold at once, by its own numbers. */
+    private readonly expected: number;
+    /** How many particles the preview's own stream has room for - see {@link reserve}. */
+    private capacity = 0;
+
+    private offsets = new Float32Array(0);
+    private colors = new Float32Array(0);
+    private alphas = new Float32Array(0);
+    private sizes = new Float32Array(0);
+    private rotations = new Float32Array(0);
+    private frames = new Float32Array(0);
+    private stretches = new Float32Array(0);
 
     /** Reused per particle by the kite maths, so a thousand sparks allocate nothing. */
     private readonly viewVelocity = new THREE.Vector3();
@@ -755,7 +814,7 @@ class EmitterRenderer {
 
     /** The frozen batch's draw order and the depths it was sorted on, reused every frame. */
     private readonly drawIndex: number[] = [];
-    private readonly depths = new Float32Array(MAX_PARTICLES);
+    private depths = new Float32Array(0);
 
     /** The last frame, its draw order and its drawn count, kept for {@link probe}. */
     private lastFrame: EmitterFrame | null = null;
@@ -810,46 +869,13 @@ class EmitterRenderer {
             ? Math.max(0, emitter.properties.weatherCubeSize) * 0.5
             : 0;
         this.tailCeiling = tailMaxSpeed(emitter);
+        this.expected = expectedParticles(
+            emitter,
+            emissionMultiplier(emitter.properties.emitFromMesh, emissionMesh),
+        );
 
-        this.geometry = new THREE.InstancedBufferGeometry();
-        this.geometry.setAttribute(
-            "corner",
-            new THREE.BufferAttribute(
-                new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]),
-                2,
-            ),
-        );
-        this.geometry.setIndex([0, 1, 2, 0, 2, 3]);
-
-        this.geometry.setAttribute(
-            "iOffset",
-            new THREE.InstancedBufferAttribute(this.offsets, 3),
-        );
-        this.geometry.setAttribute(
-            "iColor",
-            new THREE.InstancedBufferAttribute(this.colors, 3),
-        );
-        this.geometry.setAttribute(
-            "iAlpha",
-            new THREE.InstancedBufferAttribute(this.alphas, 1),
-        );
-        this.geometry.setAttribute(
-            "iSize",
-            new THREE.InstancedBufferAttribute(this.sizes, 1),
-        );
-        this.geometry.setAttribute(
-            "iRotation",
-            new THREE.InstancedBufferAttribute(this.rotations, 1),
-        );
-        this.geometry.setAttribute(
-            "iFrame",
-            new THREE.InstancedBufferAttribute(this.frames, 1),
-        );
-        this.geometry.setAttribute(
-            "iStretch",
-            new THREE.InstancedBufferAttribute(this.stretches, 1),
-        );
-        this.geometry.instanceCount = 0;
+        // No room until a particle is written - see `reserve`.
+        this.geometry = this.sprites();
 
         const heat = emitter.properties.isHeatParticle;
 
@@ -895,6 +921,85 @@ class EmitterRenderer {
         // square at the origin and would cull the whole cloud the moment the camera looked away.
         this.mesh.frustumCulled = false;
         this.mesh.name = emitter.name;
+    }
+
+    /** The preview's own stream over the arrays as they stand, with nothing drawn yet. */
+    private sprites(): THREE.InstancedBufferGeometry {
+        const geometry = new THREE.InstancedBufferGeometry();
+
+        geometry.setAttribute(
+            "corner",
+            new THREE.BufferAttribute(
+                new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]),
+                2,
+            ),
+        );
+        geometry.setIndex([0, 1, 2, 0, 2, 3]);
+
+        geometry.setAttribute(
+            "iOffset",
+            new THREE.InstancedBufferAttribute(this.offsets, 3),
+        );
+        geometry.setAttribute(
+            "iColor",
+            new THREE.InstancedBufferAttribute(this.colors, 3),
+        );
+        geometry.setAttribute(
+            "iAlpha",
+            new THREE.InstancedBufferAttribute(this.alphas, 1),
+        );
+        geometry.setAttribute(
+            "iSize",
+            new THREE.InstancedBufferAttribute(this.sizes, 1),
+        );
+        geometry.setAttribute(
+            "iRotation",
+            new THREE.InstancedBufferAttribute(this.rotations, 1),
+        );
+        geometry.setAttribute(
+            "iFrame",
+            new THREE.InstancedBufferAttribute(this.frames, 1),
+        );
+        geometry.setAttribute(
+            "iStretch",
+            new THREE.InstancedBufferAttribute(this.stretches, 1),
+        );
+        geometry.instanceCount = 0;
+
+        return geometry;
+    }
+
+    /**
+     * Gives the preview's own stream room for `count` particles - see `roomFor`.
+     *
+     * A new GEOMETRY rather than new attributes on the old one, for two reasons. The graphics
+     * card's buffers are freed with the geometry they were made for, so an attribute swapped out
+     * from under it would leave its buffer behind. And the renderer reads how many instances a
+     * geometry can draw off its attributes ONCE, the first time it draws it: one grown in place
+     * would go on drawing no more than it first had room for. Nothing is carried over - every
+     * write fills the stream from its first particle.
+     */
+    private reserve(count: number): void {
+        if (count <= this.capacity) {
+            return;
+        }
+
+        this.capacity = roomFor(count, this.capacity, this.expected);
+        this.offsets = new Float32Array(this.capacity * 3);
+        this.colors = new Float32Array(this.capacity * 3);
+        this.alphas = new Float32Array(this.capacity);
+        this.sizes = new Float32Array(this.capacity);
+        this.rotations = new Float32Array(this.capacity);
+        this.frames = new Float32Array(this.capacity);
+        // One, and only a streak writes over it: a sprite that is not one is drawn unstretched.
+        this.stretches = new Float32Array(this.capacity).fill(1);
+
+        const spent = this.geometry;
+        this.geometry = this.sprites();
+        if (this.mesh.geometry === spent) {
+            this.mesh.geometry = this.geometry;
+        }
+        spent.dispose();
     }
 
     /** The emitter this renderer draws, for callers that need its numbers rather than its pixels. */
@@ -1154,9 +1259,13 @@ class EmitterRenderer {
         const upX = e[1];
         const upY = e[4];
         const upZ = e[7];
-        const { positions, colours, uvs } = engine;
 
         const count = this.drawnCount(frame);
+        if (engine.reserve(count, this.expected)) {
+            this.mesh.geometry = engine.geometry;
+        }
+        const { positions, colours, uvs } = engine;
+
         for (let i = 0; i < count; i++) {
             const particle = this.particles[order === null ? i : order[i]];
             const look = appearanceOf(particle, this.emitter);
@@ -1693,6 +1802,8 @@ class EmitterRenderer {
         }
 
         const count = this.drawnCount(frame);
+        this.reserve(count);
+
         for (let i = 0; i < count; i++) {
             const particle = this.particles[order === null ? i : order[i]];
             const look = appearanceOf(particle, this.emitter);
@@ -1783,6 +1894,11 @@ class EmitterRenderer {
         const count = this.particles.length;
         const order = this.drawIndex;
         order.length = count;
+        if (this.depths.length < count) {
+            this.depths = new Float32Array(
+                roomFor(count, this.depths.length, this.expected),
+            );
+        }
         for (let i = 0; i < count; i++) {
             // The position as drawn - the object's uniform scale is applied to it in writeBuffers,
             // and the camera is in the unscaled simulation space.
