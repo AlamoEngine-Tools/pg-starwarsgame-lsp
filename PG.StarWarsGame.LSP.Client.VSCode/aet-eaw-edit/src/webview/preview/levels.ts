@@ -107,57 +107,6 @@ export function definedLevels(tagged: Iterable<LevelTagged>): DefinedLevels {
     return { alt: contiguous, lod: ascending(lod) };
 }
 
-/** A slider's worth of positions over the levels a model actually defines. */
-export interface LevelSteps {
-    /** How many positions the slider has. Zero when the model defines nothing to choose between. */
-    count: number;
-
-    /** The level shown at a slider position, clamped to the ends. */
-    levelAt(position: number): number;
-
-    /** Where the thumb belongs for a level, or the first position when it is not defined here. */
-    positionOf(level: number): number;
-}
-
-/**
- * Indexes a slider over the DEFINED levels rather than over the raw numbers.
- *
- * This is the whole reason the control is indexed. A level list may be sparse - a model can define
- * LOD 0, 2 and 5 and nothing between - so a slider running 0..5 would offer three positions that
- * name nothing in the file, and dragging through them would ask the viewport for meshes that do not
- * exist. Three defined levels means three stops.
- *
- * ALT arrives here already filled in (see {@link definedLevels}), so its positions and its levels
- * happen to coincide. That is a property of the input, not of this function.
- */
-export function levelSteps(levels: readonly number[]): LevelSteps {
-    return {
-        count: levels.length,
-
-        levelAt(position: number): number {
-            if (levels.length === 0) {
-                return 0;
-            }
-
-            const clamped = Math.min(
-                levels.length - 1,
-                Math.max(0, Math.round(position)),
-            );
-
-            return levels[clamped];
-        },
-
-        // The subject changes under the control: open another model and the level the reader left
-        // set may not exist there. Answering "nowhere" would put the thumb off its own track, so
-        // an unknown level reads as the first position - which is where a fresh subject opens.
-        positionOf(level: number): number {
-            const at = levels.indexOf(level);
-
-            return at < 0 ? 0 : at;
-        },
-    };
-}
-
 /**
  * The health band one damage stage covers, as whole percentages, or null where it covers none.
  *

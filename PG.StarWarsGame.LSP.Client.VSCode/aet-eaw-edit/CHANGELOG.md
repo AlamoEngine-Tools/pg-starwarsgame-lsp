@@ -13,9 +13,13 @@
   ([#437](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/437))
 - **Reset all turrets** - the model preview's Model state group on the stage carries one button that puts
   every turned turret back at the pose the model authored, in every lens, with the number of turned turrets
-  inside it; it is disabled while none is turned and left out for a subject with no turret that turns. The
-  two state sliders beside it are 16px shorter so all three fit one row
+  inside it; it is disabled while none is turned and left out for a subject with no turret that turns
   ([#438](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/438))
+- **Damage state and detail level as pills with a list** - the two sliders on the stage's bottom edge are
+  pills: the glyph, the level and the mark of a list. The list's rows say what each level is - the health
+  band a damage state covers, the meshes and triangles a detail level draws - and the pill's tooltip says it
+  for the level shown, where a slider wrote it out beside itself. In Gameplay the damage state stays on
+  screen, disabled, while the hull drives it
 - **A ship's speed, an ion stun and disabled engines in the unit preview** - the right end of the stage's
   bottom edge carries a speed slider and two toggles for a unit, in every lens. The engine effects are drawn
   as bright as the game draws them at that speed: a fifth at rest, rising to full at `Max_Speed`.

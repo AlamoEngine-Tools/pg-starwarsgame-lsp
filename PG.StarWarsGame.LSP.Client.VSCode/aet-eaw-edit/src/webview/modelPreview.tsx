@@ -93,7 +93,6 @@ import { useViewportSync } from "./preview/useViewportSync";
 import {
     type DefinedLevels,
     type LevelCost,
-    levelSteps,
     withDeclaredStages,
 } from "./preview/levels";
 import { type ParticleGroup, particleGroups } from "./preview/particleScene";
@@ -509,11 +508,6 @@ function ModelPreview(): React.JSX.Element {
     const { collapsed, setCollapsed, foldedRef, boneFilter, setBoneFilter } =
         tree;
 
-    /* Slider positions over the levels this model DEFINES. Rebuilt only when the level list
-       changes, which is once per subject. */
-    const altSteps = useMemo(() => levelSteps(levels.alt), [levels.alt]);
-    const lodSteps = useMemo(() => levelSteps(levels.lod), [levels.lod]);
-
     /**
      * Game rendering's stand-in shadow, for a model without a shadow mesh.
      *
@@ -570,7 +564,7 @@ function ModelPreview(): React.JSX.Element {
     );
 
     /**
-     * What each detail level costs, for the LOD slider's own label.
+     * What each detail level costs, for the detail level's list and its tooltip.
      *
      * Depends on `stats` for the reason the arcs and the reticles do - it is this component's
      * signal that geometry has arrived - and on `alt`, because a mesh tagged for another damage
@@ -1507,13 +1501,11 @@ function ModelPreview(): React.JSX.Element {
                             start={
                                 <SubjectStateControls
                                     alt={alt}
-                                    altSteps={altSteps}
                                     combat={combat}
                                     levels={levels}
                                     lod={lod}
                                     lodPickedRef={lodPickedRef}
                                     lodCost={lodCost}
-                                    lodSteps={lodSteps}
                                     scene={scene}
                                     setAlt={setAlt}
                                     setLod={setLod}

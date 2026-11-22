@@ -704,8 +704,9 @@ export const Shell = styled.div`
     }
 
     /* A labelled control on a stage plate: the label INLINE and small, not above a full-width
-       input the way the dock writes one. ALT and LOD are three letters and the number beside them
-       is the whole answer, so the pair fits in the 22px box everything else on the stage uses. */
+       input the way the dock writes one, so it fits in the 22px box everything else on the stage
+       uses. The damage state and the detail level were two of these, sliders both; they are pills
+       with a list now (PillSelect), and what is left here is the speed and the turret reset. */
 
     .stage-field {
         display: flex;
@@ -720,33 +721,15 @@ export const Shell = styled.div`
     }
 
     /* A slider says WHERE you are on the axis but never WHAT that is, so the value beside it says
-       so - in the health band the stage covers on the damage axis, in meshes and triangles on the
-       detail one, and in words (undamaged, distant, close-up) wherever neither number is known.
-
-       Fixed width so the plate does not resize as the thumb moves, which would shove the ability
-       bar sideways mid-drag, and sized per axis rather than shared: 92px holds the damage axis's
-       longest, "0 (undamaged)" at 88px, and the detail axis needs 165 for a model with four figures
-       of meshes. Measured in this font by the harness probe measure-plate.js; do not guess. */
+       so. Fixed width so the plate does not resize as the thumb moves, which would shove whatever
+       stands beside it sideways mid-drag. A speed is a percentage: three digits and a sign at
+       most. */
 
     .stage-field .stage-value {
-        min-width: 92px;
+        min-width: 44px;
         opacity: 0.85;
         font-variant-numeric: tabular-nums;
     }
-
-    .stage-field.detail .stage-value {
-        min-width: 165px;
-    }
-
-    /* A speed is a percentage: three digits and a sign at most. */
-
-    .stage-field.speed .stage-value {
-        min-width: 44px;
-    }
-
-    /* Short enough that both of them and the turret reset fit the left slot in one row: at a 1906px
-       window the slot is 538px wide, and at 84px the three measured 549px and wrapped. The
-       renderer that used to share the slot lives in Scene > Effects now. */
 
     .stage-field input[type="range"] {
         width: 68px;

@@ -13,10 +13,10 @@ interface Detail {
     lod: number;
     /** The levels the loaded geometry tags, ascending. */
     defined: number[];
-    /** The detail slider's position and its last stop. */
+    /** The detail level the list holds, and its last row. */
     value: string;
     max: string;
-    /** The level the slider's plate names. */
+    /** The row of the level shown. */
     label: string;
 }
 
@@ -53,18 +53,15 @@ async function detail(): Promise<Detail> {
     return browser.execute(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const v = (window as any).aetDebugViewport;
-        const input = document.querySelector<HTMLInputElement>(
-            '.stage-field.detail input[type="range"]',
+        const input = document.querySelector<HTMLSelectElement>(
+            ".pill-select.detail select",
         );
         return {
             lod: v.levels.lod as number,
             defined: v.definedLevels().lod as number[],
             value: input?.value ?? "",
-            max: input?.max ?? "",
-            label: (
-                document.querySelector(".stage-field.detail .stage-value")
-                    ?.textContent ?? ""
-            ).trim(),
+            max: input?.options[input.options.length - 1]?.value ?? "",
+            label: (input?.selectedOptions[0]?.textContent ?? "").trim(),
         };
     });
 }
@@ -169,24 +166,24 @@ describe("PRV-57", () => {
         await openInPreview(file);
         await inNewestWebview(async () => {
             await loaded();
-            // The slider's first stop, LOD0, the way a drag sets it.
+            // The list's first row, LOD0, the way a pick sets it.
             await browser.execute(() => {
-                const input = document.querySelector<HTMLInputElement>(
-                    '.stage-field.detail input[type="range"]',
+                const input = document.querySelector<HTMLSelectElement>(
+                    ".pill-select.detail select",
                 );
                 if (input === null) {
-                    throw new Error("No detail slider");
+                    throw new Error("No detail list");
                 }
                 const setter = Object.getOwnPropertyDescriptor(
-                    HTMLInputElement.prototype,
+                    HTMLSelectElement.prototype,
                     "value",
                 )!.set!;
                 setter.call(input, "0");
-                input.dispatchEvent(new Event("input", { bubbles: true }));
+                input.dispatchEvent(new Event("change", { bubbles: true }));
             });
             await browser.waitUntil(async () => (await detail()).lod === 0, {
                 timeout: 5_000,
-                timeoutMsg: "The detail slider did not move",
+                timeoutMsg: "The detail level did not change",
             });
             // The pick reaches the host as a message after the render.
             await browser.pause(2_000);

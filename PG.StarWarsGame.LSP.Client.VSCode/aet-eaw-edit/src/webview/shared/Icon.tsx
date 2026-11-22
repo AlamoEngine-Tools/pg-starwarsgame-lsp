@@ -116,6 +116,7 @@ import {
     IconSchema,
     IconScript,
     IconSearch,
+    IconSelector,
     IconSeparatorHorizontal,
     IconSettings,
     IconShadow,
@@ -295,6 +296,8 @@ const ICONS = {
     reveal: IconFolderOpen,
     expanded: IconChevronDown,
     collapsed: IconChevronRight,
+    /** A list to pick from, opening whichever way it finds room. The mark on a PillSelect. */
+    picker: IconSelector,
 
     bounds: IconBox,
 
