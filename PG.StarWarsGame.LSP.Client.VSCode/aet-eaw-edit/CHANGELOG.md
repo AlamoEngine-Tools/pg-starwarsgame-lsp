@@ -214,6 +214,11 @@
   Measured on a mod's capital ship with 145 hardpoints destroyed at once: the buffers made at the press fell
   from 43,920 to 5,025 and the copies a frame while it burns from 16,167 to 2,656, the frozen frame at the
   press from 0.44 seconds to 0.25, and the frame rate two seconds in rose from 27 a second to 71
+- **No frame of the file pose when a clip starts** (#441) - under the Game renderer a model stood in its file
+  pose for one frame each time a clip started: an infantry unit with its arms out, each time its Idle card
+  drew another take. A clip starts from the file pose, and the game's shaders were handed the bones' place in
+  the world as the frame before had left it. They are handed where the bones stand in the frame being drawn.
+  Measured on the Ewok: 7 frames of the file pose in 2,986 for 7 takes started, now none in 2,983 for 9
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

@@ -419,6 +419,15 @@ export class CameraRig {
     prepareForCamera(): void {
         this.context.camera.updateMatrixWorld();
 
+        // Where everything stands in the world NOW, before anything below reads it. three brings
+        // the world matrices up to date when it draws, and that is after the engine's shaders have
+        // been handed theirs: they were drawing every frame with the place the frame BEFORE had
+        // left. A frame late is not seen while a clip runs - but a clip starts from the file pose,
+        // and the preview measures the model there, which writes the bones' place in the world.
+        // MEASURED on the Ewok under the Game renderer (#441): one frame of the file pose, arms
+        // out, each time its Idle card drew another take - 7 of 2,986 frames for 7 takes.
+        this.context.scene.updateMatrixWorld();
+
         // The engine's per-frame contract, including the matrices. Last, not first, so it sees the
         // bone transforms the animation and skeleton work above have already settled.
         this.context.materials.updateAlamoUniforms();
