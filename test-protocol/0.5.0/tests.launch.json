@@ -663,6 +663,12 @@
       "aet-eaw-edit.shaders.directory": "{shaders}"
     }
   },
+  "PRV-72": {
+    "open": "C:\\temp\\aet-test-PRV-attached",
+    "settings": {
+      "aet-eaw-edit.lsp.source.baseGameDirectory": "{eaw}"
+    }
+  },
   "PRJ-29": {
     "open": "{repo}\\eaw-foc.code-workspace"
   },

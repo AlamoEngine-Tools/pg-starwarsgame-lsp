@@ -219,6 +219,13 @@
   drew another take. A clip starts from the file pose, and the game's shaders were handed the bones' place in
   the world as the frame before had left it. They are handed where the bones stand in the frame being drawn.
   Measured on the Ewok: 7 frames of the file pose in 2,986 for 7 takes started, now none in 2,983 for 9
+- **A model a hardpoint attaches keeps its own parts** - a unit's rule that names a part, a hardpoint's
+  `Damage_Decal`, reached inside the models its hardpoints attach: an attached weapon whose mesh is named like
+  the decal on the hull was hidden with it. And a hardpoint's death or a cloak ending wrote every part of an
+  attached model shown, the ones its own file hides among them. An attached model is one part of the unit, as
+  in the game: a rule that reaches it hides or shows it whole, a rule that names a part looks at the unit's own
+  model, and inside the attached model each part is drawn as its file has it. Reported on a mod's star
+  destroyer, which stood without its two bow weapons
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

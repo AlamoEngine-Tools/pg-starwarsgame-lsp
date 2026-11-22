@@ -761,9 +761,15 @@ describe("UnitRules, the cloaks", () => {
                 cloak,
             );
             assert.deepEqual(
-                unit.meshState(fileState(false), hull, undefined, true),
-                ruleState(true),
+                unit.meshState(drawnInFile, hull, undefined, true),
+                drawnInFile,
                 `${cloak}: the attached model`,
+            );
+            // The model is shown again; what its own file hides stays hidden.
+            assert.deepEqual(
+                unit.meshState(fileState(false), hull, undefined, true),
+                fileState(false),
+                `${cloak}: a part the attached model's file hides`,
             );
         }
     });
@@ -835,6 +841,163 @@ describe("UnitRules, a hardpoint's Collision_Mesh (#450)", () => {
         assert.deepEqual(
             unit.meshState(fileState(false), { alamoMesh: "Collision" }),
             fileState(false),
+        );
+    });
+});
+
+/**
+ * A model a hardpoint attaches, as the unit's rules see it.
+ *
+ * Measured in the game: the attached model is ONE part of the unit, a model inside the model. A rule
+ * that names a part is compared with the unit model's own parts and never looks inside it; a rule
+ * that reaches it - a bone it hangs on or below, a cloak - writes the model's one switch; and its
+ * own parts keep what its file says, drawn only while the model is.
+ *
+ * Reported on a mod's star destroyer: its two bow weapons are attached models whose one drawn mesh
+ * is named like the hardpoint's `Damage_Decal` on the hull, and the decal rule hid the weapons.
+ */
+describe("UnitRules, a model a hardpoint attaches", () => {
+    const weapon = { alamoMesh: "Weap_Blast" };
+    const collision = { alamoMesh: "Collision" };
+    /** The hull bones a model can hang on: the hardpoint's own, and its Damage_Particles bone. */
+    const HP_BONE = 1;
+    const EMIT_DAMAGE = 2;
+
+    it("leaves a part inside it that is named like a decal as its file has it", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(writes({ decals: new Set(["weap_blast"]) }));
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, HP_BONE, true),
+            drawnInFile,
+        );
+        // The unit's own part of that name is the decal.
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, HP_BONE),
+            ruleState(false),
+        );
+    });
+
+    it("does not show a part inside it for a death that shows the decal of that name", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({
+                decals: new Set(["weap_blast"]),
+                deaths: [death({ decal: "weap_blast" })],
+            }),
+        );
+
+        assert.deepEqual(
+            unit.meshState(fileState(false), weapon, HP_BONE, true),
+            fileState(false),
+        );
+    });
+
+    it("is hidden whole while it hangs on or below a living hardpoint's Damage_Particles bone", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(writes({ damageBones: new Set(["emitdamage"]) }));
+
+        for (const bone of [EMIT_DAMAGE, 3]) {
+            assert.deepEqual(
+                unit.meshState(drawnInFile, weapon, bone, true),
+                ruleState(false),
+                `on bone ${bone}`,
+            );
+        }
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, HP_BONE, true),
+            drawnInFile,
+            "above the bone",
+        );
+    });
+
+    // The death shows the MODEL. What its file hides - a collision hull - stays hidden.
+    it("draws its parts as its file has them once that hardpoint is destroyed", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["emitdamage"]),
+                deaths: [death({ damageBone: "emitdamage" })],
+            }),
+        );
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, EMIT_DAMAGE, true),
+            drawnInFile,
+        );
+        assert.deepEqual(
+            unit.meshState(fileState(false), collision, EMIT_DAMAGE, true),
+            fileState(false),
+        );
+    });
+
+    it("is hidden whole once a hardpoint dies whose Engine_Particles bone it hangs on or below", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({ deaths: [death({ engineBone: "hp_bone" })] }),
+        );
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, EMIT_DAMAGE, true),
+            ruleState(false),
+        );
+    });
+
+    it("is hidden whole for stealth, a part inside it that a cloak would show with it", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+
+        assert.deepEqual(
+            unit.meshState(
+                fileState(false),
+                { alamoMesh: "Turret_Stealth" },
+                HP_BONE,
+                true,
+            ),
+            ruleState(false),
+        );
+    });
+
+    it("draws its parts as its file has them when the cloak ends", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+        unit.setActiveAbilities(new Set());
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, HP_BONE, true),
+            drawnInFile,
+        );
+        assert.deepEqual(
+            unit.meshState(fileState(false), collision, HP_BONE, true),
+            fileState(false),
+        );
+    });
+
+    it("takes the later of a death and a cloak, as one switch", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(writes({ damageBones: new Set(["emitdamage"]) }));
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["emitdamage"]),
+                deaths: [death({ damageBone: "emitdamage" })],
+            }),
+        );
+
+        // Cloaked, then shown by the death: the death is the last write of the model's switch.
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, EMIT_DAMAGE, true),
+            drawnInFile,
+        );
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setHardpoints(writes({ damageBones: new Set(["emitdamage"]) }));
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, EMIT_DAMAGE, true),
+            drawnInFile,
         );
     });
 });

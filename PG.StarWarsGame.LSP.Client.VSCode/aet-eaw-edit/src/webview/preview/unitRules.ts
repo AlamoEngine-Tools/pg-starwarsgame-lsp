@@ -227,7 +227,18 @@ export class UnitRules {
      * A mesh's state switch with the game's rules written over the file's write, in the order the
      * preview applies them; the last write is what the mesh has.
      *
-     * @param bone The hull bone the mesh is on, for the rules that name a bone.
+     * A mesh inside a model a hardpoint attaches is evaluated PER MODEL. Measured in the game: the
+     * attached model is one part of the unit, a model inside the model. A rule that names a part -
+     * `Damage_Decal` - is compared with the unit model's own parts and never looks inside it; a
+     * rule that reaches it - a hardpoint's bone it hangs on or below, a cloak - writes the MODEL's
+     * one switch; and a part inside it is drawn only while the model is, as its own switches say.
+     * So nothing the unit writes can show what the attached model's file hides, a collision hull
+     * among them. Reported on a mod's star destroyer: its bow weapons are attached models whose
+     * one drawn mesh is named like the hardpoint's decal on the hull, and the decal rule, reaching
+     * inside, hid the weapons.
+     *
+     * @param bone The hull bone the mesh is on - for a mesh of an attached model, the bone the
+     *     model hangs on - for the rules that name a bone.
      * @param attached Whether the mesh belongs to a model a hardpoint attaches.
      */
     meshState(
@@ -259,28 +270,53 @@ export class UnitRules {
         }
 
         // What the hardpoints write on creation, then every death and every cloak in the one order
-        // they happened.
+        // they happened: to the part itself in the unit's own model, to the model it is in when a
+        // hardpoint attaches that - which starts out shown, and takes no write that names a part.
         const above = this.bonesAbove(bone);
-        written = this.creationHardpointWrite(written, above, name);
+        let model: StateSwitch = ruleState(true);
+
+        if (attached) {
+            model = this.creationHardpointWrite(model, above, null);
+        } else {
+            written = this.creationHardpointWrite(written, above, name);
+        }
 
         for (const event of this.timeline()) {
             if (event.kind === "death") {
-                written = this.deathWrite(written, event.death, above, name);
+                if (attached) {
+                    model = this.deathWrite(model, event.death, above, null);
+                } else {
+                    written = this.deathWrite(
+                        written,
+                        event.death,
+                        above,
+                        name,
+                    );
+                }
             } else {
+                // By its name, the part itself; as an attached model, the model.
                 const cloaked = cloakWrite(
                     event.type,
                     event.on,
                     meshName,
-                    attached,
+                    false,
                     undefined,
                 );
                 if (cloaked !== undefined) {
                     written = ruleState(cloaked);
                 }
+
+                const hidesModel = attached
+                    ? cloakWrite(event.type, event.on, "", true, undefined)
+                    : undefined;
+                if (hidesModel !== undefined) {
+                    model = ruleState(hidesModel);
+                }
             }
         }
 
-        return written;
+        // A hidden model draws none of its parts, whatever they say themselves.
+        return attached && !model.shown ? model : written;
     }
 
     /**

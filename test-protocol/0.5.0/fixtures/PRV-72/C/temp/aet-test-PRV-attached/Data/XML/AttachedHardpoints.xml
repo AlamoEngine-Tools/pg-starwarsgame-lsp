@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<AttachedHardpoints>
+<!-- A hardpoint that attaches a model, and names as its damage decal a mesh of the unit's model that the
+     attached model carries too, and both files draw: each corvette has a mesh called Corvette. -->
+<HardPoint Name="HP_Prv_Attached_A">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>Yes</Is_Targetable>
+<Is_Destroyable>Yes</Is_Destroyable>
+<Health>100.0</Health>
+<Model_To_Attach>Rv_corvette_leia.alo</Model_To_Attach>
+<Attachment_Bone>MuzzleA_00</Attachment_Bone>
+<Damage_Decal>Corvette</Damage_Decal>
+<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
+<Fire_Bone_B>MuzzleA_00</Fire_Bone_B>
+<Fire_Cone_Width>90.0</Fire_Cone_Width>
+<Fire_Cone_Height>90.0</Fire_Cone_Height>
+</HardPoint>
+</AttachedHardpoints>
