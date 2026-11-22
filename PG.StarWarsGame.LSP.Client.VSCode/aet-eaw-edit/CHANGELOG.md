@@ -23,6 +23,11 @@
   and `Ion stun` shows the `pi` effects of a unit for as long as it is on. The slider and `Engines disabled`
   are disabled, with the reason, for a type without the `SIMPLE_SPACE_LOCOMOTOR` behaviour, and `Ion stun`
   for one without `ION_STUN_EFFECT`. A model opened as a file has none of the three
+- **A diagnostic for ion stun effects that never go out** - the game hides a unit's `pi` effects until it is
+  ion stunned only for a type with the `ION_STUN_EFFECT` behaviour; a type without it draws the ones its
+  model file shows from the start, and nothing ever hides them. `CrossTag37` (`aetswg-007-0037`) names those
+  effects on such a type, on its behaviour list. Information, since a wreck that sparks for as long as it
+  lies there is the same finding as a ship meant to spark only while stunned
 - **The model preview shows the model file as it is** - a model file opened on its own shows every part the
   file marks visible, a stealth shell and a shield mesh included, runs every effect the file leaves on and
   stands in the file's own pose until a clip is played. The game's rules - hardpoints, abilities, cloaks, the

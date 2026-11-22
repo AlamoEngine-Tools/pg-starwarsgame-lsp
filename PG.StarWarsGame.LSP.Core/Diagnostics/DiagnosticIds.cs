@@ -727,6 +727,19 @@ public static class DiagnosticIds
     public static readonly DiagnosticId CloakKeepsParts = new(DiagnosticGroup.CrossTag, 36);
 
     /// <summary>
+    ///     A type without the ION_STUN_EFFECT behaviour whose model draws ion stun effects, which are
+    ///     then drawn from the start and never hidden.
+    /// </summary>
+    /// <remarks>
+    ///     Measured in the game: the ION_STUN_EFFECT behaviour hides every effect whose name starts
+    ///     with <c>pi</c> when the object is created, shows them for a stun and hides them at its end,
+    ///     and nothing else writes that group. Counted are the effects the model file marks visible.
+    ///     Information: a wreck that sparks for as long as it lies there is the same finding as a
+    ///     ship meant to spark only while stunned. Silent for a model whose parts are unknown.
+    /// </remarks>
+    public static readonly DiagnosticId IonEffectsNeverHidden = new(DiagnosticGroup.CrossTag, 37);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.

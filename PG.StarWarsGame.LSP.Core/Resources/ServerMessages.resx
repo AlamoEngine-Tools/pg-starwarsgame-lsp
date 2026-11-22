@@ -717,6 +717,12 @@
   <data name="IncomeSplitHandlers_TheEngine" xml:space="preserve">
     <value>&lt;{0}&gt; {1} - the engine {2}</value>
   </data>
+  <data name="IonEffectsNeverHidden_AndMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
+  <data name="IonEffectsNeverHidden_DrawnFromTheStart" xml:space="preserve">
+    <value>Ion stun effects of '{0}' are drawn from the start and never hidden without the ION_STUN_EFFECT behaviour - {1}.</value>
+  </data>
   <data name="IntFloatTupleList_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>

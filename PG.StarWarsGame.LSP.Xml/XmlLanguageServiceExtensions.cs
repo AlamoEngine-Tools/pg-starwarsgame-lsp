@@ -214,6 +214,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, CloakShowsNoShellHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ForceCloakKeepsAttachedModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, CloakKeepsPartsHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, IonEffectsNeverHiddenHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, LandDamageTableMismatchHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FiresForwardHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AttackDistanceBeyondHardpointRangeHandler>();
@@ -296,6 +297,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlFactProducer, XmlHardpointFactProducer>();
         services.AddSingleton<IXmlFactProducer, XmlDamageStageFactProducer>();
         services.AddSingleton<IXmlFactProducer, XmlCloakFactProducer>();
+        services.AddSingleton<IXmlFactProducer, XmlIonStunEffectFactProducer>();
         services.AddSingleton<IXmlFactProducer, StoryFactProducer>();
         services.AddSingleton<IXmlFactProducer, HardcodedSetValueFactProducer>();
         services.AddSingleton<IXmlFactProducer, DamageTypeTailFactProducer>();
