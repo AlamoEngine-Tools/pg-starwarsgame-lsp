@@ -14,7 +14,10 @@ import { inNewestWebview } from "./storyGraph.js";
  */
 const BYTES_PER_PARTICLE = 4 * (3 + 4 + 2 + 3) * 4 + 6 * 4;
 
-/** The bytes every emitter's buffers hold, both streams, and how many emitters there are. Run inside the preview. */
+/**
+ * The bytes every emitter's buffers hold, both streams, and how many emitters there are. Each buffer once: an
+ * emitter keeps its attributes in one, and shares its quad with every other. Run inside the preview.
+ */
 async function room(): Promise<{ bytes: number; emitters: number }> {
     return browser.execute(() => {
         interface Stream {
@@ -33,11 +36,17 @@ async function room(): Promise<{ bytes: number; emitters: number }> {
                 };
             }
         ).aetDebugViewport.particles;
-        const held = (stream: Stream | undefined): number =>
-            stream === undefined
-                ? 0
-                : (stream.index?.array.byteLength ?? 0) +
-                  Object.values(stream.attributes).reduce((sum, attribute) => sum + attribute.array.byteLength, 0);
+        const counted = new Set<ArrayBufferLike>();
+        const held = (stream: Stream | undefined): number => {
+            let bytes = 0;
+            for (const view of [stream?.index, ...Object.values(stream?.attributes ?? {})]) {
+                if (view !== null && view !== undefined && !counted.has(view.array.buffer)) {
+                    counted.add(view.array.buffer);
+                    bytes += view.array.byteLength;
+                }
+            }
+            return bytes;
+        };
 
         let bytes = 0;
         let emitters = 0;

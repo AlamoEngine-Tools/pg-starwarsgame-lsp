@@ -29,6 +29,22 @@ import {
 } from "./particleRenderer";
 
 /**
+ * An attribute's values item by item, flat, whatever buffer holds them: an emitter keeps all of
+ * its attributes in one, so an attribute's own array is every attribute's.
+ */
+function valuesOf(
+    attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+): number[] {
+    const values: number[] = [];
+    for (let item = 0; item < attribute.count; item++) {
+        for (let part = 0; part < attribute.itemSize; part++) {
+            values.push(attribute.getComponent(item, part));
+        }
+    }
+    return values;
+}
+
+/**
  * A model's whole look reaches its effects too: the tint multiplies the colour and the fade the
  * alpha - or, for an additive emitter, the colour, the way the weather fade is applied.
  */
@@ -1076,7 +1092,7 @@ describe("depth-sorted frozen batch", () => {
     function drawnZ(instance: ParticleSystemInstance): number[] {
         const geometry = instance.emitterMesh(0)!
             .geometry as THREE.InstancedBufferGeometry;
-        const offsets = geometry.getAttribute("iOffset").array;
+        const offsets = valuesOf(geometry.getAttribute("iOffset"));
         const out: number[] = [];
         for (let i = 0; i < geometry.instanceCount; i++) {
             out.push(offsets[i * 3 + 2]);
@@ -1580,7 +1596,7 @@ describe("engine effects", () => {
         side.updateMatrixWorld(true);
         instance.update(0.1, side.matrixWorldInverse);
 
-        const positions = attribute(instance, "position").array;
+        const positions = valuesOf(attribute(instance, "position"));
         const xs = [0, 1, 2, 3].map((corner) => positions[corner * 3]);
         const zs = [0, 1, 2, 3].map((corner) => positions[corner * 3 + 2]);
         assert.ok(
@@ -1654,23 +1670,24 @@ describe("engine effects", () => {
         ]);
     });
 
-    // The quads are built for the particle ceiling; what is alive is a handful of them.
+    // The stream has room ahead of need; what is alive is a handful of it.
     it("marks only the live particles' corners for the graphics card", () => {
         const instance = withEffect(
             new ParticleSystemInstance("test", testSystem([still()])),
         );
         instance.update(0.5, viewFrom(100));
         const live = instance.emitterParticles(0).length;
+        const stream = (
+            attribute(
+                instance,
+                "position",
+            ) as unknown as THREE.InterleavedBufferAttribute
+        ).data;
 
         assert.ok(live > 0, "nothing spawned, so the test proves nothing");
-        assert.deepEqual(attribute(instance, "position").updateRanges, [
-            { start: 0, count: live * 4 * 3 },
-        ]);
-        assert.deepEqual(attribute(instance, "color").updateRanges, [
-            { start: 0, count: live * 4 * 4 },
-        ]);
-        assert.deepEqual(attribute(instance, "uv").updateRanges, [
-            { start: 0, count: live * 4 * 2 },
+        // Four corners of position, colour and uv: nine values a corner.
+        assert.deepEqual(stream.updateRanges, [
+            { start: 0, count: live * 4 * 9 },
         ]);
     });
 
@@ -1686,7 +1703,16 @@ describe("engine effects", () => {
 
         assert.equal(instance.emitterParticles(0).length, 0);
         for (const name of ["position", "color", "uv"]) {
-            assert.equal(attribute(instance, name).version, 0, name);
+            assert.equal(
+                (
+                    attribute(
+                        instance,
+                        name,
+                    ) as unknown as THREE.InterleavedBufferAttribute
+                ).data.version,
+                0,
+                name,
+            );
         }
     });
 
@@ -1709,10 +1735,9 @@ describe("engine effects", () => {
             instance.update(0.5, viewFrom(100));
 
             assert.equal(room(instance), 0);
-            assert.equal(instance.emitterMesh(0)!.geometry.index!.count, 0);
         });
 
-        it("is what the emitter is expected to hold, in every attribute and the index", () => {
+        it("is what the emitter is expected to hold, in every attribute", () => {
             // Ten a second living two seconds: twenty, and one for the remainder the clock carries.
             const instance = withEffect(
                 new ParticleSystemInstance(
@@ -1723,13 +1748,11 @@ describe("engine effects", () => {
             for (let i = 0; i < 40; i++) {
                 instance.update(0.1, viewFrom(100));
             }
-            const geometry = instance.emitterMesh(0)!.geometry;
 
             assert.equal(room(instance), 21);
             for (const name of ["position", "color", "uv", "normal"]) {
                 assert.equal(attribute(instance, name).count, 21 * 4, name);
             }
-            assert.equal(geometry.index!.count, 21 * 6);
             assert.ok(instance.emitterParticles(0).length <= 21);
         });
 
@@ -1762,7 +1785,68 @@ describe("engine effects", () => {
             assert.ok(positions.count / 4 >= live, "less room than particles");
             assert.ok(positions.count / 4 < 5003, "room for the ceiling");
             assert.equal(mesh.geometry.drawRange.count, live * 6);
-            assert.equal(mesh.geometry.index!.count, (positions.count / 4) * 6);
+            assert.ok(mesh.geometry.index!.count >= live * 6);
+        });
+
+        it("is one buffer for everything a corner has", () => {
+            const instance = withEffect(
+                new ParticleSystemInstance("test", testSystem([still()])),
+            );
+            instance.update(0.5, viewFrom(100));
+
+            const buffers = new Set(
+                ["position", "color", "uv"].map(
+                    (name) =>
+                        (
+                            attribute(
+                                instance,
+                                name,
+                            ) as unknown as THREE.InterleavedBufferAttribute
+                        ).data,
+                ),
+            );
+            assert.equal(buffers.size, 1);
+            assert.ok([...buffers][0] instanceof THREE.InterleavedBuffer);
+        });
+
+        it("shares its index with every other emitter, and lets go of it before it is freed", () => {
+            const one = withEffect(
+                new ParticleSystemInstance("test", testSystem([still()])),
+            );
+            const other = withEffect(
+                new ParticleSystemInstance("test", testSystem([still()])),
+            );
+            one.update(0.5, viewFrom(100));
+            other.update(0.5, viewFrom(100));
+            const stream = one.emitterMesh(0)!.geometry;
+
+            assert.ok(stream.index !== null);
+            assert.equal(stream.index, other.emitterMesh(0)!.geometry.index);
+
+            one.dispose();
+
+            assert.equal(stream.index, null);
+        });
+
+        it("is not drawn while it holds no particle, and is the moment it holds one", () => {
+            const instance = withEffect(
+                new ParticleSystemInstance(
+                    "test",
+                    testSystem([still({ initialDelay: 1 })]),
+                ),
+            );
+            const drawn = (): boolean =>
+                (instance.emitterMesh(0)!.material as THREE.Material).visible;
+
+            instance.update(0.5, viewFrom(100));
+            assert.equal(drawn(), false, "drawn before a particle was born");
+
+            // A step is a tenth of a second at most: past the delay in twelve of them.
+            for (let i = 0; i < 12; i++) {
+                instance.update(0.1, viewFrom(100));
+            }
+            assert.ok(instance.emitterParticles(0).length > 0);
+            assert.equal(drawn(), true, "not drawn holding a particle");
         });
     });
 });
@@ -2087,13 +2171,11 @@ describe("the owning object Scale_Factor", () => {
         const live = instance.emitterParticles(0).length;
 
         return {
-            offsets: [
-                ...(mesh.geometry.getAttribute("iOffset")
-                    .array as Float32Array),
-            ].slice(0, live * 3),
-            sizes: [
-                ...(mesh.geometry.getAttribute("iSize").array as Float32Array),
-            ].slice(0, live),
+            offsets: valuesOf(mesh.geometry.getAttribute("iOffset")).slice(
+                0,
+                live * 3,
+            ),
+            sizes: valuesOf(mesh.geometry.getAttribute("iSize")).slice(0, live),
         };
     };
 
@@ -2315,9 +2397,9 @@ describe("weather emitters", () => {
         const instance = weather();
         // Camera at z 100 looking at the origin; thirty units in front of it is z 70.
         instance.update(0.1, viewFrom(100));
-        const offsets = instance
-            .emitterMesh(0)!
-            .geometry.getAttribute("iOffset").array;
+        const offsets = valuesOf(
+            instance.emitterMesh(0)!.geometry.getAttribute("iOffset"),
+        );
         for (let i = 0; i < 10; i++) {
             assert.ok(inside(offsets[i * 3], 0), `x ${offsets[i * 3]}`);
             assert.ok(inside(offsets[i * 3 + 1], 0), `y ${offsets[i * 3 + 1]}`);
@@ -2341,9 +2423,9 @@ describe("weather emitters", () => {
             weatherFadeoutDistance: 200,
         });
         instance.update(0.1, viewFrom(100));
-        const colours = instance
-            .emitterMesh(0)!
-            .geometry.getAttribute("iColor").array;
+        const colours = valuesOf(
+            instance.emitterMesh(0)!.geometry.getAttribute("iColor"),
+        );
         const reds = Array.from({ length: 10 }, (_, i) => colours[i * 3]);
         assert.ok(
             reds.every((r) => r < 0.5),
@@ -2404,8 +2486,7 @@ describe("weather emitters", () => {
         windy.update(0.1, viewFrom(100), { x: 20, y: 0, z: 0 });
 
         const turnsOf = (instance: ParticleSystemInstance) =>
-            instance.emitterMesh(0)!.geometry.getAttribute("iRotation")
-                .array[0];
+            instance.emitterMesh(0)!.geometry.getAttribute("iRotation").getX(0);
         assert.notEqual(turnsOf(windy), turnsOf(calm));
     });
 });
@@ -2416,15 +2497,6 @@ describe("weather emitters", () => {
  * nothing alive, each copying room for 5,003 particles every frame, drew at 9 frames a second.
  */
 describe("what an emitter copies to the graphics card", () => {
-    const WRITTEN = [
-        "iOffset",
-        "iColor",
-        "iAlpha",
-        "iSize",
-        "iRotation",
-        "iFrame",
-    ];
-
     function running(
         over: Partial<AlamoEmitterProperties> = {},
     ): ParticleSystemInstance {
@@ -2443,28 +2515,28 @@ describe("what an emitter copies to the graphics card", () => {
         );
     }
 
-    const attribute = (
+    /** The one buffer the emitter's own stream is drawn from. */
+    const stream = (
         instance: ParticleSystemInstance,
-        name: string,
-    ): THREE.BufferAttribute =>
-        instance
-            .emitterMesh(0)!
-            .geometry.getAttribute(name) as THREE.BufferAttribute;
+    ): THREE.InterleavedBuffer =>
+        (
+            instance
+                .emitterMesh(0)!
+                .geometry.getAttribute(
+                    "iOffset",
+                ) as THREE.InterleavedBufferAttribute
+        ).data;
 
     it("marks only the live particles", () => {
         const instance = running();
         instance.update(0.5);
         const live = instance.emitterParticles(0).length;
+        const buffer = stream(instance);
 
         assert.ok(live > 0, "nothing spawned, so the test proves nothing");
-        for (const name of WRITTEN) {
-            const written = attribute(instance, name);
-            assert.deepEqual(
-                written.updateRanges,
-                [{ start: 0, count: live * written.itemSize }],
-                name,
-            );
-        }
+        assert.deepEqual(buffer.updateRanges, [
+            { start: 0, count: live * buffer.stride },
+        ]);
     });
 
     // A hidden emitter is stepped and never drawn, so nothing takes its ranges off it.
@@ -2473,9 +2545,10 @@ describe("what an emitter copies to the graphics card", () => {
         instance.update(0.5);
         instance.update(0.5);
         const live = instance.emitterParticles(0).length;
+        const buffer = stream(instance);
 
-        assert.deepEqual(attribute(instance, "iOffset").updateRanges, [
-            { start: 0, count: live * 3 },
+        assert.deepEqual(buffer.updateRanges, [
+            { start: 0, count: live * buffer.stride },
         ]);
     });
 
@@ -2485,19 +2558,21 @@ describe("what an emitter copies to the graphics card", () => {
         instance.update(0.5);
 
         assert.equal(instance.emitterParticles(0).length, 0);
-        for (const name of [...WRITTEN, "iStretch"]) {
-            assert.equal(attribute(instance, name).version, 0, name);
-        }
+        assert.equal(stream(instance).version, 0);
     });
 
-    it("marks the stretch too for an emitter with a tail", () => {
+    it("copies a streak's stretch with the rest of it", () => {
         const instance = running({ hasTail: true });
         instance.update(0.5);
         const live = instance.emitterParticles(0).length;
+        const stretch = instance
+            .emitterMesh(0)!
+            .geometry.getAttribute(
+                "iStretch",
+            ) as THREE.InterleavedBufferAttribute;
 
-        assert.deepEqual(attribute(instance, "iStretch").updateRanges, [
-            { start: 0, count: live },
-        ]);
+        assert.ok(live > 0);
+        assert.equal(stretch.data, stream(instance));
     });
 });
 
@@ -2576,8 +2651,7 @@ describe("the room an emitter's buffers have", () => {
         const instance = running();
         instance.update(0.5);
 
-        const stretches = sprites(instance).getAttribute("iStretch")
-            .array as Float32Array;
+        const stretches = valuesOf(sprites(instance).getAttribute("iStretch"));
         assert.ok(stretches.length > 0);
         assert.ok(stretches.every((stretch) => stretch === 1));
     });
@@ -2613,7 +2687,7 @@ describe("the room an emitter's buffers have", () => {
         }
         const live = instance.emitterParticles(1).length;
         const geometry = sprites(instance, 1);
-        const offsets = geometry.getAttribute("iOffset").array;
+        const offsets = valuesOf(geometry.getAttribute("iOffset"));
 
         assert.ok(live > 21, `${live} alive, so nothing had to grow`);
         assert.ok(room(instance, 1) >= live, "less room than particles");
@@ -2635,5 +2709,122 @@ describe("the room an emitter's buffers have", () => {
 
         assert.equal(instance.emitterParticles(0).length, 5003);
         assert.equal(room(instance), 5003);
+    });
+
+    /**
+     * What an emitter costs the graphics card.
+     *
+     * Measured on a mod's capital ship with every hardpoint destroyed at once: nine buffers an
+     * emitter - 43,920 made in the frame of the press - six of them copied every frame it held a
+     * particle, 16,167 copies a frame, and every emitter that held none drawn all the same.
+     */
+    describe("on the graphics card", () => {
+        const buffersOf = (geometry: THREE.BufferGeometry): Set<unknown> =>
+            new Set(
+                INSTANCED.map(
+                    (name) =>
+                        (
+                            geometry.getAttribute(
+                                name,
+                            ) as THREE.InterleavedBufferAttribute
+                        ).data,
+                ),
+            );
+
+        it("is one buffer for everything a particle has", () => {
+            const instance = running();
+            instance.update(0.5);
+
+            const buffers = buffersOf(sprites(instance));
+            assert.equal(buffers.size, 1);
+            assert.ok(
+                [...buffers][0] instanceof THREE.InstancedInterleavedBuffer,
+            );
+        });
+
+        it("is one range of that buffer a frame: the live particles", () => {
+            const instance = running();
+            instance.update(0.5);
+            instance.update(0.1);
+            const live = instance.emitterParticles(0).length;
+            const buffer = [
+                ...buffersOf(sprites(instance)),
+            ][0] as THREE.InstancedInterleavedBuffer;
+
+            assert.ok(live > 0, "nothing spawned, so the test proves nothing");
+            assert.deepEqual(buffer.updateRanges, [
+                { start: 0, count: live * buffer.stride },
+            ]);
+        });
+
+        it("shares the quad and its index with every other emitter", () => {
+            const one = running();
+            const other = running({ blendMode: "Transparent" });
+            one.update(0.5);
+            other.update(0.5);
+
+            assert.equal(
+                sprites(one).getAttribute("corner"),
+                sprites(other).getAttribute("corner"),
+            );
+            assert.equal(sprites(one).index, sprites(other).index);
+        });
+
+        // The graphics card frees every buffer a geometry still holds when the geometry goes.
+        it("lets go of what it shares before it frees a stream it outgrew or is done with", () => {
+            const instance = running();
+            const empty = sprites(instance);
+            instance.update(0.5);
+            const grown = sprites(instance);
+
+            assert.notEqual(grown, empty);
+            assert.equal(empty.getAttribute("corner"), undefined);
+            assert.equal(empty.index, null);
+
+            instance.dispose();
+
+            assert.equal(grown.getAttribute("corner"), undefined);
+            assert.equal(grown.index, null);
+        });
+
+        it("is not drawn while it holds no particle, and is the moment it holds one", () => {
+            const instance = running({ initialDelay: 1 });
+            const mesh = instance.emitterMesh(0)!;
+            const drawn = (): boolean =>
+                (mesh.material as THREE.Material).visible;
+
+            instance.update(0.5);
+            assert.equal(drawn(), false, "drawn before a particle was born");
+            // Shown all the same: that is the switch the reader and the rules hold.
+            assert.equal(mesh.visible, true);
+
+            // A step is a tenth of a second at most: past the delay in twelve of them.
+            for (let i = 0; i < 12; i++) {
+                instance.update(0.1);
+            }
+            assert.ok(instance.emitterParticles(0).length > 0);
+            assert.equal(drawn(), true, "not drawn holding a particle");
+        });
+
+        it("is not drawn again once its last particle has died", () => {
+            const instance = running({
+                useBursts: true,
+                burstCount: 1,
+                particlesPerBurst: 5,
+                burstDelay: 0,
+                lifetime: 0.2,
+            });
+            const material = instance.emitterMesh(0)!
+                .material as THREE.Material;
+
+            instance.update(0.1);
+            assert.equal(material.visible, true);
+
+            for (let i = 0; i < 5; i++) {
+                instance.update(0.1);
+            }
+            assert.equal(instance.emitterParticles(0).length, 0);
+            assert.equal(material.visible, false);
+        });
     });
 });

@@ -586,27 +586,91 @@ export function tailGeometry(
 const QUAD_CORNERS = [-1, -1, 1, -1, 1, 1, -1, 1];
 
 /**
- * Marks the first `items` of an attribute for the graphics card, and nothing when there are none.
+ * What every emitter's stream has alike, made once and shared by all of them.
  *
- * An attribute marked without a range is copied whole, room and all - and these were sized for
+ * The quad a sprite is drawn on and the indices of its two triangles, for the preview's own
+ * stream; and for the engine effect's, the indices of every quad up to the particle ceiling - a
+ * stream draws as far into them as it has particles. MEASURED on a mod's capital ship with every
+ * hardpoint destroyed at once: each emitter kept its own copy of these beside seven buffers of
+ * its own, and the frame of the press made 43,920 buffers for 4,880 streams.
+ *
+ * Shared buffers are freed with the first geometry that goes while it still holds them, so a
+ * stream lets go of them before it is freed - see `freeStream`.
+ */
+const SPRITE_QUAD = new THREE.BufferAttribute(
+    new Float32Array(QUAD_CORNERS),
+    2,
+);
+const SPRITE_QUAD_INDEX = new THREE.BufferAttribute(
+    new Uint16Array([0, 1, 2, 0, 2, 3]),
+    1,
+);
+
+let quadIndices: THREE.BufferAttribute | null = null;
+
+/** The indices of every quad a stream of four-cornered particles can hold. Sixteen bits reach: the last corner is 20,011. */
+function everyQuadIndex(): THREE.BufferAttribute {
+    if (quadIndices === null) {
+        const index = new Uint16Array(MAX_PARTICLES * 6);
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            const v = i * 4;
+            index.set([v, v + 1, v + 2, v, v + 2, v + 3], i * 6);
+        }
+        quadIndices = new THREE.BufferAttribute(index, 1);
+    }
+
+    return quadIndices;
+}
+
+/** Frees a stream's own buffer, and leaves the ones it shares with every other stream. */
+function freeStream(geometry: THREE.BufferGeometry): void {
+    if (geometry.hasAttribute("corner")) {
+        geometry.deleteAttribute("corner");
+    }
+    geometry.setIndex(null);
+    geometry.dispose();
+}
+
+/**
+ * The floats one instance takes in the preview's own stream, and where each attribute sits in
+ * them: `[name, size, offset]`.
+ */
+const SPRITE_STRIDE = 11;
+const SPRITE_LAYOUT: readonly (readonly [string, number, number])[] = [
+    ["iOffset", 3, 0],
+    ["iColor", 3, 3],
+    ["iAlpha", 1, 6],
+    ["iSize", 1, 7],
+    ["iRotation", 1, 8],
+    ["iFrame", 1, 9],
+    ["iStretch", 1, 10],
+];
+const SPRITE_STRETCH = 10;
+
+/** The floats one corner takes in the engine effect's stream: position, colour, uv. */
+const CORNER_STRIDE = 9;
+
+/**
+ * Marks the first `values` of a stream's buffer for the graphics card, and nothing when there are
+ * none.
+ *
+ * A buffer marked without a range is copied whole, room and all - and these were sized for
  * the particle ceiling then: measured on a mod's capital ship, 4,840 emitters with nothing alive
  * copied room for 5,003 particles each, every frame, and the preview drew at 9 frames a second.
  * They have room ahead of need still - see `roomFor`. The range is set afresh each time, because
  * an emitter that is stepped and not drawn never has its ranges taken off.
+ *
+ * ONE buffer a stream, so one copy a frame. Each attribute had a buffer of its own: six copies a
+ * frame for an emitter of three particles, 16,167 a frame on that ship while it burnt.
  */
-function markWritten(
-    geometry: THREE.BufferGeometry,
-    name: string,
-    items: number,
-): void {
-    if (items <= 0) {
+function markWritten(buffer: THREE.InterleavedBuffer, values: number): void {
+    if (values <= 0) {
         return;
     }
 
-    const attribute = geometry.attributes[name] as THREE.BufferAttribute;
-    attribute.clearUpdateRanges();
-    attribute.addUpdateRange(0, items * attribute.itemSize);
-    attribute.needsUpdate = true;
+    buffer.clearUpdateRanges();
+    buffer.addUpdateRange(0, values);
+    buffer.needsUpdate = true;
 }
 
 /**
@@ -625,9 +689,9 @@ const SECOND_TEXTURE_SAMPLERS = ["NormalSampler", "DepthSampler"];
 class EngineDraw {
     geometry: THREE.BufferGeometry;
     readonly material: AlamoMaterial;
-    positions = new Float32Array(0);
-    colours = new Float32Array(0);
-    uvs = new Float32Array(0);
+    /** Every corner's position, colour and uv, {@link CORNER_STRIDE} floats a corner. */
+    corners = new Float32Array(0);
+    private buffer = new THREE.InterleavedBuffer(this.corners, CORNER_STRIDE);
     /** How many particles the stream has room for. */
     private capacity = 0;
 
@@ -650,6 +714,8 @@ class EngineDraw {
         this.material.side = THREE.DoubleSide;
         this.material.depthTest = state.depthTest && !noDepthTest;
         this.material.needsUpdate = true;
+        // Nothing to draw until a particle is written - see `written`.
+        this.material.visible = false;
     }
 
     /**
@@ -667,44 +733,39 @@ class EngineDraw {
         }
 
         this.capacity = roomFor(count, this.capacity, expected);
-        this.positions = new Float32Array(this.capacity * 4 * 3);
-        this.colours = new Float32Array(this.capacity * 4 * 4);
-        this.uvs = new Float32Array(this.capacity * 4 * 2);
+        this.corners = new Float32Array(this.capacity * 4 * CORNER_STRIDE);
 
-        this.geometry.dispose();
+        freeStream(this.geometry);
         this.geometry = this.stream();
         return true;
     }
 
-    /** A geometry over the arrays as they stand, with nothing drawn yet. */
+    /** A geometry over the corners as they stand, with nothing drawn yet. */
     private stream(): THREE.BufferGeometry {
         const geometry = new THREE.BufferGeometry();
+        this.buffer = new THREE.InterleavedBuffer(this.corners, CORNER_STRIDE);
 
-        // Position, colour, uv: the engine's own particle vertex. The bump effects declare a normal
-        // input their vertex shader never reads; it is fed zeros so the attribute is not missing.
+        // Position, colour, uv: the engine's own particle vertex, in one buffer.
         geometry.setAttribute(
             "position",
-            new THREE.BufferAttribute(this.positions, 3),
+            new THREE.InterleavedBufferAttribute(this.buffer, 3, 0),
         );
         geometry.setAttribute(
             "color",
-            new THREE.BufferAttribute(this.colours, 4),
+            new THREE.InterleavedBufferAttribute(this.buffer, 4, 3),
         );
-        geometry.setAttribute("uv", new THREE.BufferAttribute(this.uvs, 2));
+        geometry.setAttribute(
+            "uv",
+            new THREE.InterleavedBufferAttribute(this.buffer, 2, 7),
+        );
+        // The bump effects declare a normal input their vertex shader never reads. It is pointed
+        // at the positions so the attribute is not missing and costs no buffer of its own.
         geometry.setAttribute(
             "normal",
-            new THREE.BufferAttribute(
-                new Float32Array(this.capacity * 4 * 3),
-                3,
-            ),
+            new THREE.InterleavedBufferAttribute(this.buffer, 3, 0),
         );
 
-        const index = new Uint32Array(this.capacity * 6);
-        for (let i = 0; i < this.capacity; i++) {
-            const v = i * 4;
-            index.set([v, v + 1, v + 2, v, v + 2, v + 3], i * 6);
-        }
-        geometry.setIndex(new THREE.BufferAttribute(index, 1));
+        geometry.setIndex(everyQuadIndex());
         geometry.setDrawRange(0, 0);
 
         return geometry;
@@ -723,16 +784,21 @@ class EngineDraw {
         }
     }
 
-    /** Marks the first `count` quads written and ready to draw. */
+    /**
+     * Marks the first `count` quads written and ready to draw.
+     *
+     * A stream of none is not drawn at all: left in, it went through the renderer every frame to
+     * draw nothing - 2,153 of the 4,786 emitters of a mod's capital ship two seconds after every
+     * hardpoint was destroyed.
+     */
     written(count: number): void {
         this.geometry.setDrawRange(0, count * 6);
-        for (const name of ["position", "color", "uv"]) {
-            markWritten(this.geometry, name, count * 4);
-        }
+        this.material.visible = count > 0;
+        markWritten(this.buffer, count * 4 * CORNER_STRIDE);
     }
 
     dispose(): void {
-        this.geometry.dispose();
+        freeStream(this.geometry);
         this.material.dispose();
     }
 }
@@ -775,13 +841,12 @@ class EmitterRenderer {
     /** How many particles the preview's own stream has room for - see {@link reserve}. */
     private capacity = 0;
 
-    private offsets = new Float32Array(0);
-    private colors = new Float32Array(0);
-    private alphas = new Float32Array(0);
-    private sizes = new Float32Array(0);
-    private rotations = new Float32Array(0);
-    private frames = new Float32Array(0);
-    private stretches = new Float32Array(0);
+    /** Everything each particle is drawn with, {@link SPRITE_STRIDE} floats a particle. */
+    private instances = new Float32Array(0);
+    private instanceBuffer = new THREE.InstancedInterleavedBuffer(
+        this.instances,
+        SPRITE_STRIDE,
+    );
 
     /** Reused per particle by the kite maths, so a thousand sparks allocate nothing. */
     private readonly viewVelocity = new THREE.Vector3();
@@ -907,6 +972,8 @@ class EmitterRenderer {
             depthTest: !emitter.properties.noDepthTest,
             side: THREE.DoubleSide,
         });
+        // Nothing to draw until a particle is written - see `writeBuffers`.
+        this.material.visible = false;
 
         this.mesh = new THREE.Mesh(this.geometry, this.material);
 
@@ -923,47 +990,28 @@ class EmitterRenderer {
         this.mesh.name = emitter.name;
     }
 
-    /** The preview's own stream over the arrays as they stand, with nothing drawn yet. */
+    /** The preview's own stream over the instances as they stand, with nothing drawn yet. */
     private sprites(): THREE.InstancedBufferGeometry {
         const geometry = new THREE.InstancedBufferGeometry();
+        this.instanceBuffer = new THREE.InstancedInterleavedBuffer(
+            this.instances,
+            SPRITE_STRIDE,
+        );
 
-        geometry.setAttribute(
-            "corner",
-            new THREE.BufferAttribute(
-                new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]),
-                2,
-            ),
-        );
-        geometry.setIndex([0, 1, 2, 0, 2, 3]);
+        // The quad and its index are every emitter's alike - see `SPRITE_QUAD`.
+        geometry.setAttribute("corner", SPRITE_QUAD);
+        geometry.setIndex(SPRITE_QUAD_INDEX);
 
-        geometry.setAttribute(
-            "iOffset",
-            new THREE.InstancedBufferAttribute(this.offsets, 3),
-        );
-        geometry.setAttribute(
-            "iColor",
-            new THREE.InstancedBufferAttribute(this.colors, 3),
-        );
-        geometry.setAttribute(
-            "iAlpha",
-            new THREE.InstancedBufferAttribute(this.alphas, 1),
-        );
-        geometry.setAttribute(
-            "iSize",
-            new THREE.InstancedBufferAttribute(this.sizes, 1),
-        );
-        geometry.setAttribute(
-            "iRotation",
-            new THREE.InstancedBufferAttribute(this.rotations, 1),
-        );
-        geometry.setAttribute(
-            "iFrame",
-            new THREE.InstancedBufferAttribute(this.frames, 1),
-        );
-        geometry.setAttribute(
-            "iStretch",
-            new THREE.InstancedBufferAttribute(this.stretches, 1),
-        );
+        for (const [name, size, offset] of SPRITE_LAYOUT) {
+            geometry.setAttribute(
+                name,
+                new THREE.InterleavedBufferAttribute(
+                    this.instanceBuffer,
+                    size,
+                    offset,
+                ),
+            );
+        }
         geometry.instanceCount = 0;
 
         return geometry;
@@ -985,21 +1033,18 @@ class EmitterRenderer {
         }
 
         this.capacity = roomFor(count, this.capacity, this.expected);
-        this.offsets = new Float32Array(this.capacity * 3);
-        this.colors = new Float32Array(this.capacity * 3);
-        this.alphas = new Float32Array(this.capacity);
-        this.sizes = new Float32Array(this.capacity);
-        this.rotations = new Float32Array(this.capacity);
-        this.frames = new Float32Array(this.capacity);
+        this.instances = new Float32Array(this.capacity * SPRITE_STRIDE);
         // One, and only a streak writes over it: a sprite that is not one is drawn unstretched.
-        this.stretches = new Float32Array(this.capacity).fill(1);
+        for (let i = 0; i < this.capacity; i++) {
+            this.instances[i * SPRITE_STRIDE + SPRITE_STRETCH] = 1;
+        }
 
         const spent = this.geometry;
         this.geometry = this.sprites();
         if (this.mesh.geometry === spent) {
             this.mesh.geometry = this.geometry;
         }
-        spent.dispose();
+        freeStream(spent);
     }
 
     /** The emitter this renderer draws, for callers that need its numbers rather than its pixels. */
@@ -1264,7 +1309,7 @@ class EmitterRenderer {
         if (engine.reserve(count, this.expected)) {
             this.mesh.geometry = engine.geometry;
         }
-        const { positions, colours, uvs } = engine;
+        const { corners } = engine;
 
         for (let i = 0; i < count; i++) {
             const particle = this.particles[order === null ? i : order[i]];
@@ -1298,19 +1343,17 @@ class EmitterRenderer {
                 const cy = QUAD_CORNERS[corner * 2 + 1];
                 const spunX = cx * c - cy * s;
                 const spunY = cx * s + cy * c;
-                const vertex = i * 4 + corner;
-                positions[vertex * 3] =
-                    px + (rightX * spunX + upX * spunY) * size;
-                positions[vertex * 3 + 1] =
-                    py + (rightY * spunX + upY * spunY) * size;
-                positions[vertex * 3 + 2] =
-                    pz + (rightZ * spunX + upZ * spunY) * size;
-                colours[vertex * 4] = r;
-                colours[vertex * 4 + 1] = g;
-                colours[vertex * 4 + 2] = b;
-                colours[vertex * 4 + 3] = a;
-                uvs[vertex * 2] = originU + (cx * 0.5 + 0.5) * cell;
-                uvs[vertex * 2 + 1] = originV + (cy * 0.5 + 0.5) * cell;
+                // Position, colour, uv - see `CORNER_STRIDE`.
+                const at = (i * 4 + corner) * CORNER_STRIDE;
+                corners[at] = px + (rightX * spunX + upX * spunY) * size;
+                corners[at + 1] = py + (rightY * spunX + upY * spunY) * size;
+                corners[at + 2] = pz + (rightZ * spunX + upZ * spunY) * size;
+                corners[at + 3] = r;
+                corners[at + 4] = g;
+                corners[at + 5] = b;
+                corners[at + 6] = a;
+                corners[at + 7] = originU + (cx * 0.5 + 0.5) * cell;
+                corners[at + 8] = originV + (cy * 0.5 + 0.5) * cell;
             }
         }
 
@@ -1562,7 +1605,7 @@ class EmitterRenderer {
     }
 
     dispose(): void {
-        this.geometry.dispose();
+        freeStream(this.geometry);
         this.material.dispose();
         this.engine?.dispose();
         this.engine = null;
@@ -1803,6 +1846,7 @@ class EmitterRenderer {
 
         const count = this.drawnCount(frame);
         this.reserve(count);
+        const instances = this.instances;
 
         for (let i = 0; i < count; i++) {
             const particle = this.particles[order === null ? i : order[i]];
@@ -1824,41 +1868,35 @@ class EmitterRenderer {
             // what a scale on the world matrix does. It has to be here rather than on the system's
             // node because the billboard path adds the half-extent in VIEW space, after the model
             // matrix - a node scale would move every particle without resizing any of it.
-            this.offsets[i * 3] = drawn.x * this.scaleFactor;
-            this.offsets[i * 3 + 1] = drawn.y * this.scaleFactor;
-            this.offsets[i * 3 + 2] = drawn.z * this.scaleFactor;
+            //
+            // Offset, colour, alpha, size, rotation, frame, stretch - see `SPRITE_LAYOUT`.
+            const at = i * SPRITE_STRIDE;
+            instances[at] = drawn.x * this.scaleFactor;
+            instances[at + 1] = drawn.y * this.scaleFactor;
+            instances[at + 2] = drawn.z * this.scaleFactor;
 
-            this.colors[i * 3] = lr;
-            this.colors[i * 3 + 1] = lg;
-            this.colors[i * 3 + 2] = lb;
+            instances[at + 3] = lr;
+            instances[at + 4] = lg;
+            instances[at + 5] = lb;
 
-            this.alphas[i] = la;
-            this.sizes[i] = look.size * this.scaleFactor;
-            this.rotations[i] = look.rotation;
-            this.frames[i] = look.frame;
+            instances[at + 6] = la;
+            instances[at + 7] = look.size * this.scaleFactor;
+            instances[at + 8] = look.rotation;
+            instances[at + 9] = look.frame;
 
             if (tailed) {
                 // A streak takes its angle from where it is going, not from the rotation track -
                 // the engine zeroes that track outright for a tailed emitter.
                 const kite = this.kiteFor(particle, frame);
-                this.stretches[i] = kite.stretch;
-                this.rotations[i] = kite.turns;
+                instances[at + SPRITE_STRETCH] = kite.stretch;
+                instances[at + 8] = kite.turns;
             }
         }
 
         this.geometry.instanceCount = count;
-
-        const written = [
-            "iOffset",
-            "iColor",
-            "iAlpha",
-            "iSize",
-            "iRotation",
-            "iFrame",
-        ];
-        for (const name of tailed ? [...written, "iStretch"] : written) {
-            markWritten(this.geometry, name, count);
-        }
+        // An emitter holding nothing is not drawn at all - see `EngineDraw.written`.
+        this.material.visible = count > 0;
+        markWritten(this.instanceBuffer, count * SPRITE_STRIDE);
     }
 
     /**

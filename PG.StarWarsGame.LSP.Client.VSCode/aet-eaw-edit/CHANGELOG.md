@@ -207,6 +207,13 @@
   on a mod's capital ship with 145 hardpoints destroyed at once: the preview's memory after the press fell from
   1.35 GB to 0.4 GB and with the unit just loaded from 512 MB to 308 MB, the frozen frame at the press from
   1.4 seconds to 0.44, and a frame while the explosions burn from 57 milliseconds to 38
+- **An emitter costs the graphics card one buffer, and nothing while it holds no particle** - every emitter
+  kept seven buffers of its own beside a quad and an index that are every emitter's alike, copied six of them
+  each frame it held a particle, and was drawn each frame it held none. Its particles are now in one buffer,
+  the quad and the index are shared by all, and an emitter with nothing in the air is left out of the frame.
+  Measured on a mod's capital ship with 145 hardpoints destroyed at once: the buffers made at the press fell
+  from 43,920 to 5,025 and the copies a frame while it burns from 16,167 to 2,656, the frozen frame at the
+  press from 0.44 seconds to 0.25, and the frame rate two seconds in rose from 27 a second to 71
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the
