@@ -20,5 +20,13 @@ export const BREAKOFF_PART = "breakoff:";
  */
 export const DEATH_CLONE_PART = "deathclone:";
 
+/**
+ * The part id a wreck's model is asked for under when the scene arrives, before anything sheds it.
+ *
+ * A reply under it puts nothing in the scene: the model is kept, what it is drawn with is fetched,
+ * and the hardpoint that sheds the wreck later is answered from what is held.
+ */
+export const PREFETCH_PART = "prefetch:";
+
 /** Prefix for the persistent effect a piece of wreckage trails, so it can be stopped by key. */
 export const WRECK_EFFECT = "wreckfire:";

@@ -31,7 +31,11 @@ import {
     PreviewScene,
 } from "../protocol/modelPreview";
 import { collectTextureNames } from "./preview/materials";
-import { loadState, type LoadTally } from "./preview/loadProgress";
+import {
+    loadState,
+    type LoadTally,
+    nothingDrawn,
+} from "./preview/loadProgress";
 import { handoffFor } from "./preview/handoff";
 import { groundRange } from "./preview/groundRange";
 import { StageSlots } from "./shared/Stage";
@@ -40,6 +44,7 @@ import { AbilityCommandBar } from "./preview/panels/AbilityCommandBar";
 import { AbilityInfoFlyout } from "./preview/panels/AbilityInfoFlyout";
 import { AttackControls } from "./preview/panels/AttackControls";
 import { SubjectStateControls } from "./preview/panels/SubjectStateControls";
+import { UnitStateControls } from "./preview/panels/UnitStateControls";
 import { turnedTurretCount } from "./preview/turretHandles";
 import { CardInfoFlyout } from "./preview/panels/CardInfoFlyout";
 import { DamageLogFlyout } from "./preview/panels/DamageLogFlyout";
@@ -92,7 +97,6 @@ import { useViewportSync } from "./preview/useViewportSync";
 import {
     type DefinedLevels,
     type LevelCost,
-    levelSteps,
     withDeclaredStages,
 } from "./preview/levels";
 import { type ParticleGroup, particleGroups } from "./preview/particleScene";
@@ -508,11 +512,6 @@ function ModelPreview(): React.JSX.Element {
     const { collapsed, setCollapsed, foldedRef, boneFilter, setBoneFilter } =
         tree;
 
-    /* Slider positions over the levels this model DEFINES. Rebuilt only when the level list
-       changes, which is once per subject. */
-    const altSteps = useMemo(() => levelSteps(levels.alt), [levels.alt]);
-    const lodSteps = useMemo(() => levelSteps(levels.lod), [levels.lod]);
-
     /**
      * Game rendering's stand-in shadow, for a model without a shadow mesh.
      *
@@ -569,7 +568,7 @@ function ModelPreview(): React.JSX.Element {
     );
 
     /**
-     * What each detail level costs, for the LOD slider's own label.
+     * What each detail level costs, for the detail level's list and its tooltip.
      *
      * Depends on `stats` for the reason the arcs and the reticles do - it is this component's
      * signal that geometry has arrived - and on `alt`, because a mesh tagged for another damage
@@ -772,6 +771,29 @@ function ModelPreview(): React.JSX.Element {
         }
     }, [assets, loading.covered]);
 
+    /**
+     * Geometry loaded and not one mesh reaching the screen is worth saying out loud. It is a real
+     * authoring state - every sub-mesh tagged for a damage or detail level this model never
+     * selects, or the whole hull attached to a bone that ships hidden - and it is indistinguishable
+     * from a broken preview if the panel just draws an empty grid.
+     *
+     * Said once the geometry is IN, not as each part arrives - see `nothingDrawn`.
+     */
+    useEffect(() => {
+        if (!nothingDrawn(tally, viewportRef.current?.stats() ?? null)) {
+            return;
+        }
+
+        setProblems((existing) =>
+            existing.some((p) => p.message === NOTHING_DRAWN)
+                ? existing
+                : [
+                      ...existing,
+                      { severity: "warning", message: NOTHING_DRAWN },
+                  ],
+        );
+    }, [tally.expectedParts, tally.arrivedParts, tally.timedOut]);
+
     const refreshStats = useCallback(() => {
         const viewport = viewportRef.current;
         setStats(viewport?.stats() ?? null);
@@ -785,21 +807,7 @@ function ModelPreview(): React.JSX.Element {
         );
         setLevels(defined);
 
-        // Geometry loaded and not one mesh reaching the screen is worth saying out loud. It is a
-        // real authoring state - every sub-mesh tagged for a damage or detail level this model
-        // never selects, or the whole hull attached to a bone that ships hidden - and it is
-        // indistinguishable from a broken preview if the panel just draws an empty grid.
         const current = viewport?.stats() ?? null;
-        if (current !== null && current.parts > 0 && current.meshes === 0) {
-            setProblems((existing) =>
-                existing.some((p) => p.message === NOTHING_DRAWN)
-                    ? existing
-                    : [
-                          ...existing,
-                          { severity: "warning", message: NOTHING_DRAWN },
-                      ],
-            );
-        }
 
         // Not until geometry has actually ARRIVED. `definedLevels` seeds its sets with 0, so an
         // empty model reports `lod: [0]` - a full-looking answer that is really "nothing has told me
@@ -843,18 +851,18 @@ function ModelPreview(): React.JSX.Element {
         viewportRef,
     });
     const {
-        systemsRef,
-        systemScalesRef,
         pendingRef,
-        requestedSystemsRef,
         passiveEffectIdsRef,
-        explosionsRef,
         effectDrawsNow,
         queuePassiveEffects,
         dropPassiveEffects,
         cancelEffect,
         attachPending,
         playEffect,
+        prefetchEffects,
+        takeSystem,
+        systemMissing,
+        forgetSystems,
     } = particles;
 
     /**
@@ -1135,18 +1143,18 @@ function ModelPreview(): React.JSX.Element {
         deadRef,
         cloneDeathRef,
         detailWantedRef,
-        explosionsRef,
         foldedRef,
+        forgetSystems,
         altRestoredRef,
         lodPickedRef,
         passiveEffectIdsRef,
         pendingRef,
         playEffect,
+        prefetchEffects,
         queuePassiveEffects,
         refreshStats,
         refreshingRef,
         requestMaterialAssets,
-        requestedSystemsRef,
         restoredRef,
         sceneRef,
         setActiveAbilities,
@@ -1179,8 +1187,8 @@ function ModelPreview(): React.JSX.Element {
         storedCustomColourRef,
         storedFactionRef,
         storedSubjectRef,
-        systemScalesRef,
-        systemsRef,
+        systemMissing,
+        takeSystem,
         viewportRef,
     });
 
@@ -1506,13 +1514,11 @@ function ModelPreview(): React.JSX.Element {
                             start={
                                 <SubjectStateControls
                                     alt={alt}
-                                    altSteps={altSteps}
                                     combat={combat}
                                     levels={levels}
                                     lod={lod}
                                     lodPickedRef={lodPickedRef}
                                     lodCost={lodCost}
-                                    lodSteps={lodSteps}
                                     scene={scene}
                                     setAlt={setAlt}
                                     setLod={setLod}
@@ -1537,13 +1543,19 @@ function ModelPreview(): React.JSX.Element {
                                 />
                             }
                             end={
-                                <AttackControls
-                                    attackOpen={attackOpen}
-                                    combat={combat}
-                                    mode={mode}
-                                    scene={scene}
-                                    setAttackOpen={setAttackOpen}
-                                />
+                                <>
+                                    <UnitStateControls
+                                        combat={combat}
+                                        scene={scene}
+                                    />
+                                    <AttackControls
+                                        attackOpen={attackOpen}
+                                        combat={combat}
+                                        mode={mode}
+                                        scene={scene}
+                                        setAttackOpen={setAttackOpen}
+                                    />
+                                </>
                             }
                         />
                         {/* What the command bar cannot say in an icon.

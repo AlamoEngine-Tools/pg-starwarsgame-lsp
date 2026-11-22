@@ -231,3 +231,123 @@ describe("CameraRig", () => {
         assert.deepEqual(cameraRig.billboards, [card]);
     });
 });
+
+describe("CameraRig in a batch", () => {
+    /** Counts how often the model is measured from here on. */
+    function measurings(cameraRig: CameraRig): () => number {
+        let count = 0;
+        const measure = cameraRig.boundingSphere.bind(cameraRig);
+        cameraRig.boundingSphere = (includeEffects?: boolean) => {
+            count++;
+            return measure(includeEffects);
+        };
+        return () => count;
+    }
+
+    it("puts the far plane past an effect that has arrived", () => {
+        const reaches: number[] = [];
+        const { cameraRig, camera, modelRoot } = rigWith(reaches);
+        modelRoot.add(box(0));
+        cameraRig.frameAll();
+        const before = camera.far;
+
+        reaches.push(5000);
+        cameraRig.refitDepthRange();
+
+        assert.ok(camera.far > before, `${camera.far} against ${before}`);
+    });
+
+    // Measured on a mod's capital ship: every explosion put in the scene measured the whole model
+    // twice over, a second of the press that destroys every hardpoint.
+    it("measures the model once for a batch, however often its steps asked", () => {
+        const reaches: number[] = [];
+        const { cameraRig, camera, modelRoot } = rigWith(reaches);
+        modelRoot.add(box(0));
+        cameraRig.frameAll();
+        const before = camera.far;
+        const measured = measurings(cameraRig);
+
+        cameraRig.batch(() => {
+            reaches.push(5000);
+            cameraRig.refitDepthRange();
+            cameraRig.refitDepthRange();
+            cameraRig.refitDepthRange();
+
+            assert.equal(measured(), 0, "measured inside the batch");
+            assert.equal(camera.far, before);
+        });
+
+        assert.equal(measured(), 1);
+        assert.ok(camera.far > before, `${camera.far} against ${before}`);
+    });
+
+    it("measures nothing for a batch that asked for nothing", () => {
+        const { cameraRig, modelRoot } = rigWith();
+        modelRoot.add(box(0));
+        const measured = measurings(cameraRig);
+
+        cameraRig.batch(() => undefined);
+
+        assert.equal(measured(), 0);
+    });
+
+    it("waits for the outermost batch to end", () => {
+        const { cameraRig, modelRoot } = rigWith();
+        modelRoot.add(box(0));
+        const measured = measurings(cameraRig);
+
+        cameraRig.batch(() => {
+            cameraRig.batch(() => cameraRig.refitDepthRange());
+
+            assert.equal(measured(), 0, "measured when the inner batch ended");
+        });
+
+        assert.equal(measured(), 1);
+    });
+});
+
+/**
+ * #441: what the engine's shaders are handed each frame.
+ *
+ * Measured on the Ewok under the Game renderer: one frame of the file pose each time its Idle card
+ * drew another take, 7 of 2,986 frames for 7 takes. A clip starts from the file pose, the preview
+ * measures the model there, which writes the bones' place in the world, and the shaders were handed
+ * that place before the clip's first pose had reached it - three brings it up to date when it
+ * draws, which is after.
+ */
+describe("CameraRig before a frame is drawn", () => {
+    it("hands the engine's shaders the bones where they stand in the world this frame", () => {
+        const scene = new THREE.Scene();
+        const bone = new THREE.Bone();
+        const hand = new THREE.Bone();
+        bone.add(hand);
+        scene.add(bone);
+        // The file pose, in the world as the frame before left it.
+        scene.updateMatrixWorld(true);
+
+        let handed: number[] = [];
+        const cameraRig = new CameraRig(
+            standInContext({
+                scene,
+                camera: new THREE.PerspectiveCamera(),
+                materials: {
+                    updateAlamoUniforms: () => {
+                        handed = [
+                            hand.matrixWorld.elements[12],
+                            hand.matrixWorld.elements[13],
+                            hand.matrixWorld.elements[14],
+                        ];
+                    },
+                },
+                environment: { followCamera: () => undefined },
+            }),
+        );
+
+        // A clip's first pose: written to the bones, and not yet to their place in the world.
+        bone.position.set(5, 0, 0);
+        hand.position.set(0, 2, 0);
+        cameraRig.prepareForCamera();
+
+        assert.deepEqual(handed, [5, 2, 0]);
+    });
+});

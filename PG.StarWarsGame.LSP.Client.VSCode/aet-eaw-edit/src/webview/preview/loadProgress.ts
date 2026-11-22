@@ -129,6 +129,33 @@ export function loadState(tally: LoadTally): LoadState {
 }
 
 /**
+ * Whether a model whose geometry has all arrived draws none of it.
+ *
+ * Asked only once the geometry is IN - every part the scene promised, or as many as came before
+ * the wait was abandoned. Parts with no drawn mesh is the state of every unit for a moment of its
+ * load: a hardpoint's model can arrive before the hull it hangs on, and until the hull is there it
+ * hangs nowhere. Judged at that moment, the Star Destroyer - eight hardpoint models, then the hull -
+ * opened with a note that it had no visible mesh, and kept it.
+ *
+ * The textures are not waited for: what decides whether a mesh is drawn is in its geometry.
+ */
+export function nothingDrawn(
+    tally: LoadTally,
+    stats: { parts: number; meshes: number } | null,
+): boolean {
+    if (stats === null || stats.parts === 0 || stats.meshes > 0) {
+        return false;
+    }
+
+    return (
+        tally.timedOut ||
+        (tally.expectedParts !== null &&
+            tally.expectedParts > 0 &&
+            tally.arrivedParts >= tally.expectedParts)
+    );
+}
+
+/**
  * The assets asked for, and the ones answered.
  *
  * Its own object because the counting has a trap in it. The host answers each name ONCE - it keys

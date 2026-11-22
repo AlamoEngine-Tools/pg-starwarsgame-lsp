@@ -378,6 +378,22 @@
   "Stealth": null,
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
+  "MaxSpeed": 1,
+  "Behaviors": [
+    "SELECTABLE",
+    "STUNNABLE",
+    "SURFACE_FX",
+    "WALK_LOCOMOTOR",
+    "IDLE",
+    "TARGETING",
+    "WEAPON",
+    "REVEAL",
+    "HIDE_WHEN_FOGGED",
+    "DAMAGE_TRACKING",
+    "UNIT_AI",
+    "ABILITY_COUNTDOWN",
+    "GARRISON_UNIT"
+  ],
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [

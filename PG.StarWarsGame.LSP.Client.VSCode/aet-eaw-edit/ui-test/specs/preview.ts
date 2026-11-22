@@ -15,6 +15,29 @@ export async function openInPreview(file: string): Promise<void> {
     }, file);
 }
 
+/**
+ * Replaces the first `from` in a file by `to` and saves it, without showing the file: an open preview of it
+ * refreshes. A file without `from` is left as it is.
+ */
+export async function replaceInFile(file: string, from: string, to: string): Promise<void> {
+    await browser.executeWorkbench(
+        async (vscode, file: string, from: string, to: string) => {
+            const document = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+            const at = document.getText().indexOf(from);
+            if (at < 0) {
+                return;
+            }
+            const edit = new vscode.WorkspaceEdit();
+            edit.replace(document.uri, new vscode.Range(document.positionAt(at), document.positionAt(at + from.length)), to);
+            await vscode.workspace.applyEdit(edit);
+            await document.save();
+        },
+        file,
+        from,
+        to,
+    );
+}
+
 /** Opens Scene settings unless it is open already. Run inside the preview's webview. */
 export async function openSceneSettings(): Promise<void> {
     const globe = await browser.$('button[title="Scene settings"]');

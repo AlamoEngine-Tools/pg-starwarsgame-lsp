@@ -44,7 +44,7 @@ $repo = (Resolve-Path (Join-Path $here '..\..')).Path
 $fixtures = Join-Path $here 'fixtures'
 $onDemand = @('XML-14', 'XML-15', 'PRJ-15', 'LUA-26', 'LUA-27', 'LUA-28', 'LUA-34')
 $loadOrderTests = @('PRJ-24', 'PRJ-25', 'XML-29', 'XML-30')
-$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRV-45', 'PRV-46', 'PRV-56', 'PRV-58', 'PRV-59') + $loadOrderTests
+$extras = @('LUA-25', 'LUA-26', 'LUA-34', 'PRJ-15', 'PRJ-17', 'PRJ-18', 'PRV-36', 'PRV-45', 'PRV-46', 'PRV-56', 'PRV-58', 'PRV-59', 'PRV-61') + $loadOrderTests
 
 function Get-RootOf([string] $root) {
     switch ($root) {
@@ -272,6 +272,15 @@ function Invoke-Extra([string] $testId) {
                 # Under the name of a texture the game ships as a .tga: the project's .dds is never opened for it.
                 @('dds', 'Mt_commandbar.dds'))
             foreach ($pair in $textures) { python $make $pair[0] (Join-Path $dest "Textures\$($pair[1])") }
+        }
+        'PRV-61' {
+            # A mod that ships a model of the base game under its own name and none of its animation files:
+            # the walker, spelt as the report spells it. Copied from the local game workspace, so no game
+            # file is part of the fixture.
+            $source = Join-Path $repo 'eaw\Data\Art\Models\Ev_at-at.alo'
+            $dest = 'C:\temp\aet-test-PRV-anim\Data\Art\Models\EV_AT-AT.ALO'
+            if (Test-Path $source) { Copy-Item $source $dest -Force }
+            else { Write-Warning "PRV-61: $source not found; $dest is missing." }
         }
     }
 }

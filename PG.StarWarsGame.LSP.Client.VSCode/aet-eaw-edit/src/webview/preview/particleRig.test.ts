@@ -8,6 +8,7 @@ import * as THREE from "three";
 
 import { emitter, properties, testSystem } from "./particleFixture";
 import { PLAIN_LOOK } from "./cloakFade";
+import { ACTIVE_SUBJECT } from "./loadedPart";
 import { ParticleRig } from "./particleRig";
 import { standInContext } from "./viewportContext.testing";
 import { TextureStore } from "./textureStore";
@@ -20,24 +21,47 @@ import { TextureStore } from "./textureStore";
 function rigWith(anchor?: THREE.Object3D): {
     particles: ParticleRig;
     modelRoot: THREE.Group;
+    /** The parts that are off screen: add an id to hide that part. */
+    hidden: Set<string>;
+    /**
+     * What the rig asked of the scene as a whole: the depth range fitted at once, the fits held by a
+     * batch it opened, and the row refreshes.
+     */
+    asked: { fits: number; heldFits: number; rowRefreshes: number };
 } {
     const modelRoot = new THREE.Group();
+    const hidden = new Set<string>();
+    const asked = { fits: 0, heldFits: 0, rowRefreshes: 0 };
+    let batches = 0;
     if (anchor !== undefined) {
         modelRoot.add(anchor);
     }
     const context = standInContext({
+        rules: { effectBrightness: () => 1 },
         levels: { alt: 0, altDescending: false, lod: 0 },
         cameraRig: {
-            fitDistance: 1,
             cameraPosition: { x: 0, y: 0, z: 10 },
-            boundingSphere: () => ({ center: { x: 0, y: 0, z: 0 }, radius: 1 }),
-            applyClipPlanes: () => undefined,
+            refitDepthRange: () => {
+                if (batches > 0) {
+                    asked.heldFits++;
+                } else {
+                    asked.fits++;
+                }
+            },
+            batch: (work: () => void) => {
+                batches++;
+                try {
+                    work();
+                } finally {
+                    batches--;
+                }
+            },
         },
         modelRoot,
         parts: new Map(),
         textures: new TextureStore(),
         assembly: {
-            hiddenParts: new Set(),
+            hiddenParts: hidden,
             attachmentFor: () => anchor ?? modelRoot,
             partRootOf: () => null,
         },
@@ -46,11 +70,15 @@ function rigWith(anchor?: THREE.Object3D): {
             translated: new Map(),
             translatedShaders: false,
         },
-        rows: { refreshRows: () => undefined },
+        rows: {
+            refreshRows: () => {
+                asked.rowRefreshes++;
+            },
+        },
         // Every system here is the scene's own, drawn as it is.
         animation: { lookOf: () => PLAIN_LOOK },
     });
-    return { particles: new ParticleRig(context), modelRoot };
+    return { particles: new ParticleRig(context), modelRoot, hidden, asked };
 }
 
 const systemsUnder = (root: THREE.Object3D): number =>
@@ -354,6 +382,206 @@ describe("ParticleRig", () => {
 
         restore();
         assert.equal(particles.particlesVisible, true);
+    });
+});
+
+/**
+ * What a hidden part does to the effects on it.
+ *
+ * A death clone is loaded ahead of the death and kept off screen, and its effects wait with it. An
+ * explosion is not one of those: it is an event of the unit that set it off, and the unit hides its
+ * hull the moment it dies. MEASURED on a mod's capital ship: 145 hardpoints destroyed at once killed
+ * the unit, every explosion was held on the hidden hull, none played and none left - and all 145
+ * went off together when the unit was repaired.
+ */
+describe("ParticleRig on a part that is off screen", () => {
+    /** One burst of five sparks that live a fifth of a second: over within ten frames. */
+    const blast = (): ReturnType<typeof testSystem> =>
+        testSystem([
+            emitter({
+                name: "Blast",
+                properties: properties({
+                    useBursts: true,
+                    burstCount: 1,
+                    particlesPerBurst: 5,
+                    burstDelay: 0,
+                    lifetime: 0.2,
+                }),
+            }),
+        ]);
+
+    /** The most particles a system had in the air over `frames` steps, while it was in the scene. */
+    const peak = (
+        particles: ParticleRig,
+        id: string,
+        frames: number,
+    ): number => {
+        let most = 0;
+        for (let at = 0; at < frames; at++) {
+            particles.step(1 / 30, new THREE.Matrix4());
+            const entry = particles.particleSystems.get(id);
+            if (entry === undefined) {
+                break;
+            }
+            most = Math.max(most, entry.instance.emitterParticles(0).length);
+        }
+        return most;
+    };
+
+    it("holds a system added on a hidden part until the part is shown", () => {
+        const { particles, hidden } = rigWith();
+        hidden.add("clone");
+
+        particles.addParticleSystem("fx", blast(), {
+            origin: "model",
+            attachToPartId: "clone",
+        });
+
+        assert.equal(peak(particles, "fx", 15), 0);
+
+        hidden.delete("clone");
+        particles.holdEffectsOf("clone");
+
+        assert.ok(peak(particles, "fx", 15) > 0);
+    });
+
+    it("plays a one-shot started on a hidden part, and lets it go when it has burnt out", () => {
+        const { particles, hidden } = rigWith();
+        hidden.add("hull");
+
+        particles.playOnce("explosion:a", blast(), "hull", "HP_A");
+
+        assert.ok(peak(particles, "explosion:a", 30) > 0);
+        assert.equal(particles.particleSystems.has("explosion:a"), false);
+    });
+
+    it("goes on playing a one-shot whose part is hidden while it plays", () => {
+        const { particles, hidden } = rigWith();
+        particles.playOnce("explosion:a", blast(), "hull", "HP_A");
+
+        hidden.add("hull");
+        particles.holdEffectsOf("hull");
+
+        assert.ok(peak(particles, "explosion:a", 30) > 0);
+        assert.equal(particles.particleSystems.has("explosion:a"), false);
+    });
+
+    it("still holds what the part carries beside the one-shot", () => {
+        const { particles, hidden } = rigWith();
+        particles.addParticleSystem("smoke", fire(), {
+            origin: "model",
+            attachToPartId: "hull",
+        });
+        particles.playOnce("explosion:a", blast(), "hull", "HP_A");
+
+        hidden.add("hull");
+        assert.equal(particles.holdEffectsOf("hull"), true);
+
+        assert.equal(Math.max(...run(particles, "smoke", 15)), 0);
+    });
+});
+
+/**
+ * What a system coming or going asks of the scene as a whole.
+ *
+ * Measured on a mod's capital ship with every hardpoint destroyed at one press: each of the 145
+ * explosions measured the whole model twice and re-ran the row chain, 2.0 of the 5.9 seconds the
+ * press froze the preview for.
+ */
+describe("ParticleRig as one change to the scene", () => {
+    /** One burst of five sparks that live a fifth of a second: over within ten frames. */
+    const blast = (): ReturnType<typeof testSystem> =>
+        testSystem([
+            emitter({
+                name: "Blast",
+                properties: properties({
+                    useBursts: true,
+                    burstCount: 1,
+                    particlesPerBurst: 5,
+                    burstDelay: 0,
+                    lifetime: 0.2,
+                }),
+            }),
+        ]);
+
+    it("asks for the depth range once for a system it adds", () => {
+        const { particles, asked } = rigWith();
+
+        particles.addParticleSystem("a", fire(), { origin: "model" });
+
+        assert.deepEqual(asked, { fits: 1, heldFits: 0, rowRefreshes: 1 });
+    });
+
+    it("asks for the depth range once for a system it replaces", () => {
+        const { particles, asked } = rigWith();
+        particles.addParticleSystem("a", fire(), { origin: "model" });
+        asked.fits = 0;
+
+        particles.addParticleSystem("a", fire(), { origin: "model" });
+
+        assert.equal(asked.fits, 1);
+    });
+
+    it("asks for the depth range once for a system it takes out", () => {
+        const { particles, asked } = rigWith();
+        particles.addParticleSystem("a", fire(), { origin: "model" });
+        asked.fits = 0;
+
+        particles.removeParticleSystem("a");
+
+        assert.equal(asked.fits, 1);
+    });
+
+    it("refreshes the rows once when every system is replayed", () => {
+        const { particles, asked } = rigWith();
+        particles.addParticleSystem("a", fire(), { origin: "model" });
+        particles.addParticleSystem("b", fire(), { origin: "model" });
+        particles.addParticleSystem("c", fire(), { origin: "model" });
+        asked.rowRefreshes = 0;
+
+        particles.restartParticles();
+
+        assert.equal(asked.rowRefreshes, 1);
+    });
+
+    it("refreshes no rows when there is no system to replay", () => {
+        const { particles, asked } = rigWith();
+
+        particles.restartParticles();
+
+        assert.equal(asked.rowRefreshes, 0);
+    });
+
+    it("hands a subject's effects over in one batch", () => {
+        const { particles, asked } = rigWith();
+        particles.addParticleSystem("a", fire(), { origin: "model" });
+        particles.addParticleSystem("b", fire(), { origin: "model" });
+        asked.fits = 0;
+
+        particles.releaseSubjectEffects(ACTIVE_SUBJECT);
+
+        assert.equal(particles.particleSystems.size, 0);
+        assert.deepEqual(
+            { fits: asked.fits, heldFits: asked.heldFits },
+            { fits: 0, heldFits: 2 },
+        );
+    });
+
+    it("lets the one-shots that burnt out in a frame go in one batch", () => {
+        const { particles, asked } = rigWith();
+        particles.playOnce("explosion:a", blast());
+        particles.playOnce("explosion:b", blast());
+        asked.fits = 0;
+
+        for (let at = 0; at < 30; at++) {
+            particles.step(1 / 30, new THREE.Matrix4());
+        }
+
+        assert.equal(particles.particleSystems.size, 0);
+        assert.deepEqual(
+            { fits: asked.fits, heldFits: asked.heldFits },
+            { fits: 0, heldFits: 2 },
+        );
     });
 });
 

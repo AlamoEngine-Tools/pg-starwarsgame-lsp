@@ -28,4 +28,14 @@
 		<Is_Targetable>No</Is_Targetable>
 		<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
 	</HardPoint>
+	<HardPoint Name="HP_Scratch_NoBone_Model">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Is_Targetable>No</Is_Targetable>
+		<Model_To_Attach>EV_StarDestroyer.ALO</Model_To_Attach>
+		<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
+	</HardPoint>
+	<HardPoint Name="HP_Scratch_NoBone_Nowhere">
+		<Type>HARD_POINT_WEAPON_LASER</Type>
+		<Is_Targetable>No</Is_Targetable>
+	</HardPoint>
 </HardPoints>

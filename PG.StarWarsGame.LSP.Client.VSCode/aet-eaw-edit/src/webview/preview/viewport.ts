@@ -8,7 +8,6 @@
 // component owns a canvas and calls into this; nothing here knows React exists.
 
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { FIELD_OF_VIEW } from "./framing";
@@ -59,6 +58,7 @@ import { EnvironmentRig, type ShadowMeshState } from "./environmentRig";
 import { ModelRows } from "./modelRows";
 import { CameraRig } from "./cameraRig";
 import { PartAssembly } from "./partAssembly";
+import { type ParsedModel } from "./parsedModel";
 import { DestructionRig } from "./destructionRig";
 import { AnimationRig } from "./animationRig";
 import { type DeathEnding } from "./deathEnding";
@@ -76,6 +76,7 @@ import { type PreviewRules, UnitRules } from "./unitRules";
 import { ModelQueries } from "./modelQueries";
 import { type ViewportContext } from "./viewportContext";
 import { TextureStore } from "./textureStore";
+import { asOneChange } from "./sceneBatch";
 
 export type {
     AddPartOptions,
@@ -113,7 +114,6 @@ export class PreviewViewport {
     private readonly scene = new THREE.Scene();
     private readonly camera: THREE.PerspectiveCamera;
     private readonly controls: OrbitControls;
-    private readonly loader = new GLTFLoader();
     /** Every decoded texture; the one place a texture is disposed. See `TextureStore`. */
     private readonly textures = new TextureStore();
     private readonly clock = new THREE.Clock();
@@ -229,7 +229,6 @@ export class PreviewViewport {
             renderer: this.renderer,
             canvas,
             controls: this.controls,
-            loader: this.loader,
             modelRoot: this.modelRoot,
             scaledRoot: this.scaledRoot,
             parts: this.parts,
@@ -400,14 +399,14 @@ export class PreviewViewport {
      */
     async addPart(
         id: string,
-        glb: Uint8Array,
+        model: ParsedModel,
         attachToPartId?: string,
         attachBone?: string,
         options: AddPartOptions = {},
     ): Promise<THREE.Object3D> {
         return this.assembly.addPart(
             id,
-            glb,
+            model,
             attachToPartId,
             attachBone,
             options,
@@ -487,6 +486,17 @@ export class PreviewViewport {
     /** Applies a decoded texture wherever a material asked for it by name. */
     setTexture(name: string, texture: THREE.Texture): void {
         this.materials.setTexture(name, texture);
+    }
+
+    /**
+     * Copies a texture to the graphics card now.
+     *
+     * Left alone, a texture is copied on the first frame that draws with it. For the model that
+     * is the frame the cover comes off; for an effect fetched up front it is the frame the
+     * effect starts on. One already there, unchanged, is not copied again.
+     */
+    uploadTexture(texture: THREE.Texture): void {
+        this.renderer.initTexture(texture);
     }
 
     /**
@@ -607,6 +617,31 @@ export class PreviewViewport {
         this.rules.setMissileShieldObject(on);
     }
 
+    /** The behaviours the unit's type lists. See `UnitRules.setBehaviors`. */
+    setBehaviors(behaviors: readonly string[]): void {
+        this.rules.setBehaviors(behaviors);
+    }
+
+    /** The type's `Max_Speed`, or null where it writes none. See `UnitRules.setMaxSpeed`. */
+    setMaxSpeed(maxSpeed: number | null): void {
+        this.rules.setMaxSpeed(maxSpeed);
+    }
+
+    /** The unit's speed as a share of its `Max_Speed`. See `UnitRules.setSpeed`. */
+    setUnitSpeed(share: number): void {
+        this.rules.setSpeed(share);
+    }
+
+    /** Disables the unit's engines for a time, or brings them back. See `UnitRules.setEnginesDisabled`. */
+    setEnginesDisabled(disabled: boolean): void {
+        this.rules.setEnginesDisabled(disabled);
+    }
+
+    /** Ion stuns the unit, or ends the stun. See `UnitRules.setIonStunned`. */
+    setIonStunned(stunned: boolean): void {
+        this.rules.setIonStunned(stunned);
+    }
+
     /**
      * Puts the subject's geometry at the size the game draws it.
      *
@@ -710,11 +745,11 @@ export class PreviewViewport {
     /** Drops a piece of wreckage where a hardpoint used to be. See `DestructionRig.addBreakoff`. */
     async addBreakoff(
         key: string,
-        glb: Uint8Array,
+        model: ParsedModel,
         at: BreakoffAnchor,
         prop: PreviewBreakoffProp,
     ): Promise<void> {
-        return this.destruction.addBreakoff(key, glb, at, prop);
+        return this.destruction.addBreakoff(key, model, at, prop);
     }
 
     /** Clears the wreckage ONE hardpoint shed. See `DestructionRig.clearBreakoff`. */
@@ -807,6 +842,14 @@ export class PreviewViewport {
     /** Everything the model is made of, as flat items for ONE tree. See `ModelRows.treeItems`. */
     treeItems(): TreeItem[] {
         return this.rows.treeItems();
+    }
+
+    /**
+     * Runs `work` as one change to the scene: the rows are refreshed and the depth range refitted
+     * once after it, however many of its steps asked for either. See `sceneBatch.ts`.
+     */
+    batch(work: () => void): void {
+        asOneChange(this.rows, this.cameraRig, work);
     }
 
     /** The row that owns one effect. See `ModelRows.rowForSystem`. */

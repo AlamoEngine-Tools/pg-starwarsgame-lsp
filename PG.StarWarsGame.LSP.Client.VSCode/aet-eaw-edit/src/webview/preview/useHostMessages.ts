@@ -22,14 +22,20 @@ import {
     type PreviewParticle,
 } from "../../protocol/modelPreview";
 import { type ModelPreviewToWebview } from "../../protocol/panels/modelPreview";
+import { modelNeeds, sceneWreckModels } from "./effectNeeds";
 import { isSubjectSystem, type LoadTally } from "./loadProgress";
 import { modelRequestsOf } from "./modelStore";
 import { particleNotices, withParticleNotices } from "./particleNotices";
+import type { ParsedModel } from "./parsedModel";
 import { heldModels, post } from "./previewPost";
-import { BREAKOFF_PART, DEATH_CLONE_PART, WRECK_EFFECT } from "./partIds";
+import {
+    BREAKOFF_PART,
+    DEATH_CLONE_PART,
+    PREFETCH_PART,
+    WRECK_EFFECT,
+} from "./partIds";
 import { type CloneDeath } from "./deathClone";
 import { dispatchHostMessage } from "./hostMessages";
-import { type PendingEffect } from "./useParticleEffects";
 import { BREAKOFF_ATTACHMENT, type PreviewViewport } from "./viewport";
 import { type PreviewAssetLoader } from "./previewAssetLoader";
 import { defaultMode, type PreviewMode } from "./previewMode";
@@ -61,8 +67,9 @@ export interface HostMessagesInputs {
     /** How the clone of the death that happened ends - see `useCombatLens`. */
     cloneDeathRef: RefObject<CloneDeath | null>;
     detailWantedRef: RefObject<string | null>;
-    explosionsRef: RefObject<PendingEffect[]>;
     foldedRef: RefObject<boolean>;
+    /** Forgets every system and every effect still waiting on one, for a new scene. */
+    forgetSystems: () => void;
     /** Whether this subject's stored damage state has been applied to its geometry. */
     altRestoredRef: RefObject<boolean>;
     lodPickedRef: RefObject<boolean>;
@@ -77,6 +84,8 @@ export interface HostMessagesInputs {
         at?: { x: number; y: number; z: number },
         boneIndex?: number,
     ) => void;
+    /** Asks for every effect the scene can start by name, before any of them is started. */
+    prefetchEffects: (scene: PreviewScene) => void;
     queuePassiveEffects: (
         particles: readonly PreviewParticle[],
         partId: string,
@@ -84,7 +93,6 @@ export interface HostMessagesInputs {
     refreshStats: () => void;
     refreshingRef: RefObject<boolean>;
     requestMaterialAssets: (viewport: PreviewViewport) => void;
-    requestedSystemsRef: RefObject<Set<string>>;
     restoredRef: RefObject<boolean>;
     sceneRef: RefObject<PreviewScene | null>;
     setActiveAbilities: Dispatch<SetStateAction<ReadonlySet<string>>>;
@@ -117,8 +125,14 @@ export interface HostMessagesInputs {
     storedCustomColourRef: RefObject<string | null>;
     storedFactionRef: RefObject<string | null>;
     storedSubjectRef: RefObject<SubjectState | null>;
-    systemScalesRef: RefObject<Map<string, number>>;
-    systemsRef: RefObject<Map<string, AlamoParticleContent>>;
+    /** A system came back unread: nothing waits on it again. */
+    systemMissing: (name: string) => void;
+    /** Keeps a system that arrived and starts whatever was waiting on it - and nothing else. */
+    takeSystem: (
+        name: string,
+        system: AlamoParticleContent,
+        scale: number,
+    ) => void;
     viewportRef: RefObject<PreviewViewport | null>;
 }
 
@@ -131,18 +145,18 @@ export function useHostMessages({
     deadRef,
     cloneDeathRef,
     detailWantedRef,
-    explosionsRef,
     foldedRef,
+    forgetSystems,
     altRestoredRef,
     lodPickedRef,
     passiveEffectIdsRef,
     pendingRef,
     playEffect,
+    prefetchEffects,
     queuePassiveEffects,
     refreshStats,
     refreshingRef,
     requestMaterialAssets,
-    requestedSystemsRef,
     restoredRef,
     sceneRef,
     setActiveAbilities,
@@ -175,8 +189,8 @@ export function useHostMessages({
     storedCustomColourRef,
     storedFactionRef,
     storedSubjectRef,
-    systemScalesRef,
-    systemsRef,
+    systemMissing,
+    takeSystem,
     viewportRef,
 }: HostMessagesInputs) {
     // ── messages from the host ────────────────────────────────────────────────
@@ -255,9 +269,7 @@ export function useHostMessages({
                         setCollapsed(new Set(previous.collapsed));
                         foldedRef.current = true;
                     }
-                    systemsRef.current.clear();
-                    systemScalesRef.current.clear();
-                    requestedSystemsRef.current.clear();
+                    forgetSystems();
                     assets.clearLedgers();
 
                     // The scene on screen is what is kept: a model this scene has no part for is let
@@ -265,13 +277,21 @@ export function useHostMessages({
                     // wrecks and death clones are part of the scene too, held with their own clips.
                     heldModels.retain(modelRequestsOf(message.scene));
 
+                    // The wrecks the hardpoints shed, asked for with the unit rather than when one
+                    // is shed. A particle file has none, and asks for nothing below.
+                    const wrecks =
+                        message.scene.kind === PREVIEW_SCENE_KIND.particle
+                            ? []
+                            : sceneWreckModels(message.scene);
+
                     // Cover the viewport again for the new subject. The expected count is the parts
                     // that RESOLVED, because those are the only ones a GLB is asked for - counting the
-                    // rest would leave the cover waiting on geometry nobody requested.
+                    // rest would leave the cover waiting on geometry nobody requested. And the
+                    // wrecks' models, which are asked for too.
                     setTally({
-                        expectedParts: message.scene.parts.filter(
-                            (part) => part.resolved,
-                        ).length,
+                        expectedParts:
+                            message.scene.parts.filter((part) => part.resolved)
+                                .length + wrecks.length,
                         arrivedParts: 0,
                         requestedAssets: 0,
                         settledAssets: 0,
@@ -287,12 +307,12 @@ export function useHostMessages({
 
                     refreshStats();
 
-                    // One request per distinct system, however many proxies call for it.
+                    // One request per distinct system, however many proxies call for it: the
+                    // loader posts a name once.
                     for (const name of new Set(
                         particles.map((particle) => particle.systemRef),
                     )) {
-                        requestedSystemsRef.current.add(name.toLowerCase());
-                        post({ type: "requestParticleSystem", name });
+                        assets.requestSystem(name);
                     }
 
                     // A particle system is not geometry, so it takes getParticleSystem rather than
@@ -345,6 +365,24 @@ export function useHostMessages({
                             attachBone: part.attachBone ?? undefined,
                         });
                     }
+
+                    // After the unit's own geometry, so a wreck is never in its way. The reply
+                    // puts nothing in the scene - see the glb handler - and the hardpoint that
+                    // sheds the wreck is answered from the model held.
+                    for (const wreck of wrecks) {
+                        post({
+                            type: "requestGlb",
+                            modelReference: wreck.modelReference,
+                            partId: `${PREFETCH_PART}${wreck.id}`,
+                            animations: wreck.animations,
+                        });
+                    }
+
+                    // And every effect something can start once the unit is on screen - a
+                    // hardpoint's explosion, the damage smoke, the death blast, a wreck's fire -
+                    // asked for now, behind the cover, and after the geometry so it is not in the
+                    // geometry's way. Nothing is started: see `takeSystem`.
+                    prefetchEffects(message.scene);
                 },
                 glb: async (message) => {
                     // A reply to a request that a later one for the same part overtook, or that
@@ -354,12 +392,38 @@ export function useHostMessages({
                         return;
                     }
 
-                    // The bytes this reply stands for: the ones it carries, or the ones kept from
-                    // the scene before when the server says the model did not change.
+                    // The model this reply stands for: the one read from the bytes it carries, or
+                    // the one kept from the scene before when the server says the model did not
+                    // change.
                     const taken = heldModels.take(message);
-                    const glb = taken?.bytes ?? null;
 
-                    if (glb === null) {
+                    // The parts that asked for this model while the reply was due sent no request
+                    // of their own: this reply is each one's answer, handled as if it had come for
+                    // that part - the same model, or the same nothing, without the error said again.
+                    // Numbered now, so a scene arriving during the reading overtakes them like any
+                    // other reply; started behind the reading, so the part that asked first is added
+                    // first.
+                    const waiting = heldModels
+                        .answeredWith(message.partId)
+                        .map((part) => ({
+                            ...message,
+                            partId: part.partId,
+                            request: heldModels.requestOf(part.partId),
+                            attachToPartId: part.attachToPartId,
+                            attachBone: part.attachBone,
+                            data: null,
+                            error: null,
+                        }));
+                    let model: ParsedModel | null;
+                    try {
+                        model = taken === null ? null : await taken.model;
+                    } finally {
+                        for (const reply of waiting) {
+                            void onMessage(reply);
+                        }
+                    }
+
+                    if (model === null) {
                         const error = message.error ?? null;
                         if (error !== null) {
                             setProblems((current) => [
@@ -385,6 +449,28 @@ export function useHostMessages({
                         return;
                     }
 
+                    // A wreck's model fetched with the unit. Kept by the store for the moment a
+                    // hardpoint sheds it; nothing of it goes in the scene now. What it is drawn
+                    // with is asked for here, off the model, BEFORE it counts as arrived, so the
+                    // cover never reads as done in between.
+                    if (message.partId.startsWith(PREFETCH_PART)) {
+                        const needs = modelNeeds(model.scene);
+
+                        for (const name of needs.textures) {
+                            assets.requestTexture(name);
+                        }
+                        for (const shader of needs.shaders) {
+                            assets.requestShader(shader);
+                        }
+
+                        setTally((current) => ({
+                            ...current,
+                            arrivedParts: current.arrivedParts + 1,
+                        }));
+
+                        return;
+                    }
+
                     // Wreckage waiting on this model, if any. Handled BEFORE the part path, because a
                     // breakoff GLB carries no partId and would otherwise be added as a scene part
                     // called `undefined` and framed as if it were the subject.
@@ -401,7 +487,7 @@ export function useHostMessages({
                         if (pending !== undefined) {
                             await viewport.addBreakoff(
                                 pending.id,
-                                glb,
+                                model,
                                 pending.at,
                                 pending.prop,
                             );
@@ -446,7 +532,7 @@ export function useHostMessages({
                         // not reach it by mesh name.
                         await viewport.addPart(
                             message.partId,
-                            glb,
+                            model,
                             undefined,
                             undefined,
                             {
@@ -494,7 +580,7 @@ export function useHostMessages({
 
                     await viewport.addPart(
                         message.partId,
-                        glb,
+                        model,
                         message.attachToPartId ?? undefined,
                         message.attachBone ?? undefined,
                     );
@@ -592,7 +678,14 @@ export function useHostMessages({
 
                     const system = message.result.system ?? null;
 
+                    // Counted as answered, and what it names asked for off its own data - before
+                    // any emitter of it is built, which for an explosion is not until something
+                    // blows up.
+                    assets.receiveSystem(message.name, system);
+
                     if (system === null) {
+                        systemMissing(message.name);
+
                         const error = message.result.error ?? null;
                         if (error !== null) {
                             setProblems((current) => [
@@ -617,23 +710,14 @@ export function useHostMessages({
 
                     // A particle file opened directly is its own subject and attaches to nothing.
                     //
-                    // Anything WAITING on this system says it is not that: a death explosion and a
-                    // wreck's trailing fire are both asked for by name at the moment they are needed,
-                    // and neither is in the scene's proxy list. Without the third test they took this
-                    // branch - so the blast was parented to the scene root instead of to the thing
-                    // that blew up, and it called `frameAll`, yanking the camera off the subject.
-                    const awaited = explosionsRef.current.some(
-                        (pending) =>
-                            pending.system.toLowerCase() ===
-                            message.name.toLowerCase(),
-                    );
-
+                    // Asked of the SCENE, which is what knows. This used to be inferred - nothing
+                    // waiting on the system, no proxy pending, the name not among those asked for -
+                    // and an explosion answered a second time passed all three: MEASURED, every
+                    // explosion file a destroyed capital ship named left one stray copy of itself at
+                    // the scene root, and that branch calls `frameAll`.
                     if (
-                        !awaited &&
-                        pendingRef.current.length === 0 &&
-                        !requestedSystemsRef.current.has(
-                            message.name.toLowerCase(),
-                        )
+                        sceneRef.current !== null &&
+                        isSubjectSystem(sceneRef.current, message.name)
                     ) {
                         // A particle FILE opened on its own IS the subject, so it is model-owned - and
                         // it has no hull, so it reaches no model tree either way.
@@ -668,53 +752,13 @@ export function useHostMessages({
                         return;
                     }
 
-                    systemsRef.current.set(message.name.toLowerCase(), system);
-                    systemScalesRef.current.set(
-                        message.name.toLowerCase(),
+                    // Kept by name, and whatever was waiting on it started. Nothing else: an
+                    // effect fetched up front stays data until something starts it.
+                    takeSystem(
+                        message.name,
+                        system,
                         message.result.scaleFactor ?? 1,
                     );
-
-                    // A death explosion asked for at the moment of destruction plays as soon as it lands.
-                    const waiting = explosionsRef.current.filter(
-                        (pending) =>
-                            pending.system.toLowerCase() ===
-                            message.name.toLowerCase(),
-                    );
-
-                    if (waiting.length > 0) {
-                        explosionsRef.current = explosionsRef.current.filter(
-                            (pending) => !waiting.includes(pending),
-                        );
-
-                        // The scale that arrived with THIS system, not a lookup: an effect asked for
-                        // before its system landed takes the same route as one asked for after, and
-                        // the two disagreeing is exactly how a wreck's fire came back unscaled.
-                        const scale = message.result.scaleFactor ?? 1;
-
-                        for (const pending of waiting) {
-                            if (pending.once) {
-                                viewport.playOnce(
-                                    pending.id,
-                                    system,
-                                    pending.partId,
-                                    pending.bone,
-                                    scale,
-                                    pending.at,
-                                );
-                            } else {
-                                viewport.addParticleSystem(pending.id, system, {
-                                    origin: "gameplay",
-                                    attachToPartId: pending.partId,
-                                    attachBone: pending.bone,
-                                    attachBoneIndex: pending.boneIndex,
-                                    scaleFactor: scale,
-                                    at: pending.at,
-                                });
-                            }
-                        }
-                    }
-
-                    attachPending();
                 },
                 previewFeatures: (message) => {
                     // Energy DEFAULTS OFF and every read goes through this, so a panel that never

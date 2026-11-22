@@ -90,8 +90,12 @@ export class ModelQueries {
         let meshes = 0;
         let triangles = 0;
 
-        this.context.modelRoot.traverse((node) => {
-            if (node instanceof THREE.Mesh && this.context.levels.drawn(node)) {
+        // The subject's OWN meshes. Everything under the model root is more than that: an effect's
+        // quads and the viewport's own overlays hang there too. Counted in, the Star Destroyer's 17
+        // meshes read as 18 at rest and as 145 for a moment of its load, and a model that drew
+        // nothing still counted the effects it mounts.
+        this.context.assembly.forEachPartMesh((node) => {
+            if (this.context.levels.drawn(node)) {
                 meshes++;
                 triangles += triangleCount(node.geometry);
             }

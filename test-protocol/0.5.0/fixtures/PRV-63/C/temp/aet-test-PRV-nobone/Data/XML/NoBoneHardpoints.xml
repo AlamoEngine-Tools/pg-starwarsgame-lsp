@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<NoBoneHardpoints>
+<!-- The shape of the report: a weapon nobody can target, firing from the hull's own bones, with no model. -->
+<HardPoint Name="HP_Prv_NoBone_Fires">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>No</Is_Targetable>
+<Is_Destroyable>No</Is_Destroyable>
+<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
+<Fire_Bone_B>MuzzleA_00</Fire_Bone_B>
+<Fire_Cone_Width>90.0</Fire_Cone_Width>
+<Fire_Cone_Height>90.0</Fire_Cone_Height>
+</HardPoint>
+<!-- Nothing to place it by. -->
+<HardPoint Name="HP_Prv_NoBone_Nowhere">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>No</Is_Targetable>
+<Is_Destroyable>No</Is_Destroyable>
+</HardPoint>
+<!-- A model that has no bone to go on. -->
+<HardPoint Name="HP_Prv_NoBone_Model">
+<Type> HARD_POINT_WEAPON_LASER </Type>
+<Is_Targetable>No</Is_Targetable>
+<Is_Destroyable>No</Is_Destroyable>
+<Model_To_Attach>Rv_corvette.alo</Model_To_Attach>
+<Fire_Bone_A>MuzzleA_00</Fire_Bone_A>
+<Fire_Bone_B>MuzzleA_00</Fire_Bone_B>
+<Fire_Cone_Width>90.0</Fire_Cone_Width>
+<Fire_Cone_Height>90.0</Fire_Cone_Height>
+</HardPoint>
+</NoBoneHardpoints>

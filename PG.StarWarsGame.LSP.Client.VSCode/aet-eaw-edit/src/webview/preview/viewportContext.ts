@@ -7,7 +7,6 @@
 
 import type * as THREE from "three";
 import { type OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { type GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { type LoadedPart } from "./loadedPart";
 import { type AnimationRig } from "./animationRig";
@@ -49,7 +48,6 @@ export interface ViewportContext {
     readonly renderer: THREE.WebGLRenderer;
     readonly canvas: HTMLCanvasElement;
     readonly controls: OrbitControls;
-    readonly loader: GLTFLoader;
     /** Everything the model is drawn under: parts, effects, overlays. */
     readonly modelRoot: THREE.Group;
     /** The subject's own geometry, under its `Scale_Factor`. */

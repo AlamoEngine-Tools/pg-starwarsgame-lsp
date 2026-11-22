@@ -10,23 +10,17 @@ import * as l10n from "@vscode/l10n";
 import { type PreviewScene } from "../../../protocol/modelPreview";
 import { IconButton } from "../../shared/Button";
 import { Icon } from "../../shared/Icon";
-import {
-    type DefinedLevels,
-    type LevelCost,
-    levelLabel,
-    type LevelSteps,
-} from "../levels";
+import { PillSelect } from "../../shared/PillSelect";
+import { type DefinedLevels, type LevelCost, levelLabel } from "../levels";
 
 export interface SubjectStateControlsProps {
     alt: number;
-    altSteps: LevelSteps;
     combat: CombatLens;
     levels: DefinedLevels;
     lod: number;
-    /** Set when the reader moves the detail slider: their pick stands from then on. */
+    /** Set when the reader picks a detail level: their pick stands from then on. */
     lodPickedRef: RefObject<boolean>;
     lodCost: Map<number, LevelCost>;
-    lodSteps: LevelSteps;
     scene: PreviewScene | null;
     setAlt: Dispatch<SetStateAction<number>>;
     setLod: Dispatch<SetStateAction<number>>;
@@ -39,13 +33,11 @@ export interface SubjectStateControlsProps {
 
 export function SubjectStateControls({
     alt,
-    altSteps,
     combat,
     levels,
     lod,
     lodPickedRef,
     lodCost,
-    lodSteps,
     scene,
     setAlt,
     setLod,
@@ -53,6 +45,8 @@ export function SubjectStateControls({
     turnedTurrets,
     onResetTurrets,
 }: SubjectStateControlsProps): React.JSX.Element {
+    const damageTable = scene?.damageTable ?? [];
+
     return (
         <>
             {/* Which damage state and which detail level the subject is shown at.
@@ -64,12 +58,14 @@ export function SubjectStateControls({
                             Gameplay the damage state followed from play - which nothing made true,
                             so the stages were simply unreachable there and the control's absence
                             was the only trace. In Gameplay the hull now drives it through the
-                            damage table, and the slider is DISABLED rather than removed: the reader
+                            damage table, and the pick is DISABLED rather than removed: the reader
                             needs to see the stage tracking, and to see that the choice exists.
 
-                            Re-authored compactly rather than moved as it stood - the dock's
-                            `.field` is a label above a full-width control, which is a shape a 22px
-                            stage plate does not have. */}
+                            A PILL WITH A LIST, not a slider. Both were sliders with the value
+                            written beside them, and the pair filled the slot: 261px for a detail
+                            level between 0 and 3. The pill shows the level alone; what the level
+                            IS - the health band a stage covers, the meshes and triangles a detail
+                            level draws - is in the list's rows and in the tooltip. */}
             {(levels.alt.length > 1 ||
                 levels.lod.length > 1 ||
                 turretCount > 0) && (
@@ -79,71 +75,53 @@ export function SubjectStateControls({
                     aria-label={l10n.t("Model state")}
                 >
                     {levels.alt.length > 1 && (
-                        <label
-                            className="stage-field"
-                            title={
-                                combat.altDrivenByHull
-                                    ? l10n.t(
-                                          "Damage state follows the hull in Gameplay",
-                                      )
-                                    : l10n.t(
-                                          "Set damage state - 0 is undamaged",
-                                      )
-                            }
-                        >
-                            <Icon name="damage" />
-                            <input
-                                type="range"
-                                min={0}
-                                max={altSteps.count - 1}
-                                step={1}
-                                value={altSteps.positionOf(alt)}
-                                disabled={combat.altDrivenByHull}
-                                onChange={(e) =>
-                                    setAlt(
-                                        altSteps.levelAt(
-                                            Number(e.target.value),
-                                        ),
-                                    )
-                                }
-                            />
-                            <span className="stage-value">
-                                {levelLabel("alt", alt, levels.alt, {
-                                    table: scene?.damageTable ?? [],
-                                })}
-                            </span>
-                        </label>
+                        <PillSelect
+                            icon="damage"
+                            className="damage"
+                            value={alt}
+                            options={levels.alt.map((level) => ({
+                                value: level,
+                                label: levelLabel("alt", level, levels.alt, {
+                                    table: damageTable,
+                                }),
+                            }))}
+                            title={l10n.t(
+                                "Damage state {0}",
+                                levelLabel("alt", alt, levels.alt, {
+                                    table: damageTable,
+                                }),
+                            )}
+                            disabled={combat.altDrivenByHull}
+                            disabledReason={l10n.t(
+                                "Damage state {0} - follows the hull in Gameplay",
+                                alt,
+                            )}
+                            onPick={setAlt}
+                        />
                     )}
 
                     {levels.lod.length > 1 && (
-                        <label
-                            className="stage-field detail"
+                        <PillSelect
+                            icon="detail"
+                            className="detail"
+                            value={lod}
+                            options={levels.lod.map((level) => ({
+                                value: level,
+                                label: levelLabel("lod", level, levels.lod, {
+                                    cost: lodCost.get(level),
+                                }),
+                            }))}
                             title={l10n.t(
-                                "Set LOD - 0 is lowest detail in EaW",
-                            )}
-                        >
-                            <Icon name="detail" />
-                            <input
-                                type="range"
-                                min={0}
-                                max={lodSteps.count - 1}
-                                step={1}
-                                value={lodSteps.positionOf(lod)}
-                                onChange={(e) => {
-                                    lodPickedRef.current = true;
-                                    setLod(
-                                        lodSteps.levelAt(
-                                            Number(e.target.value),
-                                        ),
-                                    );
-                                }}
-                            />
-                            <span className="stage-value">
-                                {levelLabel("lod", lod, levels.lod, {
+                                "LOD {0} - 0 is lowest detail in EaW",
+                                levelLabel("lod", lod, levels.lod, {
                                     cost: lodCost.get(lod),
-                                })}
-                            </span>
-                        </label>
+                                }),
+                            )}
+                            onPick={(level) => {
+                                lodPickedRef.current = true;
+                                setLod(level);
+                            }}
+                        />
                     )}
 
                     {/* Every turret back where the model authored it, in every lens. Here rather than

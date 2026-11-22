@@ -221,6 +221,37 @@ describe("formatBugReport", () => {
         }
     });
 
+    // Whether the shipped game's files can be read decides what a preview shows (#465).
+    it("says how each game folder came to be and how many archives are read", () => {
+        const text = formatBugReport(client, {
+            ...server,
+            gameFolders: {
+                baseGame: "Detected",
+                expansion: "None",
+                archives: 14,
+            },
+        });
+
+        assert.ok(
+            text.includes(
+                "- Game folders: Base game detected, expansion none, 14 archives",
+            ),
+            text,
+        );
+        assert.ok(
+            formatBugReport(client, {
+                ...server,
+                gameFolders: { baseGame: "Set", expansion: "Set", archives: 1 },
+            }).includes(
+                "- Game folders: Base game set, expansion set, 1 archive\n",
+            ),
+        );
+    });
+
+    it("says nothing of the game folders for a server that does not report them", () => {
+        assert.ok(!formatBugReport(client, server).includes("Game folders"));
+    });
+
     it("mentions other project files under the root only when there are some", () => {
         assert.ok(
             !formatBugReport(client, server).includes("Other project files"),

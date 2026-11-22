@@ -197,6 +197,28 @@ export function useCombatLens({
     const [destroyed, setDestroyed] = useState<ReadonlySet<string>>(new Set());
 
     /**
+     * What the unit is doing and what has been done to it, put on by hand: how fast it is going as
+     * a share of its `Max_Speed`, whether it is ion stunned, and whether its engines are disabled
+     * for a time. In the game a projectile does the last two; nothing moves or shoots a unit here
+     * unless the reader does.
+     *
+     * TIER 2 - they reset on open: a fresh preview opens at full speed with nothing done to it.
+     */
+    const [speed, setSpeed] = useState(1);
+    const [ionStunned, setIonStunned] = useState(false);
+    const [enginesDisabled, setEnginesDisabled] = useState(false);
+
+    /**
+     * Which of them apply, by the behaviours the type lists - a model opened as a file lists none.
+     * The space locomotor is what moves a ship and sets its engine effects by its speed; the ion
+     * stun behaviour is what a stun is done to.
+     */
+    const movedByLocomotor = (scene?.behaviors ?? []).includes(
+        "SIMPLE_SPACE_LOCOMOTOR",
+    );
+    const stunnable = (scene?.behaviors ?? []).includes("ION_STUN_EFFECT");
+
+    /**
      * Which hardpoints are swinging, by id.
      *
      * A set rather than the one boolean this was: the button lived on the panel and swung every
@@ -451,9 +473,22 @@ export function useCombatLens({
      */
     const destroyAll = useCallback(
         (isDestroyed: boolean, log = true): void => {
-            // In declaration order - see `destroyable`.
-            for (const hardpoint of destroyable(scene?.hardpoints ?? [])) {
-                setHardpointDestroyed(hardpoint.id, isDestroyed, log);
+            const each = (): void => {
+                // In declaration order - see `destroyable`.
+                for (const hardpoint of destroyable(scene?.hardpoints ?? [])) {
+                    setHardpointDestroyed(hardpoint.id, isDestroyed, log);
+                }
+            };
+
+            // One change to the scene, however many explosions it starts or wrecks it clears.
+            // MEASURED on a mod's capital ship: 145 explosions put in the scene one by one, each
+            // re-running the row chain and measuring the model - 2.0 of the 5.9 seconds the press
+            // froze the preview for.
+            const viewport = viewportRef.current;
+            if (viewport === null) {
+                each();
+            } else {
+                viewport.batch(each);
             }
         },
         [scene, setHardpointDestroyed],
@@ -465,55 +500,77 @@ export function useCombatLens({
             return;
         }
 
-        for (const hardpoint of scene.hardpoints) {
-            if (hardpoint.partId !== null && hardpoint.partId !== undefined) {
-                viewport.setPartHidden(
-                    hardpoint.partId,
-                    partHidden(hardpoint.partId, scene.hardpoints, destroyed),
+        // One change to the scene: every write below asks for the rows again, and the reading at the
+        // end is the one refresh that answers them all. MEASURED on a mod's capital ship with every
+        // hardpoint destroyed at one press - the row chain ran once per effect of the unit here, 2.0 of
+        // the 5.9 seconds the press froze the preview for.
+        viewport.batch(() => {
+            for (const hardpoint of scene.hardpoints) {
+                if (
+                    hardpoint.partId !== null &&
+                    hardpoint.partId !== undefined
+                ) {
+                    viewport.setPartHidden(
+                        hardpoint.partId,
+                        partHidden(
+                            hardpoint.partId,
+                            scene.hardpoints,
+                            destroyed,
+                        ),
+                    );
+                }
+            }
+
+            // What every hardpoint writes on creation - its decal and its Damage_Particles bone hidden -
+            // and what each dead one wrote, in the order they died: a later death wins where two
+            // hardpoints' bones overlap.
+            viewport.setHardpoints(
+                hardpointWrites(scene.hardpoints, destroyed),
+            );
+
+            // The shield mesh is the one piece of GEOMETRY an ability reveals - DEFEND shows it, and
+            // the mesh ships hidden, so nothing else would ever bring it up.
+            viewport.setShieldRevealed(shieldRevealed(activeAbilities));
+
+            // The cloak's look: the whole model fading and tinting towards the cloak's colour. Which
+            // parts it hides and shows is the unit's rules', on its timeline with the other abilities.
+            viewport.setCloak(
+                cloakLookFor(activeAbilities, scene),
+                // HAS the ability: its block in the type's abilities list.
+                (scene.stealth ?? null) !== null ||
+                    (scene.forceCloak ?? null) !== null,
+            );
+
+            // The effect groups creation and the abilities switch - turbo's engines, power to weapons,
+            // the missile shield and the rest. Writes of each effect's state switch in the unit's rules,
+            // on one timeline with the hardpoint deaths - see `effectGroups.ts`.
+            viewport.setMissileShieldObject(
+                (scene.passiveMissileShieldRadius ?? 0) > 0,
+            );
+            // What the game does to a unit by its behaviours: the ion stun effects hidden until it
+            // is stunned, the engine effects hidden while its engines are offline.
+            viewport.setBehaviors(scene.behaviors ?? []);
+            viewport.setMaxSpeed(scene.maxSpeed ?? null);
+            viewport.setActiveAbilities(activeAbilities);
+
+            // Each effect's own flag, which the unit's rules above write over. Through the same call as
+            // every other effect deliberately: a held proxy then rides the emission gate, so its burst
+            // does not burn away unseen and come back exhausted the moment it is switched on.
+            for (const particle of scene.particles ?? []) {
+                viewport.setParticleSystemVisible(
+                    particle.id,
+                    effectState(
+                        particle.startsVisible,
+                        effectDrawsNow(particle),
+                    ),
                 );
             }
-        }
 
-        // What every hardpoint writes on creation - its decal and its Damage_Particles bone hidden -
-        // and what each dead one wrote, in the order they died: a later death wins where two
-        // hardpoints' bones overlap.
-        viewport.setHardpoints(hardpointWrites(scene.hardpoints, destroyed));
-
-        // The shield mesh is the one piece of GEOMETRY an ability reveals - DEFEND shows it, and
-        // the mesh ships hidden, so nothing else would ever bring it up.
-        viewport.setShieldRevealed(shieldRevealed(activeAbilities));
-
-        // The cloak's look: the whole model fading and tinting towards the cloak's colour. Which
-        // parts it hides and shows is the unit's rules', on its timeline with the other abilities.
-        viewport.setCloak(
-            cloakLookFor(activeAbilities, scene),
-            // HAS the ability: its block in the type's abilities list.
-            (scene.stealth ?? null) !== null ||
-                (scene.forceCloak ?? null) !== null,
-        );
-
-        // The effect groups creation and the abilities switch - turbo's engines, power to weapons,
-        // the missile shield and the rest. Writes of each effect's state switch in the unit's rules,
-        // on one timeline with the hardpoint deaths - see `effectGroups.ts`.
-        viewport.setMissileShieldObject(
-            (scene.passiveMissileShieldRadius ?? 0) > 0,
-        );
-        viewport.setActiveAbilities(activeAbilities);
-
-        // Each effect's own flag, which the unit's rules above write over. Through the same call as
-        // every other effect deliberately: a held proxy then rides the emission gate, so its burst
-        // does not burn away unseen and come back exhausted the moment it is switched on.
-        for (const particle of scene.particles ?? []) {
-            viewport.setParticleSystemVisible(
-                particle.id,
-                effectState(particle.startsVisible, effectDrawsNow(particle)),
-            );
-        }
-
-        // Both the tree and the group switches read out of the systems that just changed, so this
-        // is all it takes to bring the dock along. Destroying a hardpoint lights its smoke and every row
-        // that names it says so.
-        setTreeItems(viewport.treeItems() ?? []);
+            // Both the tree and the group switches read out of the systems that just changed, so this
+            // is all it takes to bring the dock along. Destroying a hardpoint lights its smoke and every row
+            // that names it says so.
+            setTreeItems(viewport.treeItems() ?? []);
+        });
     }, [destroyed, scene, abilityProxyIds, activeAbilities, effectDrawsNow]);
 
     /**
@@ -536,7 +593,34 @@ export function useCombatLens({
         setAttackerProjectile(null);
         setDamageLog([]);
         requestedClonesRef.current.clear();
+
+        setSpeed(1);
+        setIonStunned(false);
+        setEnginesDisabled(false);
     }, [scene]);
+
+    // The unit's speed and its engines disabled: read on every frame its effects are drawn, so
+    // handing them over is all it takes.
+    useEffect(() => {
+        const viewport = viewportRef.current;
+        if (viewport === null) {
+            return;
+        }
+
+        viewport.setUnitSpeed(speed);
+        viewport.setEnginesDisabled(enginesDisabled && movedByLocomotor);
+    }, [speed, enginesDisabled, movedByLocomotor, scene]);
+
+    // A stun switches the ion effects, which is the rows' to draw: the dock follows.
+    useEffect(() => {
+        const viewport = viewportRef.current;
+        if (viewport === null) {
+            return;
+        }
+
+        viewport.setIonStunned(ionStunned && stunnable);
+        setTreeItems(viewport.treeItems() ?? []);
+    }, [ionStunned, stunnable, scene]);
 
     /** Whether the subject has been finished off, and by which clone. */
     const [unitDead, setUnitDead] = useState(false);
@@ -1335,6 +1419,14 @@ export function useCombatLens({
         hull,
         hardpointHealthPool,
         altDrivenByHull,
+        speed,
+        setSpeed,
+        movedByLocomotor,
+        ionStunned,
+        setIonStunned,
+        stunnable,
+        enginesDisabled,
+        setEnginesDisabled,
         shipTargetable,
         liveDefence,
         fire,

@@ -27,9 +27,13 @@ public sealed record PreviewVector3(float X, float Y, float Z);
 ///     hardpoint left pointing at the old name is exactly the authoring mistake worth surfacing.
 /// </param>
 /// <param name="MovementVector">
-///     The direction the debris drifts, from <c>Debris_Movement_Vector</c>. Model space.
+///     What the debris drifts by every logic frame, from <c>Debris_Movement_Vector</c>. WORLD axes: the game
+///     adds it to the wreck's position whatever way the ship heads.
 /// </param>
-/// <param name="FacingRotateVector">Its axis of tumble, from <c>Debris_Facing_Rotate_Vector</c>.</param>
+/// <param name="FacingRotateVector">
+///     What its three facing angles grow by every logic frame, in degrees, from
+///     <c>Debris_Facing_Rotate_Vector</c>.
+/// </param>
 /// <param name="Animations">
 ///     The clips of the PROP'S OWN model, by file name. See <see cref="PreviewDeathClone" /> for why
 ///     a passive subject has to carry its own.

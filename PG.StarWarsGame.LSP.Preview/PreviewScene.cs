@@ -251,8 +251,22 @@ public sealed record PreviewScene(
     // The type's Damaged_Smoke_Asset_Name, or null where it names none. Measured in the game: each time
     // a hit takes the hull to or below 75 % or 50 % of its maximum and the unit lives, this effect is
     // added on the model's root bone, from the game's model folder.
-    string? DamagedSmokeAsset = null)
+    string? DamagedSmokeAsset = null,
+    // The behaviours the type lists, upper-cased and each once, out of all three lists: the preview
+    // does not tell a unit's space mode from its land mode. What the game does to a unit depends on
+    // them. Measured: an object with ION_STUN_EFFECT hides its pi effects when it is created and
+    // shows them only while it is ion stunned; the space locomotor hides the engine effects while
+    // the unit's engines are offline.
+    IReadOnlyList<string>? Behaviors = null,
+    // The type's Max_Speed, per FRAME as the game reads it, or null where it writes none. Measured in
+    // the game: the space locomotor sets a ship's engine effects to a brightness of 0.2 + 0.8 x
+    // speed / Max_Speed while its engines are online - and to 0 for a type whose Max_Speed is not
+    // above 0.
+    float? MaxSpeed = null)
 {
+    /// <summary>Never null, so the client has one shape to walk.</summary>
+    public IReadOnlyList<string> Behaviors { get; init; } = Behaviors ?? [];
+
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];
 

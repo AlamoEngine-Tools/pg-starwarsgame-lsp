@@ -78,10 +78,48 @@ describe("partHidden", () => {
 describe("hardpointWrites", () => {
     const engine = hardpoint({
         id: "HP_Engine",
+        type: "HARD_POINT_ENGINE",
         damageDecalBone: null,
         damageParticlesBone: null,
         engineParticlesBone: "HP_E_Bone",
         engineDeathHidesEngineParticles: true,
+    });
+
+    // Measured in the game: the engines go offline when an engine hardpoint dies and none is left
+    // undestroyed - with one left, nothing happens.
+    describe("the engines", () => {
+        const second = hardpoint({
+            id: "HP_Engine_2",
+            type: " hard_point_engine ",
+        });
+
+        it("are online while any engine hardpoint is left", () => {
+            const some = hardpointWrites(
+                [hardpoint(), engine, second],
+                new Set(["HP_Engine", "HP_Weapon"]),
+            );
+
+            assert.equal(some.enginesOffline, false);
+            assert.equal(
+                hardpointWrites([engine], new Set()).enginesOffline,
+                false,
+            );
+        });
+
+        it("are offline once every engine hardpoint is destroyed", () => {
+            const all = hardpointWrites(
+                [hardpoint(), engine, second],
+                new Set(["HP_Engine_2", "HP_Engine"]),
+            );
+
+            assert.equal(all.enginesOffline, true);
+        });
+
+        it("are never offline on a unit with no engine hardpoint", () => {
+            const none = hardpointWrites([hardpoint()], new Set(["HP_Weapon"]));
+
+            assert.equal(none.enginesOffline, false);
+        });
     });
 
     it("names what every hardpoint writes on creation, lowercased, whatever is destroyed", () => {

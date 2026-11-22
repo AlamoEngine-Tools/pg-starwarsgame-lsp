@@ -88,6 +88,8 @@ export class ParticleRig {
      * a model whose animation you still want at speed.
      */
     private particleSpeed = 1;
+    /** Seconds the rig has been stepped for, the clock an engine's flicker runs on. */
+    private seconds = 0;
 
     constructor(private readonly context: ViewportContext) {}
 
@@ -123,7 +125,11 @@ export class ParticleRig {
      * off or paused. `view` is the camera's inverse world matrix, for the streaks measured on screen.
      */
     step(dt: number, view: THREE.Matrix4): void {
+        this.seconds += dt;
+
         if (this.particlesVisible && !this.particlesPaused) {
+            const burntOut: string[] = [];
+
             for (const [id, entry] of [...this.particleSystems]) {
                 // Its model's whole look - the subject's cloak, a dying clone's fade - for a model's
                 // own effect; a gameplay effect belongs to no model and is drawn as it is.
@@ -133,6 +139,18 @@ export class ParticleRig {
                               this.subjectOfSystem(entry),
                           )
                         : PLAIN_LOOK,
+                );
+
+                // And how bright the unit's rules draw it - a ship's engine effects by its speed.
+                // The subject's own alone: another object the preview shows has no speed here.
+                entry.instance.setBrightness(
+                    entry.origin === "model" &&
+                        this.subjectOfSystem(entry) === ACTIVE_SUBJECT
+                        ? this.context.rules.effectBrightness(
+                              entry.proxyName,
+                              this.seconds,
+                          )
+                        : 1,
                 );
 
                 // The camera goes in because a streak's length is a screen-space measurement:
@@ -145,9 +163,19 @@ export class ParticleRig {
 
                 // A death explosion is over once it stops emitting and its last spark dies.
                 if (this.transient.has(id) && entry.instance.exhausted) {
-                    this.transient.delete(id);
-                    this.removeParticleSystem(id);
+                    burntOut.push(id);
                 }
+            }
+
+            // One change to the depth range, however many burnt out in this frame: the explosions
+            // of a unit destroyed at one press end within a few frames of each other.
+            if (burntOut.length > 0) {
+                this.context.cameraRig.batch(() => {
+                    for (const id of burntOut) {
+                        this.transient.delete(id);
+                        this.removeParticleSystem(id);
+                    }
+                });
             }
 
             // The ones already killed, finishing. Stepped in the SAME gate as the live systems, so
@@ -247,6 +275,10 @@ export class ParticleRig {
     ): void {
         // Always the Gameplay lens's. A one-shot IS an event - a hardpoint blowing up - and an
         // event is never something the model declares.
+        //
+        // Marked first, so it is born knowing what it is: a one-shot is never held for its part
+        // being off screen - see `addParticleSystem`.
+        this.transient.add(id);
         this.addParticleSystem(id, system, {
             origin: "gameplay",
             attachToPartId,
@@ -254,7 +286,6 @@ export class ParticleRig {
             scaleFactor,
             at,
         });
-        this.transient.add(id);
     }
 
     /**
@@ -281,7 +312,7 @@ export class ParticleRig {
 
         // Immediate: the id is about to name something else, and a fading twin under it would be
         // orphaned in the scene for good.
-        this.removeParticleSystem(id, true);
+        this.takeOut(id, true);
 
         const entry: ParticleEntry = {
             id,
@@ -313,7 +344,14 @@ export class ParticleRig {
         // Held from birth when it is attached to something already off screen: a death clone's effects
         // attach while the clone is still hidden, and a one-shot that runs there is spent before
         // anyone sees it.
+        //
+        // Not an effect played once by an event. That is the other way round: it belongs to a unit
+        // on screen, and the unit hides its hull the moment it dies - destroying the last hardpoint
+        // does both at once. MEASURED on a mod's capital ship: all 145 explosions of a unit
+        // destroyed at once were held here, never played and never left, and went off together
+        // when the unit was repaired.
         if (
+            !this.transient.has(id) &&
             attachToPartId !== undefined &&
             this.context.assembly.hiddenParts.has(attachToPartId)
         ) {
@@ -329,10 +367,10 @@ export class ParticleRig {
         // The depth range again, because the effects reach further than the model and they arrive
         // AFTER the camera was fitted to it. Without this, Boba Fett's flamethrower - 206 units of
         // throw on a seven-unit model - was culled at 156 and looked like a flame that stops.
-        this.context.cameraRig.applyClipPlanes(
-            this.context.cameraRig.boundingSphere(),
-            this.context.cameraRig.fitDistance,
-        );
+        //
+        // Once, for the system that is now there. It was fitted for the one taken out under the
+        // same id as well, which measured the whole model a second time for nothing.
+        this.context.cameraRig.refitDepthRange();
     }
 
     // ── levels ────────────────────────────────────────────────────────────────
@@ -345,6 +383,15 @@ export class ParticleRig {
      * system under the same id, and a wholesale reset of the scene or the renderer.
      */
     removeParticleSystem(id: string, immediate = false): void {
+        this.takeOut(id, immediate);
+
+        // And back in again once the effect is gone, so a one-off explosion does not leave the
+        // depth range stretched for the rest of the session.
+        this.context.cameraRig.refitDepthRange();
+    }
+
+    /** Takes a system out and says nothing to the rest of the scene: the caller does. */
+    private takeOut(id: string, immediate: boolean): void {
         const entry = this.particleSystems.get(id);
 
         if (entry !== undefined) {
@@ -371,13 +418,6 @@ export class ParticleRig {
         }
 
         this.particleSystems.delete(id);
-
-        // And back in again once the effect is gone, so a one-off explosion does not leave the
-        // depth range stretched for the rest of the session.
-        this.context.cameraRig.applyClipPlanes(
-            this.context.cameraRig.boundingSphere(),
-            this.context.cameraRig.fitDistance,
-        );
     }
 
     /** Names of the running systems, for the emitter list in the dock. */
@@ -557,6 +597,10 @@ export class ParticleRig {
                 entry.attachBoneIndex,
                 entry.scaleFactor,
             );
+        }
+
+        // One refresh answers for every system - see `setParticlesVisible`.
+        if (this.particleSystems.size > 0) {
             this.refreshParticleVisibility();
         }
     }
@@ -582,10 +626,14 @@ export class ParticleRig {
         const hidden = this.context.assembly.hiddenParts.has(partId);
         let any = false;
 
-        for (const entry of this.particleSystems.values()) {
+        for (const [id, entry] of this.particleSystems) {
             if (entry.attachToPartId === partId) {
-                entry.instance.hold("part", hidden);
                 any = true;
+
+                // An explosion already going off plays out: see `addParticleSystem`.
+                if (!this.transient.has(id)) {
+                    entry.instance.hold("part", hidden);
+                }
             }
         }
 
@@ -665,11 +713,14 @@ export class ParticleRig {
      * whether it drains or is cut - an engine glow goes out with the ship, an explosion does not.
      */
     releaseSubjectEffects(subjectId: string): void {
-        for (const [id, entry] of [...this.particleSystems]) {
-            if (this.subjectOfSystem(entry) === subjectId) {
-                this.removeParticleSystem(id);
+        // One change to the depth range, not one per effect the subject carried.
+        this.context.cameraRig.batch(() => {
+            for (const [id, entry] of [...this.particleSystems]) {
+                if (this.subjectOfSystem(entry) === subjectId) {
+                    this.removeParticleSystem(id);
+                }
             }
-        }
+        });
     }
 
     /**

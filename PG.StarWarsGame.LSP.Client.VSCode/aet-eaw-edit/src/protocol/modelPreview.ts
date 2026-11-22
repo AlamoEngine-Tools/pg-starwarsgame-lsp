@@ -700,6 +700,19 @@ export interface PreviewScene {
      */
     passiveMissileShieldRadius?: number | null;
     /**
+     * The behaviours the type lists, upper-cased and each once, out of all three of its lists.
+     * What the game does to a unit depends on them: one with `ION_STUN_EFFECT` hides its `pi`
+     * effects until it is ion stunned, and the space locomotor keeps the engine effects hidden
+     * while the engines are offline - see `UnitRules.effectState`. Absent from an older server.
+     */
+    behaviors?: readonly string[] | null;
+    /**
+     * The type's `Max_Speed`, **per FRAME** as the game reads it, or absent where it writes none.
+     * A ship's engine effects are as bright as it is fast against it, and dark for a type whose
+     * `Max_Speed` is not above 0 - see `engineGlow.ts`.
+     */
+    maxSpeed?: number | null;
+    /**
      * What the type's `Stealth_Ability` writes about the look of its cloak, or absent where it has
      * none: `Stealth_Color` and `Stealth_Transition_Time`.
      */

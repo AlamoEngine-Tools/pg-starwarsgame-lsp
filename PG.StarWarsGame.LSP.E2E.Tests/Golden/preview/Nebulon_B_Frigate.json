@@ -595,6 +595,23 @@
   "Stealth": null,
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
+  "MaxSpeed": 2.2,
+  "Behaviors": [
+    "DUMMY_STARSHIP",
+    "SELECTABLE",
+    "POWERED",
+    "SHIELDED",
+    "ABILITY_COUNTDOWN",
+    "SIMPLE_SPACE_LOCOMOTOR",
+    "TARGETING",
+    "REVEAL",
+    "HIDE_WHEN_FOGGED",
+    "UNIT_AI",
+    "ASTEROID_FIELD_DAMAGE",
+    "DAMAGE_TRACKING",
+    "ION_STUN_EFFECT",
+    "NEBULA"
+  ],
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [

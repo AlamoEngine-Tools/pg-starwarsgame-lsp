@@ -8,7 +8,6 @@ import {
     costByLevel,
     definedLevels,
     levelLabel,
-    levelSteps,
     type LevelTagged,
     proxyAltVisibleAt,
     stageForHull,
@@ -120,48 +119,6 @@ describe("definedLevels", () => {
         ]);
 
         assert.deepEqual(levels.alt, [0, 1]);
-    });
-});
-
-describe("levelSteps", () => {
-    it("walks the levels the model DEFINES, not the ten the engine allows", () => {
-        // The whole reason a slider is indexed rather than valued: a model defining ALT 0, 2 and 5
-        // has three positions, and dragging must visit exactly those three. A slider over the raw
-        // number would offer 1, 3 and 4, which name nothing in the file.
-        const steps = levelSteps([0, 2, 5]);
-
-        assert.equal(steps.count, 3);
-        assert.equal(steps.levelAt(0), 0);
-        assert.equal(steps.levelAt(1), 2);
-        assert.equal(steps.levelAt(2), 5);
-    });
-
-    it("finds the position of the level currently shown", () => {
-        const steps = levelSteps([0, 2, 5]);
-
-        assert.equal(steps.positionOf(5), 2);
-        assert.equal(steps.positionOf(2), 1);
-    });
-
-    it("falls back to the first position for a level the model does not define", () => {
-        // The subject changes under the control - open another model and the old level may not
-        // exist. Answering "nowhere" would leave the thumb off the track.
-        assert.equal(levelSteps([0, 2, 5]).positionOf(3), 0);
-    });
-
-    it("clamps a position that ran off either end", () => {
-        const steps = levelSteps([0, 2, 5]);
-
-        assert.equal(steps.levelAt(-1), 0);
-        assert.equal(steps.levelAt(99), 5);
-    });
-
-    it("survives an empty list rather than reading undefined", () => {
-        const steps = levelSteps([]);
-
-        assert.equal(steps.count, 0);
-        assert.equal(steps.levelAt(0), 0);
-        assert.equal(steps.positionOf(0), 0);
     });
 });
 

@@ -335,7 +335,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // ForceCloakKeepsAttachedModelHandler (#449). A cloak decides its parts by name, and a Force
         // cloak leaves attached models drawn.
         // 163 -> 164: CloakKeepsPartsHandler (#449). The parts a cloak neither hides nor shows.
-        const int expectedHandlerCount = 164;
+        // 164 -> 165: IonEffectsNeverHiddenHandler. The ion stun effects a type without the
+        // ION_STUN_EFFECT behaviour draws from the start.
+        const int expectedHandlerCount = 165;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
@@ -362,7 +364,8 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         [
             typeof(XmlDocumentFactProducer), typeof(XmlIndexFactProducer), typeof(XmlVariantFactProducer),
             typeof(XmlHardpointFactProducer), typeof(XmlDamageStageFactProducer), typeof(XmlCloakFactProducer),
-            typeof(StoryFactProducer), typeof(HardcodedSetValueFactProducer), typeof(DamageTypeTailFactProducer)
+            typeof(XmlIonStunEffectFactProducer), typeof(StoryFactProducer), typeof(HardcodedSetValueFactProducer),
+            typeof(DamageTypeTailFactProducer)
         ], producers);
     }
 

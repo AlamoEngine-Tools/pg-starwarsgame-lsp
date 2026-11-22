@@ -727,6 +727,19 @@ public static class DiagnosticIds
     public static readonly DiagnosticId CloakKeepsParts = new(DiagnosticGroup.CrossTag, 36);
 
     /// <summary>
+    ///     A type without the ION_STUN_EFFECT behaviour whose model draws ion stun effects, which are
+    ///     then drawn from the start and never hidden.
+    /// </summary>
+    /// <remarks>
+    ///     Measured in the game: the ION_STUN_EFFECT behaviour hides every effect whose name starts
+    ///     with <c>pi</c> when the object is created, shows them for a stun and hides them at its end,
+    ///     and nothing else writes that group. Counted are the effects the model file marks visible.
+    ///     Information: a wreck that sparks for as long as it lies there is the same finding as a
+    ///     ship meant to spark only while stunned. Silent for a model whose parts are unknown.
+    /// </remarks>
+    public static readonly DiagnosticId IonEffectsNeverHidden = new(DiagnosticGroup.CrossTag, 37);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.
@@ -1061,9 +1074,10 @@ public static class DiagnosticIds
         new(DiagnosticGroup.Preview, 8);
 
     /// <summary>
-    ///     A hardpoint names no <c>Attachment_Bone</c>. Measured: the game attaches it to nothing -
-    ///     it is placed at <c>Fire_Bone_A</c>, or at the map origin with that unset too, and its
-    ///     <c>Model_To_Attach</c> is never attached.
+    ///     A hardpoint names no <c>Attachment_Bone</c> and loses something by it. Measured: the game
+    ///     attaches it to nothing - it is placed at <c>Fire_Bone_A</c>, or at the map origin with
+    ///     that unset too, and its <c>Model_To_Attach</c> is never attached. Reported when it names
+    ///     a model or no fire bone either; one placed at its fire bone with no model loses nothing.
     /// </summary>
     public static readonly DiagnosticId PreviewHardpointNoBone = new(DiagnosticGroup.Preview, 9);
 
@@ -1176,6 +1190,15 @@ public static class DiagnosticIds
     /// </remarks>
     public static readonly DiagnosticId PreviewParticleIgnoredByGame =
         new(DiagnosticGroup.Preview, 23);
+
+    /// <summary>
+    ///     Animation files the game data lists for the previewed model cannot be read: the asset catalog
+    ///     names them, and no project, game folder or archive this server reaches holds them. The model
+    ///     opens without those clips. Warning, said once per subject with the files named and where files
+    ///     are read from, because a clip that is not offered looks exactly like one that never existed (#465).
+    /// </summary>
+    public static readonly DiagnosticId PreviewAnimationFilesUnread =
+        new(DiagnosticGroup.Preview, 24);
 
     // ── Lua analyzer ──
     // What the Lua analyzer (emmylua_ls) reports that holds for any Lua, whatever the engine binds:

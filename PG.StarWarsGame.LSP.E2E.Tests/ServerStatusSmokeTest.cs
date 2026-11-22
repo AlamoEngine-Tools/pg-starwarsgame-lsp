@@ -44,6 +44,13 @@ public abstract class ServerStatusSmokeTestBase<TFixture>(TFixture fixture) : IC
         Assert.True(status.Workspace.ProjectValid);
         Assert.Empty(status.Warnings);
         Assert.Null(status.Extended);
+
+        // The game folders are whatever this machine has, so only that each is said in one of the three
+        // states, and that the count came from the real resolver (#465).
+        Assert.NotNull(status.GameFolders);
+        Assert.Contains(status.GameFolders.BaseGame, new[] { "Set", "Detected", "None" });
+        Assert.Contains(status.GameFolders.Expansion, new[] { "Set", "Detected", "None" });
+        Assert.True(status.GameFolders.Archives >= 0);
     }
 
     /// <summary>

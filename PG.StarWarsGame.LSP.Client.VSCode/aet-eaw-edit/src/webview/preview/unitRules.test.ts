@@ -62,6 +62,7 @@ function writes(over: Partial<HardpointWrites> = {}): HardpointWrites {
         decals: new Set(),
         damageBones: new Set(),
         deaths: [],
+        enginesOffline: false,
         ...over,
     };
 }
@@ -610,6 +611,265 @@ describe("UnitRules, the effect name groups", () => {
 });
 
 /**
+ * The ion stun effects.
+ *
+ * Measured in the game: an object with the ION_STUN_EFFECT behaviour hides its `pi` effects when it
+ * is created and shows them only while it is ion stunned. An object without the behaviour takes
+ * no such write: its `pi` effects stay as its model file has them. Reported on a mod's star
+ * destroyer, which opened with its ion sparks running.
+ */
+describe("UnitRules, the ion stun effects", () => {
+    function effect(unit: UnitRules, name: string) {
+        return unit.effectState(drawnInFile, undefined, name);
+    }
+
+    it("hides pi effects when a unit with the ion stun behaviour is created", () => {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR", "ion_stun_effect"]);
+
+        assert.deepEqual(effect(unit, "PI_Damage_Elec_SD00"), ruleState(false));
+        assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
+        assert.deepEqual(effect(unit, "p_smoke"), drawnInFile);
+    });
+
+    it("leaves the pi effects of a unit without the behaviour as its file has them", () => {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+
+        assert.deepEqual(effect(unit, "pi_damage_elec"), drawnInFile);
+    });
+
+    it("asks for the level pass when the behaviours are set, and forgets them with the model", () => {
+        const { unit, applied } = rulesWith("game");
+        const before = applied();
+        unit.setBehaviors(["ION_STUN_EFFECT"]);
+        assert.equal(applied(), before + 1);
+
+        unit.forgetModel();
+
+        assert.deepEqual(effect(unit, "pi_damage_elec"), drawnInFile);
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setBehaviors(["ION_STUN_EFFECT"]);
+
+        assert.deepEqual(effect(unit, "pi_damage_elec"), drawnInFile);
+    });
+});
+
+/**
+ * The engines going offline.
+ *
+ * Measured in the game: when an engine hardpoint dies and the unit has no other left undestroyed,
+ * its engines go offline, and the space locomotor then keeps the engine effects hidden - `pe`, or
+ * `pte` under turbo - whatever else writes them. A hardpoint's `Engine_Particles` plays no part:
+ * on the Star Destroyer the glow is not below that bone at all. Reported on a mod's star destroyer
+ * with seven engine hardpoints, whose glow stayed on with all of them destroyed.
+ */
+describe("UnitRules, the engines offline", () => {
+    function effect(unit: UnitRules, name: string) {
+        return unit.effectState(drawnInFile, undefined, name);
+    }
+
+    function shipWith(over: Partial<HardpointWrites>): UnitRules {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+        unit.setHardpoints(writes(over));
+        return unit;
+    }
+
+    it("hides the pe and pte effects, and nothing else", () => {
+        const unit = shipWith({ enginesOffline: true });
+
+        assert.deepEqual(
+            effect(unit, "pe_stardestroyerengines"),
+            ruleState(false),
+        );
+        assert.deepEqual(effect(unit, "PTE_engines"), ruleState(false));
+        assert.deepEqual(effect(unit, "p_smoke"), drawnInFile);
+        assert.deepEqual(
+            effect(unit, "pptw_fx"),
+            ruleState(false),
+            "as created",
+        );
+    });
+
+    it("leaves the engine effects on while the engines are online", () => {
+        const unit = shipWith({ enginesOffline: false });
+
+        assert.deepEqual(effect(unit, "pe_stardestroyerengines"), drawnInFile);
+    });
+
+    // The locomotor writes on every service: turbo switched on afterwards shows nothing.
+    it("keeps them hidden whatever an ability writes afterwards", () => {
+        const unit = shipWith({ enginesOffline: true });
+        unit.setActiveAbilities(new Set(["TURBO"]));
+
+        assert.deepEqual(effect(unit, "pte_engines"), ruleState(false));
+        assert.deepEqual(effect(unit, "pe_engines"), ruleState(false));
+    });
+
+    it("writes nothing for a unit the space locomotor does not move", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(writes({ enginesOffline: true }));
+
+        assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+        unit.setHardpoints(writes({ enginesOffline: true }));
+
+        assert.deepEqual(effect(unit, "pe_engines"), drawnInFile);
+    });
+});
+
+/**
+ * How bright a ship's engine effects are drawn, and the states the reader puts a unit in.
+ *
+ * Measured in the game - see `engineGlow.ts` for the brightness, and for the ion stun: a stun shows
+ * the `pi` effects of a unit with the ION_STUN_EFFECT behaviour, and its end hides them again.
+ */
+describe("UnitRules, a ship's speed and the states done to it", () => {
+    function ship(): UnitRules {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR", "ION_STUN_EFFECT"]);
+        unit.setMaxSpeed(1.5);
+        return unit;
+    }
+
+    it("draws the engine effects at full brightness at full speed, which is how a unit opens", () => {
+        const unit = ship();
+
+        assert.equal(unit.effectBrightness("pe_engines", 0), 1);
+        assert.equal(unit.effectBrightness("PTE_engines", 0), 1);
+    });
+
+    it("dims the engine effects with the speed, down to a fifth at rest", () => {
+        const unit = ship();
+
+        unit.setSpeed(0);
+        assert.equal(unit.effectBrightness("pe_engines", 0), 0.2);
+
+        unit.setSpeed(0.5);
+        assert.ok(
+            Math.abs(unit.effectBrightness("pe_engines", 0) - 0.6) < 1e-9,
+        );
+    });
+
+    it("leaves every other effect at full brightness", () => {
+        const unit = ship();
+        unit.setSpeed(0);
+
+        assert.equal(unit.effectBrightness("p_smoke", 0), 1);
+        assert.equal(unit.effectBrightness("pi_damage", 0), 1);
+        assert.equal(unit.effectBrightness(undefined, 0), 1);
+    });
+
+    it("draws the engine effects of a type that cannot move dark", () => {
+        const unit = ship();
+        unit.setMaxSpeed(0);
+
+        assert.equal(unit.effectBrightness("pe_engines", 0), 0);
+    });
+
+    it("leaves the brightness alone for a unit the space locomotor does not move, and in a model preview", () => {
+        const { unit: walker } = rulesWith("game");
+        walker.setSpeed(0);
+        assert.equal(walker.effectBrightness("pe_engines", 0), 1);
+
+        const { unit: file } = rulesWith("file");
+        file.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+        file.setSpeed(0);
+        assert.equal(file.effectBrightness("pe_engines", 0), 1);
+    });
+
+    it("flickers the engine effects at up to a fifth while the engines are disabled, and keeps them drawn", () => {
+        const unit = ship();
+        unit.setEnginesDisabled(true);
+
+        const values = Array.from({ length: 30 }, (_, frame) =>
+            unit.effectBrightness("pe_engines", frame / 30 + 0.001),
+        );
+        assert.ok(values.every((value) => value >= 0 && value <= 0.2));
+        assert.ok(new Set(values).size > 10);
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "pe_engines"),
+            drawnInFile,
+        );
+
+        unit.setEnginesDisabled(false);
+        assert.equal(unit.effectBrightness("pe_engines", 0), 1);
+    });
+
+    it("shows the pi effects while the unit is ion stunned, whatever the file says, and hides them after", () => {
+        const unit = ship();
+        assert.deepEqual(
+            unit.effectState(fileState(false), undefined, "pi_damage_elec"),
+            ruleState(false),
+        );
+
+        unit.setIonStunned(true);
+        assert.deepEqual(
+            unit.effectState(fileState(false), undefined, "pi_damage_elec"),
+            ruleState(true),
+        );
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "p_smoke"),
+            drawnInFile,
+        );
+
+        unit.setIonStunned(false);
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "pi_damage_elec"),
+            ruleState(false),
+        );
+    });
+
+    it("stuns nothing that has no ion stun behaviour", () => {
+        const { unit } = rulesWith("game");
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR"]);
+        unit.setIonStunned(true);
+
+        assert.deepEqual(
+            unit.effectState(fileState(false), undefined, "pi_damage_elec"),
+            fileState(false),
+        );
+    });
+
+    it("asks for the level pass when a stun starts or ends, and only then", () => {
+        const { unit, applied } = rulesWith("game");
+        unit.setBehaviors(["ION_STUN_EFFECT"]);
+        const before = applied();
+
+        unit.setIonStunned(true);
+        unit.setIonStunned(true);
+        unit.setSpeed(0.3);
+        unit.setEnginesDisabled(true);
+
+        assert.equal(applied(), before + 1);
+    });
+
+    it("forgets all of it with the model", () => {
+        const unit = ship();
+        unit.setSpeed(0);
+        unit.setEnginesDisabled(true);
+        unit.setIonStunned(true);
+
+        unit.forgetModel();
+        unit.setBehaviors(["SIMPLE_SPACE_LOCOMOTOR", "ION_STUN_EFFECT"]);
+
+        assert.equal(unit.effectBrightness("pe_engines", 0), 1);
+        assert.deepEqual(
+            unit.effectState(drawnInFile, undefined, "pi_damage_elec"),
+            ruleState(false),
+        );
+    });
+});
+
+/**
  * Another object the preview shows - a death clone - is created too, so its effects get what creating
  * it writes, and none of the subject's hardpoint or ability writes.
  */
@@ -761,9 +1021,15 @@ describe("UnitRules, the cloaks", () => {
                 cloak,
             );
             assert.deepEqual(
-                unit.meshState(fileState(false), hull, undefined, true),
-                ruleState(true),
+                unit.meshState(drawnInFile, hull, undefined, true),
+                drawnInFile,
                 `${cloak}: the attached model`,
+            );
+            // The model is shown again; what its own file hides stays hidden.
+            assert.deepEqual(
+                unit.meshState(fileState(false), hull, undefined, true),
+                fileState(false),
+                `${cloak}: a part the attached model's file hides`,
             );
         }
     });
@@ -835,6 +1101,163 @@ describe("UnitRules, a hardpoint's Collision_Mesh (#450)", () => {
         assert.deepEqual(
             unit.meshState(fileState(false), { alamoMesh: "Collision" }),
             fileState(false),
+        );
+    });
+});
+
+/**
+ * A model a hardpoint attaches, as the unit's rules see it.
+ *
+ * Measured in the game: the attached model is ONE part of the unit, a model inside the model. A rule
+ * that names a part is compared with the unit model's own parts and never looks inside it; a rule
+ * that reaches it - a bone it hangs on or below, a cloak - writes the model's one switch; and its
+ * own parts keep what its file says, drawn only while the model is.
+ *
+ * Reported on a mod's star destroyer: its two bow weapons are attached models whose one drawn mesh
+ * is named like the hardpoint's `Damage_Decal` on the hull, and the decal rule hid the weapons.
+ */
+describe("UnitRules, a model a hardpoint attaches", () => {
+    const weapon = { alamoMesh: "Weap_Blast" };
+    const collision = { alamoMesh: "Collision" };
+    /** The hull bones a model can hang on: the hardpoint's own, and its Damage_Particles bone. */
+    const HP_BONE = 1;
+    const EMIT_DAMAGE = 2;
+
+    it("leaves a part inside it that is named like a decal as its file has it", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(writes({ decals: new Set(["weap_blast"]) }));
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, HP_BONE, true),
+            drawnInFile,
+        );
+        // The unit's own part of that name is the decal.
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, HP_BONE),
+            ruleState(false),
+        );
+    });
+
+    it("does not show a part inside it for a death that shows the decal of that name", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({
+                decals: new Set(["weap_blast"]),
+                deaths: [death({ decal: "weap_blast" })],
+            }),
+        );
+
+        assert.deepEqual(
+            unit.meshState(fileState(false), weapon, HP_BONE, true),
+            fileState(false),
+        );
+    });
+
+    it("is hidden whole while it hangs on or below a living hardpoint's Damage_Particles bone", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(writes({ damageBones: new Set(["emitdamage"]) }));
+
+        for (const bone of [EMIT_DAMAGE, 3]) {
+            assert.deepEqual(
+                unit.meshState(drawnInFile, weapon, bone, true),
+                ruleState(false),
+                `on bone ${bone}`,
+            );
+        }
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, HP_BONE, true),
+            drawnInFile,
+            "above the bone",
+        );
+    });
+
+    // The death shows the MODEL. What its file hides - a collision hull - stays hidden.
+    it("draws its parts as its file has them once that hardpoint is destroyed", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["emitdamage"]),
+                deaths: [death({ damageBone: "emitdamage" })],
+            }),
+        );
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, EMIT_DAMAGE, true),
+            drawnInFile,
+        );
+        assert.deepEqual(
+            unit.meshState(fileState(false), collision, EMIT_DAMAGE, true),
+            fileState(false),
+        );
+    });
+
+    it("is hidden whole once a hardpoint dies whose Engine_Particles bone it hangs on or below", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(
+            writes({ deaths: [death({ engineBone: "hp_bone" })] }),
+        );
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, EMIT_DAMAGE, true),
+            ruleState(false),
+        );
+    });
+
+    it("is hidden whole for stealth, a part inside it that a cloak would show with it", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+
+        assert.deepEqual(
+            unit.meshState(
+                fileState(false),
+                { alamoMesh: "Turret_Stealth" },
+                HP_BONE,
+                true,
+            ),
+            ruleState(false),
+        );
+    });
+
+    it("draws its parts as its file has them when the cloak ends", () => {
+        const { unit } = rulesWith("game");
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+        unit.setActiveAbilities(new Set());
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, HP_BONE, true),
+            drawnInFile,
+        );
+        assert.deepEqual(
+            unit.meshState(fileState(false), collision, HP_BONE, true),
+            fileState(false),
+        );
+    });
+
+    it("takes the later of a death and a cloak, as one switch", () => {
+        const { unit } = rulesWith("game");
+        unit.setHardpoints(writes({ damageBones: new Set(["emitdamage"]) }));
+        unit.setActiveAbilities(new Set(["STEALTH"]));
+        unit.setHardpoints(
+            writes({
+                damageBones: new Set(["emitdamage"]),
+                deaths: [death({ damageBone: "emitdamage" })],
+            }),
+        );
+
+        // Cloaked, then shown by the death: the death is the last write of the model's switch.
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, EMIT_DAMAGE, true),
+            drawnInFile,
+        );
+    });
+
+    it("writes nothing in a model preview", () => {
+        const { unit } = rulesWith("file");
+        unit.setHardpoints(writes({ damageBones: new Set(["emitdamage"]) }));
+
+        assert.deepEqual(
+            unit.meshState(drawnInFile, weapon, EMIT_DAMAGE, true),
+            drawnInFile,
         );
     });
 });

@@ -123,8 +123,34 @@ export class ModelRows {
             systemId?: string;
         }
     >();
+    /** How many batches are open. See {@link batch}. */
+    private batches = 0;
+    /** Whether a step of an open batch asked for the rows again. */
+    private refreshOwed = false;
 
     constructor(private readonly context: ViewportContext) {}
+
+    /**
+     * Runs `work` with the row refresh held, and refreshes once after it if any step asked.
+     *
+     * The chain answers for every row, so it costs by the size of the model and not by the size of
+     * the change: asked once per step it was most of what a change of many steps cost. Reading the
+     * rows inside the batch is a refresh like any other and settles what was asked up to there.
+     * Batches nest, and the outermost one decides - see `sceneBatch.ts`.
+     */
+    batch(work: () => void): void {
+        this.batches++;
+
+        try {
+            work();
+        } finally {
+            this.batches--;
+
+            if (this.batches === 0 && this.refreshOwed) {
+                this.treeItems();
+            }
+        }
+    }
 
     /**
      * Everything the model is made of, as flat items for ONE tree: bones, the meshes attached to
@@ -135,6 +161,9 @@ export class ModelRows {
      */
     treeItems(): TreeItem[] {
         const items: TreeItem[] = [];
+
+        // Whatever a batch was asked for up to here, this is it.
+        this.refreshOwed = false;
 
         // Rebuilt with the rows, so the inspector can never describe something the tree no longer
         // shows. Deriving it separately would mean two places deciding what a row IS - and the
@@ -676,8 +705,15 @@ export class ModelRows {
      *
      * Building the rows is what discovers which scene objects each one owns, so the two happen
      * together - a chain run against stale rows would answer for meshes that are no longer loaded.
+     *
+     * Once at the end of a batch, when one is open - see {@link batch}.
      */
     refreshRows(): void {
+        if (this.batches > 0) {
+            this.refreshOwed = true;
+            return;
+        }
+
         this.treeItems();
     }
 

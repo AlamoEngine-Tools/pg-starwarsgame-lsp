@@ -1465,6 +1465,88 @@ export const stageChromeCss = `
         padding: 0;
         border-radius: var(--radius-3);
     }
+
+    /* One pick out of a list, on a plate - see PillSelect. The glyph of what is picked, the value,
+       and the mark of a list behind a divider: the divider and the mark are what tell it from a
+       toggle, which is a pill too, and its resting border from a toggle that is off.
+
+       The list is the platform's own select, laid over the whole pill and invisible, so a press
+       anywhere on the pill opens it. Its colours are set although it is never seen: the list it
+       opens takes them. */
+    .pill-select {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
+        box-sizing: border-box;
+        height: 22px;
+        padding-left: var(--space-6);
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-6);
+        color: var(--colour-ink);
+        font-size: var(--font-size-smaller);
+        white-space: nowrap;
+    }
+
+    .pill-select > svg {
+        flex-shrink: 0;
+        opacity: 0.72;
+    }
+
+    /* Figures of one width, so the pill does not change size as the value changes. */
+    .pill-select .pill-value {
+        min-width: 1ch;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .pill-select .pill-mark {
+        display: flex;
+        align-items: center;
+        align-self: stretch;
+        padding: 0 var(--space-2);
+        border-left: var(--space-1) solid var(--colour-line-strong);
+        opacity: 0.72;
+    }
+
+    /* Two classes, to outrank a host's own rule for a select on a plate. */
+    .pill-select select.pill-list {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        opacity: 0;
+        appearance: none;
+        cursor: pointer;
+        color: var(--colour-dropdown-ink);
+        background: var(--colour-dropdown);
+        font-size: var(--font-size-12);
+    }
+
+    .pill-select:hover {
+        background: var(--colour-toolbar-hover);
+    }
+
+    .pill-select:focus-within {
+        outline: var(--space-1) solid var(--colour-focus);
+        outline-offset: 1px;
+    }
+
+    .pill-select.disabled {
+        opacity: 0.35;
+    }
+
+    .pill-select.disabled:hover {
+        background: transparent;
+    }
+
+    .pill-select.disabled select.pill-list {
+        cursor: default;
+    }
 `;
 
 /**

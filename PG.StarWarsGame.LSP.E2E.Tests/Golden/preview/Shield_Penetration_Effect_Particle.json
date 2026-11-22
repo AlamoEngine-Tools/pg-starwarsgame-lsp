@@ -321,6 +321,8 @@
   "Stealth": null,
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
+  "MaxSpeed": null,
+  "Behaviors": [],
   "DamageStages": [],
   "DamageTable": [],
   "Abilities": [],

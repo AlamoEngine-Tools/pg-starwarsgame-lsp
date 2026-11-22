@@ -16,11 +16,10 @@ import {
     UNWRITTEN_ENDING,
 } from "./deathEnding";
 import * as THREE from "three";
-import { visibilityTracks } from "./boneVisibility";
+import { type ParsedModel } from "./parsedModel";
 import { clipDone, playedLooping, playedOnce } from "./clipEnd";
 import { CloakFade, type Look, PLAIN_LOOK } from "./cloakFade";
 import { alamoNodeName } from "./skeleton";
-import { type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { type ViewportContext } from "./viewportContext";
 
 /** Scratch for the bone-palette maths, so a per-frame loop allocates nothing. */
@@ -62,8 +61,15 @@ export class AnimationRig {
     /**
      * Takes in what one part brings to its subject's animation: the rest pose of every node, the
      * nodes by name, the meshes its file hides, and its clips with their visibility tracks.
+     *
+     * The clips and the tracks are the model's own, shared by every part built from it: a clip is
+     * played, never changed.
      */
-    registerPart(subjectId: string, root: THREE.Object3D, gltf: GLTF): void {
+    registerPart(
+        subjectId: string,
+        root: THREE.Object3D,
+        model: Pick<ParsedModel, "clips" | "visibility">,
+    ): void {
         const subject = this.subjectAnimation(subjectId);
 
         // Before any clip can touch it. Recorded for the whole part, not only for the bones this
@@ -86,16 +92,14 @@ export class AnimationRig {
             }
         });
 
-        if (gltf.animations.length > 0) {
+        if (model.clips.length > 0) {
             // Rooted at the first of this subject's parts to bring clips. A clip binds to nodes BY
             // NAME from the root it was given, so a mixer rooted anywhere else drives the wrong
             // model - which is exactly what a clone's `_die` did on the scene-wide mixer.
             subject.mixer ??= new THREE.AnimationMixer(root);
-            subject.clips = [...subject.clips, ...gltf.animations];
+            subject.clips = [...subject.clips, ...model.clips];
 
-            // Off the raw glTF JSON: three's loader builds AnimationClips and does not carry an
-            // animation's extras onto them, so the parser's own document is the only source.
-            for (const [name, track] of visibilityTracks(gltf.parser.json)) {
+            for (const [name, track] of model.visibility) {
                 subject.visibility.set(name, track);
             }
         }

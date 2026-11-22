@@ -52,7 +52,8 @@ public sealed class GetServerStatusHandlerTest
         LspConfiguration? configuration = null,
         MockFileSystem? fileSystem = null,
         IReadOnlyList<string>? roots = null,
-        GameIndex? index = null)
+        GameIndex? index = null,
+        int archives = 0)
     {
         // A healthy project by default - files and models indexed - so a warning a test did not ask
         // for cannot pass silently through every other test.
@@ -63,8 +64,49 @@ public sealed class GetServerStatusHandlerTest
             new FakeGameIndexService(index),
             new RootsOnly(roots ?? []),
             new FileHelper(fileSystem ?? new MockFileSystem()),
-            new StatsOnly(new IndexCacheStats(0, 0, 0, 0), new BoneCatalogStats(0, 0)), [], TestCatalogues.English);
+            new StatsOnly(new IndexCacheStats(0, 0, 0, 0), new BoneCatalogStats(0, 0)), [], TestCatalogues.English,
+            new TiersOnly(archives));
         return handler.Handle(new GetServerStatusParams(), CancellationToken.None);
+    }
+
+    /// <summary>A resolver that answers only how many archives it reads.</summary>
+    private sealed class TiersOnly(int archives) : IGameAssetResolver
+    {
+        public GameAssetTiers Tiers => new(1, false, false, archives);
+
+        public GameAssetLocation? Locate(string gameRelativePath)
+        {
+            return null;
+        }
+
+        public byte[]? Read(string gameRelativePath)
+        {
+            return null;
+        }
+    }
+
+    // ── game folders (#465) ──────────────────────────────────────────────────
+    //
+    // Whether the shipped game's files can be read at all decides what a preview shows, and a report
+    // could not say. States and a count only - never the folders.
+
+    [Fact]
+    public async Task ReportsHowEachGameFolderCameToBe_AndTheArchivesRead()
+    {
+        var status = await Status(HealthyRecorder(), configuration: new LspConfiguration
+        {
+            GamePath = @"D:\eaw", ExpansionPath = @"C:\Steam\corruption", ExpansionPathDetected = true
+        }, archives: 14);
+
+        Assert.Equal(new ServerStatusGameFoldersDto("Set", "Detected", 14), status.GameFolders);
+    }
+
+    [Fact]
+    public async Task ReportsGameFoldersThatAreNeitherSetNorFound()
+    {
+        var status = await Status(HealthyRecorder());
+
+        Assert.Equal(new ServerStatusGameFoldersDto("None", "None", 0), status.GameFolders);
     }
 
     [Fact]
@@ -225,7 +267,7 @@ public sealed class GetServerStatusHandlerTest
             new RootsOnly([], config),
             new FileHelper(new MockFileSystem()),
             indexer ?? new StatsOnly(new IndexCacheStats(1, 1, 5, 2), new BoneCatalogStats(1, 2)),
-            caches ?? [], TestCatalogues.English);
+            caches ?? [], TestCatalogues.English, new TiersOnly(0));
         return handler.Handle(new GetServerStatusParams { Extended = true }, CancellationToken.None);
     }
 

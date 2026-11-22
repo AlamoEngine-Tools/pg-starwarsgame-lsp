@@ -15,11 +15,20 @@ import type {
     PreviewVector3,
 } from "../../protocol/modelPreview";
 
-/** Where a piece of debris is, relative to the hardpoint it came off. */
+/** A rotation as a unit quaternion, kept as plain numbers so this file stays free of three.js. */
+export interface BreakoffOrientation {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+}
+
+/** Where a piece of debris is and how it stands, in the scene's axes. */
 export interface BreakoffPose {
+    /** How far it has drifted from where the hardpoint was. */
     offset: PreviewVector3;
-    /** Degrees about each axis. */
-    rotation: PreviewVector3;
+    /** How it stands: the ship's orientation, turned by what the prop has added to its facing. */
+    orientation: BreakoffOrientation;
 }
 
 /** Where a piece of wreckage is dropped: a part, or one named bone of a part. */
@@ -120,26 +129,23 @@ export const ALAMO_FRAME_SECONDS = 0.03333;
 const FRAMES_PER_SECOND = 1 / ALAMO_FRAME_SECONDS;
 
 /**
- * Where the debris has drifted to, `seconds` after it broke off.
+ * Where the debris is and how it stands, `seconds` after it broke off.
  *
- * `Debris_Movement_Vector` and `Debris_Facing_Rotate_Vector` are per LOGIC FRAME, not per second.
- * Reading them as per-second is what made every wreck crawl: all 90 shipped props declare
- * magnitudes between 0.42 and 0.71, so a piece of a 600-unit hull would drift about ten units over
- * its entire twenty-second life and read as stationary.
+ * MEASURED in the game: every logic frame it adds `Debris_Movement_Vector` to the wreck's position
+ * and `Debris_Facing_Rotate_Vector`, in degrees, to the wreck's three facing angles. Reading the
+ * two as per second is what made every wreck crawl: all 90 shipped props declare magnitudes
+ * between 0.42 and 0.71, so a piece of a 600-unit hull would drift about ten units over its entire
+ * twenty-second life and read as stationary.
  *
- * The unit is INFERRED, and the inference is worth stating. What is measured is the frame length
- * above, and that the engine's own accessors for data-driven rates of this kind are named for the
- * frame - the per-frame projectile acceleration,
- * the per-frame repair amount - and that a debris lifetime is stored as an
- * expiration FRAME (`DEBRIS_LIFETIME_EXPIRATION_FRAME_MICRO_CHUNK`), so seconds are converted to
- * frames somewhere. The same reading applies to `Max_Speed`, where it is the only one that makes
- * sense of a turbolaser bolt declaring 25 against 2200 units of flight: 88 seconds per shot as
- * units-per-second, 2.9 as units-per-frame.
+ * THE DRIFT IS IN WORLD AXES. The game turns the vector by nothing - not by the ship's heading, not
+ * by the bone the hardpoint hung on - so the same prop leaves a ship outwards at one heading and
+ * inwards at the opposite one. A preview has to stand its ship at SOME heading, and it stands it at
+ * facing 0, the game's own zero: such a ship heads along world +X with its left on world +Y. In the
+ * scene the bow is +Z, the left is +X and up is +Y, so a world `(x, y, z)` arrives as `(y, z, x)`.
+ * Applied in the model's own axes instead, which is the game at a heading of 270, the Star
+ * Destroyer's four weapon wrecks all slid across the hull towards its centreline.
  *
- * Both are in ALAMO axes, where Z is up, and the scene runs in the model's glTF space, where Y is -
- * so both are turned by `(x, y, z) -> (x, z, -y)` on the way out. Applied raw, a piece told to fall
- * DOWNWARD slid sideways instead, and one told to tumble end over end spun about the wrong axis.
- * The same turn is what `accelerationIn` exists for on the particle side.
+ * THE TURN IS THREE ANGLES, NOT AN AXIS. See `turnOf`.
  *
  * A prop declaring no vector simply stays where the hardpoint was, which is ordinary authoring.
  */
@@ -148,21 +154,83 @@ export function breakoffPose(
     seconds: number,
 ): BreakoffPose {
     const frames = seconds * FRAMES_PER_SECOND;
+    const drift = scaled(prop.movementVector, frames);
 
     return {
-        offset: intoSceneAxes(scaled(prop.movementVector, frames)),
-        rotation: intoSceneAxes(scaled(prop.facingRotateVector, frames)),
+        offset: { x: drift.y, y: drift.z, z: drift.x },
+        orientation: multiplied(
+            SHIP_IN_SCENE,
+            turnOf(scaled(prop.facingRotateVector, frames)),
+        ),
     };
 }
 
 /**
- * An Alamo vector in the scene's axes.
+ * How a ship at facing 0 stands in the scene: the exporter's turn of Alamo's up axis, Z, onto the
+ * scene's, Y, and nothing else. A quarter turn back about X.
  *
- * Right for a rotation as well as a translation: the map is a rigid change of basis, so a spin
- * about Alamo Z - the up axis, a flat yaw - comes out as a spin about glTF Y, which is also flat.
+ * It is the WRECK's orientation at the moment it breaks off, because the game creates a wreck with
+ * its parent's facing - not with the orientation of the bone its hardpoint hung on.
  */
-function intoSceneAxes(vector: PreviewVector3): PreviewVector3 {
-    return { x: vector.x, y: vector.z, z: -vector.y + 0 };
+const SHIP_IN_SCENE: BreakoffOrientation = aboutAxis("x", -90);
+
+/**
+ * The wreck's turn away from the ship's orientation, in the wreck's own file axes, for facing
+ * angles of `degrees`.
+ *
+ * MEASURED in the game: an object's facing is three angles, applied as a roll about its heading
+ * (the X angle), then a pitch about its left (the Y angle), then a yaw about up (the Z angle). A
+ * model file has its bow down -Y and its left on +X, so in the file's own axes the roll is about
+ * -Y, the pitch about +X and the yaw about +Z.
+ *
+ * The rates used to be turned into the scene's axes and then applied in the wreck's OWN, which are
+ * Alamo's: the Y and Z rates changed places, and a wreck told to yaw flat tumbled end over end.
+ */
+function turnOf(degrees: PreviewVector3): BreakoffOrientation {
+    return multiplied(
+        multiplied(aboutAxis("z", degrees.z), aboutAxis("x", degrees.y)),
+        aboutAxis("y", -degrees.x),
+    );
+}
+
+function aboutAxis(
+    axis: "x" | "y" | "z",
+    degrees: number,
+): BreakoffOrientation {
+    const half = (degrees * Math.PI) / 360;
+    const orientation = { x: 0, y: 0, z: 0, w: Math.cos(half) };
+    orientation[axis] = Math.sin(half);
+
+    return orientation;
+}
+
+/** `first` applied after `second`, as with matrices: the product turns by `second`, then by `first`. */
+function multiplied(
+    first: BreakoffOrientation,
+    second: BreakoffOrientation,
+): BreakoffOrientation {
+    return {
+        x:
+            first.w * second.x +
+            first.x * second.w +
+            first.y * second.z -
+            first.z * second.y,
+        y:
+            first.w * second.y -
+            first.x * second.z +
+            first.y * second.w +
+            first.z * second.x,
+        z:
+            first.w * second.z +
+            first.x * second.y -
+            first.y * second.x +
+            first.z * second.w,
+        w:
+            first.w * second.w -
+            first.x * second.x -
+            first.y * second.y -
+            first.z * second.z,
+    };
 }
 
 function scaled(

@@ -82,6 +82,7 @@ internal static class XmlPublisherFixture
             new XmlHardpointFactProducer(schema, tagSource),
             new XmlDamageStageFactProducer(schema, tagSource),
             new XmlCloakFactProducer(schema, tagSource),
+            new XmlIonStunEffectFactProducer(schema, tagSource),
             new StoryFactProducer(schema, fileTypeRegistry, fileHelper),
             new HardcodedSetValueFactProducer(schema, fileTypeRegistry, fileHelper),
             new DamageTypeTailFactProducer()

@@ -104,7 +104,17 @@ export interface HardpointWrites {
     damageBones: ReadonlySet<string>;
     /** Each destroyed hardpoint's death, in the order they died. */
     deaths: readonly HardpointDeath[];
+    /**
+     * Whether the unit's engines are offline: it has engine hardpoints and none is left
+     * undestroyed. Measured in the game: an engine hardpoint dying asks how many of the unit's are
+     * left, and only with none are the engines switched off - with one left, nothing happens. What
+     * that hides is the space locomotor's to say - see `UnitRules.effectState`.
+     */
+    enginesOffline: boolean;
 }
+
+/** The hardpoint type whose last death takes the unit's engines offline. */
+const ENGINE_HARDPOINT = "HARD_POINT_ENGINE";
 
 /** Lowercased and trimmed, or null for a tag the hardpoint does not write. */
 function named(value: string | null | undefined): string | null {
@@ -158,7 +168,19 @@ export function hardpointWrites(
         }
     }
 
-    return { decals, damageBones, deaths };
+    const engines = hardpoints.filter(
+        (hardpoint) =>
+            (hardpoint.type ?? "").trim().toUpperCase() === ENGINE_HARDPOINT,
+    );
+
+    return {
+        decals,
+        damageBones,
+        deaths,
+        enginesOffline:
+            engines.length > 0 &&
+            engines.every((hardpoint) => destroyed.has(hardpoint.id)),
+    };
 }
 
 /**

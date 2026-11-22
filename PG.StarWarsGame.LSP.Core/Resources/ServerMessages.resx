@@ -717,6 +717,12 @@
   <data name="IncomeSplitHandlers_TheEngine" xml:space="preserve">
     <value>&lt;{0}&gt; {1} - the engine {2}</value>
   </data>
+  <data name="IonEffectsNeverHidden_AndMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
+  <data name="IonEffectsNeverHidden_DrawnFromTheStart" xml:space="preserve">
+    <value>Ion stun effects of '{0}' are drawn from the start and never hidden without the ION_STUN_EFFECT behaviour - {1}.</value>
+  </data>
   <data name="IntFloatTupleList_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>
@@ -1639,6 +1645,12 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="PreviewModelAction_Preview" xml:space="preserve">
     <value>Preview model {0}</value>
   </data>
+  <data name="PreviewScene_AnimationFilesAndMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
+  <data name="PreviewScene_AnimationFilesUnread" xml:space="preserve">
+    <value>{0} of {1} animation files of '{2}' are in the game data but could not be read: {3}. {4}</value>
+  </data>
   <data name="PreviewScene_AnimationSkeletonDiffers" xml:space="preserve">
     <value>'{0}' takes its animations from '{1}', whose skeleton differs from '{2}' ({3} bones against {4}). The clips play, bound by bone index - where the two skeletons disagree, a clip drives whatever bone sits at that index.</value>
   </data>
@@ -1670,7 +1682,10 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>Hardpoint '{0}' is mounted but not defined in this project.</value>
   </data>
   <data name="PreviewScene_HardpointNoBone" xml:space="preserve">
-    <value>Hardpoint '{0}' names no {1}. {2}; a Model_To_Attach is never attached.</value>
+    <value>Hardpoint '{0}' names no {1} and no Fire_Bone_A. {2}.</value>
+  </data>
+  <data name="PreviewScene_HardpointNoBoneModel" xml:space="preserve">
+    <value>Hardpoint '{0}' names no {1}, so its Model_To_Attach '{2}' is never attached. {3}.</value>
   </data>
   <data name="PreviewScene_HardpointUnreachable" xml:space="preserve">
     <value>Hardpoint '{0}' is destroyable but names no Collision_Mesh, so no shot can reach it. The unit can never be finished through its hardpoints.</value>

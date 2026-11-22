@@ -107,6 +107,16 @@ export function formatBugReport(
                 `- Other project files under the root: ${workspace.otherProjectFiles}`,
             );
         }
+        // Whether the shipped game's files can be read decides what a preview shows, and a report
+        // could not say: a model that opens without its animations looks the same either way.
+        const folders = server.gameFolders;
+        if (folders !== undefined && folders !== null) {
+            lines.push(
+                `- Game folders: Base game ${folders.baseGame.toLowerCase()}, ` +
+                    `expansion ${folders.expansion.toLowerCase()}, ` +
+                    `${folders.archives} ${folders.archives === 1 ? "archive" : "archives"}`,
+            );
+        }
         lines.push(`- Index: ${server.index.state}`);
     }
 

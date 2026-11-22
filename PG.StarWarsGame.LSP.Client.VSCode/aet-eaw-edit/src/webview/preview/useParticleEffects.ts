@@ -16,10 +16,10 @@ import {
     type AlamoParticleContent,
     type PreviewParticle,
 } from "../../protocol/modelPreview";
-import { post } from "./previewPost";
 import { type PreviewViewport } from "./viewport";
 import { type PreviewAssetLoader } from "./previewAssetLoader";
 import { effectPlaysNow } from "./damage";
+import { type SceneEffects, sceneEffectNames } from "./effectNeeds";
 import { passiveEffects } from "./passiveSubject";
 import { effectState } from "./visibility";
 
@@ -59,8 +59,9 @@ export function useParticleEffects({
      *
      * Refs, not state: they are mutated from the message handler as parts and systems arrive in
      * whatever order the server answers, and re-rendering on each arrival would buy nothing. Fetched
-     * once per NAME and instantiated once per entry - a Star Destroyer has twenty proxies calling for
-     * p_hp_imperial_damage, and fetching that twenty times is twenty round trips for one answer.
+     * once per NAME - the loader sees to that, whoever asks - and instantiated once per entry: a
+     * Star Destroyer has twenty proxies calling for p_hp_imperial_damage, and fetching that twenty
+     * times is twenty round trips for one answer.
      */
     const systemsRef = useRef(new Map<string, AlamoParticleContent>());
 
@@ -73,7 +74,14 @@ export function useParticleEffects({
      */
     const systemScalesRef = useRef(new Map<string, number>());
     const pendingRef = useRef<PreviewParticle[]>([]);
-    const requestedSystemsRef = useRef(new Set<string>());
+
+    /**
+     * Systems the server could not read, by lower-cased name.
+     *
+     * A name is asked for once per scene, so nothing will answer for one of these again: an effect
+     * started on it is dropped rather than queued for an answer that is not coming.
+     */
+    const missingSystemsRef = useRef(new Set<string>());
 
     /**
      * The effects belonging to a PASSIVE subject, by id.
@@ -135,44 +143,6 @@ export function useParticleEffects({
     );
 
     /**
-     * Queues a passive subject's own effects, once its geometry is on the way.
-     *
-     * Through the SAME pending queue every other effect uses, which is what stage 3 of the
-     * multi-subject work bought: the descriptor is re-homed onto the part that was loaded and then
-     * there is nothing special about it. A death clone's explosions and a burning wreck's fire
-     * trail could not be shown at all before, because nothing on the wire described them.
-     */
-    const queuePassiveEffects = useCallback(
-        (particles: readonly PreviewParticle[], partId: string): void => {
-            if (particles.length === 0) {
-                return;
-            }
-
-            const placed = passiveEffects(particles, partId);
-
-            for (const particle of placed) {
-                passiveEffectIdsRef.current.add(particle.id);
-            }
-
-            pendingRef.current = [...pendingRef.current, ...placed];
-
-            // One request per distinct system, however many proxies call for it - and a wreck's
-            // are usually the ship's own, so most come back off the cache immediately.
-            for (const name of new Set(
-                placed.map((particle) => particle.systemRef),
-            )) {
-                if (requestedSystemsRef.current.has(name.toLowerCase())) {
-                    continue;
-                }
-
-                requestedSystemsRef.current.add(name.toLowerCase());
-                post({ type: "requestParticleSystem", name });
-            }
-        },
-        [],
-    );
-
-    /**
      * Takes a passive subject's effects away with it.
      *
      * A wreck reaching the end of its lifetime and a clone removed by a repair both take their
@@ -180,15 +150,22 @@ export function useParticleEffects({
      */
     const dropPassiveEffects = useCallback((partId: string): void => {
         const mine = `${partId}#`;
+        const viewport = viewportRef.current;
 
-        for (const id of [...passiveEffectIdsRef.current]) {
-            if (!id.startsWith(mine)) {
-                continue;
-            }
+        const gone = [...passiveEffectIdsRef.current].filter((id) =>
+            id.startsWith(mine),
+        );
 
+        for (const id of gone) {
             passiveEffectIdsRef.current.delete(id);
-            viewportRef.current?.removeParticleSystem(id);
         }
+
+        // One change to the scene, not one per effect the part carried.
+        viewport?.batch(() => {
+            for (const id of gone) {
+                viewport.removeParticleSystem(id);
+            }
+        });
 
         pendingRef.current = pendingRef.current.filter(
             (particle) => !particle.id.startsWith(mine),
@@ -214,6 +191,10 @@ export function useParticleEffects({
         }
 
         const stillWaiting: PreviewParticle[] = [];
+        const ready: {
+            particle: PreviewParticle;
+            system: AlamoParticleContent;
+        }[] = [];
 
         for (const particle of pendingRef.current) {
             const system = systemsRef.current.get(
@@ -222,36 +203,47 @@ export function useParticleEffects({
 
             if (system === undefined || !viewport.hasPart(particle.partId)) {
                 stillWaiting.push(particle);
-                continue;
+            } else {
+                ready.push({ particle, system });
             }
-
-            // The MODEL's own: it is in the scene's proxy list, it names a bone, and it is part of
-            // what the asset is. This is the one call site that says so.
-            viewport.addParticleSystem(particle.id, system, {
-                origin: "model",
-                attachToPartId: particle.partId,
-                attachBone: particle.bone,
-                attachBoneIndex: particle.boneIndex,
-                proxyName: particle.systemRef,
-                levels: {
-                    alt: particle.alt ?? null,
-                    lod: particle.lod ?? null,
-                    altDecreaseStayHidden:
-                        particle.altDecreaseStayHidden ?? false,
-                },
-                scaleFactor:
-                    systemScalesRef.current.get(
-                        particle.systemRef.toLowerCase(),
-                    ) ?? 1,
-            });
-
-            viewport.setParticleSystemVisible(
-                particle.id,
-                effectState(particle.startsVisible, effectDrawsNow(particle)),
-            );
         }
 
         pendingRef.current = stillWaiting;
+
+        // One change to the scene, however many attach. MEASURED on a mod's capital ship: each of
+        // its 193 systems re-ran the row chain twice and measured the model twice as it attached,
+        // one 3.7 second frame while the unit loaded.
+        viewport.batch(() => {
+            for (const { particle, system } of ready) {
+                // The MODEL's own: it is in the scene's proxy list, it names a bone, and it is part
+                // of what the asset is. This is the one call site that says so.
+                viewport.addParticleSystem(particle.id, system, {
+                    origin: "model",
+                    attachToPartId: particle.partId,
+                    attachBone: particle.bone,
+                    attachBoneIndex: particle.boneIndex,
+                    proxyName: particle.systemRef,
+                    levels: {
+                        alt: particle.alt ?? null,
+                        lod: particle.lod ?? null,
+                        altDecreaseStayHidden:
+                            particle.altDecreaseStayHidden ?? false,
+                    },
+                    scaleFactor:
+                        systemScalesRef.current.get(
+                            particle.systemRef.toLowerCase(),
+                        ) ?? 1,
+                });
+
+                viewport.setParticleSystemVisible(
+                    particle.id,
+                    effectState(
+                        particle.startsVisible,
+                        effectDrawsNow(particle),
+                    ),
+                );
+            }
+        });
 
         // Everything the dock reads, not just the tree. Systems attach well after the geometry
         // does, and a model can declare its damage states ENTIRELY on proxies - `Rv_mptl-2a.alo`
@@ -271,6 +263,44 @@ export function useParticleEffects({
             assets.requestShader(shader);
         }
     }, [refreshStats, effectDrawsNow, assets]);
+
+    /**
+     * Queues a passive subject's own effects, once its geometry is in the scene.
+     *
+     * Through the SAME pending queue every other effect uses, which is what stage 3 of the
+     * multi-subject work bought: the descriptor is re-homed onto the part that was loaded and then
+     * there is nothing special about it. A death clone's explosions and a burning wreck's fire
+     * trail could not be shown at all before, because nothing on the wire described them.
+     */
+    const queuePassiveEffects = useCallback(
+        (particles: readonly PreviewParticle[], partId: string): void => {
+            if (particles.length === 0) {
+                return;
+            }
+
+            const placed = passiveEffects(particles, partId);
+
+            for (const particle of placed) {
+                passiveEffectIdsRef.current.add(particle.id);
+            }
+
+            pendingRef.current = [...pendingRef.current, ...placed];
+
+            // One request per distinct system, however many proxies call for it; the loader posts
+            // a name once per scene.
+            for (const name of new Set(
+                placed.map((particle) => particle.systemRef),
+            )) {
+                assets.requestSystem(name);
+            }
+
+            // Attached here for the systems already in hand, which with a scene's effects fetched
+            // up front is most of them: no answer is on its way to do it, and a wreck whose effects
+            // were all the ship's own used to wait for an unrelated system to arrive.
+            attachPending();
+        },
+        [assets, attachPending],
+    );
 
     /**
      * Plays a named effect at an attachment, fetching it first if it is not in hand.
@@ -300,11 +330,17 @@ export function useParticleEffects({
                 return;
             }
 
+            // Asked for and not there: nothing more is coming, so there is nothing to wait for.
+            if (missingSystemsRef.current.has(name.toLowerCase())) {
+                return;
+            }
+
             const system = systemsRef.current.get(name.toLowerCase());
 
             if (system === undefined) {
-                // Fetched now and played on arrival; an effect nothing referenced until this moment is
-                // not worth loading up front for every hardpoint on a capital ship.
+                // Played on arrival. A scene's effects are asked for when the scene arrives - see
+                // `prefetchEffects` - so this is an effect started before its answer came back; the
+                // loader posts the name only if nothing has asked for it yet.
                 explosionsRef.current.push({
                     id,
                     system: name,
@@ -314,7 +350,7 @@ export function useParticleEffects({
                     at,
                     boneIndex,
                 });
-                post({ type: "requestParticleSystem", name });
+                assets.requestSystem(name);
                 return;
             }
 
@@ -338,16 +374,109 @@ export function useParticleEffects({
                 });
             }
         },
-        [],
+        [assets],
     );
 
+    /**
+     * Asks for every effect the scene can start by name, before any of them is started.
+     *
+     * Nothing is put in the scene for them: a system that arrives with nothing waiting on it is
+     * kept, its textures and effects are fetched, and it plays the moment something starts it.
+     */
+    const prefetchEffects = useCallback(
+        (scene: SceneEffects): void => {
+            for (const name of sceneEffectNames(scene)) {
+                assets.requestSystem(name);
+            }
+        },
+        [assets],
+    );
+
+    /**
+     * Takes a system that has arrived: keeps it by name and starts whatever was waiting on it.
+     *
+     * Only what was waiting. A system nothing has started yet stays data - an explosion fetched
+     * up front must not go off because it landed.
+     */
+    const takeSystem = useCallback(
+        (name: string, system: AlamoParticleContent, scale: number): void => {
+            const key = name.toLowerCase();
+            const viewport = viewportRef.current;
+
+            systemsRef.current.set(key, system);
+            systemScalesRef.current.set(key, scale);
+            missingSystemsRef.current.delete(key);
+
+            // An effect asked for before its system arrived plays as soon as it lands.
+            const waiting = explosionsRef.current.filter(
+                (pending) => pending.system.toLowerCase() === key,
+            );
+
+            if (waiting.length > 0) {
+                explosionsRef.current = explosionsRef.current.filter(
+                    (pending) => !waiting.includes(pending),
+                );
+
+                // One change to the scene, however many were waiting on this system.
+                viewport?.batch(() => {
+                    // The scale that arrived with THIS system, not a lookup: an effect asked for
+                    // before its system landed takes the same route as one asked for after, and
+                    // the two disagreeing is exactly how a wreck's fire came back unscaled.
+                    for (const pending of waiting) {
+                        if (pending.once) {
+                            viewport.playOnce(
+                                pending.id,
+                                system,
+                                pending.partId,
+                                pending.bone,
+                                scale,
+                                pending.at,
+                            );
+                        } else {
+                            viewport.addParticleSystem(pending.id, system, {
+                                origin: "gameplay",
+                                attachToPartId: pending.partId,
+                                attachBone: pending.bone,
+                                attachBoneIndex: pending.boneIndex,
+                                scaleFactor: scale,
+                                at: pending.at,
+                            });
+                        }
+                    }
+                });
+            }
+
+            attachPending();
+        },
+        [attachPending],
+    );
+
+    /** A system came back unread: whatever was waiting on it is dropped, and nothing waits again. */
+    const systemMissing = useCallback((name: string): void => {
+        const key = name.toLowerCase();
+
+        missingSystemsRef.current.add(key);
+        explosionsRef.current = explosionsRef.current.filter(
+            (pending) => pending.system.toLowerCase() !== key,
+        );
+    }, []);
+
+    /**
+     * Forgets every system and every effect still waiting on one, for a new scene.
+     *
+     * What is waiting names parts of the scene before. Its system is asked for again with the new
+     * scene, and an effect left queued would go off on arrival - on a unit that has only just opened.
+     */
+    const forgetSystems = useCallback((): void => {
+        systemsRef.current.clear();
+        systemScalesRef.current.clear();
+        missingSystemsRef.current.clear();
+        explosionsRef.current = [];
+    }, []);
+
     return {
-        systemsRef,
-        systemScalesRef,
         pendingRef,
-        requestedSystemsRef,
         passiveEffectIdsRef,
-        explosionsRef,
         toggleEmitter,
         effectDrawsNow,
         queuePassiveEffects,
@@ -355,5 +484,9 @@ export function useParticleEffects({
         cancelEffect,
         attachPending,
         playEffect,
+        prefetchEffects,
+        takeSystem,
+        systemMissing,
+        forgetSystems,
     };
 }

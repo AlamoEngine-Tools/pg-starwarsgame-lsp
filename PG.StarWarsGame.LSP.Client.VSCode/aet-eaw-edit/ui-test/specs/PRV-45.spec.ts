@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { browser, expect } from "@wdio/globals";
 import { command, serverReady } from "../protocol.js";
+import { replaceInFile } from "./preview.js";
 import { inNewestWebview } from "./storyGraph.js";
 
 const root = "C:\\temp\\aet-test-PRV-load";
@@ -131,19 +132,7 @@ async function received(): Promise<Received> {
 
 /** Sets the unit's scale in its file and saves it, without showing the file: the scene changes and the preview refreshes. */
 async function rescale(from: string, to: string): Promise<void> {
-    await browser.executeWorkbench(
-        async (vscode, file: string, from: string, to: string) => {
-            const document = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
-            const at = document.getText().indexOf(from);
-            const edit = new vscode.WorkspaceEdit();
-            edit.replace(document.uri, new vscode.Range(document.positionAt(at), document.positionAt(at + from.length)), to);
-            await vscode.workspace.applyEdit(edit);
-            await document.save();
-        },
-        units,
-        `<Scale_Factor>${from}</Scale_Factor>`,
-        `<Scale_Factor>${to}</Scale_Factor>`,
-    );
+    await replaceInFile(units, `<Scale_Factor>${from}</Scale_Factor>`, `<Scale_Factor>${to}</Scale_Factor>`);
 }
 
 /** Refreshes the open preview by a scale edit and returns what it was sent for it. */

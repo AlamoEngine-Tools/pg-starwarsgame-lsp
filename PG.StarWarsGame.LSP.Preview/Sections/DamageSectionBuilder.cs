@@ -115,19 +115,7 @@ public sealed class DamageSectionBuilder(
     /// </remarks>
     private static bool IsShielded(EffectiveObject effective)
     {
-        return HasAnyBehavior(effective, ["SHIELDED"]);
-    }
-
-    /// <summary>
-    ///     Whether any of the three behaviour lists names one of <paramref name="behaviors" />, as a
-    ///     whole token and without case.
-    /// </summary>
-    private static bool HasAnyBehavior(EffectiveObject effective, IReadOnlyCollection<string> behaviors)
-    {
-        return PreviewTagReader.BehaviorListTags
-            .SelectMany(tag => (effective.ValueOf(tag) ?? string.Empty)
-                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-            .Any(token => behaviors.Contains(token, StringComparer.OrdinalIgnoreCase));
+        return PreviewTagReader.HasAnyBehavior(effective, ["SHIELDED"]);
     }
 
     /// <summary>
@@ -298,7 +286,7 @@ public sealed class DamageSectionBuilder(
                 clone.FloatOf("Death_Persistence_Duration"),
                 clone.FloatOf("Death_Fade_Time"),
                 clone.ValueOf("Death_Explosions_End") is { } end ? XmlUtility.SplitList(end) : [],
-                HasAnyBehavior(clone, PersistenceKeepingBehaviors)));
+                PreviewTagReader.HasAnyBehavior(clone, PersistenceKeepingBehaviors)));
         }
 
         return clones;

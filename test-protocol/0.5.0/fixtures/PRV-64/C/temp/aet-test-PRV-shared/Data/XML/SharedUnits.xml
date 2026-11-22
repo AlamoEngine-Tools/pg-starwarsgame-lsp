@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<SharedUnits>
+<SpaceUnit Name="Prv_Shared_Unit">
+<Text_ID>TEXT_NONE</Text_ID>
+<Space_Model_Name>Rv_corvette.alo</Space_Model_Name>
+<Scale_Factor>1.0</Scale_Factor>
+<HardPoints>HP_Prv_Shared_A, HP_Prv_Shared_B</HardPoints>
+</SpaceUnit>
+</SharedUnits>

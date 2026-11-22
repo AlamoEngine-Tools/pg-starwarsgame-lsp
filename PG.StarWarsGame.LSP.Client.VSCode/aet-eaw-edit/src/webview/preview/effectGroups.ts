@@ -42,6 +42,22 @@ const MISSILE_SHIELD_OBJECT: readonly GroupWrite[] = [
     { group: EFFECT_GROUP.missileShield, shown: true },
 ];
 
+/**
+ * What creating an object with the ION_STUN_EFFECT behaviour writes. Measured in the game: the
+ * behaviour takes the stun off when it starts, which hides the `pi` effects; a stun shows them and
+ * its end hides them again. An object without the behaviour takes none of these writes.
+ */
+const ION_STUN_OBJECT: readonly GroupWrite[] = [
+    { group: EFFECT_GROUP.ionStun, shown: false },
+];
+
+/**
+ * The switch an ion stun is: not an ability of the unit's but a state done to it, by a projectile
+ * in the game and by the reader here. It shows the `pi` effects while it lasts and hides them when
+ * it ends - on a unit with the behaviour, which is the caller's to check.
+ */
+export const ION_STUN_SWITCH = "ION_STUN";
+
 /** Turbo engines in place of the plain ones. */
 const TURBO: readonly GroupWrite[] = [
     { group: EFFECT_GROUP.engines, shown: false },
@@ -53,7 +69,8 @@ const TURBO: readonly GroupWrite[] = [
  * opposite of each.
  *
  * Only the ones the preview can switch: a unit's own abilities. Ion stun is done TO a unit by a
- * projectile, so nothing here switches `pi`.
+ * projectile, so no ability here switches `pi` - creating a unit with the behaviour hides it, see
+ * `ION_STUN_OBJECT`.
  */
 const WHILE_ON: ReadonlyMap<string, readonly GroupWrite[]> = new Map([
     ["TURBO", TURBO],
@@ -64,6 +81,7 @@ const WHILE_ON: ReadonlyMap<string, readonly GroupWrite[]> = new Map([
     ["INVULNERABILITY", [{ group: EFFECT_GROUP.invulnerability, shown: true }]],
     ["SPRINT", [{ group: EFFECT_GROUP.sprint, shown: true }]],
     ["INTERDICT", [{ group: EFFECT_GROUP.gravityWell, shown: true }]],
+    [ION_STUN_SWITCH, [{ group: EFFECT_GROUP.ionStun, shown: true }]],
 ]);
 
 /** Whether an effect of this name is in the group: its start against the prefix, case ignored. */
@@ -100,16 +118,24 @@ function lastWrite(
  *
  * @param missileShieldObject Whether the object's type is a missile-shield object: its
  *     `Passive_Missile_Shield_Radius` is above 0.
+ * @param ionStunObject Whether the object's type has the ION_STUN_EFFECT behaviour.
  */
 export function createdWrite(
     name: string,
     missileShieldObject: boolean,
+    ionStunObject = false,
 ): boolean | undefined {
-    const created = lastWrite(name, ON_CREATION, undefined);
+    let created = lastWrite(name, ON_CREATION, undefined);
 
-    return missileShieldObject
-        ? lastWrite(name, MISSILE_SHIELD_OBJECT, created)
-        : created;
+    if (missileShieldObject) {
+        created = lastWrite(name, MISSILE_SHIELD_OBJECT, created);
+    }
+
+    if (ionStunObject) {
+        created = lastWrite(name, ION_STUN_OBJECT, created);
+    }
+
+    return created;
 }
 
 /**

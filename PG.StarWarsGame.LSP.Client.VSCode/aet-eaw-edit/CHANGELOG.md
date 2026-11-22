@@ -13,9 +13,25 @@
   ([#437](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/437))
 - **Reset all turrets** - the model preview's Model state group on the stage carries one button that puts
   every turned turret back at the pose the model authored, in every lens, with the number of turned turrets
-  inside it; it is disabled while none is turned and left out for a subject with no turret that turns. The
-  two state sliders beside it are 16px shorter so all three fit one row
+  inside it; it is disabled while none is turned and left out for a subject with no turret that turns
   ([#438](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/438))
+- **Damage state and detail level as pills with a list** - the two sliders on the stage's bottom edge are
+  pills: the glyph, the level and the mark of a list. The list's rows say what each level is - the health
+  band a damage state covers, the meshes and triangles a detail level draws - and the pill's tooltip says it
+  for the level shown, where a slider wrote it out beside itself. In Gameplay the damage state stays on
+  screen, disabled, while the hull drives it
+- **A ship's speed, an ion stun and disabled engines in the unit preview** - the right end of the stage's
+  bottom edge carries a speed slider and two toggles for a unit, in every lens. The engine effects are drawn
+  as bright as the game draws them at that speed: a fifth at rest, rising to full at `Max_Speed`.
+  `Engines disabled` flickers them at up to a fifth, as a hit from a projectile that disables engines does,
+  and `Ion stun` shows the `pi` effects of a unit for as long as it is on. The slider and `Engines disabled`
+  are disabled, with the reason, for a type without the `SIMPLE_SPACE_LOCOMOTOR` behaviour, and `Ion stun`
+  for one without `ION_STUN_EFFECT`. A model opened as a file has none of the three
+- **A diagnostic for ion stun effects that never go out** - the game hides a unit's `pi` effects until it is
+  ion stunned only for a type with the `ION_STUN_EFFECT` behaviour; a type without it draws the ones its
+  model file shows from the start, and nothing ever hides them. `CrossTag37` (`aetswg-007-0037`) names those
+  effects on such a type, on its behaviour list. Information, since a wreck that sparks for as long as it
+  lies there is the same finding as a ship meant to spark only while stunned
 - **The model preview shows the model file as it is** - a model file opened on its own shows every part the
   file marks visible, a stealth shell and a shield mesh included, runs every effect the file leaves on and
   stands in the file's own pose until a clip is played. The game's rules - hardpoints, abilities, cloaks, the
@@ -38,6 +54,20 @@
 
 ### Fixes
 
+- **A unit whose hull is drawn opens with no note that nothing is drawn** - the Star Destroyer opened with
+  `This model has no visible mesh at the current damage and detail level`: its eight hardpoint models arrive
+  before its hull, a model that has arrived hangs nowhere until the hull is there, and the preview judged the
+  unit at that moment and kept the note. It is judged once all its geometry has arrived. The mesh and
+  triangle counts in the dock header are the model's own as well: the quads of the effects playing were
+  counted in, so the Star Destroyer's 17 meshes read as 18 at rest and as 145 for a moment of its load
+- **A hardpoint's wreck drifts and turns as the game moves it** - the preview applied a prop's
+  `Debris_Movement_Vector` in the model's own axes, so the four weapon wrecks of the Star Destroyer all slid
+  across the hull towards its centreline. The game adds the vector to the wreck's position in world axes every
+  logic frame, whatever way the ship heads, so the same prop leaves a ship outwards at one heading and inwards
+  at the opposite one; the previewed ship stands at facing 0, heading along world +X, and a wreck drifts from
+  it as it does from such a ship in the game. `Debris_Facing_Rotate_Vector` is added to the wreck's three
+  facing angles - a roll about the heading, a pitch, a yaw - where the preview had the pitch and the yaw
+  changed places, and a wreck starts standing as the ship does, not as the bone its hardpoint hung on
 - **A part is drawn only when everything that decides it shows it** - the preview took the first rule with an
   opinion on a part, so a playing clip showed a mesh the model file hides, marker plates included, and a part
   of another damage or detail level, and a clip that hid a bone took every part below it along. The game asks
@@ -155,6 +185,88 @@
   the camera presets, the grid and the draw distance go by the same sphere. A model with meshes is framed by
   its meshes as before
   ([#431](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/431))
+- **Animation files that cannot be read are said** - a model's animations are listed from the game data,
+  which names the shipped game's files whether or not they can be reached. With no game folder set or found,
+  or one that does not hold them, a mod's copy of a base-game model opened with no animations and not a word.
+  The preview now names the files it lists and cannot read, and where files are read from (`Preview24`,
+  `aetswg-014-0024`). `Copy Bug Report Info` says whether each game folder is set, detected or absent, and how
+  many archives are read
+  ([#465](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/465))
+- **A hardpoint without an attachment bone is an error only where it loses something** - the preview
+  reported every hardpoint that names no `Attachment_Bone` (`Preview9`, `aetswg-014-0009`), the shipped
+  corvette's guns included: 45 hardpoints of the base game and 88 of the expansion, none of them wrong. One
+  that cannot be targeted, fires from its `Fire_Bone_A` and attaches no model is no longer reported. The
+  error stays for one that names a model, which the game never attaches, and for one with no fire bone
+  either, which the game places at the map origin; each message now says which of the two it is
+  ([#466](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/466))
+- **The preview holds each model once** - once a unit was drawn, its preview kept every model twice: the
+  bytes it arrived as, for a refresh, and the vertex data read from them. A model named by several parts -
+  twenty turrets of one file - was read and held once more for each of them, and every refresh read all of
+  it again. A model is now read once and its bytes are let go; the hull, each hardpoint's model and each
+  wreck of that file draw from the one reading, and a refresh after an XML edit reads nothing. Measured on
+  two mod models of 149 MB and 193 MB, the preview's memory after the load fell from 250 MB to 188 MB and
+  from 258 MB to 177 MB
+  ([#442](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/442))
+- **Spent particle systems no longer slow the preview** - every particle emitter copied room for 5,003
+  particles to the graphics card on every frame, whatever was alive. Measured on a mod's capital ship with
+  every hardpoint destroyed - 4,840 emitters and nothing alive - the preview drew at 9 frames a second and
+  now draws at 53. An emitter copies the particles it has, and nothing when it has none
+- **A unit's effects and wrecks are loaded with the unit** - a hardpoint's death explosion, the hull's damage
+  smoke, the unit's death blast, a wreck's model and the fire it trails were each asked for at the moment they
+  were started - an explosion once per destroyed hardpoint - and their textures only after that. Each is now
+  asked for once while the unit loads, with its textures and shaders, and a texture is copied to the graphics
+  card as it arrives; none of them runs before it is started. Measured on a mod's capital ship with 145
+  hardpoints destroyed at once: 145 requests and 15.6 MB of textures after the press became none, and the
+  explosions were in the scene after 5.4 seconds instead of 13.3. An explosion answered more than once no
+  longer leaves a copy of itself at the centre of the scene
+- **A hardpoint's explosion plays when the unit dies with it** - destroying the last hardpoint kills the unit
+  and hides its hull, and an explosion on a hidden hull was held: it never played, never left the scene, and
+  went off when the unit was repaired. Measured on a mod's capital ship with 145 hardpoints destroyed at once:
+  no explosion played, all 145 went off together on the repair, and destroying them a second time added 145
+  more - the preview's memory grew from 1.4 GB to 2.4 GB. An explosion now plays where its bone is and leaves
+  when it has burnt out, and a second round holds no more than the first
+- **Destroying every hardpoint no longer freezes the preview for seconds** - every explosion put in the scene,
+  and every effect of the unit the rules wrote after it, decided again what each row of the model draws and
+  measured the whole model again. A change of many steps now does both once, and so does a unit attaching its
+  effects as it loads. Measured on a mod's capital ship with 145 hardpoints destroyed at once: the frozen frame
+  at the press fell from 5.9 seconds to 1.4, the one at `Repair all hardpoints` from 1.6 seconds to 0.15, and
+  the longest frame while the unit loads from 3.7 seconds to 0.35
+- **An effect holds room for the particles it has** - every emitter kept room for 5,003 particles, the game's
+  ceiling, in each of two vertex streams: 1.2 MB an emitter, with nothing alive. An emitter is now given the
+  room it is expected to need when its first particle is born, and more when it comes to hold more. Measured
+  on a mod's capital ship with 145 hardpoints destroyed at once: the preview's memory after the press fell from
+  1.35 GB to 0.4 GB and with the unit just loaded from 512 MB to 308 MB, the frozen frame at the press from
+  1.4 seconds to 0.44, and a frame while the explosions burn from 57 milliseconds to 38
+- **An emitter costs the graphics card one buffer, and nothing while it holds no particle** - every emitter
+  kept seven buffers of its own beside a quad and an index that are every emitter's alike, copied six of them
+  each frame it held a particle, and was drawn each frame it held none. Its particles are now in one buffer,
+  the quad and the index are shared by all, and an emitter with nothing in the air is left out of the frame.
+  Measured on a mod's capital ship with 145 hardpoints destroyed at once: the buffers made at the press fell
+  from 43,920 to 5,025 and the copies a frame while it burns from 16,167 to 2,656, the frozen frame at the
+  press from 0.44 seconds to 0.25, and the frame rate two seconds in rose from 27 a second to 71
+- **No frame of the file pose when a clip starts** (#441) - under the Game renderer a model stood in its file
+  pose for one frame each time a clip started: an infantry unit with its arms out, each time its Idle card
+  drew another take. A clip starts from the file pose, and the game's shaders were handed the bones' place in
+  the world as the frame before had left it. They are handed where the bones stand in the frame being drawn.
+  Measured on the Ewok: 7 frames of the file pose in 2,986 for 7 takes started, now none in 2,983 for 9
+- **A model a hardpoint attaches keeps its own parts** - a unit's rule that names a part, a hardpoint's
+  `Damage_Decal`, reached inside the models its hardpoints attach: an attached weapon whose mesh is named like
+  the decal on the hull was hidden with it. And a hardpoint's death or a cloak ending wrote every part of an
+  attached model shown, the ones its own file hides among them. An attached model is one part of the unit, as
+  in the game: a rule that reaches it hides or shows it whole, a rule that names a part looks at the unit's own
+  model, and inside the attached model each part is drawn as its file has it. Reported on a mod's star
+  destroyer, which stood without its two bow weapons
+- **A ship's engine glow goes out when its engines go offline** - with every engine hardpoint of a unit
+  destroyed its glow burned on. In the game an engine hardpoint's death takes the engines offline when the
+  unit has none left undestroyed, and the ship then keeps its `pe` and `pte` effects hidden until one is back;
+  a hardpoint's `Engine_Particles` hides only what is on or below the bone it names, which on most ships is
+  not the glow. The unit preview does the same. Reported on a mod's star destroyer with seven engine
+  hardpoints, whose seven glows stayed on with all of them destroyed
+- **Ion stun effects are off until a unit is ion stunned** - a unit whose type has the `ION_STUN_EFFECT`
+  behaviour hides its `pi` effects when it is created, as the game does; the unit preview showed them from the
+  start wherever the model file does not hide them itself. A type without the behaviour keeps them as its
+  model has them, in the game and in the preview. Reported on a mod's star destroyer, which opened with its
+  ion sparks running
 - **A texture named by a path is said again** - the information that a particle system names its sprite sheet
   by the art machine's path (`Assets21`), promised in 0.5.1, appeared only while an index built before it was
   still cached: the texture names were cut to the file name as they were read, so the XML check never saw the

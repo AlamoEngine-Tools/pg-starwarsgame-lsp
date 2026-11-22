@@ -12,10 +12,12 @@ import {
 import * as THREE from "three";
 import {
     type BreakoffAnchor,
+    type BreakoffPose,
     breakoffLifetime,
     breakoffPose,
 } from "./breakoff";
 import { BREAKOFF_ATTACHMENT } from "./loadedPart";
+import { type ParsedModel } from "./parsedModel";
 import { disposeTree } from "./partAssembly";
 import { spinAwayPose } from "./spinAway";
 import { type ViewportContext } from "./viewportContext";
@@ -29,7 +31,6 @@ interface BreakoffInstance {
     prop: PreviewBreakoffProp;
     /** Where the hardpoint was when it broke off. The debris does not follow the ship. */
     origin: THREE.Vector3;
-    facing: THREE.Quaternion;
     age: number;
     lifetime: number;
     /**
@@ -45,6 +46,13 @@ interface BreakoffInstance {
 export interface DestructionHost {
     readonly onBreakoffExpired:
         ((key: string, prop: PreviewBreakoffProp) => void) | null;
+}
+
+/** How a wreck stands at one moment of its drift, as the quaternion its root takes. */
+function orientationOf(pose: BreakoffPose): THREE.Quaternion {
+    const { x, y, z, w } = pose.orientation;
+
+    return new THREE.Quaternion(x, y, z, w);
 }
 
 export class DestructionRig {
@@ -95,7 +103,7 @@ export class DestructionRig {
      */
     async addBreakoff(
         key: string,
-        glb: Uint8Array,
+        model: ParsedModel,
         at: BreakoffAnchor,
         prop: PreviewBreakoffProp,
     ): Promise<void> {
@@ -103,13 +111,16 @@ export class DestructionRig {
         // WHICH node that is, is `breakoffAnchor`'s decision and not this one's: a hardpoint model can
         // carry a copy of the hull's own bones, and resolving the attachment bone by name inside it
         // applied the offset twice.
+        //
+        // Only its POSITION is taken. The game creates a wreck with its parent's facing, so it stands
+        // as the ship does and not as the bone its hardpoint hung on - see `breakoffPose`.
         const anchor = this.context.assembly.attachmentFor(
             at.partId,
             at.bone,
             at.boneIndex,
         );
         const origin = anchor.getWorldPosition(new THREE.Vector3());
-        const facing = anchor.getWorldQuaternion(new THREE.Quaternion());
+        const facing = orientationOf(breakoffPose(prop, 0));
 
         // The wreck's part id and its subject id are the same string on purpose: it is one model
         // and one subject, and the effects it trails already address it by this name.
@@ -117,7 +128,7 @@ export class DestructionRig {
 
         const root = await this.context.assembly.addPart(
             wreckId,
-            glb,
+            model,
             undefined,
             undefined,
             {
@@ -132,7 +143,6 @@ export class DestructionRig {
             root,
             prop,
             origin,
-            facing,
             age: 0,
             lifetime: breakoffLifetime(prop),
             expired: false,
@@ -270,15 +280,7 @@ export class DestructionRig {
                 debris.origin.z + pose.offset.z,
             );
 
-            const spin = new THREE.Euler(
-                pose.rotation.x * (Math.PI / 180),
-                pose.rotation.y * (Math.PI / 180),
-                pose.rotation.z * (Math.PI / 180),
-            );
-
-            debris.root.quaternion
-                .copy(debris.facing)
-                .multiply(new THREE.Quaternion().setFromEuler(spin));
+            debris.root.quaternion.copy(orientationOf(pose));
 
             alive.push(debris);
         }

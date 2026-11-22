@@ -50,8 +50,48 @@ export class CameraRig {
     private cachedSpan: number | null = null;
     /** Bone nodes whose geometry turns to face the camera, the light or the wind. */
     readonly billboards: THREE.Object3D[] = [];
+    /** How many batches are open. See {@link batch}. */
+    private batches = 0;
+    /** Whether a step of an open batch asked for the depth range again. */
+    private depthRangeOwed = false;
 
     constructor(private readonly context: ViewportContext) {}
+
+    /**
+     * Runs `work` with the depth range held, and refits it once after it if any step asked.
+     *
+     * Fitting it measures every drawn vertex of the model, so it costs by the size of the model
+     * and not by the size of the change. Batches nest, and the outermost one decides - see
+     * `sceneBatch.ts`.
+     */
+    batch(work: () => void): void {
+        this.batches++;
+
+        try {
+            work();
+        } finally {
+            this.batches--;
+
+            if (this.batches === 0 && this.depthRangeOwed) {
+                this.refitDepthRange();
+            }
+        }
+    }
+
+    /**
+     * Sets the depth range again for what is in the scene now, at the distance the camera was
+     * fitted to. What anything asks for that has changed how far the scene reaches - an effect
+     * arriving or leaving. Once at the end of a batch, when one is open.
+     */
+    refitDepthRange(): void {
+        if (this.batches > 0) {
+            this.depthRangeOwed = true;
+            return;
+        }
+
+        this.depthRangeOwed = false;
+        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+    }
 
     /** Starts turning every billboarded bone under a part that has just arrived. */
     collectBillboards(root: THREE.Object3D): void {
@@ -378,6 +418,15 @@ export class CameraRig {
      */
     prepareForCamera(): void {
         this.context.camera.updateMatrixWorld();
+
+        // Where everything stands in the world NOW, before anything below reads it. three brings
+        // the world matrices up to date when it draws, and that is after the engine's shaders have
+        // been handed theirs: they were drawing every frame with the place the frame BEFORE had
+        // left. A frame late is not seen while a clip runs - but a clip starts from the file pose,
+        // and the preview measures the model there, which writes the bones' place in the world.
+        // MEASURED on the Ewok under the Game renderer (#441): one frame of the file pose, arms
+        // out, each time its Idle card drew another take - 7 of 2,986 frames for 7 takes.
+        this.context.scene.updateMatrixWorld();
 
         // The engine's per-frame contract, including the matrices. Last, not first, so it sees the
         // bone transforms the animation and skeleton work above have already settled.

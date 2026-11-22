@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<AttachedUnits>
+<SpaceUnit Name="Prv_Attached_Unit">
+<Text_ID>TEXT_NONE</Text_ID>
+<Space_Model_Name>Rv_corvette.alo</Space_Model_Name>
+<Scale_Factor>1.0</Scale_Factor>
+<Tactical_Health>100</Tactical_Health>
+<HardPoints>HP_Prv_Attached_A</HardPoints>
+</SpaceUnit>
+</AttachedUnits>

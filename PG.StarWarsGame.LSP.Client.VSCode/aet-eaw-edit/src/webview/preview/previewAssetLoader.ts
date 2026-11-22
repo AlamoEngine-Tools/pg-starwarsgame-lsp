@@ -15,12 +15,14 @@ import * as THREE from "three";
 import { DDSLoader } from "three/examples/jsm/loaders/DDSLoader.js";
 import { TGALoader } from "three/examples/jsm/loaders/TGALoader.js";
 
+import type { AlamoParticleContent } from "../../protocol/modelPreview";
 import type { ModelPreviewTexture } from "../../protocol/panels/modelPreview";
 import {
     type TranslatedEffect,
     translateEffect,
     type TranslationResult,
 } from "./fx/effect";
+import { systemEffectNames, systemTextureNames } from "./effectNeeds";
 import { parseFxManifest, selectTechnique } from "./fx/fxParser";
 import { type FxMaterialState, materialStateFrom } from "./fx/renderState";
 import { collectUniformDefaults } from "./fx/semantics";
@@ -48,6 +50,8 @@ export interface AssetViewport {
     setTexture(name: string, texture: THREE.Texture): void;
     setParticleTexture(name: string, texture: THREE.Texture): void;
     setParticleTextureMissing(name: string): void;
+    /** Copies a texture to the graphics card now rather than on the first frame that draws with it. */
+    uploadTexture(texture: THREE.Texture): void;
     /** Disposes every texture whose lower-cased name is not among `keep`. */
     releaseTexturesExcept(keep: ReadonlySet<string>): void;
     /** Drops every translated effect and declared render state; the meshes go back to their archetypes. */
@@ -59,7 +63,7 @@ export interface AssetViewport {
 /** What the loader tells the panel. */
 export interface AssetLoaderEvents {
     post(message: {
-        type: "requestTexture" | "requestShader";
+        type: "requestTexture" | "requestShader" | "requestParticleSystem";
         name: string;
         /** For a texture: the version already held, when one is. */
         have?: string;
@@ -97,6 +101,20 @@ export class PreviewAssetLoader {
      */
     private readonly textures = new AssetLedger();
     private readonly shaders = new AssetLedger();
+
+    /**
+     * The particle systems asked for by name, counted with the rest: a system is what names its
+     * textures and effects, so the cover has to wait for it before it can know what else it waits on.
+     */
+    private readonly systems = new AssetLedger();
+
+    /**
+     * The effects of every system that arrived, whether or not an emitter of it was ever built.
+     *
+     * A refetch asks again for what the scene graph names, and a system fetched up front - an
+     * explosion nothing has set off yet - is not in the scene graph.
+     */
+    private readonly systemEffects = new Set<string>();
 
     /**
      * Every `.fx` and `.fxh` fetched, by lower-cased file name. Null means "asked for, not there".
@@ -143,14 +161,20 @@ export class PreviewAssetLoader {
         this.decode = options.decode ?? decodeTexture;
     }
 
-    /** Assets asked for, textures and effects together. */
+    /** Assets asked for: textures, effects and particle systems together. */
     get requested(): number {
-        return this.textures.requested + this.shaders.requested;
+        return (
+            this.textures.requested +
+            this.shaders.requested +
+            this.systems.requested
+        );
     }
 
     /** Assets answered, found or not. */
     get settled(): number {
-        return this.textures.settled + this.shaders.settled;
+        return (
+            this.textures.settled + this.shaders.settled + this.systems.settled
+        );
     }
 
     /**
@@ -188,6 +212,45 @@ export class PreviewAssetLoader {
     }
 
     /**
+     * Asks for one particle system by name, once.
+     *
+     * Every hardpoint of a capital ship names the one explosion, and the host answers every request
+     * it is sent: MEASURED, 145 requests for one system took ten seconds to come back.
+     */
+    requestSystem(name: string): void {
+        if (!this.systems.request(name)) {
+            return;
+        }
+
+        this.events.post({ type: "requestParticleSystem", name });
+        this.events.ledgersChanged();
+    }
+
+    /**
+     * A particle system has come back, or come back empty.
+     *
+     * What it names is asked for here, off the system's own data: its textures and the effects it
+     * is drawn with are on their way before any emitter of it is built, which for an explosion is
+     * not until something blows up. Asked for BEFORE the system counts as answered, so the wait
+     * never reads as over in between.
+     */
+    receiveSystem(name: string, system: AlamoParticleContent | null): void {
+        if (system !== null) {
+            for (const texture of systemTextureNames(system)) {
+                this.requestTexture(texture);
+            }
+
+            for (const effect of systemEffectNames(system)) {
+                this.systemEffects.add(effect);
+                this.requestShader(effect);
+            }
+        }
+
+        this.systems.settle(name);
+        this.events.ledgersChanged();
+    }
+
+    /**
      * Lets go of every texture the scene on screen did not ask for. Called when the scene has
      * finished loading: what stays on the GPU is what is drawn, not everything this panel ever
      * showed. A texture asked for and still on its way counts as asked for.
@@ -211,6 +274,8 @@ export class PreviewAssetLoader {
     clearLedgers(): void {
         this.textures.clear();
         this.shaders.clear();
+        this.systems.clear();
+        this.systemEffects.clear();
         this.asked.clear();
     }
 
@@ -237,6 +302,10 @@ export class PreviewAssetLoader {
         }
 
         for (const name of names) {
+            this.requestShader(name);
+        }
+
+        for (const name of this.systemEffects) {
             this.requestShader(name);
         }
     }
@@ -323,6 +392,7 @@ export class PreviewAssetLoader {
         if (kept !== undefined) {
             viewport.setTexture(name, kept.texture);
             viewport.setParticleTexture(name, kept.texture);
+            viewport.uploadTexture(kept.texture);
             this.noteContent(name, kept.texture, result.format ?? null);
             return;
         }
@@ -343,6 +413,11 @@ export class PreviewAssetLoader {
             // and the loader does not track which asked.
             viewport.setTexture(name, texture);
             viewport.setParticleTexture(name, texture);
+
+            // After the two above, which decide how it is sampled: copied to the graphics card
+            // while the cover is still down, not on the frame that first draws with it. For an
+            // effect fetched up front that frame is the one the explosion starts on.
+            viewport.uploadTexture(texture);
             this.noteContent(name, texture, result.format ?? null);
             return;
         }

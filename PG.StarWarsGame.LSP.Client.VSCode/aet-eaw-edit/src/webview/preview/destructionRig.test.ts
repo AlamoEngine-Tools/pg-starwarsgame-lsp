@@ -13,6 +13,7 @@ import {
     BREAKOFF_ATTACHMENT,
     type LoadedPart,
 } from "./loadedPart";
+import { type ParsedModel } from "./parsedModel";
 import { standInContext } from "./viewportContext.testing";
 
 const PROP: PreviewBreakoffProp = {
@@ -31,14 +32,19 @@ const PROP: PreviewBreakoffProp = {
 };
 
 /**
- * A rig over a stand-in viewport: a hull at the origin with a bone 10 units up, and an `addPart` that
- * hangs a fresh group under the model and records how it was asked for. What is removed and what expires
- * is recorded too.
+ * A rig over a stand-in viewport: a hull at the origin with a bone 10 units up and turned a quarter about
+ * its own Y, and an `addPart` that hangs a fresh group under the model and records how it was asked for.
+ * What is removed and what expires is recorded too.
  */
 function rigWith(modelScale = 1): {
     destruction: DestructionRig;
     hull: LoadedPart;
-    added: { id: string; subjectId?: string; at?: THREE.Vector3 }[];
+    added: {
+        id: string;
+        subjectId?: string;
+        at?: THREE.Vector3;
+        facing?: THREE.Quaternion;
+    }[];
     removed: string[];
     expired: string[];
     wreck: () => THREE.Group;
@@ -46,6 +52,7 @@ function rigWith(modelScale = 1): {
     const modelRoot = new THREE.Group();
     const bone = new THREE.Bone();
     bone.position.set(0, 10, 0);
+    bone.rotation.set(0, Math.PI / 2, 0);
     const hullRoot = new THREE.Group();
     hullRoot.add(bone);
     modelRoot.add(hullRoot);
@@ -58,7 +65,12 @@ function rigWith(modelScale = 1): {
         subjectId: ACTIVE_SUBJECT,
     };
     const parts = new Map<string, LoadedPart>([["hull", hull]]);
-    const added: { id: string; subjectId?: string; at?: THREE.Vector3 }[] = [];
+    const added: {
+        id: string;
+        subjectId?: string;
+        at?: THREE.Vector3;
+        facing?: THREE.Quaternion;
+    }[] = [];
     const removed: string[] = [];
     const expired: string[] = [];
     let last = new THREE.Group();
@@ -67,18 +79,22 @@ function rigWith(modelScale = 1): {
             attachmentFor: () => bone,
             addPart: async (
                 id: string,
-                _glb: Uint8Array,
+                _model: unknown,
                 _to?: string,
                 _bone?: string,
                 options?: {
                     subjectId?: string;
-                    pose?: { position: THREE.Vector3 };
+                    pose?: {
+                        position: THREE.Vector3;
+                        quaternion: THREE.Quaternion;
+                    };
                 },
             ) => {
                 added.push({
                     id,
                     subjectId: options?.subjectId,
                     at: options?.pose?.position,
+                    facing: options?.pose?.quaternion,
                 });
                 last = new THREE.Group();
                 last.add(
@@ -117,15 +133,19 @@ function rigWith(modelScale = 1): {
 }
 
 describe("DestructionRig", () => {
-    /** The stand-in assembly never parses it. */
-    const GLB = new Uint8Array(0);
+    /** The stand-in assembly never copies it. */
+    const MODEL: ParsedModel = {
+        scene: new THREE.Group(),
+        clips: [],
+        visibility: new Map(),
+    };
 
     it("loads a wreck as a subject of its own, where its bone is", async () => {
         const { destruction, added } = rigWith();
 
         await destruction.addBreakoff(
             "HP_1",
-            GLB,
+            MODEL,
             { partId: "hull", bone: "HP_Bone", boneIndex: 3 },
             PROP,
         );
@@ -137,11 +157,42 @@ describe("DestructionRig", () => {
         assert.equal(destruction.hasBreakoff("HP_1"), true);
     });
 
+    /**
+     * The game creates a wreck with its PARENT's facing, not with the orientation of the bone its
+     * hardpoint hung on. The stand-in bone is turned a quarter about its own Y; the wreck is not.
+     */
+    it("stands a wreck as the ship stands, whatever way its bone is turned", async () => {
+        const { destruction, added, wreck } = rigWith();
+
+        await destruction.addBreakoff(
+            "HP_1",
+            MODEL,
+            { partId: "hull", bone: "HP_Bone", boneIndex: 3 },
+            { ...PROP, facingRotateVector: null },
+        );
+
+        // The ship's own orientation in the scene: Alamo's up axis turned onto the scene's.
+        const ship = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0),
+            -Math.PI / 2,
+        );
+        assert.ok(
+            (added[0].facing?.angleTo(ship) ?? 1) < 1e-6,
+            `dropped at ${JSON.stringify(added[0].facing?.toArray())}`,
+        );
+
+        destruction.advanceBreakoffs(1);
+        assert.ok(
+            wreck().quaternion.angleTo(ship) < 1e-6,
+            `drifted to ${JSON.stringify(wreck().quaternion.toArray())}`,
+        );
+    });
+
     it("flies a wreck off its bone and lets it expire at the end of its life", async () => {
         const { destruction, expired, wreck } = rigWith();
         await destruction.addBreakoff(
             "HP_1",
-            GLB,
+            MODEL,
             { partId: "hull", bone: "HP_Bone", boneIndex: 3 },
             PROP,
         );
@@ -157,8 +208,8 @@ describe("DestructionRig", () => {
 
     it("takes a wreck out through the assembly when it is cleared", async () => {
         const { destruction, removed } = rigWith();
-        await destruction.addBreakoff("HP_1", GLB, { partId: "hull" }, PROP);
-        await destruction.addBreakoff("HP_2", GLB, { partId: "hull" }, PROP);
+        await destruction.addBreakoff("HP_1", MODEL, { partId: "hull" }, PROP);
+        await destruction.addBreakoff("HP_2", MODEL, { partId: "hull" }, PROP);
 
         destruction.clearBreakoff("HP_1");
         assert.deepEqual(removed, [`${BREAKOFF_ATTACHMENT}HP_1`]);

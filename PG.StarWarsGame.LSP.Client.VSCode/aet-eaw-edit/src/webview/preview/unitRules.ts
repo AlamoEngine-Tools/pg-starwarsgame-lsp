@@ -18,7 +18,14 @@
 import { PREVIEW_SCENE_KIND } from "../../protocol/modelPreview";
 import { type HardpointDeath, type HardpointWrites } from "./damage";
 import { cloakWrite, hiddenOnTypeLoad } from "./cloakWrites";
-import { createdWrite, switchWrite } from "./effectGroups";
+import {
+    createdWrite,
+    EFFECT_GROUP,
+    inGroup,
+    ION_STUN_SWITCH,
+    switchWrite,
+} from "./effectGroups";
+import { disabledFlicker, engineBrightness } from "./engineGlow";
 import { type MaterialExtras, isShieldMesh } from "./materials";
 import {
     type AnimationSwitch,
@@ -45,7 +52,13 @@ const NO_HARDPOINTS: HardpointWrites = {
     decals: new Set(),
     damageBones: new Set(),
     deaths: [],
+    enginesOffline: false,
 };
+
+/** The behaviour whose object hides its `pi` effects until it is ion stunned. */
+const ION_STUN_BEHAVIOR = "ION_STUN_EFFECT";
+/** The behaviour that moves a ship, and keeps its engine effects hidden while its engines are offline. */
+const SPACE_LOCOMOTOR_BEHAVIOR = "SIMPLE_SPACE_LOCOMOTOR";
 
 const NO_NAMES: ReadonlySet<string> = new Set();
 
@@ -86,6 +99,26 @@ export class UnitRules {
      * above 0 - which shows its `prs` effects once it is created.
      */
     missileShieldObject = false;
+    /**
+     * The behaviours the unit's type lists, upper-cased. What the game does to a unit depends on
+     * them: see {@link effectState} for the ion stun effects and the engines going offline.
+     */
+    private behaviors: ReadonlySet<string> = new Set();
+    /**
+     * The unit's speed as a share of its `Max_Speed`, 0 at rest to 1 at full speed. The reader's:
+     * nothing moves a unit in the preview. A unit opens at full speed.
+     */
+    private speed = 1;
+    /** The type's `Max_Speed`, or null where it writes none. */
+    private maxSpeed: number | null = null;
+    /**
+     * Whether the unit's engines are disabled for a time - in the game by a hit that drained its
+     * power, from a projectile that disables engines; here by the reader. Not the engines going
+     * offline for good with the last engine hardpoint: see {@link effectBrightness}.
+     */
+    private enginesDisabled = false;
+    /** Whether the unit is ion stunned - in the game by a projectile, here by the reader. */
+    private ionStunned = false;
 
     /**
      * When each death and each ability switch happened, on one clock, so the effect writes replay in
@@ -133,6 +166,11 @@ export class UnitRules {
         this.cloakShadowsOff = false;
         this.activeAbilities = new Set();
         this.missileShieldObject = false;
+        this.behaviors = new Set();
+        this.speed = 1;
+        this.maxSpeed = null;
+        this.enginesDisabled = false;
+        this.ionStunned = false;
         this.clock = 0;
         this.deathAt.clear();
         this.abilityAt.clear();
@@ -173,6 +211,67 @@ export class UnitRules {
         this.context.levels.applyLevels();
     }
 
+    /** The type's `Max_Speed`, or null where it writes none. See {@link effectBrightness}. */
+    setMaxSpeed(maxSpeed: number | null): void {
+        this.maxSpeed = maxSpeed;
+    }
+
+    /**
+     * The unit's speed as a share of its `Max_Speed`. Read on every frame the effects are drawn,
+     * so nothing has to be asked again here.
+     */
+    setSpeed(share: number): void {
+        this.speed = Math.min(1, Math.max(0, share));
+    }
+
+    /** Disables the unit's engines for a time, or brings them back. See {@link effectBrightness}. */
+    setEnginesDisabled(disabled: boolean): void {
+        this.enginesDisabled = disabled;
+    }
+
+    /**
+     * Ion stuns the unit, or ends the stun. Measured in the game: a stun shows the `pi` effects of
+     * a unit with the ion stun behaviour and its end hides them again - placed on the unit's clock
+     * like an ability's switch, so it replays in order with everything else. A unit without the
+     * behaviour takes no stun.
+     */
+    setIonStunned(stunned: boolean): void {
+        if (this.ionStunned === stunned) {
+            return;
+        }
+
+        this.ionStunned = stunned;
+        this.abilityAt.set(ION_STUN_SWITCH, { on: stunned, at: ++this.clock });
+        this.context.levels.applyLevels();
+    }
+
+    /**
+     * The brightness an effect of this name is drawn at, `seconds` into the preview's run: the
+     * engine effects of a ship by its speed, or flickering while its engines are disabled for a
+     * time - see `engineGlow.ts`. Everything else, every unit the space locomotor does not move,
+     * and every model opened as a file, is drawn as it is.
+     *
+     * Both engine groups alike: the game sets the one the ship is on - `pte` under turbo, else
+     * `pe` - and the other is hidden.
+     */
+    effectBrightness(name: string | undefined, seconds: number): number {
+        if (
+            !this.appliesGameRules() ||
+            name === undefined ||
+            !this.behaviors.has(SPACE_LOCOMOTOR_BEHAVIOR) ||
+            !(
+                inGroup(name, EFFECT_GROUP.engines) ||
+                inGroup(name, EFFECT_GROUP.turboEngines)
+            )
+        ) {
+            return 1;
+        }
+
+        return this.enginesDisabled
+            ? disabledFlicker(seconds)
+            : engineBrightness(this.speed, this.maxSpeed);
+    }
+
     /** Shows or hides the shield mesh, for the abilities that reveal it. */
     setShieldRevealed(revealed: boolean): void {
         this.shieldRevealed = revealed;
@@ -205,6 +304,14 @@ export class UnitRules {
         this.context.levels.applyLevels();
     }
 
+    /** The behaviours the unit's type lists, however cased. See {@link behaviors}. */
+    setBehaviors(behaviors: readonly string[]): void {
+        this.behaviors = new Set(
+            behaviors.map((behavior) => behavior.trim().toUpperCase()),
+        );
+        this.context.levels.applyLevels();
+    }
+
     /**
      * Whether the unit's shadow volumes are off because of its cloak. Through the level pass, because
      * the row chain decides what each shadow volume counts.
@@ -227,7 +334,18 @@ export class UnitRules {
      * A mesh's state switch with the game's rules written over the file's write, in the order the
      * preview applies them; the last write is what the mesh has.
      *
-     * @param bone The hull bone the mesh is on, for the rules that name a bone.
+     * A mesh inside a model a hardpoint attaches is evaluated PER MODEL. Measured in the game: the
+     * attached model is one part of the unit, a model inside the model. A rule that names a part -
+     * `Damage_Decal` - is compared with the unit model's own parts and never looks inside it; a
+     * rule that reaches it - a hardpoint's bone it hangs on or below, a cloak - writes the MODEL's
+     * one switch; and a part inside it is drawn only while the model is, as its own switches say.
+     * So nothing the unit writes can show what the attached model's file hides, a collision hull
+     * among them. Reported on a mod's star destroyer: its bow weapons are attached models whose
+     * one drawn mesh is named like the hardpoint's decal on the hull, and the decal rule, reaching
+     * inside, hid the weapons.
+     *
+     * @param bone The hull bone the mesh is on - for a mesh of an attached model, the bone the
+     *     model hangs on - for the rules that name a bone.
      * @param attached Whether the mesh belongs to a model a hardpoint attaches.
      */
     meshState(
@@ -259,37 +377,70 @@ export class UnitRules {
         }
 
         // What the hardpoints write on creation, then every death and every cloak in the one order
-        // they happened.
+        // they happened: to the part itself in the unit's own model, to the model it is in when a
+        // hardpoint attaches that - which starts out shown, and takes no write that names a part.
         const above = this.bonesAbove(bone);
-        written = this.creationHardpointWrite(written, above, name);
+        let model: StateSwitch = ruleState(true);
+
+        if (attached) {
+            model = this.creationHardpointWrite(model, above, null);
+        } else {
+            written = this.creationHardpointWrite(written, above, name);
+        }
 
         for (const event of this.timeline()) {
             if (event.kind === "death") {
-                written = this.deathWrite(written, event.death, above, name);
+                if (attached) {
+                    model = this.deathWrite(model, event.death, above, null);
+                } else {
+                    written = this.deathWrite(
+                        written,
+                        event.death,
+                        above,
+                        name,
+                    );
+                }
             } else {
+                // By its name, the part itself; as an attached model, the model.
                 const cloaked = cloakWrite(
                     event.type,
                     event.on,
                     meshName,
-                    attached,
+                    false,
                     undefined,
                 );
                 if (cloaked !== undefined) {
                     written = ruleState(cloaked);
                 }
+
+                const hidesModel = attached
+                    ? cloakWrite(event.type, event.on, "", true, undefined)
+                    : undefined;
+                if (hidesModel !== undefined) {
+                    model = ruleState(hidesModel);
+                }
             }
         }
 
-        return written;
+        // A hidden model draws none of its parts, whatever they say themselves.
+        return attached && !model.shown ? model : written;
     }
 
     /**
      * An effect's state switch with the game's rules written over it.
      *
      * In the order the game writes them: what creating the unit writes - its name group (`pte`,
-     * `pptw` and `prs` hidden, a missile-shield object's `prs` shown) and every Damage_Particles
-     * bone - then every hardpoint death and every ability switch, the cloaks among them, in the one
-     * order they happened.
+     * `pptw` and `prs` hidden, a missile-shield object's `prs` shown, `pi` hidden on an object with
+     * the ion stun behaviour) and every Damage_Particles bone - then every hardpoint death and
+     * every ability switch, the cloaks among them, in the one order they happened.
+     *
+     * And last, while the unit's engines are offline, its engine effects hidden. Measured in the
+     * game: an engine hardpoint dying takes the engines offline when the unit has none left
+     * undestroyed, and the space locomotor then hides the engine group it is on - `pe`, or `pte`
+     * under turbo - on every service, so nothing written after it shows them. Turbo is switched off
+     * with the engines, which hides `pte`: both groups are off. A hardpoint's `Engine_Particles`
+     * plays no part in this - on the Star Destroyer the glow is not below that bone - and neither
+     * does a unit the space locomotor does not move.
      *
      * @param bone The hull bone the effect is anchored on, for the rules that name a bone.
      * @param name The effect's proxy name, for the rules that read it; none for an effect the model
@@ -311,7 +462,12 @@ export class UnitRules {
             name !== undefined && hiddenOnTypeLoad(name)
                 ? ruleState(false)
                 : state;
-        written = this.createdWrite(written, name, this.missileShieldObject);
+        written = this.createdWrite(
+            written,
+            name,
+            this.missileShieldObject,
+            this.behaviors.has(ION_STUN_BEHAVIOR),
+        );
         const above = this.bonesAbove(bone);
 
         written = this.creationHardpointWrite(written, above, null);
@@ -335,6 +491,16 @@ export class UnitRules {
             }
         }
 
+        if (
+            name !== undefined &&
+            this.hardpoints.enginesOffline &&
+            this.behaviors.has(SPACE_LOCOMOTOR_BEHAVIOR) &&
+            (inGroup(name, EFFECT_GROUP.engines) ||
+                inGroup(name, EFFECT_GROUP.turboEngines))
+        ) {
+            written = ruleState(false);
+        }
+
         return written;
     }
 
@@ -345,7 +511,7 @@ export class UnitRules {
      */
     createdEffectState(state: StateSwitch, name?: string): StateSwitch {
         return this.appliesGameRules()
-            ? this.createdWrite(state, name, false)
+            ? this.createdWrite(state, name, false, false)
             : state;
     }
 
@@ -354,11 +520,12 @@ export class UnitRules {
         state: StateSwitch,
         name: string | undefined,
         missileShieldObject: boolean,
+        ionStunObject: boolean,
     ): StateSwitch {
         const created =
             name === undefined
                 ? undefined
-                : createdWrite(name, missileShieldObject);
+                : createdWrite(name, missileShieldObject, ionStunObject);
 
         return created === undefined ? state : ruleState(created);
     }
@@ -375,6 +542,14 @@ export class UnitRules {
         }
 
         for (const [type, { on, at }] of this.abilityAt) {
+            // A stun reaches only a unit with the behaviour - see `setIonStunned`.
+            if (
+                type === ION_STUN_SWITCH &&
+                !this.behaviors.has(ION_STUN_BEHAVIOR)
+            ) {
+                continue;
+            }
+
             placed.push({ at, event: { kind: "ability", type, on } });
         }
 

@@ -12,7 +12,8 @@ import { standInContext } from "./viewportContext.testing";
 
 /**
  * Queries over a stand-in viewport whose hull has a root bone and a turret bone under it, 5 units up,
- * carrying one triangle tagged for ALT 1. Every mesh counts as drawn; the subject has one clip.
+ * carrying one triangle tagged for ALT 1. Every mesh counts as drawn; the subject has one clip. Beside
+ * the hull hang a hardpoint's reticle and an effect's quad: meshes of the scene, not of the model.
  */
 function queriesWith(): { queries: ModelQueries; noted: string[] } {
     const modelRoot = new THREE.Group();
@@ -32,6 +33,13 @@ function queriesWith(): { queries: ModelQueries; noted: string[] } {
     barrel.name = "Barrel";
     barrel.userData.alamo = { alamoMesh: "Barrel", alamoAlt: 1 };
     turret.add(barrel);
+    const reticle = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+    reticle.userData.aetOverlay = true;
+    modelRoot.add(reticle);
+    const effect = new THREE.Group();
+    effect.userData.aetParticleSystem = true;
+    effect.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial()));
+    turret.add(effect);
     modelRoot.updateMatrixWorld(true);
     const hull: LoadedPart = {
         id: "hull",
@@ -56,6 +64,8 @@ function queriesWith(): { queries: ModelQueries; noted: string[] } {
         assembly: {
             hull: () => hull,
             activeSubjectRoots: () => [modelRoot],
+            forEachPartMesh: (visit: (mesh: THREE.Mesh) => void) =>
+                visit(barrel),
             noteAttachment: (partId: string, bone?: string) =>
                 noted.push(`${partId}/${bone}`),
         },
@@ -102,7 +112,12 @@ describe("ModelQueries", () => {
         ]);
     });
 
-    it("counts the drawn meshes, triangles, bones and clips", () => {
+    /**
+     * The subject's own meshes: an overlay and an effect's quads hang under the same root and are no
+     * part of the model. Counted in, the count rose and fell with the effects playing, and a model
+     * that drew nothing at all still counted the effects it mounts.
+     */
+    it("counts the model's drawn meshes, triangles, bones and clips", () => {
         const { queries } = queriesWith();
 
         assert.deepEqual(queries.stats(), {

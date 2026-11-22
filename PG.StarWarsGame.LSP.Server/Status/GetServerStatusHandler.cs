@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Projection;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
@@ -134,6 +135,15 @@ public sealed record ServerStatusWorkspaceDto(
 /// <param name="State">Building, Complete or Failed.</param>
 public sealed record ServerStatusIndexDto(string State);
 
+/// <summary>
+///     Whether the shipped game's files can be read: how each game folder came to be, and the archives
+///     read from them and the projects. States and a count - never a folder (#465).
+/// </summary>
+/// <param name="BaseGame">Set (by the editor or the configuration file), Detected (an install was found) or None.</param>
+/// <param name="Expansion"><paramref name="BaseGame" />'s states, for the expansion's folder.</param>
+/// <param name="Archives">How many archives assets are read from.</param>
+public sealed record ServerStatusGameFoldersDto(string BaseGame, string Expansion, int Archives);
+
 /// <summary>Result of <c>aet/getServerStatus</c>: outcomes only, never a path or a name.</summary>
 /// <param name="ServerVersion">The full informational version, commit included.</param>
 /// <param name="Warnings">Anything empty or failed that should not be, one line each.</param>
@@ -147,7 +157,8 @@ public sealed record ServerStatusDto(
     ServerStatusWorkspaceDto Workspace,
     ServerStatusIndexDto Index,
     IReadOnlyList<string> Warnings,
-    ServerStatusExtendedDto? Extended = null);
+    ServerStatusExtendedDto? Extended = null,
+    ServerStatusGameFoldersDto? GameFolders = null);
 
 /// <summary>Serves <c>aet/getServerStatus</c>.</summary>
 public sealed class GetServerStatusHandler(
@@ -158,7 +169,8 @@ public sealed class GetServerStatusHandler(
     IFileHelper fileHelper,
     IWorkspaceIndexer indexer,
     IEnumerable<ICacheStatisticsSource> caches,
-    IMessageCatalog messages)
+    IMessageCatalog messages,
+    IGameAssetResolver assets)
     : IJsonRpcRequestHandler<GetServerStatusParams, ServerStatusDto>
 {
     public Task<ServerStatusDto> Handle(GetServerStatusParams request, CancellationToken cancellationToken)
@@ -199,7 +211,27 @@ public sealed class GetServerStatusHandler(
             workspace,
             new ServerStatusIndexDto(recorder.IndexState.ToString()),
             Warnings(check, index, problem, files),
-            request.Extended ? Extended(index, files) : null));
+            request.Extended ? Extended(index, files) : null,
+            GameFolders()));
+    }
+
+    /// <summary>
+    ///     How each game folder came to be and how many archives are read. Counting the archives indexes
+    ///     them, which is otherwise left until a preview asks; a bug report is rare enough to pay for it.
+    /// </summary>
+    private ServerStatusGameFoldersDto GameFolders()
+    {
+        var current = config.Current;
+        return new ServerStatusGameFoldersDto(
+            FolderState(current.GamePath, current.GamePathDetected),
+            FolderState(current.ExpansionPath, current.ExpansionPathDetected),
+            assets.Tiers.ArchiveCount);
+    }
+
+    private static string FolderState(string? path, bool detected)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return "None";
+        return detected ? "Detected" : "Set";
     }
 
     // ── extended tier ────────────────────────────────────────────────────────

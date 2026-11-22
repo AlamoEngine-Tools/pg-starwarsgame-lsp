@@ -367,8 +367,86 @@ export class SpawnClock {
     }
 }
 
+/** The largest x a volume can yield: the one component a lifetime volume is read for. */
+function largestX(volume: AlamoSpawnVolume): number {
+    switch (volume.shape) {
+        case "Box":
+            return Math.max(volume.min.x, volume.max.x);
+
+        case "Cube":
+            return Math.abs(volume.sideLength);
+
+        case "Sphere":
+            return Math.abs(volume.sphereRadius);
+
+        case "Cylinder":
+            return Math.abs(volume.cylinderRadius);
+
+        default:
+            return volume.exactValue.x;
+    }
+}
+
+/** The longest a particle of this emitter can live, as `spawnParticle` draws its lifetime. */
+function longestLifetime(emitter: AlamoEmitter): number {
+    const properties = emitter.properties;
+    const fromVolume = largestX(emitter.lifetime);
+    const base = fromVolume > 0 ? fromVolume : properties.lifetime;
+
+    return Math.max(
+        0.01,
+        base * (1 + Math.abs(properties.randomLifetimePercent)),
+    );
+}
+
+/**
+ * How many particles an emitter is expected to hold at once, by its own numbers.
+ *
+ * What its buffers are given room for before the first particle is born. The preview's own
+ * estimate and never a limit: an emitter that comes to hold more is given more room, and one fed
+ * by another emitter's particles - a trail, a death child - runs no clock of its own, so its count
+ * is its parent's doing and not in its numbers at all.
+ *
+ * `perAttempt` is how many particles one spawn attempt makes: every vertex of a mesh, for an
+ * emitter born at each of them.
+ */
+export function expectedParticles(
+    emitter: AlamoEmitter,
+    perAttempt = 1,
+): number {
+    const properties = emitter.properties;
+
+    // Measured in the game: a weather field is born at once, the per-second value being the count
+    // outright and the lifetime playing no part.
+    if (properties.isWeatherParticle) {
+        return Math.max(1, Math.ceil(properties.particlesPerSecond));
+    }
+
+    const longest = longestLifetime(emitter);
+    let count: number;
+
+    if (properties.useBursts) {
+        // Every burst still in the air when the next one fires, the gap floored as `SpawnClock`
+        // floors it, and no more of them than the emitter fires.
+        const overlapping =
+            Math.floor(longest / Math.max(properties.burstDelay, 1e-4)) + 1;
+        const bursts =
+            properties.burstCount > 0
+                ? Math.min(properties.burstCount, overlapping)
+                : overlapping;
+
+        count = properties.particlesPerBurst * bursts;
+    } else {
+        // And one for the remainder the clock carries from step to step.
+        count = Math.ceil(properties.particlesPerSecond * longest) + 1;
+    }
+
+    return Math.max(1, Math.ceil(count * perAttempt));
+}
+
 /** Creates one particle at birth, drawing everything random about it now. */
 export function spawnParticle(emitter: AlamoEmitter, random: Random): Particle {
+    // The lifetime here is what `longestLifetime` bounds: change one and change the other.
     const properties = emitter.properties;
 
     const position = sampleVolume(emitter.position, random);
