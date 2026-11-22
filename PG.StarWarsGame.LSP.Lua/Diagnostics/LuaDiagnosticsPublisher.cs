@@ -172,7 +172,8 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         diagnostics.AddRange(LuaVersionSyntaxAnalyzer.Analyze(parsed.Tree, _messages));
 
         CollectReferenceErrors(uri, index, diagnostics, _messages);
-        diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, parsed.Tree, index.Documents, _fileHelper, _messages));
+        diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, parsed.Tree, index.Documents, _fileHelper, _messages,
+            index.AssetFiles));
         diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, parsed.Tree, index, _schemaProvider, _fileHelper,
             _messages));
         diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(parsed.Tree, uri, _messages));

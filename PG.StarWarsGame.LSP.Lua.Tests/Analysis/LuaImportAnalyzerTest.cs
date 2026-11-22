@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
@@ -106,5 +107,65 @@ public sealed class LuaImportAnalyzerTest
         var result = LuaImportAnalyzer.Analyze(ScriptUri, code, EmptyWorkspace, s_fileHelper, TestCatalogues.English);
         var diag = Assert.Single(result);
         Assert.Equal(1, diag.Range.Start.Line);
+    }
+
+    // ── scripts the game ships (#470) ────────────────────────────
+    // The game packs its Lua libraries into its archives, so a mod that requires one carries no copy
+    // of it and no document is indexed for it. The asset catalogue names every script the game ships.
+
+    private static IAssetFileIndex Shipped(params string[] paths)
+    {
+        return new MergedAssetFileIndex(paths);
+    }
+
+    [Fact]
+    public void Analyze_RequireOfAScriptTheGameShips_NoDiagnostic()
+    {
+        var result = LuaImportAnalyzer.Analyze(ScriptUri,
+            """require("PGStateMachine")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English,
+            Shipped("data/scripts/library/pgstatemachine.lua"));
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_RequireOfAScriptNobodyShips_StillEmitsError()
+    {
+        var result = LuaImportAnalyzer.Analyze(ScriptUri,
+            """require("Aet_No_Such_Module")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English,
+            Shipped("data/scripts/library/pgstatemachine.lua"));
+        var diag = Assert.Single(result);
+        Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
+        Assert.Equal(DiagnosticIds.LuaUnresolvedModule.ToString(), diag.Code?.String);
+    }
+
+    [Theory]
+    [InlineData("data/scripts/story/story_campaign.lua", "Story_Campaign")]
+    [InlineData("data/scripts/ai/landmode/attackplan.lua", "AttackPlan")]
+    [InlineData("data/scripts/library/pgcompiled.lc", "PGCompiled")]
+    public void Analyze_AShippedScript_IsFoundInEveryDirectoryTheGameSearches(string path, string module)
+    {
+        var result = LuaImportAnalyzer.Analyze(ScriptUri,
+            $"""require("{module}")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English, Shipped(path));
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_AShippedScriptOutsideTheGamesSearchPath_IsNotFound()
+    {
+        var result = LuaImportAnalyzer.Analyze(ScriptUri,
+            """require("Elsewhere")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English,
+            Shipped("data/scripts/elsewhere/elsewhere.lua"));
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void Analyze_TheMessage_NamesTheGameAsAPlaceSearched()
+    {
+        var result = LuaImportAnalyzer.Analyze(ScriptUri,
+            """require("Missing")""", EmptyWorkspace, s_fileHelper, TestCatalogues.English);
+        var text = Assert.Single(result).Message.Text();
+        Assert.Contains("Missing", text);
+        Assert.Contains("game", text);
+        Assert.DoesNotContain("workspace", text);
     }
 }
