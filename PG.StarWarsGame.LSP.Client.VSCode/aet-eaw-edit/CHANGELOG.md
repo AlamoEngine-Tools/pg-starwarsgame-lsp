@@ -54,6 +54,12 @@
 
 ### Fixes
 
+- **A unit whose hull is drawn opens with no note that nothing is drawn** - the Star Destroyer opened with
+  `This model has no visible mesh at the current damage and detail level`: its eight hardpoint models arrive
+  before its hull, a model that has arrived hangs nowhere until the hull is there, and the preview judged the
+  unit at that moment and kept the note. It is judged once all its geometry has arrived. The mesh and
+  triangle counts in the dock header are the model's own as well: the quads of the effects playing were
+  counted in, so the Star Destroyer's 17 meshes read as 18 at rest and as 145 for a moment of its load
 - **A hardpoint's wreck drifts and turns as the game moves it** - the preview applied a prop's
   `Debris_Movement_Vector` in the model's own axes, so the four weapon wrecks of the Star Destroyer all slid
   across the hull towards its centreline. The game adds the vector to the wreck's position in world axes every

@@ -9,6 +9,7 @@ import {
     isSubjectSystem,
     loadState,
     type LoadTally,
+    nothingDrawn,
 } from "./loadProgress";
 
 const tally = (over: Partial<LoadTally> = {}): LoadTally => ({
@@ -253,5 +254,51 @@ describe("isSubjectSystem", () => {
             ),
             false,
         );
+    });
+});
+
+describe("nothingDrawn", () => {
+    /**
+     * A unit's hardpoint models can arrive before its hull. Each has arrived and hangs nowhere yet,
+     * so parts are counted and not one mesh is drawn - which is the state of every load for a
+     * moment, not a finding about the model. The Star Destroyer opened with the note for that.
+     */
+    it("says nothing while geometry is still arriving", () => {
+        const arriving = tally({ expectedParts: 9, arrivedParts: 8 });
+
+        assert.equal(nothingDrawn(arriving, { parts: 8, meshes: 0 }), false);
+    });
+
+    it("says so once every part has arrived and not one mesh is drawn", () => {
+        assert.equal(nothingDrawn(tally(), { parts: 4, meshes: 0 }), true);
+    });
+
+    it("does not wait for the textures", () => {
+        const texturing = tally({ requestedAssets: 10, settledAssets: 2 });
+
+        assert.equal(nothingDrawn(texturing, { parts: 4, meshes: 0 }), true);
+    });
+
+    it("says nothing about a model that draws a mesh", () => {
+        assert.equal(nothingDrawn(tally(), { parts: 4, meshes: 1 }), false);
+    });
+
+    it("says nothing before the scene is known or when it has no parts", () => {
+        const unknown = tally({ expectedParts: null, arrivedParts: 0 });
+        const empty = tally({ expectedParts: 0, arrivedParts: 0 });
+
+        assert.equal(nothingDrawn(unknown, { parts: 0, meshes: 0 }), false);
+        assert.equal(nothingDrawn(empty, { parts: 0, meshes: 0 }), false);
+        assert.equal(nothingDrawn(tally(), null), false);
+    });
+
+    it("judges what did arrive when the wait is abandoned", () => {
+        const abandoned = tally({
+            expectedParts: 9,
+            arrivedParts: 8,
+            timedOut: true,
+        });
+
+        assert.equal(nothingDrawn(abandoned, { parts: 8, meshes: 0 }), true);
     });
 });

@@ -31,7 +31,11 @@ import {
     PreviewScene,
 } from "../protocol/modelPreview";
 import { collectTextureNames } from "./preview/materials";
-import { loadState, type LoadTally } from "./preview/loadProgress";
+import {
+    loadState,
+    type LoadTally,
+    nothingDrawn,
+} from "./preview/loadProgress";
 import { handoffFor } from "./preview/handoff";
 import { groundRange } from "./preview/groundRange";
 import { StageSlots } from "./shared/Stage";
@@ -767,6 +771,29 @@ function ModelPreview(): React.JSX.Element {
         }
     }, [assets, loading.covered]);
 
+    /**
+     * Geometry loaded and not one mesh reaching the screen is worth saying out loud. It is a real
+     * authoring state - every sub-mesh tagged for a damage or detail level this model never
+     * selects, or the whole hull attached to a bone that ships hidden - and it is indistinguishable
+     * from a broken preview if the panel just draws an empty grid.
+     *
+     * Said once the geometry is IN, not as each part arrives - see `nothingDrawn`.
+     */
+    useEffect(() => {
+        if (!nothingDrawn(tally, viewportRef.current?.stats() ?? null)) {
+            return;
+        }
+
+        setProblems((existing) =>
+            existing.some((p) => p.message === NOTHING_DRAWN)
+                ? existing
+                : [
+                      ...existing,
+                      { severity: "warning", message: NOTHING_DRAWN },
+                  ],
+        );
+    }, [tally.expectedParts, tally.arrivedParts, tally.timedOut]);
+
     const refreshStats = useCallback(() => {
         const viewport = viewportRef.current;
         setStats(viewport?.stats() ?? null);
@@ -780,21 +807,7 @@ function ModelPreview(): React.JSX.Element {
         );
         setLevels(defined);
 
-        // Geometry loaded and not one mesh reaching the screen is worth saying out loud. It is a
-        // real authoring state - every sub-mesh tagged for a damage or detail level this model
-        // never selects, or the whole hull attached to a bone that ships hidden - and it is
-        // indistinguishable from a broken preview if the panel just draws an empty grid.
         const current = viewport?.stats() ?? null;
-        if (current !== null && current.parts > 0 && current.meshes === 0) {
-            setProblems((existing) =>
-                existing.some((p) => p.message === NOTHING_DRAWN)
-                    ? existing
-                    : [
-                          ...existing,
-                          { severity: "warning", message: NOTHING_DRAWN },
-                      ],
-            );
-        }
 
         // Not until geometry has actually ARRIVED. `definedLevels` seeds its sets with 0, so an
         // empty model reports `lod: [0]` - a full-looking answer that is really "nothing has told me
