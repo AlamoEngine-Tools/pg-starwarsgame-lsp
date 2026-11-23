@@ -30,11 +30,7 @@ if (waitForDebugger)
 // An absolute path, never a relative one: see ServerLogPath for what a relative one cost.
 var logPath = ServerLogPath.Resolve(args, AppContext.BaseDirectory);
 Console.Error.WriteLine($"[LSP] Logging to {logPath}");
-Log.Logger = new LoggerConfiguration()
-    .Enrich.FromLogContext()
-    .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
-    .MinimumLevel.Debug()
-    .CreateLogger();
+Log.Logger = ServerFileLog.Create(logPath);
 #endif
 
 // The Lua debug adapter is a second process of this same exe: VS Code starts one per debug

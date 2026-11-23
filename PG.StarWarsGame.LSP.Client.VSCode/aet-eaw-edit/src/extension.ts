@@ -3,6 +3,7 @@
 
 import { ChildProcess, spawn } from "child_process";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import * as l10n from "@vscode/l10n";
 import * as vscode from "vscode";
@@ -100,9 +101,17 @@ import {
     phaseText,
     pickGag,
     planChanges,
+    serverLogArgs,
     serverWorkDoneProgress,
     statusText,
 } from "./projectClientPlan";
+import {
+    logFolderLabel,
+    logFolderOf,
+    logStoreOf,
+    removeStaleLogFolders,
+    workspaceIdOf,
+} from "./logStore";
 import { WatcherPool } from "./watcherPool";
 import {
     type NavigatorProject,
@@ -387,6 +396,9 @@ const CHOSEN_PROJECT = "aet-eaw-edit.chosenProject";
 
 /** Set on activation; the window's memory of the project last picked lives in its workspaceState. */
 let windowState: vscode.Memento | undefined;
+
+/** Set on activation; the folder every server of this window writes its log file into. */
+let serverLogFolder: string | undefined;
 
 /** The project whose server owns a file, when one does (#230). */
 function ownerOf(fsPath: string): ProjectClient | undefined {
@@ -933,11 +945,14 @@ function startProjectClient(
     if (waitForDebugger) {
         extraArgs.push("--wait-for-debugger");
     }
-    // Where the server's debug log goes. Without it the server writes beside its own binary,
-    // because a spawned process inherits the EDITOR's working directory - one session's log landed
-    // inside the VS Code installation folder, and the workspace showed none at all. One project
-    // logs in the first folder as before; several each log in their own directory.
-    extraArgs.push(`--log-dir=${spec.logDirectory}`);
+    // Where the server's debug log goes: the workspace's folder in the user's own store, one file
+    // per project. Without it the server writes beside its own binary, because a spawned process
+    // inherits the EDITOR's working directory - one session's log landed inside the VS Code
+    // installation folder. It was each project's own directory once, which put the log into the
+    // mod's folder, its version control and whatever was packaged from it.
+    if (serverLogFolder !== undefined) {
+        extraArgs.push(...serverLogArgs(spec, serverLogFolder));
+    }
     // How loud that log is. Only passed when it differs from the server's own default, so the
     // common case still starts with the command line it always had. Worth having as a setting
     // rather than a rebuild: the lines that say whether a document reached a sync handler are
@@ -1774,6 +1789,7 @@ async function reportInputs(
         os: `${process.platform} ${process.arch}`,
         workspaceFolders: vscode.workspace.workspaceFolders?.length ?? 0,
         workspaceFile: vscode.workspace.workspaceFile !== undefined,
+        logFolder: logFolderLabel(workspaceIdOf(context.storageUri?.fsPath)),
         featureFlags: flattenFlags(resolveFeatureFlags()),
     };
 
@@ -2756,6 +2772,19 @@ export async function activate(
     );
 
     windowState = context.workspaceState;
+
+    // One log folder per workspace in the user's own store, named by the id VS Code files this
+    // workspace's storage under. Set before the first server starts; a workspace that is gone
+    // would leave its folder behind for good, so the ones long unused go here.
+    const workspaceId = workspaceIdOf(context.storageUri?.fsPath);
+    serverLogFolder = logFolderOf(os.homedir(), workspaceId);
+    for (const removed of removeStaleLogFolders(
+        logStoreOf(os.homedir()),
+        workspaceId,
+        new Date(),
+    )) {
+        logLine(`Removed the unused log folder ${removed}.`);
+    }
 
     // Every restart and every project discovery goes through one coordinator: a configuration
     // change, the Restart command, a start with no server running, a workspace folder or a project

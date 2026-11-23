@@ -1,4 +1,5 @@
 // SET-01: on a clean profile the bundled server starts on a .pgproj workspace, with no file opened.
+import os from "node:os";
 import path from "node:path";
 import { browser, expect } from "@wdio/globals";
 import { client } from "../paths.js";
@@ -20,7 +21,9 @@ describe("SET-01", () => {
         expect(start.toLowerCase()).toContain(
             `bundled: ${path.join(client, "server", "PG.StarWarsGame.LSP.Server.exe")} --log-dir=`.toLowerCase(),
         );
-        expect(start.toLowerCase()).toContain("pg.starwarsgame.lsp\\eaw");
+        // The log goes to the user's own store, never into the workspace.
+        expect(start.toLowerCase()).toContain(`--log-dir=${path.join(os.homedir(), ".aetswg", "logs")}${path.sep}`.toLowerCase());
+        expect(start.toLowerCase()).not.toContain("pg.starwarsgame.lsp\\eaw");
         expect(log).toContain("Workspace scan complete.");
     });
 

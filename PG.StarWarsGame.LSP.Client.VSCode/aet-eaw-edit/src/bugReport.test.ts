@@ -17,6 +17,7 @@ const client: BugReportClientInfo = {
     os: "win32 x64",
     workspaceFolders: 2,
     workspaceFile: true,
+    logFolder: "~/.aetswg/logs/3f9c1a7e",
     featureFlags: { "tools.modelPreview": true, "story.editor": false },
 };
 
@@ -294,6 +295,13 @@ describe("formatBugReport", () => {
 
         assert.ok(text.includes("- Extension: 0.4.0"));
         assert.ok(text.includes("- Server: Not running"));
+    });
+
+    it("names the workspace's log folder, with the server running or not", () => {
+        const line = "- Log folder: ~/.aetswg/logs/3f9c1a7e";
+
+        assert.ok(formatBugReport(client, server).includes(line));
+        assert.ok(formatBugReport(client, null).includes(line));
     });
 
     it("carries no path and no project name", () => {

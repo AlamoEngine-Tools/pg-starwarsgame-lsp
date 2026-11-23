@@ -93,7 +93,8 @@ Every `.pgproj` under the open folders is a project with a language server of it
 - Commands act on the project of the document in front; with none, the project picked last in the window, or a picker.
   **EaWEdit: Select Project** changes the pick.
 - The story and localisation navigators list one group per project.
-- Each project has its own output channel and log file, in its own directory.
+- Each project has its own output channel and its own log file; the log files of a workspace share one
+  folder under `~/.aetswg/logs/`.
 - A single project behaves as before: one server, no project level anywhere.
 
 ---

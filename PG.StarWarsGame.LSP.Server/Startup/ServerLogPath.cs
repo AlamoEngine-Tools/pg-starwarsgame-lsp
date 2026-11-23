@@ -15,12 +15,15 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 /// </summary>
 public static class ServerLogPath
 {
-    /// <summary>The directory the client asks for, normally the workspace root.</summary>
+    /// <summary>
+    ///     The directory the client asks for: the workspace's folder in the user's own log store,
+    ///     shared by the servers of every project open in that workspace.
+    /// </summary>
     public const string Option = "--log-dir=";
 
     /// <summary>
     ///     The project this server serves, for the file name: one server runs per open project, and
-    ///     a dependency that is also open writes its log into the same directory as the leaf.
+    ///     all of them write into the same directory.
     /// </summary>
     public const string StemOption = "--log-stem=";
 
