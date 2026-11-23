@@ -78,11 +78,12 @@ internal static class StoryCommandTestFixtures
         return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub);
     }
 
-    public static MockFileSystem NewFileSystem()
+    /// <param name="threadText">The project's own thread file; <see cref="ThreadText" /> when not given.</param>
+    public static MockFileSystem NewFileSystem(string? threadText = null)
     {
         return new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [Path.Combine(XmlDir, "story_main.xml")] = new(ThreadText),
+            [Path.Combine(XmlDir, "story_main.xml")] = new(threadText ?? ThreadText),
             [Path.Combine(DepXmlDir, "story_dep.xml")] = new(ThreadText),
             [Path.Combine(XmlDir, "story_plots_r.xml")] = new(ManifestText),
             [Path.Combine(XmlDir, "campaigns_test.xml")] = new(CampaignSetText)
@@ -168,9 +169,10 @@ internal static class StoryCommandTestFixtures
         }
     }
 
-    public sealed class StubModelService(bool duplicateThreads = false) : IStoryModelService
+    public sealed class StubModelService(bool duplicateThreads = false, string? threadText = null)
+        : IStoryModelService
     {
-        private readonly StoryCampaignModel _model = BuildModel(duplicateThreads);
+        private readonly StoryCampaignModel _model = BuildModel(duplicateThreads, threadText ?? ThreadText);
 
         public IReadOnlyList<string> GetCampaignNames()
         {
@@ -214,9 +216,9 @@ internal static class StoryCommandTestFixtures
             return [];
         }
 
-        private static StoryCampaignModel BuildModel(bool duplicateThreads)
+        private static StoryCampaignModel BuildModel(bool duplicateThreads, string threadText)
         {
-            var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
+            var thread = StoryThreadParser.Parse(threadText, ThreadUri);
             IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
             return new StoryCampaignModel("GC", "Rebel", threads,
                 new HashSet<string>(StringComparer.Ordinal),

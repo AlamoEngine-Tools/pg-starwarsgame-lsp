@@ -157,14 +157,19 @@ export async function pressTile(label: string): Promise<void> {
     }, label);
 }
 
-/** Types a value into a row's language cell, by the row's key, and commits it as Enter does. */
+/**
+ * Types a value into a row's language cell, by the row's key, and commits it as Enter does. A credits
+ * row's key is its format, which the grid draws as a choice rather than a field; the first row of that
+ * format is the one edited.
+ */
 export async function editCell(key: string, value: string): Promise<void> {
     await browser.waitUntil(
         async () =>
             browser.execute((wanted: string) => {
                 for (const row of Array.from(document.querySelectorAll(".rows .data-row"))) {
                     const cells = Array.from(row.querySelectorAll(".cell"));
-                    const keyText = (cells[0]?.querySelector("input")?.value ?? cells[0]?.textContent ?? "").trim();
+                    const keyField = cells[0]?.querySelector<HTMLInputElement | HTMLSelectElement>("input, select");
+                    const keyText = (keyField?.value ?? cells[0]?.textContent ?? "").trim();
                     if (keyText !== wanted) continue;
                     const input = cells[1]?.querySelector("input");
                     if (!input) return false;
