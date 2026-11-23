@@ -828,8 +828,33 @@
             ],
             "markdownDescription": "%config.lsp.debug.logLevel.markdownDescription%"
           },
-          "aet-eaw-edit.lsp.debug.waitForDebugger": {
+          "aet-eaw-edit.lsp.debug.fileLogLevel": {
             "order": 13,
+            "type": "string",
+            "default": "Off",
+            "enum": [
+              "Off",
+              "Trace",
+              "Debug",
+              "Information",
+              "Warning",
+              "Error"
+            ],
+            "enumItemLabels": [
+              "%config.lsp.debug.fileLogLevel.enumItemLabels.0%",
+              "%config.lsp.debug.fileLogLevel.enumItemLabels.1%",
+              "%config.lsp.debug.fileLogLevel.enumItemLabels.2%",
+              "%config.lsp.debug.fileLogLevel.enumItemLabels.3%",
+              "%config.lsp.debug.fileLogLevel.enumItemLabels.4%",
+              "%config.lsp.debug.fileLogLevel.enumItemLabels.5%"
+            ],
+            "tags": [
+              "advanced"
+            ],
+            "markdownDescription": "%config.lsp.debug.fileLogLevel.markdownDescription%"
+          },
+          "aet-eaw-edit.lsp.debug.waitForDebugger": {
+            "order": 14,
             "type": "boolean",
             "default": false,
             "tags": [
@@ -838,7 +863,7 @@
             "markdownDescription": "%config.lsp.debug.waitForDebugger.markdownDescription%"
           },
           "aet-eaw-edit.features.preview.energyPool": {
-            "order": 14,
+            "order": 15,
             "type": "boolean",
             "default": false,
             "tags": [

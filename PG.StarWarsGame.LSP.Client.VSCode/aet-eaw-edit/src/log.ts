@@ -1,11 +1,26 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as os from "os";
 import * as vscode from "vscode";
+
+import { homeScrubber, scrubbed } from "./homePath";
+
+const ownHome = homeScrubber(os.homedir(), process.platform === "win32");
+
+/**
+ * `channel`, writing the home directory as `~` whatever is written to it and by whom. Every output
+ * channel the extension makes goes through this: they are read on screen and pasted into public
+ * issues, and a path under the home directory carries the user's name.
+ */
+export function withoutHome<T extends object>(channel: T): T {
+    return scrubbed(channel, ownHome);
+}
 
 /**
  * The extension's "EaWEdit" output channel, shared by the activation code and the panels so a
- * session leaves one readable record. Set once by activate(); lines before that are dropped.
+ * session leaves one readable record. Set once by activate(), {@link withoutHome}; lines before
+ * that are dropped.
  */
 let channel: vscode.OutputChannel | undefined;
 

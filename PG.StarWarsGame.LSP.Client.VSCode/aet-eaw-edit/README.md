@@ -93,7 +93,8 @@ Every `.pgproj` under the open folders is a project with a language server of it
 - Commands act on the project of the document in front; with none, the project picked last in the window, or a picker.
   **EaWEdit: Select Project** changes the pick.
 - The story and localisation navigators list one group per project.
-- Each project has its own output channel and log file, in its own directory.
+- Each project has its own output channel and its own log file; the log files of a workspace share one
+  folder under `~/.aetswg/logs/`.
 - A single project behaves as before: one server, no project level anywhere.
 
 ---
@@ -806,9 +807,10 @@ For development and troubleshooting. Hidden from the settings page; `@tag:advanc
 
 | Setting                                            | Default       | Meaning                                                                                                                                                                                                                                                                                                                                                                |
 |----------------------------------------------------|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `aet-eaw-edit.lsp.debug.trace.server`              | `off`         | `messages` or `verbose`: LSP traffic in the EaWEdit output channel                                                                                                                                                                                                                                                                                                     |
-| `aet-eaw-edit.lsp.debug.logLevel`                  | `Information` | `Trace`, `Debug`, `Information`, `Warning` or `Error`: detail in the server's own log file; `Debug` records whether a document reached a sync handler                                                                                                                                                                                                                                                                      |
+| `aet-eaw-edit.lsp.debug.trace.server`              | `off`         | `messages` or `verbose`: LSP traffic in the EaWEdit LSP Trace output channel                                                                                                                                                                                                                                                                                            |
+| `aet-eaw-edit.lsp.debug.logLevel`                  | `Information` | `Trace`, `Debug`, `Information`, `Warning` or `Error`: detail in the server's output channel; `Debug` records whether a document reached a sync handler                                                                                                                                                                                                                                                                      |
 | `aet-eaw-edit.lsp.debug.waitForDebugger`           | `false`       | Start the server with `--wait-for-debugger`                                                                                                                                                                                                                                                                                                                            |
+| `aet-eaw-edit.lsp.debug.fileLogLevel`              | `Off`         | `Trace`, `Debug`, `Information`, `Warning` or `Error`: the server writes its log to a file at that level, in the workspace's folder under `~/.aetswg/logs/`                                                                                                                                                                                                            |
 | `aet-eaw-edit.lsp.executable`                      | _(empty)_     | A server to run instead of the bundled one; empty = bundled                                                                                                                                                                                                                                                                                                            |
 | `aet-eaw-edit.lsp.devMode.enabled`                 | `false`       | Start the server from source with `dotnet run --project`                                                                                                                                                                                                                                                                                                               |
 | `aet-eaw-edit.lsp.devMode.projectPath`             | _(empty)_     | `PG.StarWarsGame.LSP.Server.csproj` for dev mode                                                                                                                                                                                                                                                                                                                       |
@@ -862,10 +864,12 @@ script directories; move it, or add its root to `sourceRoots`.
 **Launch refused: layer not runnable.** Declared directories under `Data/` and no space in the path, or pass the folders
 via `modPaths`. See [Lua debugger](#lua-debugger).
 
-**Raw server output.** `aet-eaw-edit.lsp.debug.trace.server` = `messages`; **EaWEdit** output channel.
+**Raw server output.** `aet-eaw-edit.lsp.debug.trace.server` = `messages`; **EaWEdit LSP Trace** output channel, one per
+project when several are open.
 
 **No diagnostics at all, for any file.** `aet-eaw-edit.lsp.debug.logLevel` = `Debug`, then restart the server and read
-the **EaWEdit** output channel (a Debug build of the server also writes `aetswg-*.log` in each project's folder): it
+the **Alamo Engine Tools - Empire at War Edit** output channel (`aet-eaw-edit.lsp.debug.fileLogLevel` = `Debug` also
+writes the lines to `aetswg-<project>-<date>.log` in the workspace's folder under `~/.aetswg/logs/`): it
 records whether XML document sync was registered and whether each `didOpen` reached the handler. At the default level
 neither line is written.
 

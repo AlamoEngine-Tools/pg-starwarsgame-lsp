@@ -1,6 +1,7 @@
 // PRJ-04: two projects in one window - two servers, a counted status, a channel and a trace each.
+import * as path from "node:path";
 import { expect } from "@wdio/globals";
-import { eaw, EAW, foc, FOC, logChannels, outputChannels, projectsReady, statusTooltip } from "../protocol.js";
+import { EAW, FOC, logChannels, outputChannels, projectsReady, statusTooltip } from "../protocol.js";
 
 describe("PRJ-04", () => {
     before(async () => {
@@ -13,15 +14,23 @@ describe("PRJ-04", () => {
         expect(tooltip).toContain(`${FOC} - ready`);
     });
 
-    // With several projects the log folder is passed with forward slashes, with one with backslashes.
-    it("logs the projects and a start per project into its own folder", () => {
+    // Every server logs into the workspace's one folder in the user's own store, never into a project;
+    // the project's name in the file name keeps the two servers' files apart. The channel names the home
+    // directory ~.
+    it("logs the projects and starts each server on the workspace's log folder, under its project's name", () => {
         const log = outputChannels().get("EaWEdit") ?? "";
         expect(log).toContain(`Projects: ${EAW}, ${FOC}`);
         const starts = log.split(/\r?\n/).filter((l) => l.includes("Starting LSP server:"));
-        const logDir = (name: string) =>
-            starts.find((l) => l.includes(`[${name}] Starting LSP server:`))!.split("--log-dir=")[1].replace(/\//g, "\\").toLowerCase();
-        expect(logDir(EAW)).toBe(eaw.toLowerCase());
-        expect(logDir(FOC)).toBe(foc.toLowerCase());
+        const logArgs = (name: string) => {
+            const line = starts.find((l) => l.includes(`[${name}] Starting LSP server:`))!;
+            const [directory, stem] = line.split("--log-dir=")[1].split(" --log-stem=");
+            return { directory: directory.toLowerCase(), stem: stem.split(" --")[0] };
+        };
+        const store = `~${path.sep}.aetswg${path.sep}logs${path.sep}`;
+        expect(logArgs(EAW).directory.startsWith(store)).toBe(true);
+        expect(logArgs(FOC).directory).toBe(logArgs(EAW).directory);
+        expect(logArgs(EAW).stem).toBe(EAW);
+        expect(logArgs(FOC).stem).toBe(FOC);
     });
 
     it("writes a channel and a trace per project", () => {

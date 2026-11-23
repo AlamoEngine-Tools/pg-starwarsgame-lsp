@@ -51,6 +51,14 @@
   already in the air finish their lives; play after a stop starts from the top. The Skeleton control
   is disabled, with its reason, for a subject without bones
   ([#289](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/289))
+- **Server logs in the user's own store** - the server's log file no longer lands in the project. Every
+  server of a workspace writes into that workspace's folder under `~/.aetswg/logs/`, one file per project
+  and day, and `Copy Bug Report Info` names the folder. A log file older than 14 days is removed, and so is
+  the folder of a workspace nothing wrote to for 30 days. The advanced setting
+  `aet-eaw-edit.lsp.debug.fileLogLevel` has a release build of the server write the file too, at the level
+  it names. Every output channel and the log file write the home directory as `~`. The `aetswg-*.log`
+  files left in a project by an earlier version can be deleted
+  ([#461](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/461))
 
 ### Fixes
 
@@ -307,6 +315,12 @@
   loading also recorded LOD 0, and the next open of the same unit or model in the window restored it. The
   level now follows the geometry as it arrives until one is picked by hand, and only a level picked by hand
   is kept for the next open
+- **Debug settings say where the lines land** - the descriptions of `aet-eaw-edit.lsp.debug.logLevel` and
+  `aet-eaw-edit.lsp.debug.trace.server` name their output channels by title, *Alamo Engine Tools - Empire
+  at War Edit* and *EaWEdit LSP Trace*, and the one per project when several are open. The log level's no
+  longer sends the reader to a log file in the first workspace folder: it names the log file's own setting
+  and its folder
+  ([#462](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/462))
 
 ## 0.5.2
 

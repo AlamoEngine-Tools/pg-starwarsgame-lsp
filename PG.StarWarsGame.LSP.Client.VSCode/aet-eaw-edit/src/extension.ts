@@ -3,6 +3,7 @@
 
 import { ChildProcess, spawn } from "child_process";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import * as l10n from "@vscode/l10n";
 import * as vscode from "vscode";
@@ -80,7 +81,7 @@ import {
     LocalisationNavigatorViewProvider,
     LocTreeItem,
 } from "./localisationNavigatorViewProvider";
-import { logLine, setLogChannel } from "./log";
+import { logLine, setLogChannel, withoutHome } from "./log";
 import { directoriesNeedingOwnWatcher } from "./dependencyWatchers";
 import { LspGateway } from "./lsp/lspGateway";
 import { RouteChanges, RoutedLspGateway } from "./lsp/routedLspGateway";
@@ -100,9 +101,17 @@ import {
     phaseText,
     pickGag,
     planChanges,
+    serverLogArgs,
     serverWorkDoneProgress,
     statusText,
 } from "./projectClientPlan";
+import {
+    logFolderLabel,
+    logFolderOf,
+    logStoreOf,
+    removeStaleLogFolders,
+    workspaceIdOf,
+} from "./logStore";
 import { WatcherPool } from "./watcherPool";
 import {
     type NavigatorProject,
@@ -387,6 +396,9 @@ const CHOSEN_PROJECT = "aet-eaw-edit.chosenProject";
 
 /** Set on activation; the window's memory of the project last picked lives in its workspaceState. */
 let windowState: vscode.Memento | undefined;
+
+/** Set on activation; the folder every server of this window writes its log file into. */
+let serverLogFolder: string | undefined;
 
 /** The project whose server owns a file, when one does (#230). */
 function ownerOf(fsPath: string): ProjectClient | undefined {
@@ -779,6 +791,8 @@ let log: vscode.OutputChannel | undefined;
  * The library traces nothing below log level Trace, and reads the verbosity from the trace.server
  * setting above it - lifting `off` to `messages`. So the level stands for the setting's on/off: Off
  * when it is off, Trace otherwise, and the library is told when that changes.
+ *
+ * The traffic names files by their paths, so the channel writes the home directory as `~`.
  */
 function createTraceChannel(name: string): vscode.LogOutputChannel {
     const channel = vscode.window.createOutputChannel(name);
@@ -801,22 +815,24 @@ function createTraceChannel(name: string): vscode.LogOutputChannel {
     const write = (message: string, ..._args: unknown[]): void =>
         channel.appendLine(message);
     const dispose = channel.dispose.bind(channel);
-    return Object.assign(channel, {
-        get logLevel() {
-            return current;
-        },
-        onDidChangeLogLevel: logLevelEmitter.event,
-        trace: write,
-        debug: write,
-        info: write,
-        warn: write,
-        error: write,
-        dispose: () => {
-            watch.dispose();
-            logLevelEmitter.dispose();
-            dispose();
-        },
-    }) as unknown as vscode.LogOutputChannel;
+    return withoutHome(
+        Object.assign(channel, {
+            get logLevel() {
+                return current;
+            },
+            onDidChangeLogLevel: logLevelEmitter.event,
+            trace: write,
+            debug: write,
+            info: write,
+            warn: write,
+            error: write,
+            dispose: () => {
+                watch.dispose();
+                logLevelEmitter.dispose();
+                dispose();
+            },
+        }) as unknown as vscode.LogOutputChannel,
+    );
 }
 
 function cfg(section: string) {
@@ -933,11 +949,23 @@ function startProjectClient(
     if (waitForDebugger) {
         extraArgs.push("--wait-for-debugger");
     }
-    // Where the server's debug log goes. Without it the server writes beside its own binary,
-    // because a spawned process inherits the EDITOR's working directory - one session's log landed
-    // inside the VS Code installation folder, and the workspace showed none at all. One project
-    // logs in the first folder as before; several each log in their own directory.
-    extraArgs.push(`--log-dir=${spec.logDirectory}`);
+    // Where the server's debug log goes: the workspace's folder in the user's own store, one file
+    // per project. Without it the server writes beside its own binary, because a spawned process
+    // inherits the EDITOR's working directory - one session's log landed inside the VS Code
+    // installation folder. It was each project's own directory once, which put the log into the
+    // mod's folder, its version control and whatever was packaged from it.
+    if (serverLogFolder !== undefined) {
+        // The file's level is an advanced setting: a release server writes no file unless it
+        // names one, so a tester can be asked for a log without a Debug build.
+        const fileLevel = cfg("lsp.debug").get<unknown>("fileLogLevel");
+        extraArgs.push(
+            ...serverLogArgs(
+                spec,
+                serverLogFolder,
+                typeof fileLevel === "string" ? fileLevel : undefined,
+            ),
+        );
+    }
     // How loud that log is. Only passed when it differs from the server's own default, so the
     // common case still starts with the command line it always had. Worth having as a setting
     // rather than a rebuild: the lines that say whether a document reached a sync handler are
@@ -1015,12 +1043,22 @@ function startProjectClient(
         project.owned.push(trace);
     }
 
+    // The server's channel, made here rather than by the client library: the library writes the
+    // server's log messages and its error stream into it, and they name paths under the home
+    // directory - a temporary folder, the log folder, a project kept in the user's documents.
+    const clientName = multi ? `${CLIENT_NAME} (${spec.name})` : CLIENT_NAME;
+    const serverChannel = withoutHome(
+        vscode.window.createOutputChannel(clientName, { log: true }),
+    );
+    project.owned.push(serverChannel);
+
     const clientOptions: LanguageClientOptions = {
         synchronize: multi ? {} : { fileEvents },
         // Story-dialog scripts open as plaintext; the server gates all work on the pgproj
         // storyDialog registry scope, so other .txt files stay untouched.
         documentSelector: documentSelectorFor(spec),
         diagnosticCollectionName: diagnosticCollectionNameFor(CLIENT_ID, spec),
+        outputChannel: serverChannel,
         traceOutputChannel: trace,
         // The status item above is the one footer for every project; the server's startup progress
         // would open a second beside it.
@@ -1085,7 +1123,7 @@ function startProjectClient(
     // The client's name is its output channel's: one per project when there are several.
     const lspClient = new LanguageClient(
         CLIENT_ID,
-        multi ? `${CLIENT_NAME} (${spec.name})` : CLIENT_NAME,
+        clientName,
         serverOptions,
         clientOptions,
     );
@@ -1774,6 +1812,7 @@ async function reportInputs(
         os: `${process.platform} ${process.arch}`,
         workspaceFolders: vscode.workspace.workspaceFolders?.length ?? 0,
         workspaceFile: vscode.workspace.workspaceFile !== undefined,
+        logFolder: logFolderLabel(workspaceIdOf(context.storageUri?.fsPath)),
         featureFlags: flattenFlags(resolveFeatureFlags()),
     };
 
@@ -2737,7 +2776,7 @@ export async function activate(
     };
     context.subscriptions.push(statusItem);
 
-    log = vscode.window.createOutputChannel("EaWEdit");
+    log = withoutHome(vscode.window.createOutputChannel("EaWEdit"));
     setLogChannel(log);
     context.subscriptions.push(log);
 
@@ -2756,6 +2795,19 @@ export async function activate(
     );
 
     windowState = context.workspaceState;
+
+    // One log folder per workspace in the user's own store, named by the id VS Code files this
+    // workspace's storage under. Set before the first server starts; a workspace that is gone
+    // would leave its folder behind for good, so the ones long unused go here.
+    const workspaceId = workspaceIdOf(context.storageUri?.fsPath);
+    serverLogFolder = logFolderOf(os.homedir(), workspaceId);
+    for (const removed of removeStaleLogFolders(
+        logStoreOf(os.homedir()),
+        workspaceId,
+        new Date(),
+    )) {
+        logLine(`Removed the unused log folder ${removed}.`);
+    }
 
     // Every restart and every project discovery goes through one coordinator: a configuration
     // change, the Restart command, a start with no server running, a workspace folder or a project

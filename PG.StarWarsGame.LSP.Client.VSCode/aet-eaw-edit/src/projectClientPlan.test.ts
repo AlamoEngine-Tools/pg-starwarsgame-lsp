@@ -14,6 +14,7 @@ import {
     ownsPath,
     pickGag,
     planChanges,
+    serverLogArgs,
     serverWorkDoneProgress,
     statusText,
     type ClientSpec,
@@ -61,7 +62,6 @@ describe("clientSpecs", () => {
 
         assert.equal(specs.length, 1);
         assert.equal(specs[0].workspaceRoot, "c:/mods/MyMod");
-        assert.equal(specs[0].logDirectory, "c:/mods/MyMod");
         assert.equal(specs[0].projectPath, "c:/mods/MyMod/mymod.pgproj");
         assert.equal(specs[0].roots, undefined);
     });
@@ -123,25 +123,14 @@ describe("clientSpecs", () => {
         const specs = clientSpecs(discover(folders, EAWX), folders);
 
         assert.deepEqual(
-            specs.map((s) => [
-                s.name,
-                s.workspaceRoot,
-                s.logDirectory,
-                s.roots,
-            ]),
+            specs.map((s) => [s.name, s.workspaceRoot, s.roots]),
             [
                 [
                     "Rev",
                     "c:/dev/EaWX/Rev",
-                    "c:/dev/EaWX/Rev",
                     ["c:/dev/EaWX/Rev", "c:/dev/EaWX/Data"],
                 ],
-                [
-                    "FotR",
-                    "c:/dev/EaWX/FotR",
-                    "c:/dev/EaWX/FotR",
-                    ["c:/dev/EaWX/FotR"],
-                ],
+                ["FotR", "c:/dev/EaWX/FotR", ["c:/dev/EaWX/FotR"]],
             ],
         );
         assert.deepEqual(specs[1].watched, [
@@ -159,6 +148,102 @@ describe("clientSpecs canonical spelling", () => {
         const [rev] = clientSpecs(discover(folders, EAWX), folders, onDisk);
 
         assert.deepEqual(rev.roots, ["c:/dev/EaWX/Rev", "c:/dev/EaWX/DATA"]);
+    });
+});
+
+/**
+ * Every server of a window logs into the workspace's one folder in the user's store, never into a
+ * project (#461); the project's name keeps the files of two servers apart.
+ */
+describe("serverLogArgs", () => {
+    const LOGS = "c:/Users/someone/.aetswg/logs/3f9c";
+
+    it("sends every project's server to the workspace's log folder, under the project's name", () => {
+        const folders = ["c:/dev/EaWX/Rev", "c:/dev/EaWX/FotR"];
+        const specs = clientSpecs(discover(folders, EAWX), folders);
+
+        assert.deepEqual(
+            specs.map((s) => serverLogArgs(s, LOGS)),
+            [
+                [`--log-dir=${LOGS}`, "--log-stem=Rev"],
+                [`--log-dir=${LOGS}`, "--log-stem=FotR"],
+            ],
+        );
+    });
+
+    it("names no project or workspace folder", () => {
+        const folders = ["c:/dev/EaWX/Rev", "c:/dev/EaWX/FotR"];
+        const specs = clientSpecs(discover(folders, EAWX), folders);
+
+        for (const spec of specs) {
+            const [directory] = serverLogArgs(spec, LOGS);
+            for (const inProject of [spec.workspaceRoot, ...folders]) {
+                assert.equal(directory.includes(inProject), false);
+            }
+        }
+    });
+
+    it("sends the one project's server there too", () => {
+        const folders = ["c:/mods/MyMod"];
+        const [spec] = clientSpecs(
+            discover(folders, {
+                "c:/mods/MyMod/mymod.pgproj": pgproj("My Mod"),
+            }),
+            folders,
+        );
+
+        assert.deepEqual(serverLogArgs(spec, LOGS), [
+            `--log-dir=${LOGS}`,
+            "--log-stem=My Mod",
+        ]);
+    });
+
+    it("passes no name for a mod folder without a project file", () => {
+        const folders = ["c:/mods/Loose"];
+        const [spec] = clientSpecs(
+            discover(folders, {}),
+            folders,
+            (d) => d,
+            () => true,
+        );
+
+        assert.deepEqual(serverLogArgs(spec, LOGS), [`--log-dir=${LOGS}`]);
+    });
+
+    it("asks for the file at the level the advanced setting names", () => {
+        const folders = ["c:/mods/MyMod"];
+        const [spec] = clientSpecs(
+            discover(folders, {
+                "c:/mods/MyMod/mymod.pgproj": pgproj("My Mod"),
+            }),
+            folders,
+        );
+
+        assert.deepEqual(serverLogArgs(spec, LOGS, "Debug"), [
+            `--log-dir=${LOGS}`,
+            "--log-stem=My Mod",
+            "--log-file-level=Debug",
+        ]);
+    });
+
+    it("leaves the server's default alone when the setting is Off, unset or blank", () => {
+        const folders = ["c:/mods/Loose"];
+        const [spec] = clientSpecs(
+            discover(folders, {}),
+            folders,
+            (d) => d,
+            () => true,
+        );
+
+        assert.deepEqual(serverLogArgs(spec, LOGS, undefined), [
+            `--log-dir=${LOGS}`,
+        ]);
+        assert.deepEqual(serverLogArgs(spec, LOGS, "Off"), [
+            `--log-dir=${LOGS}`,
+        ]);
+        assert.deepEqual(serverLogArgs(spec, LOGS, "  "), [
+            `--log-dir=${LOGS}`,
+        ]);
     });
 });
 

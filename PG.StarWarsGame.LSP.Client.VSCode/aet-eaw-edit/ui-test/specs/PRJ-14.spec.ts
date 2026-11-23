@@ -3,6 +3,7 @@
 // (#395): every project ends with one server, started once, and none is left stopped.
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { browser, expect } from "@wdio/globals";
 import { logChannels, lspStatus, outputChannels, projectsReady, setSettings } from "../protocol.js";
@@ -14,14 +15,19 @@ function linesSince(start: number): string[] {
     return (outputChannels().get("EaWEdit") ?? "").slice(start).split(/\r?\n/);
 }
 
-/** The servers running for this test's projects: their command lines name its folder. */
+/**
+ * The servers running for this window: every one is started on the workspace's one log folder, and no
+ * other window's server is, so their command lines name it. The channel writes the home directory ~.
+ */
 function serversRunning(): number {
+    const started = linesSince(0).find((l) => l.includes("Starting LSP server:") && l.includes("--log-dir="))!;
+    const logFolder = started.split("--log-dir=")[1].split(" --log-stem=")[0].trim().replace(/^~/, os.homedir()).replace(/'/g, "''");
     const out = execFileSync(
         "pwsh",
         [
             "-NoProfile",
             "-Command",
-            "@(Get-CimInstance Win32_Process -Filter \"Name = 'PG.StarWarsGame.LSP.Server.exe'\" | Where-Object { $_.CommandLine -like '*aet-test-PRJ-multi*' }).Count",
+            `@(Get-CimInstance Win32_Process -Filter "Name = 'PG.StarWarsGame.LSP.Server.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${logFolder}') }).Count`,
         ],
         { encoding: "utf8" },
     );

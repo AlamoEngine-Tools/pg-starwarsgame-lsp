@@ -1,4 +1,5 @@
 // LUA-01: the Lua analyzer starts with the server and answers in a script - lenses, the merged hover, symbols.
+import os from "node:os";
 import { expect } from "@wdio/globals";
 import { logChannels, logLine, serverReady } from "../protocol.js";
 import { codeLenses } from "./xmlEditor.js";
@@ -47,5 +48,13 @@ describe("LUA-01", () => {
         const functions = ["Definitions", "State_Init", "Cancel_Interdiction", "Under_Missile_Attack", "Cancel_Missile_Shield"];
         expect(symbols).toEqual(expect.arrayContaining(functions));
         expect(lenses.length).toBeGreaterThanOrEqual(functions.length);
+    });
+
+    // The analyzer's root for a script outside the project is a folder under the home directory, and the
+    // server logs it: the channel writes the home directory ~ (#461).
+    it("names the home directory in no line of the server's channel", () => {
+        const server = logChannels().get(SERVER) ?? "";
+        expect(server).toMatch(/Lua analyzer started \(pid \d+\) for ~[\\/]/);
+        expect(server.toLowerCase()).not.toContain(os.homedir().toLowerCase());
     });
 });

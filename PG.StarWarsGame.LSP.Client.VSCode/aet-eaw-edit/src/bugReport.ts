@@ -3,7 +3,8 @@
 
 // The bug report block: what the client knows about itself plus what the server reports, as one
 // Markdown section. Kept free of `vscode` so the unit harness can run it. The block is pasted into
-// PUBLIC issues, so it carries versions, flags and counts - never a path or a project name.
+// PUBLIC issues, so it carries versions, flags and counts - never a path or a project name. The one
+// folder it names, the log folder, is named from the home directory rather than by its path.
 
 import {
     type ServerStatus,
@@ -19,6 +20,8 @@ export interface BugReportClientInfo {
     workspaceFolders: number;
     /** True when a `.code-workspace` file is open. */
     workspaceFile: boolean;
+    /** The workspace's log folder as `~/.aetswg/logs/<workspace id>`, never its own path. */
+    logFolder: string;
     /** Every feature flag by its dotted name. */
     featureFlags: Record<string, boolean>;
 }
@@ -66,6 +69,7 @@ export function formatBugReport(
     lines.push(`- VS Code: ${client.vscodeVersion}`);
     lines.push(`- OS: ${client.os}`);
     lines.push(`- Workspace: ${workspaceShape(client)}`);
+    lines.push(`- Log folder: ${client.logFolder}`);
 
     if (server === null) {
         lines.push("- Server: Not running");

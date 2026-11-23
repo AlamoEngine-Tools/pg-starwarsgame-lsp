@@ -1,4 +1,4 @@
-// SET-03: eleven settings on the settings page, fourteen development settings behind @tag:advanced. The
+// SET-03: eleven settings on the settings page, fifteen development settings behind @tag:advanced. The
 // eleventh is What's New's openAfterUpdate (#328), added after the protocol counted ten.
 import fs from "node:fs";
 import path from "node:path";
@@ -19,8 +19,8 @@ describe("SET-03", () => {
         expect(shown.filter((s) => /Features/i.test(s.category))).toEqual([]);
     });
 
-    it("shows fourteen behind @tag:advanced", async () => {
-        expect(await settingsFound(`${ext} @tag:advanced`)).toBe(14);
+    it("shows fifteen behind @tag:advanced", async () => {
+        expect(await settingsFound(`${ext} @tag:advanced`)).toBe(15);
     });
 
     it("says where an unset game directory is found, and leaves no placeholder in the manifest", () => {

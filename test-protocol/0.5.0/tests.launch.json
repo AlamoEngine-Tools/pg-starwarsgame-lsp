@@ -695,5 +695,14 @@
     "settings": {
       "aet-eaw-edit.shaders.directory": "C:\\temp\\aet-test-SET-shaders\\mod\\Data\\Art\\Shaders"
     }
+  },
+  "SET-33": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.lsp.debug.fileLogLevel": "Debug"
+    }
+  },
+  "SET-34": {
+    "open": "{repo}\\eaw"
   }
 }

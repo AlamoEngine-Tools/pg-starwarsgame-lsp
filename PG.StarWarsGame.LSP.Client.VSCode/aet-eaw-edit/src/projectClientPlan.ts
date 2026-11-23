@@ -28,8 +28,6 @@ export interface ClientSpec {
     projectPath?: string;
     /** The root the server is given, for detection and relative paths. */
     workspaceRoot: string;
-    /** Where the server writes its log. */
-    logDirectory: string;
     /** The directories whose documents this client takes; undefined takes every document. */
     roots?: string[];
     /** The directories whose on-disk changes this client is told about; undefined is all of them. */
@@ -91,7 +89,6 @@ export function clientSpecs(
                 name: project?.name ?? "EaWEdit",
                 projectPath: project?.path,
                 workspaceRoot: first,
-                logDirectory: first,
             }),
         ];
     }
@@ -104,7 +101,6 @@ export function clientSpecs(
             name: project.name,
             projectPath: project.path,
             workspaceRoot: project.directory,
-            logDirectory: project.directory,
             roots,
             watched: unique(
                 [...project.roots, ...project.closure.map(directoryOf)].map(
@@ -465,13 +461,42 @@ export function statusText(
     return [`${icon} ${counted}`, ...problems].join(", ");
 }
 
+/**
+ * Where a client's server writes its log file: every server of the window logs into the one folder
+ * the workspace has in the user's own store, never into a project (#461), and the project's name
+ * in the file name keeps the files of two servers apart. A mod folder without a project file has
+ * no name to pass.
+ *
+ * The file is written only when asked for: a release server writes none unless `fileLevel` names a
+ * level, which the advanced `aet-eaw-edit.lsp.debug.fileLogLevel` setting carries - a tester is told
+ * its name when a log is wanted. `Off`, its default, asks for nothing, which leaves a Debug server
+ * writing its file as it always did.
+ *
+ * @param logFolder The workspace's log folder, see logStore.ts.
+ * @param fileLevel The level the file is asked for at; `Off` or nothing leaves the server's default.
+ */
+export function serverLogArgs(
+    spec: ClientSpec,
+    logFolder: string,
+    fileLevel?: string,
+): string[] {
+    const args = [`--log-dir=${logFolder}`];
+    if (spec.projectPath !== undefined) {
+        args.push(`--log-stem=${spec.name}`);
+    }
+    const level = fileLevel?.trim() ?? "";
+    if (level !== "" && level !== "Off") {
+        args.push(`--log-file-level=${level}`);
+    }
+    return args;
+}
+
 function withSignature(spec: Omit<ClientSpec, "signature">): ClientSpec {
     return {
         ...spec,
         signature: JSON.stringify([
             spec.projectPath,
             spec.workspaceRoot,
-            spec.logDirectory,
             spec.roots,
             spec.watched,
             spec.excluded,
