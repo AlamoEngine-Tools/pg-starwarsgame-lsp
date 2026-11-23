@@ -92,6 +92,29 @@ public sealed class ServerFileLogTest : IDisposable
         Assert.Contains("loud line", text);
     }
 
+    /// <summary>
+    ///     A tester's file ends up attached to a public issue, and a path under the home directory
+    ///     carries the user's name: the file says ~ for it, in the text and in a value.
+    /// </summary>
+    [Fact]
+    public void Create_WritesTheHomeDirectoryAsTilde()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var root = Path.Combine(home, "AppData", "Local", "Temp", "root");
+        using (var log = ServerFileLog.Create(Path.Combine(_directory, "aetswg-Mod-.log"), LogLevel.Debug))
+        {
+            log.Information("Analyzer started for {Root}", root);
+            log.Information("Log at file:///" + home.Replace('\\', '/') + "/logs/a.log");
+        }
+
+        var text = TodaysText("Mod");
+        Assert.DoesNotContain(home, text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(home.Replace('\\', '/'), text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Analyzer started for", text);
+        Assert.Contains("~", text);
+        Assert.Contains("[INF]", text);
+    }
+
     [Theory]
     [InlineData("Trace", LogLevel.Trace)]
     [InlineData("Debug", LogLevel.Debug)]

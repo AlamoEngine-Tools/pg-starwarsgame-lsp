@@ -6,20 +6,23 @@ using System.Text.RegularExpressions;
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
 /// <summary>
-///     The home directory in a line the server writes before logging is up, written as <c>~</c>.
+///     The home directory in a line the server writes itself, written as <c>~</c>.
 ///     <para>
-///         Those lines go to the error stream, which the client shows in the project's output
-///         channel, and they name the log folder - a path under the home directory, which carries
-///         the user's name. The channel is read on screen and pasted into public issues.
+///         A path under the home directory carries the user's name, and what the server writes is
+///         read by others: its log file is attached to public issues, and the lines it writes to
+///         the error stream before logging is up land in the project's output channel. The client
+///         does the same for everything else that channel shows.
 ///     </para>
 /// </summary>
 public static class HomePath
 {
+    private static readonly Lazy<Regex?> OwnHome = new(() =>
+        PatternOf(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), OperatingSystem.IsWindows()));
+
     /// <summary><paramref name="text" /> with every path under this user's home directory starting at <c>~</c>.</summary>
     public static string AsTilde(string text)
     {
-        return AsTilde(text, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            OperatingSystem.IsWindows());
+        return OwnHome.Value?.Replace(text, "~") ?? text;
     }
 
     /// <summary>
@@ -32,12 +35,17 @@ public static class HomePath
     /// <param name="ignoreCase">Whether the file system matches names without regard to case.</param>
     public static string AsTilde(string text, string home, bool ignoreCase)
     {
+        return PatternOf(home, ignoreCase)?.Replace(text, "~") ?? text;
+    }
+
+    private static Regex? PatternOf(string home, bool ignoreCase)
+    {
         var parts = home.TrimEnd('\\', '/').Split('\\', '/');
         if (parts.All(part => part.Length == 0))
-            return text;
+            return null;
 
         var path = string.Join(@"[\\/]", parts.Select(Regex.Escape)) + @"(?=[\\/]|[^\w.-]|$)";
-        var options = RegexOptions.CultureInvariant | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None);
-        return Regex.Replace(text, path, "~", options);
+        return new Regex(path,
+            RegexOptions.CultureInvariant | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None));
     }
 }

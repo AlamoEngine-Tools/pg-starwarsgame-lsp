@@ -210,7 +210,7 @@ describe("serverLogArgs", () => {
         assert.deepEqual(serverLogArgs(spec, LOGS), [`--log-dir=${LOGS}`]);
     });
 
-    it("asks for the file at the level the unlisted setting names", () => {
+    it("asks for the file at the level the advanced setting names", () => {
         const folders = ["c:/mods/MyMod"];
         const [spec] = clientSpecs(
             discover(folders, {
@@ -226,7 +226,7 @@ describe("serverLogArgs", () => {
         ]);
     });
 
-    it("leaves the server's default alone when the setting is unset or blank", () => {
+    it("leaves the server's default alone when the setting is Off, unset or blank", () => {
         const folders = ["c:/mods/Loose"];
         const [spec] = clientSpecs(
             discover(folders, {}),
@@ -236,6 +236,9 @@ describe("serverLogArgs", () => {
         );
 
         assert.deepEqual(serverLogArgs(spec, LOGS, undefined), [
+            `--log-dir=${LOGS}`,
+        ]);
+        assert.deepEqual(serverLogArgs(spec, LOGS, "Off"), [
             `--log-dir=${LOGS}`,
         ]);
         assert.deepEqual(serverLogArgs(spec, LOGS, "  "), [

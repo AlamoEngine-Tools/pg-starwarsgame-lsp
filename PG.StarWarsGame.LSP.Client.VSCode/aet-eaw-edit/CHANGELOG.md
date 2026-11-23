@@ -54,9 +54,10 @@
 - **Server logs in the user's own store** - the server's log file no longer lands in the project. Every
   server of a workspace writes into that workspace's folder under `~/.aetswg/logs/`, one file per project
   and day, and `Copy Bug Report Info` names the folder. A log file older than 14 days is removed, and so is
-  the folder of a workspace nothing wrote to for 30 days. The `EaWEdit` output channel and the server's
-  start lines write the home directory as `~`. The `aetswg-*.log` files left in a project by an earlier
-  version can be deleted
+  the folder of a workspace nothing wrote to for 30 days. The advanced setting
+  `aet-eaw-edit.lsp.debug.fileLogLevel` has a release build of the server write the file too, at the level
+  it names. Every output channel and the log file write the home directory as `~`. The `aetswg-*.log`
+  files left in a project by an earlier version can be deleted
   ([#461](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/461))
 
 ### Fixes

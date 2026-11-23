@@ -468,11 +468,12 @@ export function statusText(
  * no name to pass.
  *
  * The file is written only when asked for: a release server writes none unless `fileLevel` names a
- * level, which the unlisted `aet-eaw-edit.lsp.debug.fileLogLevel` setting carries - a tester is told
- * its name when a log is wanted. `None` switches the file off for a Debug server too.
+ * level, which the advanced `aet-eaw-edit.lsp.debug.fileLogLevel` setting carries - a tester is told
+ * its name when a log is wanted. `Off`, its default, asks for nothing, which leaves a Debug server
+ * writing its file as it always did.
  *
  * @param logFolder The workspace's log folder, see logStore.ts.
- * @param fileLevel The level the file is asked for at, or nothing to leave the server's default.
+ * @param fileLevel The level the file is asked for at; `Off` or nothing leaves the server's default.
  */
 export function serverLogArgs(
     spec: ClientSpec,
@@ -484,7 +485,7 @@ export function serverLogArgs(
         args.push(`--log-stem=${spec.name}`);
     }
     const level = fileLevel?.trim() ?? "";
-    if (level !== "") {
+    if (level !== "" && level !== "Off") {
         args.push(`--log-file-level=${level}`);
     }
     return args;

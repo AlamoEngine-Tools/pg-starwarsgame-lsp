@@ -17,13 +17,13 @@ describe("SET-14", () => {
     // The protocol counted 32 'EaWEdit: ...' commands; the manifest has 33 in all, 31 of them
     // 'EaWEdit: ...' (What's New's own, #328, came after the count) and the two 'Open File' entries
     // of the story nodes.
-    it("titles the 31 commands 'EaWEdit: ...' and leaves no placeholder", () => {
+    it("titles the 32 commands 'EaWEdit: ...' and leaves no placeholder", () => {
         const manifest = readJson(path.join(client, "package.json"));
         const nls: Record<string, string> = readJson(path.join(client, "package.nls.json"));
         const titles: string[] = manifest.contributes.commands.map((c: any) => nls[c.title.slice(1, -1)] ?? c.title);
         expect(titles.filter((t) => t.includes("%"))).toEqual([]);
         const own = titles.filter((t) => !t.startsWith("Open File"));
-        expect(own).toHaveLength(31);
+        expect(own).toHaveLength(32);
         expect(own.filter((t) => !t.startsWith("EaWEdit: "))).toEqual([]);
         expect(titles.filter((t) => t.startsWith("Open File")).sort()).toEqual([
             "Open File",

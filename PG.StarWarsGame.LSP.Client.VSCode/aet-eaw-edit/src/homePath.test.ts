@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { homeAsTilde } from "./homePath";
+import { homeAsTilde, scrubbed } from "./homePath";
 
 const HOME = "C:\\Users\\someone";
 
@@ -80,5 +80,95 @@ describe("homeAsTilde", () => {
             homeAsTilde("C:\\Users\\someone\\x", "", true),
             "C:\\Users\\someone\\x",
         );
+    });
+});
+
+describe("homeAsTilde in escaped text", () => {
+    it("takes a path whose backslashes are doubled, as JSON writes them", () => {
+        assert.equal(
+            homeAsTilde(
+                '{"root":"C:\\\\Users\\\\someone\\\\AppData\\\\Local\\\\Temp\\\\x"}',
+                HOME,
+                true,
+            ),
+            '{"root":"~\\\\AppData\\\\Local\\\\Temp\\\\x"}',
+        );
+    });
+});
+
+/** A channel that writes the home directory as ~ whatever is written to it. */
+describe("scrubbed", () => {
+    function channel() {
+        const written: unknown[][] = [];
+        return {
+            name: "C:\\Users\\someone\\named",
+            written,
+            get level(): number {
+                return 3;
+            },
+            appendLine(value: string): void {
+                written.push([value]);
+            },
+            error(error: string | Error, ...args: unknown[]): void {
+                written.push([error, ...args]);
+            },
+            self(): unknown {
+                return this;
+            },
+        };
+    }
+    const scrub = (text: string) => homeAsTilde(text, HOME, true);
+
+    it("scrubs every string a method is given", () => {
+        const target = channel();
+        const proxy = scrubbed(target, scrub);
+
+        proxy.appendLine("started for C:\\Users\\someone\\AppData\\x");
+        proxy.error(
+            "failed in C:\\Users\\someone\\a",
+            "and C:\\Users\\someone\\b",
+        );
+
+        assert.deepEqual(target.written, [
+            ["started for ~\\AppData\\x"],
+            ["failed in ~\\a", "and ~\\b"],
+        ]);
+    });
+
+    it("writes an error as its scrubbed text", () => {
+        const target = channel();
+        const failure = new Error("cannot read C:\\Users\\someone\\mod\\a.xml");
+        failure.stack =
+            "Error: cannot read C:\\Users\\someone\\mod\\a.xml\n    at C:\\Users\\someone\\ext\\out.js:1:1";
+
+        scrubbed(target, scrub).error(failure);
+
+        assert.deepEqual(target.written, [
+            ["Error: cannot read ~\\mod\\a.xml\n    at ~\\ext\\out.js:1:1"],
+        ]);
+    });
+
+    it("passes everything that is not text through as it is", () => {
+        const target = channel();
+        const data = { path: "C:\\Users\\someone\\kept" };
+        const listener = (): void => undefined;
+
+        scrubbed(target, scrub).error("line", 7, data, listener, null);
+
+        assert.deepEqual(target.written, [["line", 7, data, listener, null]]);
+        assert.equal(target.written[0][2], data);
+    });
+
+    it("reads a property from the channel itself", () => {
+        const proxy = scrubbed(channel(), scrub);
+
+        assert.equal(proxy.name, "C:\\Users\\someone\\named");
+        assert.equal(proxy.level, 3);
+    });
+
+    it("calls a method on the channel, not on the wrapper", () => {
+        const target = channel();
+
+        assert.equal(scrubbed(target, scrub).self(), target);
     });
 });

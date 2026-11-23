@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
+using Serilog.Formatting;
+using Serilog.Formatting.Display;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
@@ -50,13 +52,14 @@ public static class ServerFileLog
 
     /// <summary>
     ///     The logger writing to <paramref name="path" />, a stem Serilog appends the date to, at
-    ///     <paramref name="level" /> and above.
+    ///     <paramref name="level" /> and above. The file writes the home directory as <c>~</c>: see
+    ///     <see cref="HomePath" />.
     /// </summary>
     public static Logger Create(string path, LogLevel level)
     {
         return new LoggerConfiguration()
             .Enrich.FromLogContext()
-            .WriteTo.File(path, rollingInterval: RollingInterval.Day,
+            .WriteTo.File(new HomeAsTildeFormatter(), path, rollingInterval: RollingInterval.Day,
                 retainedFileTimeLimit: TimeSpan.FromDays(RetainedDays))
             .MinimumLevel.Is(EventLevelOf(level))
             .CreateLogger();
@@ -81,6 +84,20 @@ public static class ServerFileLog
         return level is null
             ? builder
             : builder.AddSerilog(logger, true);
+    }
+
+    /// <summary>The file sink's own line format, with the home directory written as <c>~</c>.</summary>
+    private sealed class HomeAsTildeFormatter : ITextFormatter
+    {
+        private readonly MessageTemplateTextFormatter _line =
+            new("{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
+
+        public void Format(LogEvent logEvent, TextWriter output)
+        {
+            using var line = new StringWriter();
+            _line.Format(logEvent, line);
+            output.Write(HomePath.AsTilde(line.ToString()));
+        }
     }
 
     private static LogEventLevel EventLevelOf(LogLevel level)

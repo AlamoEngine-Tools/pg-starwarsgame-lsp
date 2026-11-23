@@ -81,7 +81,7 @@ import {
     LocalisationNavigatorViewProvider,
     LocTreeItem,
 } from "./localisationNavigatorViewProvider";
-import { logLine, setLogChannel } from "./log";
+import { logLine, setLogChannel, withoutHome } from "./log";
 import { directoriesNeedingOwnWatcher } from "./dependencyWatchers";
 import { LspGateway } from "./lsp/lspGateway";
 import { RouteChanges, RoutedLspGateway } from "./lsp/routedLspGateway";
@@ -791,6 +791,8 @@ let log: vscode.OutputChannel | undefined;
  * The library traces nothing below log level Trace, and reads the verbosity from the trace.server
  * setting above it - lifting `off` to `messages`. So the level stands for the setting's on/off: Off
  * when it is off, Trace otherwise, and the library is told when that changes.
+ *
+ * The traffic names files by their paths, so the channel writes the home directory as `~`.
  */
 function createTraceChannel(name: string): vscode.LogOutputChannel {
     const channel = vscode.window.createOutputChannel(name);
@@ -813,22 +815,24 @@ function createTraceChannel(name: string): vscode.LogOutputChannel {
     const write = (message: string, ..._args: unknown[]): void =>
         channel.appendLine(message);
     const dispose = channel.dispose.bind(channel);
-    return Object.assign(channel, {
-        get logLevel() {
-            return current;
-        },
-        onDidChangeLogLevel: logLevelEmitter.event,
-        trace: write,
-        debug: write,
-        info: write,
-        warn: write,
-        error: write,
-        dispose: () => {
-            watch.dispose();
-            logLevelEmitter.dispose();
-            dispose();
-        },
-    }) as unknown as vscode.LogOutputChannel;
+    return withoutHome(
+        Object.assign(channel, {
+            get logLevel() {
+                return current;
+            },
+            onDidChangeLogLevel: logLevelEmitter.event,
+            trace: write,
+            debug: write,
+            info: write,
+            warn: write,
+            error: write,
+            dispose: () => {
+                watch.dispose();
+                logLevelEmitter.dispose();
+                dispose();
+            },
+        }) as unknown as vscode.LogOutputChannel,
+    );
 }
 
 function cfg(section: string) {
@@ -951,7 +955,7 @@ function startProjectClient(
     // installation folder. It was each project's own directory once, which put the log into the
     // mod's folder, its version control and whatever was packaged from it.
     if (serverLogFolder !== undefined) {
-        // The file's level is an unlisted setting: a release server writes no file unless it
+        // The file's level is an advanced setting: a release server writes no file unless it
         // names one, so a tester can be asked for a log without a Debug build.
         const fileLevel = cfg("lsp.debug").get<unknown>("fileLogLevel");
         extraArgs.push(
@@ -1039,12 +1043,22 @@ function startProjectClient(
         project.owned.push(trace);
     }
 
+    // The server's channel, made here rather than by the client library: the library writes the
+    // server's log messages and its error stream into it, and they name paths under the home
+    // directory - a temporary folder, the log folder, a project kept in the user's documents.
+    const clientName = multi ? `${CLIENT_NAME} (${spec.name})` : CLIENT_NAME;
+    const serverChannel = withoutHome(
+        vscode.window.createOutputChannel(clientName, { log: true }),
+    );
+    project.owned.push(serverChannel);
+
     const clientOptions: LanguageClientOptions = {
         synchronize: multi ? {} : { fileEvents },
         // Story-dialog scripts open as plaintext; the server gates all work on the pgproj
         // storyDialog registry scope, so other .txt files stay untouched.
         documentSelector: documentSelectorFor(spec),
         diagnosticCollectionName: diagnosticCollectionNameFor(CLIENT_ID, spec),
+        outputChannel: serverChannel,
         traceOutputChannel: trace,
         // The status item above is the one footer for every project; the server's startup progress
         // would open a second beside it.
@@ -1109,7 +1123,7 @@ function startProjectClient(
     // The client's name is its output channel's: one per project when there are several.
     const lspClient = new LanguageClient(
         CLIENT_ID,
-        multi ? `${CLIENT_NAME} (${spec.name})` : CLIENT_NAME,
+        clientName,
         serverOptions,
         clientOptions,
     );
@@ -2762,7 +2776,7 @@ export async function activate(
     };
     context.subscriptions.push(statusItem);
 
-    log = vscode.window.createOutputChannel("EaWEdit");
+    log = withoutHome(vscode.window.createOutputChannel("EaWEdit"));
     setLogChannel(log);
     context.subscriptions.push(log);
 
