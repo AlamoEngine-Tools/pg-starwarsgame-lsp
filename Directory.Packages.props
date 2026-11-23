@@ -46,7 +46,7 @@
              library, so the icon pipeline carries no encoder dependency at all. -->
         <PackageVersion Include="Pfim" Version="0.11.4"/>
         <PackageVersion Include="Serilog" Version="4.4.0"/>
-        <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0"/>
+        <PackageVersion Include="Serilog.Extensions.Logging" Version="11.0.0"/>
         <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0"/>
         <PackageVersion Include="System.CommandLine" Version="2.0.15"/>
         <PackageVersion Include="System.IO.Abstractions" Version="22.3.0"/>
