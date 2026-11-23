@@ -54,6 +54,12 @@
 
 ### Fixes
 
+- **A `require` of a script the game ships is no missing module** (#470) - a mod that requires
+  `PGStateMachine` and carries no copy of it got `Cannot find module 'PGStateMachine'`: the game packs its Lua
+  libraries into its archives, and the check looked only at Lua files read from disk. A module now resolves
+  when the game ships a script of that name in one of the directories it searches, known from the baseline or
+  from a game install's archives; a module nobody ships is still an error, and its text names the project, its
+  dependencies and the game as the places searched
 - **A unit whose hull is drawn opens with no note that nothing is drawn** - the Star Destroyer opened with
   `This model has no visible mesh at the current damage and detail level`: its eight hardpoint models arrive
   before its hull, a model that has arrived hangs nowhere until the hull is there, and the preview judged the

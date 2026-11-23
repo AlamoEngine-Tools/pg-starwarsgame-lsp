@@ -5,6 +5,7 @@ using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -23,15 +24,26 @@ internal static class LuaImportAnalyzer
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, string text, IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper,
-        IMessageCatalog messages)
+        IMessageCatalog messages, IAssetFileIndex? shippedScripts = null)
     {
         return Analyze(documentUri, LuaSyntaxTree.ParseText(text, s_parseOptions), documents, fileHelper,
-            messages);
+            messages, shippedScripts ?? EmptyAssetFileIndex.Instance);
     }
 
+    /// <summary>The unresolved requires of a script.</summary>
+    /// <param name="documentUri">The script.</param>
+    /// <param name="tree">Its syntax tree.</param>
+    /// <param name="documents">Every indexed document: the project's and its dependencies'.</param>
+    /// <param name="fileHelper">The URI normalization of the server.</param>
+    /// <param name="messages">The message catalogue.</param>
+    /// <param name="shippedScripts">
+    ///     The asset catalogue, which names every script the game ships. The game packs its Lua
+    ///     libraries into its archives, so a mod that requires one carries no copy of it and no document
+    ///     is indexed for it - the game loads it all the same.
+    /// </param>
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, SyntaxTree tree, IReadOnlyDictionary<string, DocumentIndex> documents,
-        IFileHelper fileHelper, IMessageCatalog messages)
+        IFileHelper fileHelper, IMessageCatalog messages, IAssetFileIndex shippedScripts)
     {
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
@@ -45,8 +57,10 @@ internal static class LuaImportAnalyzer
 
             var resolved = LuaRequireResolver.Resolve(requireArg, documents, fileHelper, documentUri);
             // Unresolved relative requires are silently skipped - target may be outside the workspace.
-            // Unresolved absolute requires are a real error.
-            if (resolved is null && !LuaRequireResolver.IsRelative(requireArg))
+            // An unresolved absolute require is a real error, unless the game ships a script of that name
+            // where it searches for one.
+            if (resolved is null && !LuaRequireResolver.IsRelative(requireArg) &&
+                !LuaScriptLookup.Candidates(shippedScripts, requireArg).Any())
                 diagnostics.Add(BuildDiagnostic(call, requireArg, messages));
         }
 

@@ -1,9 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Assets;
-
-namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
+namespace PG.StarWarsGame.LSP.Core.Assets;
 
 /// <summary>
 ///     Which file a Lua script name loads, the way the game finds it.
@@ -14,6 +12,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     templates are each script directory below, in this order, with <c>.lua</c> before
 ///     <c>.lc</c>. The first file that opens is the one loaded. Every template tries the mod
 ///     paths, the disk and the archives, so the merged catalog answers for all three at once.
+///     <para>
+///         A game object's <c>Lua_Script</c> and a script's own <c>require</c> are both answered here: a
+///         <c>require</c> is Lua's lookup of a name over that same search path.
+///     </para>
 /// </remarks>
 public static class LuaScriptLookup
 {

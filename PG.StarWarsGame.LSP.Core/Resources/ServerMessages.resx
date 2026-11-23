@@ -1262,7 +1262,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>A story event: Entered when the event fires and the machine is not already changing state</value>
   </data>
   <data name="LuaImport_CannotFindModule" xml:space="preserve">
-    <value>Cannot find module '{0}'. No matching '.lua' file found in workspace.</value>
+    <value>Cannot find module '{0}': No script of that name in the project, its dependencies or the game.</value>
   </data>
   <data name="LuaPlan_NoThreadFunction" xml:space="preserve">
     <value>Task force '{0}' has no thread function: The engine starts '{1}' when the plan loads and cannot run the force without it.</value>
