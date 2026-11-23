@@ -374,6 +374,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
         // Saved in the text editor's format, the only one it opens, whatever shape the file was in.
         var format = XmlTranslationFormat.TextEditor;
+        var written = XmlTranslationFormat.Of(document);
         format.Rewrite(document);
         var rows = document.Root?.Elements(format.Localisation).ToList() ?? [];
 
@@ -382,6 +383,17 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
                 return LocalisationEditResult.Fail(i, error);
 
         var lineEnding = LineEndings.Detect(text);
+
+        // A file already in that format keeps every character the batch did not ask to change:
+        // the commands are written into its text where each applies, rather than the whole
+        // document being serialised anew - which rewrites the declaration and every attribute's
+        // quotes and drops the comments outside the root. The document above stays the judge of
+        // what the batch means: a text that does not read back as the same rows is not used.
+        if (ReferenceEquals(written, format)
+            && XmlTranslationSplicer.Splice(text, commands, lineEnding) is { } spliced
+            && HoldsTheSameRows(spliced, document, format))
+            return LocalisationEditResult.Ok(spliced);
+
         var declaration = document.Declaration is { } d ? d + lineEnding : string.Empty;
         var body = Serialise(document.Root);
 
@@ -393,6 +405,32 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         if (lineEnding != "\n") body = body.Replace("\n", lineEnding, StringComparison.Ordinal);
 
         return LocalisationEditResult.Ok(declaration + body);
+    }
+
+    /// <summary>Whether <paramref name="text" /> reads back as the rows of <paramref name="expected" />.</summary>
+    private static bool HoldsTheSameRows(string text, XDocument expected, XmlTranslationFormat format)
+    {
+        XDocument written;
+        try
+        {
+            written = XDocument.Parse(text, LoadOptions.PreserveWhitespace);
+        }
+        catch (XmlException)
+        {
+            return false;
+        }
+
+        return RowsOf(written, format).SequenceEqual(RowsOf(expected, format));
+    }
+
+    /// <summary>Each row as its key and its translations in order, in a form two documents can be compared by.</summary>
+    private static IEnumerable<(string? Key, string Translations)> RowsOf(XDocument document,
+        XmlTranslationFormat format)
+    {
+        return (document.Root?.Elements(format.Localisation) ?? []).Select(row => (
+            row.Attribute(format.Key)?.Value,
+            string.Join('\0', row.Elements(format.TranslationData).Elements(format.Translation)
+                .Select(t => t.Attribute(format.Language)?.Value + '\0' + t.Value))));
     }
 
     /// <summary>
@@ -528,6 +566,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         private readonly IMessageCatalog _messages;
         private readonly List<RowState> _rows;
         private string _preamble;
+        private readonly string? _trailer;
 
         public EditState(LocDocument document, string extension, IMessageCatalog messages)
         {
@@ -535,6 +574,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             _messages = messages;
             _lineEnding = document.LineEnding;
             _preamble = document.Preamble;
+            _trailer = document.Trailer;
             _languages = [.. document.Languages];
             _rows = document.Rows
                 .Select(r => new RowState
@@ -576,12 +616,22 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
             if (preamble.Length > 0) builder.Append(preamble).Append(_lineEnding);
 
-            foreach (var row in _rows)
+            for (var i = 0; i < _rows.Count; i++)
             {
+                var row = _rows[i];
                 builder.Append(row.Leading);
                 builder.Append(row.Modified ? Serialise(row) : row.Source);
-                builder.Append(_lineEnding);
+                // After the last row comes what the file had there: its line ending or none, and
+                // whatever followed. A document not read from a text ends on one line ending.
+                builder.Append(i < _rows.Count - 1 ? _lineEnding : _trailer ?? _lineEnding);
             }
+
+            // With every row gone, what followed the last one still belongs to the file; the line
+            // ending it began with went with the row.
+            if (_rows.Count == 0 && _trailer is not null)
+                builder.Append(_trailer.StartsWith("\r\n", StringComparison.Ordinal) ? _trailer[2..]
+                    : _trailer.StartsWith('\n') ? _trailer[1..]
+                    : _trailer);
 
             return builder.ToString();
         }

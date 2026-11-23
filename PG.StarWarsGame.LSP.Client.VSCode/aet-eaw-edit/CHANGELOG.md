@@ -328,6 +328,13 @@
   included, and with the editor's own save settings: with `files.trimTrailingWhitespace` on, a save trims
   the whole file as a save by hand does. When a file cannot be written, a warning names it
   ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
+- **A localisation save changes the edited lines and nothing else** - a save of a translation XML file
+  wrote the whole document anew: the comments before and after the root and the last line ending were
+  dropped, the declaration and every attribute's quotes rewritten and the spacing inside a tag
+  normalised. The edited values are now written into the file's own text. A CSV or properties file
+  keeps its blank lines, the comments after its last entry and its missing final line ending, and a
+  line of a properties file that is no entry no longer gives every entry below it the key of the next
+  ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
 
 ## 0.5.2
 
