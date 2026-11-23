@@ -260,10 +260,7 @@ public sealed record ResolveStoryReferenceResult(
     int Column = 0,
     string? Error = null);
 
-// ── aet/getStoryDiagnostics - validation results correlated to graph nodes ───
-
-[Method("aet/getStoryDiagnostics", Direction.ClientToServer)]
-public sealed record GetStoryDiagnosticsParams(string Campaign, string Faction) : IRequest<GetStoryDiagnosticsResult>;
+// ── Validation results correlated to graph nodes: what aet/validateStoryCommandBatch returns ───
 
 public sealed record GetStoryDiagnosticsResult(
     IReadOnlyList<StoryDiagnosticDto> Diagnostics,

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Server.Story;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Story.Graph;
 using static PG.StarWarsGame.LSP.Server.Tests.Story.StoryCommandTestFixtures;
 
@@ -10,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 public sealed class ValidateStoryCommandBatchHandlerTest
 {
     private static ValidateStoryCommandBatchHandler Handler(
-        string marker, bool storyEditing = true)
+        string marker, DiagnosticSeverity severity = DiagnosticSeverity.Error)
     {
         var fs = NewFileSystem();
         var fileHelper = FileHelperFor(fs);
@@ -21,7 +22,7 @@ public sealed class ValidateStoryCommandBatchHandlerTest
             new SchemaProviderBuilder().Build(),
             fileHelper,
             Reload(),
-            new MarkerCollector(marker),
+            new MarkerCollector(marker, severity),
             TestCatalogues.English);
     }
 
@@ -33,12 +34,14 @@ public sealed class ValidateStoryCommandBatchHandlerTest
     /// <summary>
     ///     Validation must survive Edit mode being off. The panel's Validate button renders in every
     ///     mode and is the only source of story diagnostics there, so gating this on the editing flag
-    ///     silently left read-only users with none - regression guard for exactly that.
+    ///     silently left read-only users with none - regression guard for exactly that. The handler
+    ///     is built without a configuration provider, so it has no flag to read: a gate cannot come
+    ///     back without this construction changing.
     /// </summary>
     [Fact]
     public async Task StoryEditingOff_StillValidates()
     {
-        var result = await Handler("STORY_ELAPSED", storyEditing: false)
+        var result = await Handler("STORY_ELAPSED")
             .Handle(Batch(), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -55,6 +58,23 @@ public sealed class ValidateStoryCommandBatchHandlerTest
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(StoryGraphBuilder.EventNodeId(ThreadUri, "Start"), diagnostic.NodeId);
+        Assert.Equal("error", diagnostic.Severity);
+        Assert.Equal("marker 'STORY_ELAPSED'", diagnostic.Message);
+        Assert.Equal(ThreadUri, diagnostic.Uri);
+    }
+
+    [Fact]
+    public async Task NoBatch_OutsideAnyEvent_HasNoNodeId()
+    {
+        // The root tag opens the file before any event, so no event's range holds the marker: a
+        // file-level problem, which the panel lists without a node.
+        var result = await Handler("<Story>", severity: DiagnosticSeverity.Warning)
+            .Handle(Batch(), CancellationToken.None);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Null(diagnostic.NodeId);
+        Assert.Equal("warning", diagnostic.Severity);
+        Assert.Equal(ThreadUri, diagnostic.Uri);
     }
 
     [Fact]

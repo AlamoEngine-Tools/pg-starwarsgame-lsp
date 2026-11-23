@@ -8,10 +8,9 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 namespace PG.StarWarsGame.LSP.Server.Story;
 
 /// <summary>
-///     Maps XML diagnostics for one thread onto graph nodes and param slots. Shared by
-///     <see cref="GetStoryDiagnosticsHandler" /> (over committed buffer text, node ids from the
-///     model graph) and <see cref="ValidateStoryCommandBatchHandler" /> (over the staged working
-///     text, node ids computed by name) - the range-containment correlation is identical either way.
+///     Maps XML diagnostics for one thread onto graph nodes and param slots, for
+///     <see cref="ValidateStoryCommandBatchHandler" />: over the staged working text, node ids
+///     computed by name, each diagnostic placed by the event range that contains it.
 /// </summary>
 internal static class StoryDiagnosticsCorrelator
 {

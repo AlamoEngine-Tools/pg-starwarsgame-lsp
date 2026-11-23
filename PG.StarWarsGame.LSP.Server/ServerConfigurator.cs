@@ -213,7 +213,6 @@ public static class ServerConfigurator
             .WithHandler<GetStoryParamOptionsHandler>()
             .WithHandler<ResolveStoryReferenceHandler>()
             .WithHandler<ResolveReferenceHandler>()
-            .WithHandler<GetStoryDiagnosticsHandler>()
             .WithHandler<ExecuteStoryCommandHandler>()
             .WithHandler<ApplyStoryCommandBatchHandler>()
             .WithHandler<ValidateStoryCommandBatchHandler>()

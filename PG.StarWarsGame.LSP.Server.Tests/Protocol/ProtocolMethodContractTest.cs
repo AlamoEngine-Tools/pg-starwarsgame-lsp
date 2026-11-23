@@ -45,14 +45,12 @@ public sealed class ProtocolMethodContractTest
     ///     Endpoints the server serves that no client code path reaches, and why that is allowed.
     /// </summary>
     /// <remarks>
-    ///     <c>aet/getStoryDiagnostics</c> was left behind by the move to staged editing: the panel
-    ///     now dry-runs the pending batch through <c>aet/validateStoryCommandBatch</c> and reads the
-    ///     same <c>GetStoryDiagnosticsResult</c> back, so the original endpoint is still handled and
-    ///     still tested but nothing calls it. Listed rather than deleted because that is the
-    ///     maintainer's call, not this test's - but listed, so it cannot quietly become three.
+    ///     Empty since <c>aet/getStoryDiagnostics</c> went: the move to staged editing had left it
+    ///     served and uncalled, and it was the only entry. An endpoint is listed here with the reason
+    ///     it is kept rather than left to fail the test - listed, so it cannot quietly become three.
     /// </remarks>
     private static readonly HashSet<string> ServerMethodsNoClientCalls =
-        new(StringComparer.Ordinal) { "aet/getStoryDiagnostics" };
+        new(StringComparer.Ordinal);
 
     /// <summary>A request the client makes has somewhere to land.</summary>
     [Fact]

@@ -144,7 +144,8 @@ internal static class StoryCommandTestFixtures
     }
 
     /// <summary>Emits one error diagnostic at each occurrence of <c>Marker</c> in the text.</summary>
-    public sealed class MarkerCollector(string marker) : IXmlDiagnosticsCollector
+    public sealed class MarkerCollector(string marker, DiagnosticSeverity severity = DiagnosticSeverity.Error)
+        : IXmlDiagnosticsCollector
     {
         public IReadOnlyList<Diagnostic> Collect(string uri, string text, GameIndex index)
         {
@@ -156,7 +157,7 @@ internal static class StoryCommandTestFixtures
                 if (col < 0) continue;
                 results.Add(new Diagnostic
                 {
-                    Severity = DiagnosticSeverity.Error,
+                    Severity = severity,
                     Message = $"marker '{marker}'",
                     Range = new Range(
                         line, col, line, col + marker.Length)

@@ -382,8 +382,9 @@ function toggleSection(nodeId: string, section: NodeSection): void {
 }
 
 /**
- * Diagnostics per node id, from the server's aet/getStoryDiagnostics (via the extension's
- * 'diagnostics' message) - module scope for the same portal-rendering reason as the maps above.
+ * Diagnostics per node id, from the Validate action: the server's aet/validateStoryCommandBatch,
+ * relayed in the extension's 'diagnostics' message - module scope for the same portal-rendering
+ * reason as the maps above.
  */
 const nodeDiagnostics = new Map<string, StoryDiagnosticDto[]>();
 

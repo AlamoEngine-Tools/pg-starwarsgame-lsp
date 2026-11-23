@@ -3,23 +3,16 @@
 
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Preview.Abilities;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Server.Tests.Assets;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
-using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Completion;
-using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
@@ -612,63 +605,6 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal(2000, result.Options.Count);
     }
 
-    private static Diagnostic Diag(int line, int character, DiagnosticSeverity severity, string message)
-    {
-        return new Diagnostic
-        {
-            Range = new Range(
-                line, character, line, character + 4),
-            Severity = severity,
-            Message = message
-        };
-    }
-
-    private static (GetStoryDiagnosticsHandler Handler, FakeCollector Collector) DiagnosticsHandler()
-    {
-        var collector = new FakeCollector();
-        var textSource = new FakeTextSource();
-        // The stub model's threads were parsed from these exact strings - ranges line up.
-        textSource.Texts[ThreadUri] =
-            "<Story><Event Name=\"Start\"><Event_Type>STORY_ELAPSED</Event_Type></Event>" +
-            "<Event Name=\"Next\"><Event_Type>STORY_TRIGGER</Event_Type>" +
-            "<Prereq>Start</Prereq><Branch>Act1</Branch></Event></Story>";
-        textSource.Texts[SuspendedUri] = "<Story><Event Name=\"Later\"/></Story>";
-        var handler = new GetStoryDiagnosticsHandler(
-            Models(), Index(), collector, textSource, TestCatalogues.English);
-        return (handler, collector);
-    }
-
-    [Fact]
-    public async Task GetStoryDiagnostics_CorrelatesToNodeAndParamSlot()
-    {
-        var (handler, collector) = DiagnosticsHandler();
-        // The stub thread is a single line; "STORY_ELAPSED" (Start's Event_Param-free type) sits
-        // inside Start's event range. Aim at the Event_Type VALUE - event-level, no param slot.
-        collector.Seed.Add((ThreadUri, Diag(0, 40, DiagnosticSeverity.Error, "bad value")));
-
-        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC", "Rebel"), CancellationToken.None);
-
-        Assert.Null(result.Error);
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal($"{ThreadUri}#start", diagnostic.NodeId);
-        Assert.Equal("error", diagnostic.Severity);
-        Assert.Equal("bad value", diagnostic.Message);
-        Assert.Equal(ThreadUri, diagnostic.Uri);
-    }
-
-    [Fact]
-    public async Task GetStoryDiagnostics_OutsideAnyEvent_HasNoNodeId()
-    {
-        var (handler, collector) = DiagnosticsHandler();
-        collector.Seed.Add((SuspendedUri, Diag(0, 1, DiagnosticSeverity.Warning, "file-level")));
-
-        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC", "Rebel"), CancellationToken.None);
-
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Null(diagnostic.NodeId); // column 1 = the <Story> root, before any event
-        Assert.Equal("warning", diagnostic.Severity);
-    }
-
     // ── aet/resolveStoryReference ────────────────────────────────────────────
 
     private static ResolveStoryReferenceHandler ResolveHandler(FakeGameIndexService index)
@@ -785,28 +721,6 @@ public sealed class StoryProtocolHandlersTest
     private static StubModelService Models(IReadOnlyList<string>? invalidated)
     {
         return new StubModelService { Invalidated = invalidated ?? [] };
-    }
-
-    // ── aet/getStoryDiagnostics ──────────────────────────────────────────────
-
-    private sealed class FakeCollector : IXmlDiagnosticsCollector
-    {
-        public List<(string Uri, Diagnostic Diagnostic)> Seed { get; } = [];
-
-        public IReadOnlyList<Diagnostic> Collect(string uri, string text, GameIndex index)
-        {
-            return Seed.Where(s => s.Uri == uri).Select(s => s.Diagnostic).ToList();
-        }
-    }
-
-    private sealed class FakeTextSource : IDocumentTextSource
-    {
-        public Dictionary<string, string> Texts { get; } = new(StringComparer.Ordinal);
-
-        public DocumentText? GetText(string canonicalUri)
-        {
-            return Texts.TryGetValue(canonicalUri, out var text) ? new DocumentText(text, 0, false) : null;
-        }
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

@@ -218,7 +218,7 @@ export interface ResolveStoryReferenceResult {
     error?: string | null;
 }
 
-// ── aet/getStoryDiagnostics, aet/validateStoryCommandBatch ───────────────────
+// ── aet/validateStoryCommandBatch ────────────────────────────────────────────
 
 /**
  * @param nodeId The graph node the diagnostic belongs to; null for file-level problems.
