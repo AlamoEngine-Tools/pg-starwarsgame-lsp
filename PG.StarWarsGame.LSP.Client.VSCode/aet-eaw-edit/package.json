@@ -947,7 +947,7 @@
     "rete-render-utils": "^2.0.3",
     "styled-components": "^6.6.0",
     "three": "^0.187.0",
-    "vscode-languageclient": "^10.0.0",
+    "vscode-languageclient": "^11.0.0",
     "yauzl": "^3.4.0"
   },
   "bugs": {
