@@ -19,8 +19,8 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     <see cref="StoryCommandExecutor" />, then applies the resulting edits through
 ///     <c>workspace/applyEdit</c> (undo/redo and open-editor sync come free). Non-project layers
 ///     are read-only — mutations there are rejected with the override-copy guidance. Batched
-///     edit-mode saves go through <see cref="ApplyStoryCommandBatchHandler" />, which composes many
-///     commands over one <see cref="WorkingTextSet" /> before a single applyEdit.
+///     edit-mode saves go through <see cref="StoryEditBatchComposer" />, which composes many
+///     commands over one <see cref="WorkingTextSet" /> into a single edit.
 /// </summary>
 public sealed class ExecuteStoryCommandHandler(
     IStoryModelService modelService,

@@ -47,6 +47,7 @@ using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Caching;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Debug;
+using PG.StarWarsGame.LSP.Server.Editing;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Indexing;
@@ -214,8 +215,8 @@ public static class ServerConfigurator
             .WithHandler<ResolveStoryReferenceHandler>()
             .WithHandler<ResolveReferenceHandler>()
             .WithHandler<ExecuteStoryCommandHandler>()
-            .WithHandler<ApplyStoryCommandBatchHandler>()
-            .WithHandler<ValidateStoryCommandBatchHandler>()
+            .WithHandler<ValidateEditBatchHandler>()
+            .WithHandler<ApplyEditBatchHandler>()
             .WithHandler<PreviewStoryGraphHandler>()
             .WithHandler<GetWorkspaceSettingsHandler>()
             .WithHandler<SetWorkspaceSettingsHandler>()
@@ -284,6 +285,9 @@ public static class ServerConfigurator
                 // The sides the project's GameConstants names, which the dedicated story tags attach
                 // their plots to: read by the chain scan, the attachment check and the manifest writer (#192).
                 services.AddSingleton<IStorySideNamesSource, GameConstantsStorySideNames>();
+                // The visual editors' one way to write: a composer per editor behind one pair.
+                services.AddSingleton<IEditBatchComposer, StoryEditBatchComposer>();
+                services.AddSingleton<EditBatchComposers>();
                 services.AddSingleton<ICacheStatisticsSource>(sp =>
                     (ICacheStatisticsSource)sp.GetRequiredService<IStoryModelService>());
                 services.AddSingleton<IStoryGraphDiagnosticsSource, StoryGraphDiagnosticsService>();

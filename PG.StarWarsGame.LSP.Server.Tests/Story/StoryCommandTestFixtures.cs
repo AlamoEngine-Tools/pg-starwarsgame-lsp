@@ -4,14 +4,14 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
-using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Editing;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Story.Discovery;
@@ -131,18 +131,42 @@ internal static class StoryCommandTestFixtures
             Tokens: tokens, File: file, TargetFaction: faction);
     }
 
-    // ── test doubles ─────────────────────────────────────────────────────────
+    // ── the story graph's batches ────────────────────────────────────────────
 
-    public sealed class CapturingApplier(bool result = true) : IWorkspaceEditApplier
+    /// <summary>The campaign and faction every batch here is about.</summary>
+    public static readonly EditBatchSubject Subject = new("GC", "Rebel");
+
+    /// <summary>The commands as a batch carries them.</summary>
+    public static JArray Staged(params StoryCommandDto[] commands)
     {
-        public WorkspaceEdit? Edit { get; private set; }
-
-        public Task<bool> ApplyAsync(WorkspaceEdit edit, string label, CancellationToken ct)
-        {
-            Edit = edit;
-            return Task.FromResult(result);
-        }
+        return JArray.FromObject(commands);
     }
+
+    /// <summary>The story graph's composer over the sample campaign.</summary>
+    /// <param name="index">The game index; the sample one when not given.</param>
+    /// <param name="storyEditing">Whether the Story Editing feature is on.</param>
+    /// <param name="threadText">The project's own thread file; <see cref="ThreadText" /> when not given.</param>
+    /// <param name="collector">What finds problems in a thread's text; nothing does when not given.</param>
+    public static StoryEditBatchComposer Composer(
+        GameIndex? index = null, bool storyEditing = true, string? threadText = null,
+        IXmlDiagnosticsCollector? collector = null)
+    {
+        var fileHelper = FileHelperFor(NewFileSystem(threadText));
+        return new StoryEditBatchComposer(
+            new StubModelService(threadText: threadText),
+            new FakeGameIndexService(index ?? DefaultIndex()),
+            TextSource(fileHelper),
+            new SchemaProviderBuilder().Build(),
+            fileHelper,
+            Reload(),
+            Config(storyEditing),
+            new ShippedSides(),
+            collector ?? new MarkerCollector("<a marker no thread holds>"),
+            NullLogger<StoryEditBatchComposer>.Instance,
+            TestCatalogues.English);
+    }
+
+    // ── test doubles ─────────────────────────────────────────────────────────
 
     /// <summary>Emits one error diagnostic at each occurrence of <c>Marker</c> in the text.</summary>
     public sealed class MarkerCollector(string marker, DiagnosticSeverity severity = DiagnosticSeverity.Error)

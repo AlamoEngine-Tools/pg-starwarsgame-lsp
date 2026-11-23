@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Server.Story;
 using static PG.StarWarsGame.LSP.Server.Tests.Story.StoryCommandTestFixtures;
 
@@ -51,26 +50,11 @@ public sealed class StoryBatchRoundTripTest
 
     private static async Task<string> SaveAsync(string original, params StoryCommandDto[] commands)
     {
-        var fs = NewFileSystem(original);
-        var fileHelper = FileHelperFor(fs);
-        var applier = new CapturingApplier();
-        var handler = new ApplyStoryCommandBatchHandler(
-            new StubModelService(threadText: original),
-            new FakeGameIndexService(DefaultIndex()),
-            TextSource(fileHelper),
-            new SchemaProviderBuilder().Build(),
-            fileHelper,
-            Reload(),
-            applier,
-            Config(),
-            new ShippedSides(),
-            NullLogger<ApplyStoryCommandBatchHandler>.Instance, TestCatalogues.English);
-
-        var result = await handler.Handle(
-            new ApplyStoryCommandBatchParams("GC", "Rebel", commands), CancellationToken.None);
+        var result = await Composer(threadText: original)
+            .ComposeAsync(Subject, Staged(commands), CancellationToken.None);
 
         Assert.True(result.Success, result.Error);
-        var change = Assert.Single(applier.Edit!.DocumentChanges!, c => c.IsTextDocumentEdit);
+        var change = Assert.Single(result.Edit!.DocumentChanges!, c => c.IsTextDocumentEdit);
         return change.TextDocumentEdit!.Edits.Single().NewText;
     }
 

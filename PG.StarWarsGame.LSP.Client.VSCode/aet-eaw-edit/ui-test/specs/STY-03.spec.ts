@@ -1,6 +1,7 @@
-// STY-03: a save through the story graph changes the thread file in the staged value and in nothing
-// else (#339). The thread is written by hand - comments, a tag no schema knows, a reward before its
-// trigger, odd spacing - and the save must leave all of it where it was.
+// STY-03: a save through the story graph writes the thread file, changed in the staged value and in
+// nothing else; one undo takes the save back; and the next save writes the thread as the window holds
+// it, unsaved edits included (#339). The thread is written by hand - comments, a tag no schema knows, a
+// reward before its trigger, odd spacing - and a save must leave all of it where it was.
 import fs from "node:fs";
 import { browser, expect } from "@wdio/globals";
 import { serverReady } from "../protocol.js";
@@ -8,13 +9,13 @@ import { closeAll, graphLoaded, inNewestWebview, openStoryGraph } from "./storyG
 
 const thread = "C:\\temp\\aet-test-STY-save\\Data\\Xml\\Story_Save.xml";
 
-/** What the window holds for the thread file, once it has loaded it. */
-async function buffer(): Promise<{ open: boolean; text: string }> {
+/** What the window holds for the thread file while it has it loaded: its text, and whether that is unsaved. */
+async function buffer(): Promise<{ open: boolean; dirty: boolean; text: string }> {
     return browser.executeWorkbench((vscode, file: string) => {
         const document = vscode.workspace.textDocuments.find(
             (d: { uri: { fsPath: string } }) => d.uri.fsPath.toLowerCase() === file.toLowerCase(),
         );
-        return { open: document !== undefined, text: document?.getText() ?? "" };
+        return { open: document !== undefined, dirty: document?.isDirty ?? false, text: document?.getText() ?? "" };
     }, thread);
 }
 
@@ -55,6 +56,24 @@ async function setField(event: string, label: string, value: string): Promise<vo
     await browser.pause(500);
 }
 
+/** Enters Edit mode, stages one field of one event, saves, and waits until the graph has left Edit mode. */
+async function saveField(event: string, label: string, value: string): Promise<void> {
+    await inNewestWebview(async () => {
+        await (await browser.$("button.rotary-pos")).waitForExist({ timeout: 90_000 });
+        await graphLoaded();
+        await (await browser.$('button.rotary-pos[title="Edit"]')).click();
+        await setField(event, label, value);
+        const save = await browser.$('[title^="Save - "]');
+        await browser.waitUntil(async () => (await save.getAttribute("title")) !== "Save - nothing is staged", {
+            timeout: 15_000,
+            timeoutMsg: "The edit was not staged",
+        });
+        await save.click();
+        // A save that went through leaves Edit mode, and the Save button with it.
+        await save.waitForExist({ reverse: true, timeout: 30_000, timeoutMsg: "The save left the graph in Edit mode" });
+    });
+}
+
 describe("STY-03", () => {
     let original = "";
     let expected = "";
@@ -67,39 +86,45 @@ describe("STY-03", () => {
 
     it("saves the staged value into the thread file and changes nothing else in it", async () => {
         await openStoryGraph("Save_Campaign", "Empire");
-        await inNewestWebview(async () => {
-            await (await browser.$("button.rotary-pos")).waitForExist({ timeout: 90_000 });
-            await graphLoaded();
-            await (await browser.$('button.rotary-pos[title="Edit"]')).click();
-            await setField("Follow_Up", "Dialog", "NEW_DIALOG");
-            const save = await browser.$('[title^="Save - "]');
-            await browser.waitUntil(async () => (await save.getAttribute("title")) !== "Save - nothing is staged", {
-                timeout: 15_000,
-                timeoutMsg: "The edit was not staged",
-            });
-            await save.click();
-            // A save that went through leaves Edit mode, and the Save button with it.
-            await save.waitForExist({ reverse: true, timeout: 30_000, timeoutMsg: "The save left the graph in Edit mode" });
-        });
+        await saveField("Follow_Up", "Dialog", "NEW_DIALOG");
 
-        // Read from the window, which holds the thread as saved whether or not the save also reached the disk.
-        await browser.waitUntil(async () => (await buffer()).open && (await buffer()).text !== original, {
+        await browser.waitUntil(async () => fs.readFileSync(thread, "utf8") !== original, {
             timeout: 30_000,
-            timeoutMsg: "The window does not hold a changed thread",
+            timeoutMsg: "The save did not reach the thread file",
         });
-        expect((await buffer()).text).toBe(expected);
+        expect(fs.readFileSync(thread, "utf8")).toBe(expected);
+        // Written, not left behind as an unsaved document.
+        expect((await buffer()).dirty).toBe(false);
     });
 
-    it("takes the whole save back with one undo", async () => {
+    it("takes the whole save back with one undo, which leaves the thread unsaved", async () => {
         await browser.executeWorkbench(async (vscode, file: string) => {
             await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: false });
             await vscode.commands.executeCommand("undo");
         }, thread);
-        await browser.waitUntil(async () => (await buffer()).text !== expected, {
+        await browser.waitUntil(async () => (await buffer()).open && (await buffer()).text !== expected, {
             timeout: 15_000,
             timeoutMsg: "Undo changed nothing",
         });
-        expect((await buffer()).text).toBe(original);
+        // The undo is an edit like any other: the window holds the original again, the disk the save.
+        expect(await buffer()).toEqual({ open: true, dirty: true, text: original });
+        expect(fs.readFileSync(thread, "utf8")).toBe(expected);
+    });
+
+    it("writes the thread as the window holds it, so the next save takes the unsaved undo with it", async () => {
+        // The undo left the thread's editor in front of the graph.
+        await openStoryGraph("Save_Campaign", "Empire");
+        await saveField("Opening", "Branch", "Act1");
+
+        await browser.waitUntil(async () => fs.readFileSync(thread, "utf8") !== expected, {
+            timeout: 30_000,
+            timeoutMsg: "The second save did not reach the thread file",
+        });
+        const written = fs.readFileSync(thread, "utf8");
+        expect(written).toContain("<Branch>Act1</Branch>");
+        expect(written).toContain("<Story_Dialog>OLD_DIALOG</Story_Dialog>");
+        expect(written.replace(/^[ \t]*<Branch>Act1<\/Branch>\r?\n/m, "")).toBe(original);
+        expect((await buffer()).dirty).toBe(false);
         await closeAll();
     });
 });

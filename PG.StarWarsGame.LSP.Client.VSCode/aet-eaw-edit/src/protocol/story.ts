@@ -4,6 +4,8 @@
 // The story editor's wire contract. Mirrors PG.StarWarsGame.LSP.Server/Story/StoryProtocol.cs and
 // StoryCommandProtocol.cs - see ../protocol/README.md for why this is declared exactly once.
 
+import type { EditBatchProblemDto } from "./editBatch";
+
 // ── aet/getStoryPlots - campaign navigator feed ──────────────────────────────
 
 /**
@@ -218,28 +220,17 @@ export interface ResolveStoryReferenceResult {
     error?: string | null;
 }
 
-// ── aet/validateStoryCommandBatch ────────────────────────────────────────────
+// ── A story batch's problems, from aet/validateEditBatch ─────────────────────
 
 /**
- * @param nodeId The graph node the diagnostic belongs to; null for file-level problems.
- * @param side `event`/`reward` when the range falls inside a param slot.
- * @param position 0-based param slot, when `side` is set.
+ * A problem of a staged story batch: an `EditBatchProblemDto` as the story composer fills it. It
+ * places every problem in a thread file, so the file and the position are always there.
  */
-export interface StoryDiagnosticDto {
-    nodeId?: string | null;
-    side?: string | null;
-    position?: number | null;
-    severity: string;
-    message: string;
+export type StoryDiagnosticDto = EditBatchProblemDto & {
     uri: string;
     line: number;
     column: number;
-}
-
-export interface GetStoryDiagnosticsResult {
-    diagnostics: StoryDiagnosticDto[];
-    error?: string | null;
-}
+};
 
 // ── aet/getStoryLayout / aet/setStoryLayout ──────────────────────────────────
 
@@ -261,17 +252,10 @@ export interface GetStoryLayoutResult {
     error?: string | null;
 }
 
-// ── aet/executeStoryCommand, aet/applyStoryCommandBatch ──────────────────────
+// ── aet/executeStoryCommand ──────────────────────────────────────────────────
 
 export interface ExecuteStoryCommandResult {
     success: boolean;
-    error?: string | null;
-}
-
-/** @param failedIndex 0-based index of the command that failed, when `success` is false. */
-export interface ApplyStoryCommandBatchResult {
-    success: boolean;
-    failedIndex?: number | null;
     error?: string | null;
 }
 

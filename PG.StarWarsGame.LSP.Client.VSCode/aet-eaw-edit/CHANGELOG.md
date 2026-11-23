@@ -321,6 +321,13 @@
   longer sends the reader to a log file in the first workspace folder: it names the log file's own setting
   and its folder
   ([#462](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/462))
+- **Save in the story graph writes the thread files** - a save of the staged changes left every changed
+  thread as an unsaved document, which had to be saved by hand before the game or a build saw it. The
+  changes are now applied through VS Code and the files they touched are saved at once, so one undo in a
+  thread still takes the whole save back. A save writes a thread as the window holds it, unsaved edits
+  included, and with the editor's own save settings: with `files.trimTrailingWhitespace` on, a save trims
+  the whole file as a save by hand does. When a file cannot be written, a warning names it
+  ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
 
 ## 0.5.2
 

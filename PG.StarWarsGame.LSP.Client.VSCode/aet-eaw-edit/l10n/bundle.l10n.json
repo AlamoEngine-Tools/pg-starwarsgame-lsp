@@ -21,9 +21,9 @@
   "Story command failed": "Story command failed",
   "EaWEdit: {0}": "EaWEdit: {0}",
   "The story command failed.": "The story command failed.",
-  "Save failed": "Save failed",
   "EaWEdit: {0}{1}": "EaWEdit: {0}{1}",
   "The save failed.": "The save failed.",
+  "Save failed": "Save failed",
   "References to this event - prereqs and event-name params (TRIGGER_EVENT, RESET_EVENT, and so on) in other events - are NOT removed and will become unresolved. Validate afterwards finds them. Nothing is written until Save.": "References to this event - prereqs and event-name params (TRIGGER_EVENT, RESET_EVENT, and so on) in other events - are NOT removed and will become unresolved. Validate afterwards finds them. Nothing is written until Save.",
   "Delete": "Delete",
   "The story graph for '{0}' was closed with {1} unsaved change(s). Save them?": "The story graph for '{0}' was closed with {1} unsaved change(s). Save them?",
@@ -292,6 +292,9 @@
   "Encyclopedia": "Encyclopedia",
   "Encyclopedia: {0}": "Encyclopedia: {0}",
   "{0} (effective preview, read-only)": "{0} (effective preview, read-only)",
+  "EaWEdit: {0}: {1}": "EaWEdit: {0}: {1}",
+  "EaWEdit: Not written to disk - {0}": "EaWEdit: Not written to disk - {0}",
+  "The changes could not be applied.": "The changes could not be applied.",
   "Preview: {0}": "Preview: {0}",
   "Loading the release notes...": "Loading the release notes...",
   "Preview release - behaviour may change between versions": "Preview release - behaviour may change between versions",
@@ -1444,6 +1447,5 @@
   "No mod project is loaded, so there is nothing to launch the game with. Open a workspace with a .pgproj, or set \"modPaths\" in the launch configuration": "No mod project is loaded, so there is nothing to launch the game with. Open a workspace with a .pgproj, or set \"modPaths\" in the launch configuration",
   "Project layer '{0}' cannot be launched as a mod: {1}. Attaching to a running game works instead, or \"modPaths\" in the launch configuration set to a maintained mod folder": "Project layer '{0}' cannot be launched as a mod: {1}. Attaching to a running game works instead, or \"modPaths\" in the launch configuration set to a maintained mod folder",
   "no reason given": "no reason given",
-  "EaWEdit LSP: Server is not running.": "EaWEdit LSP: Server is not running.",
-  "EaWEdit: {0}: {1}": "EaWEdit: {0}: {1}"
+  "EaWEdit LSP: Server is not running.": "EaWEdit LSP: Server is not running."
 }

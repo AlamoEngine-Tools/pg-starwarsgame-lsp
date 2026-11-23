@@ -444,6 +444,12 @@
   <data name="DynamicEnumValue_IsNotAValidEnum2" xml:space="preserve">
     <value>'{0}' is not a valid enum identifier for &lt;{1}&gt;.</value>
   </data>
+  <data name="EditBatch_CommandsUnreadable" xml:space="preserve">
+    <value>The staged changes could not be read: {0}</value>
+  </data>
+  <data name="EditBatch_UnknownEditor" xml:space="preserve">
+    <value>No editor '{0}' writes through this server.</value>
+  </data>
   <data name="EffectiveObject_AddedByVariant" xml:space="preserve">
     <value>added by variant</value>
   </data>
@@ -2217,9 +2223,6 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="StoryGraph_SuspendedNeverActivated" xml:space="preserve">
     <value>This plot is suspended in campaign '{0}' and no STORY_ELEMENT reward activates it.</value>
-  </data>
-  <data name="StoryHandlers_ApplyStoryChangeS" xml:space="preserve">
-    <value>Apply story changes ({0})</value>
   </data>
   <data name="StoryHandlers_CampaignCouldNotBeAssembled" xml:space="preserve">
     <value>Campaign '{0}' could not be assembled from the staged changes.</value>

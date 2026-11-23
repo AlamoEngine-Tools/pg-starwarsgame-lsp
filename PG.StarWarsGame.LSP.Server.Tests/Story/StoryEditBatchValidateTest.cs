@@ -8,27 +8,12 @@ using static PG.StarWarsGame.LSP.Server.Tests.Story.StoryCommandTestFixtures;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
-public sealed class ValidateStoryCommandBatchHandlerTest
+public sealed class StoryEditBatchValidateTest
 {
-    private static ValidateStoryCommandBatchHandler Handler(
+    private static StoryEditBatchComposer Handler(
         string marker, DiagnosticSeverity severity = DiagnosticSeverity.Error)
     {
-        var fs = NewFileSystem();
-        var fileHelper = FileHelperFor(fs);
-        return new ValidateStoryCommandBatchHandler(
-            new StubModelService(),
-            new FakeGameIndexService(DefaultIndex()),
-            TextSource(fileHelper),
-            new SchemaProviderBuilder().Build(),
-            fileHelper,
-            Reload(),
-            new MarkerCollector(marker, severity),
-            TestCatalogues.English);
-    }
-
-    private static ValidateStoryCommandBatchParams Batch(params StoryCommandDto[] commands)
-    {
-        return new ValidateStoryCommandBatchParams("GC", "Rebel", commands);
+        return Composer(collector: new MarkerCollector(marker, severity));
     }
 
     /// <summary>
@@ -42,10 +27,10 @@ public sealed class ValidateStoryCommandBatchHandlerTest
     public async Task StoryEditingOff_StillValidates()
     {
         var result = await Handler("STORY_ELAPSED")
-            .Handle(Batch(), CancellationToken.None);
+            .ValidateAsync(Subject, Staged(), CancellationToken.None);
 
         Assert.Null(result.Error);
-        var diagnostic = Assert.Single(result.Diagnostics);
+        var diagnostic = Assert.Single(result.Problems);
         Assert.Equal(StoryGraphBuilder.EventNodeId(ThreadUri, "Start"), diagnostic.NodeId);
     }
 
@@ -54,9 +39,9 @@ public sealed class ValidateStoryCommandBatchHandlerTest
     {
         // STORY_ELAPSED is the committed trigger of "Start" - with no staged commands the validation
         // runs over buffer text and pins the marker to Start's node.
-        var result = await Handler("STORY_ELAPSED").Handle(Batch(), CancellationToken.None);
+        var result = await Handler("STORY_ELAPSED").ValidateAsync(Subject, Staged(), CancellationToken.None);
 
-        var diagnostic = Assert.Single(result.Diagnostics);
+        var diagnostic = Assert.Single(result.Problems);
         Assert.Equal(StoryGraphBuilder.EventNodeId(ThreadUri, "Start"), diagnostic.NodeId);
         Assert.Equal("error", diagnostic.Severity);
         Assert.Equal("marker 'STORY_ELAPSED'", diagnostic.Message);
@@ -69,9 +54,9 @@ public sealed class ValidateStoryCommandBatchHandlerTest
         // The root tag opens the file before any event, so no event's range holds the marker: a
         // file-level problem, which the panel lists without a node.
         var result = await Handler("<Story>", severity: DiagnosticSeverity.Warning)
-            .Handle(Batch(), CancellationToken.None);
+            .ValidateAsync(Subject, Staged(), CancellationToken.None);
 
-        var diagnostic = Assert.Single(result.Diagnostics);
+        var diagnostic = Assert.Single(result.Problems);
         Assert.Null(diagnostic.NodeId);
         Assert.Equal("warning", diagnostic.Severity);
         Assert.Equal(ThreadUri, diagnostic.Uri);
@@ -84,13 +69,13 @@ public sealed class ValidateStoryCommandBatchHandlerTest
         // A diagnostic for it proves the collector ran over the composed (pending) text.
         var handler = Handler("ZZBAD");
 
-        var empty = await handler.Handle(Batch(), CancellationToken.None);
-        Assert.Empty(empty.Diagnostics); // committed text has no marker
+        var empty = await handler.ValidateAsync(Subject, Staged(), CancellationToken.None);
+        Assert.Empty(empty.Problems); // committed text has no marker
 
-        var staged = await handler.Handle(
-            Batch(Cmd("setDialog", eventName: "Start", value: "ZZBAD")), CancellationToken.None);
+        var staged = await handler.ValidateAsync(Subject, Staged(Cmd("setDialog", eventName: "Start", value: "ZZBAD")),
+            CancellationToken.None);
 
-        var diagnostic = Assert.Single(staged.Diagnostics);
+        var diagnostic = Assert.Single(staged.Problems);
         Assert.Equal(StoryGraphBuilder.EventNodeId(ThreadUri, "Start"), diagnostic.NodeId);
         Assert.Contains("ZZBAD", diagnostic.Message);
     }
@@ -99,9 +84,9 @@ public sealed class ValidateStoryCommandBatchHandlerTest
     public async Task StagedCommandThatFails_ShortCircuitsWithThatError()
     {
         var result = await Handler("anything")
-            .Handle(Batch(Cmd("deleteEvent", eventName: "Ghost")), CancellationToken.None);
+            .ValidateAsync(Subject, Staged(Cmd("deleteEvent", eventName: "Ghost")), CancellationToken.None);
 
-        Assert.Empty(result.Diagnostics);
+        Assert.Empty(result.Problems);
         Assert.Contains("Ghost", result.Error);
     }
 }

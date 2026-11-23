@@ -11,6 +11,7 @@
 //
 // Pure, so the rule is testable without a VS Code host.
 
+import type { EditWorkspace } from "./lsp/editBatchClient";
 import type { LspGateway } from "./lsp/lspGateway";
 
 /** The project a panel is bound to. */
@@ -24,6 +25,8 @@ export interface PanelProject {
     readonly name: string;
     /** Requests to this project's server, and to no other. */
     readonly gateway: LspGateway;
+    /** Where an edit this project's server composed is applied and saved. */
+    readonly edits: EditWorkspace;
 }
 
 /**
