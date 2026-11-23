@@ -701,5 +701,8 @@
     "settings": {
       "aet-eaw-edit.lsp.debug.fileLogLevel": "Debug"
     }
+  },
+  "SET-34": {
+    "open": "{repo}\\eaw"
   }
 }

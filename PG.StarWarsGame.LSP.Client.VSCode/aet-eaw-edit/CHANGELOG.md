@@ -315,6 +315,12 @@
   loading also recorded LOD 0, and the next open of the same unit or model in the window restored it. The
   level now follows the geometry as it arrives until one is picked by hand, and only a level picked by hand
   is kept for the next open
+- **Debug settings say where the lines land** - the descriptions of `aet-eaw-edit.lsp.debug.logLevel` and
+  `aet-eaw-edit.lsp.debug.trace.server` name their output channels by title, *Alamo Engine Tools - Empire
+  at War Edit* and *EaWEdit LSP Trace*, and the one per project when several are open. The log level's no
+  longer sends the reader to a log file in the first workspace folder: it names the log file's own setting
+  and its folder
+  ([#462](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/462))
 
 ## 0.5.2
 
