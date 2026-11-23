@@ -50,7 +50,7 @@
         <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0"/>
         <PackageVersion Include="System.CommandLine" Version="2.0.15"/>
         <PackageVersion Include="System.IO.Abstractions" Version="22.3.0"/>
-        <PackageVersion Include="Testably.Abstractions.FileSystem.Interface" Version="10.4.0"/>
+        <PackageVersion Include="Testably.Abstractions.FileSystem.Interface" Version="11.1.0"/>
         <PackageVersion Include="YamlDotNet" Version="18.1.0"/>
     </ItemGroup>
 
