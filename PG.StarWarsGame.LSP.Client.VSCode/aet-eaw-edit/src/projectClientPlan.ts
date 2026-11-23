@@ -467,12 +467,25 @@ export function statusText(
  * in the file name keeps the files of two servers apart. A mod folder without a project file has
  * no name to pass.
  *
+ * The file is written only when asked for: a release server writes none unless `fileLevel` names a
+ * level, which the unlisted `aet-eaw-edit.lsp.debug.fileLogLevel` setting carries - a tester is told
+ * its name when a log is wanted. `None` switches the file off for a Debug server too.
+ *
  * @param logFolder The workspace's log folder, see logStore.ts.
+ * @param fileLevel The level the file is asked for at, or nothing to leave the server's default.
  */
-export function serverLogArgs(spec: ClientSpec, logFolder: string): string[] {
+export function serverLogArgs(
+    spec: ClientSpec,
+    logFolder: string,
+    fileLevel?: string,
+): string[] {
     const args = [`--log-dir=${logFolder}`];
     if (spec.projectPath !== undefined) {
         args.push(`--log-stem=${spec.name}`);
+    }
+    const level = fileLevel?.trim() ?? "";
+    if (level !== "") {
+        args.push(`--log-file-level=${level}`);
     }
     return args;
 }

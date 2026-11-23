@@ -69,7 +69,6 @@ using PG.StarWarsGame.LSP.Story.Sim;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
-using Serilog;
 using CoreServerOptions = PG.StarWarsGame.LSP.Core.Configuration.ServerOptions;
 
 namespace PG.StarWarsGame.LSP.Server;
@@ -84,8 +83,12 @@ public static class ServerConfigurator
     ///     XML sync handler - those lines are <c>LogDebug</c>, and reading their absence at
     ///     Information once produced a wrong diagnosis of an intermittent no-diagnostics session.
     /// </param>
+    /// <param name="fileLogLevel">
+    ///     The level the file log is written at, from <see cref="ServerFileLog.Resolve" />; null
+    ///     writes no file. The file's logger is the process-wide one the host set up.
+    /// </param>
     public static LanguageServerOptions Apply(LanguageServerOptions options,
-        CoreServerOptions? serverOptions = null, LogLevel? logLevel = null)
+        CoreServerOptions? serverOptions = null, LogLevel? logLevel = null, LogLevel? fileLogLevel = null)
     {
         // Installed before anything else: it decides how the preview protocol's enums reach the
         // client, and getting it wrong is silent - ordinals where names were expected.
@@ -106,12 +109,9 @@ public static class ServerConfigurator
         (bool Document, bool Range) formattingAfterStart = (false, false);
 
         return options
-            .ConfigureLogging(x => ServerLogLevel.Apply(x, logLevel ?? ServerLogLevel.Default)
-                    .AddLanguageProtocolLogging()
-#if DEBUG
-                    .AddSerilog(dispose: true)
-#endif
-            )
+            .ConfigureLogging(x => ServerFileLog.Apply(
+                ServerLogLevel.Apply(x, logLevel ?? ServerLogLevel.Default).AddLanguageProtocolLogging(),
+                fileLogLevel))
             // ── Two wiring conventions coexist below, deliberately ──────────────────
             // Most capabilities (Sync, Completion, Definition, CodeAction, CodeLens,
             // InlayHint) are "dual-registered": the Xml* and Lua* handler for a capability

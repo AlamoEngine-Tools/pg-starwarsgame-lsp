@@ -1,7 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as os from "os";
 import * as vscode from "vscode";
+
+import { homeAsTilde } from "./homePath";
 
 /**
  * The extension's "EaWEdit" output channel, shared by the activation code and the panels so a
@@ -15,8 +18,10 @@ export function setLogChannel(next: vscode.OutputChannel | undefined): void {
 
 export function logLine(msg: string): void {
     const ts = new Date().toISOString().replace("T", " ").replace("Z", "");
+    // The channel is read on screen and pasted into public issues: no line names the user's home.
+    const line = homeAsTilde(msg, os.homedir(), process.platform === "win32");
     try {
-        channel?.appendLine(`[${ts}] ${msg}`);
+        channel?.appendLine(`[${ts}] ${line}`);
     } catch {
         // The host disposes the output channel before every extension's deactivate() has finished,
         // and a disposed channel THROWS on append rather than ignoring it. The lines that land

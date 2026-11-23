@@ -951,7 +951,16 @@ function startProjectClient(
     // installation folder. It was each project's own directory once, which put the log into the
     // mod's folder, its version control and whatever was packaged from it.
     if (serverLogFolder !== undefined) {
-        extraArgs.push(...serverLogArgs(spec, serverLogFolder));
+        // The file's level is an unlisted setting: a release server writes no file unless it
+        // names one, so a tester can be asked for a log without a Debug build.
+        const fileLevel = cfg("lsp.debug").get<unknown>("fileLogLevel");
+        extraArgs.push(
+            ...serverLogArgs(
+                spec,
+                serverLogFolder,
+                typeof fileLevel === "string" ? fileLevel : undefined,
+            ),
+        );
     }
     // How loud that log is. Only passed when it differs from the server's own default, so the
     // common case still starts with the command line it always had. Worth having as a setting

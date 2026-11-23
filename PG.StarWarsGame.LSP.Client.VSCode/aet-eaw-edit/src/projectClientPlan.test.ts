@@ -209,6 +209,39 @@ describe("serverLogArgs", () => {
 
         assert.deepEqual(serverLogArgs(spec, LOGS), [`--log-dir=${LOGS}`]);
     });
+
+    it("asks for the file at the level the unlisted setting names", () => {
+        const folders = ["c:/mods/MyMod"];
+        const [spec] = clientSpecs(
+            discover(folders, {
+                "c:/mods/MyMod/mymod.pgproj": pgproj("My Mod"),
+            }),
+            folders,
+        );
+
+        assert.deepEqual(serverLogArgs(spec, LOGS, "Debug"), [
+            `--log-dir=${LOGS}`,
+            "--log-stem=My Mod",
+            "--log-file-level=Debug",
+        ]);
+    });
+
+    it("leaves the server's default alone when the setting is unset or blank", () => {
+        const folders = ["c:/mods/Loose"];
+        const [spec] = clientSpecs(
+            discover(folders, {}),
+            folders,
+            (d) => d,
+            () => true,
+        );
+
+        assert.deepEqual(serverLogArgs(spec, LOGS, undefined), [
+            `--log-dir=${LOGS}`,
+        ]);
+        assert.deepEqual(serverLogArgs(spec, LOGS, "  "), [
+            `--log-dir=${LOGS}`,
+        ]);
+    });
 });
 
 describe("planChanges", () => {

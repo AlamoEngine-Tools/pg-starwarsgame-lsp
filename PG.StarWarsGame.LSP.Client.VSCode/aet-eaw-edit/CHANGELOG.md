@@ -51,11 +51,12 @@
   already in the air finish their lives; play after a stop starts from the top. The Skeleton control
   is disabled, with its reason, for a subject without bones
   ([#289](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/289))
-- **Server logs in the user's own store** - the log file a Debug build of the server writes no longer lands
-  in the project. Every server of a workspace writes into that workspace's folder under
-  `~/.aetswg/logs/`, one file per project and day, and `Copy Bug Report Info` names the folder. A log file
-  older than 14 days is removed, and so is the folder of a workspace nothing wrote to for 30 days. The
-  `aetswg-*.log` files left in a project by an earlier version can be deleted
+- **Server logs in the user's own store** - the server's log file no longer lands in the project. Every
+  server of a workspace writes into that workspace's folder under `~/.aetswg/logs/`, one file per project
+  and day, and `Copy Bug Report Info` names the folder. A log file older than 14 days is removed, and so is
+  the folder of a workspace nothing wrote to for 30 days. The `EaWEdit` output channel and the server's
+  start lines write the home directory as `~`. The `aetswg-*.log` files left in a project by an earlier
+  version can be deleted
   ([#461](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/461))
 
 ### Fixes
