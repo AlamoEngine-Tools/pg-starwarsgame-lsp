@@ -444,8 +444,14 @@
   <data name="DynamicEnumValue_IsNotAValidEnum2" xml:space="preserve">
     <value>'{0}' is not a valid enum identifier for &lt;{1}&gt;.</value>
   </data>
+  <data name="EditBatch_ALowerLayer" xml:space="preserve">
+    <value>a dependency</value>
+  </data>
   <data name="EditBatch_CommandsUnreadable" xml:space="preserve">
     <value>The staged changes could not be read: {0}</value>
+  </data>
+  <data name="EditBatch_ReadOnlyLayer" xml:space="preserve">
+    <value>'{0}' belongs to {1}, which is read-only. Copy the file into the project to override it, then edit the copy.</value>
   </data>
   <data name="EditBatch_UnknownEditor" xml:space="preserve">
     <value>No editor '{0}' writes through this server.</value>

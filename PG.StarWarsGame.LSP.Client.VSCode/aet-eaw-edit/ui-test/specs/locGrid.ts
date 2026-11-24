@@ -58,7 +58,6 @@ export async function openTextFile(...labels: string[]): Promise<void> {
     }
 }
 
-/** The grid's column headers - a sortable text grid's and an ordered credits grid's alike. */
 /** The Localisation Editor view's rows as drawn: label and tree level. */
 export async function treeRows(): Promise<{ label: string; level: number }[]> {
     return browser.execute(() => {
@@ -160,25 +159,29 @@ export async function pressTile(label: string): Promise<void> {
 /**
  * Types a value into a row's language cell, by the row's key, and commits it as Enter does. A credits
  * row's key is its format, which the grid draws as a choice rather than a field; the first row of that
- * format is the one edited.
+ * format is the one edited. The language is the column's place after the key: 1 for the first.
  */
-export async function editCell(key: string, value: string): Promise<void> {
+export async function editCell(key: string, value: string, column = 1): Promise<void> {
     await browser.waitUntil(
         async () =>
-            browser.execute((wanted: string) => {
-                for (const row of Array.from(document.querySelectorAll(".rows .data-row"))) {
-                    const cells = Array.from(row.querySelectorAll(".cell"));
-                    const keyField = cells[0]?.querySelector<HTMLInputElement | HTMLSelectElement>("input, select");
-                    const keyText = (keyField?.value ?? cells[0]?.textContent ?? "").trim();
-                    if (keyText !== wanted) continue;
-                    const input = cells[1]?.querySelector("input");
-                    if (!input) return false;
-                    document.querySelectorAll("[data-aet-target]").forEach((e) => e.removeAttribute("data-aet-target"));
-                    input.setAttribute("data-aet-target", "");
-                    return true;
-                }
-                return false;
-            }, key),
+            browser.execute(
+                (wanted: string, at: number) => {
+                    for (const row of Array.from(document.querySelectorAll(".rows .data-row"))) {
+                        const cells = Array.from(row.querySelectorAll(".cell"));
+                        const keyField = cells[0]?.querySelector<HTMLInputElement | HTMLSelectElement>("input, select");
+                        const keyText = (keyField?.value ?? cells[0]?.textContent ?? "").trim();
+                        if (keyText !== wanted) continue;
+                        const input = cells[at]?.querySelector("input");
+                        if (!input) return false;
+                        document.querySelectorAll("[data-aet-target]").forEach((e) => e.removeAttribute("data-aet-target"));
+                        input.setAttribute("data-aet-target", "");
+                        return true;
+                    }
+                    return false;
+                },
+                key,
+                column,
+            ),
         { timeout: 60_000, timeoutMsg: `No row '${key}' with a language cell` },
     );
     // Selected and typed over, as a reader does: setValue appends to what a controlled input holds.

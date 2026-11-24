@@ -1,8 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions.TestingHelpers;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Editing;
 using PG.StarWarsGame.LSP.Server.Story;
 using static PG.StarWarsGame.LSP.Server.Tests.Story.StoryCommandTestFixtures;
@@ -16,6 +19,12 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Editing;
 public sealed class EditBatchHandlerTest
 {
     private static readonly EditBatchSubject AnySubject = new("GC", "Rebel");
+
+    // No project loaded: the layer rule has nothing to hold an edit against (EditBatchLayerGuardTest has the rule).
+    private static readonly EditBatchLayerGuard NoLayers = new(
+        new ProjectLayerMap(new FileHelper(new MockFileSystem())),
+        new FileHelper(new MockFileSystem()),
+        TestCatalogues.English);
 
     private static EditBatchComposers Composers(params IEditBatchComposer[] composers)
     {
@@ -45,7 +54,7 @@ public sealed class EditBatchHandlerTest
         var credits = new RecordingComposer("credits");
         var commands = new JArray(new JObject { ["kind"] = "setDialog" });
 
-        var result = await new ApplyEditBatchHandler(Composers(story, credits), TestCatalogues.English)
+        var result = await new ApplyEditBatchHandler(Composers(story, credits), NoLayers, TestCatalogues.English)
             .Handle(new ApplyEditBatchParams("story", AnySubject, commands), CancellationToken.None);
 
         Assert.True(result.Success);
@@ -72,7 +81,7 @@ public sealed class EditBatchHandlerTest
     {
         var story = new RecordingComposer("story");
 
-        var result = await new ApplyEditBatchHandler(Composers(story), TestCatalogues.English)
+        var result = await new ApplyEditBatchHandler(Composers(story), NoLayers, TestCatalogues.English)
             .Handle(new ApplyEditBatchParams("models", AnySubject, []), CancellationToken.None);
 
         Assert.False(result.Success);
@@ -93,7 +102,7 @@ public sealed class EditBatchHandlerTest
             ["kind"] = "setDialog", ["threadUri"] = ThreadUri, ["eventName"] = "Next", ["value"] = "DIALOG_X"
         });
 
-        var result = await new ApplyEditBatchHandler(Composers(Composer()), TestCatalogues.English)
+        var result = await new ApplyEditBatchHandler(Composers(Composer()), NoLayers, TestCatalogues.English)
             .Handle(
                 new ApplyEditBatchParams(StoryEditBatchComposer.EditorName, Subject, commands),
                 CancellationToken.None);
@@ -106,7 +115,7 @@ public sealed class EditBatchHandlerTest
     [Fact]
     public async Task Apply_WithCommandsThatAreNotCommands_IsRefusedWithTheReason()
     {
-        var result = await new ApplyEditBatchHandler(Composers(Composer()), TestCatalogues.English)
+        var result = await new ApplyEditBatchHandler(Composers(Composer()), NoLayers, TestCatalogues.English)
             .Handle(
                 new ApplyEditBatchParams(StoryEditBatchComposer.EditorName, Subject, JArray.Parse("[[1, 2]]")),
                 CancellationToken.None);

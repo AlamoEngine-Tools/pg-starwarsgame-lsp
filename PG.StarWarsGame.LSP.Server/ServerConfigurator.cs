@@ -287,6 +287,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IEditBatchComposer, TranslationEditBatchComposer>();
                 services.AddSingleton<IEditBatchComposer, CreditsEditBatchComposer>();
                 services.AddSingleton<EditBatchComposers>();
+                services.AddSingleton<EditBatchLayerGuard>();
                 services.AddSingleton<ICacheStatisticsSource>(sp =>
                     (ICacheStatisticsSource)sp.GetRequiredService<IStoryModelService>());
                 services.AddSingleton<IStoryGraphDiagnosticsSource, StoryGraphDiagnosticsService>();

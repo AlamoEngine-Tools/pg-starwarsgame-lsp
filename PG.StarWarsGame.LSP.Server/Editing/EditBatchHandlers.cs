@@ -32,15 +32,25 @@ public sealed class ValidateEditBatchHandler(EditBatchComposers composers, IMess
     }
 }
 
-/// <summary><c>aet/applyEditBatch</c>: hands the batch to its editor's composer to be composed.</summary>
-public sealed class ApplyEditBatchHandler(EditBatchComposers composers, IMessageCatalog messages)
+/// <summary>
+///     <c>aet/applyEditBatch</c>: hands the batch to its editor's composer to be composed, and holds
+///     what comes back to the one rule every editor shares - nothing is written below the project.
+/// </summary>
+public sealed class ApplyEditBatchHandler(
+    EditBatchComposers composers,
+    EditBatchLayerGuard layers,
+    IMessageCatalog messages)
     : IJsonRpcRequestHandler<ApplyEditBatchParams, ApplyEditBatchResult>
 {
-    public Task<ApplyEditBatchResult> Handle(ApplyEditBatchParams request, CancellationToken ct)
+    public async Task<ApplyEditBatchResult> Handle(ApplyEditBatchParams request, CancellationToken ct)
     {
-        return composers.For(request.Editor) is { } composer
-            ? composer.ComposeAsync(request.Subject, request.Commands, ct)
-            : Task.FromResult(new ApplyEditBatchResult(false,
-                Error: messages.Format("EditBatch_UnknownEditor", request.Editor)));
+        if (composers.For(request.Editor) is not { } composer)
+            return new ApplyEditBatchResult(false,
+                Error: messages.Format("EditBatch_UnknownEditor", request.Editor));
+
+        var result = await composer.ComposeAsync(request.Subject, request.Commands, ct);
+        return result.Success && layers.Objection(result.Edit) is { } objection
+            ? new ApplyEditBatchResult(false, Error: objection)
+            : result;
     }
 }

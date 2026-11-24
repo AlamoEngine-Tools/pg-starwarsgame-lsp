@@ -339,7 +339,8 @@
   file itself, so a save could not be undone and overwrote whatever the file's own editor held. A save
   is now one edit applied through VS Code and saved at once: one undo in the file takes it back, the
   file keeps its encoding and byte order mark, and a set of single-language files is written whole or
-  not at all. A save is refused, with the file named, when the file's editor holds unsaved changes
+  not at all - one undo in any of its files takes the save back in all of them. A save is refused, with
+  the file named, when the file's editor holds unsaved changes or the file belongs to a dependency
   ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
 - **A compiled DAT is no longer edited in the grid** - breaking for a `"type": "DAT"` localisation
   project, whose `.dat` files were rewritten on every save. A DAT is a build output: the way to edit
