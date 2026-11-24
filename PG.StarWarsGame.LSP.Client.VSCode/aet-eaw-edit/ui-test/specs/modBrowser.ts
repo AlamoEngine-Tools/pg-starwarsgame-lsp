@@ -263,6 +263,13 @@ export async function actions(): Promise<Action[]> {
 export async function rowActions(name: string): Promise<{ title: string; disabled: boolean }[]> {
     const row = await browser.$(rowOf(name));
     await row.waitForExist({ timeout: 30_000 });
+    // A table draws the actions of its hovered, focused and selected rows only, and draws them a
+    // moment after the row becomes one: read at once, the row has none yet.
+    await row.moveTo();
+    await browser.waitUntil(async () => (await row.$$(".row-actions button").length) > 0, {
+        timeout: 10_000,
+        timeoutMsg: `The row '${name}' drew no actions`,
+    });
     return browser.execute(
         (tr: HTMLElement) =>
             Array.from(tr.querySelectorAll(".row-actions button")).map((b) => ({
