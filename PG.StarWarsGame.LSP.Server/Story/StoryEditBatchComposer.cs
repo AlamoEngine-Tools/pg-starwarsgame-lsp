@@ -4,21 +4,17 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
-using OmniSharp.Extensions.LanguageServer.Protocol;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Core.Xml;
 using PG.StarWarsGame.LSP.Server.Editing;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Xml;
-using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
@@ -153,46 +149,8 @@ public sealed class StoryEditBatchComposer(
             return Task.FromResult(new ApplyEditBatchResult(true));
 
         logger.LogDebug("Story batch of {Count} -> an edit touching {Files} file(s)", staged.Count, changed.Count);
-        return Task.FromResult(new ApplyEditBatchResult(true, Edit: BuildBatchEdit(changed)));
-    }
-
-    /// <summary>
-    ///     One workspace edit for the whole batch: a create for each new file, then a
-    ///     whole-document replacement per changed file (the composed final text). Composing many
-    ///     commands' minimal edits would need offset rebasing after every step; replacing each
-    ///     touched document with its final text is simpler and, for a deliberate Save, just as good.
-    /// </summary>
-    private static WorkspaceEdit BuildBatchEdit(
-        IReadOnlyList<(string Uri, string? Original, string Current)> changed)
-    {
-        var changes = new List<WorkspaceEditDocumentChange>();
-
-        // Creations first, so a freshly created thread/manifest exists before its content lands.
-        foreach (var (uri, original, _) in changed)
-            if (original is null)
-                changes.Add(new WorkspaceEditDocumentChange(new CreateFile
-                {
-                    Uri = DocumentUri.From(uri),
-                    Options = new CreateFileOptions { IgnoreIfExists = true }
-                }));
-
-        foreach (var (uri, original, current) in changed)
-            changes.Add(new WorkspaceEditDocumentChange(new TextDocumentEdit
-            {
-                TextDocument = new OptionalVersionedTextDocumentIdentifier { Uri = DocumentUri.From(uri) },
-                Edits = new TextEditContainer(new TextEdit
-                {
-                    Range = original is null ? new Range(0, 0, 0, 0) : WholeDocumentRange(original),
-                    NewText = current
-                })
-            }));
-
-        return new WorkspaceEdit { DocumentChanges = new Container<WorkspaceEditDocumentChange>(changes) };
-    }
-
-    private static Range WholeDocumentRange(string text)
-    {
-        var (line, col) = new LineOffsetIndex(text).GetPosition(text.Length);
-        return new Range(0, 0, line, col);
+        return Task.FromResult(new ApplyEditBatchResult(true, Edit: EditBatchEdits.Build(changed
+            .Select(c => new EditBatchFileChange(c.Uri, c.Original, c.Current, texts.VersionOf(c.Uri)))
+            .ToList())));
     }
 }

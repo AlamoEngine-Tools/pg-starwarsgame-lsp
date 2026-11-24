@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.IO.Abstractions;
 using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Localisation;
@@ -12,15 +11,16 @@ namespace PG.StarWarsGame.LSP.Localisation;
 // attempting any kind of merge.
 public static class LocalisationConcurrencyGuard
 {
-    public static async Task<LocalisationWriteResult?> CheckAsync(
-        IFileSystem fs, string filePath, string? expectedContentHash, CancellationToken ct,
-        IMessageCatalog messages)
+    /// <param name="currentContent">The file's text as it stands, which the batch is composed from.</param>
+    /// <param name="expectedContentHash">The hash of the text the caller last read.</param>
+    /// <returns>Null when they agree; otherwise the refusal.</returns>
+    public static LocalisationWriteResult? Check(
+        string currentContent, string? expectedContentHash, IMessageCatalog messages)
     {
         if (string.IsNullOrWhiteSpace(expectedContentHash))
             return LocalisationWriteResult.Fail(
                 messages.Format("LocConcurrency_NoContentHashProvidedFetch"));
 
-        var currentContent = await fs.File.ReadAllTextAsync(filePath, ct);
         var currentHash = LocalisationContentHash.Compute(currentContent);
         if (!string.Equals(currentHash, expectedContentHash, StringComparison.Ordinal))
             return LocalisationWriteResult.Fail(

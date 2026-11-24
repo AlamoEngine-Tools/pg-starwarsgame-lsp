@@ -789,6 +789,9 @@
   <data name="LocApplyBatch_CouldNotWriteFile" xml:space="preserve">
     <value>Could not write the file: {0}</value>
   </data>
+  <data name="LocApplyBatch_DatIsBuilt" xml:space="preserve">
+    <value>'{0}' is a compiled DAT, which a build writes from the project. Convert the project to CSV or XML to edit its texts.</value>
+  </data>
   <data name="LocApplyBatch_FileNotFound" xml:space="preserve">
     <value>File not found: {0}</value>
   </data>

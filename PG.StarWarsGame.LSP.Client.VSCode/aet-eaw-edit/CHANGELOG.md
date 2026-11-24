@@ -335,6 +335,17 @@
   keeps its blank lines, the comments after its last entry and its missing final line ending, and a
   line of a properties file that is no entry no longer gives every entry below it the key of the next
   ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
+- **A save in the localisation grid and the credits editor goes through VS Code** - the server wrote the
+  file itself, so a save could not be undone and overwrote whatever the file's own editor held. A save
+  is now one edit applied through VS Code and saved at once: one undo in the file takes it back, the
+  file keeps its encoding and byte order mark, and a set of single-language files is written whole or
+  not at all. A save is refused, with the file named, when the file's editor holds unsaved changes
+  ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
+- **A compiled DAT is no longer edited in the grid** - breaking for a `"type": "DAT"` localisation
+  project, whose `.dat` files were rewritten on every save. A DAT is a build output: a save for one is
+  refused with the way forward, which is to convert the project to CSV or XML with **Set Localisation
+  Project Format** and build the DAT with **Export to DAT**. A `.dat` still opens, shows its rows and
+  is validated ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
 
 ## 0.5.2
 

@@ -8,8 +8,6 @@ using System.Xml.Linq;
 using CsvHelper;
 using CsvHelper.Configuration;
 using PG.Commons.Hashing;
-using PG.StarWarsGame.Files.DAT.Data;
-using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Text;
@@ -20,7 +18,6 @@ namespace PG.StarWarsGame.LSP.Localisation.Rows;
 /// <inheritdoc />
 public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 {
-    private readonly IDatService _datFileService;
     private readonly IFileHelper _fileHelper;
     private readonly ICrc32HashingService _hashing;
     private readonly IMessageCatalog _messages;
@@ -28,35 +25,14 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
     public LocalisationDocumentEditor(
         ILocalisationRowReader reader,
-        IDatService datFileService,
         ICrc32HashingService hashing,
         IFileHelper fileHelper,
         IMessageCatalog messages)
     {
         _messages = messages;
         _reader = reader;
-        _datFileService = datFileService;
         _hashing = hashing;
         _fileHelper = fileHelper;
-    }
-
-    public async Task<LocalisationEditResult> ApplyToFileAsync(
-        string filePath, IReadOnlyList<LocEditCommandDto> commands, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var extension = fs.Path.GetExtension(filePath).ToLowerInvariant();
-
-        if (extension != ".dat")
-        {
-            var original = await fs.File.ReadAllTextAsync(filePath, ct);
-            var composed = Apply(original, extension, commands, filePath);
-            if (!composed.Success) return composed;
-
-            await fs.File.WriteAllTextAsync(filePath, composed.NewText!, ct);
-            return composed;
-        }
-
-        return ApplyDat(filePath, commands);
     }
 
     /// <inheritdoc />
@@ -134,27 +110,8 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         return (rows, languages, null);
     }
 
-    /// <inheritdoc />
-    public async Task<LocalisationEditResult> ApplyKeyedToFileAsync(
-        string filePath, IReadOnlyList<LocKeyedCommandDto> commands, CancellationToken ct)
-    {
-        var translated = TranslateKeyed(filePath, commands);
-        if (!translated.Success)
-            return LocalisationEditResult.Fail(translated.FailedIndex ?? 0, translated.Error!);
-
-        return await ApplyToFileAsync(filePath, translated.Commands!, ct);
-    }
-
     /// <summary>
     ///     Resolves key-addressed commands against the file as it currently stands.
-    ///     <para>
-    ///         This reads the document, and <see cref="ApplyToFileAsync" /> then reads it again. The
-    ///         second read is accepted rather than threaded through: the XML path composes through
-    ///         <c>XDocument</c> and never builds a <see cref="LocDocument" /> at all, so there is no
-    ///         single document to share across all three formats, and plumbing one in would mean
-    ///         reworking the round-trip code that must not be disturbed. A save is user-initiated
-    ///         and rare; if it ever shows up in a profile, measure before restructuring.
-    ///     </para>
     /// </summary>
     public KeyedTranslationResult TranslateKeyed(
         string filePath, IReadOnlyList<LocKeyedCommandDto> commands)
@@ -223,75 +180,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
     }
 
     /// <summary>
-    ///     Applies a batch to a compiled DAT by rebuilding it from its rows.
-    ///     <para>
-    ///         There is no verbatim source to preserve here and nothing a rewrite could disturb -
-    ///         the format has no comments, quoting or whitespace - so the whole file is written
-    ///         back. The file's own sort order is preserved: rewriting an unsorted credits DAT as a
-    ///         CRC-sorted one would scramble the crawl into checksum order.
-    ///     </para>
-    /// </summary>
-    private LocalisationEditResult ApplyDat(
-        string filePath, IReadOnlyList<LocEditCommandDto> commands)
-    {
-        var fs = _fileHelper.FileSystem;
-        var sortOrder = _datFileService.LoadFile(filePath).Content.Layout;
-        var document = _reader.ReadFile(filePath);
-
-        var rows = document.Rows.ToList();
-        for (var i = 0; i < commands.Count; i++)
-            if (ApplyToRows(rows, commands[i], document.Languages) is { } error)
-                return LocalisationEditResult.Fail(i, error);
-
-        var language = document.Languages.FirstOrDefault() ?? string.Empty;
-
-        // Checked before anything is opened. A .dat stores keys as ASCII bytes and DatStringEntry
-        // refuses anything else - but it did so from inside the write, as "Value contains non-ASCII
-        // characters (Parameter 'value')", which names the wrong field and no row at all.
-        for (var i = 0; i < rows.Count; i++)
-            if (!rows[i].Key.All(char.IsAscii))
-                return LocalisationEditResult.Fail(
-                    i,
-                    _messages.Format("LocEditor_NonAsciiKey", i + 1, rows[i].Key));
-
-        // Materialised HERE, not left lazy. Building an entry is what validates its key, and the
-        // sequence used to be enumerated inside CreateDatFile - by which point File.Create had
-        // already truncated the file. One unwritable key destroyed the file it refused to write.
-        var entries = rows.Select(r => new DatStringEntry(
-            r.Key,
-            _hashing.GetCrc32(r.Key, Encoding.ASCII),
-            r.Values.FirstOrDefault(v => v.Language == language)?.Value ?? string.Empty)).ToList();
-
-        var fileType = sortOrder == DatLayoutKind.OrderedByCrc32
-            ? DatLayoutKind.OrderedByCrc32
-            : DatLayoutKind.NotOrdered;
-
-        // Written beside the target and moved over it, so the original survives every way this can
-        // fail - a rejected entry, a full disk, a crash halfway through. Truncating the real file
-        // first and hoping the write succeeds is what turned a refused save into an empty file.
-        var temporary = filePath + ".aettmp";
-        try
-        {
-            using (var stream = fs.File.Create(temporary))
-            {
-                _datFileService.CreateDatBinary(stream, entries, fileType);
-            }
-
-            fs.File.Move(temporary, filePath, true);
-        }
-        catch
-        {
-            // The original is still untouched; clear the partial away so it is not mistaken for a
-            // localisation file by the next scan.
-            if (fs.File.Exists(temporary)) fs.File.Delete(temporary);
-            throw;
-        }
-
-        return LocalisationEditResult.Ok(string.Empty);
-    }
-
-    /// <summary>
-    ///     The row-list half of the commands, shared by the DAT path. Text formats go through
+    ///     The row-list half of the commands, which a dry run of a DAT goes by. Text formats go through
     ///     <see cref="EditState" /> instead, which additionally tracks each row's original text.
     /// </summary>
     private string? ApplyToRows(

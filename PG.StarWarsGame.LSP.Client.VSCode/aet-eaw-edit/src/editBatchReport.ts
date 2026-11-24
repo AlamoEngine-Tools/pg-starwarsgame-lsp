@@ -32,7 +32,7 @@ export function reportUnreached(
 
 /**
  * Says what a save came to, unless it is on disk or the server refused it: a server that was not
- * reached, an edit the editor did not take, or files that hold the change but were not written.
+ * reached, an edit the window did not take, or files that hold the change but were not written.
  *
  * @param context What was being done, so the reader is told which action failed.
  */
@@ -49,6 +49,7 @@ export function reportSave(saved: EditBatchSave, context: string): void {
         return;
     }
 
+    const held = heldBack(saved);
     if (saved.reason === "offline" || saved.reason === "failed") {
         reportUnreached(
             { reason: saved.reason, message: saved.message ?? "" },
@@ -62,5 +63,39 @@ export function reportSave(saved: EditBatchSave, context: string): void {
                 vscode.l10n.t("The changes could not be applied."),
             ),
         );
+    } else if (held !== undefined) {
+        void vscode.window.showErrorMessage(
+            vscode.l10n.t("EaWEdit: {0}: {1}", context, held),
+        );
     }
+}
+
+/**
+ * Why the window held an edit back, with what to do about it, or undefined for any other outcome.
+ *
+ * An edit replaces a file's whole text with what the server composed. It is not applied over a
+ * document that changed while it was composed, nor - when it was composed from the saved file -
+ * over a document with unsaved changes: either would silently undo what the window holds.
+ */
+export function heldBack(saved: EditBatchSave): string | undefined {
+    if (saved.saved) {
+        return undefined;
+    }
+
+    const names = (saved.files ?? [])
+        .map((file) => path.basename(file))
+        .join(", ");
+    if (saved.reason === "changedSince") {
+        return vscode.l10n.t(
+            "A change to {0} arrived while the save was composed. Save again.",
+            names,
+        );
+    }
+    if (saved.reason === "unsavedChanges") {
+        return vscode.l10n.t(
+            "Unsaved changes in {0} would be overwritten. Save or revert them, then save again.",
+            names,
+        );
+    }
+    return undefined;
 }

@@ -8,9 +8,10 @@ namespace PG.StarWarsGame.LSP.Core.Workspace;
 
 /// <summary>
 ///     A document's current text with its <see cref="ContentHasher" /> hash.
-///     <see cref="FromOpenBuffer" /> distinguishes the live editor buffer from the saved file.
+///     <see cref="FromOpenBuffer" /> distinguishes the live editor buffer from the saved file, and
+///     <see cref="Version" /> is that buffer's version - null for the saved file.
 /// </summary>
-public sealed record DocumentText(string Text, long ContentHash, bool FromOpenBuffer);
+public sealed record DocumentText(string Text, long ContentHash, bool FromOpenBuffer, int? Version = null);
 
 /// <summary>
 ///     The single "where does a document's current text come from" answer: the open editor buffer
@@ -45,7 +46,7 @@ public sealed class DocumentTextSource : IDocumentTextSource
     public DocumentText? GetText(string canonicalUri)
     {
         if (_host.TryGet(canonicalUri, out var doc))
-            return new DocumentText(doc.Text, ContentHasher.Hash(doc.Text), true);
+            return new DocumentText(doc.Text, ContentHasher.Hash(doc.Text), true, doc.Version);
 
         var path = _fileHelper.FileUriToPath(canonicalUri);
         if (path is null || !_fileHelper.FileSystem.File.Exists(path))

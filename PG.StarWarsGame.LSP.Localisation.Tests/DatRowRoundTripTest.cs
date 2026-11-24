@@ -4,7 +4,6 @@
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.LSP.Localisation.Rows;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -14,7 +13,8 @@ using PG.StarWarsGame.LSP.Core.Util;
 namespace PG.StarWarsGame.LSP.Localisation.Tests;
 
 /// <summary>
-///     Compiled DAT files, read and written through the editor's row model.
+///     Compiled DAT files, read through the editor's row model. They are not written from it: a DAT
+///     is what a build makes of the project.
 ///     <para>
 ///         Exercised against the real <c>creditstext_english.dat</c> the workspace ships rather than
 ///         a fixture: the format is binary and produced by the game's own tools, so a hand-built
@@ -35,7 +35,7 @@ public sealed class DatRowRoundTripTest
         return path;
     }
 
-    private static (ILocalisationRowReader Reader, ILocalisationDocumentEditor Editor) Build()
+    private static ILocalisationRowReader Reader()
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
@@ -44,28 +44,14 @@ public sealed class DatRowRoundTripTest
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
         services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
-        services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
         services.AddSingleton<IMessageCatalog>(ResxMessageCatalog.Server("en"));
-        var sp = services.BuildServiceProvider();
-
-        return (sp.GetRequiredService<ILocalisationRowReader>(),
-            sp.GetRequiredService<ILocalisationDocumentEditor>());
-    }
-
-    /// <summary>Copies the shipped file into a temp directory so the workspace is never written to.</summary>
-    private static string CopyToTemp()
-    {
-        var temp = Path.Combine(Path.GetTempPath(), $"aet_dat_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(temp);
-        var target = Path.Combine(temp, "creditstext_english.dat");
-        File.Copy(RealCreditsDat(), target);
-        return target;
+        return services.BuildServiceProvider().GetRequiredService<ILocalisationRowReader>();
     }
 
     [Fact]
     public void ReadFile_RealCreditsDat_YieldsRowsInOrder()
     {
-        var (reader, _) = Build();
+        var reader = Reader();
 
         var document = reader.ReadFile(RealCreditsDat());
 
@@ -80,98 +66,11 @@ public sealed class DatRowRoundTripTest
     [Fact]
     public void ReadFile_RealCreditsDat_KeepsDuplicateKeys()
     {
-        var (reader, _) = Build();
+        var reader = Reader();
 
         var rows = reader.ReadFile(RealCreditsDat()).Rows;
 
         Assert.True(rows.Select(r => r.Key).Distinct().Count() < rows.Count,
             "expected the shipped credits file to repeat keys");
-    }
-
-    [Fact]
-    public async Task ApplyToFile_EditingOneRow_ChangesOnlyThatRowAndKeepsOrder()
-    {
-        var (reader, editor) = Build();
-        var path = CopyToTemp();
-        var before = reader.ReadFile(path).Rows;
-        var target = before.Count / 2;
-
-        var result = await editor.ApplyToFileAsync(
-            path,
-            [new LocEditCommandDto("setCell", target, Language: "ENGLISH", Value: "Edited By Test")],
-            CancellationToken.None);
-
-        Assert.True(result.Success, result.Error);
-
-        var after = reader.ReadFile(path).Rows;
-        Assert.Equal(before.Count, after.Count);
-        Assert.Equal("Edited By Test", after[target].Values[0].Value);
-        Assert.Equal(before.Select(r => r.Key), after.Select(r => r.Key));
-
-        for (var i = 0; i < before.Count; i++)
-            if (i != target)
-                Assert.Equal(before[i].Values[0].Value, after[i].Values[0].Value);
-    }
-
-    // Rewriting an unsorted credits file as a CRC-sorted one would scramble the crawl into
-    // checksum order, which is why the file's own sort order is read back and reused.
-    [Fact]
-    public async Task ApplyToFile_PreservesTheFilesSortOrder()
-    {
-        var (_, editor) = Build();
-        var path = CopyToTemp();
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IFileSystem>(new FileSystem());
-        services.SupportPetroglyphHashing();
-        services.SupportLocalisationBaseline();
-        var datService = services.BuildServiceProvider().GetRequiredService<IDatService>();
-
-        var before = datService.LoadFile(path).Content.Layout;
-
-        await editor.ApplyToFileAsync(
-            path, [new LocEditCommandDto("setCell", 0, Language: "ENGLISH", Value: "X")],
-            CancellationToken.None);
-
-        Assert.Equal(before, datService.LoadFile(path).Content.Layout);
-    }
-
-    [Fact]
-    public async Task ApplyToFile_InsertAndDelete_ChangeTheRowCount()
-    {
-        var (reader, editor) = Build();
-        var path = CopyToTemp();
-        var before = reader.ReadFile(path).Rows.Count;
-
-        await editor.ApplyToFileAsync(
-            path,
-            [
-                new LocEditCommandDto("insertRow", 0, Key: "TEST_INSERTED",
-                    Values: [new LocValueDto("ENGLISH", "Inserted")])
-            ],
-            CancellationToken.None);
-
-        var afterInsert = reader.ReadFile(path).Rows;
-        Assert.Equal(before + 1, afterInsert.Count);
-        Assert.Equal("Inserted", afterInsert[0].Values[0].Value);
-
-        await editor.ApplyToFileAsync(
-            path, [new LocEditCommandDto("deleteRow", 0)], CancellationToken.None);
-
-        Assert.Equal(before, reader.ReadFile(path).Rows.Count);
-    }
-
-    // A DAT carries the one language its filename names; a second column cannot be represented.
-    [Fact]
-    public async Task ApplyToFile_AddLanguage_IsRefused()
-    {
-        var (_, editor) = Build();
-        var path = CopyToTemp();
-
-        var result = await editor.ApplyToFileAsync(
-            path, [new LocEditCommandDto("addLanguage", Language: "GERMAN")], CancellationToken.None);
-
-        Assert.False(result.Success);
-        Assert.Contains("single language", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 }

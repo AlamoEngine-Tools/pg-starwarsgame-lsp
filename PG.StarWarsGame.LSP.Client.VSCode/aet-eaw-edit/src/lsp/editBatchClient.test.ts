@@ -9,6 +9,8 @@ import {
     EditBatchClient,
     EditBatchRequests,
     EditWorkspace,
+    OpenDocumentState,
+    unwritable,
 } from "./editBatchClient";
 import type { LspOutcome } from "./lspGateway";
 
@@ -97,7 +99,23 @@ describe("EditBatchClient.save", () => {
             },
         ]);
         assert.deepEqual(editor.edits, [edit]);
-        assert.deepEqual(saved, { saved: true, unsaved: [] });
+        assert.deepEqual(saved, { saved: true, unsaved: [], documents: [] });
+    });
+
+    it("hands back each file's hash once the batch is written", async () => {
+        const documents = [
+            { filePath: "C:\\mod\\texts.csv", contentHash: "abc" },
+        ];
+
+        const saved = await new EditBatchClient(
+            requests({
+                ok: true,
+                value: { success: true, edit: {}, documents },
+            }),
+            workspace(),
+        ).save("translation", { documents }, commands);
+
+        assert.deepEqual(saved, { saved: true, unsaved: [], documents });
     });
 
     it("names the files that hold the change but could not be written", async () => {
@@ -109,6 +127,7 @@ describe("EditBatchClient.save", () => {
         assert.deepEqual(saved, {
             saved: true,
             unsaved: ["C:\\mod\\story.xml"],
+            documents: [],
         });
     });
 
@@ -120,7 +139,7 @@ describe("EditBatchClient.save", () => {
             editor,
         ).save("story", subject, commands);
 
-        assert.deepEqual(saved, { saved: true, unsaved: [] });
+        assert.deepEqual(saved, { saved: true, unsaved: [], documents: [] });
         assert.deepEqual(editor.edits, []);
     });
 
@@ -151,11 +170,30 @@ describe("EditBatchClient.save", () => {
     it("says so when the editor does not take the edit", async () => {
         const saved = await new EditBatchClient(
             requests({ ok: true, value: { success: true, edit: {} } }),
-            workspace({ applied: false, unsaved: [] }),
+            workspace({ applied: false, reason: "refused", files: [] }),
         ).save("story", subject, commands);
 
         assert.deepEqual(saved, { saved: false, reason: "notApplied" });
     });
+
+    for (const reason of ["changedSince", "unsavedChanges"] as const) {
+        it(`names the files when the window holds back for ${reason}`, async () => {
+            const saved = await new EditBatchClient(
+                requests({ ok: true, value: { success: true, edit: {} } }),
+                workspace({
+                    applied: false,
+                    reason,
+                    files: ["C:\\mod\\texts.csv"],
+                }),
+            ).save("translation", subject, commands);
+
+            assert.deepEqual(saved, {
+                saved: false,
+                reason,
+                files: ["C:\\mod\\texts.csv"],
+            });
+        });
+    }
 
     for (const reason of ["offline", "failed"] as const) {
         it(`applies nothing when the request comes back ${reason}`, async () => {
@@ -170,4 +208,106 @@ describe("EditBatchClient.save", () => {
             assert.deepEqual(editor.edits, []);
         });
     }
+});
+
+describe("unwritable", () => {
+    /** An edit replacing one file, composed from that version, or from the saved file when none. */
+    function replacing(uri: string, version?: number | null): unknown {
+        return { textDocument: { uri, version }, edits: [{ newText: "x" }] };
+    }
+
+    function window(
+        open: Record<string, OpenDocumentState>,
+    ): (uri: string) => OpenDocumentState | undefined {
+        return (uri) => open[uri];
+    }
+
+    it("lets an edit composed from the saved file onto a file that is not open", () => {
+        assert.equal(
+            unwritable({ documentChanges: [replacing("a", null)] }, window({})),
+            undefined,
+        );
+    });
+
+    it("lets an edit composed from the saved file onto a document with nothing unsaved", () => {
+        assert.equal(
+            unwritable(
+                { documentChanges: [replacing("a")] },
+                window({ a: { version: 3, dirty: false } }),
+            ),
+            undefined,
+        );
+    });
+
+    it("holds back an edit composed from the saved file while the document has unsaved changes", () => {
+        assert.deepEqual(
+            unwritable(
+                {
+                    documentChanges: [
+                        replacing("a", null),
+                        replacing("b", null),
+                    ],
+                },
+                window({
+                    a: { version: 3, dirty: true },
+                    b: { version: 1, dirty: false },
+                }),
+            ),
+            { reason: "unsavedChanges", uris: ["a"] },
+        );
+    });
+
+    it("lets an edit composed from an open document onto that document at that version, unsaved or not", () => {
+        assert.equal(
+            unwritable(
+                { documentChanges: [replacing("a", 7)] },
+                window({ a: { version: 7, dirty: true } }),
+            ),
+            undefined,
+        );
+    });
+
+    it("holds back an edit composed from a version the document has left", () => {
+        assert.deepEqual(
+            unwritable(
+                { documentChanges: [replacing("a", 7)] },
+                window({ a: { version: 8, dirty: true } }),
+            ),
+            { reason: "changedSince", uris: ["a"] },
+        );
+    });
+
+    it("holds back an edit composed from a document the window no longer holds", () => {
+        assert.deepEqual(
+            unwritable({ documentChanges: [replacing("a", 7)] }, window({})),
+            { reason: "changedSince", uris: ["a"] },
+        );
+    });
+
+    it("says a document moved on before it says one has unsaved changes", () => {
+        assert.deepEqual(
+            unwritable(
+                { documentChanges: [replacing("a", null), replacing("b", 2)] },
+                window({
+                    a: { version: 1, dirty: true },
+                    b: { version: 3, dirty: false },
+                }),
+            ),
+            { reason: "changedSince", uris: ["b"] },
+        );
+    });
+
+    it("passes over what is not a replacement of a file's text", () => {
+        assert.equal(
+            unwritable(
+                { documentChanges: [{ kind: "create", uri: "new" }] },
+                window({}),
+            ),
+            undefined,
+        );
+    });
+
+    it("takes an edit with no changes at all", () => {
+        assert.equal(unwritable({}, window({})), undefined);
+    });
 });

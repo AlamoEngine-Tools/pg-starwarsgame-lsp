@@ -1,13 +1,13 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// Presenting a set of single-language files as one table, and taking edits back apart again.
+// Presenting a set of single-language files as one table.
 //
 // NLS and DAT hold one language per file, so a project translated into six languages is six files.
 // Editing them one at a time means never seeing a translation next to its source, which is the one
 // view that makes translating possible. The grid therefore opens the whole set as one table: each
-// file contributes its language as a column, and an edit to a cell goes back to the file that owns
-// that language.
+// file contributes its language as a column. Which file an edit to a cell goes back to is the
+// server's to decide: the grid names the set, and the server takes the batch apart.
 //
 // CSV and XML need none of this - they already carry every language in one file - so a set is only
 // ever built from the single-language formats.
@@ -30,16 +30,6 @@ export interface MergedDocument {
         key: string;
         values: { language: string; value: string }[];
     }[];
-}
-
-/** A key-addressed command as the editors stage it. */
-export interface KeyedCommand {
-    kind: string;
-    key?: string;
-    newKey?: string;
-    language?: string;
-    value?: string;
-    values?: { language: string; value: string }[];
 }
 
 /**
@@ -142,83 +132,4 @@ function passThrough(
             })),
         })),
     };
-}
-
-/** The member holding a language, or undefined when no file in the set does. */
-export function memberForLanguage(
-    members: readonly MemberDocument[],
-    language: string,
-): MemberDocument | undefined {
-    return members.find((member) =>
-        member.languages.some(
-            (l) => l.toUpperCase() === language.toUpperCase(),
-        ),
-    );
-}
-
-/**
- * Splits staged edits into one batch per file.
- *
- * A value belongs to the one file that holds its language. Everything that changes the shape of the
- * table - adding, renaming or deleting a key - belongs to every file in the set, or the files would
- * drift apart into different key lists and stop being one table at all.
- *
- * A member with nothing to do is left out entirely, so an untouched language is not rewritten and
- * its content hash is not spent.
- */
-export function partitionCommands(
-    commands: readonly KeyedCommand[],
-    members: readonly MemberDocument[],
-): Map<string, KeyedCommand[]> {
-    const batches = new Map<string, KeyedCommand[]>();
-    const add = (filePath: string, command: KeyedCommand): void => {
-        const existing = batches.get(filePath);
-        if (existing) {
-            existing.push(command);
-        } else {
-            batches.set(filePath, [command]);
-        }
-    };
-
-    for (const command of commands) {
-        if (command.kind === "setValue") {
-            const owner =
-                command.language === undefined
-                    ? undefined
-                    : memberForLanguage(members, command.language);
-            // A value for a language no file holds has nowhere to go. Dropped rather than guessed
-            // at: writing it into an arbitrary file would put German text in the French file.
-            if (owner !== undefined) {
-                add(owner.filePath, command);
-            }
-            continue;
-        }
-
-        if (command.kind === "addEntry") {
-            // Each file gets only the values for the languages it holds; the rest of the row is
-            // that file's business to leave blank.
-            for (const member of members) {
-                add(member.filePath, {
-                    ...command,
-                    values: (command.values ?? []).filter((v) =>
-                        member.languages.some(
-                            (l) => l.toUpperCase() === v.language.toUpperCase(),
-                        ),
-                    ),
-                });
-            }
-            continue;
-        }
-
-        if (command.kind === "renameKey" || command.kind === "deleteEntry") {
-            for (const member of members) {
-                add(member.filePath, command);
-            }
-        }
-
-        // addLanguage has no meaning here: in a single-language format another language is another
-        // file, which the navigator's "add language" action creates.
-    }
-
-    return batches;
 }

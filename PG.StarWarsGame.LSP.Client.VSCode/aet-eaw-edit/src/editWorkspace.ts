@@ -11,7 +11,12 @@ import type {
     WorkspaceEdit,
 } from "vscode-languageclient";
 
-import type { AppliedEdit, EditWorkspace } from "./lsp/editBatchClient";
+import {
+    type AppliedEdit,
+    type EditWorkspace,
+    type OpenDocumentState,
+    unwritable,
+} from "./lsp/editBatchClient";
 
 /**
  * @param converter The running language client's converter from the protocol's edit to VS Code's,
@@ -24,14 +29,24 @@ export function createEditWorkspace(
         async applyAndSave(edit: unknown): Promise<AppliedEdit> {
             const convert = converter();
             if (convert === undefined) {
-                return { applied: false, unsaved: [] };
+                return { applied: false, reason: "refused", files: [] };
             }
 
-            const converted = await convert.asWorkspaceEdit(
-                edit as WorkspaceEdit,
+            const composed = edit as WorkspaceEdit;
+            const stale = unwritable(composed, (uri) =>
+                stateOf(convert.asUri(uri)),
             );
+            if (stale !== undefined) {
+                return {
+                    applied: false,
+                    reason: stale.reason,
+                    files: stale.uris.map((uri) => convert.asUri(uri).fsPath),
+                };
+            }
+
+            const converted = await convert.asWorkspaceEdit(composed);
             if (!(await vscode.workspace.applyEdit(converted))) {
-                return { applied: false, unsaved: [] };
+                return { applied: false, reason: "refused", files: [] };
             }
 
             // Every file the edit changed has text in it - a created file gets its content as an
@@ -46,4 +61,15 @@ export function createEditWorkspace(
             return { applied: true, unsaved };
         },
     };
+}
+
+/** What the window holds for a file: nothing, or a document at a version that is saved or not. */
+function stateOf(uri: vscode.Uri): OpenDocumentState | undefined {
+    const wanted = uri.toString();
+    const document = vscode.workspace.textDocuments.find(
+        (open) => open.uri.toString() === wanted,
+    );
+    return document === undefined
+        ? undefined
+        : { version: document.version, dirty: document.isDirty };
 }

@@ -22,6 +22,10 @@ internal sealed class WorkingTextSet(IDocumentTextSource textSource)
     // did not exist when first touched" (a created file diffs against nothing).
     private readonly Dictionary<string, string?> _original = new(StringComparer.Ordinal);
 
+    // The version of the open document each seed was read from; absent for a seed read from the
+    // saved file and for a file that did not exist.
+    private readonly Dictionary<string, int> _versions = new(StringComparer.Ordinal);
+
     /// <summary>
     ///     The document's current text - the buffer text on first touch, or the composed result of
     ///     edits applied since. Null when the file is neither readable nor created.
@@ -29,10 +33,21 @@ internal sealed class WorkingTextSet(IDocumentTextSource textSource)
     public string? GetText(string uri)
     {
         if (_current.TryGetValue(uri, out var current)) return current;
-        var buffer = textSource.GetText(uri)?.Text;
+        var seed = textSource.GetText(uri);
+        var buffer = seed?.Text;
         _original[uri] = buffer; // records the seed (or null: absent) so Changed() can diff against it
+        if (seed is { FromOpenBuffer: true, Version: { } version }) _versions[uri] = version;
         if (buffer is not null) _current[uri] = buffer;
         return buffer;
+    }
+
+    /// <summary>
+    ///     The version of the open document <paramref name="uri" /> was seeded from, or null when
+    ///     its seed is the saved file. An edit says this so the client can hold it to that.
+    /// </summary>
+    public int? VersionOf(string uri)
+    {
+        return _versions.TryGetValue(uri, out var version) ? version : null;
     }
 
     /// <summary>Seeds a not-yet-existing file with its skeleton so later commands can read/parse it.</summary>

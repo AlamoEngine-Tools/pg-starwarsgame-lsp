@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
-using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PG.Commons.Hashing;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
@@ -20,11 +20,11 @@ namespace PG.StarWarsGame.LSP.Localisation.Tests;
 ///     <para>
 ///         Each file here holds what the grid does not model - comments, an attribute and an element
 ///         no schema knows, rows and languages out of order, odd spacing inside a tag, single quotes,
-///         an entity, a CDATA section, a blank line, a byte order mark - and is saved with one edit,
-///         then compared with the original line by line or byte by byte.
+///         an entity, a CDATA section, a blank line, text after the last row - and is saved with one
+///         edit, then compared with the original line by line.
 ///     </para>
 /// </summary>
-public sealed class LocalisationRoundTripTest : IDisposable
+public sealed class LocalisationRoundTripTest
 {
     private static readonly string[] XmlLines =
     [
@@ -71,20 +71,7 @@ public sealed class LocalisationRoundTripTest : IDisposable
         "# the end"
     ];
 
-    private readonly string _directory =
-        Path.Combine(Path.GetTempPath(), "aet-loc-round-trip-" + Guid.NewGuid().ToString("N"));
-
-    public LocalisationRoundTripTest()
-    {
-        Directory.CreateDirectory(_directory);
-    }
-
-    public void Dispose()
-    {
-        Directory.Delete(_directory, true);
-    }
-
-    private static ILocalisationDocumentEditor Editor()
+    private static ServiceProvider Services()
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
@@ -95,7 +82,12 @@ public sealed class LocalisationRoundTripTest : IDisposable
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
         services.AddSingleton<IMessageCatalog>(ResxMessageCatalog.Server("en"));
-        return services.BuildServiceProvider().GetRequiredService<ILocalisationDocumentEditor>();
+        return services.BuildServiceProvider();
+    }
+
+    private static ILocalisationDocumentEditor Editor()
+    {
+        return Services().GetRequiredService<ILocalisationDocumentEditor>();
     }
 
     private static string Text(string[] lines, string lineEnding)
@@ -103,16 +95,25 @@ public sealed class LocalisationRoundTripTest : IDisposable
         return string.Join(lineEnding, lines) + lineEnding;
     }
 
-    /// <summary>Writes the text as a file, saves one keyed edit into it, and returns the file's new text.</summary>
-    private async Task<string> SaveKeyedAsync(string fileName, string original, params LocKeyedCommandDto[] commands)
+    /// <summary>
+    ///     The text a keyed batch composes for a file of that name: each key is resolved to its row
+    ///     in the text as read, and the rows are then written the way a save writes them.
+    /// </summary>
+    private static string SaveKeyed(string fileName, string original, params LocKeyedCommandDto[] commands)
     {
-        var path = Path.Combine(_directory, fileName);
-        await File.WriteAllTextAsync(path, original, new UTF8Encoding(false), TestContext.Current.CancellationToken);
+        var services = Services();
+        var extension = Path.GetExtension(fileName);
+        var messages = services.GetRequiredService<IMessageCatalog>();
 
-        var result = await Editor().ApplyKeyedToFileAsync(path, commands, TestContext.Current.CancellationToken);
+        var translated = KeyedCommandTranslator.Translate(
+            services.GetRequiredService<ILocalisationRowReader>().Read(original, extension, fileName),
+            commands, services.GetRequiredService<ICrc32HashingService>(), messages);
+        Assert.True(translated.Success, translated.Error);
 
+        var result = services.GetRequiredService<ILocalisationDocumentEditor>()
+            .Apply(original, extension, translated.Commands!, fileName);
         Assert.True(result.Success, result.Error);
-        return await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+        return result.NewText!;
     }
 
     private static LocKeyedCommandDto SetValue(string key, string language, string value)
@@ -241,11 +242,11 @@ public sealed class LocalisationRoundTripTest : IDisposable
 
     [Theory]
     [MemberData(nameof(LineEndings))]
-    public async Task Xml_KeyedSetValue_ChangesTheValuesLine_AndNoOther(string lineEnding)
+    public void Xml_KeyedSetValue_ChangesTheValuesLine_AndNoOther(string lineEnding)
     {
         var original = Text(XmlLines, lineEnding);
 
-        var saved = await SaveKeyedAsync("texts.xml", original, SetValue("TEXT_B", "ENGLISH", "Changed"));
+        var saved = SaveKeyed("texts.xml", original, SetValue("TEXT_B", "ENGLISH", "Changed"));
 
         AssertChange(original, saved,
             [$"      <Translation Language=\"ENGLISH\">Beta</Translation>{lineEnding}"],
@@ -256,42 +257,26 @@ public sealed class LocalisationRoundTripTest : IDisposable
 
     [Theory]
     [MemberData(nameof(LineEndings))]
-    public async Task Csv_KeyedSetValue_ChangesTheRowsLine_AndNoOther(string lineEnding)
+    public void Csv_KeyedSetValue_ChangesTheRowsLine_AndNoOther(string lineEnding)
     {
         var original = Text(CsvLines, lineEnding);
 
-        var saved = await SaveKeyedAsync("texts.csv", original, SetValue("TEXT_C", "ENGLISH", "Gamma EN"));
+        var saved = SaveKeyed("texts.csv", original, SetValue("TEXT_C", "ENGLISH", "Gamma EN"));
 
         AssertChange(original, saved,
             [$"TEXT_C,Gamma{lineEnding}"],
             [$"TEXT_C,Gamma,Gamma EN{lineEnding}"]);
     }
 
-    [Fact(Skip = "#339 FR-3, red while the server writes the file itself: the byte order mark is dropped. "
-                 + "Goes with that write path, when the save is the editor's")]
-    public async Task Csv_Save_KeepsTheFilesByteOrderMark()
-    {
-        var path = Path.Combine(_directory, "marked.csv");
-        var original = Text(CsvLines, "\r\n");
-        await File.WriteAllTextAsync(path, original, new UTF8Encoding(true), TestContext.Current.CancellationToken);
-
-        var result = await Editor().ApplyKeyedToFileAsync(
-            path, [SetValue("TEXT_B", "ENGLISH", "Changed")], TestContext.Current.CancellationToken);
-
-        Assert.True(result.Success, result.Error);
-        var bytes = await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken);
-        Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, bytes.Take(3).ToArray());
-    }
-
     // ── .properties ──────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(LineEndings))]
-    public async Task Properties_KeyedSetValue_ChangesTheEntrysLine_AndNoOther(string lineEnding)
+    public void Properties_KeyedSetValue_ChangesTheEntrysLine_AndNoOther(string lineEnding)
     {
         var original = Text(PropertiesLines, lineEnding);
 
-        var saved = await SaveKeyedAsync(
+        var saved = SaveKeyed(
             "texts_english.properties", original, SetValue("TEXT_A", "ENGLISH", "Changed"));
 
         AssertChange(original, saved,
@@ -301,11 +286,11 @@ public sealed class LocalisationRoundTripTest : IDisposable
 
     [Theory]
     [MemberData(nameof(LineEndings))]
-    public async Task Properties_KeyedSetValue_BelowALineThatIsNoEntry_ChangesItsOwnLine(string lineEnding)
+    public void Properties_KeyedSetValue_BelowALineThatIsNoEntry_ChangesItsOwnLine(string lineEnding)
     {
         var original = Text(PropertiesLines, lineEnding);
 
-        var saved = await SaveKeyedAsync(
+        var saved = SaveKeyed(
             "texts_english.properties", original, SetValue("TEXT_C", "ENGLISH", "Changed"));
 
         AssertChange(original, saved,
@@ -320,9 +305,9 @@ public sealed class LocalisationRoundTripTest : IDisposable
     [InlineData("texts.csv", "key,ENGLISH\nTEXT_A,Alpha\nTEXT_B,Beta\n\n\n", "TEXT_A,Changed")]
     [InlineData("texts_english.properties", "TEXT_A=Alpha\r\nTEXT_B=Beta", "TEXT_A=Changed")]
     [InlineData("texts_english.properties", "TEXT_A=Alpha\nTEXT_B=Beta\n\n# the end", "TEXT_A=Changed")]
-    public async Task ASave_LeavesTheEndOfTheFileAsItWas(string fileName, string original, string changedLine)
+    public void ASave_LeavesTheEndOfTheFileAsItWas(string fileName, string original, string changedLine)
     {
-        var saved = await SaveKeyedAsync(fileName, original, SetValue("TEXT_A", "ENGLISH", "Changed"));
+        var saved = SaveKeyed(fileName, original, SetValue("TEXT_A", "ENGLISH", "Changed"));
 
         var unchangedLine = fileName.EndsWith(".csv", StringComparison.Ordinal) ? "TEXT_A,Alpha" : "TEXT_A=Alpha";
         Assert.Equal(original.Replace(unchangedLine, changedLine, StringComparison.Ordinal), saved);

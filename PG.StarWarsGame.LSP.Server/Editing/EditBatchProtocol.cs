@@ -21,8 +21,24 @@ namespace PG.StarWarsGame.LSP.Server.Editing;
 /// </summary>
 /// <param name="Campaign">The story editor's campaign.</param>
 /// <param name="Faction">The story editor's faction within it.</param>
+/// <param name="Documents">
+///     The localisation editors' file, or the set of single-language files the grid shows as one
+///     table. Which file of a set a command goes to is the server's decision.
+/// </param>
 [PublicAPI]
-public sealed record EditBatchSubject(string? Campaign = null, string? Faction = null);
+public sealed record EditBatchSubject(
+    string? Campaign = null,
+    string? Faction = null,
+    IReadOnlyList<EditBatchDocument>? Documents = null);
+
+/// <summary>One localisation file an editor shows, as the server listed it.</summary>
+/// <param name="ContentHash">
+///     In a request, the hash of the text the editor last read: a batch is staged against that
+///     text and is refused for a file that has changed since. In an answer, the hash the file has
+///     once the batch is written, which the editor's next batch has to carry.
+/// </param>
+[PublicAPI]
+public sealed record EditBatchDocument(string FilePath, string? ContentHash = null);
 
 /// <summary>
 ///     Checks a staged batch without writing: the commands are applied to a working copy and the
@@ -45,6 +61,9 @@ public sealed record ValidateEditBatchParams(string Editor, EditBatchSubject Sub
 /// <param name="Uri">The file the problem is in.</param>
 /// <param name="Line">0-based line in <paramref name="Uri" />.</param>
 /// <param name="Column">0-based column in <paramref name="Line" />.</param>
+/// <param name="Key">Localisation: the entry the problem is about; null for a problem of the whole file.</param>
+/// <param name="Language">Localisation: the language the problem is about.</param>
+/// <param name="Index">Localisation: the row the problem is about, 0-based in the file.</param>
 [PublicAPI]
 public sealed record EditBatchProblemDto(
     string Severity,
@@ -54,7 +73,10 @@ public sealed record EditBatchProblemDto(
     int? Position = null,
     string? Uri = null,
     int? Line = null,
-    int? Column = null);
+    int? Column = null,
+    string? Key = null,
+    string? Language = null,
+    int? Index = null);
 
 /// <param name="Error">Why the batch could not be checked at all; the problems are then empty.</param>
 [PublicAPI]
@@ -82,9 +104,11 @@ public sealed record ApplyEditBatchParams(string Editor, EditBatchSubject Subjec
 ///     Every file the batch changes, as one edit for the client to apply. Null when the batch
 ///     failed, and when it changes nothing.
 /// </param>
+/// <param name="Documents">Localisation: each file of the subject with the content hash it has once the edit is written.</param>
 [PublicAPI]
 public sealed record ApplyEditBatchResult(
     bool Success,
     int? FailedIndex = null,
     string? Error = null,
-    WorkspaceEdit? Edit = null);
+    WorkspaceEdit? Edit = null,
+    IReadOnlyList<EditBatchDocument>? Documents = null);

@@ -181,10 +181,6 @@ public static class ServerConfigurator
             .WithHandler<SetLocalisationProjectFormatHandler>()
             .WithHandler<CreateLocalisationLanguageFileHandler>()
             .WithHandler<GetLocalisationRowsHandler>()
-            .WithHandler<ApplyTranslationBatchHandler>()
-            .WithHandler<ValidateTranslationBatchHandler>()
-            .WithHandler<ApplyCreditsBatchHandler>()
-            .WithHandler<ValidateCreditsBatchHandler>()
             .WithHandler<GetEffectiveObjectHandler>()
             // Lua debugger: the layers a debug session maps game paths with and launches the game
             // from. The adapter itself runs as a separate process of this exe (--debug-adapter),
@@ -287,6 +283,9 @@ public static class ServerConfigurator
                 services.AddSingleton<IStorySideNamesSource, GameConstantsStorySideNames>();
                 // The visual editors' one way to write: a composer per editor behind one pair.
                 services.AddSingleton<IEditBatchComposer, StoryEditBatchComposer>();
+                services.AddSingleton<LocalisationBatchDocuments>();
+                services.AddSingleton<IEditBatchComposer, TranslationEditBatchComposer>();
+                services.AddSingleton<IEditBatchComposer, CreditsEditBatchComposer>();
                 services.AddSingleton<EditBatchComposers>();
                 services.AddSingleton<ICacheStatisticsSource>(sp =>
                     (ICacheStatisticsSource)sp.GetRequiredService<IStoryModelService>());
@@ -434,7 +433,6 @@ public static class ServerConfigurator
                 services.AddSingleton<IModProjectFileWriter, ModProjectFileWriter>();
                 services.AddSingleton<ILocalisationSeedFileWriter, LocalisationSeedFileWriter>();
                 services.AddSingleton<ILocalisationFormatConverter, LocalisationFormatConverter>();
-                services.AddSingleton<ILocalisationWriteLedger, LocalisationWriteLedger>();
                 services.AddSingleton<ILocalisationEntryWriter, LocalisationEntryWriter>();
 
                 // Linear startup pipeline and its stage collaborators.

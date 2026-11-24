@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -10,16 +9,13 @@ using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
-using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Localisation;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Indexing;
-using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -65,7 +61,6 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         MockFileSystem? fs = null,
         FakeReloadService? reload = null,
         ISchemaProvider? schema = null,
-        ILocalisationWriteLedger? writeLedger = null,
         IRegistryWalkStore? walks = null,
         IPreviewAssetFingerprints? previewAssets = null,
         IPreviewCacheBuilder? previewCache = null,
@@ -99,7 +94,6 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             indexer,
             reload ?? new FakeReloadService(),
             schemaProvider,
-            writeLedger ?? new LocalisationWriteLedger(fileHelper),
             walkStore,
             new OpenStartupGate(),
             previewAssets ?? new ForgottenAssets(),
@@ -684,54 +678,6 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Equal(1, reload.LocalisationReloadCount);
         Assert.Empty(spy.Updates);
     }
-
-    // The storm this closes: saving from the localisation editor already reloads the index, and the
-    // watcher then reports that same write - so one save reloaded twice and told every open tab the
-    // index had moved twice, each time costing a full re-read of a 19,000-row file.
-    [Fact]
-    public async Task Handle_CsvUnderTextRoot_HoldingWhatTheServerJustWrote_DoesNotReloadAgain()
-    {
-        const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
-        const string path = @"c:\mods\mymod\data\text\mastertextfile.csv";
-        const string content = "key,ENGLISH\r\nTEXT_A,Hello\r\n";
-        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [path] = new(content) });
-        var reload = new FakeReloadService
-        {
-            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
-        };
-        var ledger = new LocalisationWriteLedger(new FileHelper(fs));
-        ledger.Record(path, LocalisationContentHash.Compute(content));
-
-        var handler = BuildHandler(new FakeGameIndexService(), fs: fs, reload: reload, writeLedger: ledger);
-        await handler.Handle(Changed(csvUri), CancellationToken.None);
-
-        Assert.Equal(0, reload.LocalisationReloadCount);
-    }
-
-    // Matching on content is what makes the suppression safe - an edit that landed between the
-    // server's write and the watcher event still has to be picked up.
-    [Fact]
-    public async Task Handle_CsvUnderTextRoot_ChangedSinceTheServerWroteIt_StillReloads()
-    {
-        const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
-        const string path = @"c:\mods\mymod\data\text\mastertextfile.csv";
-        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-        {
-            [path] = new("key,ENGLISH\r\nTEXT_A,Edited by someone else\r\n")
-        });
-        var reload = new FakeReloadService
-        {
-            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
-        };
-        var ledger = new LocalisationWriteLedger(new FileHelper(fs));
-        ledger.Record(path, LocalisationContentHash.Compute("key,ENGLISH\r\nTEXT_A,Hello\r\n"));
-
-        var handler = BuildHandler(new FakeGameIndexService(), fs: fs, reload: reload, writeLedger: ledger);
-        await handler.Handle(Changed(csvUri), CancellationToken.None);
-
-        Assert.Equal(1, reload.LocalisationReloadCount);
-    }
-
 
     [Fact]
     public async Task Handle_PropertiesUnderTextRoot_TriggersLocalisationReload()

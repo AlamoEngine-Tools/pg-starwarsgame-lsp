@@ -9,12 +9,10 @@ import {
     readDialogGeometry,
     saveDialogGeometry,
 } from "./dialogGeometryStorage";
+import { heldBack, reportSave } from "./editBatchReport";
+import { EditBatchClient, type EditBatchSave } from "./lsp/editBatchClient";
 import { LocalisationPanelState } from "./shared/localisationPanelState";
-import {
-    KeyedCommand,
-    mergeMembers,
-    partitionCommands,
-} from "./shared/locSetMerge";
+import { mergeMembers } from "./shared/locSetMerge";
 import { siblingsOf } from "./shared/localisationTreeModel";
 import {
     PanelRegistry,
@@ -30,14 +28,15 @@ import type {
     LocalisationSeedSource,
 } from "./protocol/panels/localisationEditor";
 import {
-    ApplyLocalisationBatchResult,
     CreateLocalisationLanguageFileResult,
+    EDIT_BATCH_EDITOR,
+    type EditBatchEditor,
+    type EditBatchSubject,
     GetBaselineEntriesResult,
     GetLanguagesResult,
     GetLocalisationProjectsResult,
     GetLocalisationRowsResult,
     LOC_CATEGORY,
-    ValidateLocalisationBatchResult,
 } from "./protocol";
 
 /**
@@ -578,13 +577,11 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
         // The Validate tag reads out whatever comes back, so a failure has to arrive as a result
         // too - otherwise the tag sits on the previous run's verdict, describing a document that no
         // longer exists.
-        const outcome =
-            await this.project.gateway.request<ValidateLocalisationBatchResult>(
-                isCredits(this._category)
-                    ? "aet/validateCreditsBatch"
-                    : "aet/validateTranslationBatch",
-                { projectFilePath: this._filePath, commands },
-            );
+        const outcome = await this._batches.validate(
+            this._editor,
+            this._subject,
+            commands,
+        );
 
         this.post(
             outcome.ok
@@ -600,11 +597,10 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
     /**
      * Writes the staged batch.
      *
-     * A set is written one file at a time, each batch atomic on its own. Not atomic across the set:
-     * that would need the server to check every hash before writing any, and the failure this
-     * guards against - one file having moved on disk - is per file anyway. A refused language is
-     * named, and the whole queue stays staged so nothing is silently half-applied from the user's
-     * point of view.
+     * The server composes it into one edit - for a set, across every file a change belongs to -
+     * and VS Code applies the edit and saves the files it touched. One edit, so a set is written
+     * whole or not at all, and one step of each file's undo history. A refused batch leaves the
+     * whole queue staged, so nothing is silently half-applied from the user's point of view.
      */
     private async _save(commands: Record<string, unknown>[]): Promise<void> {
         // Answered rather than abandoned: a silent return left the Save button spinning with the
@@ -619,125 +615,44 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
             return;
         }
 
-        const method = isCredits(this._category)
-            ? "aet/applyCreditsBatch"
-            : "aet/applyTranslationBatch";
+        const saved = await this._batches.save(
+            this._editor,
+            this._subject,
+            commands,
+        );
 
-        // A set that has not been read yet has no members; fall back to the file it was opened on.
-        const members =
-            this._members.length > 0
-                ? this._members
-                : [
-                      {
-                          filePath: this._filePath,
-                          languages: [],
-                          contentHash: this._state.contentHash,
-                      },
-                  ];
-
-        const batches =
-            members.length === 1
-                ? new Map([
-                      [
-                          members[0].filePath,
-                          commands as unknown as KeyedCommand[],
-                      ],
-                  ])
-                : partitionCommands(
-                      commands as unknown as KeyedCommand[],
-                      members.map((m) => ({
-                          filePath: m.filePath,
-                          languages: m.languages,
-                          rows: [],
-                      })),
-                  );
-
-        const failures: {
-            member: Member;
-            result: ApplyLocalisationBatchResult;
-        }[] = [];
-        let firstFailedIndex: number | null = null;
-
-        for (const member of members) {
-            const batch = batches.get(member.filePath);
-            // Untouched by this batch: writing it anyway would spend its hash and make the watcher
-            // announce a change to a file nobody edited.
-            if (batch === undefined || batch.length === 0) {
-                continue;
-            }
-
-            // A rejected write is a failure of this file like any other, so it joins the list
-            // rather than escaping. Before, it left the loop mid-set: the files already written
-            // stayed written, and the user was told nothing at all.
-            const outcome =
-                await this.project.gateway.request<ApplyLocalisationBatchResult>(
-                    method,
-                    {
-                        projectFilePath: member.filePath,
-                        expectedContentHash: member.contentHash,
-                        commands: batch,
-                    },
-                );
-
-            const result: ApplyLocalisationBatchResult = outcome.ok
-                ? outcome.value
-                : { success: false, error: outcome.message };
-
-            if (result.success) {
-                member.contentHash =
-                    result.newContentHash ?? member.contentHash;
-                continue;
-            }
-
-            failures.push({ member, result });
-            firstFailedIndex ??= result.failedIndex ?? null;
-        }
-
-        if (failures.length > 0) {
+        if (!saved.saved) {
             this._state.noteSaveFailed();
-            await this._reportSetSaveFailure(failures);
+            await this._reportSaveFailure(saved);
             this.post({
                 type: "saveResult",
                 success: false,
-                failedIndex: firstFailedIndex,
+                failedIndex: saved.failedIndex ?? null,
             });
             return;
         }
 
+        // The hash each file has now is the one its next batch has to carry.
+        const written = new Map(
+            saved.documents.map((d) => [
+                d.filePath.toLowerCase(),
+                d.contentHash ?? undefined,
+            ]),
+        );
+        for (const member of this._members) {
+            member.contentHash =
+                written.get(member.filePath.toLowerCase()) ??
+                member.contentHash;
+        }
         this._state.noteSaved(
-            members.map((m) => m.contentHash ?? "").join("|"),
+            this._members.length > 0
+                ? this._members.map((m) => m.contentHash ?? "").join("|")
+                : (saved.documents[0]?.contentHash ?? undefined),
         );
+
+        // On disk unless a file could not be written, which this names.
+        reportSave(saved, vscode.l10n.t("Save failed"));
         this.post({ type: "saveResult", success: true });
-    }
-
-    /** Names the languages that would not take the write, so the user knows what is still staged. */
-    private async _reportSetSaveFailure(
-        failures: { member: Member; result: ApplyLocalisationBatchResult }[],
-    ): Promise<void> {
-        if (this._members.length <= 1) {
-            await this._reportSaveFailure(failures[0].result);
-            return;
-        }
-
-        const named = failures
-            .map(
-                (f) =>
-                    `${f.member.languages.join("/") || basename(f.member.filePath)}: ` +
-                    (f.result.error ?? vscode.l10n.t("unknown error")),
-            )
-            .join("; ");
-
-        const choice = await vscode.window.showErrorMessage(
-            vscode.l10n.t(
-                "EaWEdit: Could not save - {0}. The edits are still staged.",
-                named,
-            ),
-            vscode.l10n.t("Reload"),
-        );
-
-        if (choice === vscode.l10n.t("Reload")) {
-            await this._sendRows();
-        }
     }
 
     /**
@@ -745,25 +660,62 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
      * reload - so the message offers it rather than leaving the user to find it.
      */
     private async _reportSaveFailure(
-        result: ApplyLocalisationBatchResult,
+        saved: Extract<EditBatchSave, { saved: false }>,
     ): Promise<void> {
-        const failed = result.failedIndex;
         const where =
-            failed !== null && failed !== undefined
-                ? ` (change ${failed + 1})`
+            typeof saved.failedIndex === "number"
+                ? ` (change ${saved.failedIndex + 1})`
                 : "";
+        const why =
+            heldBack(saved) ??
+            saved.message ??
+            (saved.reason === "notApplied"
+                ? vscode.l10n.t("The changes could not be applied.")
+                : vscode.l10n.t("unknown error"));
         const choice = await vscode.window.showErrorMessage(
-            vscode.l10n.t(
-                "EaWEdit: Could not save - {0}{1}",
-                result.error ?? vscode.l10n.t("unknown error"),
-                where,
-            ),
+            vscode.l10n.t("EaWEdit: Could not save - {0}{1}", why, where),
             vscode.l10n.t("Reload"),
         );
 
         if (choice === vscode.l10n.t("Reload")) {
             await this._sendRows();
         }
+    }
+
+    /** Where this panel's staged batches are checked and saved: its project's server and editor. */
+    private get _batches(): EditBatchClient {
+        return new EditBatchClient(this.project.gateway, this.project.edits);
+    }
+
+    /** Which of the two localisation editors this panel is, as its batches say it. */
+    private get _editor(): EditBatchEditor {
+        return isCredits(this._category)
+            ? EDIT_BATCH_EDITOR.credits
+            : EDIT_BATCH_EDITOR.translation;
+    }
+
+    /**
+     * What this panel's batches are about: the file it shows, or the set of single-language files
+     * it shows as one table, each with the hash it was last read at. Which file of a set a change
+     * goes to is the server's decision.
+     */
+    private get _subject(): EditBatchSubject {
+        // A set that has not been read yet has no members; fall back to the file it was opened on.
+        const members =
+            this._members.length > 0
+                ? this._members
+                : [
+                      {
+                          filePath: this._filePath,
+                          contentHash: this._state.contentHash,
+                      },
+                  ];
+        return {
+            documents: members.map((m) => ({
+                filePath: m.filePath,
+                contentHash: m.contentHash ?? null,
+            })),
+        };
     }
 
     private async _promptSaveOnClose(): Promise<void> {

@@ -18,6 +18,7 @@
 import type { LspOutcome } from "./lspGateway";
 import type {
     ApplyEditBatchResult,
+    EditBatchDocument,
     EditBatchEditor,
     EditBatchParams,
     EditBatchSubject,
@@ -29,13 +30,29 @@ export interface EditBatchRequests {
     request<T>(method: string, params?: unknown): Promise<LspOutcome<T>>;
 }
 
+/**
+ * Why the window did not take an edit.
+ *
+ * - `refused`: VS Code turned the edit down, or no server runs to read it with.
+ * - `changedSince`: a document moved on from the version the edit was composed from.
+ * - `unsavedChanges`: the edit was composed from a saved file whose document has unsaved changes.
+ */
+export type EditRefusal = "refused" | "changedSince" | "unsavedChanges";
+
 /** What became of an edit handed to the editor. */
-export interface AppliedEdit {
-    /** Whether the editor took the edit. When it did not, nothing changed. */
-    readonly applied: boolean;
-    /** The files the edit changed that could not be saved afterwards, by path. */
-    readonly unsaved: readonly string[];
-}
+export type AppliedEdit =
+    | {
+          readonly applied: true;
+          /** The files the edit changed that could not be saved afterwards, by path. */
+          readonly unsaved: readonly string[];
+      }
+    | {
+          /** Nothing changed. */
+          readonly applied: false;
+          readonly reason: EditRefusal;
+          /** The files the refusal is about, by path; empty when it is about none in particular. */
+          readonly files: readonly string[];
+      };
 
 /** The editor's side of a save. `vscode.workspace` in production. */
 export interface EditWorkspace {
@@ -47,6 +64,60 @@ export interface EditWorkspace {
     applyAndSave(edit: unknown): Promise<AppliedEdit>;
 }
 
+/** What the window holds for a file it has open. */
+export interface OpenDocumentState {
+    readonly version: number;
+    /** Whether the document has changes that are not saved. */
+    readonly dirty: boolean;
+}
+
+/**
+ * The files of an edit the window must not take as they stand, or undefined when it may take all.
+ *
+ * Each replacement in an edit says what the server composed it from, the way the protocol provides
+ * for: a version when it read the open document, none when it read the saved file. A replacement
+ * composed from a version the document has left would undo what was typed since, and one composed
+ * from the saved file would overwrite changes the window holds and the server never saw - both
+ * replace the whole text. Either is refused, and nothing is applied.
+ *
+ * @param stateOf The window's document for a URI, or undefined when it holds none.
+ */
+export function unwritable(
+    edit: { documentChanges?: readonly unknown[] | null },
+    stateOf: (uri: string) => OpenDocumentState | undefined,
+): { reason: "changedSince" | "unsavedChanges"; uris: string[] } | undefined {
+    const changedSince: string[] = [];
+    const unsavedChanges: string[] = [];
+
+    for (const change of edit.documentChanges ?? []) {
+        const target = (
+            change as {
+                textDocument?: { uri?: string; version?: number | null };
+            }
+        ).textDocument;
+        if (typeof target?.uri !== "string") {
+            continue;
+        }
+
+        const state = stateOf(target.uri);
+        if (typeof target.version === "number") {
+            // Composed from an open document: it has to be that document still, at that version.
+            if (state?.version !== target.version) {
+                changedSince.push(target.uri);
+            }
+        } else if (state?.dirty) {
+            unsavedChanges.push(target.uri);
+        }
+    }
+
+    if (changedSince.length > 0) {
+        return { reason: "changedSince", uris: changedSince };
+    }
+    return unsavedChanges.length > 0
+        ? { reason: "unsavedChanges", uris: unsavedChanges }
+        : undefined;
+}
+
 /** Why a batch was not saved. */
 export type EditBatchFailure =
     /** The server is not running - nothing was sent. */
@@ -55,8 +126,12 @@ export type EditBatchFailure =
     | "failed"
     /** The server read the batch and refused it; `failedIndex` names the command when one did it. */
     | "refused"
-    /** The server composed the edit and the editor did not take it. */
-    | "notApplied";
+    /** The server composed the edit and the window did not take it. */
+    | "notApplied"
+    /** The window did not take the edit: a document moved on while it was composed. */
+    | "changedSince"
+    /** The window did not take the edit: a file it was composed from has unsaved changes. */
+    | "unsavedChanges";
 
 /** What a save produced. */
 export type EditBatchSave =
@@ -64,6 +139,8 @@ export type EditBatchSave =
           readonly saved: true;
           /** The files that hold the change in the editor but could not be written, by path. */
           readonly unsaved: readonly string[];
+          /** Localisation: each file of the subject with the content hash it has now. */
+          readonly documents: readonly EditBatchDocument[];
       }
     | {
           readonly saved: false;
@@ -72,6 +149,8 @@ export type EditBatchSave =
           readonly message?: string;
           /** 0-based index of the command the server refused. */
           readonly failedIndex?: number;
+          /** The files the window would not write, by path. */
+          readonly files?: readonly string[];
       };
 
 export class EditBatchClient {
@@ -128,14 +207,19 @@ export class EditBatchClient {
                 failedIndex: composed.failedIndex ?? undefined,
             };
         }
+
+        const documents = composed.documents ?? [];
         if (composed.edit === undefined || composed.edit === null) {
-            return { saved: true, unsaved: [] };
+            return { saved: true, unsaved: [], documents };
         }
 
         const applied = await this._workspace.applyAndSave(composed.edit);
-        return applied.applied
-            ? { saved: true, unsaved: applied.unsaved }
-            : { saved: false, reason: "notApplied" };
+        if (applied.applied) {
+            return { saved: true, unsaved: applied.unsaved, documents };
+        }
+        return applied.reason === "refused"
+            ? { saved: false, reason: "notApplied" }
+            : { saved: false, reason: applied.reason, files: applied.files };
     }
 }
 
