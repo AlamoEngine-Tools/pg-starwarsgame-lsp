@@ -46,13 +46,21 @@ public sealed record GetStoryPlotsResult(IReadOnlyList<StoryCampaignDto> Campaig
 /// </param>
 /// <param name="DefinitionUri">The document declaring the campaign, or null when it is not indexed.</param>
 /// <param name="DefinitionLine">0-based line of the <c>&lt;Campaign&gt;</c> element in that document.</param>
+/// <param name="SetLine">
+///     0-based line of the <c>Campaign_Set</c> value in <paramref name="DefinitionUri" />: where a
+///     rename of the set is asked. Null when the campaign declares no set, and when its definition
+///     is not the project's to write - the game's, or a dependency's.
+/// </param>
+/// <param name="SetColumn">0-based column of that value; null whenever <paramref name="SetLine" /> is.</param>
 public sealed record StoryCampaignDto(
     string Name,
     IReadOnlyList<StoryFactionDto> Factions,
     string? Set = null,
     string? PlayerFaction = null,
     string? DefinitionUri = null,
-    int? DefinitionLine = null);
+    int? DefinitionLine = null,
+    int? SetLine = null,
+    int? SetColumn = null);
 
 /// <param name="Control">
 ///     The faction's <c>AI_Player_Control</c> player type as written (<c>BasicEmpire</c>, <c>None</c>,

@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Server.Story;
 using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
@@ -300,6 +301,41 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
                 TextDocument = new TextDocumentIdentifier { Uri = xmlUri }
             });
         }
+    }
+
+    [Fact]
+    public async Task CampaignSet_ThePositionTheNavigatorIsGiven_IsWhereARenameOfTheSetIsAsked()
+    {
+        RequireEawWorkspace();
+        await WaitForFullScanAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var plots = await _fixture.Client.SendRequest(new GetStoryPlotsParams(), cts.Token);
+        var member = plots.Campaigns.FirstOrDefault(c =>
+            c.Set is not null && c.SetLine is not null && c.SetColumn is not null && c.DefinitionUri is not null);
+        Assert.True(member is not null, "No campaign of the workspace carries the position of its Campaign_Set");
+
+        // The position is the value's own, past the spaces the shipped files pad it with.
+        var uri = DocumentUri.From(member.DefinitionUri!);
+        var lines = await File.ReadAllLinesAsync(uri.GetFileSystemPath(), TestContext.Current.CancellationToken);
+        var written = lines[member.SetLine!.Value].Substring(member.SetColumn!.Value, member.Set!.Length);
+        Assert.Equal(member.Set, written, true);
+
+        var renamed = member.Set + "_Renamed";
+        var edit = await _fixture.Client.RequestRename(new RenameParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = uri },
+            Position = new Position(member.SetLine.Value, member.SetColumn.Value),
+            NewName = renamed
+        }, cts.Token);
+
+        Assert.NotNull(edit);
+        var edits = edit.DocumentChanges!.Where(c => c.IsTextDocumentEdit)
+            .SelectMany(c => c.TextDocumentEdit!.Edits).ToList();
+        // Every member the navigator lists under the set is rewritten, and each to the new name.
+        var listed = plots.Campaigns.Count(c => string.Equals(c.Set, member.Set, StringComparison.OrdinalIgnoreCase));
+        Assert.True(edits.Count >= listed, $"{edits.Count} edits for a set the navigator lists {listed} members of");
+        Assert.All(edits, e => Assert.Equal(renamed, e.NewText));
     }
 
     [Fact]

@@ -123,3 +123,55 @@ export function orderedDefinitions(
         ),
     );
 }
+
+/** Where a set's value is written in a document the project owns: what a rename is asked at. */
+export interface SetRenameTarget {
+    readonly uri: string;
+    readonly line: number;
+    readonly column: number;
+}
+
+/**
+ * Where a rename of the set these campaigns share is asked: the value as one member of the project
+ * writes it. The rename itself rewrites every member the project owns, so any one of them will do.
+ * Nothing when no member is the project's - the game's own sets, and a dependency's.
+ */
+export function setRenameTarget(
+    members: readonly StoryCampaignDto[],
+): SetRenameTarget | undefined {
+    for (const member of members) {
+        if (
+            member.definitionUri &&
+            typeof member.setLine === "number" &&
+            typeof member.setColumn === "number"
+        ) {
+            return {
+                uri: member.definitionUri,
+                line: member.setLine,
+                column: member.setColumn,
+            };
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Why `next` cannot be a set's new name, or nothing when it can. The rules are the server's own for
+ * a grouping value: it is XML text, so not empty and none of the characters that end a text node.
+ */
+export function setNameProblem(
+    next: string,
+    current: string,
+): string | undefined {
+    const name = next.trim();
+    if (name.length === 0) {
+        return l10n.t("The name is empty");
+    }
+    if (name === current) {
+        return l10n.t("The set already has this name");
+    }
+    if (/[<>&]/.test(name)) {
+        return l10n.t("A set name cannot hold '<', '>' or '&'");
+    }
+    return undefined;
+}

@@ -156,6 +156,62 @@ public sealed class StoryProtocolHandlersTest
         Assert.Null(Assert.Single(result.Campaigns).Set);
     }
 
+    /// <summary>
+    ///     The GC campaign declared in <c>campaigns.xml</c> as a member of <c>Story_Set</c>, its
+    ///     <c>Campaign_Set</c> value written at line 7, column 18. <paramref name="campaignRank" /> is
+    ///     the layer of that file, <paramref name="otherRank" /> the layer of a second document.
+    /// </summary>
+    private static GameIndex IndexWithASet(int campaignRank, int otherRank)
+    {
+        const string campUri = "file:///ws/data/xml/campaigns.xml";
+        const string otherUri = "file:///ws/data/xml/other.xml";
+        var origin = new FileOrigin(campUri, 5, 4);
+        var campaignSym = new GameSymbol("GC", GameSymbolKind.XmlObject, "Campaign", origin, null);
+        var member = new GroupMembership("Story_Set", "Campaign", origin);
+        return GameIndex.Empty with
+        {
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("GC", [campaignSym]),
+            WorkspaceGroupMemberships =
+            ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Story_Set", [member]),
+            Documents = GameIndex.Empty.Documents
+                .Add(campUri, new DocumentIndex(campUri, 1, [campaignSym], ImmutableArray<GameReference>.Empty,
+                    GroupMemberships: [new DocumentGroupMembership(member, 7, 18, "Story_Set".Length)],
+                    LayerRank: campaignRank))
+                .Add(otherUri, new DocumentIndex(otherUri, 1, ImmutableArray<GameSymbol>.Empty,
+                    ImmutableArray<GameReference>.Empty, LayerRank: otherRank))
+        };
+    }
+
+    [Fact]
+    public async Task GetStoryPlots_CarriesWhereTheCampaignsSetIsWritten()
+    {
+        var result = await new GetStoryPlotsHandler(Models(),
+                new FakeGameIndexService { Current = IndexWithASet(1, 1) })
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        // The value's own position: what a rename of the set is asked at.
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal("Story_Set", campaign.Set);
+        Assert.Equal(7, campaign.SetLine);
+        Assert.Equal(18, campaign.SetColumn);
+    }
+
+    [Fact]
+    public async Task GetStoryPlots_ASetWrittenInADependency_IsNamedButCarriesNoPosition()
+    {
+        // The campaign's file belongs to the layer below the project's own: the set is still the
+        // campaign's set, and the project cannot rename it there.
+        var result = await new GetStoryPlotsHandler(Models(),
+                new FakeGameIndexService { Current = IndexWithASet(0, 1) })
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal("Story_Set", campaign.Set);
+        Assert.Null(campaign.SetLine);
+        Assert.Null(campaign.SetColumn);
+    }
+
     // ── aet/getStoryGraph ────────────────────────────────────────────────────
 
     [Fact]

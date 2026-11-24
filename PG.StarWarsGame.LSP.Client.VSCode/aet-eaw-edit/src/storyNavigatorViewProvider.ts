@@ -20,6 +20,8 @@ import {
     orderedDefinitions,
     orderedFactions,
     roleLabel,
+    type SetRenameTarget,
+    setRenameTarget,
     setSummary,
 } from "./storyNavigatorModel";
 
@@ -31,6 +33,8 @@ export class StoryTreeItem extends vscode.TreeItem {
     public openUri?: string;
     /** 0-based line to reveal in {@link openUri}. */
     public openLine?: number;
+    /** On a set node: where "Rename Set" asks the rename; undefined when no member is the project's. */
+    public renameAt?: SetRenameTarget;
 
     constructor(
         label: string,
@@ -236,9 +240,15 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
         );
         item.description = setSummary(members, setName !== undefined);
         item.tooltip = setName ?? vscode.l10n.t("No Campaign_Set");
-        item.contextValue = setName
-            ? "aetCampaignSet"
-            : "aetCampaignSetUngrouped";
+        // Three values, one per "Rename Set" the menu shows: the command, and a disabled twin for
+        // each reason there is nothing to rename - no set at all, or a set no member of the
+        // project belongs to.
+        item.renameAt = setName ? setRenameTarget(members) : undefined;
+        item.contextValue = !setName
+            ? "aetCampaignSetUngrouped"
+            : item.renameAt
+              ? "aetCampaignSet"
+              : "aetCampaignSetReadOnly";
         return item;
     }
 

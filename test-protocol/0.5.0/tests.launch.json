@@ -722,5 +722,8 @@
     "settings": {
       "aet-eaw-edit.experimental.storyEditing": true
     }
+  },
+  "STY-05": {
+    "open": "C:\\temp\\aet-test-STY-rename"
   }
 }

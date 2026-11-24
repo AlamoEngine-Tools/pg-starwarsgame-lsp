@@ -118,4 +118,37 @@ public sealed class GroupValueRenameBuilderTest
         var index = IndexWith((DocA, "SetA", 1, 15, "SetA".Length));
         Assert.Null(GroupValueRenameBuilder.Build("SetA", "SetA", index, NullLogger.Instance));
     }
+
+    /// <summary>Puts <paramref name="uri" /> in the layer of that rank; the others stay at 0.</summary>
+    private static GameIndex InLayer(GameIndex index, string uri, int rank)
+    {
+        return index with { Documents = index.Documents.SetItem(uri, index.Documents[uri] with { LayerRank = rank }) };
+    }
+
+    [Fact]
+    public void Build_LeavesTheMembersOfADependencyAlone()
+    {
+        // A project that extends another, the set with a member in each. The dependency's file is
+        // not this project's to write, which is the rule every other rename keeps.
+        var index = InLayer(IndexWith(
+            (DocA, "Story_Test_Set", 5, 20, "Story_Test_Set".Length),
+            (DocB, "Story_Test_Set", 9, 12, "Story_Test_Set".Length)), DocA, 1);
+
+        var result = GroupValueRenameBuilder.Build("Story_Test_Set", "Renamed", index, NullLogger.Instance);
+
+        var (uri, edit) = Assert.Single(Edits(result!));
+        Assert.Equal(DocA, uri);
+        Assert.Equal("Renamed", edit.NewText);
+    }
+
+    [Fact]
+    public void Build_ASetWithNoMemberInTheProject_HasNothingToRename()
+    {
+        // DocB alone holds the set and belongs to the dependency; DocA is the project's and holds another.
+        var index = InLayer(IndexWith(
+            (DocA, "Own_Set", 5, 20, "Own_Set".Length),
+            (DocB, "Story_Test_Set", 9, 12, "Story_Test_Set".Length)), DocA, 1);
+
+        Assert.Null(GroupValueRenameBuilder.Build("Story_Test_Set", "Renamed", index, NullLogger.Instance));
+    }
 }

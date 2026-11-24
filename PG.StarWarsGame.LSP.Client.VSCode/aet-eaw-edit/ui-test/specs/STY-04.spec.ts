@@ -3,7 +3,7 @@
 // does in View (#180). The campaign's two battles are named against their order: the long chain reaches
 // Zulu first, and Alpha hangs off a root of its own, which a layout left to itself puts further left.
 import { browser, expect } from "@wdio/globals";
-import { serverReady } from "../protocol.js";
+import { serverReady, tabLabels } from "../protocol.js";
 import { graphLoaded, inNewestWebview, openStoryGraph } from "./storyGraph.js";
 
 interface Stub {
@@ -30,15 +30,6 @@ async function bothStubs(): Promise<Record<string, Stub>> {
         timeoutMsg: "The galactic graph did not draw both battles",
     });
     return stubs();
-}
-
-/** How many story graph panels are open, by their tab titles. */
-async function battleTabs(): Promise<string[]> {
-    return browser.executeWorkbench((vscode) =>
-        vscode.window.tabGroups.all
-            .flatMap((group: { tabs: { label: string }[] }) => group.tabs)
-            .map((tab: { label: string }) => tab.label),
-    );
 }
 
 describe("STY-04", () => {
@@ -69,7 +60,7 @@ describe("STY-04", () => {
     });
 
     it("opens a battle through its doorway in Edit mode", async () => {
-        const before = await battleTabs();
+        const before = await tabLabels();
         await inNewestWebview(async () => {
             await (await browser.$('button.rotary-pos[title="Edit"]')).click();
             await bothStubs();
@@ -77,7 +68,7 @@ describe("STY-04", () => {
             await doorway.waitForExist({ timeout: 15_000 });
             await doorway.click();
         });
-        await browser.waitUntil(async () => (await battleTabs()).length === before.length + 1, {
+        await browser.waitUntil(async () => (await tabLabels()).length === before.length + 1, {
             timeout: 30_000,
             timeoutMsg: "The doorway opened no battle panel in Edit mode",
         });

@@ -67,6 +67,14 @@ export interface StoryCampaignDto {
     definitionUri?: string | null;
     /** 0-based line of the `<Campaign>` element in `definitionUri`. */
     definitionLine?: number | null;
+    /**
+     * 0-based line of the `Campaign_Set` value in `definitionUri`: where a rename of the set is
+     * asked. Null when the campaign declares no set, and when its definition is not the project's
+     * to write - the game's, or a dependency's.
+     */
+    setLine?: number | null;
+    /** 0-based column of that value; null whenever `setLine` is. */
+    setColumn?: number | null;
 }
 
 export interface GetStoryPlotsResult {
