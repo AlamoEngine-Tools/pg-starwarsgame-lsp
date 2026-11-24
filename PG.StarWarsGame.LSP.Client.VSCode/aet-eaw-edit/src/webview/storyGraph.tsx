@@ -161,6 +161,7 @@ import {
 import { initPanelLayout } from "./shared/panelLayoutBridge";
 import { createRequester } from "./shared/hostRequest";
 import { poster, transport, vscodeApi } from "./shared/vscodeApi";
+import { PageToolbar } from "./shared/PageToolbar";
 import type {
     StoryGraphToHost,
     StoryGraphToWebview,
@@ -7708,6 +7709,46 @@ function App(): React.JSX.Element {
                         onClose={() => setCreateRequest(null)}
                     />
                 ) : null}
+                <PageToolbar
+                    // A window without story editing shows the story and stages nothing.
+                    save={
+                        availableModes.edit
+                            ? {
+                                  title: l10n.t(
+                                      "Save - write all staged changes to the XML files",
+                                  ),
+                                  pending: pendingCount,
+                                  disabled:
+                                      mode !== "edit" ||
+                                      pendingCount === 0 ||
+                                      saving,
+                                  disabledReason:
+                                      mode !== "edit"
+                                          ? l10n.t("Save - Edit mode only")
+                                          : saving
+                                            ? l10n.t(
+                                                  "Save - writing the staged changes now",
+                                              )
+                                            : l10n.t(
+                                                  "Save - nothing is staged",
+                                              ),
+                                  onSave: saveEdits,
+                              }
+                            : undefined
+                    }
+                    verdict={
+                        <SeverityTag
+                            severity={severity}
+                            count={problems.length}
+                            title={l10n.t(
+                                "Validate - check the story for problems (opens the panel below)",
+                            )}
+                            onClick={() => {
+                                validateEdits();
+                            }}
+                        />
+                    }
+                />
                 <div className="body">
                     <div className="canvas-column">
                         <div className="canvas-area">
@@ -7831,34 +7872,6 @@ function App(): React.JSX.Element {
                         maxWidth={520}
                         header={
                             <>
-                                {mode === "edit" ? (
-                                    <IconButton
-                                        icon="save"
-                                        className={
-                                            "header-left" +
-                                            (pendingCount > 0 ? " active" : "")
-                                        }
-                                        title={l10n.t(
-                                            "Save - write all staged changes to the XML files",
-                                        )}
-                                        badge={
-                                            pendingCount > 0
-                                                ? ` ${pendingCount}`
-                                                : ""
-                                        }
-                                        disabled={pendingCount === 0 || saving}
-                                        disabledReason={
-                                            saving
-                                                ? l10n.t(
-                                                      "Save - writing the staged changes now",
-                                                  )
-                                                : l10n.t(
-                                                      "Save - nothing is staged",
-                                                  )
-                                        }
-                                        onClick={saveEdits}
-                                    />
-                                ) : null}
                                 <RotaryModeSwitch
                                     mode={mode}
                                     modes={STORY_MODES.filter((m) =>
@@ -7883,16 +7896,6 @@ function App(): React.JSX.Element {
                                                 : m,
                                         )}
                                     onSelect={switchMode}
-                                />
-                                <SeverityTag
-                                    severity={severity}
-                                    count={problems.length}
-                                    title={l10n.t(
-                                        "Validate - check the story for problems (opens the panel below)",
-                                    )}
-                                    onClick={() => {
-                                        validateEdits();
-                                    }}
                                 />
                             </>
                         }

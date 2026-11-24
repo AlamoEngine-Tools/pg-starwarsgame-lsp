@@ -49,6 +49,8 @@ export interface LocGridShellProps {
     footer?: ReactNode;
     /** Validation results, between the table and its footer. */
     problemsBar?: ReactNode;
+    /** The page's own bar, above the table and the dock alike. */
+    toolbar: ReactNode;
     dockHeader: ReactNode;
     dockContent: ReactNode;
     /** Filters, at the foot of the dock - the story graph editor puts its there too. */
@@ -128,6 +130,7 @@ function LocGridShellBody(props: LocGridShellProps): React.JSX.Element {
     return (
         <Shell>
             {props.overlays}
+            {props.toolbar}
             <div className="body">
                 {/* The table and its footer share a column so the footer stays put while the grid
                     scrolls under it. */}

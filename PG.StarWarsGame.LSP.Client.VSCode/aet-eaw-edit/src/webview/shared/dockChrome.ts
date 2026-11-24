@@ -384,6 +384,35 @@ ${tokensCss}
        settings pane the same button reads as an ornament, because nothing says it can be pressed. */
     .btn.compact { padding: var(--space-4) var(--space-8); }
 
+    /* ── The page toolbar ──────────────────────────────────────────────── */
+    /* Across the top of the page, above the canvas and the dock alike. It never shrinks: the page
+       under it gives way, or a narrow window would squeeze the one row every action is on. A row
+       too narrow for both ends wraps the right end under the left one. */
+    .page-toolbar {
+        flex-shrink: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4) var(--space-12);
+        padding: var(--space-6) var(--space-12);
+        background: var(--colour-editor-ground);
+        border-bottom: var(--space-1) solid var(--colour-line);
+        font-family: var(--font-family-ui);
+        font-size: var(--font-size-body);
+    }
+    .page-toolbar-start,
+    .page-toolbar-end {
+        display: flex;
+        align-items: center;
+        gap: var(--space-8);
+        min-width: 0;
+    }
+    .page-toolbar-end { gap: var(--space-4); margin-left: auto; }
+
+    .page-toolbar .icon-btn { font-size: var(--icon-size-16); }
+    .page-toolbar .icon-btn .codicon { font-size: var(--icon-size-16); }
+
     /* ── Dialogs ───────────────────────────────────────────────────────── */
     .modal-backdrop {
         position: fixed;
@@ -1072,6 +1101,8 @@ export const dockHeaderCss = `
         min-height: 34px;
     }
     .dock-header.with-dial { min-height: 78px; }
+    /* A header with nothing to report takes no band of the dock. */
+    .dock-header:empty { display: none; }
     .dock-header .header-left { position: absolute; left: 8px; }
     .dock-header .header-right { position: absolute; right: 8px; }
 

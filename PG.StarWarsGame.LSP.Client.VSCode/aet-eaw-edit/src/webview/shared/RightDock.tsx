@@ -20,7 +20,10 @@ import { useEdgeResize } from "./useEdgeResize";
 import { readPanelSize, writePanelSize } from "../../shared/panelLayout";
 
 export interface RightDockProps {
-    /** Pinned above the scrolling content - mode switches, save/validate, whatever the editor needs. */
+    /**
+     * Pinned above the scrolling content: the dial and the document's passive state. What the page
+     * does to its document - save, close, the verdict - is in the page toolbar, not here.
+     */
     header?: ReactNode;
     /**
      * Whether the header carries the rotary mode dial, which needs a taller header. Held from the

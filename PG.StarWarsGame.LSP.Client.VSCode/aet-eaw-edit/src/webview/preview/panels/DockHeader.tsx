@@ -11,33 +11,22 @@ import type { Abilities } from "../useAbilities";
 import * as l10n from "@vscode/l10n";
 import {
     type ModelDetail,
-    type PreviewProblem,
     type PreviewScene,
 } from "../../../protocol/modelPreview";
 import { IconButton } from "../../shared/Button";
 import { Icon } from "../../shared/Icon";
-import { post } from "../previewPost";
 import { type ViewportStats } from "../viewport";
 import { type PreviewMode, previewModes } from "../previewMode";
 import { RotaryModeSwitch } from "../../shared/RotaryModeSwitch";
-import { SeverityTag } from "../../shared/SeverityTag";
-import { type Handoff } from "../handoff";
-import { type ValidationState } from "../../loc/useLocPanel";
 
 export interface DockHeaderProps {
     abilityState: Abilities;
     flyouts: Flyouts;
-    handoff: Handoff | null;
     mode: PreviewMode;
     modelDetail: ModelDetail | null;
-    notices: PreviewProblem[];
     player: AnimationTransport;
-    problemsOpen: boolean;
-    problemsTitle: string;
     scene: PreviewScene | null;
     setMode: Dispatch<SetStateAction<PreviewMode>>;
-    setProblemsOpen: Dispatch<SetStateAction<boolean>>;
-    severity: ValidationState;
     /** Game rendering is casting the stand-in shadow, which the game does not draw. */
     standInDrawn: boolean;
     stats: ViewportStats | null;
@@ -46,17 +35,11 @@ export interface DockHeaderProps {
 export function DockHeader({
     abilityState,
     flyouts,
-    handoff,
     mode,
     modelDetail,
-    notices,
     player,
-    problemsOpen,
-    problemsTitle,
     scene,
     setMode,
-    setProblemsOpen,
-    severity,
     standInDrawn,
     stats,
 }: DockHeaderProps): React.JSX.Element {
@@ -152,26 +135,9 @@ export function DockHeader({
                 </span>
             )}
 
-            {/* The right edge is a column: the hand-off above the severity tag. Outside
-                            the dial's span, because a particle file has no dial and is exactly where
-                            the Particle Editor belongs. One tool per scene - see handoffFor. */}
+            {/* The right edge: passive state only. The hand-off and the verdict are the page's
+                            and sit in its toolbar. */}
             <span className="header-corner">
-                {handoff !== null && (
-                    <IconButton
-                        icon={handoff.icon}
-                        className="as-action"
-                        title={handoff.title}
-                        disabled={handoff.disabledReason !== undefined}
-                        disabledReason={handoff.disabledReason ?? ""}
-                        onClick={() =>
-                            post({
-                                type: "openExternal",
-                                tool: handoff.tool,
-                            })
-                        }
-                    />
-                )}
-
                 {/* Passive state beside the warnings: a shadow on screen the game does not draw.
                 Not a control - the switch is in Scene settings - so a mark, not a button. */}
                 <span className="header-corner-row">
@@ -189,17 +155,6 @@ export function DockHeader({
                             <Icon name="standInShadow" />
                         </span>
                     )}
-                    <SeverityTag
-                        severity={severity}
-                        count={notices.length}
-                        expanded={problemsOpen}
-                        disabled={notices.length === 0}
-                        disabledReason={l10n.t(
-                            "Nothing to report about this model",
-                        )}
-                        title={problemsTitle}
-                        onClick={() => setProblemsOpen((open) => !open)}
-                    />
                 </span>
             </span>
         </>

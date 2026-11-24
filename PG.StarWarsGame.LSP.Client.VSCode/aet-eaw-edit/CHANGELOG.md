@@ -70,6 +70,12 @@
   a refactoring is, and one undo in any of the files takes the rename back in all of them. The entry is
   disabled, with the reason, on the node of the campaigns that declare no set and on a set no member of
   the project belongs to ([#181](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/181))
+- **A page toolbar above the editor and its dock** - the story graph, the localisation and credits editors,
+  the model preview and the encyclopedia preview carry one bar across the top of the page. Save is its first
+  control on the left and the validation tag its last on the right, on every page that has them. The
+  model preview's hand-off to AloViewer or the Particle Editor stands in the bar as well. In the story graph
+  Save stays in view outside Edit mode, disabled, with the reason. The dock's header keeps the mode dial and
+  the state of what is open ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

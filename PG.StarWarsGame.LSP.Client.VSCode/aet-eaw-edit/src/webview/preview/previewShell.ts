@@ -43,9 +43,7 @@ export const Shell = styled.div`
         gap: var(--space-2);
     }
 
-    /* The right edge as a column: the hand-off above the severity tag, the pair centred on the
-       header's height. The tag carries header-right for every other dock, which positions it on its
-       own; inside this column it is a plain item. */
+    /* The right edge: the header's passive marks, centred on its height. */
 
     .header-corner {
         position: absolute;
@@ -57,10 +55,6 @@ export const Shell = styled.div`
         align-items: flex-end;
         justify-content: center;
         gap: var(--space-2);
-    }
-
-    .header-corner .header-right {
-        position: static;
     }
 
     /* The severity tag's own line in that column, with the stand-in shadow's mark to its left when

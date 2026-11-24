@@ -69,8 +69,11 @@ async function saveField(event: string, label: string, value: string): Promise<v
             timeoutMsg: "The edit was not staged",
         });
         await save.click();
-        // A save that went through leaves Edit mode, and the Save button with it.
-        await save.waitForExist({ reverse: true, timeout: 30_000, timeoutMsg: "The save left the graph in Edit mode" });
+        // A save that went through leaves Edit mode. Save stays in the toolbar and says so.
+        await browser.waitUntil(async () => (await save.getAttribute("title")) === "Save - Edit mode only", {
+            timeout: 30_000,
+            timeoutMsg: "The save left the graph in Edit mode",
+        });
     });
 }
 

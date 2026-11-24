@@ -20,7 +20,7 @@ import { ConvertibleFormat, LocDockActions } from "./loc/LocDockActions";
 import { languageCopyValues } from "./loc/languageCopy";
 import { languageFillValues } from "./loc/languageFill";
 import { LocColumnMenu } from "./loc/LocColumnMenu";
-import { LocDockHeader } from "./loc/LocDockHeader";
+import { LocDockHeader, LocPageToolbar } from "./loc/LocDockHeader";
 import { useLocColumns } from "./loc/useLocColumns";
 import { LocGridMessage, LocGridShell } from "./loc/LocGridShell";
 import { EditMenuItem } from "./loc/readOnly";
@@ -405,8 +405,8 @@ function App(): React.JSX.Element {
         </>
     );
 
-    const dockHeader = (
-        <LocDockHeader
+    const toolbar = (
+        <LocPageToolbar
             queue={queue}
             problems={problems}
             validation={validation}
@@ -414,6 +414,7 @@ function App(): React.JSX.Element {
             onValidate={validate}
         />
     );
+    const dockHeader = <LocDockHeader />;
 
     const dockContent = (
         <>
@@ -586,6 +587,7 @@ function App(): React.JSX.Element {
                 e.preventDefault();
                 setMenu({ x: e.clientX, y: e.clientY, key: "", index: -1 });
             }}
+            toolbar={toolbar}
             dockHeader={dockHeader}
             dockContent={dockContent}
             dockOverview={dockOverview}

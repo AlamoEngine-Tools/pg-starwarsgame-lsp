@@ -26,10 +26,7 @@ describe("SeverityTag", () => {
             />,
         );
 
-        assert.match(
-            html,
-            /class="icon-btn validate-btn header-right sev-warning"/,
-        );
+        assert.match(html, /class="icon-btn validate-btn sev-warning"/);
     });
 
     it("takes its glyph from the severity, as a codicon", () => {

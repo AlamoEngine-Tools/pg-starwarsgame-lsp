@@ -5,7 +5,7 @@
 // graph, the localisation editors and the encyclopedia card already use.
 //
 // The dock's three levels have fixed MEANINGS, and a control goes in the one matching what it IS:
-// the header reports state about the document (the subject and the severity tag), the content is
+// the header reports state about the document (the subject and the lens dial), the content is
 // this editor's library (the model's own stats and hardpoints), and the foot holds EVERY view
 // control - camera angle, grid, which animation. Camera buttons floating over the canvas were the
 // obvious place to write them and the wrong place to put them.
@@ -113,7 +113,11 @@ import { shadowTintReach, standInBlock } from "./preview/shadowVolumePass";
 import { RightDock } from "./shared/RightDock";
 
 import { initPanelLayout } from "./shared/panelLayoutBridge";
+import * as l10n from "@vscode/l10n";
 import { vscodeApi } from "./shared/vscodeApi";
+import { IconButton } from "./shared/Button";
+import { PageToolbar } from "./shared/PageToolbar";
+import { SeverityTag } from "./shared/SeverityTag";
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
 // every drag back to it. Must run before anything measures itself.
@@ -1402,6 +1406,39 @@ function ModelPreview(): React.JSX.Element {
 
     return (
         <Shell>
+            <PageToolbar
+                actions={
+                    // One tool per scene - see handoffFor. A particle file's is the Particle Editor.
+                    handoff !== null && (
+                        <IconButton
+                            icon={handoff.icon}
+                            className="as-action"
+                            title={handoff.title}
+                            disabled={handoff.disabledReason !== undefined}
+                            disabledReason={handoff.disabledReason ?? ""}
+                            onClick={() =>
+                                post({
+                                    type: "openExternal",
+                                    tool: handoff.tool,
+                                })
+                            }
+                        />
+                    )
+                }
+                verdict={
+                    <SeverityTag
+                        severity={severity}
+                        count={notices.length}
+                        expanded={problemsOpen}
+                        disabled={notices.length === 0}
+                        disabledReason={l10n.t(
+                            "Nothing to report about this model",
+                        )}
+                        title={problemsTitle}
+                        onClick={() => setProblemsOpen((open) => !open)}
+                    />
+                }
+            />
             <div className="body">
                 <div className="stage-column">
                     <div className="viewport">
@@ -1617,17 +1654,11 @@ function ModelPreview(): React.JSX.Element {
                         <DockHeader
                             abilityState={abilityState}
                             flyouts={flyouts}
-                            handoff={handoff}
                             mode={mode}
                             modelDetail={modelDetail}
-                            notices={notices}
                             player={player}
-                            problemsOpen={problemsOpen}
-                            problemsTitle={problemsTitle}
                             scene={scene}
                             setMode={setMode}
-                            setProblemsOpen={setProblemsOpen}
-                            severity={severity}
                             standInDrawn={standInDrawn}
                             stats={stats}
                         />

@@ -1,11 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The verdict on what is open, at the right-hand end of a dock header.
+// The verdict on what is open, at the right-hand end of the page toolbar.
 //
 // Four panels draw this - the preview, the story graph, the encyclopedia card and the localisation
 // grid - and all four wrote the same three things out by hand: the class string
-// `icon-btn validate-btn header-right sev-${severity}` character for character, a codicon chosen
+// `icon-btn validate-btn sev-${severity}` character for character, a codicon chosen
 // from the severity, and a count rendered only when non-zero with a leading space. Those three are
 // what is shared here, because those three were already identical.
 //
@@ -65,7 +65,7 @@ export function SeverityTag({
     return (
         <button
             type="button"
-            className={`icon-btn validate-btn header-right sev-${severity}`}
+            className={`icon-btn validate-btn sev-${severity}`}
             title={disabled ? disabledReason : title}
             aria-expanded={expanded}
             disabled={disabled}
