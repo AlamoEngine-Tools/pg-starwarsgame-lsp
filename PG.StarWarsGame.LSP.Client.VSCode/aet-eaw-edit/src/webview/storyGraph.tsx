@@ -80,7 +80,11 @@ import { facetList } from "./storyGraph/facets";
 import { PathFilterMenu } from "./storyGraph/PathFilterMenu";
 import { noteBadge, type StoryNote } from "./storyGraph/typeNotes";
 import { type PathDirection } from "./storyGraph/pathDirection";
-import { arrangePositions } from "./storyGraph/modelArrange";
+import {
+    arrangePositions,
+    battleOrderConnections,
+} from "./storyGraph/modelArrange";
+import { battleOrderEdges, boxNodeSize } from "./storyGraph/battleOrder";
 import { lodShape } from "./storyGraph/lodShape";
 import {
     needsFullMountForLayout,
@@ -609,11 +613,9 @@ class StoryNode extends ClassicPreset.Node {
             this.width = EVENT_NODE_WIDTH;
             this.height = estimateEventNodeHeight(dto);
         } else {
-            this.width = Math.max(
-                140,
-                Math.min(dto.label.length, 30) * 6.5 + 32,
-            );
-            this.height = 40;
+            const box = boxNodeSize(dto);
+            this.width = box.w;
+            this.height = box.h;
         }
     }
 }
@@ -1741,10 +1743,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         if (dto.kind === "Event") {
             return { w: EVENT_NODE_WIDTH, h: estimateEventNodeHeight(dto) };
         }
-        return {
-            w: Math.max(140, Math.min(dto.label.length, 30) * 6.5 + 32),
-            h: 40,
-        };
+        return boxNodeSize(dto);
     };
 
     // placeNewNode's midpoint logic, but reading positions from graphModel (nodes aren't mounted).
@@ -2386,6 +2385,8 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 source: edge.fromId,
                 target: edge.toId,
             })),
+            // The battles' stand-ins in the order of play, whatever the flow alone would do.
+            battleOrderEdges(nodes, edges),
         );
 
         for (const [id, at] of positions) {
@@ -3017,7 +3018,26 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                         // first (windowed is already false here, so mountNodes adds them).
                         await mountAllFromModel();
                     }
-                    await arrange.layout({ options: ARRANGE_OPTIONS });
+                    // Everything is mounted here, so the editor's connections are the whole
+                    // graph. The order of play rides along as connections nothing draws: the
+                    // plugin lays out what it is handed, not what the editor holds.
+                    const connections = editor.getConnections();
+                    const order = battleOrderConnections(
+                        battleOrderEdges(
+                            [...graphModel.values()].map((m) => m.dto),
+                            connections.map((c) => ({
+                                fromId: c.source,
+                                toId: c.target,
+                            })),
+                        ),
+                    );
+                    await arrange.layout({
+                        options: ARRANGE_OPTIONS,
+                        connections: [
+                            ...connections,
+                            ...(order as unknown as typeof connections),
+                        ],
+                    });
                     rebuildModel(); // capture the recomputed layout into the model
                     saveAllPositions(); // ...and persist it (replaces the saved one)
                 } finally {
@@ -3690,6 +3710,18 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         opacity: 0.4;
     }
 
+    /* A battle's place in the order of play, under its name: the same words the navigator uses. */
+
+    .battle-order {
+        font-size: var(--font-size-10);
+        font-family: var(--font-family-ui);
+        color: var(--colour-muted);
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     &.k-AndJunction,
     &.k-OrJunction,
     &.k-StagingAnd,
@@ -3913,6 +3945,19 @@ function VirtualNodeView(props: {
                         <Icon name="openSubgraph" size={10} />
                     </button>
                 </Drag.NoDrag>
+            ) : null}
+            {/* One second line: the battle's place in the order of play, and while the galaxy
+                simulates what the battle is doing instead, which is the news then. */}
+            {dto.kind === "TacticalPlot" &&
+            dto.battleOrder &&
+            !props.data.simBattle ? (
+                <span className="battle-order">
+                    {l10n.t(
+                        "Battle {0} of {1}",
+                        dto.battleOrder.rank + 1,
+                        dto.battleOrder.count,
+                    )}
+                </span>
             ) : null}
             {dto.kind === "TacticalPlot" && props.data.simBattle ? (
                 <span

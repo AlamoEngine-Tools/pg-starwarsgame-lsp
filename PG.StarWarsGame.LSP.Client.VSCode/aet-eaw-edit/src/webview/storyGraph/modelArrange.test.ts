@@ -90,6 +90,48 @@ describe("arrangePositions", () => {
         assert.ok(positions.has("j"));
     });
 
+    // #180: the long chain reaches Zulu first and Alpha hangs off a root of its own, so the flow
+    // alone puts Alpha's stand-in three layers left of Zulu's. The order is an edge between two
+    // nodes rather than two sockets: Zulu's stand-in has no output for one to leave from.
+    it("puts a battle's stand-in left of the one played after it, against the flow", async () => {
+        const box = (id: string) => ({
+            id,
+            width: 140,
+            height: 54,
+            hasIn: true,
+            hasOut: false,
+        });
+        const nodes = [
+            event("begin"),
+            event("advance"),
+            event("assault"),
+            event("raid"),
+            box("zulu"),
+            box("alpha"),
+        ];
+        const edges = [
+            { id: "e0", source: "begin", target: "advance" },
+            { id: "e1", source: "advance", target: "assault" },
+            { id: "e2", source: "assault", target: "zulu" },
+            { id: "e3", source: "raid", target: "alpha" },
+        ];
+
+        const free = await arrangePositions(nodes, edges);
+        assert.ok(
+            free.get("alpha")!.x < free.get("zulu")!.x,
+            "the flow alone already orders the battles, so this graph proves nothing",
+        );
+
+        const ordered = await arrangePositions(nodes, edges, [
+            { source: "zulu", target: "alpha" },
+        ]);
+        // A later layer, not merely a larger x: the whole of Zulu lies left of Alpha.
+        assert.ok(ordered.get("zulu")!.x + 140 <= ordered.get("alpha")!.x);
+        // The order moves a stand-in; it does not turn the story's own edges round.
+        assert.ok(ordered.get("raid")!.x < ordered.get("alpha")!.x);
+        assert.ok(ordered.get("assault")!.x < ordered.get("zulu")!.x);
+    });
+
     it("returns nothing for an empty graph", async () => {
         assert.equal((await arrangePositions([], [])).size, 0);
     });

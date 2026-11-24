@@ -72,6 +72,12 @@ internal static class StoryGraphProjection
         var reachable = evaluator.ComputeReachableEvents();
         var eventOf = model.Graph.Nodes.Where(n => n.Event is not null)
             .ToDictionary(n => n.Id, n => n.Event!, StringComparer.Ordinal);
+        // A battle's stand-in says where the battle comes in the order of play - the galactic
+        // scope is the only one that holds stand-ins, so no other scope finds any.
+        var battleOrderOf = new Dictionary<string, StoryBattleOrderDto>(StringComparer.Ordinal);
+        foreach (var battle in model.Battles)
+            battleOrderOf.TryAdd(StoryGraphScoper.TacticalNodeId(battle.Key),
+                new StoryBattleOrderDto(battle.Rank, model.Battles.Count));
 
         // Filters select EVENT nodes; virtual nodes and edges survive when both endpoints do.
         var keptEvents = new HashSet<string>(StringComparer.Ordinal);
@@ -151,7 +157,8 @@ internal static class StoryGraphProjection
                 node.Event?.StoryDialog,
                 node.Event?.StoryChapter,
                 node.PortalTarget,
-                readOnlyOwner?.Invoke(node.ThreadUri)));
+                readOnlyOwner?.Invoke(node.ThreadUri),
+                node.Kind == StoryNodeKind.TacticalPlot ? battleOrderOf.GetValueOrDefault(node.Id) : null));
         }
 
         var edges = scoped.Edges

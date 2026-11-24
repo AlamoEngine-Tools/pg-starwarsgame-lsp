@@ -716,5 +716,11 @@
   },
   "SET-36": {
     "open": "C:\\temp\\aet-test-SET-set"
+  },
+  "STY-04": {
+    "open": "C:\\temp\\aet-test-STY-order",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
   }
 }

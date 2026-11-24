@@ -109,6 +109,11 @@ export interface StoryGraphNodeDto {
      * is the unlayered case.
      */
     readOnlyOwner?: string | null;
+    /**
+     * For a battle's stand-in on the galactic graph: where the battle comes in the order of play,
+     * `rank` 0-based among the faction's `count` battles. Absent or null on every other node.
+     */
+    battleOrder?: { rank: number; count: number } | null;
 }
 
 export interface StoryGraphEdgeDto {

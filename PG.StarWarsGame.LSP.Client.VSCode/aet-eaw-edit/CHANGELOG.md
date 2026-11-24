@@ -59,6 +59,12 @@
   it names. Every output channel and the log file write the home directory as `~`. The `aetswg-*.log`
   files left in a project by an earlier version can be deleted
   ([#461](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/461))
+- **A battle's play order on the campaign graph** - a battle's stand-in on the galactic story graph says
+  where the battle comes in the order of play, `Battle 2 of 9`, in the words the Story navigator uses. The
+  automatic layout puts the stand-ins in that order, an earlier battle's left of a later one's, on the first
+  open of a campaign and on Arrange; a stored arrangement stays as it is until Arrange. A pair is left as
+  the story's flow puts it when the story leads from the later battle back to the earlier one
+  ([#180](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/180))
 
 ### Fixes
 
