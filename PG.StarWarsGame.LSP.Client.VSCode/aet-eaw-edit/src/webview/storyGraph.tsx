@@ -7,7 +7,7 @@
 //
 // Editing is mode-based. View/Simulate are read-only. In Edit mode NOTHING is written to disk until
 // Save: every mutation is staged (STAGED_KINDS / staging.ts) and the whole queue is flushed to
-// aet/applyStoryCommandBatch on Save (or dry-run through aet/validateStoryCommandBatch on Validate).
+// aet/applyEditBatch on Save (or dry-run through aet/validateEditBatch on Validate).
 // Property edits are reflected instantly by an optimistic dto patch; structural gestures
 // (create/delete/rename/edges) instead ask the server for a preview graph built from the composed
 // working copy (aet/previewStoryGraph - the server does the graph build, the client never
@@ -382,8 +382,9 @@ function toggleSection(nodeId: string, section: NodeSection): void {
 }
 
 /**
- * Diagnostics per node id, from the server's aet/getStoryDiagnostics (via the extension's
- * 'diagnostics' message) - module scope for the same portal-rendering reason as the maps above.
+ * Diagnostics per node id, from the Validate action: the server's aet/validateEditBatch,
+ * relayed in the extension's 'diagnostics' message - module scope for the same portal-rendering
+ * reason as the maps above.
  */
 const nodeDiagnostics = new Map<string, StoryDiagnosticDto[]>();
 
@@ -937,9 +938,9 @@ let reportStatus: (message: string) => void = () => {
 //
 // In Edit mode, gestures don't round-trip per change (the old behaviour - sluggish even on a
 // checkbox). Each staged command mutates the local graph immediately and is queued here; the whole
-// queue is flushed to aet/applyStoryCommandBatch on Save, or dry-run through
-// aet/validateStoryCommandBatch on Validate. The command payloads are exactly the server's command
-// envelopes, so batching them needs no client-side model logic.
+// queue is flushed to aet/applyEditBatch on Save, or dry-run through aet/validateEditBatch on
+// Validate. The command payloads are exactly the server's command envelopes, so batching them needs
+// no client-side model logic.
 
 /** The queued command envelopes, in gesture order - flushed to the server only on Save. */
 const pendingCommands: Record<string, unknown>[] = [];

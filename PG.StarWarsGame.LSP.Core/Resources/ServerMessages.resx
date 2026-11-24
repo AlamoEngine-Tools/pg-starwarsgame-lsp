@@ -444,6 +444,18 @@
   <data name="DynamicEnumValue_IsNotAValidEnum2" xml:space="preserve">
     <value>'{0}' is not a valid enum identifier for &lt;{1}&gt;.</value>
   </data>
+  <data name="EditBatch_ALowerLayer" xml:space="preserve">
+    <value>a dependency</value>
+  </data>
+  <data name="EditBatch_CommandsUnreadable" xml:space="preserve">
+    <value>The staged changes could not be read: {0}</value>
+  </data>
+  <data name="EditBatch_ReadOnlyLayer" xml:space="preserve">
+    <value>'{0}' belongs to {1}, which is read-only. Copy the file into the project to override it, then edit the copy.</value>
+  </data>
+  <data name="EditBatch_UnknownEditor" xml:space="preserve">
+    <value>No editor '{0}' writes through this server.</value>
+  </data>
   <data name="EffectiveObject_AddedByVariant" xml:space="preserve">
     <value>added by variant</value>
   </data>
@@ -783,6 +795,9 @@
   <data name="LocApplyBatch_CouldNotWriteFile" xml:space="preserve">
     <value>Could not write the file: {0}</value>
   </data>
+  <data name="LocApplyBatch_DatIsBuilt" xml:space="preserve">
+    <value>'{0}' is a compiled DAT, which a build writes from the project. Convert the project to CSV or XML to edit its texts.</value>
+  </data>
   <data name="LocApplyBatch_FileNotFound" xml:space="preserve">
     <value>File not found: {0}</value>
   </data>
@@ -873,9 +888,6 @@
   <data name="LocEditor_NoLanguageGiven" xml:space="preserve">
     <value>No language given.</value>
   </data>
-  <data name="LocEditor_NonAsciiKey" xml:space="preserve">
-    <value>Row {0}: '{1}' cannot be used as a key - a .dat stores keys as ASCII. Rename the entry using unaccented letters; the translation itself is unaffected.</value>
-  </data>
   <data name="LocEditor_NotLanguageThisFile" xml:space="preserve">
     <value>'{0}' is not a language in this file.</value>
   </data>
@@ -905,6 +917,9 @@
   </data>
   <data name="LocExportDat_UnsupportedFormat" xml:space="preserve">
     <value>Unsupported format: {0}</value>
+  </data>
+  <data name="LocGetRows_DatIsBuilt" xml:space="preserve">
+    <value>Convert to CSV or XML to edit</value>
   </data>
   <data name="LocGetRows_FailedParseFile" xml:space="preserve">
     <value>Failed to parse file: {0}</value>
@@ -2217,9 +2232,6 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="StoryGraph_SuspendedNeverActivated" xml:space="preserve">
     <value>This plot is suspended in campaign '{0}' and no STORY_ELEMENT reward activates it.</value>
-  </data>
-  <data name="StoryHandlers_ApplyStoryChangeS" xml:space="preserve">
-    <value>Apply story changes ({0})</value>
   </data>
   <data name="StoryHandlers_CampaignCouldNotBeAssembled" xml:space="preserve">
     <value>Campaign '{0}' could not be assembled from the staged changes.</value>

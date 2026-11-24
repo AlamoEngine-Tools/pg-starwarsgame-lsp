@@ -4,6 +4,8 @@
 import * as vscode from "vscode";
 
 import { logLine } from "./log";
+import { reportSave, reportUnreached } from "./editBatchReport";
+import { EditBatchClient } from "./lsp/editBatchClient";
 import { PanelProject } from "./panelProject";
 import { revealDefinition } from "./revealDefinition";
 import { battleLabelOf } from "./storyBattles";
@@ -21,13 +23,14 @@ import type {
     StoryGraphToWebview,
 } from "./protocol/panels/storyGraph";
 import {
-    ApplyStoryCommandBatchResult,
+    EDIT_BATCH_EDITOR,
+    type EditBatchSubject,
     ExecuteStoryCommandResult,
-    GetStoryDiagnosticsResult,
     GetStoryGraphResult,
     GetStoryLayoutResult,
     GetStorySchemaResult,
     GraphFilters,
+    type StoryDiagnosticDto,
     StoryLayoutEntryDto,
     StorySimStateResult,
     WorkspaceSettingsDto,
@@ -154,6 +157,19 @@ export class StoryGraphPanel extends WebviewPanelHost<
     protected override relayParams(_method: string, params: unknown): unknown {
         return {
             ...(params as object),
+            campaign: this._target.campaign,
+            faction: this._target.faction,
+        };
+    }
+
+    /** Where this panel's staged batches are checked and saved: its project's server and editor. */
+    private get _batches(): EditBatchClient {
+        return new EditBatchClient(this.project.gateway, this.project.edits);
+    }
+
+    /** What this panel's batches are about. */
+    private get _subject(): EditBatchSubject {
+        return {
             campaign: this._target.campaign,
             faction: this._target.faction,
         };
@@ -373,43 +389,32 @@ export class StoryGraphPanel extends WebviewPanelHost<
     }
 
     /**
-     * Commits a staged edit-mode batch. On success the queue clears client-side and the server's
-     * `aet/storyGraphChanged` reconciles the graph; on failure the error (and which change failed)
-     * is surfaced and the queue is kept so the user can fix and re-save.
+     * Commits a staged edit-mode batch: the server composes it into one edit, VS Code applies the
+     * edit and the thread files it changed are saved. On success the queue clears client-side and
+     * the server's `aet/storyGraphChanged` reconciles the graph; on failure the error (and which
+     * change failed) is surfaced and the queue is kept so the user can fix and re-save.
      */
     private async _saveBatch(commands: StoryCommandPayload[]): Promise<void> {
-        const result =
-            await this.project.gateway.requestOrReport<ApplyStoryCommandBatchResult>(
-                "aet/applyStoryCommandBatch",
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    commands,
-                },
-                vscode.l10n.t("Save failed"),
-            );
+        const saved = await this._batches.save(
+            EDIT_BATCH_EDITOR.story,
+            this._subject,
+            commands,
+        );
 
         // The webview needs an answer either way: without one the Save button stays spinning and
         // the queue is neither cleared nor released for another attempt.
-        if (result === undefined) {
-            this.post({ type: "saveResult", success: false });
-            return;
-        }
-
-        if (!result.success) {
-            const where =
-                typeof result.failedIndex === "number"
-                    ? ` (change ${result.failedIndex + 1})`
-                    : "";
+        if (!saved.saved && saved.reason === "refused") {
             void vscode.window.showErrorMessage(
                 vscode.l10n.t(
                     "EaWEdit: {0}{1}",
-                    result.error ?? vscode.l10n.t("The save failed."),
-                    where,
+                    saved.message ?? vscode.l10n.t("The save failed."),
+                    changeOf(saved.failedIndex),
                 ),
             );
+        } else {
+            reportSave(saved, vscode.l10n.t("Save failed"));
         }
-        this.post({ type: "saveResult", success: result.success });
+        this.post({ type: "saveResult", success: saved.saved });
     }
 
     /**
@@ -554,29 +559,24 @@ export class StoryGraphPanel extends WebviewPanelHost<
             return;
         }
 
-        const result =
-            await this.project.gateway.requestOrReport<ApplyStoryCommandBatchResult>(
-                "aet/applyStoryCommandBatch",
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    commands: this._pendingCommands,
-                },
+        const saved = await this._batches.save(
+            EDIT_BATCH_EDITOR.story,
+            this._subject,
+            this._pendingCommands,
+        );
+        if (saved.saved || saved.reason !== "refused") {
+            reportSave(
+                saved,
                 vscode.l10n.t("Could not save the closed story graph"),
             );
-        if (result === undefined || result.success) {
             return;
         }
 
-        const where =
-            typeof result.failedIndex === "number"
-                ? ` (change ${result.failedIndex + 1})`
-                : "";
         void vscode.window.showErrorMessage(
             vscode.l10n.t(
                 "EaWEdit: Could not save the closed story graph{0} - {1}",
-                where,
-                result.error ?? "",
+                changeOf(saved.failedIndex),
+                saved.message ?? "",
             ),
         );
     }
@@ -654,28 +654,28 @@ export class StoryGraphPanel extends WebviewPanelHost<
     private async _validateBatch(
         commands: StoryCommandPayload[],
     ): Promise<void> {
-        const result =
-            await this.project.gateway.requestOrReport<GetStoryDiagnosticsResult>(
-                "aet/validateStoryCommandBatch",
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    commands,
-                },
-                vscode.l10n.t("Validation failed"),
-            );
-        if (result === undefined) {
+        const outcome = await this._batches.validate(
+            EDIT_BATCH_EDITOR.story,
+            this._subject,
+            commands,
+        );
+        if (!outcome.ok) {
+            reportUnreached(outcome, vscode.l10n.t("Validation failed"));
             return;
         }
 
+        const result = outcome.value;
         if (result.error) {
             void vscode.window.showWarningMessage(
                 vscode.l10n.t("EaWEdit: {0}", result.error),
             );
         }
+        // The story composer places every problem in a file, so each carries where it is.
         this.post({
             type: "diagnostics",
-            diagnostics: result.error ? [] : (result.diagnostics ?? []),
+            diagnostics: result.error
+                ? []
+                : ((result.problems ?? []) as StoryDiagnosticDto[]),
         });
     }
 
@@ -798,7 +798,7 @@ export class StoryGraphPanel extends WebviewPanelHost<
         }
         // Diagnostics are NO LONGER pushed on every graph refresh - they were the "live"
         // validation that made editing sluggish. They now come only from the explicit Validate
-        // action (aet/validateStoryCommandBatch), which reflects the staged/pending state.
+        // action (aet/validateEditBatch), which reflects the staged/pending state.
     }
 
     private async _openXml(
@@ -848,4 +848,11 @@ function filterFields(
         reachableDirection: filters?.reachableDirection || undefined,
         plotState: filters?.plotState || undefined,
     };
+}
+
+/** " (change N)" for the command the server refused, counted from one; empty when it named none. */
+function changeOf(failedIndex: number | undefined): string {
+    return typeof failedIndex === "number"
+        ? ` (change ${failedIndex + 1})`
+        : "";
 }

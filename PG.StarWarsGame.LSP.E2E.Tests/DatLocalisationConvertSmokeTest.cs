@@ -1,7 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Newtonsoft.Json.Linq;
+using PG.StarWarsGame.LSP.Localisation.Rows;
+using PG.StarWarsGame.LSP.Server.Editing;
 using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -51,5 +55,38 @@ public sealed class DatLocalisationConvertSmokeTest : IClassFixture<DatLocalisat
         var project = await File.ReadAllTextAsync(pgproj, cts.Token);
         Assert.Contains("CSV", project, StringComparison.Ordinal);
         Assert.DoesNotContain("\"dat\"", project, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     A compiled DAT is shown and not edited: reading it says why, in the words the grid puts
+    ///     on its disabled controls, and a batch for it is refused without the file being touched.
+    /// </summary>
+    [Fact]
+    public async Task ACompiledDat_IsReadWithTheReasonItIsNotEdited_AndABatchForItIsRefused()
+    {
+        await _fixture.ScanCompleted.WaitAsync(TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var before = await File.ReadAllBytesAsync(_fixture.DatPath, cts.Token);
+
+        var rows = await _fixture.Client.SendRequest(new GetLocalisationRowsParams(_fixture.DatPath), cts.Token);
+
+        Assert.Null(rows.Error);
+        Assert.Contains(rows.Rows, r => r.Key == "TEXT_FROM_DAT");
+        Assert.Equal("Convert to CSV or XML to edit", rows.ReadOnlyReason);
+
+        var applied = await _fixture.Client.SendRequest(
+            new ApplyEditBatchParams(
+                TranslationEditBatchComposer.EditorName,
+                new EditBatchSubject(Documents: [new EditBatchDocument(_fixture.DatPath, rows.ContentHash)]),
+                JArray.FromObject(new[]
+                {
+                    new LocKeyedCommandDto("setValue", "TEXT_FROM_DAT", Language: rows.Languages[0], Value: "x")
+                })),
+            cts.Token);
+
+        Assert.False(applied.Success);
+        Assert.Null(applied.Edit);
+        Assert.Contains("compiled DAT", applied.Error!, StringComparison.Ordinal);
+        Assert.Equal(before, await File.ReadAllBytesAsync(_fixture.DatPath, cts.Token));
     }
 }

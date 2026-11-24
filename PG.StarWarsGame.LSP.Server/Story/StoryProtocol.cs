@@ -13,9 +13,9 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     Gating for the authoring endpoints behind Edit mode - the staged-batch preview and the writes
 ///     themselves. The result carries the message naming the setting to turn on.
 ///     <para>
-///         Note that <c>aet/validateStoryCommandBatch</c> is deliberately NOT here: validating
-///         writes nothing and the Validate button is available in every mode, so it belongs to the
-///         read surface.
+///         Note that validating a story batch (<c>aet/validateEditBatch</c>) is deliberately NOT
+///         here: validating writes nothing and the Validate button is available in every mode, so
+///         it belongs to the read surface.
 ///     </para>
 /// </summary>
 public static class StoryEditingFeature
@@ -259,29 +259,6 @@ public sealed record ResolveStoryReferenceResult(
     int Line = 0,
     int Column = 0,
     string? Error = null);
-
-// ── aet/getStoryDiagnostics - validation results correlated to graph nodes ───
-
-[Method("aet/getStoryDiagnostics", Direction.ClientToServer)]
-public sealed record GetStoryDiagnosticsParams(string Campaign, string Faction) : IRequest<GetStoryDiagnosticsResult>;
-
-public sealed record GetStoryDiagnosticsResult(
-    IReadOnlyList<StoryDiagnosticDto> Diagnostics,
-    string? Error = null);
-
-/// <param name="NodeId">The graph node the diagnostic belongs to; null for file-level problems.</param>
-/// <param name="Side"><c>event</c>/<c>reward</c> when the range falls inside a param slot.</param>
-/// <param name="Position">0-based param slot, when <paramref name="Side" /> is set.</param>
-[PublicAPI]
-public sealed record StoryDiagnosticDto(
-    string? NodeId,
-    string? Side,
-    int? Position,
-    string Severity,
-    string Message,
-    string Uri,
-    int Line,
-    int Column);
 
 // ── aet/getStoryLayout / aet/setStoryLayout - node position sidecar ──────────
 

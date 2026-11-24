@@ -23,6 +23,7 @@ import { LocColumnMenu } from "./loc/LocColumnMenu";
 import { LocDockHeader } from "./loc/LocDockHeader";
 import { useLocColumns } from "./loc/useLocColumns";
 import { LocGridMessage, LocGridShell } from "./loc/LocGridShell";
+import { EditMenuItem } from "./loc/readOnly";
 import { LocSearch } from "./loc/LocSearch";
 import { LocProblemsBar } from "./loc/LocProblemsBar";
 import { LocRow } from "./loc/locRow";
@@ -538,6 +539,7 @@ function App(): React.JSX.Element {
 
     return (
         <LocGridShell
+            readOnlyReason={panel.readOnlyReason}
             rows={visible}
             columns={columns}
             header={header}
@@ -617,35 +619,33 @@ function TranslationRowMenu(props: {
             anchorIndex={props.index}
             onClose={props.onClose}
         >
-            <button role="menuitem" onClick={run(props.onAdd)}>
+            <EditMenuItem onClick={run(props.onAdd)}>
                 {l10n.t("Add translation...")}
-            </button>
+            </EditMenuItem>
 
             {props.onReset && (
                 <>
                     <div className="sep" />
-                    <button
-                        role="menuitem"
+                    <EditMenuItem
                         title={l10n.t(
                             "Replace this entry with the value the layer below it provides",
                         )}
                         onClick={run(() => props.onReset?.())}
                     >
                         {l10n.t("Reset to inherited value")}
-                    </button>
+                    </EditMenuItem>
                 </>
             )}
 
             {props.onDelete && (
                 <>
                     <div className="sep" />
-                    <button
-                        role="menuitem"
+                    <EditMenuItem
                         className="danger"
                         onClick={run(() => props.onDelete?.())}
                     >
                         {l10n.t("Delete row")}
-                    </button>
+                    </EditMenuItem>
                 </>
             )}
         </RowMenuFrame>

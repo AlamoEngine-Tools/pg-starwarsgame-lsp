@@ -5,6 +5,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { useReadOnly } from "./readOnly";
+
 /**
  * A cell that commits on blur or Enter and reverts on Escape.
  *
@@ -17,6 +19,7 @@ export function CellInput(props: {
 }): React.JSX.Element {
     const [draft, setDraft] = useState(props.value);
     const committed = useRef(props.value);
+    const readOnly = useReadOnly();
 
     useEffect(() => {
         setDraft(props.value);
@@ -34,6 +37,8 @@ export function CellInput(props: {
         <input
             type="text"
             value={draft}
+            disabled={readOnly !== null}
+            title={readOnly ?? undefined}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => {

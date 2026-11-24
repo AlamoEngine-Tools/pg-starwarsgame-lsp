@@ -8,8 +8,6 @@ using System.Xml.Linq;
 using CsvHelper;
 using CsvHelper.Configuration;
 using PG.Commons.Hashing;
-using PG.StarWarsGame.Files.DAT.Data;
-using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Text;
@@ -20,7 +18,6 @@ namespace PG.StarWarsGame.LSP.Localisation.Rows;
 /// <inheritdoc />
 public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 {
-    private readonly IDatService _datFileService;
     private readonly IFileHelper _fileHelper;
     private readonly ICrc32HashingService _hashing;
     private readonly IMessageCatalog _messages;
@@ -28,35 +25,14 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
     public LocalisationDocumentEditor(
         ILocalisationRowReader reader,
-        IDatService datFileService,
         ICrc32HashingService hashing,
         IFileHelper fileHelper,
         IMessageCatalog messages)
     {
         _messages = messages;
         _reader = reader;
-        _datFileService = datFileService;
         _hashing = hashing;
         _fileHelper = fileHelper;
-    }
-
-    public async Task<LocalisationEditResult> ApplyToFileAsync(
-        string filePath, IReadOnlyList<LocEditCommandDto> commands, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var extension = fs.Path.GetExtension(filePath).ToLowerInvariant();
-
-        if (extension != ".dat")
-        {
-            var original = await fs.File.ReadAllTextAsync(filePath, ct);
-            var composed = Apply(original, extension, commands, filePath);
-            if (!composed.Success) return composed;
-
-            await fs.File.WriteAllTextAsync(filePath, composed.NewText!, ct);
-            return composed;
-        }
-
-        return ApplyDat(filePath, commands);
     }
 
     /// <inheritdoc />
@@ -134,27 +110,8 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         return (rows, languages, null);
     }
 
-    /// <inheritdoc />
-    public async Task<LocalisationEditResult> ApplyKeyedToFileAsync(
-        string filePath, IReadOnlyList<LocKeyedCommandDto> commands, CancellationToken ct)
-    {
-        var translated = TranslateKeyed(filePath, commands);
-        if (!translated.Success)
-            return LocalisationEditResult.Fail(translated.FailedIndex ?? 0, translated.Error!);
-
-        return await ApplyToFileAsync(filePath, translated.Commands!, ct);
-    }
-
     /// <summary>
     ///     Resolves key-addressed commands against the file as it currently stands.
-    ///     <para>
-    ///         This reads the document, and <see cref="ApplyToFileAsync" /> then reads it again. The
-    ///         second read is accepted rather than threaded through: the XML path composes through
-    ///         <c>XDocument</c> and never builds a <see cref="LocDocument" /> at all, so there is no
-    ///         single document to share across all three formats, and plumbing one in would mean
-    ///         reworking the round-trip code that must not be disturbed. A save is user-initiated
-    ///         and rare; if it ever shows up in a profile, measure before restructuring.
-    ///     </para>
     /// </summary>
     public KeyedTranslationResult TranslateKeyed(
         string filePath, IReadOnlyList<LocKeyedCommandDto> commands)
@@ -223,75 +180,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
     }
 
     /// <summary>
-    ///     Applies a batch to a compiled DAT by rebuilding it from its rows.
-    ///     <para>
-    ///         There is no verbatim source to preserve here and nothing a rewrite could disturb -
-    ///         the format has no comments, quoting or whitespace - so the whole file is written
-    ///         back. The file's own sort order is preserved: rewriting an unsorted credits DAT as a
-    ///         CRC-sorted one would scramble the crawl into checksum order.
-    ///     </para>
-    /// </summary>
-    private LocalisationEditResult ApplyDat(
-        string filePath, IReadOnlyList<LocEditCommandDto> commands)
-    {
-        var fs = _fileHelper.FileSystem;
-        var sortOrder = _datFileService.LoadFile(filePath).Content.Layout;
-        var document = _reader.ReadFile(filePath);
-
-        var rows = document.Rows.ToList();
-        for (var i = 0; i < commands.Count; i++)
-            if (ApplyToRows(rows, commands[i], document.Languages) is { } error)
-                return LocalisationEditResult.Fail(i, error);
-
-        var language = document.Languages.FirstOrDefault() ?? string.Empty;
-
-        // Checked before anything is opened. A .dat stores keys as ASCII bytes and DatStringEntry
-        // refuses anything else - but it did so from inside the write, as "Value contains non-ASCII
-        // characters (Parameter 'value')", which names the wrong field and no row at all.
-        for (var i = 0; i < rows.Count; i++)
-            if (!rows[i].Key.All(char.IsAscii))
-                return LocalisationEditResult.Fail(
-                    i,
-                    _messages.Format("LocEditor_NonAsciiKey", i + 1, rows[i].Key));
-
-        // Materialised HERE, not left lazy. Building an entry is what validates its key, and the
-        // sequence used to be enumerated inside CreateDatFile - by which point File.Create had
-        // already truncated the file. One unwritable key destroyed the file it refused to write.
-        var entries = rows.Select(r => new DatStringEntry(
-            r.Key,
-            _hashing.GetCrc32(r.Key, Encoding.ASCII),
-            r.Values.FirstOrDefault(v => v.Language == language)?.Value ?? string.Empty)).ToList();
-
-        var fileType = sortOrder == DatLayoutKind.OrderedByCrc32
-            ? DatLayoutKind.OrderedByCrc32
-            : DatLayoutKind.NotOrdered;
-
-        // Written beside the target and moved over it, so the original survives every way this can
-        // fail - a rejected entry, a full disk, a crash halfway through. Truncating the real file
-        // first and hoping the write succeeds is what turned a refused save into an empty file.
-        var temporary = filePath + ".aettmp";
-        try
-        {
-            using (var stream = fs.File.Create(temporary))
-            {
-                _datFileService.CreateDatBinary(stream, entries, fileType);
-            }
-
-            fs.File.Move(temporary, filePath, true);
-        }
-        catch
-        {
-            // The original is still untouched; clear the partial away so it is not mistaken for a
-            // localisation file by the next scan.
-            if (fs.File.Exists(temporary)) fs.File.Delete(temporary);
-            throw;
-        }
-
-        return LocalisationEditResult.Ok(string.Empty);
-    }
-
-    /// <summary>
-    ///     The row-list half of the commands, shared by the DAT path. Text formats go through
+    ///     The row-list half of the commands, which a dry run of a DAT goes by. Text formats go through
     ///     <see cref="EditState" /> instead, which additionally tracks each row's original text.
     /// </summary>
     private string? ApplyToRows(
@@ -374,6 +263,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
         // Saved in the text editor's format, the only one it opens, whatever shape the file was in.
         var format = XmlTranslationFormat.TextEditor;
+        var written = XmlTranslationFormat.Of(document);
         format.Rewrite(document);
         var rows = document.Root?.Elements(format.Localisation).ToList() ?? [];
 
@@ -382,6 +272,17 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
                 return LocalisationEditResult.Fail(i, error);
 
         var lineEnding = LineEndings.Detect(text);
+
+        // A file already in that format keeps every character the batch did not ask to change:
+        // the commands are written into its text where each applies, rather than the whole
+        // document being serialised anew - which rewrites the declaration and every attribute's
+        // quotes and drops the comments outside the root. The document above stays the judge of
+        // what the batch means: a text that does not read back as the same rows is not used.
+        if (ReferenceEquals(written, format)
+            && XmlTranslationSplicer.Splice(text, commands, lineEnding) is { } spliced
+            && HoldsTheSameRows(spliced, document, format))
+            return LocalisationEditResult.Ok(spliced);
+
         var declaration = document.Declaration is { } d ? d + lineEnding : string.Empty;
         var body = Serialise(document.Root);
 
@@ -393,6 +294,32 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         if (lineEnding != "\n") body = body.Replace("\n", lineEnding, StringComparison.Ordinal);
 
         return LocalisationEditResult.Ok(declaration + body);
+    }
+
+    /// <summary>Whether <paramref name="text" /> reads back as the rows of <paramref name="expected" />.</summary>
+    private static bool HoldsTheSameRows(string text, XDocument expected, XmlTranslationFormat format)
+    {
+        XDocument written;
+        try
+        {
+            written = XDocument.Parse(text, LoadOptions.PreserveWhitespace);
+        }
+        catch (XmlException)
+        {
+            return false;
+        }
+
+        return RowsOf(written, format).SequenceEqual(RowsOf(expected, format));
+    }
+
+    /// <summary>Each row as its key and its translations in order, in a form two documents can be compared by.</summary>
+    private static IEnumerable<(string? Key, string Translations)> RowsOf(XDocument document,
+        XmlTranslationFormat format)
+    {
+        return (document.Root?.Elements(format.Localisation) ?? []).Select(row => (
+            row.Attribute(format.Key)?.Value,
+            string.Join('\0', row.Elements(format.TranslationData).Elements(format.Translation)
+                .Select(t => t.Attribute(format.Language)?.Value + '\0' + t.Value))));
     }
 
     /// <summary>
@@ -528,6 +455,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         private readonly IMessageCatalog _messages;
         private readonly List<RowState> _rows;
         private string _preamble;
+        private readonly string? _trailer;
 
         public EditState(LocDocument document, string extension, IMessageCatalog messages)
         {
@@ -535,6 +463,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             _messages = messages;
             _lineEnding = document.LineEnding;
             _preamble = document.Preamble;
+            _trailer = document.Trailer;
             _languages = [.. document.Languages];
             _rows = document.Rows
                 .Select(r => new RowState
@@ -576,12 +505,22 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
             if (preamble.Length > 0) builder.Append(preamble).Append(_lineEnding);
 
-            foreach (var row in _rows)
+            for (var i = 0; i < _rows.Count; i++)
             {
+                var row = _rows[i];
                 builder.Append(row.Leading);
                 builder.Append(row.Modified ? Serialise(row) : row.Source);
-                builder.Append(_lineEnding);
+                // After the last row comes what the file had there: its line ending or none, and
+                // whatever followed. A document not read from a text ends on one line ending.
+                builder.Append(i < _rows.Count - 1 ? _lineEnding : _trailer ?? _lineEnding);
             }
+
+            // With every row gone, what followed the last one still belongs to the file; the line
+            // ending it began with went with the row.
+            if (_rows.Count == 0 && _trailer is not null)
+                builder.Append(_trailer.StartsWith("\r\n", StringComparison.Ordinal) ? _trailer[2..]
+                    : _trailer.StartsWith('\n') ? _trailer[1..]
+                    : _trailer);
 
             return builder.ToString();
         }

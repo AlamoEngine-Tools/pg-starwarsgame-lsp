@@ -669,7 +669,8 @@ Read-only.
 **Localisation Editor** activity bar view, files grouped into **Text files** and **Credits files**; one grid tab per
 file, splittable side by side.
 
-- **Editing** - staged edits, count on **Save**, one all-or-nothing write; refused if the file changed on disk
+- **Editing** - staged edits, count on **Save**, one all-or-nothing edit applied through VS Code and saved at once,
+  so one undo in a file takes the save back; refused if a file changed on disk or holds unsaved changes
 - **Validate** - without writing; duplicate and empty keys are errors in text files, expected in credits files
 - **Rows** - right-click menu: add and delete; reorder on credits files
 - **Add language** - from the game's language list, for formats that hold more than one
@@ -708,9 +709,9 @@ Detection: engine naming (`credits*`), or in the `.pgproj`:
 }
 ```
 
-One format per project: a CSV project's credits file is a `.csv`. `"type": "DAT"` projects edit compiled `.dat` files
-directly (language from the file name, sort order preserved). **Set Localisation Project Format** changes the format
-from the editor.
+One format per project: a CSV project's credits file is a `.csv`. A compiled `.dat` is shown and validated, not
+edited: a DAT is what **Export to DAT** builds from the project. **Set Localisation Project Format** changes the
+format from the editor, and a `"type": "DAT"` project is converted to CSV or XML to edit its texts.
 
 ---
 

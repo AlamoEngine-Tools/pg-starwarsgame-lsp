@@ -6,13 +6,10 @@ using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
-using PG.StarWarsGame.LSP.Story.Model;
-using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Completion;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
@@ -353,47 +350,6 @@ public sealed class GetStoryParamOptionsHandler(
     {
         var idx = uri.LastIndexOf('/');
         return idx < 0 ? uri : uri[(idx + 1)..];
-    }
-}
-
-public sealed class GetStoryDiagnosticsHandler(
-    IStoryModelService modelService,
-    IGameIndexService indexService,
-    IXmlDiagnosticsCollector collector,
-    IDocumentTextSource textSource,
-    IMessageCatalog messages)
-    : IJsonRpcRequestHandler<GetStoryDiagnosticsParams, GetStoryDiagnosticsResult>
-{
-    public Task<GetStoryDiagnosticsResult> Handle(GetStoryDiagnosticsParams request, CancellationToken ct)
-    {
-        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
-        if (model is null)
-            return Task.FromResult(new GetStoryDiagnosticsResult([],
-                messages.Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
-
-        // Graph node per event INSTANCE (reference identity - duplicate names get distinct
-        // disambiguated node ids, and StoryEvent's record equality would conflate them).
-        var nodeByEvent = new Dictionary<StoryEvent, string>(ReferenceEqualityComparer.Instance);
-        foreach (var node in model.Graph.Nodes)
-            if (node.Kind == StoryNodeKind.Event && node.Event is not null)
-                nodeByEvent.TryAdd(node.Event, node.Id);
-
-        var index = indexService.Current;
-        var results = new List<StoryDiagnosticDto>();
-        foreach (var thread in model.Threads)
-        {
-            ct.ThrowIfCancellationRequested();
-            var text = textSource.GetText(thread.DocumentUri)?.Text;
-            if (text is null) continue;
-
-            StoryDiagnosticsCorrelator.Correlate(
-                thread.DocumentUri, thread.Events,
-                collector.Collect(thread.DocumentUri, text, index),
-                e => nodeByEvent.GetValueOrDefault(e),
-                results);
-        }
-
-        return Task.FromResult(new GetStoryDiagnosticsResult(results));
     }
 }
 

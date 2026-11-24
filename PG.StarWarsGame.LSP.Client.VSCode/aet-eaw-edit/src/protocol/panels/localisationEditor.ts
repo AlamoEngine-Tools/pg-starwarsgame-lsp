@@ -106,6 +106,8 @@ export interface LocalisationEditorRows {
     ordered: boolean;
     canAddLanguage: boolean;
     addLanguageCreatesFile: boolean;
+    /** Why the file is shown and not edited, as each disabled control says it; null when it is edited. */
+    readOnlyReason: string | null;
     /** The language shown alone at first, or null for all of them. */
     focusLanguage: string | null;
     /** The engine's supported languages: the only ones worth offering to add. */

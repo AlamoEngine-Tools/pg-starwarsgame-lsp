@@ -17,6 +17,7 @@ import {
     StaticFeature,
 } from "vscode-languageclient/node";
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
+import { createEditWorkspace } from "./editWorkspace";
 import {
     effectiveObjectPath,
     effectiveObjectQuery,
@@ -476,6 +477,20 @@ const lsp = new RoutedLspGateway(
 const projectGateways = new Map<string, RoutedLspGateway>();
 
 /**
+ * Where a visual editor's composed edit is applied and saved. One for the window: an edit names
+ * its files itself, and every project's client turns the protocol's edit into VS Code's the same
+ * way, so whichever client runs converts it.
+ */
+const editWorkspace = createEditWorkspace(() => {
+    for (const project of clients.values()) {
+        if (project.client !== undefined) {
+            return project.client.protocol2CodeConverter;
+        }
+    }
+    return undefined;
+});
+
+/**
  * The gateway of a panel opened while no project runs: it binds to the one project that starts,
  * and with several it stays offline rather than follow the editor in front - a panel that did
  * showed one project's data through another's server, the shape #276 closed.
@@ -532,6 +547,7 @@ function panelProject(key: string | undefined): PanelProject {
         key: resolved,
         name: clients.get(resolved)?.spec.name ?? "",
         gateway: resolved ? gatewayFor(resolved) : pendingProjectGateway,
+        edits: editWorkspace,
     };
 }
 

@@ -1,0 +1,21 @@
+<?xml version='1.0' ?>
+<!-- The opening act. Hand-written; keep the order. -->
+<Story>
+
+  <!-- reward before trigger, on purpose -->
+  <Event   Name="Opening" >
+    <Custom_Tool_Tag attr='1'>kept &amp; untouched</Custom_Tool_Tag>
+    <Reward_Param1>500</Reward_Param1>
+    <Reward_Type>CREDITS</Reward_Type>
+    <Event_Type>STORY_ELAPSED</Event_Type><!-- trailing -->
+    <Event_Param1>10</Event_Param1>
+  </Event>
+
+	<Event Name="Follow_Up">
+		<Prereq>Opening</Prereq>
+		<Event_Type>STORY_TRIGGER</Event_Type>
+		<Story_Dialog>OLD_DIALOG</Story_Dialog>
+	</Event>
+  <Stray_Root_Tag/>
+</Story>
+<!-- after the root -->

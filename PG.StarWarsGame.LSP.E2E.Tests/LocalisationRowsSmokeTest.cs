@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Newtonsoft.Json.Linq;
 using PG.StarWarsGame.LSP.Localisation.Rows;
 using PG.StarWarsGame.LSP.Localisation;
+using PG.StarWarsGame.LSP.Server.Editing;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -18,7 +20,8 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     positional editors is exactly the kind of change where the pieces each pass and the wiring
 ///     does not - a handler registered under the wrong method name, a DTO whose casing does not
 ///     survive the round trip - so what is being proved here is that the request reaches the server
-///     and the file on disk actually changes.
+///     and the edit it answers with, once written, is the file the next read sees. The server
+///     composes and writes nothing; the test writes the composed text as the editor's window does.
 /// </remarks>
 [Trait("Category", "E2E")]
 public sealed class LocalisationRowsSmokeTest : IClassFixture<LocalisationServerFixture>
@@ -47,31 +50,31 @@ public sealed class LocalisationRowsSmokeTest : IClassFixture<LocalisationServer
         Assert.Contains(result.Rows, r => r.Key == "TEXT_E2E_ALPHA");
         // The CSV can hold another column, so the editor may offer to add one.
         Assert.True(result.CanAddLanguage);
+        // And it is a file the grid edits.
+        Assert.Null(result.ReadOnlyReason);
     }
 
     [Fact]
-    public async Task ApplyTranslationBatch_SetValueByKey_ChangesTheFileOnDisk()
+    public async Task ApplyEditBatch_SetValueByKey_ComposesTheFileTheNextReadSees()
     {
         await ReadyAsync();
         var before = await GetRowsAsync(_fixture.MasterTextPath);
 
         using var cts = Timeout();
-        var applied = await _fixture.Client.SendRequest(
-            new ApplyTranslationBatchParams(
-                _fixture.MasterTextPath,
-                before.ContentHash,
-                [new LocKeyedCommandDto("setValue", "TEXT_E2E_BETA", Language: "GERMAN", Value: "Beta geaendert")]),
-            cts.Token);
+        var applied = await SaveAsync(TranslationEditBatchComposer.EditorName, _fixture.MasterTextPath,
+            before.ContentHash,
+            new LocKeyedCommandDto("setValue", "TEXT_E2E_BETA", Language: "GERMAN", Value: "Beta geaendert"));
 
         Assert.True(applied.Success, applied.Error);
-        Assert.NotNull(applied.NewContentHash);
+        var newContentHash = Assert.Single(applied.Documents!).ContentHash;
+        Assert.NotNull(newContentHash);
 
         var after = await GetRowsAsync(_fixture.MasterTextPath);
         var row = Assert.Single(after.Rows, r => r.Key == "TEXT_E2E_BETA");
         Assert.Equal("Beta geaendert", row.Values.Single(v => v.Language == "GERMAN").Value);
 
         // The hash the write returned is the one a subsequent save must echo.
-        Assert.Equal(applied.NewContentHash, after.ContentHash);
+        Assert.Equal(newContentHash, after.ContentHash);
 
         // Only the row that was named changed; the round-trip guarantee is the whole point of the
         // document editor and it is worth proving through the wire, not just in a unit test.
@@ -83,37 +86,36 @@ public sealed class LocalisationRowsSmokeTest : IClassFixture<LocalisationServer
     // The desync guard: the client must echo the hash it last read, or the write is refused rather
     // than overwriting an edit made elsewhere.
     [Fact]
-    public async Task ApplyTranslationBatch_StaleContentHash_IsRefusedAndWritesNothing()
+    public async Task ApplyEditBatch_StaleContentHash_IsRefusedAndComposesNothing()
     {
         await ReadyAsync();
         using var cts = Timeout();
         var textBefore = await File.ReadAllTextAsync(_fixture.MasterTextPath, cts.Token);
 
-        var applied = await _fixture.Client.SendRequest(
-            new ApplyTranslationBatchParams(
-                _fixture.MasterTextPath,
-                "definitely-not-the-current-hash",
-                [new LocKeyedCommandDto("setValue", "TEXT_E2E_ALPHA", Language: "ENGLISH", Value: "nope")]),
-            cts.Token);
+        var applied = await SaveAsync(TranslationEditBatchComposer.EditorName, _fixture.MasterTextPath,
+            "definitely-not-the-current-hash",
+            new LocKeyedCommandDto("setValue", "TEXT_E2E_ALPHA", Language: "ENGLISH", Value: "nope"));
 
         Assert.False(applied.Success);
         // Specifically refused for the hash, not for some earlier guard - without this the test
         // passes just as happily when the whole feature is switched off.
         Assert.Contains("changed on disk", applied.Error!, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(applied.Edit);
         Assert.Equal(textBefore, await File.ReadAllTextAsync(_fixture.MasterTextPath, cts.Token));
     }
 
     [Fact]
-    public async Task ValidateTranslationBatch_DuplicateKey_IsReportedAndNothingIsWritten()
+    public async Task ValidateEditBatch_DuplicateKey_IsReportedAndNothingIsWritten()
     {
         await ReadyAsync();
         using var cts = Timeout();
         var textBefore = await File.ReadAllTextAsync(_fixture.MasterTextPath, cts.Token);
 
         var result = await _fixture.Client.SendRequest(
-            new ValidateTranslationBatchParams(
-                _fixture.MasterTextPath,
-                [new LocKeyedCommandDto("addEntry", "TEXT_E2E_ALPHA")]),
+            new ValidateEditBatchParams(
+                TranslationEditBatchComposer.EditorName,
+                new EditBatchSubject(Documents: [new EditBatchDocument(_fixture.MasterTextPath)]),
+                JArray.FromObject(new[] { new LocKeyedCommandDto("addEntry", "TEXT_E2E_ALPHA") })),
             cts.Token);
 
         Assert.Null(result.Error);
@@ -125,21 +127,16 @@ public sealed class LocalisationRowsSmokeTest : IClassFixture<LocalisationServer
     // so addLanguage has nothing to declare - and every value written into the new language was then
     // refused with "Row 0 has no 'GERMAN' translation", after the grid had already shown the column.
     [Fact]
-    public async Task ApplyTranslationBatch_AddLanguageThenFillIt_WritesTheNewLanguageToXml()
+    public async Task ApplyEditBatch_AddLanguageThenFillIt_ComposesTheNewLanguageIntoXml()
     {
         await ReadyAsync();
         var before = await GetRowsAsync(_fixture.XmlTextPath);
 
         using var cts = Timeout();
-        var applied = await _fixture.Client.SendRequest(
-            new ApplyTranslationBatchParams(
-                _fixture.XmlTextPath,
-                before.ContentHash,
-                [
-                    new LocKeyedCommandDto("addLanguage", Language: "GERMAN"),
-                    new LocKeyedCommandDto("setValue", "TEXT_E2E_XML", Language: "GERMAN", Value: "Alfa")
-                ]),
-            cts.Token);
+        var applied = await SaveAsync(TranslationEditBatchComposer.EditorName, _fixture.XmlTextPath,
+            before.ContentHash,
+            new LocKeyedCommandDto("addLanguage", Language: "GERMAN"),
+            new LocKeyedCommandDto("setValue", "TEXT_E2E_XML", Language: "GERMAN", Value: "Alfa"));
 
         Assert.True(applied.Success, applied.Error);
 
@@ -170,18 +167,15 @@ public sealed class LocalisationRowsSmokeTest : IClassFixture<LocalisationServer
     }
 
     [Fact]
-    public async Task ApplyCreditsBatch_SetCellByIndex_ChangesTheRowItNames()
+    public async Task ApplyEditBatch_SetCellByIndex_ChangesTheRowItNames()
     {
         await ReadyAsync();
         var before = await GetRowsAsync(_fixture.CreditsPath);
 
         using var cts = Timeout();
-        var applied = await _fixture.Client.SendRequest(
-            new ApplyCreditsBatchParams(
-                _fixture.CreditsPath,
-                before.ContentHash,
-                [new LocEditCommandDto("setCell", 4, Language: "ENGLISH", Value: "Bob the Artist")]),
-            cts.Token);
+        var applied = await SaveAsync(CreditsEditBatchComposer.EditorName, _fixture.CreditsPath,
+            before.ContentHash,
+            new LocEditCommandDto("setCell", 4, Language: "ENGLISH", Value: "Bob the Artist"));
 
         Assert.True(applied.Success, applied.Error);
 
@@ -197,6 +191,29 @@ public sealed class LocalisationRowsSmokeTest : IClassFixture<LocalisationServer
     private static CancellationTokenSource Timeout()
     {
         return new CancellationTokenSource(TimeSpan.FromSeconds(30));
+    }
+
+    /// <summary>
+    ///     A save as the editor makes it: the batch goes to the server, and the text it composes for
+    ///     each file is written to that file. A refused batch comes back as it is, with nothing written.
+    /// </summary>
+    private async Task<ApplyEditBatchResult> SaveAsync<TCommand>(
+        string editor, string filePath, string? contentHash, params TCommand[] commands)
+    {
+        using var cts = Timeout();
+        var applied = await _fixture.Client.SendRequest(
+            new ApplyEditBatchParams(
+                editor,
+                new EditBatchSubject(Documents: [new EditBatchDocument(filePath, contentHash)]),
+                JArray.FromObject(commands)),
+            cts.Token);
+
+        foreach (var change in applied.Edit?.DocumentChanges ?? [])
+            if (change.TextDocumentEdit is { } edit)
+                await File.WriteAllTextAsync(
+                    edit.TextDocument.Uri.GetFileSystemPath(), edit.Edits.Single().NewText, cts.Token);
+
+        return applied;
     }
 
     private async Task ReadyAsync()

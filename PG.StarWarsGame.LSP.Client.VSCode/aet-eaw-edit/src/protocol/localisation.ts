@@ -2,6 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import * as l10n from "@vscode/l10n";
+
+import type { EditBatchProblemDto } from "./editBatch";
+
 // The localisation editor's wire contract. Mirrors the records under PG.StarWarsGame.LSP.Localisation
 // and the request records under PG.StarWarsGame.LSP.Server/Localisation - see ../protocol/README.md
 // for why this is declared exactly once.
@@ -89,27 +92,20 @@ export interface GetLocalisationRowsResult {
     error?: string | null;
     canAddLanguage: boolean;
     addLanguageCreatesFile: boolean;
+    /**
+     * Why the file is shown and not edited, as the editor says it on every control that would
+     * change it; absent for a file that is edited. A compiled DAT is the one case.
+     */
+    readOnlyReason?: string | null;
 }
 
-// ── aet/applyCreditsBatch, aet/applyTranslationBatch ─────────────────────────
+// ── A localisation batch's problems, from aet/validateEditBatch ──────────────
 
 /**
- * @param failedIndex 0-based position of the *command* that failed - not a row.
- * @param newContentHash Hash of the text just written; echo it on the next save for this file.
- */
-export interface ApplyLocalisationBatchResult {
-    success: boolean;
-    failedIndex?: number | null;
-    error?: string | null;
-    newContentHash?: string | null;
-}
-
-// ── aet/validateCreditsBatch, aet/validateTranslationBatch ───────────────────
-
-/**
- * A validation finding, in the shape both validators share.
+ * A validation finding of the grid or the credits editor: an `EditBatchProblemDto` as the two
+ * localisation composers fill it.
  *
- * The two servers report the same thing differently, which is why every locator here is optional:
+ * The two report the same thing differently, which is why every locator here is optional:
  * credits address a finding by row (`index`), translations by entry (`key`), and a translation
  * finding carries `index` as well so the one row a key cannot name - a row with a blank key - is
  * still pointable at. A finding about the batch as a whole carries neither.
@@ -118,18 +114,7 @@ export interface ApplyLocalisationBatchResult {
  * file names the command in its message and leaves `index` null; putting a command number here
  * would tint and jump to an unrelated row.
  */
-export interface LocProblemDto {
-    index?: number | null;
-    key?: string | null;
-    language?: string | null;
-    severity: string;
-    message: string;
-}
-
-export interface ValidateLocalisationBatchResult {
-    problems: LocProblemDto[];
-    error?: string | null;
-}
+export type LocProblemDto = EditBatchProblemDto;
 
 // ── aet/getBaselineEntries ───────────────────────────────────────────────────
 

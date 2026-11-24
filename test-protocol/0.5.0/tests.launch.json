@@ -704,5 +704,17 @@
   },
   "SET-34": {
     "open": "{repo}\\eaw"
+  },
+  "STY-03": {
+    "open": "C:\\temp\\aet-test-STY-save",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "SET-35": {
+    "open": "C:\\temp\\aet-test-SET-credits"
+  },
+  "SET-36": {
+    "open": "C:\\temp\\aet-test-SET-set"
   }
 }

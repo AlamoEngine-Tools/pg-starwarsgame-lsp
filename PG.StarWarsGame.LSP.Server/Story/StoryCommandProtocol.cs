@@ -82,39 +82,9 @@ public sealed record StoryCommandDto(
     }
 }
 
-// ── aet/applyStoryCommandBatch - commit a staged edit-mode batch ──────────────
-
-/// <summary>
-///     Commits an edit-mode session: the client stages command envelopes locally (instant
-///     optimistic feedback) and flushes the whole batch here on Save. The server composes them over
-///     one in-memory working copy and, if every command validates, writes them as a single
-///     <c>workspace/applyEdit</c>. The first command that fails aborts the batch - nothing is
-///     written and <see cref="ApplyStoryCommandBatchResult.FailedIndex" /> names it.
-/// </summary>
-[Method("aet/applyStoryCommandBatch", Direction.ClientToServer)]
-public sealed record ApplyStoryCommandBatchParams(
-    string Campaign,
-    string Faction,
-    IReadOnlyList<StoryCommandDto> Commands) : IRequest<ApplyStoryCommandBatchResult>;
-
-/// <param name="FailedIndex">0-based index of the command that failed, when <c>Success</c> is false.</param>
-public sealed record ApplyStoryCommandBatchResult(
-    bool Success,
-    int? FailedIndex = null,
-    string? Error = null);
-
-// ── aet/validateStoryCommandBatch - dry-run diagnostics for the staged batch ──
-
-/// <summary>
-///     Runs the on-demand Validate action: applies the staged batch to an in-memory working copy
-///     (no file write) and returns diagnostics for that pending state, so problems reflect exactly
-///     what the user has edited but not yet saved.
-/// </summary>
-[Method("aet/validateStoryCommandBatch", Direction.ClientToServer)]
-public sealed record ValidateStoryCommandBatchParams(
-    string Campaign,
-    string Faction,
-    IReadOnlyList<StoryCommandDto> Commands) : IRequest<GetStoryDiagnosticsResult>;
+// An edit-mode session's staged batch is checked and committed through the editors' one pair,
+// aet/validateEditBatch and aet/applyEditBatch (Editing/EditBatchProtocol.cs), which hands a batch
+// of these commands to StoryEditBatchComposer.
 
 // ── aet/previewStoryGraph - the graph as it would look with the staged batch applied ─────────────
 

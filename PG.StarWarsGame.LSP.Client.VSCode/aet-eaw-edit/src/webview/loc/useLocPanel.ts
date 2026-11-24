@@ -69,6 +69,8 @@ export interface LocPanel<C> {
     focusLanguage: string | null;
     /** Adding a language here means creating a sibling file, not a column. */
     addLanguageCreatesFile: boolean;
+    /** Why the file is shown and not edited, or null when it is edited - see ./readOnly. */
+    readOnlyReason: string | null;
     /** The languages the engine officially supports - the only ones worth adding. */
     supportedLanguages: string[];
     error: string | null;
@@ -108,6 +110,7 @@ export function useLocPanel<C>(options: {
     const [canAddLanguage, setCanAddLanguage] = useState(false);
     const [focusLanguage, setFocusLanguage] = useState<string | null>(null);
     const [addLanguageCreatesFile, setAddLanguageCreatesFile] = useState(false);
+    const [readOnlyReason, setReadOnlyReason] = useState<string | null>(null);
     const [supportedLanguages, setSupportedLanguages] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
@@ -136,6 +139,7 @@ export function useLocPanel<C>(options: {
                     setAddLanguageCreatesFile(
                         msg.addLanguageCreatesFile === true,
                     );
+                    setReadOnlyReason(msg.readOnlyReason ?? null);
                     setSupportedLanguages(msg.supportedLanguages ?? []);
                     // Seeded here rather than on a message of its own: it arrives with the file,
                     // before any dialog can be opened, which is the only ordering that matters.
@@ -229,13 +233,19 @@ export function useLocPanel<C>(options: {
 
     const stage = useCallback(
         (command: C) => {
+            // The controls of a file that is not edited are disabled; this holds whatever reaches
+            // here by another way, so nothing is ever staged against such a file.
+            if (readOnlyReason !== null) {
+                return;
+            }
+
             setRows((current) => applyStaged(current, command));
             setQueue((current) => [...current, command]);
             // Any edit invalidates the last Validate result - it described a different document.
             setValidation("unvalidated");
             setProblems([]);
         },
-        [applyStaged],
+        [applyStaged, readOnlyReason],
     );
 
     const save = useCallback(() => {
@@ -259,6 +269,7 @@ export function useLocPanel<C>(options: {
         canAddLanguage,
         focusLanguage,
         addLanguageCreatesFile,
+        readOnlyReason,
         supportedLanguages,
         error,
         loaded,

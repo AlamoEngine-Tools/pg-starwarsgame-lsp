@@ -2,16 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Server.Editing;
 using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
 /// <summary>
-///     Maps XML diagnostics for one thread onto graph nodes and param slots. Shared by
-///     <see cref="GetStoryDiagnosticsHandler" /> (over committed buffer text, node ids from the
-///     model graph) and <see cref="ValidateStoryCommandBatchHandler" /> (over the staged working
-///     text, node ids computed by name) - the range-containment correlation is identical either way.
+///     Maps XML diagnostics for one thread onto graph nodes and param slots, for
+///     <see cref="StoryEditBatchComposer" />: over the staged working text, node ids
+///     computed by name, each diagnostic placed by the event range that contains it.
 /// </summary>
 internal static class StoryDiagnosticsCorrelator
 {
@@ -24,7 +24,7 @@ internal static class StoryDiagnosticsCorrelator
         IReadOnlyList<StoryEvent> events,
         IEnumerable<Diagnostic> diagnostics,
         Func<StoryEvent, string?> nodeIdOf,
-        List<StoryDiagnosticDto> into)
+        List<EditBatchProblemDto> into)
     {
         foreach (var diagnostic in diagnostics)
         {
@@ -51,11 +51,11 @@ internal static class StoryDiagnosticsCorrelator
                 position = slot?.Position;
             }
 
-            into.Add(new StoryDiagnosticDto(
-                storyEvent is not null ? nodeIdOf(storyEvent) : null,
-                side, position,
+            into.Add(new EditBatchProblemDto(
                 SeverityOf(diagnostic),
                 diagnostic.Message.Text(),
+                storyEvent is not null ? nodeIdOf(storyEvent) : null,
+                side, position,
                 uri, line, column));
         }
     }

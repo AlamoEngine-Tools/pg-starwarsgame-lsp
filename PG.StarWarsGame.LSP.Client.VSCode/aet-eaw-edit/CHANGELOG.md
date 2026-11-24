@@ -321,6 +321,34 @@
   longer sends the reader to a log file in the first workspace folder: it names the log file's own setting
   and its folder
   ([#462](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/462))
+- **Save in the story graph writes the thread files** - a save of the staged changes left every changed
+  thread as an unsaved document, which had to be saved by hand before the game or a build saw it. The
+  changes are now applied through VS Code and the files they touched are saved at once, so one undo in a
+  thread still takes the whole save back. A save writes a thread as the window holds it, unsaved edits
+  included, and with the editor's own save settings: with `files.trimTrailingWhitespace` on, a save trims
+  the whole file as a save by hand does. When a file cannot be written, a warning names it
+  ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
+- **A localisation save changes the edited lines and nothing else** - a save of a translation XML file
+  wrote the whole document anew: the comments before and after the root and the last line ending were
+  dropped, the declaration and every attribute's quotes rewritten and the spacing inside a tag
+  normalised. The edited values are now written into the file's own text. A CSV or properties file
+  keeps its blank lines, the comments after its last entry and its missing final line ending, and a
+  line of a properties file that is no entry no longer gives every entry below it the key of the next
+  ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
+- **A save in the localisation grid and the credits editor goes through VS Code** - the server wrote the
+  file itself, so a save could not be undone and overwrote whatever the file's own editor held. A save
+  is now one edit applied through VS Code and saved at once: one undo in the file takes it back, the
+  file keeps its encoding and byte order mark, and a set of single-language files is written whole or
+  not at all - one undo in any of its files takes the save back in all of them. A save is refused, with
+  the file named, when the file's editor holds unsaved changes or the file belongs to a dependency
+  ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
+- **A compiled DAT is no longer edited in the grid** - breaking for a `"type": "DAT"` localisation
+  project, whose `.dat` files were rewritten on every save. A DAT is a build output: the way to edit
+  its texts is to convert the project to CSV or XML with **Set Localisation Project Format** and build
+  the DAT with **Export to DAT**. A `.dat` still opens, shows its rows and is validated; its cells, row
+  actions, line kinds, **Add language**, **Fill language** and **Save** are disabled and say
+  `Convert to CSV or XML to edit`, and the dock's header says it once in full
+  ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
 
 ## 0.5.2
 

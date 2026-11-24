@@ -47,6 +47,7 @@ using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Caching;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Debug;
+using PG.StarWarsGame.LSP.Server.Editing;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Indexing;
@@ -180,10 +181,6 @@ public static class ServerConfigurator
             .WithHandler<SetLocalisationProjectFormatHandler>()
             .WithHandler<CreateLocalisationLanguageFileHandler>()
             .WithHandler<GetLocalisationRowsHandler>()
-            .WithHandler<ApplyTranslationBatchHandler>()
-            .WithHandler<ValidateTranslationBatchHandler>()
-            .WithHandler<ApplyCreditsBatchHandler>()
-            .WithHandler<ValidateCreditsBatchHandler>()
             .WithHandler<GetEffectiveObjectHandler>()
             // Lua debugger: the layers a debug session maps game paths with and launches the game
             // from. The adapter itself runs as a separate process of this exe (--debug-adapter),
@@ -213,10 +210,9 @@ public static class ServerConfigurator
             .WithHandler<GetStoryParamOptionsHandler>()
             .WithHandler<ResolveStoryReferenceHandler>()
             .WithHandler<ResolveReferenceHandler>()
-            .WithHandler<GetStoryDiagnosticsHandler>()
             .WithHandler<ExecuteStoryCommandHandler>()
-            .WithHandler<ApplyStoryCommandBatchHandler>()
-            .WithHandler<ValidateStoryCommandBatchHandler>()
+            .WithHandler<ValidateEditBatchHandler>()
+            .WithHandler<ApplyEditBatchHandler>()
             .WithHandler<PreviewStoryGraphHandler>()
             .WithHandler<GetWorkspaceSettingsHandler>()
             .WithHandler<SetWorkspaceSettingsHandler>()
@@ -285,6 +281,13 @@ public static class ServerConfigurator
                 // The sides the project's GameConstants names, which the dedicated story tags attach
                 // their plots to: read by the chain scan, the attachment check and the manifest writer (#192).
                 services.AddSingleton<IStorySideNamesSource, GameConstantsStorySideNames>();
+                // The visual editors' one way to write: a composer per editor behind one pair.
+                services.AddSingleton<IEditBatchComposer, StoryEditBatchComposer>();
+                services.AddSingleton<LocalisationBatchDocuments>();
+                services.AddSingleton<IEditBatchComposer, TranslationEditBatchComposer>();
+                services.AddSingleton<IEditBatchComposer, CreditsEditBatchComposer>();
+                services.AddSingleton<EditBatchComposers>();
+                services.AddSingleton<EditBatchLayerGuard>();
                 services.AddSingleton<ICacheStatisticsSource>(sp =>
                     (ICacheStatisticsSource)sp.GetRequiredService<IStoryModelService>());
                 services.AddSingleton<IStoryGraphDiagnosticsSource, StoryGraphDiagnosticsService>();
@@ -431,7 +434,6 @@ public static class ServerConfigurator
                 services.AddSingleton<IModProjectFileWriter, ModProjectFileWriter>();
                 services.AddSingleton<ILocalisationSeedFileWriter, LocalisationSeedFileWriter>();
                 services.AddSingleton<ILocalisationFormatConverter, LocalisationFormatConverter>();
-                services.AddSingleton<ILocalisationWriteLedger, LocalisationWriteLedger>();
                 services.AddSingleton<ILocalisationEntryWriter, LocalisationEntryWriter>();
 
                 // Linear startup pipeline and its stage collaborators.

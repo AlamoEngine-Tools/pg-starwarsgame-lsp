@@ -99,7 +99,6 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
         return new LocDocument(rows, [identifier]);
     }
 
-    /// <summary>The file's own line ending, so writing it back does not silently normalise it.</summary>
     // ── CSV ──────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -126,7 +125,24 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
         var header = csv.HeaderRecord ?? [];
         // Column 0 is the key; the rest name languages. A blank header cell declares nothing.
         var languages = header.Skip(1).Where(h => !string.IsNullOrWhiteSpace(h)).ToList();
-        var preamble = csv.Parser.RawRecord.TrimEnd('\r', '\n');
+
+        // The parser skips blank lines, so a record's own text says nothing of the ones before it.
+        // Each record is found again in the file: what lies between it and the record before is
+        // what was skipped, and it is kept in front of the row it precedes.
+        var cursor = 0;
+
+        string Skipped(string rawRecord)
+        {
+            var at = text.IndexOf(rawRecord, cursor, StringComparison.Ordinal);
+            if (at < 0) return string.Empty;
+            var between = text[cursor..at];
+            cursor = at + rawRecord.Length;
+            return string.IsNullOrWhiteSpace(between) ? between : string.Empty;
+        }
+
+        var headerRecord = csv.Parser.RawRecord;
+        var preamble = Skipped(headerRecord) + headerRecord.TrimEnd('\r', '\n');
+        string? trailer = null;
 
         var rows = new List<LocRowDto>();
         while (csv.Read())
@@ -135,14 +151,23 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
             for (var i = 0; i < languages.Count; i++)
                 values.Add(new LocValueDto(languages[i], csv.GetField(i + 1) ?? string.Empty));
 
+            var record = csv.Parser.RawRecord;
+            var leading = Skipped(record);
+            var source = record.TrimEnd('\r', '\n');
+            trailer = record[source.Length..];
+
             rows.Add(new LocRowDto(
                 rows.Count,
                 csv.GetField(0) ?? string.Empty,
                 values,
-                csv.Parser.RawRecord.TrimEnd('\r', '\n')));
+                source,
+                leading));
         }
 
-        return new LocDocument(rows, languages, preamble, lineEnding);
+        // What follows the last record: its own line ending when it has one, then any blank lines.
+        if (trailer is not null) trailer += text[Math.Min(cursor, text.Length)..];
+
+        return new LocDocument(rows, languages, preamble, lineEnding, trailer);
     }
 
     // ── XML ──────────────────────────────────────────────────────────────────
@@ -217,18 +242,28 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
         }
 
         var lines = text.Split('\n');
+        // A text that ends in a line break splits into one more, empty, piece: not a line of the file.
+        var lineCount = text.EndsWith('\n') ? lines.Length - 1 : lines.Length;
         var rows = new List<LocRowDto>();
         var leading = new StringBuilder();
         var preamble = string.Empty;
+        var offset = 0;
+        var lastEntryEnd = -1;
 
-        foreach (var raw in lines)
+        for (var number = 0; number < lineCount; number++)
         {
+            var raw = lines[number];
+            var lineStart = offset;
+            offset += raw.Length + 1;
             var line = raw.TrimEnd('\r');
             var trimmed = line.TrimStart();
 
-            // Comments and blanks are the file's only documentation; they attach to the entry they
-            // precede so they travel with it rather than being dropped on a rewrite.
-            if (trimmed.Length == 0 || trimmed.StartsWith('#') || trimmed.StartsWith('!'))
+            // An entry is what the importer above takes as one: a line that is not blank, is not a
+            // '#' comment and holds a '='. The two are zipped by order, so a line counted here and
+            // skipped there would give every entry below it the key of the one after. Everything
+            // else - comments and blanks, the file's only documentation - attaches to the entry it
+            // precedes, so it travels with it rather than being dropped on a rewrite.
+            if (trimmed.Length == 0 || trimmed[0] == '#' || !trimmed.Contains('='))
             {
                 leading.Append(line).Append(lineEnding);
                 continue;
@@ -236,7 +271,9 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
 
             if (rows.Count == 0 && preamble.Length == 0 && leading.Length > 0)
             {
-                preamble = leading.ToString().TrimEnd('\r', '\n');
+                // Without its last line ending, which the writer puts back: a blank line between
+                // the leading comments and the first entry is part of the file.
+                preamble = leading.ToString(0, leading.Length - lineEnding.Length);
                 leading.Clear();
             }
 
@@ -253,8 +290,13 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
                 leading.ToString()));
 
             leading.Clear();
+            lastEntryEnd = lineStart + line.Length;
         }
 
-        return new LocDocument(rows, [language.LanguageIdentifier], preamble, lineEnding);
+        // What follows the last entry: its own line ending when it has one, then the comments and
+        // blank lines after it, exactly as written.
+        var trailer = lastEntryEnd < 0 ? null : text[lastEntryEnd..];
+
+        return new LocDocument(rows, [language.LanguageIdentifier], preamble, lineEnding, trailer);
     }
 }

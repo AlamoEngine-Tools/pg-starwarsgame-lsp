@@ -32,29 +32,6 @@ public interface ILocalisationDocumentEditor
         string? fileName = null);
 
     /// <summary>
-    ///     Applies a batch to a file on disk and writes the result.
-    ///     <para>
-    ///         Owns the write because <c>.dat</c> is binary: there is no text to hand back for a
-    ///         caller to save, and the DAT services write through a real file stream. Text formats
-    ///         still compose through <see cref="Apply" /> and keep their round-trip guarantee.
-    ///     </para>
-    /// </summary>
-    Task<LocalisationEditResult> ApplyToFileAsync(
-        string filePath, IReadOnlyList<LocEditCommandDto> commands, CancellationToken ct);
-
-    /// <summary>
-    ///     Applies a batch of key-addressed translation edits, resolving each key to a row before
-    ///     handing the result to <see cref="ApplyToFileAsync" />.
-    ///     <para>
-    ///         The resolution is <see cref="KeyedCommandTranslator" />; this is only the seam that
-    ///         gives it the document. Positions therefore exist in exactly one place, and callers
-    ///         above never see one.
-    ///     </para>
-    /// </summary>
-    Task<LocalisationEditResult> ApplyKeyedToFileAsync(
-        string filePath, IReadOnlyList<LocKeyedCommandDto> commands, CancellationToken ct);
-
-    /// <summary>
     ///     Resolves key-addressed commands against the file without applying them, so a dry run can
     ///     report addressing failures and inspect the keys the batch would leave behind.
     /// </summary>

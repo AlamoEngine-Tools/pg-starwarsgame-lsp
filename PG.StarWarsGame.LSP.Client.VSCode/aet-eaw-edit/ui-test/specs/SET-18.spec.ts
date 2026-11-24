@@ -1,9 +1,13 @@
 // SET-18: a credits file opens as an ordered grid with its line kinds as tiles; the crawl opens beside it
-// and full screen. How the crawl scrolls is a picture and stays a hand check.
+// and full screen. How the crawl scrolls is a picture and stays a hand check. The file is a compiled DAT,
+// which the grid shows and does not edit: its line kinds and its formats are disabled and say how its
+// texts are edited (#339). SET-35 has the line kinds of a credits file that is edited.
 import { browser, expect } from "@wdio/globals";
 import { serverReady, tabLabels } from "../protocol.js";
 import { inNewestWebview } from "./storyGraph.js";
 import { columns, contentTiles, openTextFile, sortable } from "./locGrid.js";
+
+const howToEdit = "Convert to CSV or XML to edit";
 
 describe("SET-18", () => {
     before(async () => {
@@ -15,11 +19,25 @@ describe("SET-18", () => {
         await inNewestWebview(async () => {
             expect(await columns()).toEqual(["Format", "ENGLISH"]);
             expect(await sortable()).toBe(false);
+            // A disabled tile says why in place of its badge, so each line kind names the way to edit.
             expect(await contentTiles()).toEqual([
-                { label: "Label", badge: "HEADER" },
-                { label: "Name", badge: "CENTER" },
-                { label: "Blank line", badge: "[TBL]" },
+                { label: "Add language", badge: howToEdit },
+                { label: "Label", badge: howToEdit },
+                { label: "Name", badge: howToEdit },
+                { label: "Blank line", badge: howToEdit },
             ]);
+            const formats: { disabled: boolean; title: string }[] = await browser.execute(() =>
+                Array.from(document.querySelectorAll<HTMLSelectElement>(".rows .data-row select.directive")).map((s) => ({
+                    disabled: s.disabled,
+                    title: s.title,
+                })),
+            );
+            expect(formats.length).toBeGreaterThan(0);
+            expect(formats.every((f) => f.disabled && f.title === howToEdit)).toBe(true);
+            // The dock's header says it once in full, where a tile has room for half of it.
+            expect(await browser.execute(() => (document.querySelector(".read-only-note")?.textContent ?? "").trim())).toBe(
+                howToEdit,
+            );
         });
     });
 

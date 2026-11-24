@@ -47,8 +47,15 @@ public sealed record LocRowDto(
 /// <param name="Languages">Languages the file declares, in declaration order.</param>
 /// <param name="Preamble">Everything before the first row - a CSV header, or leading comments.</param>
 /// <param name="LineEnding">The file's own line ending, so a save does not normalise it.</param>
+/// <param name="Trailer">
+///     Everything after the last row, starting with that row's own line ending when it has one:
+///     empty for a file that ends without one, and holding the comments and blank lines that
+///     follow the last row otherwise. Null for a document not read from a text, which is written
+///     with one line ending after its last row.
+/// </param>
 public sealed record LocDocument(
     IReadOnlyList<LocRowDto> Rows,
     IReadOnlyList<string> Languages,
     string Preamble = "",
-    string LineEnding = "\n");
+    string LineEnding = "\n",
+    string? Trailer = null);

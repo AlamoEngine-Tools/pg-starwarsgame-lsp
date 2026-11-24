@@ -94,6 +94,21 @@ export const Shell = styled.div`
         line-height: 1.35;
     }
 
+    /* Why the file on screen is not edited, in the dock header between Save and the validation
+       tag. Held to the room the two leave, so a longer reason is cut short and never pushes them. */
+
+    .dock-header .read-only-note {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
+        max-width: calc(100% - 112px);
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: var(--font-size-smaller);
+        color: var(--colour-muted);
+    }
+
     /* Validation results, across the foot of the table rather than down the dock - the same shape
        the story graph editor uses. */
 

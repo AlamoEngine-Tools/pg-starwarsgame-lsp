@@ -53,4 +53,7 @@ public sealed record GetLocalisationRowsResult(
     bool Ordered = false,
     string? Error = null,
     bool CanAddLanguage = false,
-    bool AddLanguageCreatesFile = false);
+    bool AddLanguageCreatesFile = false,
+    // Why the file is shown and not edited, as the editor says it on every control that would
+    // change it; null for a file that is edited. A compiled DAT is the one case: a build writes it.
+    string? ReadOnlyReason = null);
