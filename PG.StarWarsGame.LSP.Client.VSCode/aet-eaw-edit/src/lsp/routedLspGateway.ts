@@ -54,14 +54,14 @@ export class RoutedLspGateway extends LspGateway {
         return this._route()?.isRunning ?? false;
     }
 
-    override request<T>(
+    override requestRaw<T>(
         method: string,
         params: unknown = {},
     ): Promise<LspOutcome<T>> {
         const target = this._route();
         return target
-            ? target.request<T>(method, params)
-            : super.request<T>(method, params);
+            ? target.requestRaw<T>(method, params)
+            : super.requestRaw<T>(method, params);
     }
 
     /**

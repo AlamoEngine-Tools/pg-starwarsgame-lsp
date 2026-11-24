@@ -4,10 +4,6 @@
 import * as vscode from "vscode";
 
 import { GetEncyclopediaEntryResult } from "./protocol";
-import {
-    readEncyclopediaScreen,
-    saveEncyclopediaScreen,
-} from "./encyclopediaScreenStorage";
 import { PanelProject } from "./panelProject";
 import type {
     EncyclopediaToHost,
@@ -148,7 +144,7 @@ export class EncyclopediaPanel extends WebviewPanelHost<
         }
         if (msg.type === "setScreen") {
             // The person's choice, not the project's: every open card redraws for it.
-            saveEncyclopediaScreen(msg.screen);
+            this.project.stores.encyclopediaScreen.save(msg.screen);
             for (const panel of EncyclopediaPanel._panels.all) {
                 panel._reload?.(panel._multiplayer);
             }
@@ -167,7 +163,7 @@ export class EncyclopediaPanel extends WebviewPanelHost<
             type: "entry",
             entry,
             multiplayer: this._multiplayer,
-            screen: readEncyclopediaScreen(),
+            screen: this.project.stores.encyclopediaScreen.read(),
             shipName: this._drawShipName(entry),
         });
     }

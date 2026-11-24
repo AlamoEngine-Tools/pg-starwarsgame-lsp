@@ -13,18 +13,7 @@
  * Pure: no VS Code and no file system, so it runs under the node test harness.
  */
 
-/** Forward slashes, no trailing separator, lower case - the only form these are compared in. */
-function canonical(path: string): string {
-    return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-}
-
-/**
- * True when `outer` is `inner` or an ancestor of it. The separator check is what keeps `Rev2` from
- * counting as covered by a folder open on `Rev`.
- */
-function covers(outer: string, inner: string): boolean {
-    return inner === outer || inner.startsWith(outer + "/");
-}
+import { isInside, pathKey } from "./pathKey";
 
 /**
  * The reported directories that no workspace folder already covers, in the order the server gave
@@ -34,17 +23,16 @@ export function directoriesNeedingOwnWatcher(
     reported: readonly string[],
     workspaceFolders: readonly string[],
 ): string[] {
-    const folders = workspaceFolders.map(canonical);
     const seen = new Set<string>();
     const need: string[] = [];
 
     for (const directory of reported) {
-        const key = canonical(directory);
+        const key = pathKey(directory);
         if (key.length === 0 || seen.has(key)) {
             continue;
         }
         seen.add(key);
-        if (!folders.some((folder) => covers(folder, key))) {
+        if (!workspaceFolders.some((folder) => isInside(directory, folder))) {
             need.push(directory);
         }
     }

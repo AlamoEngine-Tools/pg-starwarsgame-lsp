@@ -25,15 +25,11 @@ import type {
 import {
     EDIT_BATCH_EDITOR,
     type EditBatchSubject,
-    ExecuteStoryCommandResult,
-    GetStoryGraphResult,
-    GetStoryLayoutResult,
-    GetStorySchemaResult,
     GraphFilters,
     type StoryDiagnosticDto,
     StoryLayoutEntryDto,
-    StorySimStateResult,
-    WorkspaceSettingsDto,
+    RequestMethod,
+    StorySimMethod,
 } from "./protocol";
 
 /**
@@ -63,7 +59,9 @@ export class StoryGraphPanel extends WebviewPanelHost<
     private _pendingSimulate = false;
 
     /** Parameter completion, which the webview asks for through the shared request relay. */
-    protected override readonly relayMethods = ["aet/getStoryParamOptions"];
+    protected override readonly relayMethods: readonly RequestMethod[] = [
+        "aet/getStoryParamOptions",
+    ];
 
     private constructor(
         private readonly _target: StoryGraphTarget,
@@ -273,19 +271,20 @@ export class StoryGraphPanel extends WebviewPanelHost<
         method: string,
         args: Record<string, unknown> | undefined,
     ): Promise<void> {
-        const requestName =
-            "aet/storySim" + method.charAt(0).toUpperCase() + method.slice(1);
-        const result =
-            await this.project.gateway.requestOrReport<StorySimStateResult>(
-                requestName,
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    scope: this._target.scope,
-                    ...(args ?? {}),
-                },
-                vscode.l10n.t("Simulation request failed"),
-            );
+        // The action is the page's word for it; a name the server does not have is refused there.
+        const requestName = ("aet/storySim" +
+            method.charAt(0).toUpperCase() +
+            method.slice(1)) as StorySimMethod;
+        const result = await this.project.gateway.requestOrReport(
+            requestName,
+            {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                scope: this._target.scope,
+                ...(args ?? {}),
+            },
+            vscode.l10n.t("Simulation request failed"),
+        );
         // The record of a run, for a report of "nothing happened": every command but the
         // clock's own ticks and polls, with what came back.
         if (method !== "tick" && method !== "getState") {
@@ -341,16 +340,15 @@ export class StoryGraphPanel extends WebviewPanelHost<
             }
         }
 
-        const result =
-            await this.project.gateway.requestOrReport<ExecuteStoryCommandResult>(
-                "aet/executeStoryCommand",
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    ...payload,
-                },
-                vscode.l10n.t("Story command failed"),
-            );
+        const result = await this.project.gateway.requestOrReport(
+            "aet/executeStoryCommand",
+            {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                ...payload,
+            },
+            vscode.l10n.t("Story command failed"),
+        );
 
         // Either a failed request or a refused command: a gesture may have changed the view
         // optimistically (e.g. a picked-off connection), so have the webview re-fetch and match
@@ -479,10 +477,9 @@ export class StoryGraphPanel extends WebviewPanelHost<
     /** Fetches the workspace preferences and pushes the swimlane-lane toggles to the webview. */
     private async _sendWorkspaceSettings(): Promise<void> {
         // Preferences are optional - the graph works without them, so a failure is not reported.
-        const settings =
-            await this.project.gateway.request<WorkspaceSettingsDto>(
-                "aet/getWorkspaceSettings",
-            );
+        const settings = await this.project.gateway.request(
+            "aet/getWorkspaceSettings",
+        );
         if (!settings.ok) {
             return;
         }
@@ -510,16 +507,15 @@ export class StoryGraphPanel extends WebviewPanelHost<
     private async _fetchSkipDeleteConfirm(): Promise<boolean> {
         // Defaults to asking: a preference that could not be read must not silently skip a
         // confirmation the user never turned off.
-        const settings =
-            await this.project.gateway.requestOr<WorkspaceSettingsDto>(
-                "aet/getWorkspaceSettings",
-                {},
-                {
-                    skipStoryDeleteConfirmation: false,
-                    showThreadLanes: false,
-                    showChapterLanes: false,
-                },
-            );
+        const settings = await this.project.gateway.requestOr(
+            "aet/getWorkspaceSettings",
+            {},
+            {
+                skipStoryDeleteConfirmation: false,
+                showThreadLanes: false,
+                showChapterLanes: false,
+            },
+        );
         return settings.skipStoryDeleteConfirmation === true;
     }
 
@@ -613,18 +609,17 @@ export class StoryGraphPanel extends WebviewPanelHost<
         commands: StoryCommandPayload[],
         filters: GraphFilters,
     ): Promise<void> {
-        const result =
-            await this.project.gateway.requestOrReport<GetStoryGraphResult>(
-                "aet/previewStoryGraph",
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    scope: this._target.scope,
-                    commands,
-                    ...filterFields(filters),
-                },
-                vscode.l10n.t("Preview failed"),
-            );
+        const result = await this.project.gateway.requestOrReport(
+            "aet/previewStoryGraph",
+            {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                scope: this._target.scope,
+                commands,
+                ...filterFields(filters),
+            },
+            vscode.l10n.t("Preview failed"),
+        );
         if (result === undefined) {
             return;
         }
@@ -692,10 +687,7 @@ export class StoryGraphPanel extends WebviewPanelHost<
 
     private async _sendSchema(): Promise<void> {
         // Schema is styling sugar - the graph renders without it, so a failure stays quiet.
-        const schema =
-            await this.project.gateway.request<GetStorySchemaResult>(
-                "aet/getStorySchema",
-            );
+        const schema = await this.project.gateway.request("aet/getStorySchema");
         if (!schema.ok) {
             return;
         }
@@ -730,23 +722,22 @@ export class StoryGraphPanel extends WebviewPanelHost<
      * in the same spot or the preview looks like a different graph.
      */
     private async _layout(): Promise<StoryLayoutEntryDto[]> {
-        const stored =
-            await this.project.gateway.requestOr<GetStoryLayoutResult>(
-                "aet/getStoryLayout",
-                {
-                    campaign: this._target.campaign,
-                    faction: this._target.faction,
-                    scope: this._target.scope,
-                },
-                { entries: [] },
-            );
+        const stored = await this.project.gateway.requestOr(
+            "aet/getStoryLayout",
+            {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                scope: this._target.scope,
+            },
+            { entries: [] },
+        );
         return stored.entries ?? [];
     }
 
     private async _sendGraph(filters: GraphFilters): Promise<void> {
         // Reported into the webview rather than as a notification: this is the panel's whole
         // content, so the message belongs where the graph would have been.
-        const outcome = await this.project.gateway.request<GetStoryGraphResult>(
+        const outcome = await this.project.gateway.request(
             "aet/getStoryGraph",
             {
                 campaign: this._target.campaign,

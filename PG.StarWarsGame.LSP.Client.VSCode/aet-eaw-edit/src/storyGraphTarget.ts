@@ -71,18 +71,6 @@ export function panelTitle(target: StoryGraphTarget): string {
         : l10n.t("Story - {0}", chain);
 }
 
-/** Every campaign faction pair the navigator feed declares, in document order. */
-export function targetsOf(
-    campaigns: readonly StoryCampaignDto[],
-): StoryGraphTarget[] {
-    return campaigns.flatMap((campaign) =>
-        (campaign.factions ?? []).map((faction) => ({
-            campaign: campaign.name,
-            faction: faction.faction,
-        })),
-    );
-}
-
 /** One quick-pick entry per target, carrying the target so the caller never re-parses a label. */
 export interface StoryGraphTargetItem {
     label: string;

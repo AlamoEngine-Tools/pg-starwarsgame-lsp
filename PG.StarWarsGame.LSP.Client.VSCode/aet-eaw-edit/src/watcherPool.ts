@@ -8,6 +8,8 @@
 // asked for it, and is disposed when the last of them lets go. Kept free of `vscode`: the extension
 // supplies the factory that creates the real watcher.
 
+import { pathKey } from "./pathKey";
+
 /** One on-disk change; `type` is the LSP FileChangeType (1 created, 2 changed, 3 deleted). */
 export interface FileEvent {
     path: string;
@@ -56,7 +58,7 @@ export class WatcherPool {
         glob: string,
         listener: (event: FileEvent) => void,
     ): string {
-        const key = `${directory.replace(/\\/g, "/").toLowerCase()}|${glob}`;
+        const key = `${pathKey(directory)}|${glob}`;
         let shared = this._shared.get(key);
         if (shared === undefined) {
             const listeners = new Set<(event: FileEvent) => void>();

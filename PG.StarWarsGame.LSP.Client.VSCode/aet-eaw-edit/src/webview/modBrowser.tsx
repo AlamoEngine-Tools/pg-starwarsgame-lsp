@@ -33,7 +33,6 @@ import {
     GetSymbolNodeResult,
     GetSymbolOutlineResult,
     GetSymbolPageParams,
-    GetSymbolPageResult,
     GetSymbolPreviewResult,
     SymbolKindCount,
     SymbolOutline,
@@ -132,7 +131,7 @@ const request = createRequester(transport);
 
 /** A model's detail for its preview's tree: one function, so the tile asks once per model. */
 function loadModelDetail(model: string): Promise<GetModelDetailResult | null> {
-    return request<GetModelDetailResult>(GET_MODEL_DETAIL, {
+    return request(GET_MODEL_DETAIL, {
         modelReference: model,
     });
 }
@@ -406,7 +405,7 @@ function App(): React.JSX.Element {
         if (outline === null) {
             return;
         }
-        void request<GetSymbolOutlineResult>(GET_SYMBOL_OUTLINE, {
+        void request(GET_SYMBOL_OUTLINE, {
             outline,
         }).then((result) => {
             setSummary(result);
@@ -450,10 +449,7 @@ function App(): React.JSX.Element {
                 offset,
                 limit: PAGE_SIZE,
             };
-            const result = await request<GetSymbolPageResult>(
-                GET_SYMBOL_PAGE,
-                params,
-            );
+            const result = await request(GET_SYMBOL_PAGE, params);
             setLoaded((known) => ({
                 ...known,
                 [node.key]: {
@@ -505,7 +501,7 @@ function App(): React.JSX.Element {
         if (known) {
             return known;
         }
-        const result = await request<GetSymbolNodeResult>(GET_SYMBOL_NODE, {
+        const result = await request(GET_SYMBOL_NODE, {
             page: node.page,
             id: node.row.id,
         });
@@ -519,7 +515,7 @@ function App(): React.JSX.Element {
         if (loaded[node.key]) {
             return;
         }
-        const result = await request<GetSymbolPageResult>(GET_SYMBOL_PAGE, {
+        const result = await request(GET_SYMBOL_PAGE, {
             page: node.page,
             parent: node.parent,
             sort: sorts[node.key]?.column,
@@ -615,10 +611,10 @@ function App(): React.JSX.Element {
         if (previews[key]) {
             return;
         }
-        const result = await request<GetSymbolPreviewResult>(
-            GET_SYMBOL_PREVIEW,
-            { page: node.page, id: node.row.id },
-        );
+        const result = await request(GET_SYMBOL_PREVIEW, {
+            page: node.page,
+            id: node.row.id,
+        });
         setPreviews((known) => ({
             ...known,
             [key]: result ?? { adapter: null, tiles: [] },
@@ -1609,7 +1605,7 @@ function CardSection({
     useEffect(() => {
         let live = true;
         setCard(null);
-        void request<GetEncyclopediaEntryResult>(GET_ENCYCLOPEDIA_ENTRY, {
+        void request(GET_ENCYCLOPEDIA_ENTRY, {
             objectId,
         }).then((result) => {
             if (live) {

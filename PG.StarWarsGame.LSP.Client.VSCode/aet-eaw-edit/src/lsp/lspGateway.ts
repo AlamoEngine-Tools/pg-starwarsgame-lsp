@@ -14,6 +14,13 @@
 
 import * as l10n from "@vscode/l10n";
 
+import type {
+    ParamlessMethod,
+    RequestMethod,
+    RequestParams,
+    RequestResult,
+} from "../protocol/requests";
+
 /** The two ways a call can come back with nothing. */
 export type LspFailure =
     /** The server is not running - nothing was sent. */
@@ -69,6 +76,11 @@ function failureText(context: string | undefined, message: string): string {
  * request object buys nothing a caller here can use.
  */
 const EXECUTE_COMMAND = "workspace/executeCommand";
+
+/** A request's params argument: left out for a method that takes nothing. */
+type ParamsOf<M extends RequestMethod> = M extends ParamlessMethod
+    ? [params?: RequestParams<M>]
+    : [params: RequestParams<M>];
 
 export class LspGateway {
     /**
@@ -160,7 +172,20 @@ export class LspGateway {
      *
      * This is the primitive; the helpers below are the three things callers actually do with it.
      */
-    async request<T>(
+    request<M extends RequestMethod>(
+        method: M,
+        ...params: ParamsOf<M>
+    ): Promise<LspOutcome<RequestResult<M>>> {
+        return this.requestRaw<RequestResult<M>>(method, params[0] ?? {});
+    }
+
+    /**
+     * One request by a method name the compiler cannot read at the call: a webview's relayed
+     * request, which is data checked against its panel's allow-list, and a navigator's, whose method
+     * is a type parameter of its base class. Everything else goes through {@link request}, where the
+     * method types the params and the result.
+     */
+    async requestRaw<T>(
         method: string,
         params: unknown = {},
     ): Promise<LspOutcome<T>> {
@@ -189,12 +214,12 @@ export class LspGateway {
      * @param context Prefixed to a failure message, so the user is told which action failed rather
      *     than only that something did. `undefined` on success is the caller's cue to stop.
      */
-    async requestOrReport<T>(
-        method: string,
-        params: unknown = {},
+    async requestOrReport<M extends RequestMethod>(
+        method: M,
+        params: RequestParams<M>,
         context?: string,
-    ): Promise<T | undefined> {
-        const outcome = await this.request<T>(method, params);
+    ): Promise<RequestResult<M> | undefined> {
+        const outcome = await this.requestRaw<RequestResult<M>>(method, params);
         if (outcome.ok) {
             return outcome.value;
         }
@@ -215,12 +240,12 @@ export class LspGateway {
      * modal would interrupt editing over a convenience, and a dropdown awaiting a reply must not
      * hang just because the answer never came.
      */
-    async requestOr<T>(
-        method: string,
-        params: unknown,
-        fallback: T,
-    ): Promise<T> {
-        const outcome = await this.request<T>(method, params);
+    async requestOr<M extends RequestMethod>(
+        method: M,
+        params: RequestParams<M>,
+        fallback: RequestResult<M>,
+    ): Promise<RequestResult<M>> {
+        const outcome = await this.requestRaw<RequestResult<M>>(method, params);
         return outcome.ok ? outcome.value : fallback;
     }
 
@@ -232,8 +257,11 @@ export class LspGateway {
      *
      * @returns whether it got through, for a caller that wants to know.
      */
-    async notify(method: string, params: unknown = {}): Promise<boolean> {
-        return (await this.request(method, params)).ok;
+    async notify<M extends RequestMethod>(
+        method: M,
+        ...params: ParamsOf<M>
+    ): Promise<boolean> {
+        return (await this.requestRaw(method, params[0] ?? {})).ok;
     }
 
     /**

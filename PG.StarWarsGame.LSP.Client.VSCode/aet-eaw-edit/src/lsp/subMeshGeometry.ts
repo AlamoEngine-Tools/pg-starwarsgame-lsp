@@ -12,7 +12,10 @@
 // tested at all.
 
 import { type LspGateway } from "./lspGateway";
-import { type GetSubMeshGeometryResult } from "../protocol/modelPreview";
+import {
+    type GeometryTable,
+    type GetSubMeshGeometryResult,
+} from "../protocol/modelPreview";
 
 /** A message from a webview: a tagged bag whose fields are checked rather than trusted. */
 interface GeometryRequest {
@@ -29,21 +32,19 @@ export async function subMeshGeometryReply(
     lsp: LspGateway,
     message: GeometryRequest,
 ): Promise<{ type: "subMeshGeometry"; result: GetSubMeshGeometryResult }> {
-    const result = await lsp.request<GetSubMeshGeometryResult>(
-        "aet/getSubMeshGeometry",
-        {
-            modelReference: String(message.modelReference ?? ""),
+    const result = await lsp.request("aet/getSubMeshGeometry", {
+        modelReference: String(message.modelReference ?? ""),
 
-            // Number(x ?? d) rather than (x || d): mesh 0, sub-mesh 0 and offset 0 are the first of
-            // each and the commonest request there is, and a falsy default would rewrite every one
-            // of them into something else.
-            meshIndex: Number(message.meshIndex ?? 0),
-            subMeshIndex: Number(message.subMeshIndex ?? 0),
-            table: String(message.table ?? "vertices"),
-            offset: Number(message.offset ?? 0),
-            count: Number(message.count ?? 100),
-        },
-    );
+        // Number(x ?? d) rather than (x || d): mesh 0, sub-mesh 0 and offset 0 are the first of
+        // each and the commonest request there is, and a falsy default would rewrite every one
+        // of them into something else.
+        meshIndex: Number(message.meshIndex ?? 0),
+        subMeshIndex: Number(message.subMeshIndex ?? 0),
+        // As the page named it: a table the server does not have is answered with its error.
+        table: String(message.table ?? "vertices") as GeometryTable,
+        offset: Number(message.offset ?? 0),
+        count: Number(message.count ?? 100),
+    });
 
     return {
         type: "subMeshGeometry",

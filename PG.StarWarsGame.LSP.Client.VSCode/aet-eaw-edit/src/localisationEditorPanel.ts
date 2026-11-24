@@ -5,15 +5,13 @@ import { basename } from "path";
 import * as vscode from "vscode";
 
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
-import {
-    readDialogGeometry,
-    saveDialogGeometry,
-} from "./dialogGeometryStorage";
 import { heldBack, reportSave } from "./editBatchReport";
 import { EditBatchClient, type EditBatchSave } from "./lsp/editBatchClient";
+import { pathKey, samePath } from "./pathKey";
 import { LocalisationPanelState } from "./shared/localisationPanelState";
 import { mergeMembers } from "./shared/locSetMerge";
 import { siblingsOf } from "./shared/localisationTreeModel";
+import { saveDialogGeometry } from "./stores";
 import {
     PanelRegistry,
     panelSetKey,
@@ -28,13 +26,9 @@ import type {
     LocalisationSeedSource,
 } from "./protocol/panels/localisationEditor";
 import {
-    CreateLocalisationLanguageFileResult,
     EDIT_BATCH_EDITOR,
     type EditBatchEditor,
     type EditBatchSubject,
-    GetBaselineEntriesResult,
-    GetLanguagesResult,
-    GetLocalisationProjectsResult,
     GetLocalisationRowsResult,
     LOC_CATEGORY,
 } from "./protocol";
@@ -273,7 +267,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
                 await this._addLanguageFile(msg.language);
                 break;
             case "saveDialogGeometry":
-                saveDialogGeometry(msg.id, msg.geometry);
+                saveDialogGeometry(this.project.stores, msg.id, msg.geometry);
                 break;
             case "exportDat":
                 await vscode.commands.executeCommand(
@@ -333,7 +327,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
             return [];
         }
 
-        const result = await this.project.gateway.requestOr<GetLanguagesResult>(
+        const result = await this.project.gateway.requestOr(
             "aet/getLanguages",
             {},
             { languages: [] },
@@ -351,11 +345,10 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
         // escape here as an unhandled rejection and leave the grid stuck on "Loading...".
         const results: GetLocalisationRowsResult[] = [];
         for (const filePath of this._filePaths) {
-            const outcome =
-                await this.project.gateway.request<GetLocalisationRowsResult>(
-                    "aet/getLocalisationRows",
-                    { projectFilePath: filePath },
-                );
+            const outcome = await this.project.gateway.request(
+                "aet/getLocalisationRows",
+                { projectFilePath: filePath },
+            );
 
             if (!outcome.ok) {
                 this.post({
@@ -408,7 +401,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
             supportedLanguages: await this._supportedLanguagesAsync(),
             // Sent with the file so a dialog knows where it belongs on its first render - asking
             // for it when one opens would show it centred and then move it.
-            dialogGeometry: readDialogGeometry(),
+            dialogGeometry: this.project.stores.dialogGeometry.read(),
             type: "rows",
             rows: merged.rows,
             languages: merged.languages,
@@ -444,15 +437,14 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
      * working editor.
      */
     private async _sendSeedSources(): Promise<void> {
-        const listed =
-            await this.project.gateway.requestOr<GetLocalisationProjectsResult>(
-                "aet/getLocalisationProjects",
-                {},
-                { projects: [] },
-            );
+        const listed = await this.project.gateway.requestOr(
+            "aet/getLocalisationProjects",
+            {},
+            { projects: [] },
+        );
 
-        const self = (listed.projects ?? []).find(
-            (p) => p.filePath.toLowerCase() === this._filePath.toLowerCase(),
+        const self = (listed.projects ?? []).find((p) =>
+            samePath(p.filePath, this._filePath),
         );
         if (self === undefined) {
             return;
@@ -461,11 +453,10 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
         const sources: LocalisationSeedSource[] = [];
 
         for (const sibling of siblingsOf(self, listed.projects ?? [])) {
-            const read =
-                await this.project.gateway.request<GetLocalisationRowsResult>(
-                    "aet/getLocalisationRows",
-                    { projectFilePath: sibling.filePath },
-                );
+            const read = await this.project.gateway.request(
+                "aet/getLocalisationRows",
+                { projectFilePath: sibling.filePath },
+            );
             if (!read.ok || read.value.error) {
                 continue;
             }
@@ -516,12 +507,11 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
      * result is offered for opening rather than left for the user to find in the tree.
      */
     private async _addLanguageFile(language: string): Promise<void> {
-        const result =
-            await this.project.gateway.requestOrReport<CreateLocalisationLanguageFileResult>(
-                "aet/createLocalisationLanguageFile",
-                { projectFilePath: this._filePath, language },
-                vscode.l10n.t("Could not create the {0} file", language),
-            );
+        const result = await this.project.gateway.requestOrReport(
+            "aet/createLocalisationLanguageFile",
+            { projectFilePath: this._filePath, language },
+            vscode.l10n.t("Could not create the {0} file", language),
+        );
         if (result === undefined) {
             return;
         }
@@ -565,12 +555,11 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
      * would interrupt editing over a convenience.
      */
     private async _sendBaseline(): Promise<void> {
-        const result =
-            await this.project.gateway.requestOr<GetBaselineEntriesResult>(
-                "aet/getBaselineEntries",
-                { projectFilePath: this._filePath },
-                { entries: [] },
-            );
+        const result = await this.project.gateway.requestOr(
+            "aet/getBaselineEntries",
+            { projectFilePath: this._filePath },
+            { entries: [] },
+        );
         this.post({ type: "baselineRows", entries: result.entries ?? [] });
     }
 
@@ -638,14 +627,13 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
         // The hash each file has now is the one its next batch has to carry.
         const written = new Map(
             saved.documents.map((d) => [
-                d.filePath.toLowerCase(),
+                pathKey(d.filePath),
                 d.contentHash ?? undefined,
             ]),
         );
         for (const member of this._members) {
             member.contentHash =
-                written.get(member.filePath.toLowerCase()) ??
-                member.contentHash;
+                written.get(pathKey(member.filePath)) ?? member.contentHash;
         }
         this._state.noteSaved(
             this._members.length > 0

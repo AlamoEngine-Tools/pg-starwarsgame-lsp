@@ -104,13 +104,10 @@ for (const setup of WORKSPACE_SETUPS) {
 
             for (const project of setup.projects) {
                 active = fileOf(project, "Data/Xml/Units.xml");
-                assert.deepEqual(
-                    await routed.request<string>("aet/getStoryPlots"),
-                    {
-                        ok: true,
-                        value: `${project.name}:aet/getStoryPlots`,
-                    },
-                );
+                assert.deepEqual(await routed.request("aet/getStoryPlots"), {
+                    ok: true,
+                    value: `${project.name}:aet/getStoryPlots`,
+                });
             }
         });
     });

@@ -767,27 +767,3 @@ export function fillEmptyFunctions(source: string): string {
         cursor = close;
     }
 }
-
-/** Narrows every argument of a call to the parameter widths a signature declares. */
-export function narrowCallArguments(
-    call: string,
-    parameterTypes: readonly string[],
-    scope: Scope,
-    structs: StructTable,
-): string {
-    const open = call.indexOf("(");
-    if (open === -1 || matchingParen(call, open) !== call.length - 1) {
-        return call;
-    }
-
-    const args = splitTopLevel(call.slice(open + 1, -1));
-    if (args.length !== parameterTypes.length) {
-        return call;
-    }
-
-    const narrowed = args.map((arg, i) =>
-        narrowExpression(arg, parameterTypes[i], scope, structs),
-    );
-
-    return `${call.slice(0, open)}(${narrowed.join(", ")})`;
-}

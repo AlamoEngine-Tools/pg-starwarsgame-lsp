@@ -17,17 +17,20 @@
 
 import type { LspOutcome } from "./lspGateway";
 import type {
-    ApplyEditBatchResult,
     EditBatchDocument,
     EditBatchEditor,
     EditBatchParams,
     EditBatchSubject,
     ValidateEditBatchResult,
 } from "../protocol/editBatch";
+import type { RequestParams, RequestResult } from "../protocol/requests";
 
 /** The slice of the gateway this needs - so a test can supply a function. */
 export interface EditBatchRequests {
-    request<T>(method: string, params?: unknown): Promise<LspOutcome<T>>;
+    request<M extends "aet/validateEditBatch" | "aet/applyEditBatch">(
+        method: M,
+        params: RequestParams<M>,
+    ): Promise<LspOutcome<RequestResult<M>>>;
 }
 
 /**
@@ -169,7 +172,7 @@ export class EditBatchClient {
         subject: EditBatchSubject,
         commands: readonly TCommand[],
     ): Promise<LspOutcome<ValidateEditBatchResult>> {
-        return this._requests.request<ValidateEditBatchResult>(
+        return this._requests.request(
             "aet/validateEditBatch",
             paramsOf(editor, subject, commands),
         );
@@ -186,7 +189,7 @@ export class EditBatchClient {
         subject: EditBatchSubject,
         commands: readonly TCommand[],
     ): Promise<EditBatchSave> {
-        const outcome = await this._requests.request<ApplyEditBatchResult>(
+        const outcome = await this._requests.request(
             "aet/applyEditBatch",
             paramsOf(editor, subject, commands),
         );

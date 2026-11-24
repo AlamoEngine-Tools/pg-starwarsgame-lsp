@@ -35,7 +35,7 @@ export class ModBrowserViewProvider implements ProjectTree<ModBrowserOutlineItem
     static readonly viewId = "aet-eaw-edit.lsp.modBrowser";
 
     /** The outlines a browser opens on; their summaries are what the panel asks for first. */
-    private static readonly OUTLINES = [
+    private static readonly OUTLINES: readonly SymbolOutline[] = [
         "gameData",
         "assets",
         "scripts",

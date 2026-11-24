@@ -28,6 +28,9 @@ public sealed class ProtocolMethodContractTest
 {
     private static readonly string RepoRoot = FindRepoRoot();
 
+    /// <summary>The client's map of every request, <c>src/protocol/requests.ts</c>.</summary>
+    private const string RequestMapFile = "requests.ts";
+
     /// <summary>
     ///     Method names the client builds at run time rather than writing out.
     /// </summary>
@@ -49,6 +52,7 @@ public sealed class ProtocolMethodContractTest
     ///     served and uncalled, and it was the only entry. An endpoint is listed here with the reason
     ///     it is kept rather than left to fail the test - listed, so it cannot quietly become three.
     /// </remarks>
+    // ReSharper disable once CollectionNeverUpdated.Local - empty on purpose; see the remarks.
     private static readonly HashSet<string> ServerMethodsNoClientCalls =
         new(StringComparer.Ordinal);
 
@@ -74,7 +78,7 @@ public sealed class ProtocolMethodContractTest
     [Fact]
     public void EveryServerMethod_IsReachedByTheClientOrDeclaredUnused()
     {
-        var client = ClientMethods();
+        var client = ClientCallers();
 
         var unreached = ServerMethods()
             .Where(m => !client.Contains(m)
@@ -87,6 +91,20 @@ public sealed class ProtocolMethodContractTest
             $"Server endpoint(s) nothing in the client calls: {string.Join(", ", unreached)}. Either "
             + "the client's call site was renamed and the feature is broken, or the endpoint is dead "
             + "and belongs in ServerMethodsNoClientCalls with the reason it is kept.");
+    }
+
+    /// <summary>The client's map of requests declares a method; it does not call it.</summary>
+    /// <remarks>
+    ///     <c>protocol/requests.ts</c> names every request with its params and its result, the
+    ///     simulator's included. Read as a caller it would reach every endpoint by itself, and an
+    ///     endpoint whose last call site went would pass. The simulator's methods are the proof it is
+    ///     not: the map spells each one out, and no caller does, because the panel builds the name.
+    /// </remarks>
+    [Fact]
+    public void TheRequestMap_IsADeclaration_NotACaller()
+    {
+        Assert.Contains("aet/storySimStart", ClientMethods());
+        Assert.DoesNotContain("aet/storySimStart", ClientCallers());
     }
 
     /// <summary>
@@ -157,11 +175,25 @@ public sealed class ProtocolMethodContractTest
     /// </remarks>
     private static HashSet<string> ClientMethods()
     {
+        return ClientNames(_ => false);
+    }
+
+    /// <summary>
+    ///     Every <c>aet/*</c> name a call site of the shipped client spells: the same scan without
+    ///     the request map, which lists every method whether anything calls it or not.
+    /// </summary>
+    private static HashSet<string> ClientCallers()
+    {
+        return ClientNames(f => f.Equals(RequestMapFile, StringComparison.Ordinal));
+    }
+
+    private static HashSet<string> ClientNames(Func<string, bool> skip)
+    {
         var root = Path.Combine(
             RepoRoot, "PG.StarWarsGame.LSP.Client.VSCode", "aet-eaw-edit", "src");
         // Either quote: the client is formatted by Prettier, whose default is double quotes.
         var methods = Scan(root, ["*.ts", "*.tsx"], @"[""'](aet/[A-Za-z]+)[""']",
-            f => f.Contains(".test.", StringComparison.Ordinal));
+            f => f.Contains(".test.", StringComparison.Ordinal) || skip(f));
 
         Assert.NotEmpty(methods);
         return methods;

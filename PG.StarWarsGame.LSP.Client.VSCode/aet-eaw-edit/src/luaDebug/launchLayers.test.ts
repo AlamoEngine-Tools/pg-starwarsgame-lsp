@@ -53,6 +53,15 @@ describe("collectSourceRoots", () => {
 
         assert.deepEqual(roots, ["D:/Shared/Scripts"]);
     });
+
+    it("drops a root spelled again with a trailing separator", () => {
+        const roots = collectSourceRoots([
+            layer("Mod", 1, "D:/Mods/Mod", ["D:/Shared/Scripts"]),
+            layer("Dep", 0, "D:/Mods/Dep", ["D:/Shared/Scripts/"]),
+        ]);
+
+        assert.deepEqual(roots, ["D:/Shared/Scripts"]);
+    });
 });
 
 describe("buildModChain", () => {

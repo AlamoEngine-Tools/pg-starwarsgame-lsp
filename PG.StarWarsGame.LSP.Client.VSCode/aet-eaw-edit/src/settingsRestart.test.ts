@@ -8,7 +8,6 @@ import {
     previewAssetsChanged,
     previewEffectsChanged,
     restartReason,
-    restartRequired,
 } from "./settingsRestart";
 
 /** A configuration change touching exactly these settings, as `affectsConfiguration` answers it. */
@@ -47,7 +46,7 @@ const STARTUP = [
     "aet-eaw-edit.diagnostics.workspaceOnStartup",
 ];
 
-describe("restartRequired", () => {
+describe("restartReason, as whether a change restarts the servers", () => {
     for (const setting of [
         ...FEATURES,
         SHADER_FOLDER,
@@ -55,14 +54,14 @@ describe("restartRequired", () => {
         ...STARTUP,
     ]) {
         it(`restarts for ${setting}`, () => {
-            assert.equal(restartRequired(change(setting)), true);
+            assert.notEqual(restartReason(change(setting)), null);
         });
     }
 
     it("does not restart for a setting the panels read themselves", () => {
         assert.equal(
-            restartRequired(change("aet-eaw-edit.features.preview.energyPool")),
-            false,
+            restartReason(change("aet-eaw-edit.features.preview.energyPool")),
+            null,
         );
     });
 });

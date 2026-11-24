@@ -30,6 +30,8 @@
 // cannot follow, so a bundle built from it fails at load with "Cannot find module './impl/format'".
 import { parse, type ParseError } from "jsonc-parser/lib/esm/main";
 
+import { isInside, pathKey } from "./pathKey";
+
 /** What the extension found, and how to read a project file it names. */
 export interface DiscoveryInput {
     /** The workspace folders, in the order the window lists them. */
@@ -85,7 +87,7 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
     const folders = input.folders.map(normalize);
     const files = new Map<string, ProjectFile | undefined>();
     const load = (path: string): ProjectFile | undefined => {
-        const key = keyOf(path);
+        const key = pathKey(path);
         if (!files.has(key)) {
             files.set(key, readProjectFile(input.read(path)));
         }
@@ -100,10 +102,10 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
         const inFolder = input.projectFiles
             .map(normalize)
             .filter((p) => isInside(p, folder))
-            .sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+            .sort((a, b) => pathKey(a).localeCompare(pathKey(b)));
         for (const path of inFolder) {
-            if (!seen.has(keyOf(path))) {
-                seen.add(keyOf(path));
+            if (!seen.has(pathKey(path))) {
+                seen.add(pathKey(path));
                 candidates.push(path);
             }
         }
@@ -111,7 +113,7 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
 
     const closures = new Map<string, string[]>();
     const closure = (path: string): string[] => {
-        const key = keyOf(path);
+        const key = pathKey(path);
         if (!closures.has(key)) {
             closures.set(key, closureOf(path, load));
         }
@@ -124,8 +126,8 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
     const swallows = (outer: string, inner: string): boolean =>
         outer !== inner &&
         isInside(dirname(inner), dirname(outer)) &&
-        keyOf(dirname(inner)) !== keyOf(dirname(outer)) &&
-        (closure(outer).some((d) => keyOf(d) === keyOf(inner)) ||
+        pathKey(dirname(inner)) !== pathKey(dirname(outer)) &&
+        (closure(outer).some((d) => pathKey(d) === pathKey(inner)) ||
             declared(outer).some((d) => isInside(dirname(inner), d)));
     const nested = candidates.filter((p) =>
         candidates.some((outer) => swallows(outer, p)),
@@ -152,7 +154,7 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
         };
     });
 
-    const openKeys = new Set(open.map(keyOf));
+    const openKeys = new Set(open.map(pathKey));
     const underFolder = (path: string) =>
         folders.some((f) => isInside(path, f));
     const assigned = new Set<string>();
@@ -163,7 +165,7 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
         const others = openDirectories.filter((d) => d !== project.directory);
         project.roots = rootsOf(project.directory, project.directories, others);
         for (const dependency of project.closure) {
-            const key = keyOf(dependency);
+            const key = pathKey(dependency);
             if (
                 openKeys.has(key) ||
                 assigned.has(key) ||
@@ -189,7 +191,7 @@ export function discoverProjects(input: DiscoveryInput): Discovery {
     for (const project of projects) {
         project.excluded = openDirectories.filter(
             (d) =>
-                keyOf(d) !== keyOf(project.directory) &&
+                pathKey(d) !== pathKey(project.directory) &&
                 project.roots.some((root) => isInside(d, root)),
         );
     }
@@ -230,7 +232,7 @@ function closureOf(
     const onStack = new Set<string>();
 
     const visit = (path: string) => {
-        const key = keyOf(path);
+        const key = pathKey(path);
         if (emitted.has(key) || onStack.has(key)) {
             return;
         }
@@ -248,7 +250,7 @@ function closureOf(
     };
 
     visit(root);
-    return ordered.filter((p) => keyOf(p) !== keyOf(root));
+    return ordered.filter((p) => pathKey(p) !== pathKey(root));
 }
 
 /** A project's directory, plus each declared directory that lies outside it. */
@@ -335,10 +337,6 @@ function normalize(path: string): string {
         : slashed;
 }
 
-function keyOf(path: string): string {
-    return normalize(path).toLowerCase();
-}
-
 function dirname(path: string): string {
     const index = path.lastIndexOf("/");
     return index < 0 ? "" : path.slice(0, index);
@@ -348,13 +346,6 @@ function stem(path: string): string {
     const file = path.slice(path.lastIndexOf("/") + 1);
     const dot = file.lastIndexOf(".");
     return dot > 0 ? file.slice(0, dot) : file;
-}
-
-/** Whether `path` is `directory` or lies under it, on a segment boundary. */
-function isInside(path: string, directory: string): boolean {
-    const p = keyOf(path);
-    const d = keyOf(directory);
-    return p === d || p.startsWith(d.endsWith("/") ? d : d + "/");
 }
 
 /**

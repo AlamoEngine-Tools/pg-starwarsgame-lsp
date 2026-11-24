@@ -10,8 +10,8 @@
 // hardcoded default.
 //
 // The values are a USER setting, not a project one. Which width you like reading at follows the
-// person the way the preview's light rig does (`viewerSettingsStorage`), unlike where a dialog was
-// dragged, which is deliberately per project (`dialogGeometryStorage`). The host backs this with
+// person the way the preview's light rig does (`viewerSettings` in `stores`), unlike where a dialog was
+// dragged, which is deliberately per project (`dialogGeometry` there). The host backs this with
 // `globalState` for that reason.
 
 /** Sizes by `<surface>.<control>` key, in pixels. */

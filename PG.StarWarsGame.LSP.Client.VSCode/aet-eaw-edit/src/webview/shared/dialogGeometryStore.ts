@@ -28,8 +28,6 @@ export const DIALOG_IDS = {
     addTranslation: "loc.add-translation",
 } as const;
 
-export type DialogId = (typeof DIALOG_IDS)[keyof typeof DIALOG_IDS];
-
 let remembered = new Map<string, StoredGeometry>();
 let publish: ((id: string, geometry: StoredGeometry) => void) | null = null;
 
