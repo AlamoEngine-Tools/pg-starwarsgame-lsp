@@ -14,20 +14,24 @@ describe("SET-14", () => {
         await serverReady();
     });
 
-    // The protocol counted 32 'EaWEdit: ...' commands; the manifest has 33 in all, 31 of them
-    // 'EaWEdit: ...' (What's New's own, #328, came after the count) and the two 'Open File' entries
-    // of the story nodes.
+    // The manifest has 37 commands: 32 titled 'EaWEdit: ...', and five entries of the Campaign
+    // Editor's nodes, which are named for what they do to the node - the two 'Open File' and the
+    // three 'Rename Set' (#181).
     it("titles the 32 commands 'EaWEdit: ...' and leaves no placeholder", () => {
         const manifest = readJson(path.join(client, "package.json"));
         const nls: Record<string, string> = readJson(path.join(client, "package.nls.json"));
         const titles: string[] = manifest.contributes.commands.map((c: any) => nls[c.title.slice(1, -1)] ?? c.title);
         expect(titles.filter((t) => t.includes("%"))).toEqual([]);
-        const own = titles.filter((t) => !t.startsWith("Open File"));
+        const ofANode = (t: string): boolean => t.startsWith("Open File") || t.startsWith("Rename Set");
+        const own = titles.filter((t) => !ofANode(t));
         expect(own).toHaveLength(32);
         expect(own.filter((t) => !t.startsWith("EaWEdit: "))).toEqual([]);
-        expect(titles.filter((t) => t.startsWith("Open File")).sort()).toEqual([
+        expect(titles.filter(ofANode).sort()).toEqual([
             "Open File",
             "Open File - no document in the project",
+            "Rename Set - no Campaign_Set to rename",
+            "Rename Set - no member in the project",
+            "Rename Set...",
         ]);
         expect(fs.readFileSync(path.join(client, "package.json"), "utf8")).not.toMatch(/"%[^"%]*[^%"]"/);
     });

@@ -108,11 +108,32 @@ public sealed class GetStoryPlotsHandler(
             // A baseline definition carries a game-relative path the editor cannot open.
             var origin = index.Resolve(campaign.Name, "Campaign")?.Origin as FileOrigin;
             var navigable = origin is { IsNavigable: true } ? origin : null;
-            campaigns.Add(new StoryCampaignDto(campaign.Name, factions, SetForCampaign(origin),
-                campaign.PlayerFaction, navigable?.Uri, navigable?.Line));
+            var set = SetForCampaign(origin);
+            var setTag = SetTagOf(index, navigable, set);
+            campaigns.Add(new StoryCampaignDto(campaign.Name, factions, set,
+                campaign.PlayerFaction, navigable?.Uri, navigable?.Line, setTag?.TagLine, setTag?.TagColumn));
         }
 
         return new GetStoryPlotsResult(campaigns);
+    }
+
+    /// <summary>
+    ///     Where a campaign's <c>Campaign_Set</c> value is written, when the project may rewrite it:
+    ///     the campaign's own membership of <paramref name="set" /> in a document of the project's
+    ///     own layer. A dependency's document is read-only here, so it yields nothing and the
+    ///     navigator offers no rename from it.
+    /// </summary>
+    private static DocumentGroupMembership? SetTagOf(GameIndex index, FileOrigin? definition, string? set)
+    {
+        if (definition is null || set is null) return null;
+        if (!index.Documents.TryGetValue(definition.Uri, out var document)) return null;
+        if (document.GroupMemberships.IsDefaultOrEmpty || document.LayerRank < index.LeafLayerRank) return null;
+
+        return document.GroupMemberships.FirstOrDefault(m =>
+            string.Equals(m.Membership.GroupKey, set, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(m.Membership.MemberTypeName, "Campaign", StringComparison.OrdinalIgnoreCase)
+            && m.Membership.MemberOrigin is FileOrigin member
+            && member.Uri == definition.Uri && member.Line == definition.Line);
     }
 
     // (campaign definition origin) -> Campaign_Set value, derived from the workspace group index

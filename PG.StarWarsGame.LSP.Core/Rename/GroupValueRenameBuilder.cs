@@ -13,8 +13,9 @@ namespace PG.StarWarsGame.LSP.Core.Rename;
 ///     Renames a <see cref="Schema.TagSemanticType.ReferenceGroup" /> grouping key (e.g. a
 ///     <c>Campaign_Set</c> value or an SFXEvent <c>Overlap_Test</c> value): the key has no single
 ///     declaration - it is the shared value of a tag on every member object - so the rename rewrites
-///     that value in place across every member occurrence. Baseline (shipped-game) members are not in
-///     the editable document set and are left untouched; only workspace documents are rewritten.
+///     that value in place across every member occurrence the project owns. Baseline (shipped-game)
+///     members are not in the document set at all, and a dependency's members are in it but not the
+///     project's to write: both are left untouched, as every other rename leaves them.
 /// </summary>
 public static class GroupValueRenameBuilder
 {
@@ -27,9 +28,10 @@ public static class GroupValueRenameBuilder
         if (string.Equals(trimmed, groupKey, StringComparison.Ordinal)) return null;
 
         var edits = new Dictionary<string, List<TextEdit>>(StringComparer.Ordinal);
+        var leaf = index.LeafLayerRank;
         foreach (var doc in index.Documents.Values)
         {
-            if (doc.GroupMemberships.IsDefaultOrEmpty) continue;
+            if (doc.GroupMemberships.IsDefaultOrEmpty || doc.LayerRank < leaf) continue;
             foreach (var m in doc.GroupMemberships)
             {
                 if (!string.Equals(m.Membership.GroupKey, groupKey, StringComparison.OrdinalIgnoreCase))

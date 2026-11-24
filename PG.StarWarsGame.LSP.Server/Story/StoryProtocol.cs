@@ -46,13 +46,21 @@ public sealed record GetStoryPlotsResult(IReadOnlyList<StoryCampaignDto> Campaig
 /// </param>
 /// <param name="DefinitionUri">The document declaring the campaign, or null when it is not indexed.</param>
 /// <param name="DefinitionLine">0-based line of the <c>&lt;Campaign&gt;</c> element in that document.</param>
+/// <param name="SetLine">
+///     0-based line of the <c>Campaign_Set</c> value in <paramref name="DefinitionUri" />: where a
+///     rename of the set is asked. Null when the campaign declares no set, and when its definition
+///     is not the project's to write - the game's, or a dependency's.
+/// </param>
+/// <param name="SetColumn">0-based column of that value; null whenever <paramref name="SetLine" /> is.</param>
 public sealed record StoryCampaignDto(
     string Name,
     IReadOnlyList<StoryFactionDto> Factions,
     string? Set = null,
     string? PlayerFaction = null,
     string? DefinitionUri = null,
-    int? DefinitionLine = null);
+    int? DefinitionLine = null,
+    int? SetLine = null,
+    int? SetColumn = null);
 
 /// <param name="Control">
 ///     The faction's <c>AI_Player_Control</c> player type as written (<c>BasicEmpire</c>, <c>None</c>,
@@ -173,7 +181,18 @@ public sealed record StoryGraphNodeDto(
     // author's question. Per node rather than per graph, because a leaf commonly extends a graph it
     // does not wholly own and the two kinds sit side by side in one view. Null - the default - is
     // editable, so an unlayered workspace and every existing caller are unaffected.
-    string? ReadOnlyOwner = null);
+    string? ReadOnlyOwner = null,
+    // For a battle's stand-in on the galactic graph: where the battle comes in the order of play.
+    // On the node, not beside the graph, because the node is all a node view is handed; and from
+    // the model the graph was projected from, so a staged edit that reorders the battles reorders
+    // these with it. Null on every other node, and on a stub whose manifest names no battle.
+    StoryBattleOrderDto? BattleOrder = null);
+
+/// <summary>A battle's place among its faction's battles.</summary>
+/// <param name="Rank">0-based order in which the galactic story reaches the battle.</param>
+/// <param name="Count">How many battles the faction has.</param>
+[PublicAPI]
+public sealed record StoryBattleOrderDto(int Rank, int Count);
 
 [PublicAPI]
 public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, string? Label);

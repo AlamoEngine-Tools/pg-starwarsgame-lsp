@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<Campaigns>
+<Campaign Name="Rename_Empire">
+<Campaign_Set>Rename_Set</Campaign_Set>
+<Starting_Active_Player>Empire</Starting_Active_Player>
+<Is_Story_Campaign>true</Is_Story_Campaign>
+<Empire_Story_Name>Story_Plots_Rename.xml</Empire_Story_Name>
+</Campaign>
+</Campaigns>

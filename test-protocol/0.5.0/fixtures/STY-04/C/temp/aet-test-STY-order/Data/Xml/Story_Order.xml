@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!-- Two battles whose order of play is neither the order of their names nor where the graph would put
+     them by itself: the long chain reaches Zulu first, and Alpha hangs off a root of its own. -->
+<Story>
+<Event Name="Order_Begin">
+<Event_Type>STORY_TRIGGER</Event_Type>
+</Event>
+<Event Name="Order_Advance">
+<Event_Type>STORY_TRIGGER</Event_Type>
+<Prereq>Order_Begin</Prereq>
+</Event>
+<Event Name="Order_Assault">
+<Event_Type>STORY_TRIGGER</Event_Type>
+<Prereq>Order_Advance</Prereq>
+<Reward_Type>LINK_TACTICAL</Reward_Type>
+<Reward_Param1>Kuat</Reward_Param1>
+<Reward_Param2>SPACE</Reward_Param2>
+<Reward_Param3>Empire</Reward_Param3>
+<Reward_Param4>Zulu_Battle.TED</Reward_Param4>
+<Reward_Param5>Rebel</Reward_Param5>
+<Reward_Param7>Story_Plots_Zulu_Battle.xml</Reward_Param7>
+<Reward_Param8>0</Reward_Param8>
+</Event>
+<Event Name="Order_Raid">
+<Event_Type>STORY_TRIGGER</Event_Type>
+<Reward_Type>LINK_TACTICAL</Reward_Type>
+<Reward_Param1>Kuat</Reward_Param1>
+<Reward_Param2>SPACE</Reward_Param2>
+<Reward_Param3>Empire</Reward_Param3>
+<Reward_Param4>Alpha_Battle.TED</Reward_Param4>
+<Reward_Param5>Rebel</Reward_Param5>
+<Reward_Param7>Story_Plots_Alpha_Battle.xml</Reward_Param7>
+<Reward_Param8>0</Reward_Param8>
+</Event>
+</Story>

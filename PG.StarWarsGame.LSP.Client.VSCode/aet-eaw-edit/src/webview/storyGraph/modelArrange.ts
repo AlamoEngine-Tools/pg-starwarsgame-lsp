@@ -20,6 +20,7 @@ import {
 } from "rete-auto-arrange-plugin";
 
 import { ARRANGE_OPTIONS } from "./arrangeOptions";
+import type { BattleOrderEdge } from "./battleOrder";
 
 /** The three options the plugin bakes into every layout before merging ours over them. */
 const PLUGIN_BAKED_OPTIONS = {
@@ -43,10 +44,31 @@ export interface ArrangeEdge {
     readonly target: string;
 }
 
-/** Where each node lands, in graph coordinates. Empty for an empty graph. */
+/**
+ * The order of play as connections the plugin turns into elk edges. They name no socket, so each
+ * runs from node to node: a battle's stand-in need not have an output for one to leave from, and
+ * nothing draws them - they exist for the layout alone.
+ */
+export function battleOrderConnections(order: readonly BattleOrderEdge[]): {
+    id: string;
+    source: string;
+    target: string;
+}[] {
+    return order.map((pair, index) => ({
+        id: `battle-order-${index}`,
+        source: pair.source,
+        target: pair.target,
+    }));
+}
+
+/**
+ * Where each node lands, in graph coordinates. Empty for an empty graph. `order` keeps the battles'
+ * stand-ins in the order of play: each pair's source in an earlier layer than its target.
+ */
 export async function arrangePositions(
     nodes: readonly ArrangeNode[],
     edges: readonly ArrangeEdge[],
+    order: readonly BattleOrderEdge[] = [],
 ): Promise<Map<string, { x: number; y: number }>> {
     const placed = new Map<string, { x: number; y: number }>();
     if (nodes.length === 0) {
@@ -63,19 +85,22 @@ export async function arrangePositions(
         })),
         // Only an edge whose endpoints both carry the socket it uses, or the plugin builds an elk
         // edge against a port that does not exist.
-        connections: edges
-            .filter(
-                (edge) =>
-                    nodes.some((n) => n.id === edge.source && n.hasOut) &&
-                    nodes.some((n) => n.id === edge.target && n.hasIn),
-            )
-            .map((edge) => ({
-                id: edge.id,
-                source: edge.source,
-                sourceOutput: "out",
-                target: edge.target,
-                targetInput: "in",
-            })),
+        connections: [
+            ...edges
+                .filter(
+                    (edge) =>
+                        nodes.some((n) => n.id === edge.source && n.hasOut) &&
+                        nodes.some((n) => n.id === edge.target && n.hasIn),
+                )
+                .map((edge) => ({
+                    id: edge.id,
+                    source: edge.source,
+                    sourceOutput: "out",
+                    target: edge.target,
+                    targetInput: "in",
+                })),
+            ...battleOrderConnections(order),
+        ],
     };
 
     const plugin = new AutoArrangePlugin();

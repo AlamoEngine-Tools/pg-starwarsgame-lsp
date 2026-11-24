@@ -248,6 +248,18 @@
         {
           "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
           "when": "false"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.renameCampaignSet",
+          "when": "false"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.renameCampaignSetNoMember",
+          "when": "false"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.renameCampaignSetUngrouped",
+          "when": "false"
         }
       ],
       "editor/title": [
@@ -324,6 +336,21 @@
           "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
           "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem =~ /^aetStory(CampaignNoFile|FileMissing)$/",
           "group": "inline"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.renameCampaignSet",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetCampaignSet",
+          "group": "1_modification"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.renameCampaignSetNoMember",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetCampaignSetReadOnly",
+          "group": "1_modification"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.renameCampaignSetUngrouped",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetCampaignSetUngrouped",
+          "group": "1_modification"
         },
         {
           "command": "aet-eaw-edit.lsp.openLocalisationEditor",
@@ -435,6 +462,20 @@
         "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
         "title": "%command.lsp.openStoryFileUnavailable.title%",
         "icon": "$(go-to-file)",
+        "enablement": "false"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.renameCampaignSet",
+        "title": "%command.lsp.renameCampaignSet.title%"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.renameCampaignSetNoMember",
+        "title": "%command.lsp.renameCampaignSetNoMember.title%",
+        "enablement": "false"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.renameCampaignSetUngrouped",
+        "title": "%command.lsp.renameCampaignSetUngrouped.title%",
         "enablement": "false"
       },
       {

@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!-- The Rebel side of Rename_Set. -->
+<Campaigns>
+    <Campaign Name="Rename_Rebel">
+        <Starting_Active_Player>Rebel</Starting_Active_Player>
+        <Hand_Written_Note>Rename_Set stays in this note</Hand_Written_Note>
+        <Campaign_Set> Rename_Set </Campaign_Set>
+        <Is_Story_Campaign>true</Is_Story_Campaign>
+        <Rebel_Story_Name>Story_Plots_Rename.xml</Rebel_Story_Name>
+    </Campaign>
+</Campaigns>

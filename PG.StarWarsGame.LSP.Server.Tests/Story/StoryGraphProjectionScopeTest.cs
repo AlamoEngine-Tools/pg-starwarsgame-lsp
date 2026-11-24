@@ -68,4 +68,29 @@ public sealed class StoryGraphProjectionScopeTest
             CancellationToken.None);
         Assert.Contains(upstream.Nodes, n => n.Id == entryPortal);
     }
+
+    [Fact]
+    public async Task InTheGalaxy_ABattleStubCarriesItsPlaceInThePlayOrder()
+    {
+        var result = await Handler().Handle(new GetStoryGraphParams("GC", "Empire"), CancellationToken.None);
+
+        // E links M2 in and is reached before E2, which links M5 in: the order of play, which the
+        // file names happen to agree with here and need not.
+        var m2 = result.Nodes.Single(n => n.Id == StoryGraphScoper.TacticalNodeId(StoryBattleFixture.M2Key));
+        var m5 = result.Nodes.Single(n => n.Id == StoryGraphScoper.TacticalNodeId(StoryBattleFixture.M5Key));
+        Assert.Equal(new StoryBattleOrderDto(0, 2), m2.BattleOrder);
+        Assert.Equal(new StoryBattleOrderDto(1, 2), m5.BattleOrder);
+        // Only a battle's stand-in has a place in that order.
+        Assert.All(result.Nodes.Where(n => n.Kind != "TacticalPlot"), n => Assert.Null(n.BattleOrder));
+    }
+
+    [Fact]
+    public async Task InsideABattle_NoNodeCarriesAPlayOrder()
+    {
+        var result = await Handler().Handle(
+            new GetStoryGraphParams("GC", "Empire", Scope: StoryBattleFixture.M2Key), CancellationToken.None);
+
+        Assert.NotEmpty(result.Nodes);
+        Assert.All(result.Nodes, n => Assert.Null(n.BattleOrder));
+    }
 }

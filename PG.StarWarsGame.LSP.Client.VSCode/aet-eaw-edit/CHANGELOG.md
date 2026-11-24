@@ -59,9 +59,24 @@
   it names. Every output channel and the log file write the home directory as `~`. The `aetswg-*.log`
   files left in a project by an earlier version can be deleted
   ([#461](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/461))
+- **A battle's play order on the campaign graph** - a battle's stand-in on the galactic story graph says
+  where the battle comes in the order of play, `Battle 2 of 9`, in the words the Story navigator uses. The
+  automatic layout puts the stand-ins in that order, an earlier battle's left of a later one's, on the first
+  open of a campaign and on Arrange; a stored arrangement stays as it is until Arrange. A pair is left as
+  the story's flow puts it when the story leads from the later battle back to the earlier one
+  ([#180](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/180))
+- **Rename Set in the Campaign Editor** - the context menu of a `Campaign_Set` node renames the set: the
+  new name is written to every member the project owns, each file changed in that one value and saved as
+  a refactoring is, and one undo in any of the files takes the rename back in all of them. The entry is
+  disabled, with the reason, on the node of the campaigns that declare no set and on a set no member of
+  the project belongs to ([#181](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/181))
 
 ### Fixes
 
+- **A rename of a `Campaign_Set` or `Overlap_Test` value leaves a dependency's files alone** - renaming
+  the value in a project that extends another rewrote the members in the referenced project's files too,
+  which no other rename does. Only the members the project owns are rewritten now, and a value none of
+  them carries offers no rename ([#181](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/181))
 - **A `require` of a script the game ships is no missing module** (#470) - a mod that requires
   `PGStateMachine` and carries no copy of it got `Cannot find module 'PGStateMachine'`: the game packs its Lua
   libraries into its archives, and the check looked only at Lua files read from disk. A module now resolves

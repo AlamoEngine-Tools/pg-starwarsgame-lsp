@@ -11,6 +11,8 @@ import {
     orderedDefinitions,
     orderedFactions,
     roleLabel,
+    setNameProblem,
+    setRenameTarget,
     setSummary,
 } from "./storyNavigatorModel";
 
@@ -185,5 +187,82 @@ describe("orderedDefinitions", () => {
             orderedDefinitions(members, true).map((c) => c.name),
             ["Story_Empire", "Story_Rebel"],
         );
+    });
+});
+
+describe("setRenameTarget", () => {
+    const written = (
+        name: string,
+        at: { uri: string; line: number; column: number } | null,
+    ): StoryCampaignDto => ({
+        ...campaign(name, "Rebel", [], "Story_Set"),
+        definitionUri: at?.uri ?? "file:///game/campaigns.xml",
+        setLine: at?.line ?? null,
+        setColumn: at?.column ?? null,
+    });
+
+    it("is where one member of the project writes the set", () => {
+        const target = setRenameTarget([
+            written("Story_Empire", null),
+            written("Story_Rebel", {
+                uri: "file:///mod/campaigns.xml",
+                line: 7,
+                column: 18,
+            }),
+        ]);
+
+        assert.deepEqual(target, {
+            uri: "file:///mod/campaigns.xml",
+            line: 7,
+            column: 18,
+        });
+    });
+
+    // The game's own campaigns and a dependency's carry no position: nothing here may rewrite them.
+    it("is nothing for a set no member of the project belongs to", () => {
+        assert.equal(
+            setRenameTarget([
+                written("Story_Empire", null),
+                written("Story_Rebel", null),
+            ]),
+            undefined,
+        );
+        assert.equal(setRenameTarget([]), undefined);
+    });
+
+    it("needs the document as well as the position", () => {
+        const member = {
+            ...written("Story_Rebel", null),
+            definitionUri: null,
+            setLine: 7,
+            setColumn: 18,
+        };
+
+        assert.equal(setRenameTarget([member]), undefined);
+    });
+});
+
+describe("setNameProblem", () => {
+    it("takes a new name as it is written", () => {
+        assert.equal(setNameProblem("Story_Set_2", "Story_Set"), undefined);
+        // A change of case alone is a rename too.
+        assert.equal(setNameProblem("story_set", "Story_Set"), undefined);
+    });
+
+    it("says why an empty name or the unchanged one renames nothing", () => {
+        assert.equal(typeof setNameProblem("", "Story_Set"), "string");
+        assert.equal(typeof setNameProblem("   ", "Story_Set"), "string");
+        assert.equal(typeof setNameProblem("Story_Set", "Story_Set"), "string");
+        assert.equal(
+            typeof setNameProblem(" Story_Set ", "Story_Set"),
+            "string",
+        );
+    });
+
+    // The value is written as XML text: these would break the tag it sits in.
+    it("refuses a character the XML could not hold", () => {
+        for (const name of ["A<B", "A>B", "A&B"]) {
+            assert.equal(typeof setNameProblem(name, "Story_Set"), "string");
+        }
     });
 });
