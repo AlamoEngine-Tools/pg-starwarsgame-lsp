@@ -124,8 +124,12 @@ describe("STY-05", () => {
         // The comment and the note that name the set stay as written: only the value is the set.
         expect(fs.readFileSync(empire, "utf8")).toBe(expected[0]);
         expect(fs.readFileSync(rebel, "utf8")).toBe(expected[1]);
-        // Written, not left behind as unsaved documents.
-        expect((await buffers()).some((b) => b.dirty)).toBe(false);
+        // Written, not left behind as unsaved documents. Waited for: the file is on disk a moment
+        // before its document stops counting as unsaved.
+        await browser.waitUntil(async () => !(await buffers()).some((b) => b.dirty), {
+            timeout: 15_000,
+            timeoutMsg: "A member stayed unsaved after the rename",
+        });
         await browser.waitUntil(async () => (await sets())[0]?.label === "Renamed_Set", {
             timeout: 30_000,
             timeoutMsg: "The Campaign Editor still lists the old name",
