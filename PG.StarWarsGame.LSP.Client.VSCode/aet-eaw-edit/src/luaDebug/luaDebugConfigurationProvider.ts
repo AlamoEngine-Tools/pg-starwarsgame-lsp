@@ -123,9 +123,7 @@ export class LuaDebugConfigurationProvider
         if (!lsp.isRunning) {
             return undefined;
         }
-        const outcome = await lsp.request<LaunchLayersResult>(
-            "aet/getLaunchLayers",
-        );
+        const outcome = await lsp.request("aet/getLaunchLayers");
         if (!outcome.ok) {
             return undefined;
         }

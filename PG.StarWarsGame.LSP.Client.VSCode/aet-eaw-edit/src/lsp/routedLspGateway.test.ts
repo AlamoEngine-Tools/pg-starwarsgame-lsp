@@ -27,9 +27,9 @@ describe("RoutedLspGateway", () => {
         let current = serverNamed("alpha");
         const routed = new RoutedLspGateway(() => current);
 
-        const first = await routed.request<string>("aet/getStoryPlots");
+        const first = await routed.request("aet/getStoryPlots");
         current = serverNamed("beta");
-        const second = await routed.request<string>("aet/getStoryPlots");
+        const second = await routed.request("aet/getStoryPlots");
 
         assert.deepEqual(first, { ok: true, value: "alpha:aet/getStoryPlots" });
         assert.deepEqual(second, { ok: true, value: "beta:aet/getStoryPlots" });
@@ -50,8 +50,8 @@ describe("RoutedLspGateway", () => {
         const routed = new RoutedLspGateway(() => serverNamed("core"));
 
         assert.equal(
-            await routed.requestOr("aet/x", {}, "fallback"),
-            "core:aet/x",
+            await routed.requestOr("aet/getLanguages", {}, { languages: [] }),
+            "core:aet/getLanguages",
         );
         assert.equal(await routed.executeCommand("aet-eaw-edit.reload"), true);
     });

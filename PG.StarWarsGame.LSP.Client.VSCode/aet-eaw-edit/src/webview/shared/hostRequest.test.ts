@@ -53,17 +53,22 @@ describe("createRequester", () => {
     it("posts the method and params under a request id", () => {
         const transport = fakeTransport();
         const request = createRequester(transport);
-        void request("aet/x", { a: 1 });
+        void request("aet/getSymbolPreview", { page: "units", id: "AT_AT" });
         assert.deepEqual(transport.posted, [
-            { type: "request", id: 1, method: "aet/x", params: { a: 1 } },
+            {
+                type: "request",
+                id: 1,
+                method: "aet/getSymbolPreview",
+                params: { page: "units", id: "AT_AT" },
+            },
         ]);
     });
 
     it("resolves with the result of the response carrying its id", async () => {
         const transport = fakeTransport();
         const request = createRequester(transport);
-        const first = request<number>("aet/a");
-        const second = request<number>("aet/b");
+        const first = request("aet/getLanguages");
+        const second = request("aet/listModels");
         transport.answer({ type: "response", id: 2, result: 20 });
         transport.answer({ type: "response", id: 1, result: 10 });
         assert.deepEqual(await Promise.all([first, second]), [10, 20]);
@@ -73,7 +78,7 @@ describe("createRequester", () => {
         const transport = fakeTransport();
         const timers = fakeTimers();
         const request = createRequester(transport, timers);
-        const pending = request<string>("aet/a");
+        const pending = request("aet/getLanguages");
         transport.answer({ type: "outline", id: 1, result: "no" });
         transport.answer({ type: "response", id: 99, result: "no" });
         transport.answer({ type: "response", id: "1", result: "no" });
@@ -84,7 +89,7 @@ describe("createRequester", () => {
     it("resolves null when the host answers nothing", async () => {
         const transport = fakeTransport();
         const request = createRequester(transport);
-        const pending = request("aet/a");
+        const pending = request("aet/getLanguages");
         transport.answer({ type: "response", id: 1 });
         assert.equal(await pending, null);
     });
@@ -93,7 +98,7 @@ describe("createRequester", () => {
         const transport = fakeTransport();
         const timers = fakeTimers();
         const request = createRequester(transport, timers);
-        const pending = request<number>("aet/slow");
+        const pending = request("aet/getStorySchema");
         timers.fire();
         transport.answer({ type: "response", id: 1, result: 5 });
         assert.equal(await pending, null);
@@ -103,7 +108,7 @@ describe("createRequester", () => {
         const transport = fakeTransport();
         const timers = fakeTimers();
         const request = createRequester(transport, timers);
-        const pending = request("aet/a");
+        const pending = request("aet/getLanguages");
         assert.equal(timers.pending(), 1);
         transport.answer({ type: "response", id: 1, result: 1 });
         await pending;
@@ -112,8 +117,8 @@ describe("createRequester", () => {
 
     it("gives each requester its own id sequence", () => {
         const transport = fakeTransport();
-        void createRequester(transport)("aet/a");
-        void createRequester(transport)("aet/b");
+        void createRequester(transport)("aet/getLanguages");
+        void createRequester(transport)("aet/listModels");
         assert.deepEqual(
             transport.posted.map((m) => (m as { id: number }).id),
             [1, 1],

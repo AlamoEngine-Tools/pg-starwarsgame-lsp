@@ -39,11 +39,6 @@ export interface LuaScriptsResult {
     scripts: LuaScriptRow[];
 }
 
-export interface LuaScriptsChangedEvent {
-    reason: "scriptAdded" | "scriptRemoved" | "suspended" | "stateChanged";
-    scriptId: number | null;
-}
-
 /** A script row of the tree, presentation decided. */
 export interface ScriptNode {
     kind: "script";

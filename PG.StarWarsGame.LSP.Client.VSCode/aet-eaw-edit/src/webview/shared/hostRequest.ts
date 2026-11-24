@@ -9,6 +9,12 @@
 // or does not answer in time - so a dropped reply is an empty answer, never a page that hangs.
 
 import type { HostRequest, HostResponse } from "../../protocol/panels/common";
+import type {
+    RequestMethod,
+    RequestParams,
+    RequestResult,
+    StoryChainParams,
+} from "../../protocol/requests";
 import type { Transport } from "./vscodeApi";
 
 /** Long enough for a large page of a list; a reply that takes longer is treated as lost. */
@@ -21,12 +27,21 @@ export interface RequesterOptions {
     clearTimer?(handle: unknown): void;
 }
 
+/**
+ * What a page sends for a method: its params without the campaign faction, which only the page's
+ * panel knows and adds on the way through.
+ */
+export type PageRequestParams<M extends RequestMethod> = Omit<
+    RequestParams<M>,
+    keyof StoryChainParams
+>;
+
 /** One request; null when the server answered nothing, failed, or did not answer in time. */
-export type Requester = <T>(
-    method: string,
-    params?: unknown,
+export type Requester = <M extends RequestMethod>(
+    method: M,
+    params?: PageRequestParams<M>,
     timeoutMs?: number,
-) => Promise<T | null>;
+) => Promise<RequestResult<M> | null>;
 
 function isResponse(message: unknown): message is HostResponse {
     return (
@@ -64,11 +79,11 @@ export function createRequester(
         }
     });
 
-    return <T>(
-        method: string,
-        params?: unknown,
+    return <M extends RequestMethod>(
+        method: M,
+        params?: PageRequestParams<M>,
         timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS,
-    ): Promise<T | null> =>
+    ): Promise<RequestResult<M> | null> =>
         new Promise((resolve) => {
             const id = next++;
             const timer = setTimer(() => {
@@ -78,7 +93,7 @@ export function createRequester(
             }, timeoutMs);
             waiting.set(id, (result) => {
                 clearTimer(timer);
-                resolve(result as T | null);
+                resolve(result as RequestResult<M> | null);
             });
             const request: HostRequest = {
                 type: "request",

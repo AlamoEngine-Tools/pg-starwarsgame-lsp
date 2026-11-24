@@ -78,11 +78,6 @@ export function restartReason(affects: Affects): RestartReason | null {
     return touches(STARTUP_SETTINGS, affects) ? "startup" : null;
 }
 
-/** Whether a configuration change needs the servers started again to take effect. */
-export function restartRequired(affects: Affects): boolean {
-    return restartReason(affects) !== null;
-}
-
 /** Whether a configuration change moves where an open preview's effects are read from. */
 export function previewEffectsChanged(affects: Affects): boolean {
     return touches(EFFECT_SETTINGS, affects);

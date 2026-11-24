@@ -4,7 +4,7 @@
 import * as vscode from "vscode";
 
 import { PanelProject } from "./panelProject";
-import { encyclopediaScreenParams } from "./encyclopediaScreenStorage";
+import { encyclopediaScreenParams } from "./stores";
 import { GET_ENCYCLOPEDIA_ENTRY } from "./protocol/encyclopedia";
 import { MOD_BROWSER_METHODS, SymbolOutline } from "./protocol/modBrowser";
 import type {
@@ -150,7 +150,10 @@ export class ModBrowserPanel extends WebviewPanelHost<
     /** The embedded card is drawn for the same screen as the encyclopedia preview. */
     protected override relayParams(method: string, params: unknown): unknown {
         return method === GET_ENCYCLOPEDIA_ENTRY
-            ? { ...(params as object), ...encyclopediaScreenParams() }
+            ? {
+                  ...(params as object),
+                  ...encyclopediaScreenParams(this.project.stores),
+              }
             : params;
     }
 }

@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import * as l10n from "@vscode/l10n";
+
+import { pathKey } from "../pathKey";
 /**
  * The launch-layers answer from the server and the two things a debug configuration is built
  * from it: the script roots the adapter maps game paths with, and the mod chain the game is
@@ -35,7 +37,7 @@ export function collectSourceRoots(layers: readonly LaunchLayer[]): string[] {
     const roots: string[] = [];
     for (const layer of byPrecedence(layers)) {
         for (const root of layer.scriptRoots) {
-            const key = root.replace(/\\/g, "/").toLowerCase();
+            const key = pathKey(root);
             if (!seen.has(key)) {
                 seen.add(key);
                 roots.push(root);

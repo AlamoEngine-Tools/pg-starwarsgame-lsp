@@ -19,13 +19,15 @@
 
 import * as vscode from "vscode";
 
-import { readPanelLayout, savePanelSize } from "./panelLayoutStorage";
 import { PanelProject, projectSubjectKey, projectTitle } from "./panelProject";
+import { pathKey } from "./pathKey";
+import { savePanelSize } from "./stores";
 import type {
     CommonToHost,
     HostRequest,
     HostResponse,
 } from "./protocol/panels/common";
+import type { RequestMethod } from "./protocol/requests";
 
 /** What makes one panel different from another. */
 export interface WebviewPanelSpec {
@@ -112,7 +114,7 @@ export abstract class WebviewPanelHost<
      * anything else is answered with null rather than passed on: the webview reaches the server only
      * where its panel says it may.
      */
-    protected readonly relayMethods: readonly string[] = [];
+    protected readonly relayMethods: readonly RequestMethod[] = [];
 
     /**
      * @param adopt A panel VS Code already created, for a custom editor. Custom editors are handed
@@ -176,7 +178,7 @@ export abstract class WebviewPanelHost<
             this.panel.webview.cspSource,
             spec.bodyStyle,
             spec.allowBlobImages,
-            readPanelLayout(),
+            this.project.stores.panelLayout.read(),
         );
 
         this.onDidDispose = this.panel.onDidDispose;
@@ -193,7 +195,7 @@ export abstract class WebviewPanelHost<
                     value?: unknown;
                 };
                 if (typeof key === "string" && typeof value === "number") {
-                    savePanelSize(key, value);
+                    savePanelSize(this.project.stores, key, value);
                 }
                 return;
             }
@@ -221,9 +223,11 @@ export abstract class WebviewPanelHost<
      */
     private async _relay(msg: HostRequest): Promise<void> {
         const method = typeof msg.method === "string" ? msg.method : "";
-        const outcome = this.relayMethods.includes(method)
+        const outcome = (this.relayMethods as readonly string[]).includes(
+            method,
+        )
             ? await this.project.gateway
-                  .request<unknown>(
+                  .requestRaw<unknown>(
                       method,
                       this.relayParams(method, msg.params),
                   )
@@ -334,12 +338,12 @@ export class PanelRegistry<
 /**
  * Identifies a panel that stands for a file.
  *
- * Lower-cased because Windows hands the same file back under different casings, and two panels for
+ * A path key because Windows hands the same file back under different spellings, and two panels for
  * one file each hold their own staged queue and their own content hash - whichever saved second
  * would be refused as stale, having silently lost the other's work.
  */
 export function panelKey(filePath: string): string {
-    return filePath.toLowerCase();
+    return pathKey(filePath);
 }
 
 /**

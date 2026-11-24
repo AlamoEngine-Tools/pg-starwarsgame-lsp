@@ -13,6 +13,7 @@
 
 import type { EditWorkspace } from "./lsp/editBatchClient";
 import type { LspGateway } from "./lsp/lspGateway";
+import type { Stores } from "./stores";
 
 /** The project a panel is bound to. */
 export interface PanelProject {
@@ -27,6 +28,8 @@ export interface PanelProject {
     readonly gateway: LspGateway;
     /** Where an edit this project's server composed is applied and saved. */
     readonly edits: EditWorkspace;
+    /** What the extension remembers between sessions; a panel keeps no memento of its own. */
+    readonly stores: Stores;
 }
 
 /**

@@ -4,7 +4,6 @@
 import { ChildProcess, spawn } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
-import * as path from "path";
 import * as l10n from "@vscode/l10n";
 import * as vscode from "vscode";
 import {
@@ -16,11 +15,23 @@ import {
     State,
     StaticFeature,
 } from "vscode-languageclient/node";
+import * as whatsNewCommands from "./commands/whatsNew";
+import * as luaDebugCommands from "./commands/luaDebug";
+import * as localisationCommands from "./commands/localisation";
+import * as modBrowserCommands from "./commands/modBrowser";
+import * as storyCommands from "./commands/story";
+import * as projectCommands from "./commands/project";
+import * as diagnosticsCommands from "./commands/diagnostics";
+import * as navigationCommands from "./commands/navigation";
+import * as previewCommands from "./commands/preview";
+import * as gameObjectsCommands from "./commands/gameObjects";
+import type { HostDeps } from "./commands/host";
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
+import { cfg, resolveFeatureFlags } from "./hostSettings";
+import type { ProjectClient } from "./projectClient";
 import { createEditWorkspace } from "./editWorkspace";
 import {
-    effectiveObjectPath,
-    effectiveObjectQuery,
+    EFFECTIVE_SCHEME,
     parseEffectiveObjectQuery,
 } from "./effectiveObjectUri";
 import { EncyclopediaPanel } from "./encyclopediaPanel";
@@ -28,55 +39,21 @@ import { ModBrowserPanel } from "./modBrowserPanel";
 import {
     ModBrowserOutlineItem,
     ModBrowserViewProvider,
-    OPEN_MOD_BROWSER,
 } from "./modBrowserViewProvider";
 import { PanelProject } from "./panelProject";
 import { WebviewPanelHost } from "./webviewPanelHost";
-import { shownVersion, whatsNewOnStart } from "./whatsNewModel";
-import {
-    OPEN_AFTER_UPDATE_SETTING,
-    OPEN_WHATS_NEW,
-    WHATS_NEW_SEEN_VERSION,
-    WhatsNewPanel,
-} from "./whatsNewPanel";
+import { WhatsNewPanel } from "./whatsNewPanel";
 import { ModelPreviewEditorProvider } from "./modelPreviewEditor";
 import { ModelInspectorPanel } from "./modelInspectorPanel";
 import { ModelPreviewPanel } from "./modelPreviewPanel";
-import {
-    type ModelPickItem,
-    modelPickItems,
-    pickedModelName,
-    previewSubjectFor,
-} from "./modelPicker";
-import { type ListModelsResult } from "./protocol/modelPreview";
-import { type ServerStatus } from "./protocol/serverStatus";
-import {
-    type BugReportClientInfo,
-    type BugReportOptions,
-    flattenFlags,
-    formatBugReport,
-    formatExtendedStats,
-} from "./bugReport";
-import {
-    type DiagnosticReportPayload,
-    editorReport,
-    gitHubIssue,
-} from "./diagnosticReport";
-import { offerShaderSources, shaderDirectory } from "./shaderSources";
+import { shaderDirectory } from "./shaderSources";
 import {
     previewAssetsChanged,
     previewEffectsChanged,
     restartReason,
 } from "./settingsRestart";
 import { RestartCoordinator } from "./restartCoordinator";
-import { initDialogGeometryStorage } from "./dialogGeometryStorage";
-import { initPanelLayoutStorage } from "./panelLayoutStorage";
-import { initViewerSettingsStorage } from "./viewerSettingsStorage";
-import {
-    encyclopediaScreenParams,
-    initEncyclopediaScreenStorage,
-} from "./encyclopediaScreenStorage";
-import { initProjectSettingsStorage } from "./projectSettingsStorage";
+import { type Stores, createStores } from "./stores";
 import { LocalisationEditorPanel } from "./localisationEditorPanel";
 import {
     LocalisationNavigatorViewProvider,
@@ -91,12 +68,10 @@ import { discoverProjects } from "./projectDiscovery";
 import { isModFolder, projectOfferDue } from "./modLayout";
 import {
     type ClientSpec,
-    type ClientState,
     type LoadingPhase,
     clientSpecs,
     diagnosticCollectionNameFor,
     documentSelectorFor,
-    isInside,
     ownerKey,
     ownsPath,
     phaseText,
@@ -106,8 +81,8 @@ import {
     serverWorkDoneProgress,
     statusText,
 } from "./projectClientPlan";
+import { isInside, pathKey } from "./pathKey";
 import {
-    logFolderLabel,
     logFolderOf,
     logStoreOf,
     removeStaleLogFolders,
@@ -120,39 +95,16 @@ import {
 } from "./projectGroupedTree";
 import { vscodeMessageSink } from "./lsp/vscodeMessageSink";
 import {
-    LUA_DEBUG_TYPE,
-    LuaDebugAdapterDescriptorFactory,
-} from "./luaDebug/luaDebugAdapterFactory";
-import { LuaDebugConfigurationProvider } from "./luaDebug/luaDebugConfigurationProvider";
-import {
-    LuaScriptsTreeItem,
-    LuaScriptsViewProvider,
-} from "./luaDebug/luaScriptsViewProvider";
-import {
     resolveServerCommand,
     resolveServerEnvironment,
 } from "./serverCommand";
 import { analyzerProblem, serverProblem } from "./serverLaunch";
 import {
     AdoptModProjectParams,
-    AdoptModProjectResult,
-    ConvertLocalisationFormatResult,
-    ExportLocalisationToDatResult,
-    GET_ENCYCLOPEDIA_ENTRY,
-    GetEffectiveObjectResult,
-    GetEncyclopediaEntryResult,
-    GetLocalisationProjectsResult,
-    GetRootLocalisationConfigResult,
-    GetStoryPlotsResult,
-    LOC_CATEGORY,
-    SetLocalisationProjectFormatResult,
     StoryGraphChangedParams,
     StorySimChangedParams,
 } from "./protocol";
-import { formatChoices, formatOutcome } from "./localisationProjectFormat";
 import { StoryGraphPanel } from "./storyGraphPanel";
-import { graphTargets, type StoryGraphTarget } from "./storyGraphTarget";
-import { setNameProblem } from "./storyNavigatorModel";
 import {
     StoryNavigatorViewProvider,
     StoryTreeItem,
@@ -242,9 +194,6 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
     }
 }
 
-/** URI scheme for the read-only "effective object" virtual documents (variant inheritance). */
-const EFFECTIVE_SCHEME = "aet-effective";
-
 /** URI scheme for the right-hand side of a project-migration diff: the file as it would be written. */
 const PGPROJ_PROPOSED_SCHEME = "aet-pgproj-proposed";
 
@@ -328,12 +277,13 @@ class EffectiveObjectContentProvider
 
         // The document IS the report here - it is read-only generated text, so a failure is written
         // into it as a comment rather than raised as a notification over the tab that just opened.
-        const outcome = await gatewayFor(
-            projectKey,
-        ).request<GetEffectiveObjectResult>("aet/getEffectiveObject", {
-            objectId,
-            typeName: typeName || undefined,
-        });
+        const outcome = await gatewayFor(projectKey).request(
+            "aet/getEffectiveObject",
+            {
+                objectId,
+                typeName: typeName || undefined,
+            },
+        );
 
         if (!outcome.ok) {
             return outcome.reason === "offline"
@@ -347,44 +297,6 @@ class EffectiveObjectContentProvider
     }
 }
 
-/**
- * One language client and the server process behind it (#229).
- *
- * One runs per open project; a window with a single project runs exactly one, as it always did.
- */
-interface ProjectClient {
-    spec: ClientSpec;
-    client: LanguageClient | undefined;
-    /**
-     * The server process, while one is running.
-     *
-     * Held because the language client does not hold it for us on the factory path, and because a
-     * shutdown that times out leaves nothing else able to reach it. Cleared by the process's own
-     * `exit`, so it never names something already gone.
-     */
-    process: ChildProcess | undefined;
-    /** Requests to this project's server; offline once it failed or stopped. */
-    gateway: LspGateway;
-    state: ClientState;
-    /** Which feed a "loading" project waits for; cleared with every other state. */
-    phase?: LoadingPhase;
-    /** The line the bar shows in place of the phase for a moment, when a phase drew one. */
-    gag?: string;
-    /**
-     * This server's watchers over directories outside the workspace folders.
-     *
-     * A bare glob only ever watches the folders the window is open on, so a project reached
-     * through `projectReferences` was invisible: editing a dependency's XML, scripts, localisation
-     * or its own `.pgproj` produced no `didChangeWatchedFiles` at all, and nothing re-indexed
-     * until the server was restarted. These carry an absolute `RelativePattern` instead, and
-     * their events are forwarded by hand because `synchronize.fileEvents` is fixed when the
-     * client is constructed, long before the server has resolved which projects exist.
-     */
-    dependencyWatchers: vscode.Disposable[];
-    /** Disposed with the client: a project's own trace channel, when it has one. */
-    owned: vscode.Disposable[];
-}
-
 /** The running clients, in discovery order. */
 const clients = new Map<string, ProjectClient>();
 
@@ -393,11 +305,8 @@ function primaryClient(): ProjectClient | undefined {
     return clients.values().next().value;
 }
 
-/** The workspaceState key of the project last picked for this window. */
-const CHOSEN_PROJECT = "aet-eaw-edit.chosenProject";
-
-/** Set on activation; the window's memory of the project last picked lives in its workspaceState. */
-let windowState: vscode.Memento | undefined;
+/** Set first thing on activation: everything the extension remembers between sessions. */
+let stores!: Stores;
 
 /** Set on activation; the folder every server of this window writes its log file into. */
 let serverLogFolder: string | undefined;
@@ -442,7 +351,7 @@ function folderProject(
 }
 
 function chosenProject(): ProjectClient | undefined {
-    const key = windowState?.get<string>(CHOSEN_PROJECT);
+    const key = stores.chosenProject.read();
     return key === undefined ? undefined : clients.get(key);
 }
 
@@ -549,6 +458,7 @@ function panelProject(key: string | undefined): PanelProject {
         name: clients.get(resolved)?.spec.name ?? "",
         gateway: resolved ? gatewayFor(resolved) : pendingProjectGateway,
         edits: editWorkspace,
+        stores,
     };
 }
 
@@ -568,7 +478,7 @@ async function pickProject(): Promise<ProjectClient | undefined> {
     if (picked === undefined) {
         return undefined;
     }
-    await windowState?.update(CHOSEN_PROJECT, picked.key);
+    stores.chosenProject.save(picked.key);
     return clients.get(picked.key);
 }
 
@@ -688,9 +598,7 @@ const dependencyWatcherPool = new WatcherPool((directory, glob, emit) => {
 async function refreshDependencyWatchers(
     project: ProjectClient,
 ): Promise<void> {
-    const answer = await project.gateway.request<{
-        directories?: readonly string[];
-    }>("aet/getWatchDirectories");
+    const answer = await project.gateway.request("aet/getWatchDirectories");
     if (!answer.ok) {
         return;
     }
@@ -852,30 +760,11 @@ function createTraceChannel(name: string): vscode.LogOutputChannel {
     );
 }
 
-function cfg(section: string) {
-    return vscode.workspace.getConfiguration(`aet-eaw-edit.${section}`);
-}
-
 /** A game install directory, from its `aet-eaw-edit.lsp.source` setting. */
 function gameDirectory(
     name: "baseGameDirectory" | "expansionDirectory",
 ): string | undefined {
     return cfg("lsp.source").get<string>(name) || undefined;
-}
-
-/**
- * The experimental features, sent to the server via initializationOptions; everything else is always
- * on. The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults each to true, so
- * the fallbacks here carry the user-facing default - off - and must mirror package.json. Restart-based:
- * the config listener in activate() restarts the server when an `aet-eaw-edit.experimental` value
- * changes.
- */
-function resolveFeatureFlags() {
-    const experimental = cfg("experimental");
-    return {
-        storyEditing: experimental.get<boolean>("storyEditing", false),
-        storySimulator: experimental.get<boolean>("storySimulator", false),
-    };
 }
 
 function validateConfiguration(extensionPath: string): boolean {
@@ -1132,7 +1021,7 @@ function startProjectClient(
                     spec.workspaceRoot,
                     subdirectories,
                     files,
-                    askedAboutProject(context),
+                    askedAboutProject(),
                 ),
         },
     };
@@ -1604,21 +1493,16 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
     modBrowserProvider?.projectsChanged();
     updateStatus();
     if (discovery.projects.length === 0 && folders.length > 0) {
-        void offerProjectFile(context, folders[0]);
+        void offerProjectFile(folders[0]);
     }
 }
 
-/** Folders whose project file offer was declined for good, kept across sessions. */
-const PROJECT_OFFER_DECLINED = "aet-eaw-edit.projectOfferDeclined";
 /** Folders offered a project file this session, so a rediscovery does not ask again. */
 const projectOffered = new Set<string>();
 
 /** The folders already asked about a project file: declined for good, or offered this session. */
-function askedAboutProject(context: vscode.ExtensionContext): string[] {
-    return [
-        ...context.globalState.get<string[]>(PROJECT_OFFER_DECLINED, []),
-        ...projectOffered,
-    ];
+function askedAboutProject(): string[] {
+    return [...stores.projectOfferDeclined.read(), ...projectOffered];
 }
 
 /**
@@ -1626,23 +1510,9 @@ function askedAboutProject(context: vscode.ExtensionContext): string[] {
  * the folder holds and it opens, so what was guessed is in front of the reader. Its creation
  * restarts the servers like any new `.pgproj`.
  */
-async function offerProjectFile(
-    context: vscode.ExtensionContext,
-    folder: string,
-): Promise<void> {
-    const key = folder.toLowerCase();
-    const declined = context.globalState.get<string[]>(
-        PROJECT_OFFER_DECLINED,
-        [],
-    );
-    if (
-        !projectOfferDue(
-            folder,
-            subdirectories,
-            files,
-            askedAboutProject(context),
-        )
-    ) {
+async function offerProjectFile(folder: string): Promise<void> {
+    const key = pathKey(folder);
+    if (!projectOfferDue(folder, subdirectories, files, askedAboutProject())) {
         return;
     }
     projectOffered.add(key);
@@ -1657,8 +1527,8 @@ async function offerProjectFile(
         never,
     );
     if (choice === never) {
-        await context.globalState.update(PROJECT_OFFER_DECLINED, [
-            ...declined,
+        stores.projectOfferDeclined.save([
+            ...stores.projectOfferDeclined.read(),
             key,
         ]);
         return;
@@ -1667,10 +1537,9 @@ async function offerProjectFile(
         return;
     }
 
-    const outcome = await lsp.request<AdoptModProjectResult>(
-        "aet/adoptModProject",
-        { directory: folder } satisfies AdoptModProjectParams,
-    );
+    const outcome = await lsp.request("aet/adoptModProject", {
+        directory: folder,
+    } satisfies AdoptModProjectParams);
     if (!outcome.ok) {
         void vscode.window.showErrorMessage(
             vscode.l10n.t(
@@ -1797,213 +1666,6 @@ function killServer(child: ChildProcess | undefined): void {
     child.kill("SIGKILL");
 }
 
-/**
- * The basic bug report block: what the client knows about itself, plus the server's own status
- * when it is running. Outcomes only - no path and no project name - because it goes into public
- * issues.
- */
-async function collectBugReport(
-    context: vscode.ExtensionContext,
-    gateway: LspGateway,
-    options: BugReportOptions = {},
-): Promise<string> {
-    const { client, server } = await reportInputs(
-        context,
-        gateway,
-        options.extended === true,
-    );
-    return formatBugReport(client, server, options);
-}
-
-/** What the client knows about itself, and the server's status when it is running. */
-async function reportInputs(
-    context: vscode.ExtensionContext,
-    gateway: LspGateway,
-    extended: boolean,
-): Promise<{ client: BugReportClientInfo; server: ServerStatus | null }> {
-    const client: BugReportClientInfo = {
-        extensionVersion: String(
-            context.extension.packageJSON.version ?? "unknown",
-        ),
-        vscodeVersion: vscode.version,
-        os: `${process.platform} ${process.arch}`,
-        workspaceFolders: vscode.workspace.workspaceFolders?.length ?? 0,
-        workspaceFile: vscode.workspace.workspaceFile !== undefined,
-        logFolder: logFolderLabel(workspaceIdOf(context.storageUri?.fsPath)),
-        featureFlags: flattenFlags(resolveFeatureFlags()),
-    };
-
-    const status = gateway.isRunning
-        ? await gateway.request<ServerStatus>("aet/getServerStatus", {
-              extended,
-          })
-        : undefined;
-
-    return { client, server: status?.ok ? status.value : null };
-}
-
-/**
- * Basic or basic plus extended stats - asked every time rather than remembered, because the
- * extended counts describe the project's shape and sharing them is a choice made per report.
- * Undefined when dismissed.
- */
-async function pickReportTier(
-    title: string,
-): Promise<{ extended: boolean } | undefined> {
-    return vscode.window.showQuickPick(
-        [
-            {
-                label: vscode.l10n.t("Basic info"),
-                description: vscode.l10n.t(
-                    "Versions, sources and workspace checks",
-                ),
-                extended: false,
-            },
-            {
-                label: vscode.l10n.t("Basic + extended stats"),
-                description: vscode.l10n.t(
-                    "Adds dependency, index and asset counts",
-                ),
-                extended: true,
-            },
-        ],
-        { title, placeHolder: vscode.l10n.t("What to include") },
-    );
-}
-
-/**
- * Opens a prefilled GitHub issue for one diagnostic. The author reviews and submits it in the
- * browser; nothing is posted from here, which is why no login is needed.
- */
-async function reportDiagnosticOnGitHub(
-    context: vscode.ExtensionContext,
-    gateway: LspGateway,
-    report: DiagnosticReportPayload,
-): Promise<void> {
-    const tier = await pickReportTier(`Report ${report.id} on GitHub`);
-    if (!tier) {
-        return;
-    }
-
-    const { client, server } = await reportInputs(
-        context,
-        gateway,
-        tier.extended,
-    );
-    // The per-type symbol list stays out: it runs to dozens of lines and the prefill is capped.
-    const extended =
-        tier.extended && server?.extended
-            ? formatExtendedStats(server.extended, false)
-            : null;
-    const issue = gitHubIssue(
-        report,
-        formatBugReport(client, server),
-        extended,
-    );
-
-    if (!issue.fits) {
-        const choice = await vscode.window.showWarningMessage(
-            vscode.l10n.t(
-                "EaWEdit: The report for {0} is too long to prefill an issue",
-                report.id,
-            ),
-            vscode.l10n.t("Open report in editor"),
-        );
-        if (choice === vscode.l10n.t("Open report in editor")) {
-            await openDiagnosticReport(context, gateway, report, tier);
-        }
-        return;
-    }
-
-    await vscode.env.openExternal(vscode.Uri.parse(issue.url));
-
-    if (issue.trimmed.length > 0) {
-        const left = issue.trimmed.map((t) =>
-            t === "extended"
-                ? vscode.l10n.t("extended stats")
-                : vscode.l10n.t("part of the basic info"),
-        );
-        const choice = await vscode.window.showInformationMessage(
-            vscode.l10n.t(
-                "EaWEdit: Issue prefill shortened - {0} left out",
-                left.join(vscode.l10n.t(" and ")),
-            ),
-            vscode.l10n.t("Open full report"),
-        );
-        if (choice === vscode.l10n.t("Open full report")) {
-            await openDiagnosticReport(context, gateway, report, tier);
-        }
-    }
-}
-
-/** The same report, untrimmed, in an untitled Markdown tab - for pasting anywhere. */
-async function openDiagnosticReport(
-    context: vscode.ExtensionContext,
-    gateway: LspGateway,
-    report: DiagnosticReportPayload,
-    chosen?: { extended: boolean },
-): Promise<void> {
-    const tier =
-        chosen ??
-        (await pickReportTier(vscode.l10n.t("Open report for {0}", report.id)));
-    if (!tier) {
-        return;
-    }
-
-    const { client, server } = await reportInputs(
-        context,
-        gateway,
-        tier.extended,
-    );
-    const full = formatBugReport(client, server, {
-        extended: tier.extended,
-        symbolTypes: tier.extended,
-    });
-    const document = await vscode.workspace.openTextDocument({
-        language: "markdown",
-        content: editorReport(report, full),
-    });
-    await vscode.window.showTextDocument(document);
-}
-
-/**
- * Asks which model to preview, from every model the project can reach - its own, its dependencies'
- * and the base game's - so a model that is not in the explorer can be found without its name.
- *
- * A QuickPick that also accepts what was typed: the list is the asset catalog, and a model saved a
- * moment ago may not be in it yet.
- */
-async function pickModel(gateway: LspGateway): Promise<string | null> {
-    const result = await gateway.requestOrReport<ListModelsResult>(
-        "aet/listModels",
-        {},
-        vscode.l10n.t("Could not list models"),
-    );
-    if (!result) {
-        return null;
-    }
-
-    const pick = vscode.window.createQuickPick<ModelPickItem>();
-    pick.title = vscode.l10n.t("Preview Model");
-    pick.placeholder = vscode.l10n.t(
-        "Model file name, e.g. EV_StarDestroyer.ALO",
-    );
-    pick.matchOnDescription = true;
-    pick.items = modelPickItems(result.models);
-
-    const name = await new Promise<string | null>((resolve) => {
-        pick.onDidAccept(() => {
-            resolve(pickedModelName(pick.activeItems[0], pick.value));
-            pick.hide();
-        });
-        pick.onDidHide(() => resolve(null));
-        pick.show();
-    });
-
-    pick.dispose();
-    return name;
-}
-
 export async function activate(
     context: vscode.ExtensionContext,
 ): Promise<void> {
@@ -2013,593 +1675,13 @@ export async function activate(
         l10n.config({ contents: vscode.l10n.bundle });
     }
 
-    // Per project, not per machine: where a dialog belongs depends on the mod being edited.
-    initDialogGeometryStorage(context.workspaceState);
-
-    // The preview's room settings follow the person rather than the project, so globalState.
-    // The preview's PROJECT settings do not - the weapon bench, the faction and its colour all name
-    // things out of the mod's own tree - so they go to workspaceState beside the dialog geometry.
-    initViewerSettingsStorage(context.globalState);
-    initProjectSettingsStorage(context.workspaceState);
-    // The screen the encyclopedia card is drawn for is the display the person targets.
-    initEncyclopediaScreenStorage(context.globalState);
-
-    // Same reasoning: how wide you like a dock is a property of your screen and your habits,
-    // not of the mod you have open.
-    initPanelLayoutStorage(context.globalState);
-
-    // The What's New page belongs to the extension, not to a project: it opens from the palette
-    // in any window, project or none.
-    const extensionVersion = String(
-        context.extension.packageJSON.version ?? "unknown",
-    );
-    // The manifest's preview flag, the one the Marketplace badges the extension with; the page
-    // carries the same mark.
-    const extensionPreview = context.extension.packageJSON.preview === true;
-    // The page's version: the installed one, or Unreleased in the development host, where the
-    // manifest still names the last release and the notes being written sit above its section.
-    const whatsNewVersion = shownVersion(
-        extensionVersion,
-        context.extensionMode === vscode.ExtensionMode.Development,
-    );
-    context.subscriptions.push(
-        vscode.commands.registerCommand(OPEN_WHATS_NEW, () =>
-            WhatsNewPanel.show(
-                context.extensionUri,
-                whatsNewVersion,
-                extensionPreview,
-            ),
-        ),
-    );
-    // Once per new version, and on the first start, which stands in for a walkthrough: nothing
-    // stored a version before this page existed, so every user of the first release carrying it
-    // is a first start, and that release's notes are the ones that matter most to them.
-    {
-        const seen = whatsNewOnStart(
-            context.globalState.get<string>(WHATS_NEW_SEEN_VERSION),
-            extensionVersion,
-            vscode.workspace
-                .getConfiguration()
-                .get<boolean>(OPEN_AFTER_UPDATE_SETTING, true),
-        );
-        if (seen.store !== undefined) {
-            void context.globalState.update(WHATS_NEW_SEEN_VERSION, seen.store);
-        }
-        if (seen.open) {
-            void WhatsNewPanel.show(
-                context.extensionUri,
-                whatsNewVersion,
-                extensionPreview,
-            );
-        }
-    }
-
-    // The Lua debugger. Both registrations stay in place whatever the feature flag says: the
-    // debug type must exist for launch.json to validate, and a disabled feature answers with the
-    // setting to turn on rather than by vanishing.
-    context.subscriptions.push(
-        vscode.debug.registerDebugConfigurationProvider(
-            LUA_DEBUG_TYPE,
-            new LuaDebugConfigurationProvider((folder) => {
-                const project =
-                    folder === undefined ? undefined : folderProject(folder);
-                return project === undefined
-                    ? lsp
-                    : gatewayFor(project.spec.key);
-            }),
-        ),
-        vscode.debug.registerDebugAdapterDescriptorFactory(
-            LUA_DEBUG_TYPE,
-            new LuaDebugAdapterDescriptorFactory(
-                context.extensionPath,
-                logLine,
-            ),
-        ),
-    );
-
-    // The scripts view follows whichever eaw-lua session is active; with none it says so in place.
-    const luaScripts = new LuaScriptsViewProvider();
-    context.subscriptions.push(
-        luaScripts,
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.luaDebug.refreshScripts",
-            () => luaScripts.refresh(),
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.luaDebug.refreshThreads",
-            (item?: LuaScriptsTreeItem) => luaScripts.refreshThreads(item),
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.luaDebug.breakScript",
-            (item?: LuaScriptsTreeItem) => luaScripts.breakScript(item),
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.luaDebug.breakThread",
-            (item?: LuaScriptsTreeItem) => luaScripts.breakThread(item),
-        ),
-    );
+    // Before anything reads a stored value. Which value follows the person and which the mod is
+    // decided in `stores`.
+    stores = createStores(context.globalState, context.workspaceState);
 
     localisationNavigatorProvider = new ProjectGroupedTree<LocTreeItem>(
         navigatorProjects,
         (key) => new LocalisationNavigatorViewProvider(gatewayFor(key)),
-    );
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider(
-            LocalisationNavigatorViewProvider.viewId,
-            localisationNavigatorProvider,
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.refreshLocalisationNavigator",
-            () => localisationNavigatorProvider?.refresh(),
-        ),
-        // Hosted here rather than in the tree so the palette can reach it too. Lifted out of the
-        // sidebar webview, which owned this quick pick before the tree existed.
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.newLocalisationProject",
-            async () => {
-                const choice = await vscode.window.showQuickPick(
-                    [
-                        {
-                            label: vscode.l10n.t(
-                                "Initialise from the game baseline",
-                            ),
-                            command: "aet-eaw-edit.lsp.initLocalisationProject",
-                        },
-                        {
-                            label: vscode.l10n.t(
-                                "Import existing localisation files",
-                            ),
-                            command:
-                                "aet-eaw-edit.lsp.importLocalisationProject",
-                        },
-                    ],
-                    {
-                        placeHolder: vscode.l10n.t(
-                            "Create a localisation project",
-                        ),
-                    },
-                );
-                if (choice) {
-                    await vscode.commands.executeCommand(choice.command);
-                }
-            },
-        ),
-        // Opens the localisation grid in its own tab. Invoked with the file tree item, or without
-        // arguments from the command palette (quick-picks a file, grouped by category).
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.openLocalisationEditor",
-            async (arg?: LocTreeItem) => {
-                // A clicked row belongs to the project whose tree it is in.
-                const projectKey =
-                    (arg && localisationNavigatorProvider?.projectOf(arg)) ??
-                    (await commandProjectKey());
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                // The quick pick below is for the palette, where nothing was clicked. A node that
-                // WAS clicked and carries no project is a node that should not have offered this
-                // action - answering it by listing every localisation file in the workspace is how
-                // clicking a credits group ended up offering unrelated .dat translation files.
-                if (arg !== undefined && arg.project === undefined) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: That node groups several files rather than being one. Open one of the files under it.",
-                        ),
-                    );
-                    return;
-                }
-
-                let project = arg?.project;
-                if (!project) {
-                    const result =
-                        await lsp.requestOrReport<GetLocalisationProjectsResult>(
-                            "aet/getLocalisationProjects",
-                            {},
-                            vscode.l10n.t("Could not list localisation files"),
-                        );
-                    if (!result) {
-                        return;
-                    }
-                    if (result.error || !result.projects?.length) {
-                        vscode.window.showWarningMessage(
-                            vscode.l10n.t(
-                                "EaWEdit: {0}",
-                                result.error ??
-                                    vscode.l10n.t(
-                                        "no localisation files found in this workspace.",
-                                    ),
-                            ),
-                        );
-                        return;
-                    }
-
-                    const picked = await vscode.window.showQuickPick(
-                        result.projects
-                            .slice()
-                            .sort(
-                                (a, b) =>
-                                    a.category.localeCompare(b.category) ||
-                                    a.label.localeCompare(b.label),
-                            )
-                            .map((p) => ({
-                                label: p.label,
-                                description:
-                                    p.category === LOC_CATEGORY.credits
-                                        ? vscode.l10n.t("Credits")
-                                        : vscode.l10n.t("Text"),
-                                detail: p.filePath,
-                                project: p,
-                            })),
-                        {
-                            placeHolder: vscode.l10n.t(
-                                "Open a localisation file",
-                            ),
-                        },
-                    );
-                    if (!picked) {
-                        return;
-                    }
-                    project = picked.project;
-                }
-
-                // A node standing for a set of single-language files opens them as one table, so a
-                // translation sits beside its source. A language inside that set opens the same
-                // table with the other columns hidden - the set is the project either way, which is
-                // why both are named after the set rather than after whichever file was clicked.
-                LocalisationEditorPanel.showSet(
-                    arg?.setFilePaths ?? [project.filePath],
-                    arg?.setLabel ?? project.label,
-                    project.category,
-                    context.extensionUri,
-                    panelProject(projectKey),
-                    arg?.focusLanguage,
-                );
-            },
-        ),
-        // The crawl lives in the editor title bar, where a preview belongs - the same place a
-        // Markdown or LaTeX editor puts one. Both are gated to the credits panel by its view type.
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.previewCreditsCrawl",
-            () => LocalisationEditorPanel.previewCrawl(false),
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.previewCreditsCrawlFullScreen",
-            () => LocalisationEditorPanel.previewCrawl(true),
-        ),
-        // Export was only ever reachable from inside the old sidebar webview; the tree is the
-        // natural home for it, and a menu entry needs a real command behind it.
-        // Opening the raw file is a thing you do to a file, so it belongs on the file's own menu in
-        // the tree rather than inside the editor showing it.
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.openLocalisationAsText",
-            async (arg?: LocTreeItem) => {
-                const filePath = arg?.project?.filePath;
-                if (!filePath) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: No localisation file selected.",
-                        ),
-                    );
-                    return;
-                }
-                await vscode.window.showTextDocument(
-                    vscode.Uri.file(filePath),
-                    { viewColumn: vscode.ViewColumn.Beside },
-                );
-            },
-        ),
-        // Convert reaches here from two places - the editor's dock and the palette - so the request
-        // and the way its outcome is reported live in one place rather than two that drift.
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.convertLocalisationFormat",
-            async (
-                arg?:
-                    | LocTreeItem
-                    | {
-                          filePath?: string;
-                          targetFormat?: string;
-                          category?: string;
-                          /** The asking panel's project (#276). */
-                          projectKey?: string;
-                      },
-            ) => {
-                const projectKey = await locCommandProjectKey(arg);
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                const direct = arg as
-                    | {
-                          filePath?: string;
-                          targetFormat?: string;
-                          category?: string;
-                      }
-                    | undefined;
-                let filePath =
-                    direct?.filePath ??
-                    (arg as LocTreeItem | undefined)?.project?.filePath;
-                let category =
-                    direct?.category ??
-                    (arg as LocTreeItem | undefined)?.project?.category;
-
-                if (!filePath) {
-                    const result =
-                        await lsp.requestOrReport<GetLocalisationProjectsResult>(
-                            "aet/getLocalisationProjects",
-                            {},
-                            vscode.l10n.t("Could not list localisation files"),
-                        );
-                    if (!result) {
-                        return;
-                    }
-                    if (result.error || !result.projects?.length) {
-                        vscode.window.showWarningMessage(
-                            vscode.l10n.t(
-                                "EaWEdit: {0}",
-                                result.error ??
-                                    vscode.l10n.t(
-                                        "no localisation files found in this workspace.",
-                                    ),
-                            ),
-                        );
-                        return;
-                    }
-                    const picked = await vscode.window.showQuickPick(
-                        result.projects.map((p) => ({
-                            label: p.label,
-                            description: p.resourceType.toUpperCase(),
-                            detail: p.filePath,
-                            project: p,
-                        })),
-                        {
-                            placeHolder: vscode.l10n.t(
-                                "Convert which localisation file?",
-                            ),
-                        },
-                    );
-                    if (!picked) {
-                        return;
-                    }
-                    filePath = picked.project.filePath;
-                    category = picked.project.category;
-                }
-
-                let targetFormat = direct?.targetFormat;
-                if (!targetFormat) {
-                    // DAT is absent on purpose: it is the game's load format, produced by Export to DAT.
-                    const picked = await vscode.window.showQuickPick(
-                        [
-                            {
-                                label: vscode.l10n.t("CSV"),
-                                description: vscode.l10n.t(
-                                    "Comma-separated values (.csv)",
-                                ),
-                            },
-                            {
-                                label: vscode.l10n.t("XML"),
-                                description: vscode.l10n.t(
-                                    "eaw-translation v1 XML (.xml)",
-                                ),
-                            },
-                            {
-                                label: vscode.l10n.t("NLS"),
-                                description: vscode.l10n.t(
-                                    "Java-style properties (.properties)",
-                                ),
-                            },
-                        ],
-                        {
-                            title: vscode.l10n.t("Convert Localisation File"),
-                            placeHolder: vscode.l10n.t(
-                                "Write it in which format?",
-                            ),
-                        },
-                    );
-                    if (!picked) {
-                        return;
-                    }
-                    targetFormat = picked.label;
-                }
-
-                const result =
-                    await lsp.requestOrReport<ConvertLocalisationFormatResult>(
-                        "aet/convertLocalisationFormat",
-                        { projectFilePath: filePath, targetFormat },
-                        vscode.l10n.t(
-                            "Could not convert {0} to {1}",
-                            path.basename(filePath),
-                            targetFormat,
-                        ),
-                    );
-                if (!result) {
-                    return;
-                }
-
-                if (result.error) {
-                    vscode.window.showErrorMessage(
-                        vscode.l10n.t("EaWEdit: {0}", result.error),
-                    );
-                    return;
-                }
-
-                // A repoint leaves everything still in the old format unloaded. Worth saying now,
-                // while it is one line of the .pgproj away from being put back.
-                const orphans =
-                    result.projectFormatChanged &&
-                    result.otherFilesInOldFormat > 0
-                        ? result.otherFilesInOldFormat
-                        : 0;
-                // A single-language target (NLS) writes one file per language rather than dropping
-                // all but one, so the message has to be able to report more than a single path.
-                const written =
-                    result.writtenPaths ??
-                    (result.writtenPath ? [result.writtenPath] : []);
-                // Whole sentences, one per case: clauses glued into one give a translator nothing to work with.
-                const names = written.map((p) => path.basename(p)).join(", ");
-                const message =
-                    written.length > 1
-                        ? orphans > 0
-                            ? vscode.l10n.t(
-                                  "EaWEdit: Wrote {0} files, one per language: {1}. The original file was kept. {2} other file(s) are still in the previous format and are no longer loaded.",
-                                  written.length,
-                                  names,
-                                  orphans,
-                              )
-                            : vscode.l10n.t(
-                                  "EaWEdit: Wrote {0} files, one per language: {1}. The original file was kept.",
-                                  written.length,
-                                  names,
-                              )
-                        : orphans > 0
-                          ? vscode.l10n.t(
-                                "EaWEdit: Wrote {0}. The original file was kept. {1} other file(s) are still in the previous format and are no longer loaded.",
-                                written[0],
-                                orphans,
-                            )
-                          : vscode.l10n.t(
-                                "EaWEdit: Wrote {0}. The original file was kept.",
-                                written[0],
-                            );
-                const choice = await vscode.window.showInformationMessage(
-                    message,
-                    vscode.l10n.t("Open"),
-                );
-                localisationNavigatorProvider?.refresh();
-                if (choice === vscode.l10n.t("Open") && result.writtenPath) {
-                    LocalisationEditorPanel.show(
-                        result.writtenPath,
-                        path.basename(result.writtenPath),
-                        category ?? LOC_CATEGORY.text,
-                        context.extensionUri,
-                        panelProject(projectKey),
-                    );
-                }
-            },
-        ),
-        // Which format the project LOADS (#121), as opposed to converting a file. The palette entry and
-        // the navigator's title-bar button are this one command. Nothing is converted: the .pgproj is
-        // repointed and the project reloads, so the message has to say how many files that leaves.
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.setLocalisationProjectFormat",
-            async () => {
-                const projectKey = await commandProjectKey();
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                const config =
-                    await lsp.request<GetRootLocalisationConfigResult>(
-                        "aet/getRootLocalisationConfig",
-                    );
-                const current =
-                    config.ok && config.value.configured
-                        ? config.value.type
-                        : null;
-
-                const picked = await vscode.window.showQuickPick(
-                    formatChoices(current),
-                    {
-                        title: vscode.l10n.t("Set Localisation Project Format"),
-                        placeHolder: vscode.l10n.t(
-                            "Load the project's text from which format? No files are converted",
-                        ),
-                    },
-                );
-                if (!picked) {
-                    return;
-                }
-
-                const result =
-                    await lsp.requestOrReport<SetLocalisationProjectFormatResult>(
-                        "aet/setLocalisationProjectFormat",
-                        { format: picked.format },
-                        vscode.l10n.t(
-                            "Could not set the localisation format to {0}",
-                            picked.format,
-                        ),
-                    );
-                if (!result) {
-                    return;
-                }
-
-                const outcome = formatOutcome(result);
-                if (outcome.kind === "error") {
-                    vscode.window.showErrorMessage(outcome.text);
-                    return;
-                }
-                if (outcome.kind === "warning") {
-                    vscode.window.showWarningMessage(outcome.text);
-                } else {
-                    vscode.window.showInformationMessage(outcome.text);
-                }
-                if (result.changed) {
-                    localisationNavigatorProvider?.refresh();
-                }
-            },
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.exportLocalisationToDat",
-            async (arg?: LocTreeItem & { projectKey?: string }) => {
-                const filePath = arg?.project?.filePath;
-                if (!filePath) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: No localisation file selected.",
-                        ),
-                    );
-                    return;
-                }
-                const projectKey = await locCommandProjectKey(arg);
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                const result =
-                    await lsp.requestOrReport<ExportLocalisationToDatResult>(
-                        "aet/exportLocalisationToDat",
-                        { projectFilePath: filePath },
-                        vscode.l10n.t("DAT export failed"),
-                    );
-                if (!result) {
-                    return;
-                }
-
-                if (result.error) {
-                    vscode.window.showErrorMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: DAT export failed - {0}",
-                            result.error,
-                        ),
-                    );
-                    return;
-                }
-                vscode.window.showInformationMessage(
-                    result.writtenFiles.length === 1
-                        ? vscode.l10n.t("EaWEdit: Exported 1 DAT file.")
-                        : vscode.l10n.t(
-                              "EaWEdit: Exported {0} DAT files.",
-                              result.writtenFiles.length,
-                          ),
-                );
-            },
-        ),
     );
 
     effectiveObjectProvider = new EffectiveObjectContentProvider();
@@ -2619,252 +1701,10 @@ export async function activate(
         navigatorProjects,
         (key) => new ModBrowserViewProvider(gatewayFor(key)),
     );
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider(
-            ModBrowserViewProvider.viewId,
-            modBrowserProvider,
-        ),
-        // From an outline row, or from the palette, which opens the game data.
-        vscode.commands.registerCommand(
-            OPEN_MOD_BROWSER,
-            async (arg?: ModBrowserOutlineItem) => {
-                const projectKey =
-                    (arg && modBrowserProvider?.projectOf(arg)) ??
-                    (await commandProjectKey());
-                if (projectKey === null) {
-                    return;
-                }
-                const project = panelProject(projectKey);
-                if (!project.gateway.requireRunning()) {
-                    return;
-                }
-                ModBrowserPanel.show(
-                    context.extensionUri,
-                    project,
-                    arg?.outline ?? "gameData",
-                );
-            },
-        ),
-    );
 
     storyNavigatorProvider = new ProjectGroupedTree<StoryTreeItem>(
         navigatorProjects,
         (key) => new StoryNavigatorViewProvider(gatewayFor(key)),
-    );
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider(
-            StoryNavigatorViewProvider.viewId,
-            storyNavigatorProvider,
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.refreshStoryNavigator",
-            () => storyNavigatorProvider?.refresh(),
-        ),
-        // Opens the read-only story graph panel. Invoked with the campaign tree item (inline icon
-        // in the navigator) or without arguments from the command palette (quick-picks a campaign).
-        // A graph is one campaign FACTION, so the tree offers this on its faction node and hands
-        // both halves over. The palette has no node to hand over, so it asks - once, over a flat
-        // list of every pair, rather than a campaign prompt followed by a faction prompt.
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.openStoryGraph",
-            async (arg?: StoryTreeItem) => {
-                // A clicked row belongs to the project whose tree it is in.
-                const projectKey =
-                    (arg && storyNavigatorProvider?.projectOf(arg)) ??
-                    (await commandProjectKey());
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                // A battle node carries its key in fileName and its name in the label; it opens the
-                // battle's own graph, the sub-graph the galactic one shows as a portal.
-                let target: StoryGraphTarget | undefined =
-                    arg?.campaignName && arg?.factionName
-                        ? {
-                              campaign: arg.campaignName,
-                              faction: arg.factionName,
-                              ...(arg.kind === "battle" && arg.fileName
-                                  ? {
-                                        scope: arg.fileName,
-                                        scopeLabel: String(
-                                            arg.label ?? arg.fileName,
-                                        ),
-                                    }
-                                  : {}),
-                          }
-                        : undefined;
-
-                if (!target) {
-                    const result =
-                        await lsp.requestOrReport<GetStoryPlotsResult>(
-                            "aet/getStoryPlots",
-                            {},
-                            vscode.l10n.t("Cannot load story campaigns"),
-                        );
-                    if (!result) {
-                        return;
-                    }
-                    if (result.error) {
-                        vscode.window.showWarningMessage(
-                            vscode.l10n.t("EaWEdit: {0}", result.error),
-                        );
-                        return;
-                    }
-
-                    const items = graphTargets(result.campaigns ?? []);
-                    if (!items.length) {
-                        vscode.window.showInformationMessage(
-                            vscode.l10n.t(
-                                "EaWEdit: No story campaigns found in this workspace.",
-                            ),
-                        );
-                        return;
-                    }
-                    const picked = await vscode.window.showQuickPick(items, {
-                        title: vscode.l10n.t("Open Story Graph"),
-                        placeHolder: vscode.l10n.t(
-                            "Select a campaign faction or one of its battles",
-                        ),
-                    });
-                    target = picked?.target;
-                }
-                if (target) {
-                    StoryGraphPanel.show(
-                        target,
-                        context.extensionUri,
-                        panelProject(projectKey),
-                        undefined,
-                        false,
-                    );
-                }
-            },
-        ),
-        // The server's resolution is the only one: the model resolved every manifest entry to its
-        // document when it was assembled, case-insensitively as the engine reads files. There is
-        // no name search here - a workspace glob is case-sensitive and would answer by a different
-        // rule than the one the model used, which is how a file that was right there read as missing.
-        // Invoked from a navigator node's inline button with the node; a node with nothing to open
-        // offers the disabled twin instead, so this never runs for one.
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.openStoryFile",
-            async (item?: StoryTreeItem) => {
-                if (!item?.openUri) {
-                    return;
-                }
-                try {
-                    const doc = await vscode.workspace.openTextDocument(
-                        vscode.Uri.parse(item.openUri),
-                    );
-                    const line = item.openLine ?? 0;
-                    await vscode.window.showTextDocument(doc, {
-                        preview: true,
-                        selection: new vscode.Range(line, 0, line, 0),
-                    });
-                } catch (e) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: Cannot open '{0}' - {1}",
-                            String(item.label),
-                            String(e),
-                        ),
-                    );
-                }
-            },
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.openStoryFileUnavailable",
-            () => undefined,
-        ),
-        // A Campaign_Set has no declaration of its own: it is the value every member writes. The
-        // server's rename rewrites that value in every member the project owns, so this asks it
-        // at one of them - the position the plots feed gave the node - and applies the edit as
-        // the refactoring it is, which saves the files it touched when the editor is set to.
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.renameCampaignSet",
-            async (item?: StoryTreeItem) => {
-                const at = item?.renameAt;
-                const current = item?.setName;
-                if (!at || !current) {
-                    return;
-                }
-                const entered = await vscode.window.showInputBox({
-                    title: vscode.l10n.t("Rename Set"),
-                    prompt: vscode.l10n.t(
-                        "New name for every member in the project",
-                    ),
-                    value: current,
-                    validateInput: (value) => setNameProblem(value, current),
-                });
-                if (entered === undefined) {
-                    return;
-                }
-                const refuse = (reason: string): void => {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: Cannot rename the set '{0}' - {1}",
-                            current,
-                            reason,
-                        ),
-                    );
-                };
-                try {
-                    const uri = vscode.Uri.parse(at.uri);
-                    const document =
-                        await vscode.workspace.openTextDocument(uri);
-                    // The position is the feed's, and the file may have moved on since: a rename
-                    // asked one line off would rename whatever stands there now.
-                    const written = document.getText(
-                        new vscode.Range(
-                            at.line,
-                            at.column,
-                            at.line,
-                            at.column + current.length,
-                        ),
-                    );
-                    if (written.toLowerCase() !== current.toLowerCase()) {
-                        refuse(
-                            vscode.l10n.t(
-                                "the campaign file changed since the list was read",
-                            ),
-                        );
-                        return;
-                    }
-                    const edit = await vscode.commands.executeCommand<
-                        vscode.WorkspaceEdit | undefined
-                    >(
-                        "vscode.executeDocumentRenameProvider",
-                        uri,
-                        new vscode.Position(at.line, at.column),
-                        entered.trim(),
-                    );
-                    if (!edit || edit.size === 0) {
-                        refuse(vscode.l10n.t("the server offered no rename"));
-                        return;
-                    }
-                    if (
-                        !(await vscode.workspace.applyEdit(edit, {
-                            isRefactoring: true,
-                        }))
-                    ) {
-                        refuse(vscode.l10n.t("the edit was not applied"));
-                    }
-                } catch (e) {
-                    refuse(String(e));
-                }
-            },
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.renameCampaignSetNoMember",
-            () => undefined,
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.renameCampaignSetUngrouped",
-            () => undefined,
-        ),
     );
 
     statusItem = vscode.window.createStatusBarItem(
@@ -2896,8 +1736,6 @@ export async function activate(
     logLine(
         `  lsp.projectPath  = ${cfg("lsp.devMode").get<string>("projectPath") ?? "(not set)"}`,
     );
-
-    windowState = context.workspaceState;
 
     // One log folder per workspace in the user's own store, named by the id VS Code files this
     // workspace's storage under. Set before the first server starts; a workspace that is gone
@@ -2943,22 +1781,6 @@ export async function activate(
     const coordinator = restarts;
 
     watchWorkspace(context);
-    // Changes the project remembered for commands; the window asks on its own only when the
-    // document in front belongs to no project and nothing was picked yet.
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.selectProject",
-            async () => {
-                if (clients.size <= 1) {
-                    void vscode.window.showInformationMessage(
-                        vscode.l10n.t("EaWEdit: One project open"),
-                    );
-                    return;
-                }
-                await pickProject();
-            },
-        ),
-    );
     // A folder added or removed changes which projects the window holds; only the servers of the
     // projects that came or went start or stop.
     context.subscriptions.push(
@@ -3003,610 +1825,6 @@ export async function activate(
         }),
     );
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.debug.forceStartup",
-            async () => {
-                await stopAllClients();
-                const serverMissing = serverProblem(
-                    resolveServerCommand(context.extensionPath, []),
-                    fs.existsSync,
-                );
-                if (serverMissing) {
-                    void vscode.window.showErrorMessage(serverMissing);
-                } else {
-                    await reconcileClients(context);
-                }
-            },
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.restartServer",
-            restartServer,
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.revalidateWorkspace",
-            async () => {
-                // The workspace is the window: every project's server revalidates its own files.
-                // Asking one project left the others' diagnostics as they were (#167).
-                const keys = clients.size > 0 ? [...clients.keys()] : [""];
-                await Promise.all(
-                    keys.map((key) =>
-                        gatewayFor(key).executeCommand(
-                            "aet-eaw-edit.lsp.revalidateWorkspace",
-                            [],
-                            l10n.t("could not revalidate the workspace"),
-                        ),
-                    ),
-                );
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.newModProject",
-            async () => {
-                // Writes a new project wherever it is told to; no open project is asked about it.
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-                const name = await vscode.window.showInputBox({
-                    prompt: vscode.l10n.t("Mod name"),
-                    placeHolder: vscode.l10n.t("My Awesome Mod"),
-                    validateInput: (v) =>
-                        v?.trim() ? null : vscode.l10n.t("Name is required"),
-                });
-                if (!name) {
-                    return;
-                }
-                const folders = await vscode.window.showOpenDialog({
-                    canSelectFolders: true,
-                    canSelectFiles: false,
-                    canSelectMany: false,
-                    openLabel: vscode.l10n.t("Select mod root folder"),
-                });
-                if (!folders?.length) {
-                    return;
-                }
-                // The server says what it did - created, or refused because a project file exists. The
-                // client announced "created" whenever the command returned, refusals included.
-                await lsp.executeCommand(
-                    "aet-eaw-edit.lsp.newModProject",
-                    [{ name: name.trim(), path: folders[0].fsPath }],
-                    vscode.l10n.t("Mod project not created - {0}", name.trim()),
-                );
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.reloadProject",
-            async () => {
-                const projectKey = await commandProjectKey();
-                if (projectKey === null) {
-                    return;
-                }
-                // The reload indexes the project again; the status says so until the server's
-                // $/workspaceScanComplete, which ends a reload as it ends startup.
-                const project = clients.get(projectKey);
-                if (
-                    project?.state === "ready" ||
-                    project?.state === "loading"
-                ) {
-                    project.state = "indexing";
-                    project.phase = undefined;
-                    updateStatus();
-                }
-                await gatewayFor(projectKey).executeCommand(
-                    "aet-eaw-edit.lsp.reloadProject",
-                    [],
-                    l10n.t("could not reload the project"),
-                );
-            },
-        ),
-    );
-
-    // The server's remaining commands, owned here like the rest. The language client would register
-    // them from the server's one `registerCapability` batch, but that batch also names commands this
-    // extension registers itself, collides, and is dropped whole - so a quick fix naming one of these
-    // found no command at all.
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.suppressDiagnosticGlobally",
-            async (...args: unknown[]) => {
-                const projectKey = await commandProjectKey();
-                if (projectKey === null) {
-                    return;
-                }
-                await gatewayFor(projectKey).executeCommand(
-                    "aet-eaw-edit.lsp.suppressDiagnosticGlobally",
-                    args,
-                    l10n.t("could not suppress the diagnostic"),
-                );
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.revalidateDocument",
-            async (uri?: string) => {
-                const target =
-                    uri ??
-                    vscode.window.activeTextEditor?.document.uri.toString();
-                if (target === undefined) {
-                    return;
-                }
-                const owner = ownerOf(vscode.Uri.parse(target).fsPath);
-                const projectKey =
-                    owner === undefined || clients.size <= 1
-                        ? await commandProjectKey()
-                        : owner.spec.key;
-                if (projectKey === null) {
-                    return;
-                }
-                await gatewayFor(projectKey).executeCommand(
-                    "aet-eaw-edit.lsp.revalidateDocument",
-                    [target],
-                    l10n.t("could not revalidate the document"),
-                );
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.createLocalisationKey",
-            async (keyName?: string) => {
-                if (!keyName) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: No localisation key name provided.",
-                        ),
-                    );
-                    return;
-                }
-
-                // The quick fix raising this belongs to the document in front of the reader.
-                const projectKey = await commandProjectKey();
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                const fetched =
-                    await lsp.request<GetLocalisationProjectsResult>(
-                        "aet/getLocalisationProjects",
-                    );
-                if (!fetched.ok) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: Could not fetch localisation projects from server.",
-                        ),
-                    );
-                    return;
-                }
-                const projects = fetched.value.projects ?? [];
-
-                if (!projects.length) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: No localisation projects found. Use 'EaWEdit: Initialise Localisation Project from Baseline' first.",
-                        ),
-                    );
-                    return;
-                }
-
-                const picked = await vscode.window.showQuickPick(
-                    projects.map((p) => ({
-                        label: p.label,
-                        description: p.filePath,
-                        detail: `${p.projectName} - ${p.resourceType}`,
-                        filePath: p.filePath,
-                    })),
-                    {
-                        title: vscode.l10n.t(
-                            "Create localisation key '{0}'",
-                            keyName,
-                        ),
-                        placeHolder: vscode.l10n.t(
-                            "Select localisation project",
-                        ),
-                    },
-                );
-                if (!picked) {
-                    return;
-                }
-
-                const english = await vscode.window.showInputBox({
-                    title: vscode.l10n.t("New key: {0}", keyName),
-                    prompt: vscode.l10n.t(
-                        "English translation text (required)",
-                    ),
-                    validateInput: (v) =>
-                        v?.trim()
-                            ? null
-                            : vscode.l10n.t("Translation text is required"),
-                });
-                if (english === undefined) {
-                    return;
-                }
-
-                await lsp.executeCommand(
-                    "aet-eaw-edit.lsp.createLocalisationKey",
-                    [keyName, picked.filePath, { ENGLISH: english }],
-                    l10n.t(
-                        "could not create the localisation key '{0}'",
-                        keyName,
-                    ),
-                );
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.initLocalisationProject",
-            async () => {
-                const projectKey = await commandProjectKey();
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                const config =
-                    await lsp.request<GetRootLocalisationConfigResult>(
-                        "aet/getRootLocalisationConfig",
-                    );
-                if (!config.ok) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit LSP: Could not query the project's localisation config.",
-                        ),
-                    );
-                    return;
-                }
-                const rootConfig = config.value;
-
-                // The .pgproj already declares a localisation node - it wins outright, no picker.
-                if (rootConfig.configured) {
-                    const confirmed =
-                        await vscode.window.showInformationMessage(
-                            vscode.l10n.t(
-                                'Initialise the localisation project ({0} in "{1}")?',
-                                rootConfig.type ?? "",
-                                rootConfig.directory ?? "",
-                            ),
-                            { modal: true },
-                            vscode.l10n.t("Initialise"),
-                        );
-                    if (confirmed !== vscode.l10n.t("Initialise")) {
-                        return;
-                    }
-                    await lsp.executeCommand(
-                        "aet-eaw-edit.lsp.initLocalisationProject",
-                        [{}],
-                        l10n.t("could not initialise the localisation project"),
-                    );
-                    return;
-                }
-
-                // Not configured - the VS Code setting only pre-fills the picker here, as a last resort.
-                const formatOptions = [
-                    {
-                        label: vscode.l10n.t("CSV"),
-                        description: vscode.l10n.t(
-                            "Comma-separated values (.csv)",
-                        ),
-                    },
-                    {
-                        label: vscode.l10n.t("XML"),
-                        description: vscode.l10n.t(
-                            "eaw-translation v1 XML (.xml)",
-                        ),
-                    },
-                    {
-                        label: vscode.l10n.t("NLS"),
-                        description: vscode.l10n.t(
-                            "Java-style properties (.properties)",
-                        ),
-                    },
-                ];
-                const defaultFormat = cfg("localisation")
-                    .get<string>("format", "format-dat")
-                    .replace(/^format-/, "")
-                    .toUpperCase();
-                const defaultIdx = formatOptions.findIndex(
-                    (o) => o.label === defaultFormat,
-                );
-                if (defaultIdx > 0) {
-                    formatOptions.unshift(
-                        formatOptions.splice(defaultIdx, 1)[0],
-                    );
-                }
-
-                const formatItem = await vscode.window.showQuickPick(
-                    formatOptions,
-                    {
-                        title: vscode.l10n.t(
-                            "Initialise Localisation Project from Baseline",
-                        ),
-                        placeHolder: vscode.l10n.t("Select output format"),
-                    },
-                );
-                if (!formatItem) {
-                    return;
-                }
-
-                const directory = await vscode.window.showInputBox({
-                    title: vscode.l10n.t(
-                        "Localisation directory (relative to the .pgproj)",
-                    ),
-                    value: "data/text",
-                    prompt: vscode.l10n.t(
-                        "Where the localisation project files will live",
-                    ),
-                    validateInput: (v) =>
-                        v?.trim()
-                            ? null
-                            : vscode.l10n.t("A directory is required"),
-                });
-                if (!directory) {
-                    return;
-                }
-
-                await lsp.executeCommand(
-                    "aet-eaw-edit.lsp.initLocalisationProject",
-                    [{ format: formatItem.label, directory: directory.trim() }],
-                    l10n.t("could not initialise the localisation project"),
-                );
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.importLocalisationProject",
-            async () => {
-                const projectKey = await commandProjectKey();
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                const convertibleFormats = [
-                    {
-                        label: vscode.l10n.t("CSV"),
-                        description: vscode.l10n.t(
-                            "Comma-separated values (.csv)",
-                        ),
-                    },
-                    {
-                        label: vscode.l10n.t("XML"),
-                        description: vscode.l10n.t(
-                            "eaw-translation v1 XML (.xml)",
-                        ),
-                    },
-                    {
-                        label: vscode.l10n.t("NLS"),
-                        description: vscode.l10n.t(
-                            "Java-style properties (.properties)",
-                        ),
-                    },
-                ];
-                const datFormat = {
-                    label: vscode.l10n.t("DAT"),
-                    description: vscode.l10n.t(
-                        "The game's proprietary binary format (.dat)",
-                    ),
-                };
-                const sourceFormatChoices = [...convertibleFormats, datFormat];
-
-                const sourceFormatItem = await vscode.window.showQuickPick(
-                    sourceFormatChoices,
-                    {
-                        title: vscode.l10n.t(
-                            "Import Existing Localisation Files",
-                        ),
-                        placeHolder: vscode.l10n.t(
-                            "Format of the existing files",
-                        ),
-                    },
-                );
-                if (!sourceFormatItem) {
-                    return;
-                }
-                const isDatSource =
-                    sourceFormatItem.label === vscode.l10n.t("DAT");
-
-                // DAT is one binary file per language (MasterTextFile_<LANGUAGE>.dat) - the user picks
-                // one file, the server discovers its siblings in the same folder. Every other format
-                // stores all languages in one file, so the user picks the containing folder directly.
-                let sourceDirectory: string;
-                const defaultUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-                if (isDatSource) {
-                    const sourceFiles = await vscode.window.showOpenDialog({
-                        canSelectFolders: false,
-                        canSelectFiles: true,
-                        canSelectMany: false,
-                        defaultUri,
-                        filters: { [vscode.l10n.t("DAT files")]: ["dat"] },
-                        openLabel: vscode.l10n.t(
-                            "Select a MasterTextFile_<LANGUAGE>.dat file",
-                        ),
-                        title: vscode.l10n.t(
-                            "Select one DAT file - its siblings in the same folder are imported too",
-                        ),
-                    });
-                    if (!sourceFiles?.length) {
-                        return;
-                    }
-                    sourceDirectory = vscode.Uri.joinPath(
-                        sourceFiles[0],
-                        "..",
-                    ).fsPath;
-                } else {
-                    const sourceFolders = await vscode.window.showOpenDialog({
-                        canSelectFolders: true,
-                        canSelectFiles: false,
-                        canSelectMany: false,
-                        defaultUri,
-                        openLabel: vscode.l10n.t(
-                            "Select folder with existing files",
-                        ),
-                        title: vscode.l10n.t(
-                            "Folder containing the {0} files",
-                            sourceFormatItem.label,
-                        ),
-                    });
-                    if (!sourceFolders?.length) {
-                        return;
-                    }
-                    sourceDirectory = sourceFolders[0].fsPath;
-                }
-
-                // Pre-fill the target format to match the source - the common case is "just register
-                // what I already have," not a conversion. DAT is never a conversion target (no DAT
-                // generator wired into this wizard - use the existing "Export DAT" action for that), so
-                // it only appears as a target choice when the source is DAT itself, with no pre-selection
-                // (DAT is never git-friendly for collaborative editing - force an explicit choice).
-                let targetFormatItem:
-                    { label: string; description: string } | undefined;
-                if (isDatSource) {
-                    targetFormatItem = await vscode.window.showQuickPick(
-                        [...convertibleFormats, datFormat],
-                        {
-                            title: vscode.l10n.t("Target Format"),
-                            placeHolder: vscode.l10n.t(
-                                "Format to use going forward",
-                            ),
-                        },
-                    );
-                } else {
-                    const targetChoices = convertibleFormats.map((o) => ({
-                        ...o,
-                    }));
-                    const sourceIdx = targetChoices.findIndex(
-                        (o) => o.label === sourceFormatItem.label,
-                    );
-                    if (sourceIdx > 0) {
-                        targetChoices.unshift(
-                            targetChoices.splice(sourceIdx, 1)[0],
-                        );
-                    }
-                    targetFormatItem = await vscode.window.showQuickPick(
-                        targetChoices,
-                        {
-                            title: vscode.l10n.t("Target Format"),
-                            placeHolder: vscode.l10n.t(
-                                "Format to use going forward (defaults to {0})",
-                                sourceFormatItem.label,
-                            ),
-                        },
-                    );
-                }
-                if (!targetFormatItem) {
-                    return;
-                }
-
-                let targetDirectory: string | undefined;
-                if (targetFormatItem.label !== sourceFormatItem.label) {
-                    targetDirectory = await vscode.window.showInputBox({
-                        title: vscode.l10n.t(
-                            "Target directory (relative to the .pgproj)",
-                        ),
-                        value: "data/text",
-                        prompt: vscode.l10n.t(
-                            "Converting {0} to {1} - where should the new file go?",
-                            sourceFormatItem.label,
-                            targetFormatItem.label,
-                        ),
-                        validateInput: (v) =>
-                            v?.trim()
-                                ? null
-                                : vscode.l10n.t("A directory is required"),
-                    });
-                    if (!targetDirectory) {
-                        return;
-                    }
-                }
-
-                await lsp.executeCommand(
-                    "aet-eaw-edit.lsp.importLocalisationProject",
-                    [
-                        {
-                            sourceFormat: sourceFormatItem.label,
-                            sourceDirectory,
-                            targetFormat: targetFormatItem.label,
-                            ...(targetDirectory
-                                ? { targetDirectory: targetDirectory.trim() }
-                                : {}),
-                        },
-                    ],
-                    l10n.t("could not import the localisation files"),
-                );
-                // No message here: executeCommand returns nothing to check, so anything said at this
-                // point is a guess. The server reports the outcome - what it wrote, or why it did not.
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.showReferences",
-            (
-                uriStr: string,
-                position: { line: number; character: number },
-                rawLocations: {
-                    uri: string;
-                    range: {
-                        start: { line: number; character: number };
-                        end: { line: number; character: number };
-                    };
-                }[],
-            ) => {
-                const uri = vscode.Uri.parse(uriStr);
-                const pos = new vscode.Position(
-                    position.line,
-                    position.character,
-                );
-                const locations = rawLocations.map(
-                    (l) =>
-                        new vscode.Location(
-                            vscode.Uri.parse(l.uri),
-                            new vscode.Range(
-                                new vscode.Position(
-                                    l.range.start.line,
-                                    l.range.start.character,
-                                ),
-                                new vscode.Position(
-                                    l.range.end.line,
-                                    l.range.end.character,
-                                ),
-                            ),
-                        ),
-                );
-                vscode.commands.executeCommand(
-                    "editor.action.showReferences",
-                    uri,
-                    pos,
-                    locations,
-                );
-            },
-        ),
-    );
-
-    // Opens the encyclopedia popup preview for a GameObject. Triggered by the "preview encyclopedia"
-    // code lens (objectId passed as the first argument), or from the command palette (prompts).
     // Opening a .alo or .ala shows the model instead of the binary editor. Registered whatever the
     // feature flag says: the flag gates the SERVER endpoints, and a custom editor that vanishes with
     // a setting would leave those files opening as binary with no hint why.
@@ -3616,302 +1834,38 @@ export async function activate(
         ),
     );
 
-    // The bug report block. Works with the server down too - "not running" is itself the most
-    // useful thing a report can say - so it asks rather than requiring a running server.
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.copyBugReportInfo",
-            async () => {
-                const tier = await pickReportTier(
-                    vscode.l10n.t("Copy Bug Report Info"),
-                );
-                if (!tier) {
-                    return;
-                }
-
-                // The clipboard has no size limit, so the extended copy carries the per-type list too.
-                const text = await collectBugReport(
-                    context,
-                    lsp,
-                    tier.extended ? { extended: true, symbolTypes: true } : {},
-                );
-                await vscode.env.clipboard.writeText(text);
-                void vscode.window.showInformationMessage(
-                    vscode.l10n.t("EaWEdit: Bug report info copied"),
-                );
-            },
-        ),
-    );
-
-    // The two report actions every diagnostic offers beside its suppressions. Client commands the
-    // server only names: the version, the clipboard and the browser are all on this side.
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.reportDiagnosticOnGitHub",
-            (report: DiagnosticReportPayload) =>
-                reportDiagnosticOnGitHub(context, lsp, report),
-        ),
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.openDiagnosticReport",
-            (report: DiagnosticReportPayload) =>
-                openDiagnosticReport(context, lsp, report),
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.previewModel",
-            async (referenceArg?: string, projectKeyArg?: string) => {
-                const projectKey = projectKeyArg ?? (await commandProjectKey());
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                const name = referenceArg?.trim() || (await pickModel(lsp));
-                if (!name) {
-                    return;
-                }
-
-                ModelPreviewPanel.show(
-                    context.extensionUri,
-                    panelProject(projectKey),
-                    previewSubjectFor(name),
-                    name,
-                );
-            },
-        ),
-    );
-
-    // Never wired to activation: a modder who has not asked for shader-accurate previews should not
-    // be nagged about a download they may not want.
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.shaders.obtain",
-            async () => {
-                await offerShaderSources(context);
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.clearPreviewCache",
-            async () => {
-                const projectKey = await commandProjectKey();
-                if (projectKey === null) {
-                    return;
-                }
-                // The cache is the server's: it knows the project's folder and stops a build that
-                // would fill it again.
-                const result = await gatewayFor(projectKey).requestOrReport<{
-                    removed: number;
-                }>(
-                    "aet/clearPreviewCache",
-                    {},
-                    vscode.l10n.t("Could not clear the preview cache"),
-                );
-                if (result) {
-                    void vscode.window.showInformationMessage(
-                        vscode.l10n.t(
-                            "Preview cache cleared - {0} converted models removed",
-                            result.removed,
-                        ),
-                    );
-                }
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.previewAssembledUnit",
-            async (objectIdArg?: string, projectKeyArg?: string) => {
-                const projectKey = projectKeyArg ?? (await commandProjectKey());
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                let objectId = objectIdArg;
-                if (!objectId) {
-                    objectId = await vscode.window.showInputBox({
-                        title: vscode.l10n.t("Preview Assembled Unit"),
-                        prompt: vscode.l10n.t(
-                            "Name of the GameObject to assemble, e.g. Generic_Star_Destroyer",
-                        ),
-                        validateInput: (v) =>
-                            v?.trim()
-                                ? null
-                                : vscode.l10n.t("Object name is required"),
-                    });
-                }
-                if (!objectId?.trim()) {
-                    return;
-                }
-
-                const id = objectId.trim();
-                ModelPreviewPanel.show(
-                    context.extensionUri,
-                    panelProject(projectKey),
-                    { kind: "object", objectId: id },
-                    id,
-                );
-            },
-        ),
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.showEncyclopedia",
-            async (objectIdArg?: string, projectKeyArg?: string) => {
-                const projectKey = projectKeyArg ?? (await commandProjectKey());
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                let objectId = objectIdArg;
-                if (!objectId) {
-                    objectId = await vscode.window.showInputBox({
-                        title: vscode.l10n.t("Preview Encyclopedia Popup"),
-                        prompt: vscode.l10n.t(
-                            "Name of the GameObject whose popup to preview",
-                        ),
-                        validateInput: (v) =>
-                            v?.trim()
-                                ? null
-                                : vscode.l10n.t("Object name is required"),
-                    });
-                }
-                if (!objectId?.trim()) {
-                    return;
-                }
-                const id = objectId.trim();
-
-                // Both the first open and the SP/MP toggle go through here, so the panel never has to
-                // know how to reach the server - it asks, this fetches.
-                const load = async (
-                    multiplayer: boolean,
-                    retarget: boolean,
-                ): Promise<void> => {
-                    const entry =
-                        await lsp.requestOrReport<GetEncyclopediaEntryResult>(
-                            GET_ENCYCLOPEDIA_ENTRY,
-                            {
-                                objectId: id,
-                                multiplayer,
-                                ...encyclopediaScreenParams(),
-                            },
-                            vscode.l10n.t(
-                                "Could not load the encyclopedia entry",
-                            ),
-                        );
-                    if (entry === undefined) {
-                        return;
-                    }
-
-                    if (retarget) {
-                        EncyclopediaPanel.show(
-                            context.extensionUri,
-                            panelProject(projectKey),
-                            entry,
-                            (mp) => void load(mp, false),
-                        );
-                    } else {
-                        EncyclopediaPanel.update(
-                            resolveProjectKey(projectKey),
-                            entry,
-                        );
-                    }
-                };
-
-                // Retargeting keeps whatever SP/MP mode the panel is already showing.
-                await load(
-                    EncyclopediaPanel.multiplayer(
-                        resolveProjectKey(projectKey),
-                    ),
-                    true,
-                );
-            },
-        ),
-    );
-
-    // Opens the read-only "effective object" virtual document for a variant GameObject. Triggered by
-    // the "show effective object" code lens (objectId passed as the first argument), or from the command
-    // palette (prompts for the object name).
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            "aet-eaw-edit.lsp.showEffectiveObject",
-            async (
-                objectIdArg?: string,
-                projectKeyArg?: string | null,
-                typeNameArg?: string | null,
-            ) => {
-                const projectKey = projectKeyArg ?? (await commandProjectKey());
-                if (projectKey === null) {
-                    return;
-                }
-                const lsp = gatewayFor(projectKey);
-                if (!lsp.requireRunning()) {
-                    return;
-                }
-
-                let objectId = objectIdArg;
-                if (!objectId) {
-                    objectId = await vscode.window.showInputBox({
-                        title: vscode.l10n.t("Show Effective Object"),
-                        prompt: vscode.l10n.t(
-                            "Name of the variant GameObject to resolve",
-                        ),
-                        validateInput: (v) =>
-                            v?.trim()
-                                ? null
-                                : vscode.l10n.t("Object name is required"),
-                    });
-                }
-                if (!objectId?.trim()) {
-                    return;
-                }
-                objectId = objectId.trim();
-
-                // The tab label is derived from the URI's path basename, so bake the intent into it: this is a
-                // generated, read-only preview of the fully-merged object, not an editable source file. The real
-                // object id and its project travel in the query, so the decorative basename doesn't affect
-                // content resolution.
-                const project = panelProject(projectKey);
-                const uri = vscode.Uri.from({
-                    scheme: EFFECTIVE_SCHEME,
-                    path: effectiveObjectPath(
-                        objectId,
-                        project.name,
-                        clients.size,
-                    ),
-                    query: effectiveObjectQuery({
-                        objectId,
-                        projectKey: project.key,
-                        typeName: typeNameArg ?? "",
-                    }),
-                });
-                effectiveObjectProvider?.refresh(uri);
-                const doc = await vscode.workspace.openTextDocument(uri);
-                // Open beside the active editor so the preview sits next to the source it was generated from.
-                await vscode.window.showTextDocument(doc, {
-                    preview: true,
-                    viewColumn: vscode.ViewColumn.Beside,
-                });
-            },
-        ),
-    );
+    // Every command, by area. Each module gets the same view of the host and nothing else of it.
+    const deps: HostDeps = {
+        clients,
+        lsp,
+        stores,
+        localisationNavigatorProvider,
+        storyNavigatorProvider,
+        modBrowserProvider,
+        effectiveObjectProvider,
+        gatewayFor,
+        panelProject,
+        resolveProjectKey,
+        commandProjectKey,
+        locCommandProjectKey,
+        ownerOf,
+        folderProject,
+        pickProject,
+        reconcileClients,
+        stopAllClients,
+        restartServer,
+        updateStatus,
+    };
+    whatsNewCommands.register(context, deps);
+    luaDebugCommands.register(context, deps);
+    localisationCommands.register(context, deps);
+    modBrowserCommands.register(context, deps);
+    storyCommands.register(context, deps);
+    projectCommands.register(context, deps);
+    diagnosticsCommands.register(context, deps);
+    navigationCommands.register(context, deps);
+    previewCommands.register(context, deps);
+    gameObjectsCommands.register(context, deps);
 
     if (validateConfiguration(context.extensionPath)) {
         // The first discovery, in the same queue as everything after it.

@@ -571,6 +571,15 @@ describe("ownsPath", () => {
 
         assert.equal(ownsPath(single, "d:/elsewhere/a.xml"), true);
     });
+
+    it("gives a change to a server whose watched directory ends in a separator", () => {
+        const spec: ClientSpec = { ...rev, watched: ["c:/dev/EaWX/Data/"] };
+
+        assert.equal(
+            ownsPath(spec, "c:/dev/EaWX/Data/Data/XML/units.xml"),
+            true,
+        );
+    });
 });
 
 describe("ownerKey", () => {
@@ -590,6 +599,18 @@ describe("ownerKey", () => {
 
     it("names no client for a file outside every project", () => {
         assert.equal(ownerKey(specs, "c:/elsewhere/a.xml"), undefined);
+    });
+
+    it("names the client whose root ends in a separator", () => {
+        const withSeparator: ClientSpec[] = [
+            specs[0],
+            { ...specs[1], roots: ["c:\\dev\\EaWX\\FotR\\"] },
+        ];
+
+        assert.equal(
+            ownerKey(withSeparator, "c:/dev/EaWX/FotR/Data/XML/a.xml"),
+            specs[1].key,
+        );
     });
 
     it("names the single client for any file", () => {

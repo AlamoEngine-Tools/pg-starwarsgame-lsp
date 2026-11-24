@@ -45,12 +45,18 @@ function serverCommands() {
         .sort();
 }
 
-/** The command ids the extension registers with `vscode.commands.registerCommand`. */
+/**
+ * The command ids the extension registers with `vscode.commands.registerCommand`: in the host's own
+ * modules and in the command modules, one per area, under `commands/`.
+ */
 function extensionCommands() {
-    const text = fs
-        .readdirSync(src)
-        .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
-        .map((name) => fs.readFileSync(path.join(src, name), "utf8"))
+    const text = [src, path.join(src, "commands")]
+        .flatMap((dir) =>
+            fs
+                .readdirSync(dir)
+                .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+                .map((name) => fs.readFileSync(path.join(dir, name), "utf8")),
+        )
         .join("\n");
     return new Set([...text.matchAll(/registerCommand\(\s*"([^"]+)"/g)].map((m) => m[1]));
 }

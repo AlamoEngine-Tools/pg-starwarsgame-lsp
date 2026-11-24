@@ -7,5 +7,6 @@ export * from "./editBatch";
 export * from "./encyclopedia";
 export * from "./localisation";
 export * from "./modelPreview";
+export * from "./requests";
 export * from "./story";
 export * from "./workspace";

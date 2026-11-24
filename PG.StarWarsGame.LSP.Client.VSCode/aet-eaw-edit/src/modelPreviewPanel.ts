@@ -14,14 +14,7 @@ import { ModelInspectorPanel } from "./modelInspectorPanel";
 import { PanelProject, projectSubjectKey } from "./panelProject";
 import {
     GET_MODEL_DETAIL,
-    GetModelDetailResult,
-    GetModelGlbResult,
-    GetModelTextureResult,
     PreviewTransfer,
-    GetParticleSystemResult,
-    GetPreviewSceneResult,
-    GetProjectileResult,
-    GetShaderSourceResult,
     PreviewSourceFile,
 } from "./protocol/modelPreview";
 import type {
@@ -38,14 +31,7 @@ import {
 } from "./previewTransfer";
 import { revealDefinition } from "./revealDefinition";
 import { type SubjectState, subjectStateFrom } from "./shared/subjectState";
-import {
-    readViewerSettings,
-    saveViewerSettings,
-} from "./viewerSettingsStorage";
-import {
-    readProjectSettings,
-    saveProjectSettings,
-} from "./projectSettingsStorage";
+import { readProjectSettings, saveProjectSettings } from "./stores";
 import { panelKey, PanelRegistry, WebviewPanelHost } from "./webviewPanelHost";
 
 /** What the preview is showing, and therefore what to ask the server for. */
@@ -268,11 +254,13 @@ export class ModelPreviewPanel extends WebviewPanelHost<
                 // geometry lands - otherwise the grid and the lights visibly snap a frame later.
                 this.post({
                     type: "viewerSettings",
-                    settings: readViewerSettings(),
+                    settings: this.project.stores.viewerSettings.read(),
                     // Beside the room rather than inside it: the two are at different TIERS -
-                    // the room follows the person, these follow the project. See
-                    // `projectSettingsStorage`.
-                    project: readProjectSettings(this.project.key),
+                    // the room follows the person, these follow the project. See `stores`.
+                    project: readProjectSettings(
+                        this.project.stores,
+                        this.project.key,
+                    ),
                     subject:
                         ModelPreviewPanel.subjectStates.get(this.stateKey) ??
                         null,
@@ -290,11 +278,15 @@ export class ModelPreviewPanel extends WebviewPanelHost<
                 return;
 
             case "setViewerSettings":
-                saveViewerSettings(message.settings);
+                this.project.stores.viewerSettings.save(message.settings);
                 return;
 
             case "setProjectSettings":
-                saveProjectSettings(this.project.key, message.project);
+                saveProjectSettings(
+                    this.project.stores,
+                    this.project.key,
+                    message.project,
+                );
                 return;
 
             case "setSubjectState":
@@ -474,11 +466,10 @@ export class ModelPreviewPanel extends WebviewPanelHost<
         refresh = false,
         assetsChanged = false,
     ): Promise<void> {
-        const result =
-            await this.project.gateway.request<GetPreviewSceneResult>(
-                "aet/getPreviewScene",
-                requestFor(this.subject),
-            );
+        const result = await this.project.gateway.request(
+            "aet/getPreviewScene",
+            requestFor(this.subject),
+        );
 
         if (!result.ok) {
             // Said out loud on an open, because the panel would otherwise sit empty with no reason
@@ -519,8 +510,11 @@ export class ModelPreviewPanel extends WebviewPanelHost<
         if (refresh) {
             this.post({
                 type: "viewerSettings",
-                settings: readViewerSettings(),
-                project: readProjectSettings(this.project.key),
+                settings: this.project.stores.viewerSettings.read(),
+                project: readProjectSettings(
+                    this.project.stores,
+                    this.project.key,
+                ),
                 subject:
                     ModelPreviewPanel.subjectStates.get(this.stateKey) ?? null,
             });
@@ -546,21 +540,18 @@ export class ModelPreviewPanel extends WebviewPanelHost<
                 ? message.animations
                 : null;
 
-        const result = await this.project.gateway.request<GetModelGlbResult>(
-            "aet/getModelGlb",
-            {
-                modelReference,
-                // An animation subject asks for its own clip. Anything else asks for every clip the
-                // scene found for it - the picker needs them all, and the opening rules already say
-                // none of them plays until the reader chooses one.
-                animations:
-                    this.subject.kind === "animation"
-                        ? [this.subject.animationReference]
-                        : (own ?? this.sceneAnimations),
-                // The version the webview holds: for the same one the server offers no bytes.
-                have: message.have,
-            },
-        );
+        const result = await this.project.gateway.request("aet/getModelGlb", {
+            modelReference,
+            // An animation subject asks for its own clip. Anything else asks for every clip the
+            // scene found for it - the picker needs them all, and the opening rules already say
+            // none of them plays until the reader chooses one.
+            animations:
+                this.subject.kind === "animation"
+                    ? [this.subject.animationReference]
+                    : (own ?? this.sceneAnimations),
+            // The version the webview holds: for the same one the server offers no bytes.
+            have: message.have,
+        });
 
         this.post({
             type: "glb",
@@ -629,10 +620,9 @@ export class ModelPreviewPanel extends WebviewPanelHost<
      * matrices have no business in the load path of a preview nobody inspects.
      */
     private async sendModelDetail(modelReference: string): Promise<void> {
-        const result = await this.project.gateway.request<GetModelDetailResult>(
-            GET_MODEL_DETAIL,
-            { modelReference },
-        );
+        const result = await this.project.gateway.request(GET_MODEL_DETAIL, {
+            modelReference,
+        });
 
         this.post({
             type: "modelDetail",
@@ -644,11 +634,10 @@ export class ModelPreviewPanel extends WebviewPanelHost<
     }
 
     private async sendParticleSystem(name: string): Promise<void> {
-        const result =
-            await this.project.gateway.request<GetParticleSystemResult>(
-                "aet/getParticleSystem",
-                { name },
-            );
+        const result = await this.project.gateway.request(
+            "aet/getParticleSystem",
+            { name },
+        );
 
         this.post({
             type: "particleSystem",
@@ -666,10 +655,9 @@ export class ModelPreviewPanel extends WebviewPanelHost<
      * answer after an edit to the projectile's own XML would be worse than the round trip costs.
      */
     private async sendProjectile(name: string): Promise<void> {
-        const result = await this.project.gateway.request<GetProjectileResult>(
-            "aet/getProjectile",
-            { name },
-        );
+        const result = await this.project.gateway.request("aet/getProjectile", {
+            name,
+        });
 
         this.post({
             type: "projectile",
@@ -681,11 +669,10 @@ export class ModelPreviewPanel extends WebviewPanelHost<
     }
 
     private async sendShader(name: string): Promise<void> {
-        const result =
-            await this.project.gateway.request<GetShaderSourceResult>(
-                "aet/getShaderSource",
-                { name },
-            );
+        const result = await this.project.gateway.request(
+            "aet/getShaderSource",
+            { name },
+        );
 
         this.post({
             type: "shader",
@@ -715,11 +702,10 @@ export class ModelPreviewPanel extends WebviewPanelHost<
             return;
         }
 
-        const result =
-            await this.project.gateway.request<GetModelTextureResult>(
-                "aet/getModelTexture",
-                { name, have },
-            );
+        const result = await this.project.gateway.request(
+            "aet/getModelTexture",
+            { name, have },
+        );
 
         this.post({
             type: "texture",

@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import { samePath } from "./pathKey";
+
 /** The subdirectories or the files of a directory, or undefined when it cannot be read. */
 type Listing = (directory: string) => readonly string[] | undefined;
 
@@ -88,7 +90,7 @@ function isGame(directory: string, files: Listing): boolean {
  * {@link offersProject}) and has not been asked about yet - not declined for good, not answered
  * earlier this session. The server is told, so it does not raise its own error over the offer.
  *
- * @param asked The folders already asked about, lower-cased.
+ * @param asked The folders already asked about, in any spelling.
  */
 export function projectOfferDue(
     directory: string,
@@ -97,7 +99,7 @@ export function projectOfferDue(
     asked: readonly string[],
 ): boolean {
     return (
-        !asked.includes(directory.toLowerCase()) &&
+        !asked.some((folder) => samePath(folder, directory)) &&
         offersProject(directory, list, files)
     );
 }

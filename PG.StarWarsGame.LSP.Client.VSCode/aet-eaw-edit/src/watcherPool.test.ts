@@ -75,4 +75,13 @@ describe("WatcherPool", () => {
 
         assert.equal(created.length, 1);
     });
+
+    it("treats a directory spelled with a trailing separator as the same one", () => {
+        const { pool, created } = fakePool();
+
+        pool.acquire("c:/dev/Data", ["**/*.lua"], () => undefined);
+        pool.acquire("c:/dev/Data/", ["**/*.lua"], () => undefined);
+
+        assert.equal(created.length, 1);
+    });
 });

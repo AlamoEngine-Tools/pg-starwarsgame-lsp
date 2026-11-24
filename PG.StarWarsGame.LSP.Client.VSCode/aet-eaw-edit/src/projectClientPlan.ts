@@ -16,6 +16,7 @@
 
 import * as l10n from "@vscode/l10n";
 
+import { isInside, pathKey, samePath } from "./pathKey";
 import type { Discovery } from "./projectDiscovery";
 
 /** One client the window should be running. */
@@ -85,7 +86,10 @@ export function clientSpecs(
         }
         return [
             withSignature({
-                key: project?.path.toLowerCase() ?? WINDOW_CLIENT,
+                key:
+                    project === undefined
+                        ? WINDOW_CLIENT
+                        : pathKey(project.path),
                 name: project?.name ?? "EaWEdit",
                 projectPath: project?.path,
                 workspaceRoot: first,
@@ -97,7 +101,7 @@ export function clientSpecs(
         const roots = project.roots.map(canonical);
         const excluded = project.excluded.map(canonical);
         return withSignature({
-            key: project.path.toLowerCase(),
+            key: pathKey(project.path),
             name: project.name,
             projectPath: project.path,
             workspaceRoot: project.directory,
@@ -130,7 +134,7 @@ function servedUnder(
     subdirectories: (directory: string) => string[] | undefined,
 ): ServedDirectory[] {
     const inside = excluded.filter(
-        (e) => isInside(e, root) && !sameDirectory(e, root),
+        (e) => isInside(e, root) && !samePath(e, root),
     );
     if (inside.length === 0) {
         return [{ path: root, recursive: true }];
@@ -142,16 +146,12 @@ function servedUnder(
     const served: ServedDirectory[] = [{ path: root, recursive: false }];
     for (const child of children) {
         const path = `${slashed(root)}/${child}`;
-        if (inside.some((e) => sameDirectory(e, path))) {
+        if (inside.some((e) => samePath(e, path))) {
             continue;
         }
         served.push(...servedUnder(path, inside, subdirectories));
     }
     return served;
-}
-
-function sameDirectory(a: string, b: string): boolean {
-    return slashed(a).toLowerCase() === slashed(b).toLowerCase();
 }
 
 /** Which running clients to stop and which specs to start. A changed client is both. */
@@ -240,18 +240,14 @@ export function ownerKey(
     if (specs.length === 1 && specs[0].roots === undefined) {
         return specs[0].key;
     }
-    const target = slashed(path).toLowerCase();
     let owner: string | undefined;
     let longest = -1;
     for (const spec of specs) {
         for (const root of spec.roots ?? []) {
-            const r = slashed(root).toLowerCase();
-            if (
-                (target === r || target.startsWith(r + "/")) &&
-                r.length > longest
-            ) {
+            const length = pathKey(root).length;
+            if (isInside(path, root) && length > longest) {
                 owner = spec.key;
-                longest = r.length;
+                longest = length;
             }
         }
     }
@@ -267,13 +263,6 @@ export function ownsPath(spec: ClientSpec, path: string): boolean {
     );
 }
 
-/** Whether `path` is `directory` or lies under it, on a segment boundary, ignoring separator and case. */
-export function isInside(path: string, directory: string): boolean {
-    const target = slashed(path).toLowerCase();
-    const d = slashed(directory).toLowerCase();
-    return target === d || target.startsWith(d + "/");
-}
-
 /**
  * Where one client stands. "loading" follows the index: the server's gate is open, and the feeds
  * the views draw from - campaigns, translations, the Mod Browser's lists - are being asked for.
@@ -285,12 +274,6 @@ export type ClientState =
 
 /** Which feed a loading project waits for, in the order they are asked. */
 export type LoadingPhase = "campaigns" | "translations" | "assets";
-
-export const LOADING_PHASES: readonly LoadingPhase[] = [
-    "campaigns",
-    "translations",
-    "assets",
-];
 
 /** What a project in a busy state is doing, as the bar says it. */
 export function phaseText(client: {
@@ -517,7 +500,7 @@ function directoryOf(path: string): string {
 function unique(paths: string[]): string[] {
     const seen = new Set<string>();
     return paths.filter((p) => {
-        const key = p.toLowerCase();
+        const key = pathKey(p);
         if (seen.has(key)) {
             return false;
         }

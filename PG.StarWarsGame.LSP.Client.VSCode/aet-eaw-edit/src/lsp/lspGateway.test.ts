@@ -40,7 +40,7 @@ describe("LspGateway.request", () => {
     it("reports offline without sending when there is no client", async () => {
         const gateway = new LspGateway(() => undefined);
 
-        const outcome = await gateway.request("aet/anything");
+        const outcome = await gateway.request("aet/getLanguages");
 
         assert.equal(outcome.ok, false);
         assert.equal(outcome.ok === false && outcome.reason, "offline");
@@ -52,7 +52,7 @@ describe("LspGateway.request", () => {
     it("turns a rejected request into an outcome rather than throwing", async () => {
         const gateway = new LspGateway(() => rejecting("socket closed"));
 
-        const outcome = await gateway.request("aet/anything");
+        const outcome = await gateway.request("aet/getLanguages");
 
         assert.equal(outcome.ok, false);
         assert.equal(outcome.ok === false && outcome.reason, "failed");
@@ -67,9 +67,7 @@ describe("LspGateway.request", () => {
             answering({ languages: ["ENGLISH"] }),
         );
 
-        const outcome = await gateway.request<{ languages: string[] }>(
-            "aet/getLanguages",
-        );
+        const outcome = await gateway.request("aet/getLanguages");
 
         assert.equal(outcome.ok, true);
         assert.deepEqual(outcome.ok === true ? outcome.value : null, {
@@ -83,9 +81,67 @@ describe("LspGateway.request", () => {
         let client: LspRequestSender | undefined;
         const gateway = new LspGateway(() => client);
 
-        assert.equal((await gateway.request("aet/x")).ok, false);
+        assert.equal((await gateway.request("aet/getLanguages")).ok, false);
         client = answering(42);
-        assert.equal((await gateway.request("aet/x")).ok, true);
+        assert.equal((await gateway.request("aet/getLanguages")).ok, true);
+    });
+
+    it("sends an empty object for a method that takes nothing", async () => {
+        const sent: unknown[] = [];
+        const gateway = new LspGateway(() => ({
+            sendRequest: <T>(_method: string, params: unknown) => {
+                sent.push(params);
+                return Promise.resolve(null as T);
+            },
+        }));
+
+        await gateway.request("aet/getLanguages");
+
+        assert.deepEqual(sent, [{}]);
+    });
+
+    it("sends the params a method takes as they were given", async () => {
+        const sent: unknown[] = [];
+        const gateway = new LspGateway(() => ({
+            sendRequest: <T>(method: string, params: unknown) => {
+                sent.push({ method, params });
+                return Promise.resolve(null as T);
+            },
+        }));
+
+        await gateway.request("aet/getLocalisationRows", {
+            projectFilePath: "c:/mod/Data/Text/MasterTextFile_ENGLISH.dat",
+        });
+
+        assert.deepEqual(sent, [
+            {
+                method: "aet/getLocalisationRows",
+                params: {
+                    projectFilePath:
+                        "c:/mod/Data/Text/MasterTextFile_ENGLISH.dat",
+                },
+            },
+        ]);
+    });
+});
+
+describe("LspGateway.requestRaw", () => {
+    // The relay's door: the method arrives as data from a webview, off its panel's allow-list.
+    it("sends a method named at run time", async () => {
+        const sent: string[] = [];
+        const gateway = new LspGateway(() => ({
+            sendRequest: <T>(method: string) => {
+                sent.push(method);
+                return Promise.resolve(7 as T);
+            },
+        }));
+        const method: string = "aet/getSymbolPage";
+
+        assert.deepEqual(await gateway.requestRaw<number>(method, {}), {
+            ok: true,
+            value: 7,
+        });
+        assert.deepEqual(sent, ["aet/getSymbolPage"]);
     });
 });
 
@@ -113,7 +169,11 @@ describe("LspGateway.requestOrReport", () => {
         const gateway = new LspGateway(() => undefined, messages);
 
         assert.equal(
-            await gateway.requestOrReport("aet/x", {}, "load the graph"),
+            await gateway.requestOrReport(
+                "aet/getLanguages",
+                {},
+                "load the graph",
+            ),
             undefined,
         );
         assert.deepEqual(messages.warnings, [serverNotRunning()]);
@@ -126,7 +186,11 @@ describe("LspGateway.requestOrReport", () => {
         const gateway = new LspGateway(() => rejecting("boom"), messages);
 
         assert.equal(
-            await gateway.requestOrReport("aet/x", {}, "save the batch"),
+            await gateway.requestOrReport(
+                "aet/getLanguages",
+                {},
+                "save the batch",
+            ),
             undefined,
         );
         assert.equal(messages.warnings.length, 0);
@@ -138,7 +202,12 @@ describe("LspGateway.requestOrReport", () => {
         const messages = sink();
         const gateway = new LspGateway(() => answering({ ok: 1 }), messages);
 
-        assert.deepEqual(await gateway.requestOrReport("aet/x"), { ok: 1 });
+        assert.deepEqual(
+            await gateway.requestOrReport("aet/getLanguages", {}),
+            {
+                ok: 1,
+            },
+        );
         assert.deepEqual(messages.errors, []);
         assert.deepEqual(messages.warnings, []);
     });
@@ -153,22 +222,25 @@ describe("LspGateway.requestOr", () => {
         const broken = new LspGateway(() => rejecting("nope"), messages);
 
         assert.deepEqual(
-            await offline.requestOr("aet/x", {}, { options: [] }),
-            { options: [] },
+            await offline.requestOr("aet/getLanguages", {}, { languages: [] }),
+            { languages: [] },
         );
-        assert.deepEqual(await broken.requestOr("aet/x", {}, { options: [] }), {
-            options: [],
-        });
+        assert.deepEqual(
+            await broken.requestOr("aet/getLanguages", {}, { languages: [] }),
+            { languages: [] },
+        );
         assert.deepEqual(messages.warnings, []);
         assert.deepEqual(messages.errors, []);
     });
 
     it("prefers the answer when there is one", async () => {
-        const gateway = new LspGateway(() => answering({ entries: [1, 2] }));
+        const gateway = new LspGateway(() =>
+            answering({ languages: ["ENGLISH", "GERMAN"] }),
+        );
 
         assert.deepEqual(
-            await gateway.requestOr("aet/x", {}, { entries: [] }),
-            { entries: [1, 2] },
+            await gateway.requestOr("aet/getLanguages", {}, { languages: [] }),
+            { languages: ["ENGLISH", "GERMAN"] },
         );
     });
 });
@@ -222,7 +294,11 @@ describe("LspGateway.notify", () => {
         const gateway = new LspGateway(() => rejecting("nope"), messages);
 
         assert.equal(
-            await gateway.notify("aet/setStoryLayout", { entries: [] }),
+            await gateway.notify("aet/setStoryLayout", {
+                campaign: "Campaign",
+                faction: "Empire",
+                entries: [],
+            }),
             false,
         );
         assert.deepEqual(messages.errors, []);

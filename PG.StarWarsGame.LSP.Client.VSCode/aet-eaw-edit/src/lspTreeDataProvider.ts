@@ -12,17 +12,18 @@
 import * as vscode from "vscode";
 
 import { LspGateway, LspOutcome } from "./lsp/lspGateway";
+import type { ParamlessMethod, RequestResult } from "./protocol/requests";
 import { emptyNavigatorMessage } from "./navigatorPlaceholder";
 
 /**
  * A tree view fed by one `aet/*` request.
  *
  * @typeParam TItem The view's TreeItem type.
- * @typeParam TData What the request returns for the tree to build itself from.
+ * @typeParam M The request the tree builds itself from; what it answers is the tree's data.
  */
 export abstract class LspTreeDataProvider<
     TItem extends vscode.TreeItem,
-    TData,
+    M extends ParamlessMethod,
 > implements vscode.TreeDataProvider<TItem> {
     /**
      * The last answer, or undefined for "not fetched, or the last fetch failed".
@@ -30,9 +31,9 @@ export abstract class LspTreeDataProvider<
      * One variable, so there is no second one to fall out of step with it. Cleared by
      * {@link refresh} so the next read is fresh.
      */
-    protected data: TData | undefined;
+    protected data: RequestResult<M> | undefined;
     /** The `aet/*` method this tree is built from. */
-    protected abstract readonly method: string;
+    protected abstract readonly method: M;
     /** The row of a workspace the scan found none in: "No story campaigns found in this workspace." */
     protected abstract noneFound(): string;
     /** The row of a request that failed, when the subclass does not word it itself. */
@@ -75,7 +76,7 @@ export abstract class LspTreeDataProvider<
 
         // Left uncached on any failure. The view then fetches when it is opened, which is where a
         // failure has somewhere to be shown - here there is no row to put it in.
-        const outcome = await this.lsp.request<TData>(this.method);
+        const outcome = await this._ask();
         this.data =
             outcome.ok && !this.errorOf(outcome.value)
                 ? outcome.value
@@ -95,15 +96,17 @@ export abstract class LspTreeDataProvider<
     }
 
     /** The error the payload carries, if any. Server results report failure in-band. */
-    protected abstract errorOf(data: TData): string | null | undefined;
+    protected abstract errorOf(
+        data: RequestResult<M>,
+    ): string | null | undefined;
 
     // ── the shared behaviour ─────────────────────────────────────────────────
 
     /** Whether the answer is empty - which is a different thing from a failure. */
-    protected abstract isEmpty(data: TData): boolean;
+    protected abstract isEmpty(data: RequestResult<M>): boolean;
 
     /** Builds the root rows from a non-empty answer. */
-    protected abstract rootItems(data: TData): TItem[];
+    protected abstract rootItems(data: RequestResult<M>): TItem[];
 
     /** A plain row for the empty, error and server-down states, so the view is never blank. */
     protected abstract infoItem(message: string): TItem;
@@ -123,7 +126,7 @@ export abstract class LspTreeDataProvider<
      * error, the other keeps it short - and neither is wrong.
      */
     protected failureMessage(
-        outcome: Extract<LspOutcome<TData>, { ok: false }>,
+        outcome: Extract<LspOutcome<RequestResult<M>>, { ok: false }>,
     ): string {
         return outcome.reason === "offline"
             ? vscode.l10n.t("LSP server is not running.")
@@ -135,7 +138,7 @@ export abstract class LspTreeDataProvider<
             return this._present(this.data);
         }
 
-        const outcome = await this.lsp.request<TData>(this.method);
+        const outcome = await this._ask();
         if (!outcome.ok) {
             return [this.infoItem(this.failureMessage(outcome))];
         }
@@ -149,7 +152,16 @@ export abstract class LspTreeDataProvider<
         return this._present(outcome.value);
     }
 
-    private _present(data: TData): TItem[] {
+    /**
+     * The tree's request. Raw, because the method is a type parameter here and the typed door
+     * resolves its params per method; the class's own constraint is what keeps it to a method that
+     * takes none.
+     */
+    private _ask(): Promise<LspOutcome<RequestResult<M>>> {
+        return this.lsp.requestRaw<RequestResult<M>>(this.method);
+    }
+
+    private _present(data: RequestResult<M>): TItem[] {
         return this.isEmpty(data)
             ? [
                   this.infoItem(

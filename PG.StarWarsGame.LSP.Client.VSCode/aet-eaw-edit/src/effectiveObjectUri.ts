@@ -12,6 +12,9 @@
 
 import * as l10n from "@vscode/l10n";
 
+/** URI scheme for the read-only "effective object" virtual documents (variant inheritance). */
+export const EFFECTIVE_SCHEME = "aet-effective";
+
 /** The object a document shows and the project whose server resolves it. */
 export interface EffectiveObjectRef {
     readonly objectId: string;

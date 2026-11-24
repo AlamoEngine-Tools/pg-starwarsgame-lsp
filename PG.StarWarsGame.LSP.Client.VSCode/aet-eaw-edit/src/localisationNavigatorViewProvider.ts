@@ -49,11 +49,11 @@ export class LocTreeItem extends vscode.TreeItem {
  */
 export class LocalisationNavigatorViewProvider extends LspTreeDataProvider<
     LocTreeItem,
-    GetLocalisationProjectsResult
+    "aet/getLocalisationProjects"
 > {
     public static readonly viewId = "aet-eaw-edit.lsp.localisationNavigator";
 
-    protected readonly method = "aet/getLocalisationProjects";
+    protected readonly method = "aet/getLocalisationProjects" as const;
 
     protected noneFound(): string {
         return vscode.l10n.t("No localisation files found in this workspace.");

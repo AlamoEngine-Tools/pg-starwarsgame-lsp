@@ -71,11 +71,11 @@ const ROLE_ICONS: Record<FactionRole["kind"], string> = {
  */
 export class StoryNavigatorViewProvider extends LspTreeDataProvider<
     StoryTreeItem,
-    GetStoryPlotsResult
+    "aet/getStoryPlots"
 > {
     public static readonly viewId = "aet-eaw-edit.lsp.storyNavigator";
 
-    protected readonly method = "aet/getStoryPlots";
+    protected readonly method = "aet/getStoryPlots" as const;
 
     protected noneFound(): string {
         return vscode.l10n.t("No story campaigns found in this workspace.");

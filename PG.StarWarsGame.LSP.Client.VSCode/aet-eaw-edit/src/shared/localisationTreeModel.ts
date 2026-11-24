@@ -6,6 +6,7 @@
 
 import * as l10n from "@vscode/l10n";
 
+import { pathKey, samePath } from "../pathKey";
 import { LOC_CATEGORY, LocProjectInfo } from "../protocol";
 
 // Re-exported so a consumer of the tree model does not need a second import for the thing every
@@ -197,7 +198,7 @@ export function siblingsOf(
     }
 
     return projects.filter((other) => {
-        if (other.filePath.toLowerCase() === project.filePath.toLowerCase()) {
+        if (samePath(other.filePath, project.filePath)) {
             return false;
         }
 
@@ -234,7 +235,7 @@ function siblingName(project: LocProjectInfo): SiblingName | null {
         : stem;
 
     return {
-        directory: directory.toLowerCase(),
+        directory: pathKey(directory),
         setLabel: `${withoutLanguage.toLowerCase()}${extension.toLowerCase()}`,
     };
 }

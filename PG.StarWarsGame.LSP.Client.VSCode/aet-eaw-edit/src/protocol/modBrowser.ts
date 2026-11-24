@@ -12,6 +12,8 @@ import { GET_MODEL_DETAIL } from "./modelPreview";
 /** The outlines the sidebar picks between. */
 export type SymbolOutline = "gameData" | "assets" | "scripts" | "schema";
 
+import type { RequestMethod } from "./requests";
+
 export const GET_SYMBOL_OUTLINE = "aet/getSymbolOutline";
 export const GET_SYMBOL_PAGE = "aet/getSymbolPage";
 export const GET_SYMBOL_NODE = "aet/getSymbolNode";
@@ -21,7 +23,7 @@ export const GET_SYMBOL_PREVIEW = "aet/getSymbolPreview";
  * The requests the panel's webview may have relayed to its server, and no other: its own four,
  * and the encyclopedia card an object's preview embeds.
  */
-export const MOD_BROWSER_METHODS: readonly string[] = [
+export const MOD_BROWSER_METHODS: readonly RequestMethod[] = [
     GET_SYMBOL_OUTLINE,
     GET_SYMBOL_PAGE,
     GET_SYMBOL_NODE,

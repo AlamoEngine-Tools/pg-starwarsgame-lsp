@@ -154,6 +154,12 @@ describe("projectOfferDue", () => {
         assert.equal(projectOfferDue("C:/Mod", dirs, none, ["c:/mod"]), false);
     });
 
+    /** The declined list of an earlier version holds the folder as the window spelled it. */
+    it("is not due for a folder asked about under its other separator", () => {
+        assert.equal(projectOfferDue("c:/mod", dirs, none, ["c:\\mod"]), false);
+        assert.equal(projectOfferDue("c:/mod", dirs, none, ["c:/mod/"]), false);
+    });
+
     it("is not due for a folder that is not offered a project", () => {
         assert.equal(
             projectOfferDue("c:/notes", tree({ "c:/notes": [] }), none, []),

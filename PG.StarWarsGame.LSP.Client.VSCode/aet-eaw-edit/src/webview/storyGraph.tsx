@@ -125,7 +125,6 @@ import {
 import styled, { createGlobalStyle } from "styled-components";
 
 import {
-    GetStoryParamOptionsResult,
     StoryDiagnosticDto,
     StoryGraphEdgeDto,
     StoryGraphNodeDto,
@@ -318,7 +317,7 @@ async function fetchParamOptions(
     position: number,
     query: string,
 ): Promise<StoryParamOptionDto[]> {
-    const result = await request<GetStoryParamOptionsResult>(
+    const result = await request(
         "aet/getStoryParamOptions",
         { side, typeName, position, query: query || undefined },
         3000,

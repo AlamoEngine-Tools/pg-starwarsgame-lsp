@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as vscode from "vscode";
 
-import { readPanelLayout } from "./panelLayoutStorage";
+import type { PanelLayout } from "./shared/panelLayout";
 import type {
     WhatsNewPayload,
     WhatsNewToHost,
@@ -28,8 +28,6 @@ import { buildWhatsNewPayload } from "./whatsNewModel";
 export const OPEN_WHATS_NEW = "aet-eaw-edit.whatsNew.open";
 export const OPEN_AFTER_UPDATE_SETTING =
     "aet-eaw-edit.whatsNew.openAfterUpdate";
-/** Global-state key: the version whose notes the page last opened for, or was told to skip. */
-export const WHATS_NEW_SEEN_VERSION = "whatsNew.seenVersion";
 
 /** One per window: a second tab of the same notes would say nothing the first does not. */
 export class WhatsNewPanel {
@@ -43,6 +41,7 @@ export class WhatsNewPanel {
         private readonly _extensionUri: vscode.Uri,
         private readonly _version: string,
         private readonly _preview: boolean,
+        layout: PanelLayout,
     ) {
         this._panel = vscode.window.createWebviewPanel(
             "aetWhatsNew",
@@ -79,7 +78,7 @@ export class WhatsNewPanel {
             webview.cspSource,
             undefined,
             false,
-            readPanelLayout(),
+            layout,
         );
         webview.onDidReceiveMessage((msg: WhatsNewToHost) =>
             this._onMessage(msg),
@@ -91,15 +90,20 @@ export class WhatsNewPanel {
         });
     }
 
-    /** Opens the page, or reveals the one already open. */
+    /**
+     * Opens the page, or reveals the one already open.
+     *
+     * @param layout The stored dock sizes, read when the page is first built.
+     */
     static async show(
         extensionUri: vscode.Uri,
         version: string,
         preview: boolean,
+        layout: () => PanelLayout,
     ): Promise<void> {
         let panel = WhatsNewPanel._open;
         if (panel === undefined) {
-            panel = new WhatsNewPanel(extensionUri, version, preview);
+            panel = new WhatsNewPanel(extensionUri, version, preview, layout());
             WhatsNewPanel._open = panel;
         } else {
             panel._panel.reveal();

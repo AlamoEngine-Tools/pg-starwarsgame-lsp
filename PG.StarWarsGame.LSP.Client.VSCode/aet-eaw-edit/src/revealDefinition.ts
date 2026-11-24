@@ -11,7 +11,6 @@
 import * as vscode from "vscode";
 
 import { LspGateway } from "./lsp/lspGateway";
-import { ResolveReferenceResult } from "./protocol/workspace";
 
 /**
  * Resolves `value` and opens its definition beside the panel.
@@ -26,13 +25,15 @@ export async function revealDefinition(
     lsp: LspGateway,
     value: string,
     referenceType?: string,
-    method = "aet/resolveReference",
+    method:
+        | "aet/resolveReference"
+        | "aet/resolveStoryReference" = "aet/resolveReference",
 ): Promise<void> {
     if (!value) {
         return;
     }
 
-    const result = await lsp.requestOrReport<ResolveReferenceResult>(
+    const result = await lsp.requestOrReport(
         method,
         { value, referenceType },
         vscode.l10n.t("Cannot open the definition of '{0}'", value),
