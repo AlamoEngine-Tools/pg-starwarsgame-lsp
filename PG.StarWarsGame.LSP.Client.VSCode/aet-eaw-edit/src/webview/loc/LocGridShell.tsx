@@ -15,6 +15,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { LocRow } from "../loc/locRow";
 import { RightDock } from "../shared/RightDock";
 import { Shell } from "./locGridStyles";
+import { ReadOnlyContext } from "./readOnly";
 
 const ROW_HEIGHT = 26;
 
@@ -64,9 +65,23 @@ export interface LocGridShellProps {
     onGridDragLeave?: (event: React.DragEvent) => void;
     /** Viewport Y of the boundary a drop would land on, or null to draw nothing. */
     dropIndicatorY?: number | null;
+
+    /**
+     * Why the file is shown and not edited, or null when it is edited. Every control in the shell
+     * that would change the file reads it and disables itself with it - see ./readOnly.
+     */
+    readOnlyReason?: string | null;
 }
 
 export function LocGridShell(props: LocGridShellProps): React.JSX.Element {
+    return (
+        <ReadOnlyContext.Provider value={props.readOnlyReason ?? null}>
+            <LocGridShellBody {...props} />
+        </ReadOnlyContext.Provider>
+    );
+}
+
+function LocGridShellBody(props: LocGridShellProps): React.JSX.Element {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const virtualizer = useVirtualizer({

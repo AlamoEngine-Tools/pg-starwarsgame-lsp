@@ -34,6 +34,7 @@ import { menuAction, RowMenuFrame } from "./shared/RowMenu";
 import { gridFooterLabel } from "./loc/gridFooter";
 import { ConvertibleFormat, LocDockActions } from "./loc/LocDockActions";
 import { LocGridMessage, LocGridShell } from "./loc/LocGridShell";
+import { EditMenuItem, useReadOnly } from "./loc/readOnly";
 import { LocColumnMenu } from "./loc/LocColumnMenu";
 import { LocDockHeader } from "./loc/LocDockHeader";
 import { useLocColumns } from "./loc/useLocColumns";
@@ -680,6 +681,7 @@ function App(): React.JSX.Element {
                 <LocTileGrid>
                     {CREDITS_STEPS.map((step) => (
                         <LocTile
+                            edits
                             key={step.id}
                             icon={step.icon}
                             label={step.label}
@@ -701,11 +703,14 @@ function App(): React.JSX.Element {
                         />
                     ))}
                 </LocTileGrid>
-                <p className="step-help">
-                    {l10n.t(
-                        "Drag onto the table to place, or click to add at the end.",
-                    )}
-                </p>
+                {/* How to use the tiles - which a file that is not edited has no use for. */}
+                {panel.readOnlyReason === null && (
+                    <p className="step-help">
+                        {l10n.t(
+                            "Drag onto the table to place, or click to add at the end.",
+                        )}
+                    </p>
+                )}
             </DockSection>
         </>
     );
@@ -727,6 +732,7 @@ function App(): React.JSX.Element {
 
     return (
         <LocGridShell
+            readOnlyReason={panel.readOnlyReason}
             rows={visible}
             columns={columns}
             header={header}
@@ -820,80 +826,65 @@ function CreditsRowMenu(props: {
         >
             {onRow ? (
                 <>
-                    <button
-                        role="menuitem"
-                        onClick={run(() => props.onInsert("above"))}
-                    >
+                    <EditMenuItem onClick={run(() => props.onInsert("above"))}>
                         {l10n.t("Insert row above")}
-                    </button>
-                    <button
-                        role="menuitem"
-                        onClick={run(() => props.onInsert("below"))}
-                    >
+                    </EditMenuItem>
+                    <EditMenuItem onClick={run(() => props.onInsert("below"))}>
                         {l10n.t("Insert row below")}
-                    </button>
-                    <button
-                        role="menuitem"
+                    </EditMenuItem>
+                    <EditMenuItem
                         onClick={run(() => props.onInsertSpacer("above"))}
                     >
                         {l10n.t("Insert blank line above")}
-                    </button>
-                    <button
-                        role="menuitem"
+                    </EditMenuItem>
+                    <EditMenuItem
                         onClick={run(() => props.onInsertSpacer("below"))}
                     >
                         {l10n.t("Insert blank line below")}
-                    </button>
+                    </EditMenuItem>
                 </>
             ) : (
                 <>
-                    <button
-                        role="menuitem"
-                        onClick={run(() => props.onInsert("end"))}
-                    >
+                    <EditMenuItem onClick={run(() => props.onInsert("end"))}>
                         {l10n.t("Add row")}
-                    </button>
-                    <button
-                        role="menuitem"
+                    </EditMenuItem>
+                    <EditMenuItem
                         onClick={run(() => props.onInsertSpacer("end"))}
                     >
                         {l10n.t("Add blank line")}
-                    </button>
+                    </EditMenuItem>
                 </>
             )}
 
             {onRow && (
                 <>
                     <div className="sep" />
-                    <button
-                        role="menuitem"
+                    <EditMenuItem
                         disabled={props.index === 0}
                         onClick={run(() =>
                             props.onMove(props.index, props.index - 1),
                         )}
                     >
                         {l10n.t("Move up")}
-                    </button>
-                    <button
-                        role="menuitem"
+                    </EditMenuItem>
+                    <EditMenuItem
                         disabled={props.index >= props.lastIndex}
                         onClick={run(() =>
                             props.onMove(props.index, props.index + 1),
                         )}
                     >
                         {l10n.t("Move down")}
-                    </button>
+                    </EditMenuItem>
 
                     <div className="sep" />
-                    <button
-                        role="menuitem"
+                    <EditMenuItem
                         className="danger"
                         onClick={run(() => props.onDelete(props.index))}
                     >
                         {props.spacer
                             ? l10n.t("Remove blank line")
                             : l10n.t("Delete row")}
-                    </button>
+                    </EditMenuItem>
                 </>
             )}
         </RowMenuFrame>
@@ -912,6 +903,7 @@ function DirectiveSelect(props: {
     value: string;
     onCommit: (next: string) => void;
 }): React.JSX.Element {
+    const readOnly = useReadOnly();
     const known = CREDITS_DIRECTIVES as readonly string[];
     const recognised = known.includes(props.value.trim().toUpperCase());
     const options = recognised ? known : [...known, props.value];
@@ -919,6 +911,8 @@ function DirectiveSelect(props: {
     return (
         <select
             className="directive"
+            disabled={readOnly !== null}
+            title={readOnly ?? undefined}
             value={recognised ? props.value.trim().toUpperCase() : props.value}
             onChange={(e) => props.onCommit(e.target.value)}
         >

@@ -90,7 +90,10 @@ public sealed class GetLocalisationRowsHandler
             // language found in the source, which is how one credits file produces every crawl.
             CanAddLanguage: LocalisationDocumentEditor.SupportsMultipleLanguages(extension),
             AddLanguageCreatesFile:
-            LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(extension));
+            LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(extension),
+            // A DAT is what a build makes of the project; the composers refuse a batch for one, and
+            // the editor is told here so it never offers the edit.
+            ReadOnlyReason: extension == ".dat" ? _messages.Format("LocGetRows_DatIsBuilt") : null);
     }
 
     /// <summary>

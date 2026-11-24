@@ -10,8 +10,10 @@
 
 import * as l10n from "@vscode/l10n";
 import { LocProblem, ValidationState } from "./useLocPanel";
+import { useReadOnly } from "./readOnly";
 import { validateTitle } from "./validateState";
 import { IconButton } from "../shared/Button";
+import { Icon } from "../shared/Icon";
 import { SeverityTag } from "../shared/SeverityTag";
 
 export function LocDockHeader(props: {
@@ -22,6 +24,7 @@ export function LocDockHeader(props: {
     onSave: () => void;
     onValidate: () => void;
 }): React.JSX.Element {
+    const readOnly = useReadOnly();
     return (
         <>
             <IconButton
@@ -29,10 +32,22 @@ export function LocDockHeader(props: {
                 className={`header-left${props.queue.length > 0 ? " active" : ""}`}
                 title={l10n.t("Save - write all staged changes to the file")}
                 badge={props.queue.length > 0 ? ` ${props.queue.length}` : ""}
-                disabled={props.queue.length === 0}
-                disabledReason={l10n.t("Save - nothing is staged")}
+                disabled={props.queue.length === 0 || readOnly !== null}
+                disabledReason={
+                    readOnly !== null
+                        ? l10n.t("Save - {0}", readOnly)
+                        : l10n.t("Save - nothing is staged")
+                }
                 onClick={props.onSave}
             />
+            {/* State, where the dock keeps it: why nothing here can be changed, in full. The
+                controls each say it too, but a tile has room for half of it. */}
+            {readOnly !== null && (
+                <span className="read-only-note" title={readOnly}>
+                    <Icon name="readOnly" />
+                    {readOnly}
+                </span>
+            )}
             <SeverityTag
                 severity={props.validation}
                 count={props.problems.length}

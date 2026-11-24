@@ -419,6 +419,9 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
             canAddLanguage:
                 this._members.length === 1 && results[0].canAddLanguage,
             addLanguageCreatesFile: results[0].addLanguageCreatesFile,
+            // A set is of one format, so what holds one of its files read-only holds them all.
+            readOnlyReason:
+                results.map((r) => r.readOnlyReason).find((r) => !!r) ?? null,
             focusLanguage: this._focusLanguage ?? null,
         });
 

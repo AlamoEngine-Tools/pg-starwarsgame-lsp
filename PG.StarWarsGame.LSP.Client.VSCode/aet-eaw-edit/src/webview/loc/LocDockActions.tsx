@@ -171,6 +171,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                 <LocTileGrid>
                     {(props.canAddLanguage || props.addLanguageCreatesFile) && (
                         <LocTile
+                            edits
                             icon="add"
                             label={l10n.t("Add language")}
                             title={
@@ -192,6 +193,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         canCopy ||
                         canSeed) && (
                         <LocTile
+                            edits
                             icon="fillLanguage"
                             label={l10n.t("Fill language")}
                             title={l10n.t(

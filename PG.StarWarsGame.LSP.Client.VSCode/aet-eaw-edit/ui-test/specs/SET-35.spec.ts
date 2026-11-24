@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { browser, expect } from "@wdio/globals";
 import { notifications, serverReady } from "../protocol.js";
 import { inNewestWebview } from "./storyGraph.js";
-import { columns, editCell, openTextFile, save, saveTitle } from "./locGrid.js";
+import { columns, contentTiles, editCell, openTextFile, save, saveTitle } from "./locGrid.js";
 
 const credits = "C:\\temp\\aet-test-SET-credits\\Data\\Text\\CreditsText.csv";
 const nothingStaged = "Save - nothing is staged";
@@ -33,6 +33,12 @@ describe("SET-35", () => {
         await openTextFile("Credits files", "CreditsText.csv");
         await inNewestWebview(async () => {
             expect(await columns()).toEqual(["Format", "ENGLISH"]);
+            // The line kinds of a credits file that is edited, each with the token it becomes.
+            expect(await contentTiles()).toEqual([
+                { label: "Label", badge: "HEADER" },
+                { label: "Name", badge: "CENTER" },
+                { label: "Blank line", badge: "[TBL]" },
+            ]);
             await saveCell("HEADER", "Lead Writer");
             await browser.waitUntil(async () => (await saveTitle()) === nothingStaged, {
                 timeout: 30_000,

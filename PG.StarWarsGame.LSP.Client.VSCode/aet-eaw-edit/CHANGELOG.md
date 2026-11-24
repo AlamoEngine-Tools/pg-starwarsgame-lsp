@@ -342,10 +342,12 @@
   not at all. A save is refused, with the file named, when the file's editor holds unsaved changes
   ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
 - **A compiled DAT is no longer edited in the grid** - breaking for a `"type": "DAT"` localisation
-  project, whose `.dat` files were rewritten on every save. A DAT is a build output: a save for one is
-  refused with the way forward, which is to convert the project to CSV or XML with **Set Localisation
-  Project Format** and build the DAT with **Export to DAT**. A `.dat` still opens, shows its rows and
-  is validated ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
+  project, whose `.dat` files were rewritten on every save. A DAT is a build output: the way to edit
+  its texts is to convert the project to CSV or XML with **Set Localisation Project Format** and build
+  the DAT with **Export to DAT**. A `.dat` still opens, shows its rows and is validated; its cells, row
+  actions, line kinds, **Add language**, **Fill language** and **Save** are disabled and say
+  `Convert to CSV or XML to edit`, and the dock's header says it once in full
+  ([#339](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/339))
 
 ## 0.5.2
 

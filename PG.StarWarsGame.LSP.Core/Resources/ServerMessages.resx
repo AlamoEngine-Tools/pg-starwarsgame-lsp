@@ -882,9 +882,6 @@
   <data name="LocEditor_NoLanguageGiven" xml:space="preserve">
     <value>No language given.</value>
   </data>
-  <data name="LocEditor_NonAsciiKey" xml:space="preserve">
-    <value>Row {0}: '{1}' cannot be used as a key - a .dat stores keys as ASCII. Rename the entry using unaccented letters; the translation itself is unaffected.</value>
-  </data>
   <data name="LocEditor_NotLanguageThisFile" xml:space="preserve">
     <value>'{0}' is not a language in this file.</value>
   </data>
@@ -914,6 +911,9 @@
   </data>
   <data name="LocExportDat_UnsupportedFormat" xml:space="preserve">
     <value>Unsupported format: {0}</value>
+  </data>
+  <data name="LocGetRows_DatIsBuilt" xml:space="preserve">
+    <value>Convert to CSV or XML to edit</value>
   </data>
   <data name="LocGetRows_FailedParseFile" xml:space="preserve">
     <value>Failed to parse file: {0}</value>

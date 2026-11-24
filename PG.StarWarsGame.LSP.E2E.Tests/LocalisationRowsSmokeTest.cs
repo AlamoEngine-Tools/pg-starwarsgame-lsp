@@ -50,6 +50,8 @@ public sealed class LocalisationRowsSmokeTest : IClassFixture<LocalisationServer
         Assert.Contains(result.Rows, r => r.Key == "TEXT_E2E_ALPHA");
         // The CSV can hold another column, so the editor may offer to add one.
         Assert.True(result.CanAddLanguage);
+        // And it is a file the grid edits.
+        Assert.Null(result.ReadOnlyReason);
     }
 
     [Fact]

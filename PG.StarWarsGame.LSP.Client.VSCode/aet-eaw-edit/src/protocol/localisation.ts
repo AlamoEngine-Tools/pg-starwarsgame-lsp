@@ -92,6 +92,11 @@ export interface GetLocalisationRowsResult {
     error?: string | null;
     canAddLanguage: boolean;
     addLanguageCreatesFile: boolean;
+    /**
+     * Why the file is shown and not edited, as the editor says it on every control that would
+     * change it; absent for a file that is edited. A compiled DAT is the one case.
+     */
+    readOnlyReason?: string | null;
 }
 
 // ── A localisation batch's problems, from aet/validateEditBatch ──────────────
