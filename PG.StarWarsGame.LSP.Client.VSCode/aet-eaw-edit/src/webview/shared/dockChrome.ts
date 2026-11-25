@@ -1474,6 +1474,32 @@ export const rotarySwitchCss = `
             0 0 0 2px var(--colour-editor-ground),
             0 0 7px 1px var(--colour-focus);
     }
+
+    /* A mode-wide action: beside the centre and on its level, where the arc above holds the modes.
+       Bordered, because it fires and returns where a position latches. Each slot is a fixed place,
+       so an action is where it was in the last mode. */
+    .rotary-action {
+        position: absolute;
+        left: 50%; top: 70%;
+        width: 22px; height: 22px;
+        padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-round);
+        background: var(--colour-action-2);
+        color: var(--colour-action-2-ink);
+        line-height: 1;
+        cursor: pointer;
+    }
+    .rotary-action svg { width: var(--icon-size-11); height: var(--icon-size-11); display: block; }
+    .rotary-action:hover:not(:disabled) {
+        background: var(--colour-action-2-hover);
+        border-color: var(--colour-focus);
+    }
+    .rotary-action:disabled { opacity: 0.35; cursor: default; }
+    .rotary-action.at-start { transform: translate(-50%, -50%) translate(-44px, 12px); }
+    .rotary-action.at-end { transform: translate(-50%, -50%) translate(44px, 12px); }
+    .rotary-action.at-end-2 { transform: translate(-50%, -50%) translate(70px, 12px); }
 `;
 
 /**

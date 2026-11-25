@@ -84,6 +84,14 @@
   nothing. It asks first; *Discard & Don't Ask Again* answers for good, and the new setting
   `aet-eaw-edit.editors.confirmDiscard` turns the question back on
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **Scene reset, Destroy all and Repair all on the preview's dial** - the dial of the model preview carries
+  what a lens does to everything it shows. Scene reset stands in the same place in every lens and puts the
+  subject back as it loaded, without loading it again: the rest pose, every part and effect as it opened,
+  the damage state and the detail level, the hardpoints, hull and shield, the turrets, speed, ion stun and
+  engines, the abilities, the selection and the damage log. The camera, the overlays, the lens, the attacker
+  and the tree's filter and folded rows stay as set. In Gameplay, Destroy all hardpoints and Repair all
+  hardpoints stand at the dial's other end; they left the title of the Hardpoints section
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

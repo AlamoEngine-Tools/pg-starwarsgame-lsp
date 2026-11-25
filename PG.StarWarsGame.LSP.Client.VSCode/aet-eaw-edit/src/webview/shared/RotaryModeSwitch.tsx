@@ -13,6 +13,7 @@
 import * as l10n from "@vscode/l10n";
 import * as React from "react";
 
+import { type Enablement } from "./Button";
 import { type ChoiceOption } from "./choice";
 import { Icon, type IconName } from "./Icon";
 
@@ -49,9 +50,32 @@ export type RotaryMode<Id extends string> = Omit<ChoiceOption<Id>, "icon"> & {
  */
 const RADIUS = 40;
 
+/**
+ * Where a mode-wide action sits beside the centre.
+ *
+ * A slot rather than an order, so an action is in the same spot in every mode that has it: the
+ * reset is at the start whatever else the mode adds at the end.
+ */
+export type DialSlot = "start" | "end" | "end-2";
+
+/**
+ * Something a mode does to everything it shows - a reset, destroying every hardpoint. The arc above
+ * the centre picks the mode; these act within it.
+ */
+export type DialAction = Enablement & {
+    id: string;
+    icon: IconName;
+    /** Names the action; there is no room for a word beside the glyph. */
+    title: string;
+    slot: DialSlot;
+    onPress: () => void;
+};
+
 export function RotaryModeSwitch<Id extends string>(props: {
     mode: Id;
     modes: readonly RotaryMode<Id>[];
+    /** The mode's own actions on everything it shows, each in its slot beside the centre. */
+    actions?: readonly DialAction[];
     onSelect: (mode: Id) => void;
 }): React.JSX.Element {
     const { modes } = props;
@@ -102,6 +126,25 @@ export function RotaryModeSwitch<Id extends string>(props: {
                         onClick={() => props.onSelect(mode.id)}
                     >
                         <Icon name={mode.icon} />
+                    </button>
+                );
+            })}
+            {(props.actions ?? []).map((action) => {
+                const name = action.disabled
+                    ? action.disabledReason
+                    : action.title;
+
+                return (
+                    <button
+                        key={action.id}
+                        type="button"
+                        className={`rotary-action at-${action.slot}`}
+                        title={name}
+                        aria-label={name}
+                        disabled={action.disabled}
+                        onClick={action.onPress}
+                    >
+                        <Icon name={action.icon} />
                     </button>
                 );
             })}

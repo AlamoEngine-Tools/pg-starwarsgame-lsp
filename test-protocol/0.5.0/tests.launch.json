@@ -732,5 +732,8 @@
     "settings": {
       "aet-eaw-edit.editors.confirmDiscard": false
     }
+  },
+  "PRV-78": {
+    "open": "{repo}\\eaw"
   }
 }

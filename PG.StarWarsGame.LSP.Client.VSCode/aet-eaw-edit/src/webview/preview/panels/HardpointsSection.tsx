@@ -67,34 +67,7 @@ export function HardpointsSection({
     viewportRef,
 }: HardpointsSectionProps): React.JSX.Element {
     return (
-        <DockSection
-            title={l10n.t("Hardpoints")}
-            count={combat.cards.length}
-            end={
-                <>
-                    <IconButton
-                        icon="effects"
-                        className="header-right"
-                        size={13}
-                        title={l10n.t("Destroy all hardpoints")}
-                        disabled={!combat.cards.some((c) => c.isDestroyable)}
-                        disabledReason={l10n.t(
-                            "No hardpoint on this model can be destroyed",
-                        )}
-                        onClick={() => combat.destroyAll(true)}
-                    />
-                    <IconButton
-                        icon="reset"
-                        className="header-right"
-                        size={13}
-                        title={l10n.t("Repair all hardpoints")}
-                        disabled={combat.destroyed.size === 0}
-                        disabledReason={l10n.t("Nothing is destroyed")}
-                        onClick={() => combat.destroyAll(false)}
-                    />
-                </>
-            }
-        >
+        <DockSection title={l10n.t("Hardpoints")} count={combat.cards.length}>
             <div className="field-note">
                 {l10n.t(
                     "Hover a targeting mark to see its tracked art; click one to aim the attacker at that hardpoint.",

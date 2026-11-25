@@ -116,6 +116,8 @@ import { initPanelLayout } from "./shared/panelLayoutBridge";
 import * as l10n from "@vscode/l10n";
 import { vscodeApi } from "./shared/vscodeApi";
 import { IconButton } from "./shared/Button";
+import { type DialAction } from "./shared/RotaryModeSwitch";
+import { resetScene } from "./preview/sceneReset";
 import { PageToolbar } from "./shared/PageToolbar";
 import { SeverityTag } from "./shared/SeverityTag";
 
@@ -1380,6 +1382,71 @@ function ModelPreview(): React.JSX.Element {
     const handoff =
         scene === null ? null : handoffFor(scene.kind, scene.sourceFile);
 
+    // The subject back the way it loaded, in place. What the reader set up to look at it - camera,
+    // overlays, lens, attacker, the tree's filter and folds - stays; see sceneReset.ts.
+    const resetSceneNow = (): void =>
+        resetScene({
+            showRestPose: () => player.setAnimation(null),
+            resetModel: tree.resetModel,
+            forgetDetailPick: () => {
+                lodPickedRef.current = false;
+            },
+            resetTurrets: () => {
+                viewportRef.current?.resetAllTurretAims();
+                combat.setSweeping(new Set());
+            },
+            repair: () => {
+                combat.repairTarget(false);
+                combat.destroyAll(false, false);
+            },
+            resetUnitState: () => {
+                combat.setSpeed(1);
+                combat.setIonStunned(false);
+                combat.setEnginesDisabled(false);
+            },
+            clearAbilities: () => setActiveAbilities(new Set()),
+            clearSelection,
+            restartParticles: particleTransport.restart,
+            clearDamageLog: () => combat.setDamageLog([]),
+        });
+
+    // The reset is in the same slot in every lens; Gameplay adds its two at the other end.
+    const dialActions: DialAction[] = [
+        {
+            id: "sceneReset",
+            icon: "sceneReset",
+            title: l10n.t(
+                "Reset the scene - put the subject back as it loaded",
+            ),
+            slot: "start",
+            onPress: resetSceneNow,
+        },
+        ...(mode === "gameplay"
+            ? ([
+                  {
+                      id: "destroyAll",
+                      icon: "effects",
+                      title: l10n.t("Destroy all hardpoints"),
+                      slot: "end",
+                      disabled: !combat.cards.some((c) => c.isDestroyable),
+                      disabledReason: l10n.t(
+                          "No hardpoint on this model can be destroyed",
+                      ),
+                      onPress: () => combat.destroyAll(true),
+                  },
+                  {
+                      id: "repairAll",
+                      icon: "repair",
+                      title: l10n.t("Repair all hardpoints"),
+                      slot: "end-2",
+                      disabled: combat.destroyed.size === 0,
+                      disabledReason: l10n.t("Nothing is destroyed"),
+                      onPress: () => combat.destroyAll(false),
+                  },
+              ] satisfies DialAction[])
+            : []),
+    ];
+
     const pills = useOverlayPills({
         emitters,
         fireArcs,
@@ -1653,6 +1720,7 @@ function ModelPreview(): React.JSX.Element {
                     header={
                         <DockHeader
                             abilityState={abilityState}
+                            dialActions={dialActions}
                             flyouts={flyouts}
                             mode={mode}
                             modelDetail={modelDetail}

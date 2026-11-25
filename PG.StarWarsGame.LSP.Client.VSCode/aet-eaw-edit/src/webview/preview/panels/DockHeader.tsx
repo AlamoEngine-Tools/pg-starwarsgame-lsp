@@ -17,10 +17,15 @@ import { IconButton } from "../../shared/Button";
 import { Icon } from "../../shared/Icon";
 import { type ViewportStats } from "../viewport";
 import { type PreviewMode, previewModes } from "../previewMode";
-import { RotaryModeSwitch } from "../../shared/RotaryModeSwitch";
+import {
+    type DialAction,
+    RotaryModeSwitch,
+} from "../../shared/RotaryModeSwitch";
 
 export interface DockHeaderProps {
     abilityState: Abilities;
+    /** What the lens does to everything it shows: the scene reset, and Gameplay's destroy and repair. */
+    dialActions: readonly DialAction[];
     flyouts: Flyouts;
     mode: PreviewMode;
     modelDetail: ModelDetail | null;
@@ -34,6 +39,7 @@ export interface DockHeaderProps {
 
 export function DockHeader({
     abilityState,
+    dialActions,
     flyouts,
     mode,
     modelDetail,
@@ -130,6 +136,7 @@ export function DockHeader({
                             weapons: scene.weapons.length,
                             abilities: abilityState.abilities.length,
                         })}
+                        actions={dialActions}
                         onSelect={setMode}
                     />
                 </span>

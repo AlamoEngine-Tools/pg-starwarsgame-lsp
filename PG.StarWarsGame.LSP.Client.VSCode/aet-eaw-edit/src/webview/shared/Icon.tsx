@@ -45,6 +45,7 @@ import {
     IconChevronDown,
     IconChevronRight,
     IconChevronUp,
+    IconRestore,
     IconCircleDot,
     IconCircleOff,
     IconCircleX,
@@ -302,6 +303,9 @@ const ICONS = {
     // mark a row whose content sits below it.
     foldUp: IconChevronUp,
     unfoldDown: IconChevronDown,
+    // The subject put back the way it loaded. A clock wound back rather than the undo arrow, which
+    // is `reset` and takes back one thing.
+    sceneReset: IconRestore,
     /** A list to pick from, opening whichever way it finds room. The mark on a PillSelect. */
     picker: IconSelector,
 
