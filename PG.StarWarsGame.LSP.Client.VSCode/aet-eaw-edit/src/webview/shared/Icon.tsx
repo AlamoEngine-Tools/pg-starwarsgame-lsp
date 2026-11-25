@@ -44,6 +44,7 @@ import {
     IconCheck,
     IconChevronDown,
     IconChevronRight,
+    IconChevronUp,
     IconCircleDot,
     IconCircleOff,
     IconCircleX,
@@ -296,6 +297,11 @@ const ICONS = {
     reveal: IconFolderOpen,
     expanded: IconChevronDown,
     collapsed: IconChevronRight,
+    // A band that folds away upwards and opens downwards - the dock's header. The chevron points
+    // the way pressing it moves the band, which is not what `expanded` and `collapsed` say: those
+    // mark a row whose content sits below it.
+    foldUp: IconChevronUp,
+    unfoldDown: IconChevronDown,
     /** A list to pick from, opening whichever way it finds room. The mark on a PillSelect. */
     picker: IconSelector,
 

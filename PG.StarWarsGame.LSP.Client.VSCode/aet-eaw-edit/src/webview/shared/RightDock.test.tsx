@@ -91,4 +91,35 @@ describe("RightDock", () => {
         assert.equal(html.includes("folded"), false, html);
         assert.match(html, /<i>dial<\/i>/);
     });
+
+    /**
+     * The header folds away upwards and opens downwards, and the chevron points the way pressing it
+     * moves the header: up while it is open, down while it is folded. A chevron to the right said
+     * the header would move sideways.
+     */
+    it("points the chevron the way the header will move", () => {
+        const open = renderToStaticMarkup(
+            <RightDock
+                memoKey="preview.dock"
+                header={dial}
+                headerHoldsDial
+                content={<i>c</i>}
+            />,
+        );
+        applyStoredLayout({ "story.dock.headerFolded": 1 });
+        const folded = renderToStaticMarkup(
+            <RightDock
+                memoKey="story.dock"
+                header={dial}
+                headerHoldsDial
+                content={<i>c</i>}
+            />,
+        );
+
+        assert.match(open, /header-fold[^>]*><svg[^>]*tabler-icon-chevron-up/);
+        assert.match(
+            folded,
+            /header-fold[^>]*><svg[^>]*tabler-icon-chevron-down/,
+        );
+    });
 });

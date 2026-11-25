@@ -118,7 +118,7 @@ export function RightDock({
                 >
                     {headerHoldsDial && (
                         <IconButton
-                            icon={folded ? "collapsed" : "expanded"}
+                            icon={folded ? "unfoldDown" : "foldUp"}
                             className="header-fold"
                             size={13}
                             title={
