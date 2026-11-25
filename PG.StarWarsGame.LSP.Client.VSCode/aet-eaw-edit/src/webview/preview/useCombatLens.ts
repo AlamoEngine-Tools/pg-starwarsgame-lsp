@@ -193,6 +193,9 @@ export function useCombatLens({
     }, [justFired]);
     const logRef = useRef<HTMLDivElement | null>(null);
 
+    /** The pill that opens the damage log, which is where the log opens. */
+    const logPillRef = useRef<HTMLButtonElement | null>(null);
+
     /** Hardpoints currently blown off. */
     const [destroyed, setDestroyed] = useState<ReadonlySet<string>>(new Set());
 
@@ -1404,6 +1407,7 @@ export function useCombatLens({
         setLogOpen,
         justFired,
         logRef,
+        logPillRef,
         destroyed,
         setDestroyed,
         sweeping,

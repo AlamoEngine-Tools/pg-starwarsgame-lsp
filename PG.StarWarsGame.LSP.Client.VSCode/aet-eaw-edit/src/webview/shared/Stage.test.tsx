@@ -10,6 +10,9 @@ import { StageFlyout, StageSlots } from "./Stage";
 
 const noop = (): void => undefined;
 
+/** No pill to open at: these read the markup, and nothing is laid out to place the flyout in. */
+const noPill = { current: null };
+
 describe("StageSlots", () => {
     it("lays an edge out as three slots, start, middle and end", () => {
         const html = renderToStaticMarkup(
@@ -51,14 +54,14 @@ describe("StageSlots", () => {
 describe("StageFlyout", () => {
     it("is a dialog named by its title, with a head and a body", () => {
         const html = renderToStaticMarkup(
-            <StageFlyout title="Camera" at="right" onClose={noop}>
+            <StageFlyout title="Camera" anchor={noPill} onClose={noop}>
                 <p>body</p>
             </StageFlyout>,
         );
 
         assert.match(
             html,
-            /^<div class="stage-flyout on-right" role="dialog" aria-label="Camera">/,
+            /^<div class="stage-flyout" role="dialog" aria-label="Camera"/,
         );
         assert.match(
             html,
@@ -70,13 +73,12 @@ describe("StageFlyout", () => {
         );
     });
 
-    /** Opening upwards from the bottom edge, where its button is - and any variant after that. */
-    it("opens from the bottom and carries a variant after its corner", () => {
+    /** Where it sits is measured, not classed: the only class beside its own is the variant. */
+    it("carries a variant and no corner", () => {
         const html = renderToStaticMarkup(
             <StageFlyout
                 title="Damage log"
-                at="right"
-                fromBottom
+                anchor={noPill}
                 className="sizeable"
                 onClose={noop}
             >
@@ -84,10 +86,18 @@ describe("StageFlyout", () => {
             </StageFlyout>,
         );
 
-        assert.match(
-            html,
-            /^<div class="stage-flyout from-bottom on-right sizeable"/,
+        assert.match(html, /^<div class="stage-flyout sizeable"/);
+    });
+
+    /** Rendered to be measured: one painted frame in the wrong place is a visible jump. */
+    it("stays hidden until it has been placed at its pill", () => {
+        const html = renderToStaticMarkup(
+            <StageFlyout title="Camera" anchor={noPill} onClose={noop}>
+                {null}
+            </StageFlyout>,
         );
+
+        assert.match(html, /^<div[^>]*style="visibility:hidden"/);
     });
 
     /** The count claims the head's free space, then the tools, then the close at the far end. */
@@ -95,8 +105,7 @@ describe("StageFlyout", () => {
         const html = renderToStaticMarkup(
             <StageFlyout
                 title="Abilities"
-                at="mid"
-                fromBottom
+                anchor={noPill}
                 count={3}
                 tools={<button type="button">reset</button>}
                 onClose={noop}
@@ -116,7 +125,7 @@ describe("StageFlyout", () => {
         const html = renderToStaticMarkup(
             <StageFlyout
                 title="Damage log"
-                at="right"
+                anchor={noPill}
                 edges={<div className="resize-handle-n" />}
                 style={{ height: 200 }}
                 onClose={noop}
@@ -127,7 +136,7 @@ describe("StageFlyout", () => {
 
         assert.match(
             html,
-            /style="height:200px"><div class="resize-handle-n"><\/div><div class="stage-flyout-head">/,
+            /style="height:200px;visibility:hidden"><div class="resize-handle-n"><\/div><div class="stage-flyout-head">/,
         );
     });
 });

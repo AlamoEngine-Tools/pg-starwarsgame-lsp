@@ -1814,25 +1814,26 @@ export const comboboxCss = `
 `;
 
 /**
- * The panel a stage-corner button opens beside itself.
+ * The panel a stage pill opens beside itself.
  *
  * Shared for the same reason as the plate: the story graph's colour key is this flyout, not a
  * lookalike. The preview's "less cramped" rules for fields inside a flyout stay in its own sheet -
  * they are about the preview's settings, not about what a flyout is.
  */
 export const stageFlyoutCss = `
-    /* One box, several corners. Which side a panel is on says which button it belongs to before a
-       word of it is read. */
+    /* One box, wherever its pill is. Where it sits is not here: it is measured against the pill
+       that opened it and set on the box itself (placeStageFlyout), because a pill is not in a
+       corner a stylesheet could name. */
     .stage-flyout {
         position: absolute;
-        top: 40px;
         z-index: 3;
         /* Wide enough that a two-line checkbox label is the exception rather than the rule. At 270
            nearly every note and half the labels wrapped, which is what made the panel read as
            cramped even before the sections went in. */
         width: 304px;
-        /* Never past the bottom of the stage; the body scrolls inside instead. */
-        max-height: calc(100% - 56px);
+        /* Never past the stage; the body scrolls inside instead. The placement sets the real cap,
+           which is the room between the pill and the far edge. */
+        max-height: calc(100% - 16px);
         display: flex;
         flex-direction: column;
         border: var(--space-1) solid var(--colour-line-strong);
@@ -1840,26 +1841,10 @@ export const stageFlyoutCss = `
         background: var(--colour-panel);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
-    /* A flyout the reader can size. The max-height above still caps it against the stage, so a
+    /* A flyout the reader can size. The placement's cap still holds it against the stage, so a
        remembered height from a taller window cannot push it off the top. */
     .stage-flyout.sizeable { position: absolute; }
     .stage-flyout.sizeable .stage-flyout-body { flex: 1 1 auto; min-height: 0; }
-    .stage-flyout.on-left { left: 8px; }
-    .stage-flyout.on-right { right: 8px; }
-    /* Centred on the stage, like the bar it belongs to. */
-    .stage-flyout.on-mid { left: 50%; transform: translateX(-50%); }
-
-    /* Opens UPWARDS from the bottom edge, because that is where its button is. A flyout that
-       appears at the top of the stage when you pressed something at the bottom reads as a
-       different panel opening rather than this one, and the eye has to go and find it.
-
-       The clearance is bigger than the top edge's 40px: the preview's bottom row can be two plates
-       tall once the shader corner shows its source line under the switch. */
-    .stage-flyout.from-bottom {
-        top: auto;
-        bottom: 56px;
-        max-height: calc(100% - 72px);
-    }
 
     .stage-flyout-head {
         display: flex;

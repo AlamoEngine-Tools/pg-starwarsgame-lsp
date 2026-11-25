@@ -61,7 +61,7 @@ export function CameraFlyout({
     return (
         <StageFlyout
             title={l10n.t("Camera")}
-            at="right"
+            anchor={flyouts.cameraPillRef}
             ref={flyouts.cameraRef}
             onClose={() => flyouts.setCameraOpen(false)}
         >

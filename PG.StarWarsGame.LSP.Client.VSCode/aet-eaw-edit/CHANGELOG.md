@@ -95,6 +95,12 @@
 
 ### Fixes
 
+- **A stage flyout opens at the pill that opens it** - the flyouts on the stage of the model preview and of
+  the story graph hung from a fixed corner of the stage, whichever pill had opened them. The abilities flyout
+  sat off its pill and overlapped the command bar that holds the pill. Each flyout now opens centred on its
+  pill, below a pill on the top edge and above one on the bottom edge, clear of the pill's plate, and follows
+  the pill when the panel is resized. The stage's side edge still stops it
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 - **A rename of a `Campaign_Set` or `Overlap_Test` value leaves a dependency's files alone** - renaming
   the value in a project that extends another rewrote the members in the referenced project's files too,
   which no other rename does. Only the members the project owns are rewritten now, and a value none of

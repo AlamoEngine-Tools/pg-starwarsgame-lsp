@@ -6493,6 +6493,8 @@ function App(): React.JSX.Element {
     // facet list above, which also names branches the current filter is hiding.
     const [branchEntries, setBranchEntries] = useState<BranchKeyEntry[]>([]);
     const [colourKeyOpen, setColourKeyOpen] = useState(false);
+    /** The pill that opens the colour key, which is where the key opens. */
+    const colourKeyPill = useRef<HTMLButtonElement | null>(null);
     const [threads, setThreads] = useState<string[]>([]);
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
@@ -7822,6 +7824,7 @@ function App(): React.JSX.Element {
                                         colourKeyOpen ? "active" : undefined
                                     }
                                     expanded={colourKeyOpen}
+                                    ref={colourKeyPill}
                                     onClick={() =>
                                         setColourKeyOpen((open) => !open)
                                     }
@@ -7829,6 +7832,7 @@ function App(): React.JSX.Element {
                             </div>
                             {colourKeyOpen ? (
                                 <ColourKeyFlyout
+                                    anchor={colourKeyPill}
                                     branches={branchEntries}
                                     onClose={() => setColourKeyOpen(false)}
                                 />

@@ -15,6 +15,8 @@ import { post } from "../previewPost";
 import { abilityFacts, gotoDefinitionTitle } from "../abilityRows";
 
 export interface AbilitiesFlyoutProps {
+    /** The pill on the command bar that opens this, which is where it opens. */
+    abilitiesPillRef: RefObject<HTMLButtonElement | null>;
     abilitiesRef: RefObject<HTMLDivElement | null>;
     abilityState: Abilities;
     infoAbility: string | null;
@@ -23,6 +25,7 @@ export interface AbilitiesFlyoutProps {
 }
 
 export function AbilitiesFlyout({
+    abilitiesPillRef,
     abilitiesRef,
     abilityState,
     infoAbility,
@@ -32,8 +35,7 @@ export function AbilitiesFlyout({
     return (
         <StageFlyout
             title={l10n.t("Abilities")}
-            at="mid"
-            fromBottom
+            anchor={abilitiesPillRef}
             ref={abilitiesRef}
             count={abilityState.abilities.length}
             onClose={() => setAbilitiesOpen(false)}

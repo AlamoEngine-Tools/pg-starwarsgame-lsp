@@ -3,7 +3,7 @@
 
 // Fire, Repair, the weapon settings and the damage log, on the stage bottom edge in Gameplay.
 
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction, RefObject } from "react";
 import type { CombatLens } from "../useCombatLens";
 import * as l10n from "@vscode/l10n";
 import { type PreviewScene } from "../../../protocol/modelPreview";
@@ -12,6 +12,8 @@ import { type PreviewMode } from "../previewMode";
 
 export interface AttackControlsProps {
     attackOpen: boolean;
+    /** The pill that opens the weapon settings, for the flyout to open at. */
+    attackPillRef: RefObject<HTMLButtonElement | null>;
     combat: CombatLens;
     mode: PreviewMode;
     scene: PreviewScene | null;
@@ -20,6 +22,7 @@ export interface AttackControlsProps {
 
 export function AttackControls({
     attackOpen,
+    attackPillRef,
     combat,
     mode,
     scene,
@@ -97,6 +100,7 @@ export function AttackControls({
                             className={attackOpen ? "active" : undefined}
                             expanded={attackOpen}
                             title={l10n.t("Weapon settings")}
+                            ref={attackPillRef}
                             onClick={() => setAttackOpen((open) => !open)}
                         />
 
@@ -109,6 +113,7 @@ export function AttackControls({
                             className={combat.logOpen ? "active" : undefined}
                             expanded={combat.logOpen}
                             title={l10n.t("Damage log")}
+                            ref={combat.logPillRef}
                             disabled={combat.damageLog.length === 0}
                             // Names the control even when it is disabled: a tooltip that
                             // gives only the reason leaves a reader who has never opened it

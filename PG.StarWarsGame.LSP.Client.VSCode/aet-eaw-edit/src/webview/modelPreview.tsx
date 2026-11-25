@@ -1550,6 +1550,8 @@ function ModelPreview(): React.JSX.Element {
                             setWorldOpen={setWorldOpen}
                             viewportRef={viewportRef}
                             worldOpen={worldOpen}
+                            worldPillRef={flyouts.worldPillRef}
+                            cameraPillRef={flyouts.cameraPillRef}
                         />
 
                         {worldOpen && (
@@ -1577,7 +1579,7 @@ function ModelPreview(): React.JSX.Element {
                         )}
 
                         {/* Where you look FROM. The mirror of the scene panel opposite, down to the
-                            corner it hangs in and the reset in its head - the two are the same kind
+                            pill it opens at and the reset in its head - the two are the same kind
                             of thing about different halves of the picture. */}
                         {cameraOpen && (
                             <CameraFlyout
@@ -1639,6 +1641,7 @@ function ModelPreview(): React.JSX.Element {
                             middle={
                                 <AbilityCommandBar
                                     abilitiesOpen={abilitiesOpen}
+                                    abilitiesPillRef={flyouts.abilitiesPillRef}
                                     abilityState={abilityState}
                                     combat={combat}
                                     mode={mode}
@@ -1654,6 +1657,7 @@ function ModelPreview(): React.JSX.Element {
                                     />
                                     <AttackControls
                                         attackOpen={attackOpen}
+                                        attackPillRef={flyouts.attackPillRef}
                                         combat={combat}
                                         mode={mode}
                                         scene={scene}
@@ -1670,6 +1674,7 @@ function ModelPreview(): React.JSX.Element {
                             fact. */}
                         {abilitiesOpen && (
                             <AbilitiesFlyout
+                                abilitiesPillRef={flyouts.abilitiesPillRef}
                                 abilitiesRef={abilitiesRef}
                                 abilityState={abilityState}
                                 infoAbility={infoAbility}

@@ -48,6 +48,13 @@ export function useFlyouts({
     const abilitiesRef = useRef<HTMLDivElement | null>(null);
     const attackRef = useRef<HTMLDivElement | null>(null);
 
+    /* The pill that opens each stage flyout. A flyout opens at its pill, so it has to be told
+       which one that is - the pills are on the stage's rows, the flyouts beside them. */
+    const worldPillRef = useRef<HTMLButtonElement | null>(null);
+    const cameraPillRef = useRef<HTMLButtonElement | null>(null);
+    const abilitiesPillRef = useRef<HTMLButtonElement | null>(null);
+    const attackPillRef = useRef<HTMLButtonElement | null>(null);
+
     /** Whether the model's identity flyout is showing. Closed on open - it is a check, not a tool. */
     const [infoOpen, setInfoOpen] = useState(false);
     const infoRef = useRef<HTMLDivElement | null>(null);
@@ -128,7 +135,8 @@ export function useFlyouts({
     // Both stage flyouts, one rule. Escape closes both; an outside click deliberately closes
     // neither - see above. They can be open TOGETHER on purpose: setting up a shot means moving the
     // light and the camera against each other, and a panel that shuts the other one turns that into
-    // a trip back to the button every time. Opposite corners, so they never overlap.
+    // a trip back to the button every time. Their pills are at opposite ends of the top edge, so
+    // on a stage wide enough for both they do not overlap.
     useEffect(() => {
         if (!worldOpen && !cameraOpen && !abilitiesOpen && !attackOpen) {
             return;
@@ -342,6 +350,10 @@ export function useFlyouts({
         cameraRef,
         abilitiesRef,
         attackRef,
+        worldPillRef,
+        cameraPillRef,
+        abilitiesPillRef,
+        attackPillRef,
         infoOpen,
         setInfoOpen,
         infoRef,

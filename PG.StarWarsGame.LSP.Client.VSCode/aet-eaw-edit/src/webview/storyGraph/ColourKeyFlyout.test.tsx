@@ -11,23 +11,23 @@ import { EDGE_KINDS, LIFECYCLE_TOKENS } from "./palette";
 
 const noop = (): void => undefined;
 
+/** No pill to open at: these read the markup, and nothing is laid out to place the flyout in. */
+const noPill = { current: null };
+
 describe("ColourKeyFlyout", () => {
-    it("is the shared stage flyout, opening upwards from the bottom-right corner", () => {
+    it("is the shared stage flyout, with its own variant for the key's lists", () => {
         const html = renderToStaticMarkup(
-            <ColourKeyFlyout branches={[]} onClose={noop} />,
+            <ColourKeyFlyout anchor={noPill} branches={[]} onClose={noop} />,
         );
 
-        assert.match(
-            html,
-            /class="stage-flyout from-bottom on-right colour-key"/,
-        );
+        assert.match(html, /class="stage-flyout colour-key"/);
         assert.match(html, /class="stage-flyout-head"/);
         assert.match(html, /aria-label="Close"/);
     });
 
     it("keys every lifecycle and every edge kind the graph draws", () => {
         const html = renderToStaticMarkup(
-            <ColourKeyFlyout branches={[]} onClose={noop} />,
+            <ColourKeyFlyout anchor={noPill} branches={[]} onClose={noop} />,
         );
 
         for (const lifecycle of Object.keys(LIFECYCLE_TOKENS)) {
@@ -47,6 +47,7 @@ describe("ColourKeyFlyout", () => {
     it("keys each branch with the token the overview draws it in", () => {
         const html = renderToStaticMarkup(
             <ColourKeyFlyout
+                anchor={noPill}
                 branches={[
                     {
                         branch: "Act1",
@@ -81,6 +82,7 @@ describe("ColourKeyFlyout", () => {
     it("says a branch colour replaces the lifecycle colour zoomed out", () => {
         const html = renderToStaticMarkup(
             <ColourKeyFlyout
+                anchor={noPill}
                 branches={[
                     {
                         branch: "Act1",
@@ -98,6 +100,7 @@ describe("ColourKeyFlyout", () => {
     it("names the branches that share a colour", () => {
         const html = renderToStaticMarkup(
             <ColourKeyFlyout
+                anchor={noPill}
                 branches={[
                     {
                         branch: "Act1",
@@ -121,7 +124,7 @@ describe("ColourKeyFlyout", () => {
     /** Disable, don't hide: the section stays and says why it is empty. */
     it("keeps the branch section when nothing in view has a branch, and says so", () => {
         const html = renderToStaticMarkup(
-            <ColourKeyFlyout branches={[]} onClose={noop} />,
+            <ColourKeyFlyout anchor={noPill} branches={[]} onClose={noop} />,
         );
 
         assert.match(html, />Branches</);

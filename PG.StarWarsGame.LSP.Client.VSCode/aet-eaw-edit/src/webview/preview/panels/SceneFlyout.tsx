@@ -62,7 +62,7 @@ export function SceneFlyout({
     return (
         <StageFlyout
             title={l10n.t("Scene")}
-            at="left"
+            anchor={flyouts.worldPillRef}
             ref={flyouts.worldRef}
             tools={
                 <IconButton

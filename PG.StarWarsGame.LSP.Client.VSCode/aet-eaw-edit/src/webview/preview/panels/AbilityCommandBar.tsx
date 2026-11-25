@@ -3,7 +3,7 @@
 
 // The ability command bar: one button per ability, in the game's own arrangement.
 
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction, RefObject } from "react";
 import type { Abilities } from "../useAbilities";
 import type { CombatLens } from "../useCombatLens";
 import * as l10n from "@vscode/l10n";
@@ -16,6 +16,8 @@ import { abilityBarTitle } from "../abilityRows";
 
 export interface AbilityCommandBarProps {
     abilitiesOpen: boolean;
+    /** The pill that opens the abilities flyout, for the flyout to open at. */
+    abilitiesPillRef: RefObject<HTMLButtonElement | null>;
     abilityState: Abilities;
     combat: CombatLens;
     mode: PreviewMode;
@@ -25,6 +27,7 @@ export interface AbilityCommandBarProps {
 
 export function AbilityCommandBar({
     abilitiesOpen,
+    abilitiesPillRef,
     abilityState,
     combat,
     mode,
@@ -109,6 +112,7 @@ export function AbilityCommandBar({
                             className={abilitiesOpen ? "active" : undefined}
                             expanded={abilitiesOpen}
                             title={l10n.t("Show abilities")}
+                            ref={abilitiesPillRef}
                             onClick={() => setAbilitiesOpen((open) => !open)}
                         />
                     </div>

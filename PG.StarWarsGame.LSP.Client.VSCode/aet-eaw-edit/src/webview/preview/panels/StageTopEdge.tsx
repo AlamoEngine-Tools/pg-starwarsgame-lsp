@@ -43,6 +43,9 @@ export interface StageTopEdgeProps {
     setWorldOpen: Dispatch<SetStateAction<boolean>>;
     viewportRef: RefObject<PreviewViewport | null>;
     worldOpen: boolean;
+    /** The two pills that open a flyout, for the flyouts to open at. */
+    worldPillRef: RefObject<HTMLButtonElement | null>;
+    cameraPillRef: RefObject<HTMLButtonElement | null>;
 }
 
 export function StageTopEdge({
@@ -60,6 +63,8 @@ export function StageTopEdge({
     setWorldOpen,
     viewportRef,
     worldOpen,
+    worldPillRef,
+    cameraPillRef,
 }: StageTopEdgeProps): React.JSX.Element {
     return (
         <StageSlots
@@ -77,6 +82,7 @@ export function StageTopEdge({
                             }
                             expanded={worldOpen}
                             title={l10n.t("Scene settings")}
+                            ref={worldPillRef}
                             onClick={() => setWorldOpen((open) => !open)}
                         />
                     </div>
@@ -264,6 +270,7 @@ export function StageTopEdge({
                             className={cameraOpen ? "active" : undefined}
                             expanded={cameraOpen}
                             title={l10n.t("Camera settings")}
+                            ref={cameraPillRef}
                             onClick={() => setCameraOpen((open) => !open)}
                         />
                     </div>

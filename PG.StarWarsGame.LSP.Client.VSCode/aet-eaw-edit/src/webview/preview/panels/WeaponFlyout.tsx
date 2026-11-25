@@ -27,8 +27,7 @@ export function WeaponFlyout({
     return (
         <StageFlyout
             title={l10n.t("Weapon")}
-            at="right"
-            fromBottom
+            anchor={flyouts.attackPillRef}
             ref={flyouts.attackRef}
             onClose={() => flyouts.setAttackOpen(false)}
         >
