@@ -76,6 +76,9 @@
   model preview's hand-off to AloViewer or the Particle Editor stands in the bar as well. In the story graph
   Save stays in view outside Edit mode, disabled, with the reason. The dock's header keeps the mode dial and
   the state of what is open ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **A fold for the dock header** - the header that holds the mode dial folds away with the chevron in its
+  top-right corner and opens with it again. The dock of each editor keeps its own fold between sessions
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

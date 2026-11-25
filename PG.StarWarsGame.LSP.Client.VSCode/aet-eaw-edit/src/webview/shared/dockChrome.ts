@@ -1103,6 +1103,18 @@ export const dockHeaderCss = `
     .dock-header.with-dial { min-height: 78px; }
     /* A header with nothing to report takes no band of the dock. */
     .dock-header:empty { display: none; }
+
+    /* The fold of a header that holds the dial: in its top-right corner, and still there once the
+       header is folded, where it is all that is left of it. Three classes, so the header's own
+       icon sizing further down does not make a corner mark as large as a control. */
+    .dock-header .icon-btn.header-fold {
+        position: absolute;
+        top: var(--space-2);
+        right: var(--space-2);
+        min-width: 0;
+        padding: var(--space-2);
+    }
+    .dock-header.with-dial.folded { min-height: 20px; padding: 0; }
     .dock-header .header-left { position: absolute; left: 8px; }
     .dock-header .header-right { position: absolute; right: 8px; }
 

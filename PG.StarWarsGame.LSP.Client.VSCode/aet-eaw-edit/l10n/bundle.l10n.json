@@ -689,6 +689,8 @@
   "Close": "Close",
   "{0} - click to switch mode": "{0} - click to switch mode",
   "{0} - the other modes are unavailable here": "{0} - the other modes are unavailable here",
+  "Open the dock header": "Open the dock header",
+  "Fold the dock header away": "Fold the dock header away",
   "Every problem is in view, so there is nothing to filter.": "Every problem is in view, so there is nothing to filter.",
   "Showing all problems. {0} are not in the current view.": "Showing all problems. {0} are not in the current view.",
   "Showing only problems in the current view. {0} hidden.": "Showing only problems in the current view. {0} hidden.",

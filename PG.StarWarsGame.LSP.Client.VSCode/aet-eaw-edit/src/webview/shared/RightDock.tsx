@@ -14,8 +14,9 @@
 // interpolates `rightDockCss` (and `dockChromeCss` for the sections inside it).
 
 import * as l10n from "@vscode/l10n";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 
+import { IconButton } from "./Button";
 import { useEdgeResize } from "./useEdgeResize";
 import { readPanelSize, writePanelSize } from "../../shared/panelLayout";
 
@@ -28,7 +29,8 @@ export interface RightDockProps {
     /**
      * Whether the header carries the rotary mode dial, which needs a taller header. Held from the
      * first frame, before the dial itself has arrived, so the dock does not draw itself in two
-     * steps.
+     * steps. A header that holds the dial can be folded away by the chevron in its corner; the dock
+     * remembers that with its width, under the same `memoKey`.
      */
     headerHoldsDial?: boolean;
     /**
@@ -84,6 +86,21 @@ export function RightDock({
         },
     );
 
+    // A fold is kept with the dock's sizes, as a size of one: it follows the reader like the width
+    // does, and each editor's dock keeps its own.
+    const foldKey =
+        memoKey === undefined ? undefined : `${memoKey}.headerFolded`;
+    const [folded, setFolded] = useState(
+        foldKey !== undefined && readPanelSize(foldKey, 0) === 1,
+    );
+    const toggleFold = (): void => {
+        const next = !folded;
+        setFolded(next);
+        if (foldKey !== undefined) {
+            writePanelSize(foldKey, next ? 1 : 0);
+        }
+    };
+
     return (
         <div className="right-dock" style={{ width: size }}>
             <div
@@ -94,10 +111,27 @@ export function RightDock({
             {header !== undefined && (
                 <div
                     className={
-                        "dock-header" + (headerHoldsDial ? " with-dial" : "")
+                        "dock-header" +
+                        (headerHoldsDial ? " with-dial" : "") +
+                        (headerHoldsDial && folded ? " folded" : "")
                     }
                 >
-                    {header}
+                    {headerHoldsDial && (
+                        <IconButton
+                            icon={folded ? "collapsed" : "expanded"}
+                            className="header-fold"
+                            size={13}
+                            title={
+                                folded
+                                    ? l10n.t("Open the dock header")
+                                    : l10n.t("Fold the dock header away")
+                            }
+                            expanded={!folded}
+                            onClick={toggleFold}
+                        />
+                    )}
+                    {/* Unmounted while folded, like a folded section's body. */}
+                    {headerHoldsDial && folded ? null : header}
                 </div>
             )}
             <div className="dock-content">{content}</div>

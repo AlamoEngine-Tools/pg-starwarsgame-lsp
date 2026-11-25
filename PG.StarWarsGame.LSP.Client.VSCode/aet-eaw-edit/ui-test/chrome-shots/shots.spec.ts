@@ -141,6 +141,16 @@ describe("Chrome pictures", () => {
                 await browser.pause(800);
             });
             await capture("story-3-simulation");
+
+            // The dock header folded away, and open again so the fold is not left stored.
+            await inNewestWebview(async () => {
+                await (await browser.$("button.header-fold")).click();
+                await browser.pause(500);
+            });
+            await capture("story-4-header-folded");
+            await inNewestWebview(async () => {
+                await (await browser.$("button.header-fold")).click();
+            });
         });
     }
 
