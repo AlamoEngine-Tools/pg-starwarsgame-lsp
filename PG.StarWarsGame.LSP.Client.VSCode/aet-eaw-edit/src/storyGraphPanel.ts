@@ -16,6 +16,7 @@ import {
     type StoryGraphTarget,
 } from "./storyGraphTarget";
 import { PanelRegistry, WebviewPanelHost } from "./webviewPanelHost";
+import { TYPE_NAMES_SETTING, typeNameMode } from "./shared/storyTypeNames";
 import type {
     StoryCommandPayload,
     StoryEditorMode,
@@ -30,6 +31,7 @@ import {
     StoryLayoutEntryDto,
     RequestMethod,
     StorySimMethod,
+    type StoryTypeSchemaDto,
 } from "./protocol";
 
 /**
@@ -79,6 +81,16 @@ export class StoryGraphPanel extends WebviewPanelHost<
         });
 
         this.onDidDispose(() => void this._promptSaveOnClose());
+
+        // Which name the palette's tiles show, pushed again whenever the setting changes: only the
+        // extension host can read configuration, and a reader who switches the names wants to see
+        // them switch in the graph that is open.
+        const watch = vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration(TYPE_NAMES_SETTING)) {
+                this._sendTypeNames();
+            }
+        });
+        this.onDidDispose(() => watch.dispose());
     }
     // A node to centre on once the first graph has been posted - a portal's landing spot on a panel
 
@@ -177,6 +189,7 @@ export class StoryGraphPanel extends WebviewPanelHost<
         switch (msg.type) {
             case "ready":
                 this._sendAvailableModes();
+                this._sendTypeNames();
                 await this._sendSchema();
                 await this._sendWorkspaceSettings();
                 await this._sendGraph({});
@@ -474,6 +487,16 @@ export class StoryGraphPanel extends WebviewPanelHost<
         });
     }
 
+    /** Tells the webview which of a type's two names its palette tiles show. */
+    private _sendTypeNames(): void {
+        this.post({
+            type: "typeNames",
+            mode: typeNameMode(
+                vscode.workspace.getConfiguration().get(TYPE_NAMES_SETTING),
+            ),
+        });
+    }
+
     /** Fetches the workspace preferences and pushes the swimlane-lane toggles to the webview. */
     private async _sendWorkspaceSettings(): Promise<void> {
         // Preferences are optional - the graph works without them, so a failure is not reported.
@@ -698,6 +721,8 @@ export class StoryGraphPanel extends WebviewPanelHost<
             type: "schema",
             eventTypes: events.map((t) => t.name),
             rewardTypes: rewards.map((t) => t.name),
+            eventTypeLabels: labelsOf(events),
+            rewardTypeLabels: labelsOf(rewards),
             // Keyed by type name, ranked worst first, events and rewards together: a node knows
             // which of the two it is, and the webview only ever looks one name up.
             typeNotes: Object.fromEntries(
@@ -839,6 +864,20 @@ function filterFields(
         reachableDirection: filters?.reachableDirection || undefined,
         plotState: filters?.plotState || undefined,
     };
+}
+
+/** The display name of each type the schema has named, by the type's technical name. */
+function labelsOf(
+    types: readonly StoryTypeSchemaDto[],
+): Record<string, string> {
+    const labels: Record<string, string> = {};
+    for (const type of types) {
+        const label = type.label?.trim();
+        if (label) {
+            labels[type.name] = label;
+        }
+    }
+    return labels;
 }
 
 /** " (change N)" for the command the server refused, counted from one; empty when it named none. */

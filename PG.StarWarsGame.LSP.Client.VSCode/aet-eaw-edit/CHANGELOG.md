@@ -96,6 +96,12 @@
   graph carries a point on its edge that ends at the pill that opened it, as a speech bubble points at its
   speaker. Weapon settings and Damage log stop at the same edge of the stage, and the tail shows which pill
   each belongs to ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **Display names for story types** - the story graph's palette names an event or reward type in words, such
+  as *Time elapsed* for `STORY_ELAPSED`, on a smaller tile, and an event's tile carries a glyph of its own.
+  The tile's tooltip holds the technical name, and the palette's search finds a type by either name; a tile
+  found by its technical name alone shows that name while the search is set. The new setting
+  `aet-eaw-edit.editors.storyTypeNames` switches the tiles to the technical names, in a graph that is open
+  too ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

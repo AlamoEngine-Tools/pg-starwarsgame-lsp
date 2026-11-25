@@ -119,6 +119,17 @@ export const fittedCss = `
        the dock's ordinary rhythm. It sits here because this is where a consumer looks for it. */
     --dock-tile-gap: var(--space-6);
 
+    /* The story graph's type tiles, fitted to a type's display name: two lines of two to four
+       short words under a glyph. Measured in the running dock at its 11px label: every one of the
+       205 display names fits two lines once the label has 96px, which is this tile less its
+       padding and border; at 86px six were cut. Two stand side by side at the width the dock opens
+       at (251px of grid), three from 330px. The taller row is for technical names, which run to
+       three lines; the two longest of those are still cut at this width, and read in full from
+       the tooltip. */
+    --palette-tile-w: 106px;
+    --palette-tile-h: 58px;
+    --palette-tile-h-technical: 72px;
+
     /* Room at the trailing edge of a search box for the three mode toggles that overlay it: three
        buttons of 22px plus their padding, measured, not chosen. The scale's nearest step is 24px,
        which would run the search text under the buttons. */

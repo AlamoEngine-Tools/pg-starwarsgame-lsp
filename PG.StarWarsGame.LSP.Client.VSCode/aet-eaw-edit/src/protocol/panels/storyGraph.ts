@@ -162,6 +162,12 @@ export interface StoryGraphSchema {
     type: "schema";
     eventTypes: string[];
     rewardTypes: string[];
+    /**
+     * The display name of each type the schema has named, by technical name. Two maps and not one:
+     * an event and a reward may share a technical name and are named differently.
+     */
+    eventTypeLabels: Record<string, string>;
+    rewardTypeLabels: Record<string, string>;
     typeNotes: Record<string, StoryNoteDto[]>;
     eventTypeParams: Record<string, StoryParamSchemaDto[]>;
     rewardTypeParams: Record<string, StoryParamSchemaDto[]>;
@@ -235,6 +241,12 @@ export interface StoryGraphAvailableModes {
     simulate: boolean;
 }
 
+/** Which of a type's two names the palette's tiles show, as the setting has it. */
+export interface StoryGraphTypeNames {
+    type: "typeNames";
+    mode: "display" | "technical";
+}
+
 /** The answer to `confirmStage`: whether to stage the command it carried. */
 export interface StoryGraphConfirmStageResult {
     type: "confirmStageResult";
@@ -273,6 +285,7 @@ export type StoryGraphToWebview =
     | StoryGraphInvalidate
     | StoryGraphWorkspaceSettings
     | StoryGraphAvailableModes
+    | StoryGraphTypeNames
     | StoryGraphConfirmStageResult
     | StoryGraphSaveResult
     | StoryGraphDirtyExitChoice

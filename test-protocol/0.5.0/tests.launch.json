@@ -744,5 +744,11 @@
   },
   "PRV-80": {
     "open": "{repo}\\eaw"
+  },
+  "STY-07": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
   }
 }

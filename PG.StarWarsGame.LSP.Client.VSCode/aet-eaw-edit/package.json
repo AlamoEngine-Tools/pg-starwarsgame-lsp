@@ -672,6 +672,24 @@
             "type": "boolean",
             "default": true,
             "markdownDescription": "%config.editors.confirmDiscard.markdownDescription%"
+          },
+          "aet-eaw-edit.editors.storyTypeNames": {
+            "order": 6,
+            "type": "string",
+            "default": "display",
+            "markdownDescription": "%config.editors.storyTypeNames.markdownDescription%",
+            "enum": [
+              "display",
+              "technical"
+            ],
+            "enumItemLabels": [
+              "%config.editors.storyTypeNames.enumItemLabels.0%",
+              "%config.editors.storyTypeNames.enumItemLabels.1%"
+            ],
+            "markdownEnumDescriptions": [
+              "%config.editors.storyTypeNames.markdownEnumDescriptions.0%",
+              "%config.editors.storyTypeNames.markdownEnumDescriptions.1%"
+            ]
           }
         }
       },

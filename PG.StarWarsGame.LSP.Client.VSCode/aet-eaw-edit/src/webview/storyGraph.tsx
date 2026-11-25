@@ -19,6 +19,7 @@ import * as l10n from "@vscode/l10n";
 import {
     CSSProperties,
     DragEvent,
+    Fragment,
     PointerEvent as ReactPointerEvent,
     useCallback,
     useEffect,
@@ -68,6 +69,7 @@ import {
 } from "./storyGraph/canvasEdgeStyle";
 import { branchKey, type BranchKeyEntry } from "./storyGraph/colourKey";
 import { ColourKeyFlyout } from "./storyGraph/ColourKeyFlyout";
+import { eventIcon } from "./storyGraph/eventIcons";
 import { FrameNotifier } from "./storyGraph/frameNotifier";
 import {
     canReuseStoredLayout,
@@ -79,6 +81,15 @@ import { createLabelSizer, LINE_RATIO, wrapLabel } from "./storyGraph/lodLabel";
 import { facetList } from "./storyGraph/facets";
 import { PathFilterMenu } from "./storyGraph/PathFilterMenu";
 import { noteBadge, type StoryNote } from "./storyGraph/typeNotes";
+import {
+    breakPieces,
+    matchesType,
+    otherName,
+    tileName,
+    typeNameMode,
+    type TypeNameMode,
+    type TypeNames,
+} from "./storyGraph/typeNames";
 import { type PathDirection } from "./storyGraph/pathDirection";
 import {
     arrangePositions,
@@ -5802,6 +5813,43 @@ const Shell = styled.div`
         outline: var(--space-1) solid var(--colour-focus);
     }
 
+    /* A palette tile is smaller than the dock's shared tile. There are two hundred type tiles and
+       a type's display name is two or three short words, so the size is fitted to those names
+       (--palette-tile-w and -h) and the dock shows more of them at once. The three structural
+       tiles - New event, AND, OR - are the same size: they are the same kind of thing to drag,
+       and at the shared size they stood one to a row above a grid of two. Where the reader has
+       asked for technical names every row is taller: an identifier runs to three lines where a
+       display name fits two. */
+
+    .palette-scroll .tile-grid {
+        grid-template-columns: repeat(auto-fill, var(--palette-tile-w));
+        grid-auto-rows: var(--palette-tile-h);
+    }
+
+    .palette-scroll.technical-names .tile-grid {
+        grid-auto-rows: var(--palette-tile-h-technical);
+    }
+
+    .palette-scroll .palette-tile {
+        gap: var(--space-2);
+        padding: var(--space-4);
+    }
+
+    /* Whole words. The shared tile breaks a label anywhere, which is right for a raw token and
+       cuts a display name in the middle of a word; here a line breaks at a space, at the break
+       opportunities a technical name is given after each underscore, and inside a word only when
+       that word alone is wider than the tile. */
+
+    .palette-scroll .palette-tile .tile-label {
+        font-size: var(--font-size-11);
+        overflow-wrap: break-word;
+        word-break: normal;
+    }
+
+    .palette-scroll.technical-names .palette-tile .tile-label {
+        -webkit-line-clamp: 3;
+    }
+
     .palette-empty {
         font-size: var(--font-size-11);
         color: var(--colour-muted);
@@ -6498,6 +6546,15 @@ function App(): React.JSX.Element {
     const [threads, setThreads] = useState<string[]>([]);
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
+    // What each type is called in words, and which of its two names the palette's tiles show. The
+    // labels come with the schema, the choice is the reader's setting.
+    const [eventTypeLabels, setEventTypeLabels] = useState<
+        ReadonlyMap<string, string>
+    >(new Map());
+    const [rewardTypeLabels, setRewardTypeLabels] = useState<
+        ReadonlyMap<string, string>
+    >(new Map());
+    const [typeNames, setTypeNames] = useState<TypeNameMode>("display");
     const [status, setStatus] = useState<string | null>(
         l10n.t("Loading story graph..."),
     );
@@ -7329,6 +7386,22 @@ function App(): React.JSX.Element {
                     setRewardTypes(
                         (msg.rewardTypes as string[] | undefined) ?? [],
                     );
+                    setEventTypeLabels(
+                        new Map(
+                            Object.entries(
+                                (msg.eventTypeLabels as
+                                    Record<string, string> | undefined) ?? {},
+                            ),
+                        ),
+                    );
+                    setRewardTypeLabels(
+                        new Map(
+                            Object.entries(
+                                (msg.rewardTypeLabels as
+                                    Record<string, string> | undefined) ?? {},
+                            ),
+                        ),
+                    );
                     // EventNodeView is rendered by rete's own portal pipeline, not as an App
                     // child, so it can't receive these as React props - mirrored into module
                     // scope (eventTypeParams/rewardTypeParams/untestedTypes) for that reason.
@@ -7518,6 +7591,9 @@ function App(): React.JSX.Element {
                         edit: msg.edit === true,
                         simulate: msg.simulate === true,
                     });
+                    break;
+                case "typeNames":
+                    setTypeNames(typeNameMode(msg.mode));
                     break;
                 case "confirmStageResult":
                     if (msg.proceed) {
@@ -7947,6 +8023,14 @@ function App(): React.JSX.Element {
                                     <NodePalette
                                         eventTypes={eventTypes}
                                         rewardTypes={rewardTypes}
+                                        eventNames={{
+                                            mode: typeNames,
+                                            labels: eventTypeLabels,
+                                        }}
+                                        rewardNames={{
+                                            mode: typeNames,
+                                            labels: rewardTypeLabels,
+                                        }}
                                     />
                                 ) : null}
                                 {mode === "simulate" && simState?.running ? (
@@ -8703,6 +8787,10 @@ function fadedBg(color: string): string {
 function NodePalette(props: {
     eventTypes: string[];
     rewardTypes: string[];
+    /** What each event type is called, and which of its two names its tile shows. */
+    eventNames: TypeNames;
+    /** The same for the rewards: a reward and an event may share a technical name. */
+    rewardNames: TypeNames;
 }): React.JSX.Element {
     const [search, setSearch] = useState("");
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
@@ -8710,11 +8798,15 @@ function NodePalette(props: {
         Rewards: true,
     });
     const q = search.trim().toLowerCase();
-    const matches = (name: string): boolean =>
-        q === "" || name.toLowerCase().includes(q);
 
-    const eventTypes = props.eventTypes.filter(matches);
-    const rewardTypes = props.rewardTypes.filter(matches);
+    // By either name, whichever the tiles show: a type is found by what it is called in XML and
+    // by what it is called in words.
+    const eventTypes = props.eventTypes.filter((type) =>
+        matchesType(props.eventNames, type, q),
+    );
+    const rewardTypes = props.rewardTypes.filter((type) =>
+        matchesType(props.rewardNames, type, q),
+    );
     // The structural actions (New event / AND / OR) always stay - the search only filters the types.
     const showBlank = true;
     const showAndJunction = true;
@@ -8728,14 +8820,15 @@ function NodePalette(props: {
         e.dataTransfer.effectAllowed = "copy";
     };
 
-    // The whole tile is washed in its family colour - no glyph (they were all identical). Structural
-    // tiles (New/AND/OR) keep a distinguishing glyph since their shapes actually differ.
+    // The whole tile is washed in its family colour, which says which family a type is in. An
+    // event's glyph says what the type itself is - see eventIcons.ts. Rewards carry none yet.
+    // Structural tiles (New/AND/OR) keep a distinguishing glyph since their shapes differ.
     const tile = (
         key: string,
         glyph: React.JSX.Element | null,
-        label: string,
+        label: React.ReactNode,
         drag: PaletteDrag,
-        hint: string,
+        title: string,
     ): React.JSX.Element => {
         const color = stepColor(drag.category, drag.type);
         return (
@@ -8743,13 +8836,48 @@ function NodePalette(props: {
                 key={key}
                 className="dock-tile palette-tile"
                 draggable
+                data-type={drag.type ?? undefined}
                 style={{ background: fadedBg(color), borderColor: color }}
                 onDragStart={(e) => onDragStart(e, drag)}
-                title={`${label}\n${hint}`}
+                title={title}
             >
                 {glyph ? <span className="tile-glyph">{glyph}</span> : null}
                 <span className="tile-label">{label}</span>
             </div>
+        );
+    };
+
+    /** A structural tile's tooltip: what it is, then what dragging it does. */
+    const structural = (label: string, hint: string): string =>
+        `${label}\n${hint}`;
+
+    /**
+     * The tile of one event or reward type: the name the reader asked for, the other name and the
+     * hint in its tooltip. A technical name is cut where it may break, after each underscore -
+     * a browser breaks a line at a space only, and a name left whole is cut mid-word.
+     */
+    const typeTile = (
+        category: "trigger" | "reward",
+        type: string,
+        hint: string,
+    ): React.JSX.Element => {
+        const names =
+            category === "trigger" ? props.eventNames : props.rewardNames;
+        const shown = tileName(names, type, q);
+        const other = otherName(names, type, q);
+        return tile(
+            type,
+            category === "trigger" ? <Icon name={eventIcon(type)} /> : null,
+            shown.technical
+                ? breakPieces(shown.text).map((piece, at) => (
+                      <Fragment key={at}>
+                          {at > 0 ? <wbr /> : null}
+                          {piece}
+                      </Fragment>
+                  ))
+                : shown.text,
+            { category, type },
+            [shown.text, other, hint].filter(Boolean).join("\n"),
         );
     };
 
@@ -8787,21 +8915,30 @@ function NodePalette(props: {
                     setCollapsed((c) => ({ ...c, [label]: !c[label] }))
                 }
             >
-                {[...families.entries()].map(([color, names]) => (
-                    <div key={color} className="tile-family">
-                        <div className="tile-grid">
-                            {names.map((t) =>
-                                tile(t, null, t, { category, type: t }, hint),
-                            )}
+                <div className="palette-types">
+                    {[...families.entries()].map(([color, names]) => (
+                        <div key={color} className="tile-family">
+                            <div className="tile-grid">
+                                {names.map((t) => typeTile(category, t, hint))}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </DockSection>
         );
     };
 
     return (
-        <div className="palette-scroll">
+        // The class says which name the type tiles show: a technical name runs to three lines
+        // where a display name fits two, so every row of the palette is taller with it.
+        <div
+            className={
+                "palette-scroll" +
+                (props.eventNames.mode === "technical"
+                    ? " technical-names"
+                    : "")
+            }
+        >
             <div className="dock-search">
                 <div className="search-field">
                     <input
@@ -8821,8 +8958,11 @@ function NodePalette(props: {
                                   <Icon name="add" />,
                                   l10n.t("New event"),
                                   { category: "blank", type: null },
-                                  l10n.t(
-                                      "Drag onto the canvas to create a new untyped event, then edit it in place",
+                                  structural(
+                                      l10n.t("New event"),
+                                      l10n.t(
+                                          "Drag onto the canvas to create a new untyped event, then edit it in place",
+                                      ),
                                   ),
                               )
                             : null}
@@ -8832,8 +8972,11 @@ function NodePalette(props: {
                                   <span className="junction-glyph shape-circle" />,
                                   "AND",
                                   { category: "andJunction", type: null },
-                                  l10n.t(
-                                      "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together",
+                                  structural(
+                                      "AND",
+                                      l10n.t(
+                                          "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together",
+                                      ),
                                   ),
                               )
                             : null}
@@ -8843,8 +8986,11 @@ function NodePalette(props: {
                                   <span className="junction-glyph shape-diamond" />,
                                   "OR",
                                   { category: "orJunction", type: null },
-                                  l10n.t(
-                                      "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm",
+                                  structural(
+                                      "OR",
+                                      l10n.t(
+                                          "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm",
+                                      ),
                                   ),
                               )
                             : null}
