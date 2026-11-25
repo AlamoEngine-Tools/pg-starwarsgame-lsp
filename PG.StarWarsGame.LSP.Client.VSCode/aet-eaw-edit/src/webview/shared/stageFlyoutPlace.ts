@@ -12,11 +12,17 @@
 // Everything here is in the STAGE's own coordinates, because the flyout is a child of the stage and
 // is placed inside it.
 
-/** Between the flyout and the plate its pill sits on. */
-export const FLYOUT_GAP = 4;
+/**
+ * Between the flyout and the plate its pill sits on. The flyout's tail stands in this gap and
+ * points at the pill, so the gap is as deep as the tail is long plus a pixel of air.
+ */
+export const FLYOUT_GAP = 8;
 
 /** How close to the stage's edge the flyout is allowed to get. */
 export const FLYOUT_MARGIN = 8;
+
+/** How close to a corner of the flyout its tail may stand. A tail on the rounding points at nothing. */
+export const FLYOUT_TAIL_INSET = 12;
 
 export interface StageFlyoutRequest {
     /** The pill's box. */
@@ -49,6 +55,14 @@ export interface StageFlyoutPlacement {
 
     /** The room it has, the margin kept. The box is capped at this and its body scrolls. */
     maxHeight: number;
+
+    /**
+     * Where the tail stands along the edge that faces the pill, from the flyout's own left edge to
+     * the tail's middle. It is over the middle of the pill, also when the stage's edge has stopped
+     * the flyout and the two are no longer centred - which is when it matters: two pills side by
+     * side in a corner open two flyouts in one place, and the tail says which is whose.
+     */
+    tail: number;
 }
 
 export function placeStageFlyout(
@@ -77,5 +91,9 @@ export function placeStageFlyout(
         side,
         offset,
         maxHeight: Math.max(0, stage.height - offset - FLYOUT_MARGIN),
+        tail: Math.max(
+            FLYOUT_TAIL_INSET,
+            Math.min(middle - left, width - FLYOUT_TAIL_INSET),
+        ),
     };
 }

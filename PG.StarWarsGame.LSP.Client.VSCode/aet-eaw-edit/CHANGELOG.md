@@ -92,6 +92,10 @@
   and the tree's filter and folded rows stay as set. In Gameplay, Destroy all hardpoints and Repair all
   hardpoints stand at the dial's other end; they left the title of the Hardpoints section
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **A tail from a stage flyout to its pill** - each flyout on the stage of the model preview and of the story
+  graph carries a point on its edge that ends at the pill that opened it, as a speech bubble points at its
+  speaker. Weapon settings and Damage log stop at the same edge of the stage, and the tail shows which pill
+  each belongs to ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

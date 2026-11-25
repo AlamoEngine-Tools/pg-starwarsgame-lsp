@@ -98,6 +98,8 @@ describe("StageFlyout", () => {
         );
 
         assert.match(html, /^<div[^>]*style="visibility:hidden"/);
+        // And no tail yet: before it is placed there is no pill for one to point at.
+        assert.doesNotMatch(html, /stage-flyout-tail/);
     });
 
     /** The count claims the head's free space, then the tools, then the close at the far end. */

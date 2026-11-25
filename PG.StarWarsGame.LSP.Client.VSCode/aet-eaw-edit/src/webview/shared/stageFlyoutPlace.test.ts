@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import {
     FLYOUT_GAP,
     FLYOUT_MARGIN,
+    FLYOUT_TAIL_INSET,
     placeStageFlyout,
 } from "./stageFlyoutPlace";
 
@@ -97,5 +98,41 @@ describe("placeStageFlyout", () => {
         const at = place({ stage: { width: 1000, height: 40 } });
 
         assert.equal(at.maxHeight, 0);
+    });
+
+    /** The tail is what joins the two: it needs the gap to stand in, or it lands on the plate. */
+    it("leaves the gap a tail needs between the flyout and the pill's plate", () => {
+        assert.equal(FLYOUT_GAP, 8);
+    });
+
+    it("points its tail at the middle of the pill", () => {
+        // Centred on the pill, so the pill's middle is the flyout's own.
+        assert.equal(place().tail, 152);
+    });
+
+    /**
+     * Two pills side by side in a corner open two flyouts that both stop at the stage's edge. The
+     * tail is then the only thing that says which pill a flyout belongs to.
+     */
+    it("keeps the tail on the pill when the stage's edge has stopped the flyout", () => {
+        const at = place({
+            pill: { left: 960, right: 988, top: 12, bottom: 40 },
+        });
+
+        // The flyout stopped at 688; the pill's middle is 974.
+        assert.equal(at.tail, 974 - 688);
+    });
+
+    /** A tail on a rounded corner points at nothing and breaks the corner's line. */
+    it("keeps the tail off the flyout's corners", () => {
+        const farRight = place({
+            pill: { left: 990, right: 1000, top: 12, bottom: 40 },
+        });
+        const farLeft = place({
+            pill: { left: 0, right: 10, top: 12, bottom: 40 },
+        });
+
+        assert.equal(farRight.tail, 304 - FLYOUT_TAIL_INSET);
+        assert.equal(farLeft.tail, FLYOUT_TAIL_INSET);
     });
 });

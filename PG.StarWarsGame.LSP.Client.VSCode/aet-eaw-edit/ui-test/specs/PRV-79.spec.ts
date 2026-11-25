@@ -1,10 +1,11 @@
 // PRV-79: a stage flyout opens at the pill that opens it (#222). Each of the preview's five - Scene, Camera,
 // Abilities, Weapon and Damage log - sits the gap clear of its pill's plate, away from the stage edge the pill
 // is on, and centred on the pill unless the stage's side edge stops it first, and it follows the pill when the
-// stage is resized. Before, each hung from a fixed corner of the stage, whatever pill had opened it.
+// stage is resized. A tail on the flyout's edge points at the pill. Before, each hung from a fixed corner of the
+// stage, whatever pill had opened it, and nothing joined the two.
 import { browser, expect } from "@wdio/globals";
 import { command, serverReady } from "../protocol.js";
-import { flyoutPlacement, misplaced, openFlyout } from "./flyouts.js";
+import { flyoutPlacement, misplaced, openFlyout, tailOff } from "./flyouts.js";
 import { press } from "./preview.js";
 import { inNewestWebview } from "./storyGraph.js";
 
@@ -27,6 +28,7 @@ describe("PRV-79", () => {
             const scene = await openFlyout('button[title="Scene settings"]', "Scene");
             const camera = await openFlyout('button[title="Camera settings"]', "Camera");
             expect([...misplaced("Scene", scene), ...misplaced("Camera", camera)]).toEqual([]);
+            expect([...tailOff("Scene", scene), ...tailOff("Camera", camera)]).toEqual([]);
             await browser.keys("Escape");
         });
     });
@@ -44,6 +46,8 @@ describe("PRV-79", () => {
                 ...misplaced("Weapon", weapon),
                 ...misplaced("Damage log", log),
             ]).toEqual([]);
+            // Weapon and Damage log stop at the same stage edge: the tail is what says which pill each belongs to.
+            expect([...tailOff("Abilities", abilities), ...tailOff("Weapon", weapon), ...tailOff("Damage log", log)]).toEqual([]);
         });
     });
 
@@ -64,6 +68,7 @@ describe("PRV-79", () => {
             const after = (await flyoutPlacement(pill, "Abilities"))!;
             expect(after.flyout.left).not.toBe(before.flyout.left);
             expect(misplaced("Abilities", after)).toEqual([]);
+            expect(tailOff("Abilities", after)).toEqual([]);
         });
     });
 });

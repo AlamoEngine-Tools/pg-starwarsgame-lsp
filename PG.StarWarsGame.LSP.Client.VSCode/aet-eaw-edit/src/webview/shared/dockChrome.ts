@@ -1846,6 +1846,30 @@ export const stageFlyoutCss = `
     .stage-flyout.sizeable { position: absolute; }
     .stage-flyout.sizeable .stage-flyout-body { flex: 1 1 auto; min-height: 0; }
 
+    /* The tail: what joins a flyout to the pill that opened it, the way a speech bubble is joined
+       to its speaker. A square turned on its corner with its middle on the box's edge, so the half
+       that shows is a point and its two outer sides carry the box's own border. It stands in the
+       gap the placement leaves (FLYOUT_GAP) and stops a pixel short of the pill's plate.
+
+       Its place along the edge is set on it, measured from the box's OUTER edge; a positioned
+       child is measured from inside the border, hence the margin that takes the border back. */
+    .stage-flyout-tail {
+        position: absolute;
+        box-sizing: border-box;
+        width: 10px;
+        height: 10px;
+        margin-left: calc(-1 * var(--space-1));
+        border: var(--space-1) solid var(--colour-line-strong);
+        background: var(--colour-panel);
+        transform: translateX(-50%) rotate(45deg);
+        /* Never a target: it reaches over the gap towards the pill it points at. */
+        pointer-events: none;
+    }
+    /* A flyout BELOW its pill points up from its top edge, one above its pill down from its foot.
+       Only the two sides that face outwards are drawn; the other two would cut across the box. */
+    .stage-flyout-tail.at-top { top: -6px; border-right: none; border-bottom: none; }
+    .stage-flyout-tail.at-bottom { bottom: -6px; border-left: none; border-top: none; }
+
     .stage-flyout-head {
         display: flex;
         align-items: center;

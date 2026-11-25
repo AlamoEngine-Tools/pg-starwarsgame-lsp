@@ -2,7 +2,7 @@
 import { browser } from "@wdio/globals";
 
 /** The gap the flyout keeps to its pill's plate, and the margin it keeps to the stage's edge. */
-const GAP = 4;
+const GAP = 8;
 const MARGIN = 8;
 
 /** What a browser rounds away between two boxes laid out from fractional sizes. */
@@ -21,6 +21,8 @@ export interface FlyoutPlacement {
     /** The plate the pill sits on, or the pill itself when it has none. */
     plate: Box;
     flyout: Box;
+    /** The tail that points from the flyout at its pill, or null when it has none. */
+    tail: Box | null;
     /** The box the flyout is placed in, inside its border. */
     stage: Box;
 }
@@ -42,10 +44,12 @@ export async function flyoutPlacement(pill: string, flyout: string): Promise<Fly
                 return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
             };
             const outer = stage.getBoundingClientRect();
+            const tail = box.querySelector(".stage-flyout-tail");
             return {
                 pill: of(button),
                 plate: of(button.closest(".stage-chrome") ?? button),
                 flyout: of(box),
+                tail: tail ? of(tail) : null,
                 stage: {
                     left: outer.left + stage.clientLeft,
                     top: outer.top + stage.clientTop,
@@ -101,6 +105,31 @@ export function misplaced(name: string, at: FlyoutPlacement): string[] {
     const stoppedRight = near(at.flyout.right, at.stage.right - MARGIN) && pillMiddle > flyoutMiddle;
     if (!near(pillMiddle, flyoutMiddle) && !stoppedLeft && !stoppedRight) {
         wrong.push(`${name}: its middle is ${Math.round(flyoutMiddle - pillMiddle)} px off its pill's`);
+    }
+    return wrong;
+}
+
+/**
+ * What is wrong with a flyout's tail, or nothing. It sits on the edge of the flyout that faces the pill, and
+ * its middle is over the pill's middle, so it points at that pill and at no neighbour of it.
+ */
+export function tailOff(name: string, at: FlyoutPlacement): string[] {
+    if (at.tail === null) {
+        return [`${name}: has no tail`];
+    }
+    const wrong: string[] = [];
+    const near = (a: number, b: number): boolean => Math.abs(a - b) <= SLACK;
+    const pillMiddle = (at.pill.left + at.pill.right) / 2;
+    const tailMiddle = (at.tail.left + at.tail.right) / 2;
+    const tailCentre = (at.tail.top + at.tail.bottom) / 2;
+    const onTopEdge = (at.pill.top + at.pill.bottom) / 2 <= (at.stage.top + at.stage.bottom) / 2;
+    const facing = onTopEdge ? at.flyout.top : at.flyout.bottom;
+
+    if (!near(tailMiddle, pillMiddle)) {
+        wrong.push(`${name}: its tail is ${Math.round(tailMiddle - pillMiddle)} px off its pill's middle`);
+    }
+    if (!near(tailCentre, facing)) {
+        wrong.push(`${name}: its tail is ${Math.round(tailCentre - facing)} px off the edge that faces its pill`);
     }
     return wrong;
 }

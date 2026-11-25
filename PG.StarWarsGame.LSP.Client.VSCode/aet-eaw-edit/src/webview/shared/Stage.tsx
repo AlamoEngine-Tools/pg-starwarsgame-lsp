@@ -150,7 +150,8 @@ export function StageFlyout({
             was.left === next.left &&
             was.side === next.side &&
             was.offset === next.offset &&
-            was.maxHeight === next.maxHeight
+            was.maxHeight === next.maxHeight &&
+            was.tail === next.tail
                 ? was
                 : next,
         );
@@ -208,6 +209,15 @@ export function StageFlyout({
                 />
             </div>
             <div className="stage-flyout-body">{children}</div>
+            {/* What joins the flyout to its pill, the way a speech bubble is joined to its speaker.
+                Only once placed: before that there is no pill to point at. */}
+            {at !== null && (
+                <span
+                    className={`stage-flyout-tail at-${at.side === "below" ? "top" : "bottom"}`}
+                    style={{ left: at.tail }}
+                    aria-hidden="true"
+                />
+            )}
         </div>
     );
 }

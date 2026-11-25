@@ -183,6 +183,22 @@ describe("stageFlyoutCss", () => {
         );
     });
 
+    /** The tail points at the pill, so it is on the edge that faces the pill and nowhere else. */
+    it("draws the tail on the top edge or the foot, and never as a target", () => {
+        assert.match(
+            stageFlyoutCss,
+            /\.stage-flyout-tail\.at-top\s*\{[^}]*\btop:/,
+        );
+        assert.match(
+            stageFlyoutCss,
+            /\.stage-flyout-tail\.at-bottom\s*\{[^}]*\bbottom:/,
+        );
+        assert.match(
+            stageFlyoutCss,
+            /\.stage-flyout-tail\s*\{[^}]*pointer-events:\s*none/,
+        );
+    });
+
     it("scrolls the body, never the box, so the head stays put", () => {
         assert.match(stageFlyoutCss, /\.stage-flyout\s*\{[^}]*max-height:/);
         assert.match(
