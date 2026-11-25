@@ -28,5 +28,21 @@ export interface SetPanelLayout {
     value: number;
 }
 
+/** A page asks to drop its staged changes; the host asks the reader first. */
+export interface ConfirmDiscard {
+    type: "confirmDiscard";
+    /** Chosen by the page; the answer carries it back. */
+    id: number;
+    /** How many changes are staged, for the question's text. */
+    count: number;
+}
+
+/** The reader's answer to a {@link ConfirmDiscard}. */
+export interface DiscardAnswer {
+    type: "discardAnswer";
+    id: number;
+    confirmed: boolean;
+}
+
 /** What every webview may send its host besides its own vocabulary. */
-export type CommonToHost = HostRequest | SetPanelLayout;
+export type CommonToHost = HostRequest | SetPanelLayout | ConfirmDiscard;

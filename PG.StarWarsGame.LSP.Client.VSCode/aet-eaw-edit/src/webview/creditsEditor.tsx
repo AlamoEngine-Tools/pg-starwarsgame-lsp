@@ -165,6 +165,7 @@ function App(): React.JSX.Element {
         validation,
         stage,
         save,
+        discard,
         validate,
     } = panel;
 
@@ -558,6 +559,7 @@ function App(): React.JSX.Element {
             problems={problems}
             validation={validation}
             onSave={save}
+            onDiscard={discard}
             onValidate={validate}
         />
     );

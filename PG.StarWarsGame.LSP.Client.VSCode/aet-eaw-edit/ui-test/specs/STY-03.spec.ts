@@ -87,6 +87,34 @@ describe("STY-03", () => {
         await serverReady();
     });
 
+    // Discard asks first, and the editor shows no modal dialog to a test: this window has the setting
+    // behind "Discard & Don't Ask Again" turned off, so Discard acts at once (#222).
+    it("drops a staged value on Discard, stays in Edit mode and writes nothing", async () => {
+        await openStoryGraph("Save_Campaign", "Empire");
+        await inNewestWebview(async () => {
+            await (await browser.$("button.rotary-pos")).waitForExist({ timeout: 90_000 });
+            await graphLoaded();
+            await (await browser.$('button.rotary-pos[title="Edit"]')).click();
+            const discard = await browser.$("button.toolbar-discard");
+            expect(await discard.getAttribute("title")).toBe("Discard - nothing is staged");
+            await setField("Follow_Up", "Dialog", "DROPPED_DIALOG");
+            const save = await browser.$('[title^="Save - "]');
+            await browser.waitUntil(async () => (await save.getAttribute("title")) !== "Save - nothing is staged", {
+                timeout: 15_000,
+                timeoutMsg: "The edit was not staged",
+            });
+
+            await discard.click();
+
+            // Nothing staged, and still Edit: outside it Save would say "Edit mode only".
+            await browser.waitUntil(async () => (await save.getAttribute("title")) === "Save - nothing is staged", {
+                timeout: 30_000,
+                timeoutMsg: "Discard left the value staged",
+            });
+        });
+        expect(fs.readFileSync(thread, "utf8")).toBe(original);
+    });
+
     it("saves the staged value into the thread file and changes nothing else in it", async () => {
         await openStoryGraph("Save_Campaign", "Empire");
         await saveField("Follow_Up", "Dialog", "NEW_DIALOG");

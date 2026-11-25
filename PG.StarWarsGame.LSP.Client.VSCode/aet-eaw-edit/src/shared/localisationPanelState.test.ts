@@ -134,6 +134,20 @@ describe("LocalisationPanelState", () => {
         assert.equal(state.shouldDeliver("hash-2"), true);
     });
 
+    // The page shows its staged edits in its rows. Dropping them needs the file's rows again, and
+    // the file has not moved: an unchanged hash kept the edits on screen with an empty queue behind
+    // them.
+    it("delivers an unchanged file again once the page dropped what it had staged", () => {
+        const state = new LocalisationPanelState();
+        state.noteRead("hash-1");
+        state.syncPending([{ kind: "setValue" }]);
+
+        state.noteDiscarded();
+
+        assert.equal(state.shouldDeliver("hash-1"), true);
+        assert.equal(state.isDirty, false);
+    });
+
     it("delivers the first read", () => {
         assert.equal(
             new LocalisationPanelState().shouldDeliver("hash-1"),

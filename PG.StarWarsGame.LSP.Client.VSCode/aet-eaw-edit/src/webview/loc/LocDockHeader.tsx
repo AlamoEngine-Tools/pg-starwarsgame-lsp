@@ -25,11 +25,18 @@ export function LocPageToolbar(props: {
     problems: readonly LocProblem[];
     validation: ValidationState;
     onSave: () => void;
+    onDiscard: () => void;
     onValidate: () => void;
 }): React.JSX.Element {
     const readOnly = useReadOnly();
     return (
         <PageToolbar
+            discard={{
+                title: l10n.t("Discard - drop all staged changes"),
+                disabled: props.queue.length === 0,
+                disabledReason: l10n.t("Discard - nothing is staged"),
+                onDiscard: props.onDiscard,
+            }}
             save={{
                 title: l10n.t("Save - write all staged changes to the file"),
                 pending: props.queue.length,

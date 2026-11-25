@@ -242,7 +242,12 @@ export class LocalisationEditorPanel extends WebviewPanelHost<
     protected async onMessage(msg: LocalisationEditorToHost): Promise<void> {
         switch (msg.type) {
             case "ready":
+                await this._sendRows();
+                break;
             case "fetch":
+                if (msg.discarded === true) {
+                    this._state.noteDiscarded();
+                }
                 await this._sendRows();
                 break;
             case "pendingSync":

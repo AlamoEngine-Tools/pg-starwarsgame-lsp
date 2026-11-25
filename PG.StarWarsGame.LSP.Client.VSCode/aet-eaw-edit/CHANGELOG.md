@@ -79,6 +79,11 @@
 - **A fold for the dock header** - the header that holds the mode dial folds away with the chevron in its
   top-right corner and opens with it again. The dock of each editor keeps its own fold between sessions
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **Discard beside Save** - the page toolbar of the story graph, the localisation editor and the credits
+  editor carries Discard next to Save. It drops every staged change and shows what is saved again, and writes
+  nothing. It asks first; *Discard & Don't Ask Again* answers for good, and the new setting
+  `aet-eaw-edit.editors.confirmDiscard` turns the question back on
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

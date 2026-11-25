@@ -100,6 +100,46 @@ describe("PageToolbar", () => {
         assert.equal(/Close/.test(html), false, html);
     });
 
+    /** Save and Discard are the two things to do with what is staged, so they stand together. */
+    it("puts Discard beside Save, before the page's own actions", () => {
+        const html = renderToStaticMarkup(
+            <PageToolbar
+                save={{ title: "Save - write it", pending: 2, onSave: noop }}
+                discard={{ title: "Discard - drop it", onDiscard: noop }}
+                actions={<i>a</i>}
+                verdict={verdict}
+            />,
+        );
+
+        const save = html.indexOf("toolbar-save");
+        const discard = html.indexOf("toolbar-discard");
+        const action = html.indexOf("<i>a</i>");
+        assert.ok(save > 0 && save < discard && discard < action, html);
+        assert.match(
+            html,
+            /class="icon-btn toolbar-discard" title="Discard - drop it"/,
+        );
+    });
+
+    it("says why Discard cannot be pressed while it cannot", () => {
+        const html = renderToStaticMarkup(
+            <PageToolbar
+                discard={{
+                    title: "Discard - drop it",
+                    disabled: true,
+                    disabledReason: "Discard - nothing is staged",
+                    onDiscard: noop,
+                }}
+                verdict={verdict}
+            />,
+        );
+
+        assert.match(
+            html,
+            /class="icon-btn toolbar-discard" title="Discard - nothing is staged" aria-label="Discard - nothing is staged" disabled=""/,
+        );
+    });
+
     it("says why Save cannot be pressed while it cannot", () => {
         const html = renderToStaticMarkup(
             <PageToolbar

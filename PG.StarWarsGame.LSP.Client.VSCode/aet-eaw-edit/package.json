@@ -666,6 +666,12 @@
             "type": "boolean",
             "default": true,
             "markdownDescription": "%config.whatsNew.openAfterUpdate.markdownDescription%"
+          },
+          "aet-eaw-edit.editors.confirmDiscard": {
+            "order": 5,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.editors.confirmDiscard.markdownDescription%"
           }
         }
       },

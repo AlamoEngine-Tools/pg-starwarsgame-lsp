@@ -24,6 +24,11 @@ export interface LocalisationEditorReady {
 /** Read the file again: after a save, or an invalidation with nothing staged. */
 export interface LocalisationEditorFetch {
     type: "fetch";
+    /**
+     * The page dropped its staged edits and needs the file's rows back. Without it an unchanged
+     * file is not sent again, and the dropped edits would stay on screen.
+     */
+    discarded?: boolean;
 }
 
 /** The staged queue as it stands, mirrored so a dirty tab can offer to save when it closes. */

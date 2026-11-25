@@ -708,7 +708,8 @@
   "STY-03": {
     "open": "C:\\temp\\aet-test-STY-save",
     "settings": {
-      "aet-eaw-edit.experimental.storyEditing": true
+      "aet-eaw-edit.experimental.storyEditing": true,
+      "aet-eaw-edit.editors.confirmDiscard": false
     }
   },
   "SET-35": {
@@ -725,5 +726,11 @@
   },
   "STY-05": {
     "open": "C:\\temp\\aet-test-STY-rename"
+  },
+  "SET-37": {
+    "open": "C:\\temp\\aet-test-SET-discard",
+    "settings": {
+      "aet-eaw-edit.editors.confirmDiscard": false
+    }
   }
 }

@@ -1,5 +1,6 @@
-// SET-03: eleven settings on the settings page, fifteen development settings behind @tag:advanced. The
-// eleventh is What's New's openAfterUpdate (#328), added after the protocol counted ten.
+// SET-03: twelve settings on the settings page, fifteen development settings behind @tag:advanced. The
+// eleventh is What's New's openAfterUpdate (#328), the twelfth the editors' confirmDiscard (#222); the
+// protocol counted ten.
 import fs from "node:fs";
 import path from "node:path";
 import { expect } from "@wdio/globals";
@@ -13,8 +14,8 @@ describe("SET-03", () => {
         await serverReady();
     });
 
-    it("shows eleven settings and no feature flag on the plain search", async () => {
-        expect(await settingsFound(ext)).toBe(11);
+    it("shows twelve settings and no feature flag on the plain search", async () => {
+        expect(await settingsFound(ext)).toBe(12);
         const shown = await settingsShown();
         expect(shown.filter((s) => /Features/i.test(s.category))).toEqual([]);
     });

@@ -12,7 +12,7 @@
 // Glyphs only, as everywhere a glyph means the thing. Every page has the bar, and a control that
 // appears on more than one page stands in the same spot on each: the bar takes its controls by
 // name and places them itself, so no page can order them its own way. Save is first on the left,
-// filled while changes are staged; the verdict is last on the right. What only some pages have -
+// filled while changes are staged, with Discard beside it; the verdict is last on the right. What only some pages have -
 // their own actions, after Save - grows inward from there, so its coming and going moves neither.
 // A page that stages nothing has no Save. There is no Close: the tab's own cross closes the page.
 
@@ -30,9 +30,18 @@ export type ToolbarSave = Enablement & {
     onSave: () => void;
 };
 
+/** Dropping what is staged, and why it cannot be pressed when it cannot. */
+export type ToolbarDiscard = Enablement & {
+    /** What pressing it drops, as `Discard - ...`. */
+    title: string;
+    onDiscard: () => void;
+};
+
 export interface PageToolbarProps {
     /** Left out on a page that stages nothing, which has nothing to save. */
     save?: ToolbarSave;
+    /** Beside Save, on the pages that have it: the staged changes dropped instead of written. */
+    discard?: ToolbarDiscard;
     /** The page's own actions, after Save: icon buttons. */
     actions?: ReactNode;
     /** The verdict on what is open. Every page has one, and it is always the last control. */
@@ -41,6 +50,7 @@ export interface PageToolbarProps {
 
 export function PageToolbar({
     save,
+    discard,
     actions,
     verdict,
 }: PageToolbarProps): React.JSX.Element {
@@ -52,6 +62,24 @@ export function PageToolbar({
         >
             <span className="page-toolbar-start">
                 {save !== undefined && <SaveButton save={save} />}
+                {discard !== undefined &&
+                    (discard.disabled === undefined ? (
+                        <IconButton
+                            icon="reset"
+                            className="toolbar-discard"
+                            title={discard.title}
+                            onClick={discard.onDiscard}
+                        />
+                    ) : (
+                        <IconButton
+                            icon="reset"
+                            className="toolbar-discard"
+                            title={discard.title}
+                            disabled={discard.disabled}
+                            disabledReason={discard.disabledReason}
+                            onClick={discard.onDiscard}
+                        />
+                    ))}
                 {actions}
             </span>
             <span className="page-toolbar-end">{verdict}</span>

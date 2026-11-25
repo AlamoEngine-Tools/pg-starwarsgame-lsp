@@ -162,6 +162,7 @@ import { initPanelLayout } from "./shared/panelLayoutBridge";
 import { createRequester } from "./shared/hostRequest";
 import { poster, transport, vscodeApi } from "./shared/vscodeApi";
 import { PageToolbar } from "./shared/PageToolbar";
+import { requestDiscard } from "./shared/discardRequest";
 import type {
     StoryGraphToHost,
     StoryGraphToWebview,
@@ -6672,6 +6673,19 @@ function App(): React.JSX.Element {
         });
     }, []);
 
+    // Drops what is staged and stays in Edit: the graph is read again, which shows what is saved.
+    const discardEdits = useCallback(() => {
+        void requestDiscard(transport, pendingCommands.length).then(
+            (confirmed) => {
+                if (!confirmed) {
+                    return;
+                }
+                clearPendingCommands();
+                post({ type: "fetch", filters: filtersRef.current });
+            },
+        );
+    }, []);
+
     const validateEdits = useCallback(() => {
         post({
             type: "validateBatch",
@@ -7733,6 +7747,30 @@ function App(): React.JSX.Element {
                                                   "Save - nothing is staged",
                                               ),
                                   onSave: saveEdits,
+                              }
+                            : undefined
+                    }
+                    discard={
+                        availableModes.edit
+                            ? {
+                                  title: l10n.t(
+                                      "Discard - drop all staged changes",
+                                  ),
+                                  disabled:
+                                      mode !== "edit" ||
+                                      pendingCount === 0 ||
+                                      saving,
+                                  disabledReason:
+                                      mode !== "edit"
+                                          ? l10n.t("Discard - Edit mode only")
+                                          : saving
+                                            ? l10n.t(
+                                                  "Discard - writing the staged changes now",
+                                              )
+                                            : l10n.t(
+                                                  "Discard - nothing is staged",
+                                              ),
+                                  onDiscard: discardEdits,
                               }
                             : undefined
                     }
