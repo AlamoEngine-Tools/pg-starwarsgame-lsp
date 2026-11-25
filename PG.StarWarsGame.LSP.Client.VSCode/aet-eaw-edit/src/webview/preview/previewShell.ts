@@ -9,6 +9,7 @@
 import styled from "styled-components";
 
 import {
+    detailsFlyoutCss,
     dockBodyCss,
     dockChromeCss,
     dockHeaderCss,
@@ -1403,64 +1404,10 @@ export const Shell = styled.div`
         opacity: 1;
     }
 
-    /* Pinned against the WINDOW, because the row it belongs to lives inside a scroller that would
-       clip it. placeInfo and placeCardInfo supply the corner; everything here is the box itself. */
+    /* The flyout a card's or an ability's info pill opens beside the dock. Shared with the story
+       graph's palette since that took it - see detailsFlyoutCss. */
 
-    .details-flyout {
-        position: fixed;
-        z-index: 6;
-        width: 320px;
-        max-height: 62vh;
-        display: flex;
-        flex-direction: column;
-        border: var(--space-1) solid var(--colour-line-strong);
-        border-radius: var(--radius-6);
-        background: var(--colour-panel);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-    }
-
-    .details-head {
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-6);
-        padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
-        border-bottom: var(--space-1) solid var(--colour-line);
-        font-size: var(--font-size-11);
-    }
-
-    .details-title {
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    /* Takes what is left and gives it back: the title is what identifies the row, so it is the
-       half that survives a narrow box. */
-
-    .details-subtitle {
-        flex: 1;
-        min-width: 0;
-        color: var(--colour-muted);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .details-head .icon-btn {
-        margin-left: auto;
-        align-self: center;
-    }
-
-    .details-body {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-8);
-        padding: var(--space-8) var(--space-8) var(--space-8);
-        overflow-y: auto;
-    }
+    ${detailsFlyoutCss}
 
     /* Word for word what the localisation and encyclopedia problem bars are, because it is the
        same bar in the same place. The relative position is the one that matters most: the shared

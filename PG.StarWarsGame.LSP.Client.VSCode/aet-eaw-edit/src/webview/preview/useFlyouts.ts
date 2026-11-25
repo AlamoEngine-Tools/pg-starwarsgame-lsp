@@ -12,7 +12,7 @@ import {
     useRef,
     useState,
 } from "react";
-import { anchorFlyout } from "./flyoutAnchor";
+import { anchorFlyout, type AnchorPlacement } from "../shared/flyoutAnchor";
 
 /** What useFlyouts reads from the rest of the preview. */
 export interface FlyoutsInputs {
@@ -67,19 +67,15 @@ export function useFlyouts({
        list back into the wall of prose that putting them behind a button was meant to end. */
     const [infoCard, setInfoCard] = useState<string | null>(null);
     const cardInfoRef = useRef<HTMLDivElement | null>(null);
-    const [cardInfoAt, setCardInfoAt] = useState<{
-        left: number;
-        top: number;
-    } | null>(null);
+    const [cardInfoAt, setCardInfoAt] = useState<AnchorPlacement | null>(null);
 
     /* The same, for an ability card. Its own slot rather than sharing `infoCard`: the two lists are
        open at once - the abilities are a stage flyout - and one id could not say which was meant. */
     const [infoAbility, setInfoAbility] = useState<string | null>(null);
     const abilityInfoRef = useRef<HTMLDivElement | null>(null);
-    const [abilityInfoAt, setAbilityInfoAt] = useState<{
-        left: number;
-        top: number;
-    } | null>(null);
+    const [abilityInfoAt, setAbilityInfoAt] = useState<AnchorPlacement | null>(
+        null,
+    );
     const [hardpointSearchPressed, setHardpointSearchPressed] = useState(false);
     const hardpointSearchRef = useRef<HTMLDivElement | null>(null);
 
@@ -246,10 +242,7 @@ export function useFlyouts({
      * second thing to keep in step with `anchorFlyout`.
      */
     const placeBesideRow = useCallback(
-        (
-            selector: string,
-            box: HTMLElement | null,
-        ): { left: number; top: number } | null => {
+        (selector: string, box: HTMLElement | null): AnchorPlacement | null => {
             const button = document.querySelector(selector);
             const dock = document.querySelector(".right-dock");
 

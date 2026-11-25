@@ -750,5 +750,14 @@
     "settings": {
       "aet-eaw-edit.experimental.storyEditing": true
     }
+  },
+  "STY-08": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "PRV-81": {
+    "open": "{repo}\\eaw"
   }
 }

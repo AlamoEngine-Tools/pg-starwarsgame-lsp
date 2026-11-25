@@ -157,7 +157,14 @@ export type StoryGraphToHost =
 
 // ── host -> webview ─────────────────────────────────────────────────────────
 
-/** The event and reward types with their parameters and notes, each keyed by type name. */
+/** What the schema says about one type in prose: what the type does, and its notes. */
+export interface StoryTypeDoc {
+    description: string | null;
+    /** Ranked by the server, worst first. */
+    notes: StoryNoteDto[];
+}
+
+/** The event and reward types with their names, documentation and parameters, by type name. */
 export interface StoryGraphSchema {
     type: "schema";
     eventTypes: string[];
@@ -168,6 +175,12 @@ export interface StoryGraphSchema {
      */
     eventTypeLabels: Record<string, string>;
     rewardTypeLabels: Record<string, string>;
+    /**
+     * What the schema says about each type in prose, by technical name: what the type does and
+     * its notes. For the documentation a type's tile opens; the parameters travel below.
+     */
+    eventTypeDocs: Record<string, StoryTypeDoc>;
+    rewardTypeDocs: Record<string, StoryTypeDoc>;
     typeNotes: Record<string, StoryNoteDto[]>;
     eventTypeParams: Record<string, StoryParamSchemaDto[]>;
     rewardTypeParams: Record<string, StoryParamSchemaDto[]>;

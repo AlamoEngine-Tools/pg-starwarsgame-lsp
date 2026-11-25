@@ -2054,3 +2054,95 @@ export const inspectorCss = `
         outline-offset: -1px;
     }
 `;
+
+/**
+ * The flyout a row's info pill opens beside the dock - a hardpoint card's measurements, an
+ * ability's facts, a story type's documentation.
+ *
+ * Shared since the story graph's palette took it from the model preview: the same box, placed the
+ * same way (anchorFlyout), with the same tail. The markup is DetailsFlyout.
+ */
+export const detailsFlyoutCss = `
+    /* Pinned against the WINDOW, because the row it belongs to lives inside a scroller that would
+       clip it. anchorFlyout supplies the corner; everything here is the box itself. */
+
+    .details-flyout {
+        position: fixed;
+        z-index: 6;
+        width: 320px;
+        max-height: 62vh;
+        display: flex;
+        flex-direction: column;
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-6);
+        background: var(--colour-panel);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    }
+
+    .details-head {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-6);
+        padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
+        border-bottom: var(--space-1) solid var(--colour-line);
+        font-size: var(--font-size-11);
+    }
+
+    .details-title {
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Takes what is left and gives it back: the title is what identifies the row, so it is the
+       half that survives a narrow box. */
+
+    .details-subtitle {
+        flex: 1;
+        min-width: 0;
+        color: var(--colour-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .details-head .icon-btn {
+        margin-left: auto;
+        align-self: center;
+    }
+
+    .details-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-8);
+        padding: var(--space-8) var(--space-8) var(--space-8);
+        overflow-y: auto;
+    }
+
+    /* The tail: what joins the flyout to the pill that opened it, the way a speech bubble is
+       joined to its speaker. A square turned on its corner with its middle on the edge that faces
+       the dock, so the half that shows is a point and its two outer sides carry the box's own
+       border. It stands in the gap the placement leaves and stops a pixel short of the dock.
+
+       Its place down the edge is set on it, measured from the box's OUTER edge; a positioned child
+       is measured from inside the border, hence the margin that takes the border back. */
+
+    .details-tail {
+        position: absolute;
+        right: -6px;
+        box-sizing: border-box;
+        width: 10px;
+        height: 10px;
+        margin-top: calc(-1 * var(--space-1));
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-bottom: none;
+        border-left: none;
+        background: var(--colour-panel);
+        transform: translateY(-50%) rotate(45deg);
+        /* Never a target: it reaches over the gap towards the pill it points at. */
+        pointer-events: none;
+    }
+`;

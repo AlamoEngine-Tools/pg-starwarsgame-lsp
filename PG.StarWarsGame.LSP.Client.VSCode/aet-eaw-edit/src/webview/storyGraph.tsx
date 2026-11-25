@@ -29,11 +29,13 @@ import {
     useState,
 } from "react";
 import { Combobox } from "./shared/Combobox";
+import { badgeIcon } from "./shared/badges";
 import { Icon, SeverityMark } from "./shared/Icon";
 import { ModalLayerContext } from "./shared/Modal";
 import { SelectField } from "./shared/SelectField";
 import {
     comboboxCss,
+    detailsFlyoutCss,
     dockBodyCss,
     dockChromeCss,
     dockHeaderCss,
@@ -81,6 +83,8 @@ import { createLabelSizer, LINE_RATIO, wrapLabel } from "./storyGraph/lodLabel";
 import { facetList } from "./storyGraph/facets";
 import { PathFilterMenu } from "./storyGraph/PathFilterMenu";
 import { noteBadge, type StoryNote } from "./storyGraph/typeNotes";
+import { noteLine, pillSeverity, type TypeDoc } from "./storyGraph/typeDocs";
+import { TypeInfoFlyout, type TypeInfo } from "./storyGraph/TypeInfoFlyout";
 import {
     breakPieces,
     matchesType,
@@ -5807,6 +5811,128 @@ const Shell = styled.div`
         border-style: solid;
         border-width: var(--space-1);
         cursor: grab;
+        /* For the info pill in its corner. */
+        position: relative;
+    }
+
+    /* The pill in a type tile's corner: it opens the type's documentation beside the dock, and it
+       is the tile's only mark - red where the engine does not run the type, yellow where nobody
+       has verified it. The look is the shared info badge's; this is where it stands. */
+
+    .palette-tile .tile-info {
+        position: absolute;
+        top: var(--space-2);
+        right: var(--space-2);
+    }
+
+    .palette-tile .tile-info.active {
+        opacity: 1;
+        background: var(--colour-toolbar-hover);
+    }
+
+    ${detailsFlyoutCss}
+
+    /* What the documentation flyout holds. Prose wraps here, unlike a card's facts, and the two
+       names in its head are a type's two names, so neither is cut short while there is room. */
+
+    .type-doc .details-body {
+        font-size: var(--font-size-12);
+        line-height: 1.45;
+    }
+
+    .type-doc p {
+        margin: 0;
+    }
+
+    .type-doc-notes {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .type-doc-notes li {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-6);
+    }
+
+    .type-doc-notes li svg {
+        flex-shrink: 0;
+        margin-top: var(--space-2);
+    }
+
+    .type-doc-notes .sev-warning svg {
+        color: var(--colour-warning);
+    }
+    .type-doc-notes .sev-error svg {
+        color: var(--colour-error);
+    }
+
+    .type-doc-heading {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-6);
+        padding-top: var(--space-4);
+        border-top: var(--space-1) solid var(--colour-line);
+        font-size: var(--font-size-11);
+        color: var(--colour-muted);
+    }
+
+    .type-doc-heading .section-count {
+        margin-left: auto;
+    }
+
+    .type-doc-none {
+        color: var(--colour-muted);
+    }
+
+    .type-doc-params {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-8);
+    }
+
+    /* A parameter: its position, its name, what it holds, then the sentence under the three. */
+
+    .type-doc-params li {
+        display: grid;
+        grid-template-columns: auto auto 1fr auto;
+        align-items: baseline;
+        column-gap: var(--space-6);
+        row-gap: var(--space-2);
+    }
+
+    .type-doc-params .param-position {
+        color: var(--colour-muted);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .type-doc-params .param-name {
+        font-weight: 600;
+    }
+
+    .type-doc-params .param-kind {
+        min-width: 0;
+        color: var(--colour-muted);
+        font-family: var(--font-family-code);
+        font-size: var(--font-size-11);
+        overflow-wrap: anywhere;
+    }
+
+    .type-doc-params .param-optional {
+        color: var(--colour-muted);
+        font-size: var(--font-size-11);
+    }
+
+    .type-doc-params .param-text {
+        grid-column: 2 / -1;
+        color: var(--colour-muted);
     }
 
     .palette-tile:hover {
@@ -6555,6 +6681,15 @@ function App(): React.JSX.Element {
         ReadonlyMap<string, string>
     >(new Map());
     const [typeNames, setTypeNames] = useState<TypeNameMode>("display");
+    // What the schema says about each type in prose, and whose documentation is open beside the
+    // palette - one at a time, like every row flyout.
+    const [eventTypeDocs, setEventTypeDocs] = useState<
+        ReadonlyMap<string, TypeDoc>
+    >(new Map());
+    const [rewardTypeDocs, setRewardTypeDocs] = useState<
+        ReadonlyMap<string, TypeDoc>
+    >(new Map());
+    const [typeInfo, setTypeInfo] = useState<TypeInfo | null>(null);
     const [status, setStatus] = useState<string | null>(
         l10n.t("Loading story graph..."),
     );
@@ -7402,6 +7537,22 @@ function App(): React.JSX.Element {
                             ),
                         ),
                     );
+                    setEventTypeDocs(
+                        new Map(
+                            Object.entries(
+                                (msg.eventTypeDocs as
+                                    Record<string, TypeDoc> | undefined) ?? {},
+                            ),
+                        ),
+                    );
+                    setRewardTypeDocs(
+                        new Map(
+                            Object.entries(
+                                (msg.rewardTypeDocs as
+                                    Record<string, TypeDoc> | undefined) ?? {},
+                            ),
+                        ),
+                    );
                     // EventNodeView is rendered by rete's own portal pipeline, not as an App
                     // child, so it can't receive these as React props - mirrored into module
                     // scope (eventTypeParams/rewardTypeParams/untestedTypes) for that reason.
@@ -7937,6 +8088,31 @@ function App(): React.JSX.Element {
                                     onClose={() => setSimSelection(null)}
                                 />
                             ) : null}
+                            {/* A type's documentation, beside the dock rather than unfolded inside the
+                        palette. Only in Edit mode: the palette is the one place it opens from. */}
+                            {mode === "edit" && typeInfo ? (
+                                <TypeInfoFlyout
+                                    info={typeInfo}
+                                    names={{
+                                        mode: typeNames,
+                                        labels:
+                                            typeInfo.category === "trigger"
+                                                ? eventTypeLabels
+                                                : rewardTypeLabels,
+                                    }}
+                                    doc={(typeInfo.category === "trigger"
+                                        ? eventTypeDocs
+                                        : rewardTypeDocs
+                                    ).get(typeInfo.type)}
+                                    params={
+                                        (typeInfo.category === "trigger"
+                                            ? eventTypeParams
+                                            : rewardTypeParams
+                                        ).get(typeInfo.type) ?? []
+                                    }
+                                    onClose={() => setTypeInfo(null)}
+                                />
+                            ) : null}
                         </div>
                         <div className="bottom-panels">
                             {showProblems && problems.length ? (
@@ -8031,6 +8207,10 @@ function App(): React.JSX.Element {
                                             mode: typeNames,
                                             labels: rewardTypeLabels,
                                         }}
+                                        eventDocs={eventTypeDocs}
+                                        rewardDocs={rewardTypeDocs}
+                                        info={typeInfo}
+                                        onInfo={setTypeInfo}
                                     />
                                 ) : null}
                                 {mode === "simulate" && simState?.running ? (
@@ -8791,12 +8971,23 @@ function NodePalette(props: {
     eventNames: TypeNames;
     /** The same for the rewards: a reward and an event may share a technical name. */
     rewardNames: TypeNames;
+    /** What the schema says about each type, for the mark on its tile's info pill. */
+    eventDocs: ReadonlyMap<string, TypeDoc>;
+    rewardDocs: ReadonlyMap<string, TypeDoc>;
+    /** The type whose documentation is open beside the dock, and how a pill opens or closes it. */
+    info: TypeInfo | null;
+    onInfo: (info: TypeInfo | null) => void;
 }): React.JSX.Element {
     const [search, setSearch] = useState("");
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
         Rewards: true,
     });
+
+    // The documentation flyout belongs to a tile here. When the palette goes - the mode changes,
+    // the dock folds - there is no pill left for it to point at, so it goes too.
+    const { onInfo } = props;
+    useEffect(() => () => onInfo(null), [onInfo]);
     const q = search.trim().toLowerCase();
 
     // By either name, whichever the tiles show: a type is found by what it is called in XML and
@@ -8829,6 +9020,7 @@ function NodePalette(props: {
         label: React.ReactNode,
         drag: PaletteDrag,
         title: string,
+        corner: React.JSX.Element | null = null,
     ): React.JSX.Element => {
         const color = stepColor(drag.category, drag.type);
         return (
@@ -8836,6 +9028,7 @@ function NodePalette(props: {
                 key={key}
                 className="dock-tile palette-tile"
                 draggable
+                data-category={drag.category}
                 data-type={drag.type ?? undefined}
                 style={{ background: fadedBg(color), borderColor: color }}
                 onDragStart={(e) => onDragStart(e, drag)}
@@ -8843,6 +9036,7 @@ function NodePalette(props: {
             >
                 {glyph ? <span className="tile-glyph">{glyph}</span> : null}
                 <span className="tile-label">{label}</span>
+                {corner}
             </div>
         );
     };
@@ -8865,6 +9059,43 @@ function NodePalette(props: {
             category === "trigger" ? props.eventNames : props.rewardNames;
         const shown = tileName(names, type, q);
         const other = otherName(names, type, q);
+
+        // The info pill: the documentation is one press away, and the pill is the tile's only
+        // mark - its severity is the worst thing the schema notes about the type. A press on it
+        // must not start a drag of the tile it sits on, so the pill refuses the drag itself.
+        const notes = (
+            category === "trigger" ? props.eventDocs : props.rewardDocs
+        ).get(type)?.notes;
+        const severity = pillSeverity(notes);
+        const open =
+            props.info?.category === category && props.info.type === type;
+        const pill = (
+            <button
+                type="button"
+                className={
+                    `info-badge tile-info sev-${severity}` +
+                    (open ? " active" : "")
+                }
+                draggable
+                onDragStart={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }}
+                aria-expanded={open}
+                aria-label={l10n.t("Documentation")}
+                title={
+                    severity === "info" || notes === undefined
+                        ? l10n.t("Documentation")
+                        : noteLine(notes[0])
+                }
+                onClick={(e) => {
+                    e.stopPropagation();
+                    props.onInfo(open ? null : { category, type });
+                }}
+            >
+                <Icon name={badgeIcon(severity)} size={14} />
+            </button>
+        );
         return tile(
             type,
             category === "trigger" ? <Icon name={eventIcon(type)} /> : null,
@@ -8878,6 +9109,7 @@ function NodePalette(props: {
                 : shown.text,
             { category, type },
             [shown.text, other, hint].filter(Boolean).join("\n"),
+            pill,
         );
     };
 

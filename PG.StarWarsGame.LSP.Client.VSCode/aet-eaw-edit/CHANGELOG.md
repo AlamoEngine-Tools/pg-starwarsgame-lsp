@@ -102,6 +102,12 @@
   found by its technical name alone shows that name while the search is set. The new setting
   `aet-eaw-edit.editors.storyTypeNames` switches the tiles to the technical names, in a graph that is open
   too ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **Documentation on a story type's tile** - each event and reward tile in the story graph's palette carries
+  an info pill that opens the type's documentation beside the dock: both names, what the type does, the
+  schema's notes and every parameter with what it holds. The pill is red on a type the engine does not run
+  and yellow on one nobody has verified. The flyouts an info pill opens, here and on a hardpoint or ability
+  card in the model preview, carry a tail that points at the pill
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

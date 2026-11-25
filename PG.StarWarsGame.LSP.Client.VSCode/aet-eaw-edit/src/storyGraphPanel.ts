@@ -22,6 +22,7 @@ import type {
     StoryEditorMode,
     StoryGraphToHost,
     StoryGraphToWebview,
+    StoryTypeDoc,
 } from "./protocol/panels/storyGraph";
 import {
     EDIT_BATCH_EDITOR,
@@ -723,6 +724,8 @@ export class StoryGraphPanel extends WebviewPanelHost<
             rewardTypes: rewards.map((t) => t.name),
             eventTypeLabels: labelsOf(events),
             rewardTypeLabels: labelsOf(rewards),
+            eventTypeDocs: docsOf(events),
+            rewardTypeDocs: docsOf(rewards),
             // Keyed by type name, ranked worst first, events and rewards together: a node knows
             // which of the two it is, and the webview only ever looks one name up.
             typeNotes: Object.fromEntries(
@@ -878,6 +881,20 @@ function labelsOf(
         }
     }
     return labels;
+}
+
+/** What the schema says about each type in prose, by the type's technical name. */
+function docsOf(
+    types: readonly StoryTypeSchemaDto[],
+): Record<string, StoryTypeDoc> {
+    const docs: Record<string, StoryTypeDoc> = {};
+    for (const type of types) {
+        docs[type.name] = {
+            description: type.description?.trim() || null,
+            notes: type.notes ?? [],
+        };
+    }
+    return docs;
 }
 
 /** " (change N)" for the command the server refused, counted from one; empty when it named none. */
