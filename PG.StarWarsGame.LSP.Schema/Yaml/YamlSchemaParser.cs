@@ -288,6 +288,7 @@ internal static class YamlSchemaParser
             {
                 Name = v.Name,
                 Value = string.IsNullOrWhiteSpace(v.Value) ? null : v.Value,
+                Label = v.Label,
                 Description = v.Description,
                 Notes = ReadNotes(v.Notes),
                 Groups = v.Groups,

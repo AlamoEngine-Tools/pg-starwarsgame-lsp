@@ -507,6 +507,9 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal("Event", param.Label);
         var enter = Assert.Single(result.EventTypes, t => t.Name == "STORY_ENTER");
         Assert.Null(Assert.Single(enter.Params).Label);
+        // The type's own display name travels the same way: what the schema gives, or null.
+        Assert.Equal("Time elapsed", Assert.Single(result.EventTypes, t => t.Name == "STORY_ELAPSED").Label);
+        Assert.Null(enter.Label);
         // Notes travel whole rather than as one boolean: the editor has to tell an untested type
         // from one the engine ignores, and until 2.0.0 the wire could only say "untested".
         var untested = Assert.Single(
@@ -868,7 +871,11 @@ public sealed class StoryProtocolHandlersTest
             Name = "StoryEventType",
             Values =
             [
-                new EnumValueDefinition { Name = "STORY_ELAPSED" },
+                new EnumValueDefinition
+                {
+                    Name = "STORY_ELAPSED",
+                    Label = new Dictionary<string, string> { ["en"] = "Time elapsed" }
+                },
                 new EnumValueDefinition { Name = "STORY_TRIGGER" },
                 new EnumValueDefinition
                 {

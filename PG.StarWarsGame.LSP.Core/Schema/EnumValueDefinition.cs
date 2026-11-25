@@ -20,6 +20,13 @@ public sealed record EnumValueDefinition
     /// <summary>The member's value: <see cref="Value" /> where the schema writes one, else its name.</summary>
     public string EngineValue => Value ?? Name;
 
+    /// <summary>
+    ///     The member's display name, by language: a few words for where the editor shows a name
+    ///     and not an identifier - the story graph's palette shows it on a type's tile. Empty where
+    ///     the schema gives none; <see cref="Name" /> stays what XML writes and what is compared.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Label { get; init; } = new Dictionary<string, string>();
+
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
 
     /// <summary>

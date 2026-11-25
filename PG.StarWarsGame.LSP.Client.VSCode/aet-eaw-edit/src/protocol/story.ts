@@ -204,6 +204,11 @@ export interface StoryTypeSchemaDto {
      */
     notes: StoryNoteDto[];
     params: StoryParamSchemaDto[];
+    /**
+     * The type's display name, in one to four words: what a palette tile shows where the reader has
+     * asked for names and not identifiers. Null for a type the schema has not named.
+     */
+    label?: string | null;
 }
 
 export interface GetStorySchemaResult {

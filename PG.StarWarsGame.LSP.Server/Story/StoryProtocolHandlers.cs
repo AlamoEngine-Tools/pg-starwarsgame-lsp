@@ -277,7 +277,10 @@ public sealed class GetStorySchemaHandler(ISchemaProvider schema)
                     p.Description.GetValueOrDefault("en"),
                     p.Enum?.Values.Select(v => v.Name).ToList(),
                     p.Label.GetValueOrDefault("en")))
-                .ToList()));
+                .ToList(),
+                // English, as the description and every other text here: the schema carries no
+                // other language yet. Null where the schema has not named the type.
+                value.Label.GetValueOrDefault("en")));
         return types;
     }
 }
