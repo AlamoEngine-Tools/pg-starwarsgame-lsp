@@ -741,5 +741,8 @@
   },
   "STY-06": {
     "open": "{repo}\\eaw"
+  },
+  "PRV-80": {
+    "open": "{repo}\\eaw"
   }
 }

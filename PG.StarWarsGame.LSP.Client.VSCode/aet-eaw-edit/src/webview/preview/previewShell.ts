@@ -1007,6 +1007,10 @@ export const Shell = styled.div`
     .stage-flyout input[type="number"],
     .stage-flyout select {
         padding: var(--space-4) var(--space-8);
+        /* The padding goes INSIDE the width. A text field in a .field is as wide as its row, and
+           this page has no box-sizing reset: with the padding on top of that width the projectile
+           search ran past its row and out of the flyout, and the flyout scrolled sideways. */
+        box-sizing: border-box;
     }
 
     /* A list box, where the padding has to go on the ROWS - padding on the select itself indents

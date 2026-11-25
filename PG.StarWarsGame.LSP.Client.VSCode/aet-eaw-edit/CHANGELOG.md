@@ -101,6 +101,9 @@
   pill, below a pill on the top edge and above one on the bottom edge, clear of the pill's plate, and follows
   the pill when the panel is resized. The stage's side edge still stops it
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **The projectile search stays inside the weapon flyout** - the search field in the model preview's weapon
+  settings ran past the flyout's right edge, and the flyout scrolled sideways
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 - **A rename of a `Campaign_Set` or `Overlap_Test` value leaves a dependency's files alone** - renaming
   the value in a project that extends another rewrote the members in the referenced project's files too,
   which no other rename does. Only the members the project owns are rewritten now, and a value none of
