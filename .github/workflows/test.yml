@@ -56,10 +56,22 @@ jobs:
       with:
         node-version: 22
 
+    # Whether this run has to exercise the setup scripts' harness: always on a push, a release and
+    # a manual run, and on a pull request only when it changed one of the harness's inputs. The
+    # harness was the slowest step of the Windows job - 244 s of a 14-minute run - for two scripts
+    # that change a few times a year. The real setup below still runs them in every run.
+    - name: Detect setup script changes
+      id: setup-scripts
+      shell: bash
+      run: node scripts/setup-scripts-changed.js >> "$GITHUB_OUTPUT"
+
     # The workspace setup scripts (both, on both operating systems, against local throwaway
-    # repositories) and the release version helper. Runs before the real setup so a broken script
-    # fails here, with a scenario name, rather than as a build error further down.
+    # repositories), the release version helper and the project file guard. Runs before the real
+    # setup so a broken script fails here, with a scenario name, rather than as a build error
+    # further down. The setup scripts' scenarios report as skipped when the step above says so.
     - name: Test the repo scripts
+      env:
+        SETUP_SCRIPTS_CHANGED: ${{ steps.setup-scripts.outputs.changed }}
       run: node --test "scripts/*.test.js"
 
     # Windows runs the PowerShell script and Ubuntu the bash one, so every run exercises both on
