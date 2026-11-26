@@ -32,7 +32,6 @@ import { Combobox } from "./shared/Combobox";
 import { badgeIcon } from "./shared/badges";
 import { Icon, SeverityMark } from "./shared/Icon";
 import { ModalLayerContext } from "./shared/Modal";
-import { SelectField } from "./shared/SelectField";
 import { SearchPlate } from "./shared/SearchPlate";
 import { compileMatcher, type SearchMode } from "./shared/searchPattern";
 import {
@@ -66,7 +65,7 @@ import {
     isLifecycleStep,
     resolvePath,
 } from "./simPlayback";
-import { ClearFiltersButton } from "./storyGraph/ClearFiltersButton";
+import { GraphFilterPlate } from "./storyGraph/GraphFilterPlate";
 import {
     canvasEdgeStyle,
     type CanvasEdgeStyle,
@@ -220,6 +219,8 @@ initPanelLayout(vscodeApi);
  */
 interface FilterState {
     nameFilter: string;
+    /** How `nameFilter` is read, as the filter plate's field shows it. Not a filter: the reset keeps it. */
+    nameFilterMode: SearchMode;
     branch: string;
     lifecycle: string;
     reachableFrom: string;
@@ -347,6 +348,7 @@ async function fetchParamOptions(
 
 const EMPTY_FILTERS: FilterState = {
     nameFilter: "",
+    nameFilterMode: "text",
     branch: "",
     lifecycle: "",
     reachableFrom: "",
@@ -5737,17 +5739,6 @@ const Shell = styled.div`
         flex-shrink: 0;
     }
 
-    .filters-below {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-    }
-
-    .filters-below .select-field {
-        display: flex;
-        width: 100%;
-    }
-
     /* Icons inherit their button's colour (never coloured individually) and scale per context. An
        SVG glyph sits on the middle of the line beside it, as the codicon font does. The dial sizes
        its own glyphs in rotarySwitchCss. */
@@ -6553,9 +6544,31 @@ const Shell = styled.div`
 
     /* The colour key's corner plate - bottom right, where the legend strip used to end. */
 
-    .key-corner {
+    /* The canvas's lower right corner, shared by the event filter's plate and the colour key: one
+       row along the bottom edge, the key in the corner and the plate to its left, growing leftwards
+       and upwards when it opens. As wide as the canvas so the open plate can take a share of it;
+       the empty part of the row lets the canvas under it be dragged. */
+
+    .canvas-foot {
+        position: absolute;
+        left: 8px;
         right: 8px;
         bottom: 8px;
+        z-index: 2;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-end;
+        gap: var(--space-6);
+        pointer-events: none;
+    }
+
+    .canvas-foot > * {
+        pointer-events: auto;
+    }
+
+    .canvas-foot > .key-corner {
+        position: static;
+        flex-shrink: 0;
     }
 
     /* The colour key (storyGraph/ColourKeyFlyout). One row per swatch, the swatch in a fixed-width
@@ -7846,7 +7859,11 @@ function App(): React.JSX.Element {
 
     const clearFilters = (): void => {
         setNameDraft("");
-        fetchGraph({ ...EMPTY_FILTERS });
+        // The mode stays: it is how the reader types patterns, not something that narrows the graph.
+        fetchGraph({
+            ...EMPTY_FILTERS,
+            nameFilterMode: filtersRef.current.nameFilterMode,
+        });
     };
     const toggleLane = (which: "thread" | "chapter"): void => {
         const nextThread =
@@ -8049,21 +8066,34 @@ function App(): React.JSX.Element {
                                     {status ?? l10n.t("Arranging layout...")}
                                 </p>
                             ) : null}
-                            {/* The colour key, on a corner plate like the preview's stage controls. After
-                        the status cover, so the key can still be opened while a layout runs. */}
-                            <div className="stage-chrome key-corner">
-                                <IconButton
-                                    icon="details"
-                                    title={l10n.t("Colour key")}
-                                    className={
-                                        colourKeyOpen ? "active" : undefined
-                                    }
-                                    expanded={colourKeyOpen}
-                                    ref={colourKeyPill}
-                                    onClick={() =>
-                                        setColourKeyOpen((open) => !open)
-                                    }
+                            {/* The canvas's lower right corner: the event filter, and the colour key on
+                        a corner plate like the preview's stage controls. After the status cover, so
+                        both can still be used while a layout runs. */}
+                            <div className="canvas-foot">
+                                <GraphFilterPlate
+                                    filters={filters}
+                                    draft={nameDraft}
+                                    onDraft={setNameDraft}
+                                    onFilter={setFilter}
+                                    onReset={clearFilters}
+                                    branches={branches}
+                                    lifecycles={LIFECYCLES}
+                                    plotStates={PLOT_STATES}
                                 />
+                                <div className="stage-chrome key-corner">
+                                    <IconButton
+                                        icon="details"
+                                        title={l10n.t("Colour key")}
+                                        className={
+                                            colourKeyOpen ? "active" : undefined
+                                        }
+                                        expanded={colourKeyOpen}
+                                        ref={colourKeyPill}
+                                        onClick={() =>
+                                            setColourKeyOpen((open) => !open)
+                                        }
+                                    />
+                                </div>
                             </div>
                             {colourKeyOpen ? (
                                 <ColourKeyFlyout
@@ -8273,36 +8303,8 @@ function App(): React.JSX.Element {
                                         }}
                                     />
                                 ) : null}
-                                <div className="dock-search">
-                                    <div className="dock-section-title">
-                                        {l10n.t("Filter")}
-                                    </div>
-                                    <div className="search-field">
-                                        {/* The box shows what was typed at once; only the APPLIED filter waits -
-                                    each one costs a server request and a full rebuild (#131). */}
-                                        <input
-                                            type="text"
-                                            placeholder={l10n.t(
-                                                "Filter event names...",
-                                            )}
-                                            value={nameDraft}
-                                            onChange={(e) =>
-                                                setNameDraft(e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                </div>
                                 <div className="overview-mid">
                                     <div className="overview-tools">
-                                        {/* The draft, so the button wakes with the first letter rather than with
-                                    the fetch it is waiting on. */}
-                                        <ClearFiltersButton
-                                            filters={{
-                                                ...filters,
-                                                nameFilter: nameDraft,
-                                            }}
-                                            onClear={clearFilters}
-                                        />
                                         <IconButton
                                             icon="arrange"
                                             onClick={() => {
@@ -8378,64 +8380,6 @@ function App(): React.JSX.Element {
                                     </div>
                                     <Minimap
                                         getHandle={() => editorRef.current}
-                                    />
-                                </div>
-                                <div className="filters-below">
-                                    <SelectField
-                                        value={filters.branch}
-                                        ariaLabel={l10n.t("Branch")}
-                                        title={l10n.t("Branch")}
-                                        icon="search"
-                                        options={[
-                                            {
-                                                value: "",
-                                                label: l10n.t("All branches"),
-                                            },
-                                            ...branches.map((b) => ({
-                                                value: b,
-                                            })),
-                                        ]}
-                                        onChange={(branch) =>
-                                            setFilter({ branch })
-                                        }
-                                    />
-                                    <SelectField
-                                        value={filters.lifecycle}
-                                        ariaLabel={l10n.t("Lifecycle")}
-                                        title={l10n.t("Lifecycle")}
-                                        icon="search"
-                                        options={[
-                                            {
-                                                value: "",
-                                                label: l10n.t("Any lifecycle"),
-                                            },
-                                            ...LIFECYCLES.map((l) => ({
-                                                value: l,
-                                            })),
-                                        ]}
-                                        onChange={(lifecycle) =>
-                                            setFilter({ lifecycle })
-                                        }
-                                    />
-                                    <SelectField
-                                        value={filters.plotState}
-                                        ariaLabel={l10n.t("Plot state")}
-                                        icon="search"
-                                        title={l10n.t(
-                                            "Plot state - how this faction's manifest registers the thread an event lives in",
-                                        )}
-                                        options={[
-                                            {
-                                                value: "",
-                                                label: l10n.t("Any plot state"),
-                                            },
-                                            ...PLOT_STATES.map((p) => ({
-                                                value: p,
-                                            })),
-                                        ]}
-                                        onChange={(plotState) =>
-                                            setFilter({ plotState })
-                                        }
                                     />
                                 </div>
                             </>

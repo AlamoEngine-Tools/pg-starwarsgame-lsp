@@ -135,7 +135,10 @@ public sealed record GetStoryGraphParams(
     // Which scope to show: null or empty is the galactic story with each battle as one portal;
     // a battle key (from getStoryPlots' battles) is that battle's own graph with the galaxy as
     // portals. An older client sends none and gets the galactic story.
-    string? Scope = null) : IRequest<GetStoryGraphResult>;
+    string? Scope = null,
+    // How NameFilter is read: "text", "wildcard" or "regex" (see StoryNamePattern). Null is text,
+    // which is what the filter did before it had modes.
+    string? NameFilterMode = null) : IRequest<GetStoryGraphResult>;
 
 /// <param name="Branches">
 ///     Every branch name in the campaign, INDEPENDENT of the filters that produced

@@ -2192,8 +2192,15 @@ export const searchPlateCss = `
        stands on. It stood on a list a dock wide when this stretched from edge to edge; on a grid
        or a canvas that would be a bar across the page. */
 
-    .search-plate.floating.open:not(.beside) {
+    .search-plate.floating.open:not(.beside),
+    .search-plate.placed.open:not(.beside) {
         width: min(440px, calc(100% - 12px));
+    }
+
+    /* Where its host puts it, among other controls on a corner. */
+
+    .search-plate.placed {
+        position: relative;
     }
 
     /* At the foot of a scroller it is the last child of: it stays on the scroller's bottom edge

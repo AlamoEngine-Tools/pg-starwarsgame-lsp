@@ -71,6 +71,7 @@ import {
     IconFlag,
     IconFlame,
     IconGauge,
+    IconGitBranch,
     IconGift,
     IconGridDots,
     IconHandClick,
@@ -108,6 +109,7 @@ import {
     IconPoint,
     IconPlus,
     IconPolygon,
+    IconProgressCheck,
     type IconProps,
     IconRadar,
     IconRefresh,
@@ -378,6 +380,11 @@ const ICONS = {
     searchScope: IconColumns,
     // Entries that only repeat the layer below this file - the localisation search's quick filter.
     layerBelow: IconStackBack,
+    // The story graph's three dropdown filters: a branch of the story, an event's lifecycle, and
+    // whether the faction's manifest runs a plot or holds it suspended.
+    branch: IconGitBranch,
+    lifecycle: IconProgressCheck,
+    plotState: IconPlayerPause,
 
     // ── the story simulation ──────────────────────────────────────────────────
     // What the running story is waiting on the AUTHOR for: a hand on a control, because every

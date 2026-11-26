@@ -866,6 +866,7 @@ function filterFields(
         reachableFrom: filters?.reachableFrom || undefined,
         reachableDirection: filters?.reachableDirection || undefined,
         plotState: filters?.plotState || undefined,
+        nameFilterMode: filters?.nameFilterMode || undefined,
     };
 }
 

@@ -91,9 +91,10 @@ export interface SearchPlateProps {
 
     /**
      * Where the plate stands. `floating` on the corner of a list that scrolls inside a pane of its
-     * own; `sticky` at the foot of a scroller it is the last child of.
+     * own; `sticky` at the foot of a scroller it is the last child of; `placed` where its host puts
+     * it, beside other corner controls.
      */
-    variant?: "floating" | "sticky";
+    variant?: "floating" | "sticky" | "placed";
 
     /**
      * The field opens beside the plate, to its left and over whatever is there, instead of inside

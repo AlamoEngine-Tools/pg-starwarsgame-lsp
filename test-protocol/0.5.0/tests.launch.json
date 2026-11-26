@@ -771,5 +771,11 @@
   },
   "SET-38": {
     "open": "{repo}\\foc"
+  },
+  "STY-10": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
   }
 }

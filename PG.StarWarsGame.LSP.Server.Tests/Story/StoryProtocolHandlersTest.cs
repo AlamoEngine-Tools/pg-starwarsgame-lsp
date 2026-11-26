@@ -267,6 +267,29 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal(["Start"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
     }
 
+    // The search plate reads a pattern three ways, and the graph's event filter is answered here
+    // rather than in the webview - so the three ways have to hold on the server, the same as the
+    // lists that match in the webview.
+    [Theory]
+    [InlineData(null, "n?xt", new string[0])]
+    [InlineData("text", "n?xt", new string[0])]
+    [InlineData("wildcard", "n?xt", new[] { "Next" })]
+    [InlineData("wildcard", "l*r", new[] { "Later" })]
+    [InlineData("regex", "^(start|next)$", new[] { "Start", "Next" })]
+    // Half-typed most of the time it is used: a pattern that does not compile finds nothing and
+    // does not fail the request.
+    [InlineData("regex", "(", new string[0])]
+    public async Task GetStoryGraph_NameFilter_ReadsThePatternInItsMode(
+        string? mode, string pattern, string[] expected)
+    {
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
+            .Handle(new GetStoryGraphParams("GC", "Rebel", pattern, NameFilterMode: mode),
+                TestContext.Current.CancellationToken);
+
+        Assert.Null(result.Error);
+        Assert.Equal(expected.Order(), result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).Order());
+    }
+
     [Fact]
     public async Task GetStoryGraph_BranchFilter_KeepsBranchMembers()
     {

@@ -171,6 +171,11 @@ export interface GraphFilters {
      * event in a running plot whose prereq has not fired.
      */
     plotState?: string;
+    /**
+     * How `nameFilter` is read: `text`, `wildcard` or `regex`, as the search plate's field shows it.
+     * Absent is plain text, which is what the filter did before it had modes.
+     */
+    nameFilterMode?: string;
 }
 
 // ── aet/getStorySchema ───────────────────────────────────────────────────────

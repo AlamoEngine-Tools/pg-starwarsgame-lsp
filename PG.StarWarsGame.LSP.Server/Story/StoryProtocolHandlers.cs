@@ -199,7 +199,8 @@ public sealed class GetStoryGraphHandler(
         return Task.FromResult(StoryGraphProjection.Project(
             model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
             request.PlotState, request.ReachableDirection, request.Scope,
-            uri => DependencyOwnership.ReadOnlyOwner(reloadService.LastWorkspaceConfig, uri)));
+            uri => DependencyOwnership.ReadOnlyOwner(reloadService.LastWorkspaceConfig, uri),
+            request.NameFilterMode));
     }
 }
 

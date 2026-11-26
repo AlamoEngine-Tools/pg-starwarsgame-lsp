@@ -184,6 +184,14 @@ describe("SearchPlate", () => {
         assert.match(html, /<div class="search-plate-box beside"/);
     });
 
+    /** On a canvas corner it shares with other controls, the host places it. */
+    it("takes its place from its host when placed", () => {
+        assert.match(
+            plate({ variant: "placed" }),
+            /^<div class="search-plate placed">/,
+        );
+    });
+
     /**
      * Dropdown filters are pills on a line of their own ABOVE the field, at full length, and only
      * while the plate is open: the closed plate is one row, and the filter icon is what says a

@@ -126,6 +126,12 @@
   Inherited switch is a quick filter beside the magnifier, with the count of entries it would bring
   back. The filter icon resets the pattern, the column and the switch together
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **The story graph's event filter on the canvas** - the event filter is the same plate, on the
+  canvas's lower right corner beside the colour key, and the dock's foot keeps no filter. The event
+  name is read as plain text, with wildcards or as a regular expression, and the server matches it in
+  that mode, so the graph shows the events the pattern means. The branch, the lifecycle and the plot
+  state are pills on the line above the field. The filter icon clears all four and keeps the mode
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

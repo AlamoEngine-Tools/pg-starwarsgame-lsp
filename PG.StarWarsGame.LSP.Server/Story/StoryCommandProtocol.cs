@@ -111,7 +111,9 @@ public sealed record PreviewStoryGraphParams(
     // edit previewed while filtered upstream stays filtered the same way.
     string? ReachableDirection = null,
     // The battle whose panel is previewing, or null for the galactic level - see GetStoryGraphParams.
-    string? Scope = null) : IRequest<GetStoryGraphResult>;
+    string? Scope = null,
+    // How NameFilter is read - see GetStoryGraphParams.
+    string? NameFilterMode = null) : IRequest<GetStoryGraphResult>;
 
 /// <summary>
 ///     Sends <c>workspace/applyEdit</c> to the client. A seam so command handlers are testable
