@@ -6,35 +6,34 @@ import { describe, it } from "node:test";
 
 import {
     countTreeNodes,
-    searchIsOpen,
     treeFilterSummary,
+    treeIsFiltered,
     treeMinHeight,
 } from "./treeSearch";
 
-describe("searchIsOpen", () => {
-    it("is closed until the reader opens it", () => {
-        assert.equal(searchIsOpen(false, ""), false);
+describe("treeIsFiltered", () => {
+    it("is not filtered with no pattern and every kind on", () => {
+        assert.equal(treeIsFiltered("", 3), false);
     });
 
-    it("opens when the reader presses the magnifier", () => {
-        assert.equal(searchIsOpen(true, ""), true);
+    it("is filtered by a pattern", () => {
+        assert.equal(treeIsFiltered("HP_", 3), true);
     });
 
     /**
-     * The rule the whole control depends on.
+     * A quick filter is a filter.
      *
-     * A collapsed box with text still in it is a filter narrowing the tree with nothing on screen
-     * saying so - the reader sees a short tree and no reason for it. Whatever the button says, a
-     * non-empty pattern keeps its own box visible.
+     * One kind switched off hides rows as surely as a pattern does, so it turns the plate's filter
+     * icon into the reset - which is what switches the kind back on.
      */
-    it("stays open while the pattern has text, whatever the button says", () => {
-        assert.equal(searchIsOpen(false, "HP_"), true);
+    it("is filtered by a kind switched off, with no pattern at all", () => {
+        assert.equal(treeIsFiltered("", 2), true);
+        assert.equal(treeIsFiltered("", 0), true);
     });
 
     it("counts whitespace as text, because it filters like text", () => {
-        // A stray space matches nothing and empties the tree. Hiding the box that holds it is the
-        // worst version of this bug, not an edge case of it.
-        assert.equal(searchIsOpen(false, " "), true);
+        // The reset has to be live for a stray space, or nothing on the closed plate can remove it.
+        assert.equal(treeIsFiltered(" ", 3), true);
     });
 });
 

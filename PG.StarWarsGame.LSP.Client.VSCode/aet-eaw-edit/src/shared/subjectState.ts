@@ -13,6 +13,8 @@
 // left off, which is what this carries.
 //
 
+import { type SearchMode, searchModeFrom } from "./searchMode";
+
 /** One subject's session state. Every field is safe to apply blind; the caller checks levels. */
 export interface SubjectState {
     /** Damage state. Checked against the model's own levels before it is applied. */
@@ -33,6 +35,8 @@ export interface SubjectState {
     animation: string | null;
     /** The tree's own filter, so a search survives a reopen. */
     filterText: string;
+    /** How that filter is read. Kept with it: a regular expression read back as text finds nothing. */
+    filterMode: SearchMode;
     /** Rows that were collapsed. Bone ids are stable; a stale one simply never matches. */
     collapsed: string[];
     /**
@@ -61,6 +65,7 @@ export const EMPTY_SUBJECT_STATE: SubjectState = {
     hiddenEmitters: [],
     animation: null,
     filterText: "",
+    filterMode: "text",
     collapsed: [],
     hidden: [],
     shown: [],
@@ -82,6 +87,7 @@ export function subjectStateFrom(stored: unknown): SubjectState {
         hiddenEmitters: indices(raw.hiddenEmitters),
         animation: typeof raw.animation === "string" ? raw.animation : null,
         filterText: typeof raw.filterText === "string" ? raw.filterText : "",
+        filterMode: searchModeFrom(raw.filterMode),
         collapsed: strings(raw.collapsed),
         hidden: strings(raw.hidden),
         shown: strings(raw.shown),

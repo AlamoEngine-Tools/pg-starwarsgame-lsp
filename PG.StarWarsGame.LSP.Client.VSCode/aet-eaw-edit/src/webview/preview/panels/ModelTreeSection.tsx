@@ -3,7 +3,7 @@
 
 // The Model tree: every bone, mesh and proxy, filtered, folded and switched row by row.
 
-import type { Dispatch, SetStateAction, RefObject } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { ModelTree } from "../useModelTree";
 import * as l10n from "@vscode/l10n";
 import { IconButton } from "../../shared/Button";
@@ -27,7 +27,6 @@ export interface ModelTreeSectionProps {
     clearSelection: () => void;
     detailsRow: string | null;
     openInspector: (rowId: string) => void;
-    searchRef: RefObject<HTMLDivElement | null>;
     selected: ReadonlySet<string>;
     setAnchor: Dispatch<SetStateAction<string | null>>;
     setSearchPressed: Dispatch<SetStateAction<boolean>>;
@@ -40,7 +39,6 @@ export function ModelTreeSection({
     clearSelection,
     detailsRow,
     openInspector,
-    searchRef,
     selected,
     setAnchor,
     setSearchPressed,
@@ -261,11 +259,16 @@ ${becauseText(node.because)}`
                 <SearchPlate
                     open={tree.searchOpen}
                     pattern={tree.boneFilter}
+                    mode={tree.boneFilterMode}
+                    filtered={tree.filtered}
+                    error={tree.filterError}
                     placeholder={l10n.t("Filter the tree, e.g. HP_")}
                     title={l10n.t("Filter the tree by name")}
                     onPattern={tree.setBoneFilter}
+                    onMode={tree.setBoneFilterMode}
                     onOpen={setSearchPressed}
-                    ref={searchRef}
+                    onReset={tree.resetFilter}
+                    beside
                 >
                     {/* Always here, open or closed. A pattern and a kind are two
                                         halves of the same question, and hiding one of them the

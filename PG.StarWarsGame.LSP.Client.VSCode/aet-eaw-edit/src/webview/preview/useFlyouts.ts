@@ -59,8 +59,8 @@ export function useFlyouts({
     const [infoOpen, setInfoOpen] = useState(false);
     const infoRef = useRef<HTMLDivElement | null>(null);
 
-    /* Whether the reader has pressed the tree's magnifier. NOT whether the box is showing - see
-       `searchIsOpen`, which keeps it open while a pattern would otherwise be hidden behind it. */
+    /* Whether the reader has pressed the tree's magnifier, which is whether its field is showing.
+       The plate folds an empty field away on an outside press by itself. */
     const [searchPressed, setSearchPressed] = useState(false);
 
     /* Which hardpoint card has its measurements open. One at a time: two of them open turns the
@@ -77,7 +77,6 @@ export function useFlyouts({
         null,
     );
     const [hardpointSearchPressed, setHardpointSearchPressed] = useState(false);
-    const hardpointSearchRef = useRef<HTMLDivElement | null>(null);
 
     /**
      * The scene flyout's box.
@@ -87,46 +86,6 @@ export function useFlyouts({
      * viewport would make the two impossible to use together. It has its own close button instead.
      */
     const worldRef = useRef<HTMLDivElement | null>(null);
-
-    /**
-     * The tree's search element, for the click-outside that folds it away again.
-     *
-     * Unlike the stage flyouts above, an outside click DOES close this one: it is a control you
-     * open, type in and leave, not a set of dials you work while watching the model. It closes only
-     * when empty, though - `searchIsOpen` would reopen it on the next render otherwise, and the
-     * press would read as a control that does nothing.
-     */
-    const searchRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        if (!hardpointSearchPressed) {
-            return;
-        }
-
-        const onDown = (event: MouseEvent): void => {
-            if (!hardpointSearchRef.current?.contains(event.target as Node)) {
-                setHardpointSearchPressed(false);
-            }
-        };
-
-        document.addEventListener("mousedown", onDown);
-        return () => document.removeEventListener("mousedown", onDown);
-    }, [hardpointSearchPressed]);
-
-    useEffect(() => {
-        if (!searchPressed) {
-            return;
-        }
-
-        const onDown = (event: MouseEvent): void => {
-            if (!searchRef.current?.contains(event.target as Node)) {
-                setSearchPressed(false);
-            }
-        };
-
-        document.addEventListener("mousedown", onDown);
-        return () => document.removeEventListener("mousedown", onDown);
-    }, [searchPressed]);
 
     // Both stage flyouts, one rule. Escape closes both; an outside click deliberately closes
     // neither - see above. They can be open TOGETHER on purpose: setting up a shot means moving the
@@ -362,8 +321,6 @@ export function useFlyouts({
         abilityInfoAt,
         hardpointSearchPressed,
         setHardpointSearchPressed,
-        hardpointSearchRef,
         worldRef,
-        searchRef,
     };
 }

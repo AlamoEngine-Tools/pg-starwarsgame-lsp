@@ -2190,7 +2190,7 @@ export const searchPlateCss = `
         bottom: 6px;
     }
 
-    .search-plate.floating.open {
+    .search-plate.floating.open:not(.beside) {
         left: 6px;
     }
 
@@ -2210,33 +2210,53 @@ export const searchPlateCss = `
         align-self: flex-end;
     }
 
-    .search-plate.sticky.open {
+    .search-plate.sticky.open:not(.beside) {
         width: auto;
         margin-left: 0;
         align-self: stretch;
     }
 
-    /* In the flow above a list that has no box to float over and scrolls with its section. No
-       plate of its own then: there is nothing under it to be read through. */
+    /* The field's box: the input, with the three ways of reading a pattern over its trailing edge.
+       In the plate's own row it takes the room to the left of the icons. The basis is what decides
+       where it wraps: below this it is not worth having on the row, and the whole line goes above
+       the icons instead. */
 
-    .search-plate.inline {
-        position: static;
-        margin: var(--space-2) 0 var(--space-6);
-        padding: 0;
-        background: none;
-        border: none;
+    .search-plate .search-plate-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        flex: 1 1 180px;
+        min-width: 0;
     }
 
-    /* The basis is what decides where it wraps: below this it is not worth having on the row, and
-       the whole line goes above the icons instead.
+    /* Beside the plate, for a plate in a dock: SearchPlate places it against the window, as tall
+       as the plate and with its right edge under the plate's left one. The two then draw as one
+       plate that grew leftwards, over the stage, where a name has room. Fixed, because the plate
+       stands in a panel that scrolls and a child of one is clipped by it. Above the stage's own
+       flyouts: the reader opened this last, and is typing in it. */
 
-       The editor's own input tokens, declared rather than inherited. Every other input in the
+    .search-plate .search-plate-box.beside {
+        position: fixed;
+        z-index: 25;
+        box-sizing: border-box;
+        padding: var(--space-2);
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-6) 0 0 var(--radius-6);
+        background: color-mix(in srgb, var(--colour-sidebar) 94%, transparent);
+    }
+
+    .search-plate.beside {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+
+    /* The editor's own input tokens, declared rather than inherited. Every other input in the
        extension picks these up from the rule VS Code injects into a webview, but this one sits on
        a plate of its own over a list, where an input that merely happens to look right is one host
        stylesheet change away from looking wrong. Rounded to match the plate it stands in. */
 
     .search-plate .search-plate-field {
-        flex: 1 1 130px;
+        width: 100%;
         min-width: 0;
         box-sizing: border-box;
         /* The ICONS' height, exactly. Left to its own, the field came out 27px against their 22,
@@ -2245,7 +2265,7 @@ export const searchPlateCss = `
            had just pressed it. Padding goes with it: an input centres its own text once it has a
            height, so the vertical padding was only ever there to make one. */
         height: 22px;
-        padding: 0 var(--space-8);
+        padding: 0 var(--search-modes-inset) 0 var(--space-8);
         color: var(--colour-input-ink);
         background: var(--colour-input);
         border: var(--space-1) solid var(--colour-input-line);
@@ -2266,6 +2286,65 @@ export const searchPlateCss = `
         color: var(--colour-placeholder);
     }
 
+    /* A pattern that does not compile empties the list. The field says so before the reader goes
+       looking for the rows. */
+
+    .search-plate .search-plate-field[aria-invalid="true"] {
+        border-color: var(--colour-error);
+    }
+
+    /* The three modes, over the field's trailing edge. One of three, but NOT drawn as the joined,
+       filled segments a settings pane gets: three of those wall to wall inside a 22px field read
+       as squeezed, a block the pattern had to fit beside. Here each is a glyph with air around it,
+       the way an editor's find widget draws them - no border, no fill, and only the chosen one
+       carries the accent. */
+
+    .search-plate .search-plate-modes {
+        position: absolute;
+        right: 4px;
+        display: flex;
+    }
+
+    .search-plate .search-plate-box.beside .search-plate-modes {
+        right: 7px;
+    }
+
+    .search-plate .search-plate-modes .mode-selector {
+        width: auto;
+        gap: var(--space-4);
+    }
+
+    .search-plate .search-plate-modes .mode-selector button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 20px;
+        min-width: 20px;
+        height: 16px;
+        padding: 0;
+        border: none;
+        border-radius: var(--radius-3);
+        background: transparent;
+        opacity: 0.72;
+    }
+
+    .search-plate .search-plate-modes .mode-selector button svg {
+        width: 13px;
+        height: 13px;
+    }
+
+    .search-plate .search-plate-modes .mode-selector button:hover {
+        background: var(--colour-action-2-hover);
+        opacity: 1;
+    }
+
+    .search-plate .search-plate-modes .mode-selector button.active {
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+        opacity: 1;
+    }
+
     /* The one button that never moves. Everything else in this row is what it opens onto, so it
        keeps its width whichever of the two is showing. */
 
@@ -2284,5 +2363,15 @@ export const searchPlateCss = `
         font-size: var(--font-size-smaller);
         padding: var(--space-2) var(--space-8);
         border-radius: var(--radius-6);
+    }
+
+    /* The filter icon once something is set: the reset. In the warning colour rather than the
+       accent the quick filters carry, or it would read as one more toggle that happens to be on.
+       At full strength: an icon button rests at 72%, and the warning colour dimmed that far came
+       out a pale tan on a light theme's panel, well under the contrast an icon needs. */
+
+    .search-plate .icon-btn.search-plate-reset.set {
+        color: var(--colour-warning);
+        opacity: 1;
     }
 `;

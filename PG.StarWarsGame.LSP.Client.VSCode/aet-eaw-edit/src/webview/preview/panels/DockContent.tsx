@@ -97,7 +97,6 @@ export function DockContent({
                     clearSelection={clearSelection}
                     detailsRow={detailsRow}
                     openInspector={inspection.openInspector}
-                    searchRef={flyouts.searchRef}
                     selected={selected}
                     setAnchor={setAnchor}
                     setSearchPressed={flyouts.setSearchPressed}
@@ -174,9 +173,10 @@ export function DockContent({
                     combat={combat}
                     foldedGroups={hardpointList.foldedGroups}
                     hardpointFilter={hardpointList.hardpointFilter}
+                    hardpointFilterError={hardpointList.hardpointFilterError}
+                    hardpointFilterMode={hardpointList.hardpointFilterMode}
                     hardpointGroups={hardpointList.hardpointGroups}
                     hardpointSearchOpen={hardpointList.hardpointSearchOpen}
-                    hardpointSearchRef={flyouts.hardpointSearchRef}
                     infoCard={flyouts.infoCard}
                     scene={scene}
                     selectBoneRow={selectBoneRow}
@@ -184,6 +184,9 @@ export function DockContent({
                     selected={selected}
                     setFoldedGroups={hardpointList.setFoldedGroups}
                     setHardpointFilter={hardpointList.setHardpointFilter}
+                    setHardpointFilterMode={
+                        hardpointList.setHardpointFilterMode
+                    }
                     setHardpointSearchPressed={
                         flyouts.setHardpointSearchPressed
                     }

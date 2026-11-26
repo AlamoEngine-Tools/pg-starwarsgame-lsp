@@ -11,6 +11,7 @@
 // finds a type by either.
 
 import type { TypeNameMode } from "../../shared/storyTypeNames";
+import { compileMatcher, type SearchMode } from "../shared/searchPattern";
 
 export { typeNameMode, type TypeNameMode } from "../../shared/storyTypeNames";
 
@@ -27,27 +28,19 @@ function displayName(names: TypeNames, type: string): string | null {
     return label === undefined || label === "" ? null : label;
 }
 
-/** A search pattern as it is compared: trimmed, in lower case. Empty matches everything. */
-function folded(pattern: string): string {
-    return pattern.trim().toLowerCase();
-}
-
-/** Whether a type answers a search pattern - by either name, whichever the tiles show. */
+/**
+ * Whether a type answers a search pattern - by either name, whichever the tiles show. The pattern
+ * is read in the search plate's mode, without case; an empty one answers everything.
+ */
 export function matchesType(
     names: TypeNames,
     type: string,
     pattern: string,
+    mode: SearchMode = "text",
 ): boolean {
-    const q = folded(pattern);
+    const answers = compileMatcher(pattern.trim(), mode).test;
 
-    if (q === "") {
-        return true;
-    }
-
-    return (
-        type.toLowerCase().includes(q) ||
-        (displayName(names, type)?.toLowerCase().includes(q) ?? false)
-    );
+    return answers(type) || answers(displayName(names, type) ?? type);
 }
 
 /**
@@ -61,19 +54,17 @@ export function tileName(
     names: TypeNames,
     type: string,
     pattern: string,
+    mode: SearchMode = "text",
 ): { text: string; technical: boolean } {
     const label = displayName(names, type);
-    const q = folded(pattern);
+    const q = pattern.trim();
+    const answers = compileMatcher(q, mode).test;
 
     if (names.mode === "technical" || label === null) {
         return { text: type, technical: true };
     }
 
-    if (
-        q !== "" &&
-        !label.toLowerCase().includes(q) &&
-        type.toLowerCase().includes(q)
-    ) {
+    if (q !== "" && !answers(label) && answers(type)) {
         return { text: type, technical: true };
     }
 
@@ -85,6 +76,7 @@ export function otherName(
     names: TypeNames,
     type: string,
     pattern: string,
+    mode: SearchMode = "text",
 ): string | null {
     const label = displayName(names, type);
 
@@ -92,7 +84,7 @@ export function otherName(
         return null;
     }
 
-    return tileName(names, type, pattern).technical ? label : type;
+    return tileName(names, type, pattern, mode).technical ? label : type;
 }
 
 /**

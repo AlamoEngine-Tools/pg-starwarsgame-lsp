@@ -765,5 +765,8 @@
     "settings": {
       "aet-eaw-edit.experimental.storyEditing": true
     }
+  },
+  "PRV-82": {
+    "open": "{repo}\\eaw"
   }
 }

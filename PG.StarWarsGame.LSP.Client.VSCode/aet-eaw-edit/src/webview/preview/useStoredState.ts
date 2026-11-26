@@ -14,6 +14,7 @@ import { post } from "./previewPost";
 import { buildTree, defaultCollapsed, type TreeItem } from "./previewTree";
 import { type PreviewViewport } from "./viewport";
 import { lodToRecord, type SubjectState } from "../../shared/subjectState";
+import { type SearchMode } from "../shared/searchPattern";
 import { type LoadState } from "./loadProgress";
 import {
     type Attacker,
@@ -27,6 +28,7 @@ export interface StoredStateInputs {
     attacker: Attacker;
     attackerPresets: AttackerPreset[];
     boneFilter: string;
+    boneFilterMode: SearchMode;
     collapsed: ReadonlySet<string>;
     customColour: string | null;
     destroyed: ReadonlySet<string>;
@@ -51,6 +53,7 @@ export function useStoredState({
     attacker,
     attackerPresets,
     boneFilter,
+    boneFilterMode,
     collapsed,
     customColour,
     destroyed,
@@ -161,6 +164,7 @@ export function useStoredState({
                 hiddenEmitters: [...hiddenEmitters],
                 animation,
                 filterText: boneFilter,
+                filterMode: boneFilterMode,
                 collapsed: [...collapsed],
                 hidden: viewportRef.current?.hiddenItemIds() ?? [],
                 shown: viewportRef.current?.shownItemIds() ?? [],
@@ -173,6 +177,7 @@ export function useStoredState({
         hiddenEmitters,
         animation,
         boneFilter,
+        boneFilterMode,
         collapsed,
         treeItems,
     ]);

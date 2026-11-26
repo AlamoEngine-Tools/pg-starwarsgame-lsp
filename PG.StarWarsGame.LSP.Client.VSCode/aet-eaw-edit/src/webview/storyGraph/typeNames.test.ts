@@ -119,3 +119,63 @@ describe("typeNameMode", () => {
         assert.equal(typeNameMode("names"), "display");
     });
 });
+
+describe("a type against a pattern mode", () => {
+    it("finds a type by either name with wildcards", () => {
+        assert.equal(
+            matchesType(
+                display,
+                "STORY_MOVIE_DONE",
+                "movie*finished",
+                "wildcard",
+            ),
+            true,
+        );
+        assert.equal(
+            matchesType(display, "STORY_MOVIE_DONE", "movie_d?ne", "wildcard"),
+            true,
+        );
+        assert.equal(
+            matchesType(display, "STORY_ELAPSED", "movie*", "wildcard"),
+            false,
+        );
+    });
+
+    it("finds a type by either name with a regular expression", () => {
+        assert.equal(
+            matchesType(display, "STORY_ELAPSED", "^story_e", "regex"),
+            true,
+        );
+        assert.equal(
+            matchesType(display, "STORY_ELAPSED", "elapsed$", "regex"),
+            true,
+        );
+        assert.equal(
+            matchesType(display, "STORY_ELAPSED", "(", "regex"),
+            false,
+        );
+    });
+
+    it("takes the same characters literally in plain text", () => {
+        assert.equal(
+            matchesType(display, "STORY_MOVIE_DONE", "movie*finished"),
+            false,
+        );
+    });
+
+    /** Found by the technical name alone, whatever the mode: the tile shows the name that answered. */
+    it("shows the technical name where only that one answered the pattern", () => {
+        assert.deepEqual(
+            tileName(display, "STORY_MOVIE_DONE", "movie_d?ne", "wildcard"),
+            { text: "STORY_MOVIE_DONE", technical: true },
+        );
+        assert.deepEqual(
+            tileName(display, "STORY_MOVIE_DONE", "^movie f", "regex"),
+            { text: "Movie finished", technical: false },
+        );
+        assert.equal(
+            otherName(display, "STORY_MOVIE_DONE", "movie_d?ne", "wildcard"),
+            "Movie finished",
+        );
+    });
+});

@@ -109,10 +109,14 @@
   card in the model preview, carry a tail that points at the pill
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 - **One search plate for the lists in a dock** - the story graph's palette is searched from a plate at the
-  foot of the dock, as the model tree is: a magnifier and the palette's two kinds, event types and rewards,
-  with a field that opens to the left of icons that do not move. A narrowed group says so in its title,
-  such as `1 of 64`; a kind switched off takes its group away; Escape and the magnifier clear the pattern.
-  The model tree's and the hardpoint list's searches are the same plate
+  foot of the dock, as the model tree is: a magnifier, the palette's two kinds, event types and rewards,
+  and a filter icon. The field opens beside the plate, over the stage, to the left of icons that do not
+  move, and holds the three ways of reading a pattern: plain text, wildcard and regular expression. A
+  narrowed group says so in its title, such as `1 of 64`, and a kind switched off takes its group away.
+  Escape and the magnifier close the field and leave the pattern in force. The filter icon becomes the
+  reset once a pattern or a switched-off kind narrows the list, and names the pattern in its tooltip.
+  The model tree's and the hardpoint list's searches are the same plate, the hardpoint list's on the
+  lower right corner of the list as the others are
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes

@@ -33,7 +33,8 @@ import { badgeIcon } from "./shared/badges";
 import { Icon, SeverityMark } from "./shared/Icon";
 import { ModalLayerContext } from "./shared/Modal";
 import { SelectField } from "./shared/SelectField";
-import { SearchPlate, searchPlateOpen } from "./shared/SearchPlate";
+import { SearchPlate } from "./shared/SearchPlate";
+import { compileMatcher, type SearchMode } from "./shared/searchPattern";
 import {
     comboboxCss,
     detailsFlyoutCss,
@@ -8986,8 +8987,10 @@ function NodePalette(props: {
     onInfo: (info: TypeInfo | null) => void;
 }): React.JSX.Element {
     const [search, setSearch] = useState("");
-    // The search plate: whether its magnifier is pressed, and which of the two kinds of type the
-    // palette shows. Both kinds on is the whole palette.
+    // The search plate: how the pattern is read, whether its magnifier is pressed - which is
+    // whether the field shows, and nothing more - and which of the two kinds of type the palette
+    // shows. Both kinds on is the whole palette.
+    const [searchMode, setSearchMode] = useState<SearchMode>("text");
     const [searchPressed, setSearchPressed] = useState(false);
     const [kinds, setKinds] = useState<ReadonlySet<"trigger" | "reward">>(
         new Set(["trigger", "reward"]),
@@ -9009,15 +9012,15 @@ function NodePalette(props: {
     // the dock folds - there is no pill left for it to point at, so it goes too.
     const { onInfo } = props;
     useEffect(() => () => onInfo(null), [onInfo]);
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
 
     // By either name, whichever the tiles show: a type is found by what it is called in XML and
-    // by what it is called in words.
+    // by what it is called in words. The pattern is read in the plate's mode.
     const eventTypes = props.eventTypes.filter((type) =>
-        matchesType(props.eventNames, type, q),
+        matchesType(props.eventNames, type, q, searchMode),
     );
     const rewardTypes = props.rewardTypes.filter((type) =>
-        matchesType(props.rewardNames, type, q),
+        matchesType(props.rewardNames, type, q, searchMode),
     );
     // The structural actions (New event / AND / OR) always stay - the search only filters the types.
     const showBlank = true;
@@ -9078,8 +9081,8 @@ function NodePalette(props: {
     ): React.JSX.Element => {
         const names =
             category === "trigger" ? props.eventNames : props.rewardNames;
-        const shown = tileName(names, type, q);
-        const other = otherName(names, type, q);
+        const shown = tileName(names, type, q, searchMode);
+        const other = otherName(names, type, q, searchMode);
 
         // The info pill: the documentation is one press away, and the pill is the tile's only
         // mark - its severity is the worst thing the schema notes about the type. A press on it
@@ -9272,17 +9275,28 @@ function NodePalette(props: {
             ) : null}
 
             {/* The search, in the model tree's shape: a plate at the foot of the palette with the
-                magnifier and the two kinds, whose field opens to the left of icons that never
-                move. Last in the scroller, so it stays on the dock's bottom edge while the tiles
-                move under it. It finds a type by either of its names. */}
+                magnifier, the two kinds and the filter icon, whose field opens to the left of
+                icons that never move - beside the plate, over the canvas. Last in the scroller, so
+                it stays on the dock's bottom edge while the tiles move under it. It finds a type
+                by either of its names. A kind switched off is a filter like a pattern is, and the
+                reset puts both back. */}
             <SearchPlate
-                open={searchPlateOpen(searchPressed, search)}
+                open={searchPressed}
                 pattern={search}
+                mode={searchMode}
+                filtered={search !== "" || kinds.size < 2}
+                error={compileMatcher(q, searchMode).error}
                 placeholder={l10n.t("Search by either name")}
                 title={l10n.t("Search the node types")}
                 onPattern={setSearch}
+                onMode={setSearchMode}
                 onOpen={setSearchPressed}
+                onReset={() => {
+                    setSearch("");
+                    setKinds(new Set(["trigger", "reward"]));
+                }}
                 variant="sticky"
+                beside
             >
                 <IconButton
                     icon="trigger"

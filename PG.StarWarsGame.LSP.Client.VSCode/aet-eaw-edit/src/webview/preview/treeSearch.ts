@@ -1,12 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The model tree's search element: when its box is showing, and whether to say the tree is narrowed.
+// The model tree's search element: whether the tree is narrowed, and how its header says so.
 //
-// The box is closed until it is wanted, and opens into the space to the LEFT of a strip of icons
-// that never move - the magnifier and the three kinds. Collapsing brings its own hazard, and
-// `searchIsOpen` and `treeFilterSummary` both exist to answer it: a filter you cannot see is a
-// filter nobody can undo, and the reader is left looking at a short tree with no reason for it.
+// The box is closed until it is wanted, and closing it does not clear it: a pattern stays in force
+// behind a closed plate. That brings its own hazard, and `treeIsFiltered` and `treeFilterSummary`
+// both exist to answer it: a filter you cannot see is a filter nobody can undo, so the plate's
+// filter icon turns into the reset and the header counts what is left.
 
 /**
  * How many rows a tree holds, counting the ones a fold is currently hiding.
@@ -34,12 +34,15 @@ export function countTreeNodes(
 export const TREE_KIND_COUNT = 3;
 
 /**
- * Whether the search box is showing.
+ * Whether anything narrows the tree: a pattern, or a kind switched off.
  *
- * The rule is the search plate's own, since the plate is shared: a non-empty pattern keeps its box
- * open however the button was left. Named here as the tree has always called it.
+ * A switched-off kind counts for as much as a pattern. It hides rows just the same, and it is what
+ * the plate's reset puts back.
  */
-export { searchPlateOpen as searchIsOpen } from "../shared/SearchPlate";
+export function treeIsFiltered(pattern: string, kindsOn: number): boolean {
+    // Length, not `trim()`: the reset has to be there to take a stray space out of the box.
+    return pattern.length > 0 || kindsOn < TREE_KIND_COUNT;
+}
 
 /**
  * What the tree's header says when it is showing less than the whole model, or null when it is not.

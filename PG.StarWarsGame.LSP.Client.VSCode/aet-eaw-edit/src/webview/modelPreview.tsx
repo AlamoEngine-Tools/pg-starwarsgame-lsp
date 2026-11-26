@@ -515,8 +515,15 @@ function ModelPreview(): React.JSX.Element {
         treeItems,
         viewportRef,
     });
-    const { collapsed, setCollapsed, foldedRef, boneFilter, setBoneFilter } =
-        tree;
+    const {
+        collapsed,
+        setCollapsed,
+        foldedRef,
+        boneFilter,
+        setBoneFilter,
+        boneFilterMode,
+        setBoneFilterMode,
+    } = tree;
 
     /**
      * Game rendering's stand-in shadow, for a model without a shadow mesh.
@@ -1171,6 +1178,7 @@ function ModelPreview(): React.JSX.Element {
         setAttackerPresets,
         setAttackerProjectile,
         setBoneFilter,
+        setBoneFilterMode,
         setCollapsed,
         setCustomColour,
         setDestroyed,
@@ -1248,6 +1256,7 @@ function ModelPreview(): React.JSX.Element {
         attacker,
         attackerPresets,
         boneFilter,
+        boneFilterMode,
         collapsed,
         customColour,
         destroyed,

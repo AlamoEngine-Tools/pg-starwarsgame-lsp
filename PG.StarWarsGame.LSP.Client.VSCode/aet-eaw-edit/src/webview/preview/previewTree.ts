@@ -12,6 +12,7 @@
 // Kept free of three.js so the whole shape - nesting, filtering, selection - is testable.
 
 import { type VisibilityLink } from "./visibility";
+import { compileMatcher, type SearchMode } from "../shared/searchPattern";
 
 /** What a row stands for. The filter chips are exactly these. */
 export type TreeKind = "bone" | "mesh" | "particle";
@@ -249,6 +250,8 @@ export function defaultCollapsed(roots: readonly TreeNode[]): Set<string> {
 /** What the filter row asks for. */
 export interface TreeFilter {
     text: string;
+    /** How the text is read. Plain text when not given. */
+    mode?: SearchMode;
     /** Kinds to show. An empty set shows nothing, which is what unticking everything should do. */
     kinds: ReadonlySet<TreeKind>;
 }
@@ -276,14 +279,14 @@ export function filterTree(
     roots: readonly TreeNode[],
     filter: TreeFilter,
 ): TreeNode[] {
-    const needle = filter.text.trim().toLowerCase();
+    const needle = filter.text.trim();
+    const answers = compileMatcher(needle, filter.mode ?? "text").test;
 
     // `wanted` false inside a text hit: its contents are what was searched for, so they do not each
     // have to carry the word themselves. The KIND is asked either way.
     const keep = (node: TreeNode, wanted: boolean): TreeNode | null => {
         const kindOk = filter.kinds.has(node.kind);
-        const matches =
-            kindOk && (!wanted || node.name.toLowerCase().includes(needle));
+        const matches = kindOk && (!wanted || answers(node.name));
 
         const children = node.children
             .map((child) => keep(child, wanted && !matches))

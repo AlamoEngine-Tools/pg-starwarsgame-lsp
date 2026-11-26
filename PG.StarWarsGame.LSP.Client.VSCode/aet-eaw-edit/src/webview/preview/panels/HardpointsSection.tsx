@@ -25,15 +25,17 @@ import { type PreviewViewport } from "../viewport";
 import { healthBar } from "../hardpointCards";
 import { reticleFor } from "../reticles";
 import { type HardpointGroup } from "../hardpointGroups";
+import { type SearchMode } from "../../shared/searchPattern";
 
 export interface HardpointsSectionProps {
     boneRows: Map<string, string>;
     combat: CombatLens;
     foldedGroups: ReadonlySet<string>;
     hardpointFilter: string;
+    hardpointFilterError: string | undefined;
+    hardpointFilterMode: SearchMode;
     hardpointGroups: HardpointGroup[];
     hardpointSearchOpen: boolean;
-    hardpointSearchRef: RefObject<HTMLDivElement | null>;
     infoCard: string | null;
     scene: PreviewScene | null;
     selectBoneRow: (rowId: string | undefined) => void;
@@ -41,6 +43,7 @@ export interface HardpointsSectionProps {
     selected: ReadonlySet<string>;
     setFoldedGroups: Dispatch<SetStateAction<ReadonlySet<string>>>;
     setHardpointFilter: Dispatch<SetStateAction<string>>;
+    setHardpointFilterMode: Dispatch<SetStateAction<SearchMode>>;
     setHardpointSearchPressed: Dispatch<SetStateAction<boolean>>;
     setInfoCard: Dispatch<SetStateAction<string | null>>;
     setWeaponArcs: (id: string, on: boolean) => void;
@@ -52,9 +55,10 @@ export function HardpointsSection({
     combat,
     foldedGroups,
     hardpointFilter,
+    hardpointFilterError,
+    hardpointFilterMode,
     hardpointGroups,
     hardpointSearchOpen,
-    hardpointSearchRef,
     infoCard,
     scene,
     selectBoneRow,
@@ -62,6 +66,7 @@ export function HardpointsSection({
     selected,
     setFoldedGroups,
     setHardpointFilter,
+    setHardpointFilterMode,
     setHardpointSearchPressed,
     setInfoCard,
     setWeaponArcs,
@@ -74,21 +79,6 @@ export function HardpointsSection({
                     "Hover a targeting mark to see its tracked art; click one to aim the attacker at that hardpoint.",
                 )}
             </div>
-
-            {/* The tree's own search element, in the same shape: a magnifier
-                                    that opens leftward into a field, with the icons anchored to
-                                    the right so nothing moves when it does. Filters on the TYPE,
-                                    which is what the groups are, and on the name, which is what a
-                                    reader looking for one hardpoint knows. */}
-            <SearchPlate
-                open={hardpointSearchOpen}
-                pattern={hardpointFilter}
-                placeholder={l10n.t("Filter by type or name")}
-                onPattern={setHardpointFilter}
-                onOpen={setHardpointSearchPressed}
-                variant="inline"
-                ref={hardpointSearchRef}
-            />
 
             {hardpointGroups.length === 0 && (
                 <div className="field-note">
@@ -405,6 +395,26 @@ export function HardpointsSection({
                     )}
                 </Fragment>
             ))}
+
+            {/* The tree's own search plate, in the same place: the list's lower right corner.
+                The list has no pane of its own and scrolls with the dock, so the plate is the
+                last thing in the section and sticks to the dock's bottom edge for as long as the
+                list is on screen. Filters on the TYPE, which is what the groups are, and on the
+                name, which is what a reader looking for one hardpoint knows. */}
+            <SearchPlate
+                open={hardpointSearchOpen}
+                pattern={hardpointFilter}
+                mode={hardpointFilterMode}
+                filtered={hardpointFilter !== ""}
+                error={hardpointFilterError}
+                placeholder={l10n.t("Filter by type or name")}
+                onPattern={setHardpointFilter}
+                onMode={setHardpointFilterMode}
+                onOpen={setHardpointSearchPressed}
+                onReset={() => setHardpointFilter("")}
+                variant="sticky"
+                beside
+            />
         </DockSection>
     );
 }
