@@ -9,6 +9,7 @@ import * as l10n from "@vscode/l10n";
 import { Fragment } from "react";
 import { type PreviewScene } from "../../../protocol/modelPreview";
 import { IconButton } from "../../shared/Button";
+import { SearchPlate } from "../../shared/SearchPlate";
 import { DockSection } from "../../shared/DockSection";
 import { safeImageSource } from "../../shared/safeImage";
 import { PartCard } from "../PartCard";
@@ -79,52 +80,15 @@ export function HardpointsSection({
                                     the right so nothing moves when it does. Filters on the TYPE,
                                     which is what the groups are, and on the name, which is what a
                                     reader looking for one hardpoint knows. */}
-            <div
-                className={
-                    "tree-search hardpoint-search" +
-                    (hardpointSearchOpen ? " open" : "")
-                }
+            <SearchPlate
+                open={hardpointSearchOpen}
+                pattern={hardpointFilter}
+                placeholder={l10n.t("Filter by type or name")}
+                onPattern={setHardpointFilter}
+                onOpen={setHardpointSearchPressed}
+                variant="inline"
                 ref={hardpointSearchRef}
-            >
-                {hardpointSearchOpen && (
-                    <input
-                        className="tree-filter"
-                        type="text"
-                        autoFocus
-                        value={hardpointFilter}
-                        placeholder={l10n.t("Filter by type or name")}
-                        onChange={(e) => setHardpointFilter(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Escape") {
-                                e.stopPropagation();
-                                setHardpointFilter("");
-                                setHardpointSearchPressed(false);
-                            }
-                        }}
-                    />
-                )}
-                <div className="tree-search-icons">
-                    <IconButton
-                        icon="search"
-                        className={
-                            "tree-search-toggle" +
-                            (hardpointSearchOpen ? " active" : "")
-                        }
-                        expanded={hardpointSearchOpen}
-                        title={
-                            hardpointSearchOpen
-                                ? l10n.t("Close the filter")
-                                : l10n.t("Filter by type or name")
-                        }
-                        onClick={() => {
-                            if (hardpointSearchOpen) {
-                                setHardpointFilter("");
-                            }
-                            setHardpointSearchPressed((open) => !open);
-                        }}
-                    />
-                </div>
-            </div>
+            />
 
             {hardpointGroups.length === 0 && (
                 <div className="field-note">

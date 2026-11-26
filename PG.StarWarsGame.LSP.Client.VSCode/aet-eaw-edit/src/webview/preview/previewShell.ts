@@ -18,6 +18,7 @@ import {
     problemsPanelCss,
     rightDockCss,
     rotarySwitchCss,
+    searchPlateCss,
     stageChromeCss,
     stageFlyoutCss,
     stageRowCss,
@@ -175,17 +176,6 @@ export const Shell = styled.div`
     .card-group-title:hover {
         background: var(--colour-hover);
         opacity: 0.9;
-    }
-
-    /* The hardpoint list's search sits in the flow above the cards rather than floating on them:
-       there is no list box here for it to float over, and the section already scrolls as one. */
-
-    .hardpoint-search {
-        position: static;
-        margin: var(--space-2) 0 var(--space-6);
-        padding: 0;
-        background: none;
-        border: none;
     }
 
     /* Pressed. The one control on the stage that FIRES rather than latching, so it says so for a
@@ -532,93 +522,11 @@ export const Shell = styled.div`
         position: relative;
     }
 
-    /* Drawn ON the list, hard against its bottom-right corner.
+    /* The tree's search: a plate on the list's bottom-right corner, which this pane positions.
+       It is the shared search plate since the story graph's palette took it - see searchPlateCss.
+       The hardpoint list has the same plate in the flow above its cards. */
 
-       Closed, it is four icons hugging the right. Open, it also claims the left edge of the pane -
-       which is the whole reason for floating it: sharing a row with the icons, the field measured
-       58px of the 214 a docked panel has, and a bone name does not fit in 58px. Nothing moves when
-       it opens, because the icons are anchored to the right edge either way. */
-
-    .tree-search {
-        position: absolute;
-        right: 6px;
-        bottom: 6px;
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        /* Wraps, and the plate is anchored by its BOTTOM, so a line that does not fit is added
-           above the icons rather than below them. The icons therefore never move whatever the dock
-           is doing: wide, this is one row with the field to their left, which is the shape it was
-           designed as; narrow, the field takes a line of its own on top. Measured at a docked 214px
-           the field got 34px sharing the row - not enough to read a bone name in - and the same
-           layout at twice the width gives it 135px, which is. */
-        flex-wrap: wrap;
-        gap: var(--space-4);
-        padding: var(--space-2);
-        border-radius: var(--radius-6);
-        /* Its own plate. Rows run underneath it, and a transparent strip over a list of names is
-           unreadable in both directions. */
-        background: color-mix(in srgb, var(--colour-sidebar) 88%, transparent);
-        border: var(--space-1) solid var(--colour-line-strong);
-    }
-
-    .tree-search.open {
-        left: 6px;
-    }
-
-    /* The basis is what decides where it wraps: below this it is not worth having on the row, and
-       the whole line goes above the icons instead.
-
-       The editor's own input tokens, declared rather than inherited. Every other input in the
-       extension picks these up from the rule VS Code injects into a webview, but this one sits on
-       a plate of its own over a list, where an input that merely happens to look right is one host
-       stylesheet change away from looking wrong. Rounded to match the plate it stands in. */
-
-    .tree-search .tree-filter {
-        flex: 1 1 130px;
-        min-width: 0;
-        box-sizing: border-box;
-        /* The ICONS' height, exactly. Left to its own, the field came out 27px against their 22,
-           so opening it grew the row from 30 to 35 - and because the plate is anchored by its
-           bottom and its items are centred, the whole icon strip rose 2px under the pointer that
-           had just pressed it. Padding goes with it: an input centres its own text once it has a
-           height, so the vertical padding was only ever there to make one. */
-        height: 22px;
-        padding: 0 var(--space-8);
-        color: var(--colour-input-ink);
-        background: var(--colour-input);
-        border: var(--space-1) solid var(--colour-input-line);
-        border-radius: var(--radius-3);
-        font-family: inherit;
-        font-size: inherit;
-    }
-
-    /* Inset, so the ring is drawn ON the field rather than growing it - an outline that adds a
-       pixel each side would nudge the icons every time the box took focus. */
-
-    .tree-search .tree-filter:focus {
-        outline: var(--space-1) solid var(--colour-focus);
-        outline-offset: -1px;
-    }
-
-    .tree-search .tree-filter::placeholder {
-        color: var(--colour-placeholder);
-    }
-
-    /* The one button that never moves. Everything else in this row is what it opens onto, so it
-       keeps its width whichever of the two is showing. */
-
-    .tree-search .tree-search-toggle {
-        flex: 0 0 auto;
-    }
-
-    .tree-search-icons {
-        display: flex;
-        align-items: center;
-        gap: var(--space-4);
-        flex: 0 0 auto;
-    }
+    ${searchPlateCss}
 
     /* The empty message keeps the list's own shape rather than the row's - no hover, no pointer,
        and it must not look like something you can click. */
@@ -1268,7 +1176,6 @@ export const Shell = styled.div`
         flex-wrap: wrap;
     }
 
-    .tree-search .icon-btn,
     .view-toggles .icon-btn {
         font-size: var(--font-size-smaller);
         padding: var(--space-2) var(--space-8);

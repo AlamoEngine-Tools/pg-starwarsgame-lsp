@@ -108,6 +108,12 @@
   and yellow on one nobody has verified. The flyouts an info pill opens, here and on a hardpoint or ability
   card in the model preview, carry a tail that points at the pill
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **One search plate for the lists in a dock** - the story graph's palette is searched from a plate at the
+  foot of the dock, as the model tree is: a magnifier and the palette's two kinds, event types and rewards,
+  with a field that opens to the left of icons that do not move. A narrowed group says so in its title,
+  such as `1 of 64`; a kind switched off takes its group away; Escape and the magnifier clear the pattern.
+  The model tree's and the hardpoint list's searches are the same plate
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

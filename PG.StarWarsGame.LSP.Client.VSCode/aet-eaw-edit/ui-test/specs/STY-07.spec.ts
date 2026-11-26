@@ -58,7 +58,14 @@ async function shown(): Promise<string[]> {
  * reach React, and the pattern of the test before stays in force.
  */
 async function search(text: string): Promise<void> {
-    const field = await browser.$(".palette-scroll .search-field input");
+    const plate = ".palette-scroll .search-plate";
+    // The field is there once the magnifier was pressed, or while it holds a pattern.
+    if (!(await (await browser.$(`${plate} .search-plate-field`)).isExisting())) {
+        const magnifier = await browser.$(`${plate} .search-plate-toggle`);
+        await magnifier.waitForExist({ timeout: 30_000 });
+        await browser.execute((el: HTMLElement) => el.click(), magnifier as unknown as HTMLElement);
+    }
+    const field = await browser.$(`${plate} .search-plate-field`);
     await field.waitForExist({ timeout: 30_000 });
     await field.click();
     await browser.keys(["Control", "a"]);
@@ -68,7 +75,7 @@ async function search(text: string): Promise<void> {
     }
     await browser.pause(300);
     const held: string = await browser.execute(
-        () => document.querySelector<HTMLInputElement>(".palette-scroll .search-field input")?.value ?? "",
+        () => document.querySelector<HTMLInputElement>(".palette-scroll .search-plate-field")?.value ?? "",
     );
     if (held !== text) throw new Error(`The search holds '${held}', not '${text}'`);
 }

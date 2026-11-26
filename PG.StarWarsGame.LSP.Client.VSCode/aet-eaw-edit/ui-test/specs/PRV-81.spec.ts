@@ -1,7 +1,8 @@
 // PRV-81: the flyout a hardpoint card's info pill opens in the model preview stands beside the dock with a
 // tail that points at the pill, and a second press closes it (#222). It is the same flyout the story graph's
 // palette opens for a type's documentation. Before, it stood beside the dock with nothing that joined it to
-// its pill. An ability's info pill opens the same flyout; this test does not press that one.
+// its pill. An ability's info pill opens the same flyout; this test does not press that one. The hardpoint
+// list's search is the shared search plate: it filters the cards and Escape clears it.
 import { browser, expect } from "@wdio/globals";
 import { command, serverReady } from "../protocol.js";
 import { press } from "./preview.js";
@@ -70,6 +71,30 @@ describe("PRV-81", () => {
             await press(pill);
             await browser.pause(300);
             expect(await placed(pill)).toBeNull();
+        });
+    });
+
+    // The hardpoint list's search is the shared search plate, in the flow above the cards.
+    it("filters the hardpoint cards from the search plate above them, and Escape clears it", async () => {
+        await inNewestWebview(async () => {
+            const cards = async (): Promise<number> => browser.execute(() => document.querySelectorAll("[data-card]").length);
+            const all = await cards();
+            expect(all).toBeGreaterThan(1);
+
+            await press('.search-plate.inline button[title="Filter by type or name"]');
+            const field = await browser.$(".search-plate.inline .search-plate-field");
+            await field.waitForExist({ timeout: 10_000 });
+            await field.click();
+            await field.addValue("engine");
+            await browser.pause(400);
+            const narrowed = await cards();
+            expect(narrowed).toBeGreaterThan(0);
+            expect(narrowed).toBeLessThan(all);
+
+            await browser.keys("Escape");
+            await browser.pause(400);
+            expect(await (await browser.$(".search-plate.inline .search-plate-field")).isExisting()).toBe(false);
+            expect(await cards()).toBe(all);
         });
     });
 });

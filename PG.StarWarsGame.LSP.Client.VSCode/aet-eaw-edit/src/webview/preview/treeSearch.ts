@@ -36,15 +36,10 @@ export const TREE_KIND_COUNT = 3;
 /**
  * Whether the search box is showing.
  *
- * Not simply the button's state. A non-empty pattern keeps its own box open however the button was
- * left, because the alternative is a tree silently narrowed by text nobody can see - and the way
- * out of that state is to edit the very text the collapse just hid.
+ * The rule is the search plate's own, since the plate is shared: a non-empty pattern keeps its box
+ * open however the button was left. Named here as the tree has always called it.
  */
-export function searchIsOpen(pressed: boolean, pattern: string): boolean {
-    // Length, not `trim()`. A pattern of one space matches nothing and empties the tree, which is
-    // the loudest version of this bug rather than an edge case of it.
-    return pressed || pattern.length > 0;
-}
+export { searchPlateOpen as searchIsOpen } from "../shared/SearchPlate";
 
 /**
  * What the tree's header says when it is showing less than the whole model, or null when it is not.

@@ -2146,3 +2146,143 @@ export const detailsFlyoutCss = `
         pointer-events: none;
     }
 `;
+
+/**
+ * The search of a list in a dock: a plate with a magnifier and the list's own toggles, whose field
+ * opens to the left of icons that never move.
+ *
+ * Shared since the story graph's palette took the model tree's search. The markup is SearchPlate.
+ */
+export const searchPlateCss = `
+    /* Drawn ON the list, hard against its bottom-right corner.
+
+       Closed, it is a few icons hugging the right. Open, it also claims the left edge of the pane -
+       which is the whole reason for floating it: sharing a row with the icons, the field measured
+       58px of the 214 a docked panel has, and a name does not fit in 58px. Nothing moves when it
+       opens, because the icons are anchored to the right edge either way. */
+
+    .search-plate {
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        /* Wraps, and the plate is anchored by its BOTTOM, so a line that does not fit is added
+           above the icons rather than below them. The icons therefore never move whatever the dock
+           is doing: wide, this is one row with the field to their left, which is the shape it was
+           designed as; narrow, the field takes a line of its own on top. Measured at a docked 214px
+           the field got 34px sharing the row - not enough to read a name in - and the same layout
+           at twice the width gives it 135px, which is. */
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        padding: var(--space-2);
+        border-radius: var(--radius-6);
+        /* Its own plate. Rows run underneath it, and a transparent strip over a list of names is
+           unreadable in both directions. */
+        background: color-mix(in srgb, var(--colour-sidebar) 88%, transparent);
+        border: var(--space-1) solid var(--colour-line-strong);
+    }
+
+    /* On the corner of a list that scrolls inside a pane of its own, which the pane positions. */
+
+    .search-plate.floating {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+    }
+
+    .search-plate.floating.open {
+        left: 6px;
+    }
+
+    /* At the foot of a scroller it is the last child of: it stays on the scroller's bottom edge
+       while the list moves under it, and the room it takes at the end of the content is the pad
+       that lets the last row be scrolled clear of it. Closed it is as wide as its icons, against
+       the right; open it takes the row. */
+
+    .search-plate.sticky {
+        position: sticky;
+        bottom: 6px;
+        width: fit-content;
+        margin-left: auto;
+        /* In a column that is taller than what it holds, the plate takes the foot: the free space
+           goes above it. In an ordinary block these two do nothing. */
+        margin-top: auto;
+        align-self: flex-end;
+    }
+
+    .search-plate.sticky.open {
+        width: auto;
+        margin-left: 0;
+        align-self: stretch;
+    }
+
+    /* In the flow above a list that has no box to float over and scrolls with its section. No
+       plate of its own then: there is nothing under it to be read through. */
+
+    .search-plate.inline {
+        position: static;
+        margin: var(--space-2) 0 var(--space-6);
+        padding: 0;
+        background: none;
+        border: none;
+    }
+
+    /* The basis is what decides where it wraps: below this it is not worth having on the row, and
+       the whole line goes above the icons instead.
+
+       The editor's own input tokens, declared rather than inherited. Every other input in the
+       extension picks these up from the rule VS Code injects into a webview, but this one sits on
+       a plate of its own over a list, where an input that merely happens to look right is one host
+       stylesheet change away from looking wrong. Rounded to match the plate it stands in. */
+
+    .search-plate .search-plate-field {
+        flex: 1 1 130px;
+        min-width: 0;
+        box-sizing: border-box;
+        /* The ICONS' height, exactly. Left to its own, the field came out 27px against their 22,
+           so opening it grew the row from 30 to 35 - and because the plate is anchored by its
+           bottom and its items are centred, the whole icon strip rose 2px under the pointer that
+           had just pressed it. Padding goes with it: an input centres its own text once it has a
+           height, so the vertical padding was only ever there to make one. */
+        height: 22px;
+        padding: 0 var(--space-8);
+        color: var(--colour-input-ink);
+        background: var(--colour-input);
+        border: var(--space-1) solid var(--colour-input-line);
+        border-radius: var(--radius-3);
+        font-family: inherit;
+        font-size: inherit;
+    }
+
+    /* Inset, so the ring is drawn ON the field rather than growing it - an outline that adds a
+       pixel each side would nudge the icons every time the box took focus. */
+
+    .search-plate .search-plate-field:focus {
+        outline: var(--space-1) solid var(--colour-focus);
+        outline-offset: -1px;
+    }
+
+    .search-plate .search-plate-field::placeholder {
+        color: var(--colour-placeholder);
+    }
+
+    /* The one button that never moves. Everything else in this row is what it opens onto, so it
+       keeps its width whichever of the two is showing. */
+
+    .search-plate .search-plate-toggle {
+        flex: 0 0 auto;
+    }
+
+    .search-plate-icons {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        flex: 0 0 auto;
+    }
+
+    .search-plate .icon-btn {
+        font-size: var(--font-size-smaller);
+        padding: var(--space-2) var(--space-8);
+        border-radius: var(--radius-6);
+    }
+`;

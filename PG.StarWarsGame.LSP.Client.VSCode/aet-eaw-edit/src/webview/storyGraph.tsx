@@ -33,6 +33,7 @@ import { badgeIcon } from "./shared/badges";
 import { Icon, SeverityMark } from "./shared/Icon";
 import { ModalLayerContext } from "./shared/Modal";
 import { SelectField } from "./shared/SelectField";
+import { SearchPlate, searchPlateOpen } from "./shared/SearchPlate";
 import {
     comboboxCss,
     detailsFlyoutCss,
@@ -44,6 +45,7 @@ import {
     problemsPanelCss,
     rightDockCss,
     rotarySwitchCss,
+    searchPlateCss,
     stageChromeCss,
     stageFlyoutCss,
 } from "./shared/dockChrome";
@@ -5783,10 +5785,13 @@ const Shell = styled.div`
 
     .palette-scroll {
         min-width: 0;
-    }
-
-    .palette-scroll .dock-search {
-        margin-bottom: var(--space-8);
+        /* A column at least as tall as the dock's content, so the search plate, its last child,
+           stands at the dock's foot however little the palette holds. Narrowed to one tile the
+           palette is far shorter than the dock, and a plate that followed the last tile up moved
+           under the hand typing in it. */
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
     }
 
     .palette-new {
@@ -5831,6 +5836,8 @@ const Shell = styled.div`
     }
 
     ${detailsFlyoutCss}
+
+    ${searchPlateCss}
 
     /* What the documentation flyout holds. Prose wraps here, unlike a card's facts, and the two
        names in its head are a type's two names, so neither is cut short while there is room. */
@@ -8979,6 +8986,20 @@ function NodePalette(props: {
     onInfo: (info: TypeInfo | null) => void;
 }): React.JSX.Element {
     const [search, setSearch] = useState("");
+    // The search plate: whether its magnifier is pressed, and which of the two kinds of type the
+    // palette shows. Both kinds on is the whole palette.
+    const [searchPressed, setSearchPressed] = useState(false);
+    const [kinds, setKinds] = useState<ReadonlySet<"trigger" | "reward">>(
+        new Set(["trigger", "reward"]),
+    );
+    const toggleKind = (kind: "trigger" | "reward"): void =>
+        setKinds((current) => {
+            const next = new Set(current);
+            if (!next.delete(kind)) {
+                next.add(kind);
+            }
+            return next;
+        });
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
         Rewards: true,
@@ -9121,9 +9142,10 @@ function NodePalette(props: {
         label: string,
         category: "trigger" | "reward",
         items: string[],
+        total: number,
         hint: string,
     ): React.JSX.Element | null => {
-        if (!items.length) {
+        if (!items.length || !kinds.has(category)) {
             return null;
         }
         const isCollapsed = q === "" && collapsed[label];
@@ -9141,7 +9163,12 @@ function NodePalette(props: {
             <DockSection
                 id={label}
                 title={label}
-                count={items.length}
+                // A narrowed list says so: "3" over the events reads as a schema with three.
+                count={
+                    items.length === total
+                        ? total
+                        : l10n.t("{0} of {1}", items.length, total)
+                }
                 collapsed={isCollapsed}
                 onToggle={() =>
                     setCollapsed((c) => ({ ...c, [label]: !c[label] }))
@@ -9171,16 +9198,6 @@ function NodePalette(props: {
                     : "")
             }
         >
-            <div className="dock-search">
-                <div className="search-field">
-                    <input
-                        type="text"
-                        placeholder={l10n.t("Search node types...")}
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                </div>
-            </div>
             {showBlank || showAndJunction || showOrJunction ? (
                 <div className="dock-section palette-new">
                     <div className="tile-grid">
@@ -9233,12 +9250,14 @@ function NodePalette(props: {
                 l10n.t("Event types"),
                 "trigger",
                 eventTypes,
+                props.eventTypes.length,
                 l10n.t("Drag onto the canvas to create an event"),
             )}
             {typeGroup(
                 l10n.t("Rewards"),
                 "reward",
                 rewardTypes,
+                props.rewardTypes.length,
                 l10n.t("Drag onto an event node to attach this reward to it"),
             )}
             {q !== "" && !eventTypes.length && !rewardTypes.length ? (
@@ -9246,6 +9265,40 @@ function NodePalette(props: {
                     {l10n.t('No node types match "{0}".', search)}
                 </p>
             ) : null}
+            {kinds.size === 0 ? (
+                <p className="palette-empty">
+                    {l10n.t("Nothing matches that filter.")}
+                </p>
+            ) : null}
+
+            {/* The search, in the model tree's shape: a plate at the foot of the palette with the
+                magnifier and the two kinds, whose field opens to the left of icons that never
+                move. Last in the scroller, so it stays on the dock's bottom edge while the tiles
+                move under it. It finds a type by either of its names. */}
+            <SearchPlate
+                open={searchPlateOpen(searchPressed, search)}
+                pattern={search}
+                placeholder={l10n.t("Search by either name")}
+                title={l10n.t("Search the node types")}
+                onPattern={setSearch}
+                onOpen={setSearchPressed}
+                variant="sticky"
+            >
+                <IconButton
+                    icon="trigger"
+                    className={kinds.has("trigger") ? "active" : undefined}
+                    pressed={kinds.has("trigger")}
+                    title={l10n.t("Show event types")}
+                    onClick={() => toggleKind("trigger")}
+                />
+                <IconButton
+                    icon="reward"
+                    className={kinds.has("reward") ? "active" : undefined}
+                    pressed={kinds.has("reward")}
+                    title={l10n.t("Show rewards")}
+                    onClick={() => toggleKind("reward")}
+                />
+            </SearchPlate>
         </div>
     );
 }
