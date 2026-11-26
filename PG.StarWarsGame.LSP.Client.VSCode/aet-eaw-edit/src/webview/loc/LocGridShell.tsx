@@ -53,8 +53,11 @@ export interface LocGridShellProps {
     toolbar: ReactNode;
     dockHeader: ReactNode;
     dockContent: ReactNode;
-    /** Filters, at the foot of the dock - the story graph editor puts its there too. */
-    dockOverview?: ReactNode;
+    /**
+     * The search plate, on the grid's lower right corner. It searches the grid, so it stands on
+     * the grid rather than in the dock.
+     */
+    searchPlate?: ReactNode;
     /** Right-clicking the empty area below the rows, so an empty file is still reachable. */
     onEmptyAreaContextMenu?: (event: React.MouseEvent) => void;
 
@@ -135,81 +138,97 @@ function LocGridShellBody(props: LocGridShellProps): React.JSX.Element {
                 {/* The table and its footer share a column so the footer stays put while the grid
                     scrolls under it. */}
                 <div className="grid-column">
-                    <div
-                        className="grid-area"
-                        ref={scrollRef}
-                        onDragOver={props.onGridDragOver}
-                        onDrop={props.onGridDrop}
-                        onDragLeave={props.onGridDragLeave}
-                        onContextMenu={(e) => {
-                            // Only when the click missed every row: a file with nothing in it has no
-                            // row to right-click, and the menu is the only way to add one.
-                            if (
-                                (e.target as HTMLElement).closest(
-                                    ".data-row",
-                                ) === null
-                            ) {
-                                props.onEmptyAreaContextMenu?.(e);
-                            }
-                        }}
-                    >
-                        {/* Divs on one shared grid template rather than a table: a <table> whose tbody
+                    {/* The grid and the plate on its corner. A frame of their own, because the grid
+                        scrolls and a plate inside it would scroll away with the rows. */}
+                    <div className="grid-frame">
+                        <div
+                            className="grid-area"
+                            ref={scrollRef}
+                            onDragOver={props.onGridDragOver}
+                            onDrop={props.onGridDrop}
+                            onDragLeave={props.onGridDragLeave}
+                            onContextMenu={(e) => {
+                                // Only when the click missed every row: a file with nothing in it has no
+                                // row to right-click, and the menu is the only way to add one.
+                                if (
+                                    (e.target as HTMLElement).closest(
+                                        ".data-row",
+                                    ) === null
+                                ) {
+                                    props.onEmptyAreaContextMenu?.(e);
+                                }
+                            }}
+                        >
+                            {/* Divs on one shared grid template rather than a table: a <table> whose tbody
                         is display:block and whose rows are absolutely positioned cannot keep its
                         header and body columns aligned, and the row/cell display overrides fight
                         the table layout algorithm. One template string drives both. */}
-                        {/* min-content, not fit-content: the columns' own minimums decide how narrow
+                            {/* min-content, not fit-content: the columns' own minimums decide how narrow
                         the table may get, not whatever text happens to be in the rows currently
                         mounted. With a virtualised list fit-content made the width depend on the
                         scroll position. */}
-                        <div
-                            className="grid"
-                            style={{ minWidth: "min-content" }}
-                        >
                             <div
-                                className="head-row"
-                                style={{ gridTemplateColumns: props.columns }}
+                                className="grid"
+                                style={{ minWidth: "min-content" }}
                             >
-                                {props.header}
-                            </div>
+                                <div
+                                    className="head-row"
+                                    style={{
+                                        gridTemplateColumns: props.columns,
+                                    }}
+                                >
+                                    {props.header}
+                                </div>
 
-                            <div
-                                className="rows"
-                                style={{
-                                    height: `${virtualizer.getTotalSize()}px`,
-                                }}
-                            >
-                                {virtualizer.getVirtualItems().map((item) => {
-                                    const row = props.rows[item.index];
-                                    return (
-                                        <div
-                                            key={item.key}
-                                            data-row-index={row.index}
-                                            className={[
-                                                "data-row",
-                                                props.rowClassName?.(row) ?? "",
-                                            ]
-                                                .filter(Boolean)
-                                                .join(" ")}
-                                            title={props.rowTitle?.(row)}
-                                            onFocusCapture={() =>
-                                                props.onRowFocus?.(row)
-                                            }
-                                            onContextMenu={(e) =>
-                                                props.onRowContextMenu?.(row, e)
-                                            }
-                                            style={{
-                                                gridTemplateColumns:
-                                                    props.columns,
-                                                transform: `translateY(${item.start}px)`,
-                                                height: `${ROW_HEIGHT}px`,
-                                            }}
-                                        >
-                                            {props.renderRow(row)}
-                                        </div>
-                                    );
-                                })}
+                                <div
+                                    className="rows"
+                                    style={{
+                                        height: `${virtualizer.getTotalSize()}px`,
+                                    }}
+                                >
+                                    {virtualizer
+                                        .getVirtualItems()
+                                        .map((item) => {
+                                            const row = props.rows[item.index];
+                                            return (
+                                                <div
+                                                    key={item.key}
+                                                    data-row-index={row.index}
+                                                    className={[
+                                                        "data-row",
+                                                        props.rowClassName?.(
+                                                            row,
+                                                        ) ?? "",
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(" ")}
+                                                    title={props.rowTitle?.(
+                                                        row,
+                                                    )}
+                                                    onFocusCapture={() =>
+                                                        props.onRowFocus?.(row)
+                                                    }
+                                                    onContextMenu={(e) =>
+                                                        props.onRowContextMenu?.(
+                                                            row,
+                                                            e,
+                                                        )
+                                                    }
+                                                    style={{
+                                                        gridTemplateColumns:
+                                                            props.columns,
+                                                        transform: `translateY(${item.start}px)`,
+                                                        height: `${ROW_HEIGHT}px`,
+                                                    }}
+                                                >
+                                                    {props.renderRow(row)}
+                                                </div>
+                                            );
+                                        })}
+                                </div>
                             </div>
                         </div>
+                        {props.searchPlate}
                     </div>
                     {/* Fixed to the viewport, because the boundary it marks is reported in viewport
                     coordinates and the grid underneath it scrolls. */}
@@ -233,7 +252,6 @@ function LocGridShellBody(props: LocGridShellProps): React.JSX.Element {
                     maxWidth={520}
                     header={props.dockHeader}
                     content={props.dockContent}
-                    overview={props.dockOverview}
                 />
             </div>
         </Shell>

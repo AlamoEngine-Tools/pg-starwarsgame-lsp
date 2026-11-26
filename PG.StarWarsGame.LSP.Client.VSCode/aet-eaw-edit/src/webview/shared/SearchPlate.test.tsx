@@ -183,4 +183,53 @@ describe("SearchPlate", () => {
         assert.match(html, /^<div class="search-plate floating open beside">/);
         assert.match(html, /<div class="search-plate-box beside"/);
     });
+
+    /**
+     * Dropdown filters are pills on a line of their own ABOVE the field, at full length, and only
+     * while the plate is open: the closed plate is one row, and the filter icon is what says a
+     * pill is set.
+     */
+    it("puts its dropdown filters on a line above the field while open, and nowhere while closed", () => {
+        const pills = <span className="a-pill">All fields</span>;
+        const open = plate({ open: true, pills });
+
+        assert.match(
+            open,
+            /^<div class="search-plate floating open"><div class="search-plate-above"><div class="search-plate-pills"><span class="a-pill">All fields<\/span><\/div><\/div><div class="search-plate-box">/,
+        );
+        assert.doesNotMatch(plate({ pills }), /a-pill|search-plate-above/);
+    });
+
+    /**
+     * Why a pattern does not compile, in words above the field. Without it the list just empties,
+     * which reads as "no matches" - and a tooltip is nothing a reader finds while typing.
+     */
+    it("says in words above the field why the pattern does not compile", () => {
+        const html = plate({
+            open: true,
+            mode: "regex",
+            pattern: "(",
+            error: "Unterminated group",
+        });
+
+        assert.match(
+            html,
+            /<div class="search-plate-above"><div class="search-plate-error" role="alert">Unterminated group<\/div><\/div>/,
+        );
+        assert.doesNotMatch(plate({ open: true }), /search-plate-above/);
+    });
+
+    /** A field beside the plate has no line above it to write on; its tooltip carries the reason. */
+    it("keeps the reason on the field alone where the field opens beside the plate", () => {
+        const html = plate({
+            open: true,
+            beside: true,
+            mode: "regex",
+            pattern: "(",
+            error: "Unterminated group",
+        });
+
+        assert.doesNotMatch(html, /search-plate-above/);
+        assert.match(html, /<input[^>]*title="Unterminated group"/);
+    });
 });

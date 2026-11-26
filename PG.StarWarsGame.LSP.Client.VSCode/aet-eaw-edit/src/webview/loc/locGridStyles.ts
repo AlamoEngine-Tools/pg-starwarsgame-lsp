@@ -16,9 +16,10 @@ import {
     dockBodyCss,
     dockChromeCss,
     dockHeaderCss,
-    dockOverviewCss,
     problemsPanelCss,
     rightDockCss,
+    pillSelectCss,
+    searchPlateCss,
 } from "../shared/dockChrome";
 
 export const Shell = styled.div`
@@ -68,10 +69,30 @@ export const Shell = styled.div`
         min-height: 0;
     }
 
+    /* The grid and the search plate on its corner. The grid scrolls inside it and the plate does
+       not: a plate inside the scroller would leave with the rows. */
+
+    .grid-frame {
+        flex: 1;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    /* Clear of the grid's scroll bars, which run along the same two edges. */
+
+    .grid-frame > .search-plate.floating {
+        right: var(--space-16);
+        bottom: var(--space-16);
+    }
+
     .grid-area {
         flex: 1;
         overflow: auto;
         position: relative;
+        /* Room past the last row, so it can be scrolled out from under the plate. */
+        padding-bottom: calc(var(--space-24) * 2);
     }
 
     /* Where a dragged row will land. Pinned to the viewport rather than to the grid, so it stays on
@@ -382,7 +403,8 @@ export const Shell = styled.div`
        acting on the file, the foot for narrowing what you are looking at. */
 
     ${dockBodyCss}
-    ${dockOverviewCss}
+    ${pillSelectCss}
+    ${searchPlateCss}
     button {
         background: var(--colour-action-2);
         color: var(--colour-action-2-ink);
@@ -458,13 +480,6 @@ export const Shell = styled.div`
         border-color: var(--colour-focus);
     }
 
-    /* The search-mode toggles: icon buttons, the same ones the graph editor's overview tools use. */
-
-    .mode-group {
-        display: flex;
-        gap: var(--space-4);
-    }
-
     /* A spacer is a marker, not content: it spans the row, reads as a rule, and cannot be typed
        into - only removed from the row menu. */
 
@@ -502,26 +517,6 @@ export const Shell = styled.div`
     .data-row.inherited select {
         color: var(--colour-faint);
         font-style: italic;
-    }
-
-    .inherited-toggle {
-        display: flex;
-        align-items: center;
-        gap: var(--space-6);
-        cursor: pointer;
-    }
-
-    .inherited-toggle input {
-        cursor: pointer;
-    }
-
-    .inherited-toggle .badge {
-        opacity: 0.7;
-        font-size: var(--font-size-smaller);
-        background: var(--colour-badge);
-        color: var(--colour-badge-ink);
-        border-radius: var(--radius-6);
-        padding: 0 var(--space-6);
     }
 
     .actions {

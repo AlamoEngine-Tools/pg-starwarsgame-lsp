@@ -47,7 +47,7 @@ import {
 import { BaselineRow, toBaselineRows } from "./translationInherited";
 import { languageCopyValues } from "./loc/languageCopy";
 import { LocTile, LocTileGrid } from "./loc/LocTile";
-import { LocSearch } from "./loc/LocSearch";
+import { LocSearchPlate } from "./loc/LocSearchPlate";
 import { LocProblemsBar } from "./loc/LocProblemsBar";
 import { LocRow } from "./loc/locRow";
 import { rowSeverityClass, severityByRow } from "./loc/rowSeverity";
@@ -718,8 +718,8 @@ function App(): React.JSX.Element {
         </>
     );
 
-    const dockOverview = (
-        <LocSearch
+    const searchPlate = (
+        <LocSearchPlate
             filter={filter}
             onFilter={setFilter}
             mode={mode}
@@ -792,7 +792,7 @@ function App(): React.JSX.Element {
             toolbar={toolbar}
             dockHeader={dockHeader}
             dockContent={dockContent}
-            dockOverview={dockOverview}
+            searchPlate={searchPlate}
         />
     );
 }

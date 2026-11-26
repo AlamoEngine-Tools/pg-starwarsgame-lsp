@@ -103,6 +103,13 @@ export interface SearchPlateProps {
 
     /** The list's own quick filters - which kinds it shows - after the magnifier. Three at most. */
     children?: ReactNode;
+
+    /**
+     * The search's dropdown filters, as pills on a line above the field. Shown while the plate is
+     * open and at full length there; the closed plate stays one row, and the filter icon is what
+     * says one of them is set. A plate whose field opens beside it has no such line.
+     */
+    pills?: ReactNode;
 }
 
 function samePlace(
@@ -133,10 +140,16 @@ export function SearchPlate({
     variant = "floating",
     beside = false,
     children,
+    pills,
 }: SearchPlateProps): React.JSX.Element {
     const plate = useRef<HTMLDivElement | null>(null);
     const [fieldAt, setFieldAt] = useState<PlateFieldPlacement | null>(null);
     const detached = open && beside;
+
+    /* The line above the field: the dropdown filters, and why a pattern does not compile. The
+       plate is anchored by its bottom, so the line is added above icons that do not move. */
+    const above =
+        open && !beside && (pills !== undefined || error !== undefined);
 
     /* The field beside the plate is placed against the window, so nothing positions it but this:
        measured after every render, and again when the window or anything around the plate moves. */
@@ -214,6 +227,22 @@ export function SearchPlate({
             }
             ref={plate}
         >
+            {above && (
+                <div className="search-plate-above">
+                    {pills !== undefined && (
+                        <div className="search-plate-pills">{pills}</div>
+                    )}
+                    {/* In words, and nearest the field. Without it the list just empties, which
+                        reads as "no matches" - and a tooltip is nothing a reader finds while
+                        typing. */}
+                    {error !== undefined && (
+                        <div className="search-plate-error" role="alert">
+                            {error}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* The field grows into the space to the LEFT of the icons, which never move. That is
                 what makes the strip a fixed anchor rather than a row that rearranges itself. */}
             {open && (

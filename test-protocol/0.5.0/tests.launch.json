@@ -768,5 +768,8 @@
   },
   "PRV-82": {
     "open": "{repo}\\eaw"
+  },
+  "SET-38": {
+    "open": "{repo}\\foc"
   }
 }

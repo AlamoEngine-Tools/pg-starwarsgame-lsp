@@ -79,17 +79,21 @@ describe("ModeSelector", () => {
     it("draws a glyph through the icon seam, not a codicon class", () => {
         const html = render(
             <ModeSelector
-                label="Search in"
-                value="text"
+                label="Open"
+                value="definition"
                 options={[
-                    { id: "text", label: "Plain text", icon: "searchLiteral" },
+                    {
+                        id: "definition",
+                        label: "Go to definition",
+                        icon: "definition",
+                    },
                 ]}
                 onSelect={() => undefined}
             />,
         );
 
-        assert.match(html, /codicon-case-sensitive/);
-        assert.equal(/>Plain text</.test(html), false, html);
+        assert.match(html, /codicon-go-to-file/);
+        assert.equal(/>Go to definition</.test(html), false, html);
     });
 
     /**

@@ -24,7 +24,7 @@ import { LocDockHeader, LocPageToolbar } from "./loc/LocDockHeader";
 import { useLocColumns } from "./loc/useLocColumns";
 import { LocGridMessage, LocGridShell } from "./loc/LocGridShell";
 import { EditMenuItem } from "./loc/readOnly";
-import { LocSearch } from "./loc/LocSearch";
+import { LocSearchPlate } from "./loc/LocSearchPlate";
 import { LocProblemsBar } from "./loc/LocProblemsBar";
 import { LocRow } from "./loc/locRow";
 import { rowSeverityClass, severityByRow } from "./loc/rowSeverity";
@@ -60,7 +60,7 @@ import {
 } from "./translationStaging";
 import { sortRows } from "./translationView";
 import { nextSort, SortState } from "./shared/tableSort";
-import { Button } from "./shared/Button";
+import { Button, IconButton } from "./shared/Button";
 import { Field } from "./shared/Field";
 import { Icon, SeverityMark } from "./shared/Icon";
 
@@ -508,8 +508,8 @@ function App(): React.JSX.Element {
         </>
     );
 
-    const dockOverview = (
-        <LocSearch
+    const searchPlate = (
+        <LocSearchPlate
             filter={filter}
             onFilter={setFilter}
             mode={mode}
@@ -520,24 +520,29 @@ function App(): React.JSX.Element {
             error={rowFilter.error}
             placeholders={PLACEHOLDERS}
             keyScopeLabel={l10n.t("Key only")}
+            toggled={showInherited}
+            onResetToggles={() => setShowInherited(false)}
         >
-            <label
-                className="inherited-toggle"
+            {/* A quick filter, beside the magnifier. Off is where it rests - the entries that only
+                repeat the layer below are hidden - so switching it on counts as a filter, and the
+                reset switches it off again. The count is how many it would bring back. */}
+            <IconButton
+                icon="layerBelow"
+                className={showInherited ? "active" : undefined}
+                pressed={showInherited}
                 title={l10n.t(
                     "Show entries whose value is identical to the layer below this file",
                 )}
-            >
-                <input
-                    type="checkbox"
-                    checked={showInherited}
-                    onChange={(e) => setShowInherited(e.target.checked)}
-                />
-                {l10n.t("Inherited")}
-                {inherited.size > 0 && (
-                    <span className="badge">{inherited.size}</span>
-                )}
-            </label>
-        </LocSearch>
+                badge={
+                    inherited.size > 0 ? (
+                        <span className="search-plate-count">
+                            {inherited.size}
+                        </span>
+                    ) : undefined
+                }
+                onClick={() => setShowInherited((shown) => !shown)}
+            />
+        </LocSearchPlate>
     );
 
     return (
@@ -592,7 +597,7 @@ function App(): React.JSX.Element {
             toolbar={toolbar}
             dockHeader={dockHeader}
             dockContent={dockContent}
-            dockOverview={dockOverview}
+            searchPlate={searchPlate}
         />
     );
 }

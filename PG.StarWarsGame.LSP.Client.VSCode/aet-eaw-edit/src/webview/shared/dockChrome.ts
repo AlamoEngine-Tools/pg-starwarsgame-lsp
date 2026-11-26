@@ -172,25 +172,9 @@ ${tokensCss}
     }
 
     /* ── Search ────────────────────────────────────────────────────────── */
-    /* The mode toggles sit inside the box, the way an editor's find widget puts them - that buys
-       back a whole row, which is what made this corner feel cramped. */
     .dock-search { display: flex; flex-direction: column; gap: var(--space-6); }
     .search-field { position: relative; display: flex; align-items: center; }
     .search-field input[type=text] { width: 100%; padding: var(--space-4) var(--space-8); }
-    /* Room for the three toggles, which overlay the trailing edge. Only where they exist - the
-       graph editor's filters have no modes and must not carry a gap for buttons it never draws. */
-    .search-field.with-modes input[type=text] { padding-right: var(--search-modes-inset); }
-    .search-field .mode-group { position: absolute; right: 3px; display: flex; gap: var(--space-1); }
-    /* The three modes are a one-of-N choice and say so - but inside the box they are a compact
-       cluster over the trailing edge, not the full-width joined row a settings pane gets. So the
-       group keeps its own width and its segments keep the size they had as separate toggles. */
-    .search-field .mode-group .mode-selector { width: auto; }
-    .search-field .mode-group .mode-selector button {
-        flex: 0 0 auto;
-        min-width: 22px;
-        padding: var(--space-2) var(--space-4);
-    }
-    .search-field .mode-group .codicon { font-size: var(--icon-size-14); }
 
     /* A control and its label are a pair and sit close; the gap BETWEEN fields is what the
        section body sets, and it is larger. Three pixels here had the label almost touching the
@@ -1508,7 +1492,7 @@ export const rotarySwitchCss = `
  * Shared because the story graph's colour key button (#128) sits on the same plate the preview's
  * corners use. The host places it; this is only what it looks like.
  */
-export const stageChromeCss = `
+const stagePlateCss = `
     /* One shared plate so every corner reads as the same kind of thing. Semi-transparent, since
        a solid panel over a viewport looks like a hole in it. */
     .stage-chrome {
@@ -1535,6 +1519,14 @@ export const stageChromeCss = `
         border-radius: var(--radius-3);
     }
 
+`;
+
+/**
+ * The pill a list is picked from - see PillSelect. A block of its own since the search plate took
+ * the pill for its dropdown filters: a page with a search plate and no stage needs these rules
+ * without the stage's.
+ */
+export const pillSelectCss = `
     /* One pick out of a list, on a plate - see PillSelect. The glyph of what is picked, the value,
        and the mark of a list behind a divider: the divider and the mark are what tell it from a
        toggle, which is a pill too, and its resting border from a toggle that is off.
@@ -1617,6 +1609,12 @@ export const stageChromeCss = `
         cursor: default;
     }
 `;
+
+/**
+ * The stage's plates and the pill select that sits on them, which is how every page with a stage
+ * takes the two.
+ */
+export const stageChromeCss = stagePlateCss + pillSelectCss;
 
 /**
  * The stage's edges: a row of three slots along the top and along the bottom, the plates sitting
@@ -2190,8 +2188,12 @@ export const searchPlateCss = `
         bottom: 6px;
     }
 
+    /* Open, a plate that keeps its field inside it takes a width of its own from the corner it
+       stands on. It stood on a list a dock wide when this stretched from edge to edge; on a grid
+       or a canvas that would be a bar across the page. */
+
     .search-plate.floating.open:not(.beside) {
-        left: 6px;
+        width: min(440px, calc(100% - 12px));
     }
 
     /* At the foot of a scroller it is the last child of: it stays on the scroller's bottom edge
@@ -2248,6 +2250,66 @@ export const searchPlateCss = `
     .search-plate.beside {
         border-top-left-radius: 0;
         border-bottom-left-radius: 0;
+    }
+
+    /* The line above the field: the search's dropdown filters as pills, and why a pattern does not
+       compile. A whole line of its own, so the field and the icons wrap under it and - the plate
+       being anchored by its bottom - the line is added above icons that do not move. */
+
+    .search-plate .search-plate-above {
+        flex: 1 0 100%;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        min-width: 0;
+    }
+
+    .search-plate .search-plate-pills {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: var(--space-4);
+    }
+
+    /* At full length here, which is the point of the line - up to a width a name fits in. */
+
+    .search-plate .pill-select .pill-value {
+        max-width: 28ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+    }
+
+    /* A pill away from its resting value narrows the list. It carries the accent a quick filter
+       does, so an open plate shows at a glance which of its filters are set. */
+
+    .search-plate .pill-select.set {
+        border-color: var(--colour-action);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+    }
+
+    .search-plate .pill-select.set .pill-mark {
+        border-left-color: var(--colour-action-ink);
+        opacity: 1;
+    }
+
+    .search-plate .pill-select.set > svg {
+        opacity: 1;
+    }
+
+    .search-plate .search-plate-error {
+        padding: 0 var(--space-2);
+        font-size: var(--font-size-smaller);
+        color: var(--colour-error);
+        overflow-wrap: anywhere;
+    }
+
+    /* A count on a quick filter: how many rows switching it on would bring back. */
+
+    .search-plate .search-plate-count {
+        font-size: var(--font-size-smallest);
+        font-variant-numeric: tabular-nums;
     }
 
     /* The editor's own input tokens, declared rather than inherited. Every other input in the

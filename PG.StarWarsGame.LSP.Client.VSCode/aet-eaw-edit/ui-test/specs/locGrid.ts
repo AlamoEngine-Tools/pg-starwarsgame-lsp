@@ -110,25 +110,42 @@ export async function rowTexts(): Promise<string[]> {
     );
 }
 
-/** Types into the grid's row filter. */
+/** The grid's search plate, on the grid's lower right corner. */
+const PLATE = ".grid-column .search-plate";
+
+/** Types into the grid's search, opening its field first. Replaced by keys, as a reader does. */
 export async function filterRows(text: string): Promise<void> {
-    await (await browser.$("input.filter")).setValue(text);
+    if (!(await (await browser.$(`${PLATE} .search-plate-field`)).isExisting())) {
+        await browser.execute(
+            (selector: string) => document.querySelector<HTMLButtonElement>(`${selector} .search-plate-toggle`)?.click(),
+            PLATE,
+        );
+    }
+    const field = await browser.$(`${PLATE} .search-plate-field`);
+    await field.waitForExist({ timeout: 10_000 });
+    await field.click();
+    await browser.keys(["Control", "a"]);
+    await browser.keys("Backspace");
+    if (text !== "") await field.addValue(text);
     await browser.pause(1_000);
 }
 
-/** The Inherited toggle: its tooltip, and whether it is ticked. */
+/** The Inherited quick filter on the search plate: its tooltip, and whether it is on. */
 export async function inherited(): Promise<{ title: string; checked: boolean }> {
-    return browser.execute(() => {
-        const label = document.querySelector("label.inherited-toggle");
+    return browser.execute((selector: string) => {
+        const toggle = document.querySelector(`${selector} .search-plate-icons button:nth-child(2)`);
         return {
-            title: label?.getAttribute("title") ?? "",
-            checked: label?.querySelector("input")?.checked ?? false,
+            title: toggle?.getAttribute("title") ?? "",
+            checked: toggle?.getAttribute("aria-pressed") === "true",
         };
-    });
+    }, PLATE);
 }
 
 export async function toggleInherited(): Promise<void> {
-    await browser.execute(() => document.querySelector<HTMLInputElement>("label.inherited-toggle input")?.click());
+    await browser.execute(
+        (selector: string) => document.querySelector<HTMLButtonElement>(`${selector} .search-plate-icons button:nth-child(2)`)?.click(),
+        PLATE,
+    );
     await browser.pause(1_000);
 }
 

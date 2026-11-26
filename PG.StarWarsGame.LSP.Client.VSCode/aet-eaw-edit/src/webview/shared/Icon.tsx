@@ -52,6 +52,7 @@ import {
     IconClipboardCopy,
     IconCloudDownload,
     IconCoins,
+    IconColumns,
     IconCopy,
     IconCrosshair,
     IconCube,
@@ -81,7 +82,6 @@ import {
     IconInfoCircle,
     IconLayersUnion,
     IconLayoutGrid,
-    IconLetterCase,
     IconLink,
     IconListDetails,
     IconListTree,
@@ -111,7 +111,6 @@ import {
     type IconProps,
     IconRadar,
     IconRefresh,
-    IconRegex,
     IconRepeat,
     IconRoute,
     IconRuler,
@@ -124,6 +123,7 @@ import {
     IconShadow,
     IconSparkles,
     IconStack2,
+    IconStackBack,
     IconStairsUp,
     IconSun,
     IconSunHigh,
@@ -373,11 +373,11 @@ const ICONS = {
     threadLanes: IconListTree,
     chapterLanes: IconBook,
 
-    // The find widget's three modes. Listed here so the whole set can be read in one place, but
-    // `CODICONS` below routes all three to the editor's own marks - see the note there.
-    searchLiteral: IconLetterCase,
-    searchWildcard: IconAsterisk,
-    searchRegex: IconRegex,
+    // Which column a search reads its pattern in. The three ways of reading the pattern are not
+    // icons: the search plate writes them out as the characters they mean.
+    searchScope: IconColumns,
+    // Entries that only repeat the layer below this file - the localisation search's quick filter.
+    layerBelow: IconStackBack,
 
     // ── the story simulation ──────────────────────────────────────────────────
     // What the running story is waiting on the AUTHOR for: a hand on a control, because every
@@ -537,14 +537,6 @@ export type IconName = keyof typeof ICONS;
 /** Meanings that keep the editor's glyph rather than taking Tabler's. */
 const CODICONS = {
     definition: "go-to-file",
-
-    // The find widget's three search modes, and the same argument again. A reader recognises Aa,
-    // the star and .* from the editor's own search box - they are not descriptions of anything,
-    // they are learned marks - so redrawing them in another set would make a control someone
-    // already knows look like a new one. Tabler entries exist for all three; this routes past them.
-    searchLiteral: "case-sensitive",
-    searchWildcard: "star-full",
-    searchRegex: "regex",
 } as const satisfies Partial<Record<IconName, string>>;
 
 type CodiconMeaning = keyof typeof CODICONS;
