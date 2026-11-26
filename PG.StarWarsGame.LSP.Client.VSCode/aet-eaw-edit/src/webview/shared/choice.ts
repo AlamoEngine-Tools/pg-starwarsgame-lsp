@@ -35,6 +35,15 @@ interface Choosable<Id extends string> {
      */
     icon?: IconName;
 
+    /**
+     * A written mark, shown INSTEAD of the label where there is no icon.
+     *
+     * For an option whose meaning IS a few characters: `.*` is a regular expression to anyone who
+     * would choose it, and no drawing says it better. Never translated - it is notation, not a
+     * word - and never read aloud: the label stays what the option is called.
+     */
+    mark?: string;
+
     /** Longer than the label, for the tooltip. */
     title?: string;
 }

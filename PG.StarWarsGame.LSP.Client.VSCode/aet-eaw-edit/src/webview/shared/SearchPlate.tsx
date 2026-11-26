@@ -31,26 +31,30 @@ import { type SearchMode } from "./searchPattern";
 import { placePlateField, type PlateFieldPlacement } from "./searchPlateField";
 
 /**
- * The three ways a pattern is read. The icons and wording the localisation search shipped with -
- * unchanged, because users have them in their fingers.
+ * The three ways a pattern is read, in the wording the localisation search shipped with.
+ *
+ * Each is drawn as the characters it means rather than as an icon: `ab` for plain text, `*?` for
+ * the two wildcards, `.*` for a regular expression. The icons before them said the wrong things -
+ * a letter-case glyph reads as "case sensitive" for a search that is not, and an asterisk drawn
+ * small is a star.
  */
 export const SEARCH_MODES: ChoiceOption<SearchMode>[] = [
     {
         id: "text",
         label: l10n.t("text"),
-        icon: "searchLiteral",
+        mark: "ab",
         title: l10n.t("Plain text search"),
     },
     {
         id: "wildcard",
         label: l10n.t("wildcard"),
-        icon: "searchWildcard",
+        mark: "*?",
         title: l10n.t("Wildcard: * matches any text, ? matches one character"),
     },
     {
         id: "regex",
         label: l10n.t("regex"),
-        icon: "searchRegex",
+        mark: ".*",
         title: l10n.t("Regular expression (case-insensitive)"),
     },
 ];

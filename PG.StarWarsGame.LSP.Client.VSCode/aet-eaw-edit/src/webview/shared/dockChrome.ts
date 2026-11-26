@@ -2326,23 +2326,29 @@ export const searchPlateCss = `
         border: none;
         border-radius: var(--radius-3);
         background: transparent;
-        opacity: 0.72;
+        color: var(--colour-input-ink);
     }
 
-    .search-plate .search-plate-modes .mode-selector button svg {
-        width: 13px;
-        height: 13px;
+    /* A mode is drawn as the characters it means, in the code font those characters are typed in.
+       The asterisk and the dot sit high and low in their cells, so the line is as tall as the
+       button and the mark is centred by the flex box rather than by a line height. At the field's
+       own ink and full strength: two thin characters dimmed the way an idle icon is came out too
+       faint to read, and the accent on the chosen one is enough to tell them apart. */
+
+    .search-plate .search-plate-modes .mode-mark {
+        font-family: var(--font-family-code);
+        font-size: var(--font-size-12);
+        line-height: 1;
+        letter-spacing: 0;
     }
 
     .search-plate .search-plate-modes .mode-selector button:hover {
         background: var(--colour-action-2-hover);
-        opacity: 1;
     }
 
     .search-plate .search-plate-modes .mode-selector button.active {
         background: var(--colour-action);
         color: var(--colour-action-ink);
-        opacity: 1;
     }
 
     /* The one button that never moves. Everything else in this row is what it opens onto, so it

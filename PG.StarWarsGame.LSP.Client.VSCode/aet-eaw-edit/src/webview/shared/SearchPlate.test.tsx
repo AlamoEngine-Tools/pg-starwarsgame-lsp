@@ -116,6 +116,29 @@ describe("SearchPlate", () => {
         assert.equal(box.match(/aria-checked="true"/g)?.length, 1);
     });
 
+    /**
+     * Each mode is drawn as the characters it means, not as an icon: `ab` for plain text, `*?` for
+     * wildcards, `.*` for a regular expression. A letter-case icon said "case sensitive" for a
+     * search that is not, and a star said nothing about wildcards.
+     */
+    it("draws the modes as written marks: ab, *? and .*", () => {
+        const html = plate({ open: true });
+        const modes =
+            /<div class="search-plate-modes">.*?<\/span><\/div>/.exec(
+                html,
+            )?.[0] ?? "";
+
+        assert.deepEqual(
+            [
+                ...modes.matchAll(
+                    /<span class="mode-mark"[^>]*>([^<]*)<\/span>/g,
+                ),
+            ].map((m) => m[1]),
+            ["ab", "*?", ".*"],
+        );
+        assert.doesNotMatch(modes, /<svg/);
+    });
+
     /** A regex that does not compile empties the list; the field says why. */
     it("marks the field invalid and says why when the pattern does not compile", () => {
         const html = plate({

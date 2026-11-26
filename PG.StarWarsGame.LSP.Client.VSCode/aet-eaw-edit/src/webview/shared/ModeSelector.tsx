@@ -63,6 +63,13 @@ export function ModeSelector<Id extends string>(props: {
                         type="button"
                         role="radio"
                         aria-checked={option.id === props.value}
+                        // A mark is notation, not a name: the label is what the option is called.
+                        aria-label={
+                            option.icon === undefined &&
+                            option.mark !== undefined
+                                ? option.label
+                                : undefined
+                        }
                         className={option.id === props.value ? "active" : ""}
                         disabled={
                             props.disabled === true ||
@@ -77,10 +84,14 @@ export function ModeSelector<Id extends string>(props: {
                         }
                         onClick={() => props.onSelect(option.id)}
                     >
-                        {option.icon === undefined ? (
-                            option.label
-                        ) : (
+                        {option.icon !== undefined ? (
                             <Icon name={option.icon} />
+                        ) : option.mark !== undefined ? (
+                            <span className="mode-mark" aria-hidden="true">
+                                {option.mark}
+                            </span>
+                        ) : (
+                            option.label
                         )}
                     </button>
                 );

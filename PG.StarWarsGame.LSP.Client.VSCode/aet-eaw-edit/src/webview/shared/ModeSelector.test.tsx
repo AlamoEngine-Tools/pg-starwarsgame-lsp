@@ -163,4 +163,32 @@ describe("ModeSelector", () => {
         }
         assert.match(html, /role="radiogroup"[^>]*aria-disabled="true"/);
     });
+
+    /**
+     * Some options are best drawn as the characters they mean - `.*` IS a regular expression to
+     * anyone who would pick it. The mark is drawn, and the label is what the option is called aloud.
+     */
+    it("draws an option's written mark, and names the option by its label", () => {
+        const html = render(
+            <ModeSelector
+                label="How the pattern is read"
+                value="regex"
+                options={[
+                    { id: "text", label: "text", mark: "ab" },
+                    { id: "regex", label: "regex", mark: ".*" },
+                ]}
+                onSelect={() => undefined}
+            />,
+        );
+
+        assert.match(
+            html,
+            /<button[^>]*aria-label="regex"[^>]*><span class="mode-mark" aria-hidden="true">\.\*<\/span><\/button>/,
+        );
+        assert.match(
+            html,
+            /<button[^>]*aria-label="text"[^>]*><span class="mode-mark" aria-hidden="true">ab<\/span><\/button>/,
+        );
+        assert.doesNotMatch(html, /<svg/);
+    });
 });

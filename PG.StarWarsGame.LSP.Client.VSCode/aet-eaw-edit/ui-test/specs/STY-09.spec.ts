@@ -1,7 +1,7 @@
 // STY-09: the story graph's palette is searched from a plate at the foot of the dock, in the model tree's
 // shape (#222): a magnifier, the two kinds - event types and rewards - and a filter icon. The field opens to
 // the left of icons that do not move, beside the plate and over the canvas, with the three ways of reading a
-// pattern inside it. A narrowed group says so in its title, "1 of 64"; a kind switched off takes its group
+// pattern inside it, each drawn as the characters it means: ab, *? and .*. A narrowed group says so in its title, "1 of 64"; a kind switched off takes its group
 // away. Closing the field - Escape, or the magnifier - leaves the pattern in force; the filter icon is the
 // reset, live as soon as a pattern or a switched-off kind narrows the palette. Before, the palette had a text
 // field across its top, a count that did not say it was narrowed, and a search that closing cleared.
@@ -55,6 +55,8 @@ interface Field {
     /** The tooltips of the pattern modes inside the field, and the one that is chosen. */
     modes: string[];
     chosen: string;
+    /** What each mode is drawn as: the characters it means. */
+    marks: string[];
     /** The field's box against the dock and the plate: it opens beside the plate, over the canvas. */
     leftOfDock: number;
     gapToPlate: number;
@@ -76,6 +78,7 @@ async function field(): Promise<Field | null> {
             invalid: input.getAttribute("aria-invalid") === "true",
             modes: radios.map((r) => r.getAttribute("title") ?? ""),
             chosen: radios.find((r) => r.getAttribute("aria-checked") === "true")?.getAttribute("title") ?? "",
+            marks: radios.map((r) => (r.textContent ?? "").trim()),
             leftOfDock: dock.getBoundingClientRect().left - at.left,
             gapToPlate: plateAt.left - at.right,
             sameRow: Math.abs(at.top - plateAt.top) + Math.abs(at.bottom - plateAt.bottom),
@@ -155,6 +158,8 @@ describe("STY-09", () => {
             const at = await field();
             expect(at?.modes).toEqual([TEXT, WILDCARD, REGEX]);
             expect(at?.chosen).toBe(TEXT);
+            // Drawn as the characters each mode means, not as icons.
+            expect(at?.marks).toEqual(["ab", "*?", ".*"]);
             // The field's box reaches out of the dock, over the canvas, and meets the plate's left edge
             // on the plate's own row.
             expect(at?.leftOfDock).toBeGreaterThan(40);
