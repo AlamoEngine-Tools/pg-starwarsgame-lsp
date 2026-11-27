@@ -368,6 +368,9 @@
   "LUA-36": {
     "open": "C:\\temp\\aet-test-lua36"
   },
+  "LUA-37": {
+    "open": "{repo}\\eaw"
+  },
   "LUA-34": {
     "open": null,
     "extension": false

@@ -345,6 +345,30 @@ public sealed class GeneratedAnalyzerDocumentsTest
         Assert.Equal("d", item!.Detail);
     }
 
+    // An item's data is whatever its server put there (#489): the analyzer's keywords carry null
+    // (measured, 0.25.1), and a request about such an item names no document of its own.
+    [Theory]
+    [MemberData(nameof(BareData))]
+    public async Task CompletionResolve_OfAnItemWithBareData_IsPassedThrough_DataUntouched(JToken data)
+    {
+        var (documents, inner) = Open();
+        inner.Answer("completionItem/resolve",
+            new JObject { ["label"] = "Find_Player", ["detail"] = "d", ["data"] = data.DeepClone() });
+
+        var item = await documents.RequestAsync<CompletionItem>("completionItem/resolve",
+            new CompletionItem { Label = "Find_Player", Data = data.DeepClone() }, CancellationToken.None);
+
+        Assert.Equal("d", item!.Detail);
+        Assert.True(JToken.DeepEquals(data, SentParams(inner)["data"]));
+        // A JSON null comes back as no data at all.
+        Assert.True(JToken.DeepEquals(data, item.Data ?? JValue.CreateNull()));
+    }
+
+    public static TheoryData<JToken> BareData()
+    {
+        return [JValue.CreateNull(), new JValue(42), new JValue("item-7"), new JArray(1, 2)];
+    }
+
     [Fact]
     public async Task DocumentSymbols_OnGeneratedLinesDropped_OthersMapped()
     {

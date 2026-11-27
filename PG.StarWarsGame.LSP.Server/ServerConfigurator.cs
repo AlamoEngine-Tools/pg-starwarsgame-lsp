@@ -707,6 +707,13 @@ public static class ServerConfigurator
                         ChangeNotifications = false
                     };
 
+                // One completion capability for XML and Lua: the library puts one handler's options
+                // there, a different one per start (#489, see CompletionTriggers). Only the static
+                // capability is corrected; a dynamic registration carries each handler's own selector.
+                if (response.Capabilities.CompletionProvider is not null)
+                    response.Capabilities.CompletionProvider =
+                        CompletionTriggers.Merge([XmlCompletionHandler.Options, LuaCompletionHandler.Options]);
+
                 var scanRoots = ComputeScanRoots(request, config.Current);
 
                 // Log whether a .pgproj was found under the scan roots - useful startup breadcrumb only.

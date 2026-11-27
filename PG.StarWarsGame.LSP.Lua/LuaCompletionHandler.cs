@@ -46,6 +46,9 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
     public override async Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
+        // A character only another language opens the list on (see CompletionTriggers).
+        if (CompletionTriggers.IsForeign(request, Options.TriggerCharacters)) return new CompletionList();
+
         var (ours, alone) = HandleOurs(request);
         if (alone || !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
@@ -92,15 +95,21 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
     protected override CompletionRegistrationOptions CreateRegistrationOptions(
         CompletionCapability capability, ClientCapabilities clientCapabilities)
     {
-        return new CompletionRegistrationOptions
-        {
-            DocumentSelector = TextDocumentSelector.ForLanguage("lua"),
-            // Ours, then the analyzer's (measured, 0.25.1) less the space: it would open the list
-            // after every word.
-            TriggerCharacters = new Container<string>("\"", "'", ".", ":", "(", "[", "@", "\\", "/", "|", "#", "?"),
-            ResolveProvider = true
-        };
+        return Options;
     }
+
+    /// <summary>
+    ///     This handler's options, which the server also merges into its one static completion
+    ///     capability (see <see cref="CompletionTriggers" />).
+    /// </summary>
+    public static CompletionRegistrationOptions Options => new()
+    {
+        DocumentSelector = TextDocumentSelector.ForLanguage("lua"),
+        // Ours, then the analyzer's (measured, 0.25.1) less the space: it would open the list
+        // after every word.
+        TriggerCharacters = new Container<string>("\"", "'", ".", ":", "(", "[", "@", "\\", "/", "|", "#", "?"),
+        ResolveProvider = true
+    };
 
     private CompletionList BuildCompletions(ArgumentContext? ctx, string uri, GameIndex index)
     {

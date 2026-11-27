@@ -104,7 +104,19 @@ public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
     // not name its own.
     private static string? OriginOf(JToken request)
     {
-        return request["textDocument"]?["uri"]?.Value<string>() ?? request["data"]?["uri"]?.Value<string>();
+        return UriOf(Child(Child(request, "textDocument"), "uri")) ?? UriOf(Child(Child(request, "data"), "uri"));
+    }
+
+    // A property's value is whatever its sender put there: an item's data is the analyzer's own and is
+    // null on a keyword (#489). Only an object has children, and only a string is a URI.
+    private static JToken? Child(JToken? token, string name)
+    {
+        return token is JObject obj ? obj[name] : null;
+    }
+
+    private static string? UriOf(JToken? token)
+    {
+        return token is { Type: JTokenType.String } ? token.Value<string>() : null;
     }
 
     private LuaLineMap? MapOf(string? uri)
@@ -124,9 +136,7 @@ public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
                         array.RemoveAt(i);
                 return true;
             case JObject obj:
-                var own = obj["uri"]?.Type == JTokenType.String ? obj["uri"]!.Value<string>()
-                    : obj["targetUri"]?.Type == JTokenType.String ? obj["targetUri"]!.Value<string>()
-                    : obj["textDocument"]?["uri"]?.Value<string>();
+                var own = UriOf(obj["uri"]) ?? UriOf(obj["targetUri"]) ?? UriOf(Child(obj["textDocument"], "uri"));
                 var context = own ?? uri;
                 if (!MapLines(obj, MapOf(context), line, hits)) return false;
                 foreach (var property in obj.Properties().ToList())
