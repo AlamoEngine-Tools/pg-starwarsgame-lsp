@@ -162,6 +162,8 @@
   "Reload": "Reload",
   "EaWEdit: 1 unsaved localisation change in '{0}'.": "EaWEdit: 1 unsaved localisation change in '{0}'.",
   "EaWEdit: {0} unsaved localisation changes in '{1}'.": "EaWEdit: {0} unsaved localisation changes in '{1}'.",
+  "EaWEdit: \"{0}\" points at the Data folder itself - {1}. Set it to the folder above - {2}": "EaWEdit: \"{0}\" points at the Data folder itself - {1}. Set it to the folder above - {2}",
+  "EaWEdit: \"{0}\" holds no Data folder - {1}. Fix it, or clear it to find the game by itself": "EaWEdit: \"{0}\" holds no Data folder - {1}. Fix it, or clear it to find the game by itself",
   "GENERATED READ-ONLY PREVIEW": "GENERATED READ-ONLY PREVIEW",
   "Effective (fully-merged) form of variant object '{0}'.": "Effective (fully-merged) form of variant object '{0}'.",
   "This is not an editable source file - edits are discarded, and": "This is not an editable source file - edits are discarded, and",

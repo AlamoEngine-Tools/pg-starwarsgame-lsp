@@ -775,6 +775,13 @@
   "SET-38": {
     "open": "{repo}\\foc"
   },
+  "SET-39": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.lsp.source.baseGameDirectory": "C:\\temp\\aet-test-SET-gamedir\\Game\\GameData\\Data",
+      "aet-eaw-edit.lsp.source.expansionDirectory": "C:\\temp\\aet-test-SET-gamedir\\Game\\corruption"
+    }
+  },
   "STY-10": {
     "open": "{repo}\\eaw",
     "settings": {
