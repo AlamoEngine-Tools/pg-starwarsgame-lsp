@@ -87,7 +87,10 @@ public sealed class PreviewSceneBuilder(
     ///     something a synchronous scene build should be doing; a scene without it simply carries no
     ///     ability icons.
     /// </param>
-    public PreviewScene BuildForObject(string objectId, IconCatalog? icons = null)
+    /// <param name="environment">
+    ///     The map environment to assemble a land unit for, or null for its default model.
+    /// </param>
+    public PreviewScene BuildForObject(string objectId, IconCatalog? icons = null, string? environment = null)
     {
         var index = indexService.Current;
         var resolver = new EffectiveObjectResolver(index, schema, tagSource);
@@ -110,7 +113,11 @@ public sealed class PreviewSceneBuilder(
         // DeclaredModels is variant-resolved and already restricted to the TACTICAL models - a
         // starbase's low-detail galactic mesh legitimately lacks the hardpoint bones, so including it
         // would produce a scene full of phantom problems.
-        var hull = bones.DeclaredModels(effective.ObjectId).FirstOrDefault(m => !string.IsNullOrEmpty(m));
+        // An environment the unit maps puts that pair's model in Land_Model_Name's place.
+        var terrainModels = TerrainModelSectionBuilder.TerrainModels(effective, schema);
+        var terrain = TerrainModelSectionBuilder.For(terrainModels, environment);
+        var hull = terrain?.Model
+                   ?? bones.DeclaredModels(effective.ObjectId).FirstOrDefault(m => !string.IsNullOrEmpty(m));
 
         if (hull is null)
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoTacticalModel, "error",
@@ -132,6 +139,16 @@ public sealed class PreviewSceneBuilder(
             weapons.Add(unitWeapon);
 
         var animationSource = _animations.ResolveAnimationOverride(index, effective, hull, problems);
+
+        // Each mapped model as a switch to it would load it: found or not, with the clips the scene would
+        // then offer - the override's, as the hull's are.
+        var terrainEntries = terrainModels
+            .Select(t => t with
+            {
+                Resolved = assets.Locate(PreviewModelReference.ModelPath(t.Model)) is not null,
+                Animations = AnimationSectionBuilder.AnimationsFor(index, animationSource ?? t.Model)
+            })
+            .ToList();
 
         // Read once: the scene carries it and the check below compares against it.
         var stages = DamageSectionBuilder.DamageStages(effective);
@@ -197,7 +214,9 @@ public sealed class PreviewSceneBuilder(
                 ? smoke
                 : null,
             Behaviors: PreviewTagReader.Behaviors(effective),
-            MaxSpeed: effective.FloatOf("Max_Speed"));
+            MaxSpeed: effective.FloatOf("Max_Speed"),
+            TerrainModels: terrainEntries,
+            Environment: terrain?.Environment);
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────

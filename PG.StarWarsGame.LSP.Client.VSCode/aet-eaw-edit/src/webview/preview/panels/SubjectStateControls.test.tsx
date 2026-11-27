@@ -62,7 +62,10 @@ function levels(shown: {
 }
 
 /** The pill of one axis: everything from its label to the label's end. */
-function pillOf(html: string, axis: "damage" | "detail"): string {
+function pillOf(
+    html: string,
+    axis: "damage" | "detail" | "environment",
+): string {
     const pill = html.match(
         new RegExp(`<label class="pill-select ${axis}[\\s\\S]*?</label>`),
     )?.[0];
@@ -167,5 +170,91 @@ describe("SubjectStateControls", () => {
         const html = controls({ turretCount: 0, turnedTurrets: 0 });
 
         assert.equal(html.includes("<button"), false, html);
+    });
+});
+
+/** A unit's controls with one damage state and one detail level, so only the environment can show. */
+function environmentOf(
+    scene: Record<string, unknown> | null,
+    picked: (string | null)[] = [],
+): string {
+    const props = {
+        alt: 0,
+        combat: { altDrivenByHull: false },
+        levels: { alt: [0], lod: [0] },
+        lod: 0,
+        lodPickedRef: { current: false },
+        lodCost: new Map(),
+        scene,
+        setAlt: () => undefined,
+        setLod: () => undefined,
+        onResetTurrets: () => undefined,
+        onPickEnvironment: (environment: string | null) =>
+            picked.push(environment),
+        turretCount: 0,
+        turnedTurrets: 0,
+    } as unknown as SubjectStateControlsProps;
+
+    return renderToStaticMarkup(<SubjectStateControls {...props} />);
+}
+
+const trooper = {
+    kind: "Object",
+    terrainModels: [
+        { environment: "Temperate", model: "EI_TROOPER.ALO" },
+        { environment: "Arctic", model: "EI_TROOPER_Snow.ALO" },
+    ],
+};
+
+describe("SubjectStateControls, the map environment (#294)", () => {
+    it("offers the default model and each environment the unit maps, with its model", () => {
+        const pill = pillOf(environmentOf(trooper), "environment");
+
+        assert.deepEqual(
+            [...pill.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)</g)].map(
+                (option) => [option[1], option[2]],
+            ),
+            [
+                ["", "Default model"],
+                ["Temperate", "Temperate - EI_TROOPER.ALO"],
+                ["Arctic", "Arctic - EI_TROOPER_Snow.ALO"],
+            ],
+        );
+    });
+
+    it("shows the environment the scene was assembled for", () => {
+        const pill = pillOf(
+            environmentOf({ ...trooper, environment: "Arctic" }),
+            "environment",
+        );
+
+        assert.match(pill, /<span class="pill-value">Arctic<\/span>/);
+        assert.match(
+            pill,
+            /title="Map environment Arctic - EI_TROOPER_Snow.ALO"/,
+        );
+    });
+
+    it("shows the default model while no environment is picked", () => {
+        const pill = pillOf(environmentOf(trooper), "environment");
+
+        assert.match(pill, /<span class="pill-value">Default<\/span>/);
+        assert.match(pill, /title="Map environment - default model"/);
+    });
+
+    it("is disabled and says why on a unit that maps no environment", () => {
+        const pill = pillOf(
+            environmentOf({ kind: "Object", terrainModels: [] }),
+            "environment",
+        );
+
+        assert.match(pill, /<select[^>]* disabled=""/);
+        assert.match(pill, /title="No Land_Terrain_Model_Mapping"/);
+    });
+
+    it("leaves the environment out of a bare model's controls", () => {
+        const html = environmentOf({ kind: "Model", terrainModels: [] });
+
+        assert.equal(html.includes("pill-select"), false, html);
     });
 });

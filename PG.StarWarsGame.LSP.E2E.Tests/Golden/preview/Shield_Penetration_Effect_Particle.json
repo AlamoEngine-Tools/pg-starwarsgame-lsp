@@ -322,6 +322,8 @@
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
   "MaxSpeed": null,
+  "Environment": null,
+  "TerrainModels": [],
   "Behaviors": [],
   "DamageStages": [],
   "DamageTable": [],

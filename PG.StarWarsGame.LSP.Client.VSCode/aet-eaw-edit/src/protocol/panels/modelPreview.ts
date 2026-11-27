@@ -135,6 +135,12 @@ export interface ModelPreviewOpenExternal {
     tool: "model" | "particles";
 }
 
+/** Assembles the unit again on another map environment; null is its default model. */
+export interface ModelPreviewSetEnvironment {
+    type: "setEnvironment";
+    environment: string | null;
+}
+
 export type ModelPreviewToHost<Subject = unknown> =
     | ModelPreviewReady
     | ModelPreviewSetViewerSettings
@@ -151,7 +157,8 @@ export type ModelPreviewToHost<Subject = unknown> =
     | ModelPreviewUpdateInspector<Subject>
     | ModelPreviewObtainShaders
     | ModelPreviewRevealDefinition
-    | ModelPreviewOpenExternal;
+    | ModelPreviewOpenExternal
+    | ModelPreviewSetEnvironment;
 
 // ── host to webview ─────────────────────────────────────────────────────────
 

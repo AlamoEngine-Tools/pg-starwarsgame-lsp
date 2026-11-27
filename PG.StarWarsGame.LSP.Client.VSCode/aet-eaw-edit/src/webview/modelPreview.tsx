@@ -1645,6 +1645,12 @@ function ModelPreview(): React.JSX.Element {
                                     onResetTurrets={() =>
                                         viewportRef.current?.resetAllTurretAims()
                                     }
+                                    onPickEnvironment={(environment) =>
+                                        post({
+                                            type: "setEnvironment",
+                                            environment,
+                                        })
+                                    }
                                 />
                             }
                             middle={

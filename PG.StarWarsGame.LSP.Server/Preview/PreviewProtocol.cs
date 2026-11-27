@@ -34,6 +34,12 @@ public sealed record GetPreviewSceneParams : IRequest<GetPreviewSceneResult>
     ///     scene; an animation names no model, so the pairing has to be recovered and verified.
     /// </summary>
     public string? AnimationReference { get; init; }
+
+    /// <summary>
+    ///     The map environment to assemble a land unit for - one its <c>Land_Terrain_Model_Mapping</c>
+    ///     names - or null for its default model. Read only with <see cref="ObjectId" />.
+    /// </summary>
+    public string? Environment { get; init; }
 }
 
 /// <summary>Result of <c>aet/getPreviewScene</c>.</summary>

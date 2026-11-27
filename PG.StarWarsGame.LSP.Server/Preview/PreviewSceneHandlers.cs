@@ -117,7 +117,9 @@ public sealed class GetPreviewSceneHandler(
     ///     Every model the client will ask for on this scene's behalf, each with the clips it will
     ///     offer: a part with the scene's, a death clone or a piece of wreckage with its own when it
     ///     has any. That is the rule the client's request follows, so an entry converted ahead is
-    ///     the entry the request finds.
+    ///     the entry the request finds. Then the model of each other map environment the unit maps,
+    ///     with the clips the scene would offer on it (#294): last, since the reader may never pick
+    ///     one, and only one not listed already.
     /// </summary>
     private static List<PreviewBuildItem> ModelsOf(PreviewScene scene)
     {
@@ -137,6 +139,11 @@ public sealed class GetPreviewSceneHandler(
                 items.Add(new PreviewBuildItem(prop.ModelRef,
                     prop.Animations.Count > 0 ? prop.Animations : scene.Animations));
 
+        foreach (var terrain in scene.TerrainModels)
+            if (terrain.Resolved && !items.Any(item =>
+                    item.ModelReference.Equals(terrain.Model, StringComparison.OrdinalIgnoreCase)))
+                items.Add(new PreviewBuildItem(terrain.Model, terrain.Animations));
+
         return items;
     }
 
@@ -149,7 +156,7 @@ public sealed class GetPreviewSceneHandler(
             // catalog - opening a bare .alo or an .ala never touches it.
             var catalog = await icons.GetAsync(cancellationToken);
             return new GetPreviewSceneResult(
-                WithReticleIcons(builder.BuildForObject(request.ObjectId, catalog)));
+                WithReticleIcons(builder.BuildForObject(request.ObjectId, catalog, request.Environment)));
         }
 
         if (!string.IsNullOrWhiteSpace(request.AnimationReference))

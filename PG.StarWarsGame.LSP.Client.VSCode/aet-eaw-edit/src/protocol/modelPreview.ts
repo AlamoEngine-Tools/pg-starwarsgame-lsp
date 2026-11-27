@@ -680,6 +680,21 @@ export interface PreviewSourceFile {
     packed: boolean;
 }
 
+/** The land model a unit wears on one map environment, from its `Land_Terrain_Model_Mapping`. */
+export interface PreviewTerrainModel {
+    /** The environment as the first pair for it writes it, trimmed. */
+    environment: string;
+    /** The model that pair names. */
+    model: string;
+    /** Whether the model is found where the game would read it. */
+    resolved?: boolean;
+    /**
+     * The clips the scene offers when the unit wears this model. Read by the server's background build,
+     * which converts the model ahead with them; the webview asks for the scene again on a switch instead.
+     */
+    animations?: readonly string[];
+}
+
 /**
  * Everything needed to draw a preview, with no binary payload.
  *
@@ -712,6 +727,16 @@ export interface PreviewScene {
      * `Max_Speed` is not above 0 - see `engineGlow.ts`.
      */
     maxSpeed?: number | null;
+    /**
+     * The map environments the unit's `Land_Terrain_Model_Mapping` names, each once with the model of
+     * its first pair, in written order; empty where it maps none. Absent from an older server.
+     */
+    terrainModels?: readonly PreviewTerrainModel[] | null;
+    /**
+     * The environment the scene was assembled for, as `terrainModels` spells it, or absent when it was
+     * assembled on the unit's default model.
+     */
+    environment?: string | null;
     /**
      * What the type's `Stealth_Ability` writes about the look of its cloak, or absent where it has
      * none: `Stealth_Color` and `Stealth_Transition_Time`.
@@ -873,6 +898,11 @@ export interface PreviewScene {
 /** Exactly one is expected; they are tried in the order declared here. */
 export interface GetPreviewSceneParams {
     objectId?: string;
+    /**
+     * The map environment to assemble a land unit for, one its `Land_Terrain_Model_Mapping` names;
+     * absent for its default model. Read only with `objectId`.
+     */
+    environment?: string;
     /**
      * An `.ala` the user opened. The server finds the model it drives and returns that scene - an
      * animation names no model, so the pairing is recovered from the filename and then verified
