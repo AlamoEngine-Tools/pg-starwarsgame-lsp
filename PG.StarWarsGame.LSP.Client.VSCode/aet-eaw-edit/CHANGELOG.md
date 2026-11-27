@@ -145,6 +145,21 @@
 
 ### Fixes
 
+- **Lua keyword completions resolve in every script** - in a script that defines a state handler, a task
+  force or an override of a game function, focusing a keyword such as `local` in the completion list failed
+  with `Request completionItem/resolve failed` and an internal error. The item now resolves like any other
+  ([#489](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/489))
+- **Completion opens on every trigger character, in XML and Lua alike** - on about half of the server's
+  starts, typing `.`, `:` or a quote in a Lua script opened no completion list and the list's items never
+  showed their details; on the other half, typing `<` or `>` in an XML file opened none. Each start now
+  takes the trigger characters of both languages and resolves the Lua items
+  ([#489](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/489))
+- **A game directory that names no game is reported** - `aet-eaw-edit.lsp.source.baseGameDirectory` and
+  `expansionDirectory` ask for the folder that holds the game's `Data`. Set to `Data` itself, the game's
+  archives were looked for one folder too deep, none were found, and models that ship with the game did
+  not load without a word. A warning now names the folder above a directory that is a `Data` folder, and
+  reports one that holds no `Data` folder at all
+  ([#393](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/393))
 - **A stage flyout opens at the pill that opens it** - the flyouts on the stage of the model preview and of
   the story graph hung from a fixed corner of the stage, whichever pill had opened them. The abilities flyout
   sat off its pill and overlapped the command bar that holds the pill. Each flyout now opens centred on its

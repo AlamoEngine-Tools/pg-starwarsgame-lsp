@@ -99,6 +99,7 @@ import {
     resolveServerEnvironment,
 } from "./serverCommand";
 import { analyzerProblem, serverProblem } from "./serverLaunch";
+import { gameDirectoryProblem } from "./gameDirectories";
 import {
     AdoptModProjectParams,
     StoryGraphChangedParams,
@@ -791,6 +792,20 @@ function validateConfiguration(extensionPath: string): boolean {
             ),
         );
         valid = false;
+    }
+
+    // A game directory that names no game is reported, and the server starts all the same: the
+    // workspace's own files still resolve without it.
+    for (const name of ["baseGameDirectory", "expansionDirectory"] as const) {
+        const problem = gameDirectoryProblem(
+            `aet-eaw-edit.lsp.source.${name}`,
+            gameDirectory(name) ?? "",
+            (folder) =>
+                fs.existsSync(folder) && fs.statSync(folder).isDirectory(),
+        );
+        if (problem) {
+            void vscode.window.showWarningMessage(problem);
+        }
     }
 
     if (

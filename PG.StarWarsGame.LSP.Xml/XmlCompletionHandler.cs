@@ -64,6 +64,9 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
+        // A character only another language opens the list on (see CompletionTriggers).
+        if (CompletionTriggers.IsForeign(request, Options.TriggerCharacters))
+            return Task.FromResult(new CompletionList());
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult(new CompletionList());
@@ -335,11 +338,17 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     protected override CompletionRegistrationOptions CreateRegistrationOptions(
         CompletionCapability capability, ClientCapabilities clientCapabilities)
     {
-        return new CompletionRegistrationOptions
-        {
-            DocumentSelector = TextDocumentSelector.ForLanguage("xml"),
-            TriggerCharacters = new Container<string>(">", "<"),
-            ResolveProvider = false
-        };
+        return Options;
     }
+
+    /// <summary>
+    ///     This handler's options, which the server also merges into its one static completion
+    ///     capability (see <see cref="CompletionTriggers" />).
+    /// </summary>
+    public static CompletionRegistrationOptions Options => new()
+    {
+        DocumentSelector = TextDocumentSelector.ForLanguage("xml"),
+        TriggerCharacters = new Container<string>(">", "<"),
+        ResolveProvider = false
+    };
 }

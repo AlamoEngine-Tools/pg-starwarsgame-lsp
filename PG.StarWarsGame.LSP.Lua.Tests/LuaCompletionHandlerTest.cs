@@ -121,6 +121,29 @@ public sealed class LuaCompletionHandlerTest
         Assert.NotEqual("theirs", unit.Detail);
     }
 
+    // One completion capability serves XML and Lua (#489): a character only XML opens the list on
+    // reaches this handler too, and answers nothing here - the analyzer is not asked.
+    [Theory]
+    [InlineData("<")]
+    [InlineData(">")]
+    public async Task ATriggerCharacterOfAnotherLanguage_IsAnsweredWithNothing(string trigger)
+    {
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/completion",
+            TheirList(new CompletionItem { Label = "local_thing" }));
+        var request = CompletionAt(0, 21) with
+        {
+            Context = new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.TriggerCharacter, TriggerCharacter = trigger
+            }
+        };
+
+        var result = await WithAnalyzer(ObjectArgument, analyzer).Handle(request, CancellationToken.None);
+
+        Assert.Empty(result.Items);
+        Assert.Empty(analyzer.Requests);
+    }
+
     // Identifiers, members and keywords are the analyzer's alone (#155): ours name XML objects,
     // localisation keys and modules inside a string argument, and nothing else.
     [Theory]

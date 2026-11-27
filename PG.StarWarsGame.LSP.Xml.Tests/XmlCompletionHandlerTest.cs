@@ -166,6 +166,24 @@ public sealed class XmlCompletionHandlerTest
         Assert.Contains("Display_Name", labels);
     }
 
+    // One completion capability serves XML and Lua (#489): a character only Lua opens the list on
+    // reaches this handler too, and answers nothing here.
+    [Theory]
+    [InlineData(".")]
+    [InlineData(":")]
+    [InlineData("\"")]
+    public async Task Handle_ATriggerCharacterOfAnotherLanguage_IsAnsweredWithNothing(string trigger)
+    {
+        var (handler, host, schema, _) = Build();
+        schema.Add(MakeType("Faction"));
+        schema.AddForType("Faction", MakeTag("Max_Speed"));
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <\n</Faction>", 1);
+
+        var result = await handler.Handle(At(1, 3, trigger), CancellationToken.None);
+
+        Assert.Empty(result.Items);
+    }
+
     [Fact]
     public async Task Handle_TagNameContext_SingletonAlreadyPresent_ExcludedFromList()
     {
