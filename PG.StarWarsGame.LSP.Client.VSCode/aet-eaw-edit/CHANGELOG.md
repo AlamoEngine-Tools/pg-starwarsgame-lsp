@@ -132,6 +132,11 @@
   that mode, so the graph shows the events the pattern means. The branch, the lifecycle and the plot
   state are pills on the line above the field. The filter icon clears all four and keeps the mode
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **View controls only in the dock's foot** - the story graph's foot holds the minimap, the canvas
+  tools at its right - zoom in, zoom out, fit, arrange and the two lanes - and a zoom slider with the
+  zoom in percent under them, which follows the wheel and zooms about the middle of the view. The
+  encyclopedia card's zoom is the same slider, its size in percent where it read `Zoom 3.00x`
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

@@ -109,6 +109,13 @@ import {
     shouldWindow,
 } from "./storyGraph/lodPolicy";
 import { Extent, fitZoom } from "./storyGraph/viewportFit";
+import {
+    CANVAS_ZOOM_MAX,
+    CANVAS_ZOOM_MIN,
+    stepZoom,
+    zoomAboutCentre,
+} from "./storyGraph/canvasZoom";
+import { ZoomSlider } from "./shared/ZoomSlider";
 import { booleanParamLabel, paramLabel } from "./storyGraph/paramLabels";
 import { paramRowSpecs } from "./storyGraph/paramRows";
 import { StagedRenames } from "./storyGraph/stagedRenames";
@@ -778,6 +785,12 @@ interface EditorHandle {
 
     /** Pans the viewport so (graphX, graphY) sits at the centre - the minimap's click-to-navigate. */
     panTo(graphX: number, graphY: number): void;
+
+    /** The canvas's zoom, as a factor: 1 is 100%. */
+    zoomLevel(): number;
+
+    /** Zooms the canvas to `zoom`, keeping the middle of the view where it is - the dock foot's zoom. */
+    zoomTo(zoom: number): void;
 
     /** Whether the graph is in windowed/LOD mode (big graph): the LOD overview is drawn and only the
      * visible window mounts into rete. The overview stays up at all zoom levels so edges (and off-
@@ -3258,6 +3271,19 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 rect.height / 2 - graphY * k,
             );
         },
+        zoomLevel(): number {
+            return area.area.transform.k;
+        },
+        zoomTo(zoom: number): void {
+            const rect = container.getBoundingClientRect();
+            const { ox, oy } = zoomAboutCentre(
+                area.area.transform,
+                { width: rect.width, height: rect.height },
+                zoom,
+            );
+            // The 'zoomed' pipe then reconciles the mounted window and tells the foot, as a wheel does.
+            void area.area.zoom(zoom, ox, oy);
+        },
         isWindowed(): boolean {
             return windowed;
         },
@@ -5723,18 +5749,18 @@ const Shell = styled.div`
     ${dockHeaderCss}
     ${dockBodyCss}
     ${dockOverviewCss}
-        /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
-        /* Tools on the left set the left gap; mirror it on the right, minimap flexes to fill between. */
+    /* The minimap takes the row, and the canvas tools stand at its right in two columns - the zoom
+       pair, then fit and arrange, then the two lanes - so the stack is as tall as the minimap
+       rather than a column that outgrows it. */
     .overview-mid {
         display: flex;
         align-items: center;
         gap: var(--space-8);
-        padding-right: var(--space-8);
     }
 
     .overview-tools {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(2, auto);
         gap: var(--space-4);
         flex-shrink: 0;
     }
@@ -8304,7 +8330,47 @@ function App(): React.JSX.Element {
                                     />
                                 ) : null}
                                 <div className="overview-mid">
+                                    <Minimap
+                                        getHandle={() => editorRef.current}
+                                    />
+                                    {/* The canvas tools at the minimap's right: how close, how framed,
+                                    how laid out, and what is drawn behind the nodes. */}
                                     <div className="overview-tools">
+                                        <IconButton
+                                            icon="zoomIn"
+                                            title={l10n.t("Zoom in")}
+                                            onClick={() => {
+                                                const handle =
+                                                    editorRef.current;
+                                                handle?.zoomTo(
+                                                    stepZoom(
+                                                        handle.zoomLevel(),
+                                                        1,
+                                                    ),
+                                                );
+                                            }}
+                                        />
+                                        <IconButton
+                                            icon="zoomOut"
+                                            title={l10n.t("Zoom out")}
+                                            onClick={() => {
+                                                const handle =
+                                                    editorRef.current;
+                                                handle?.zoomTo(
+                                                    stepZoom(
+                                                        handle.zoomLevel(),
+                                                        -1,
+                                                    ),
+                                                );
+                                            }}
+                                        />
+                                        <IconButton
+                                            icon="frame"
+                                            title={l10n.t("Fit graph to view")}
+                                            onClick={() =>
+                                                editorRef.current?.fit()
+                                            }
+                                        />
                                         <IconButton
                                             icon="arrange"
                                             onClick={() => {
@@ -8333,13 +8399,6 @@ function App(): React.JSX.Element {
                                             title={l10n.t(
                                                 "Arrange - recompute the automatic layout",
                                             )}
-                                        />
-                                        <IconButton
-                                            icon="frame"
-                                            title={l10n.t("Fit graph to view")}
-                                            onClick={() =>
-                                                editorRef.current?.fit()
-                                            }
                                         />
                                         <IconButton
                                             icon="threadLanes"
@@ -8378,10 +8437,10 @@ function App(): React.JSX.Element {
                                             }
                                         />
                                     </div>
-                                    <Minimap
-                                        getHandle={() => editorRef.current}
-                                    />
                                 </div>
+                                <CanvasZoomSlider
+                                    getHandle={() => editorRef.current}
+                                />
                             </>
                         }
                     />
@@ -8504,6 +8563,31 @@ const STORY_MODES: RotaryMode<EditorMode>[] = [
 ];
 
 const MINIMAP_H = 118;
+
+/**
+ * The canvas's zoom in the dock's foot: the shared slider, by doublings from 1% to 200%, with the
+ * zoom in percent. It follows the canvas however it was zoomed - the wheel, the tools, a fit - through
+ * the same pan/zoom bridge the minimap reads.
+ */
+function CanvasZoomSlider(props: {
+    getHandle: () => EditorHandle | null;
+}): React.JSX.Element {
+    const [, force] = useReducer((x: number) => x + 1, 0);
+    useEffect(() => subscribeAreaChange(() => force()), []);
+    const handle = props.getHandle();
+
+    return (
+        <ZoomSlider
+            value={handle?.zoomLevel() ?? 1}
+            min={CANVAS_ZOOM_MIN}
+            max={CANVAS_ZOOM_MAX}
+            logarithmic
+            label={l10n.t("Zoom")}
+            title={l10n.t("Drag, or scroll over the graph")}
+            onZoom={(zoom) => handle?.zoomTo(zoom)}
+        />
+    );
+}
 
 /**
  * A hand-built overview of the whole graph (the rete minimap plugin can only overlay the canvas, not

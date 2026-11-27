@@ -1360,6 +1360,27 @@ export const dockOverviewCss = `
         overflow-y: auto;
     }
     .dock-overview > input[type=text] { width: 100%; }
+
+    /* A zoom in a foot - see ZoomSlider. The track takes the row; the readout keeps a width of its
+       own, so the track does not change length as the number under it grows a digit. */
+    .zoom-slider {
+        display: flex;
+        align-items: center;
+        gap: var(--space-8);
+    }
+    .zoom-slider input[type=range] {
+        flex: 1;
+        min-width: 0;
+        height: 18px;
+        margin: 0;
+    }
+    .zoom-slider .zoom-readout {
+        flex: 0 0 auto;
+        min-width: 5ch;
+        text-align: right;
+        font-size: var(--font-size-smaller);
+        font-variant-numeric: tabular-nums;
+    }
 `;
 
 /**

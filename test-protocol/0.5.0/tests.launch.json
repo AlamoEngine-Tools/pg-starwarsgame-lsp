@@ -777,5 +777,14 @@
     "settings": {
       "aet-eaw-edit.experimental.storyEditing": true
     }
+  },
+  "STY-11": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "PRV-83": {
+    "open": "{repo}\\eaw"
   }
 }

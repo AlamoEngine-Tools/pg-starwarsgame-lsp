@@ -46,6 +46,7 @@ import {
 } from "./shared/dockChrome";
 import { DockSection } from "./shared/DockSection";
 import { Field } from "./shared/Field";
+import { ZoomSlider } from "./shared/ZoomSlider";
 import { SeverityMark } from "./shared/Icon";
 import { ProblemsPanel } from "./shared/ProblemsPanel";
 import { problemLook } from "./shared/problemLook";
@@ -507,24 +508,19 @@ function App(): React.JSX.Element {
                     }
                     overview={
                         <>
-                            <Field
-                                label={l10n.t("Zoom {0}x", zoom.toFixed(2))}
-                                as="label"
-                            >
-                                <input
-                                    type="range"
+                            {/* The shared zoom of a dock's foot, as the story graph has it: the card's
+                            size in percent beside the track. */}
+                            <Field label={l10n.t("Zoom")}>
+                                <ZoomSlider
+                                    value={zoom}
                                     min={ZOOM_MIN}
                                     max={ZOOM_MAX}
                                     step={ZOOM_STEP}
-                                    value={zoom}
-                                    onChange={(e) =>
-                                        setZoom(
-                                            clampZoom(Number(e.target.value)),
-                                        )
-                                    }
+                                    label={l10n.t("Zoom")}
                                     title={l10n.t(
                                         "Drag, or scroll over the preview",
                                     )}
+                                    onZoom={(next) => setZoom(clampZoom(next))}
                                 />
                             </Field>
 
